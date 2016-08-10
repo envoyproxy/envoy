@@ -70,17 +70,13 @@ entry. The following command operators are supported:
 %FAILURE_REASON%
   Additional failure reason if any in addition to response code. Possible values are:
 
-  * **LH**: Local health check failed in addition to 503 response code.
-            Local service failing :ref:`health check requests <arch_overview_health_checking>`.
-  * **UH**: No healthy upstream hosts in addition to 503 response code.
-            There are no healthy hosts in upstream cluster.
+  * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>`
+            in addition to 503 response code.
+  * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
   * **UT**: Upstream request timeout in addition to 504 response code.
   * **LR**: Connection local reset in addition to 503 reponse code.
-            Envoy reset connection.
   * **UR**: Upstream remote reset in addition to 503 response code.
-            Upstream host reset connection.
   * **UF**: Upstream connection failure in addition to 503 response code.
-
   * **UC**: Upstream connection termination in additon to 503 response code.
   * **UO**: Upstream overflow (circuit breaking) in addition to 503 reponse code.
             Envoy performed :ref:`circuit breaking <arch_overview_circuit_break>`.
