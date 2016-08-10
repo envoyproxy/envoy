@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/upstream/upstream.h"
+
 namespace Upstream {
 
 class MockHostDescription : public HostDescription {

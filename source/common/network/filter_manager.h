@@ -46,12 +46,13 @@ private:
 
     Connection& connection() override { return parent_.connection_; }
     void continueReading() override { parent_.onContinueReading(this); }
-    Upstream::HostDescriptionPtr upstreamHost() override { return host_description_; }
-    void upstreamHost(Upstream::HostDescriptionPtr host) override { host_description_ = host; }
+    Upstream::HostDescriptionPtr upstreamHost() override { return parent_.host_description_; }
+    void upstreamHost(Upstream::HostDescriptionPtr host) override {
+      parent_.host_description_ = host;
+    }
 
     FilterManager& parent_;
     ReadFilterPtr filter_;
-    Upstream::HostDescriptionPtr host_description_;
   };
 
   typedef std::unique_ptr<ActiveReadFilter> ActiveReadFilterPtr;
@@ -62,6 +63,7 @@ private:
   BufferSource& buffer_source_;
   std::list<ActiveReadFilterPtr> upstream_filters_;
   std::list<WriteFilterPtr> downstream_filters_;
+  Upstream::HostDescriptionPtr host_description_;
 };
 
 } // Network
