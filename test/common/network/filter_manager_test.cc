@@ -3,6 +3,7 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/upstream/host.h"
 
 using testing::InSequence;
 using testing::Return;
@@ -29,6 +30,10 @@ TEST_F(NetworkFilterManagerTest, All) {
   manager.addReadFilter(read_filter);
   manager.addWriteFilter(write_filter);
   manager.addFilter(filter);
+
+  Upstream::HostDescriptionPtr host_description(new Upstream::MockHostDescription());
+  read_filter->callbacks_->upstreamHost(host_description);
+  EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
 
   read_buffer_.add("hello");
   EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello")))
