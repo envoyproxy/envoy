@@ -1,0 +1,73 @@
+#pragma once
+
+#include "envoy/grpc/rpc_channel.h"
+#include "envoy/ratelimit/ratelimit.h"
+#include "envoy/upstream/cluster_manager.h"
+
+#include "common/generated/ratelimit.pb.h"
+#include "common/json/json_loader.h"
+
+namespace RateLimit {
+
+class GrpcClientImpl : public Client, public Grpc::RpcChannelCallbacks {
+public:
+  GrpcClientImpl(Grpc::RpcChannelFactory& factory,
+                 const Optional<std::chrono::milliseconds>& timeout);
+  ~GrpcClientImpl();
+
+  static void createRequest(pb::lyft::ratelimit::RateLimitRequest& request,
+                            const std::string& domain, const std::vector<Descriptor>& descriptors);
+
+  // RateLimit::Client
+  void cancel() override;
+  void limit(RequestCallbacks& callbacks, const std::string& domain,
+             const std::vector<Descriptor>& descriptors) override;
+
+private:
+  // Grpc::RpcChannelCallbacks
+  void onSuccess() override;
+  void onFailure(const Optional<uint64_t>& grpc_status, const std::string& message) override;
+
+  Grpc::RpcChannelPtr channel_;
+  pb::lyft::ratelimit::RateLimitService::Stub service_;
+  RequestCallbacks* callbacks_{};
+  pb::lyft::ratelimit::RateLimitResponse response_;
+};
+
+class GrpcFactoryImpl : public ClientFactory, public Grpc::RpcChannelFactory {
+public:
+  GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm,
+                  Stats::Store& stats_store);
+
+  // RateLimit::ClientFactory
+  ClientPtr create(const Optional<std::chrono::milliseconds>& timeout) override;
+
+  // Grpc::RpcChannelFactory
+  Grpc::RpcChannelPtr create(Grpc::RpcChannelCallbacks& callbacks,
+                             const Optional<std::chrono::milliseconds>& timeout) override;
+
+private:
+  const std::string cluster_name_;
+  Upstream::ClusterManager& cm_;
+  Stats::Store& stats_store_;
+};
+
+class NullClientImpl : public Client {
+public:
+  // RateLimit::Client
+  void cancel() override {}
+  void limit(RequestCallbacks& callbacks, const std::string&,
+             const std::vector<Descriptor>&) override {
+    callbacks.complete(LimitStatus::OK);
+  }
+};
+
+class NullFactoryImpl : public ClientFactory {
+public:
+  // RateLimit::ClientFactory
+  ClientPtr create(const Optional<std::chrono::milliseconds>&) override {
+    return ClientPtr{new NullClientImpl()};
+  }
+};
+
+} // RateLimit

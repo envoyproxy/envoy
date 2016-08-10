@@ -1,0 +1,47 @@
+---
+en:
+  navigation:
+    docs: Docs
+    github: Github
+    logo: Envoy
+    search_placeholder: Search the docs
+    basics:
+      title: Basics
+      quickstart: Quickstart
+      install: Install
+      configuration: Configure
+    advanced:
+      title: Advanced
+      threat_model: Threat Model
+      contributing: Contributing
+    communication:
+      title: Communication
+      support: Support
+      security_reporting: Security Reporting
+
+  introduction:
+    first:
+      header: HTTP2 support
+      description: Envoy supports HTTP2.
+    second:
+      header: Service discovery support
+      description: Envoy supports routing to services discovered via our service discovery service.
+    third:
+      header: AWS proxying
+      description: Envoy can be used as an AWS proxy.
+
+# landing cta
+  cta:
+    docs: View Docs
+    github: Github
+
+# index
+  index:
+    headline: C++ front/service proxy
+    description: Envoy is an open source frontend and service proxy, from the developers at Lyft
+
+# footer
+  built:
+    twitter: Twitter
+    github: Github
+    download: Download the Lyft app

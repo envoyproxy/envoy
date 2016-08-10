@@ -1,0 +1,3 @@
+sphinx==1.4.5
+sphinx_rtd_theme==0.1.9
+sphinxcontrib-httpdomain==1.5.0
