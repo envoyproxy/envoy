@@ -1,0 +1,218 @@
+{
+  "listeners": [
+  {
+    "port": 10000,
+    "filters": [
+      { "type": "read", "name": "echo", "config": {} }
+    ]
+  },
+  {
+    "port": 10001,
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "http2",
+        "access_log": [
+        {
+          "path": "/dev/null",
+          "filters": [
+            {"type": "status_code", "op": ">=", "value": 500},
+            {"type": "duration", "op": ">=", "value": 1000000}
+          ]
+        },
+        {
+          "path": "/dev/null"
+        }],
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "redirect",
+              "domains": [ "www.redirect.com" ],
+              "require_ssl": "all",
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1"
+                }
+              ]
+            },
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1",
+                  "runtime": {
+                    "key": "some_key",
+                    "default": 0
+                  }
+                },
+                {
+                  "prefix": "/test/long/url",
+                  "cluster": "cluster_1"
+                },
+                {
+                  "prefix": "/test/",
+                  "cluster": "cluster_2"
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "both", "name": "health_check",
+            "config": {
+              "pass_through_mode": false, "endpoint": "/healthcheck"
+            }
+          },
+          { "type": "decoder", "name": "router", "config": {}}
+        ]
+      }
+    }]
+  },
+  {
+    "port": 10002,
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "http2",
+        "access_log": [
+        {
+          "path": "/dev/null",
+          "filters": [
+            {"type": "status_code", "op": ">=", "value": 500},
+            {"type": "duration", "op": ">=", "value": 1000000}
+          ]
+        },
+        {
+          "path": "/dev/null"
+        }],
+        "stat_prefix": "router",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {
+              "name": "redirect",
+              "domains": [ "www.redirect.com" ],
+              "require_ssl": "all",
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1"
+                }
+              ]
+            },
+            {
+              "name": "integration",
+              "domains": [ "*" ],
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "cluster_1",
+                  "runtime": {
+                    "key": "some_key",
+                    "default": 0
+                  }
+                },
+                {
+                  "prefix": "/test/long/url",
+                  "cluster": "cluster_1"
+                },
+                {
+                  "prefix": "/test/",
+                  "cluster": "cluster_2"
+                }
+              ]
+            }
+          ]
+        },
+        "filters": [
+          { "type": "both", "name": "health_check",
+            "config": {
+              "pass_through_mode": false, "endpoint": "/healthcheck"
+            }
+          },
+          { "type": "decoder", "name": "buffer",
+            "config": {
+              "max_request_bytes": 5242880,
+              "max_request_time_s": 120
+            }
+          },
+          { "type": "decoder", "name": "router", "config": {} }
+        ]
+      }
+    }]
+  },
+  {
+    "port": 10004,
+    "filters": [
+      { "type": "read", "name":
+        "tcp_proxy",
+        "config": { "cluster": "cluster_1", "stat_prefix": "test_tcp" }
+      }
+    ]
+  }],
+
+  "admin": { "access_log_path": "/dev/null", "port": 10003 },
+  "statsd_local_udp_port": 8125,
+  "statsd_tcp_cluster_name": "statsd",
+  "tracing": {
+    "http": {
+      "sinks": [
+        {
+          "type": "lightstep",
+          "access_token_file": "test/config/integration/lightstep_access_token",
+          "config": {
+            "collector_cluster": "lightstep_saas"
+          }
+        }
+      ]
+    }
+  },
+
+  "runtime": {
+    "symlink_root": "test/common/runtime/test_data/current",
+    "subdirectory": "envoy",
+    "override_subdirectory": "envoy_override"
+  },
+
+  "cluster_manager": {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11000"}]
+    },
+    {
+      "name": "cluster_2",
+      "connect_timeout_ms": 250,
+      "type": "strict_dns",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://localhost:11001"}]
+    },
+    {
+      "name": "statsd",
+      "connect_timeout_ms": 250,
+      "type": "strict_dns",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://localhost:10009"}]
+    },
+    {
+      "name": "lightstep_saas",
+      "connect_timeout_ms": 250,
+      "type": "strict_dns",
+      "lb_type": "round_robin",
+      "_comment:": "this is expected to fail",
+      "hosts": [{"url": "tcp://localhost:10010"}]
+    }]
+  }
+}

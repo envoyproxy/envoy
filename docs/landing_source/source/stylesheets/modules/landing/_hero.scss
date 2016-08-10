@@ -1,0 +1,52 @@
+.hero {
+  background: $base-hero-color;
+  height: 572px;
+  margin-bottom: 1em;
+  text-align: center;
+
+  @include media($medium-screen-up) {
+    height: 660px;
+ }
+}
+
+.hero-headline {
+  color: $dark-brown;
+  font-size: $base-font-size * 2.2;
+  font-weight: 600;
+  margin: 1.2em 0 0.5em;
+}
+
+.hero-description {
+  color: tint($dark-brown, 20%);
+  display: inline-block;
+  font-size: $base-font-size;
+  line-height: 1.4;
+  margin: 0 0 2.5em;
+  width: 100%;
+
+  @include media($medium-screen-up) {
+    font-size: $base-font-size * 1.35;
+    width: 75%;
+  }
+}
+
+.hero-banner-container {
+  .laptop {
+    background: image_url("laptop.png");
+    background-size: 350px;
+    background-repeat: no-repeat;
+    background-position: 50%;
+    height: 13em;
+    margin: 0 auto;
+    width: 330px;
+
+    @include media($medium-screen-up) {
+      @include span-columns(8 of 12);
+      @include shift(2);
+      background-size: 549px;
+      height: 21em;
+      position: absolute;
+      width: 680px;
+    }
+  }
+}

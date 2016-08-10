@@ -1,0 +1,40 @@
+.. _arch_overview_ssl:
+
+SSL
+===
+
+Envoy supports both :ref:`SSL termination <config_listener_ssl_context>` in listeners as well as
+:ref:`SSL origination <config_cluster_manager_cluster_ssl>` when making connections to upstream
+clusters. Support is sufficient for Envoy to perform standard edge proxy duties for modern web
+services as well as to initiate connections with external services that have advanced SSL
+requirements (TLS1.2, SNI, etc.). Envoy supports the following SSL features:
+
+* **Configurable ciphers**: Each SSL listener and client can specify the ciphers that it supports.
+* **Client certificates**: Upstream/client connections can present a client certificate in addition
+  to server certificate verification.
+* **Certificate verification and pinning**: Certificate verification options include basic chain
+  verification, subject name verification, and hash pinning.
+* **ALPN**: SSL listeners support ALPN. The HTTP connection manager uses this information (in
+  addition to protocol inference) to determine whether a client is speaking HTTP/1.1 or HTTP/2.
+* **SNI**: SNI is currently supported for client connections. Listener support is likely to be added
+  in the future.
+
+Underlying implementation
+-------------------------
+
+Currently Envoy is written to use openssl 1.0.2 as the SSL provider. Swapping in a different
+provider in the future would not be difficult.
+
+.. _arch_overview_ssl_auth_filter:
+
+Authentication filter
+---------------------
+
+Envoy provides a network filter that performs SSL client authentication via principals fetched from
+a REST VPN service. This filter matches the presented client certificate hash against the principal
+list to determine whether the connection should be allowed or not. Optional IP white listing can
+also be configured. This functionality can be used to build edge proxy VPN support for web
+infrastructure.
+
+Client SSL authentication filter :ref:`configuration reference
+<config_network_filters_client_ssl_auth>`.

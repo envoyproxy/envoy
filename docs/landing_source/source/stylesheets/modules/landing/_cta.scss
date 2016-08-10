@@ -1,0 +1,21 @@
+.landing-cta {
+  padding: 3em 0 5em;
+  text-align: center;
+
+  @include media($medium-screen-up) {
+    padding: 0 0 6em;
+    margin-top: 2em;
+  }
+
+  &-description {
+    color: $dark-brown;
+  }
+
+  &-button-fill {
+    @include button-filled($red);
+  }
+
+  &-button-outline {
+    @include button-outline($red, $red);
+  }
+}

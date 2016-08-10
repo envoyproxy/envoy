@@ -1,0 +1,76 @@
+---
+layout: layout
+---
+
+<header class="hero" role="banner">
+  <%= partial 'partials/global_nav' %>
+  <section class="body-content-container wrap-container" data-waypoint="hero-content">
+    <h2 class="hero-headline"><%= t("index.headline") %></h2>
+    <h3 class="hero-description"><%= t("index.description") %></h3>
+    <div class="hero-banner-container">
+      <div class="laptop">
+      </div>
+    </div>
+  </section>
+</header>
+
+<div class="body-content-container wrap-container" role="main">
+  <%= partial 'partials/main_cta' %>
+  <section class="introduction">
+    <div class="introduction-container" data-waypoint="introduction-container">
+      <div class="introduction-item second-graphic">
+        <div class="introduction-item-graphic-wrapper">
+          <div class="intro-graphic-one">
+          </div>
+        </div>
+        <div class="introduction-item-text-wrapper">
+          <h4 class="introduction-item-header">
+            <%= t("introduction.first.header") %>
+          </h4>
+          <p class="introduction-item-text">
+            <%= t("introduction.first.description") %>
+          </p>
+        </div>
+      </div>
+
+      <div class="introduction-item third-graphic">
+        <div class="introduction-item-text-wrapper">
+          <h4 class="introduction-item-header">
+            <%= t("introduction.second.header") %>
+          </h4>
+          <p class="introduction-item-text">
+            <%= t("introduction.second.description") %>
+          </p>
+        </div>
+        <div class="introduction-item-graphic-wrapper">
+          <div class="intro-graphic-two">
+          </div>
+        </div>
+      </div>
+
+      <div class="introduction-item fourth-graphic">
+        <div class="introduction-item-graphic-wrapper">
+          <div class="intro-graphic-three">
+          </div>
+        </div>
+        <div class="introduction-item-text-wrapper">
+          <h4 class="introduction-item-header">
+            <%= t("introduction.third.header") %>
+          </h4>
+          <p class="introduction-item-text">
+            <%= t("introduction.third.description") %>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="landing-cta">
+  <section class="wrap-container">
+    <%= link_to t("cta.docs"),
+      "./docs/index.html", class: "landing-cta-button-fill" %>
+    <%= link_to t("cta.github"),
+      "http://github.com/lyft/envoy", class: "landing-cta-button-outline" %>
+  </section>
+</div>

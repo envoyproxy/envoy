@@ -1,0 +1,52 @@
+.. _config_http_conn_man_route_table_vhost:
+
+Virtual host
+============
+
+The top level element in the routing configuration is a virtual host. Each virtual host has
+a logical name as well as a set of domains that get routed to it based on the incoming request's
+host header. This allows a single listener to service multiple top level domain path trees. Once a
+virtual host is selected based on the domain, the routes are processed in order to see which
+upstream cluster to route to or whether to perform a redirect.
+
+.. code-block:: json
+
+  {
+    "name": "...",
+    "domains": [],
+    "routes": [],
+    "require_ssl": "...",
+    "virtual_clusters": []
+  }
+
+name
+  *(required, string)* The logical name of the virtual host. This is used when emitting certain
+  statistics but is not relevant for forwarding.
+
+domains
+  *(required, array)* A list of domains (host/authority header) that will be matched to this
+  virtual host. Currently, wildcard matching is not supported of the form "\*.foo.com", however
+  a special entry "\*" is allowed which will match any host/authority header. Only a single virtual
+  host in the entire route configuration can match on "\*".
+
+:ref:`routes <config_http_conn_man_route_table_route>`
+  *(required, array)* The list of routes that will be matched, in order, for incoming requests.
+  The first route that matches will be used.
+
+require_ssl
+  *(optional, string)* Specifies the type of SSL enforcement the virtual host expects. Possible
+  values are:
+
+  all
+    All requests must use SSL. If a request is not using SSL, a 302 redirect will be sent telling
+    the client to use HTTPS.
+
+  external_only
+    External requests must use SSL. If a request is external and it is not using SSL, a 302 redirect
+    will be sent telling the client to use HTTPS.
+
+  If this option is not specified, there is no SSL requirement for the virtual host.
+
+:ref:`virtual_clusters <config_http_conn_man_route_table_vcluster>`
+  *(optional, array)* A list of virtual clusters defined for this virtual host. Virtual clusters
+  are used for additional statistics gathering.
