@@ -67,6 +67,10 @@ case_sensitive
 
 timeout_ms
   *(optional, integer)* Specifies the timeout for the route. If not specified, the default is 15s.
+  Note that this timeout includes all retries. See also
+  :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
+  :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
+  :ref:`retry overview <arch_overview_http_routing_retry>`.
 
 content_type
   *(optional, string)* Indicates that the route should additionally match on the *content-type*

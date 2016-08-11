@@ -63,6 +63,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     request_headers.remove(Headers::get().EnvoyRetryOn);
     request_headers.remove(Headers::get().EnvoyUpstreamAltStatName);
     request_headers.remove(Headers::get().EnvoyUpstreamRequestTimeoutMs);
+    request_headers.remove(Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs);
     request_headers.remove(Headers::get().EnvoyExpectedRequestTimeoutMs);
 
     for (const Http::LowerCaseString& header : config.routeConfig().internalOnlyHeaders()) {
