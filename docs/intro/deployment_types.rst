@@ -8,8 +8,14 @@ types in increasing order of complexity.
 Service to service only
 -----------------------
 
+FIXFIX
+
 Service to service plus front proxy
 -----------------------------------
 
+FIXFIX
+
 Service to service, front proxy, and double proxy
 -------------------------------------------------
+
+FIXFIX
