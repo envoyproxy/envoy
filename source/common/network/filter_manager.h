@@ -61,9 +61,9 @@ private:
 
   Connection& connection_;
   BufferSource& buffer_source_;
+  Upstream::HostDescriptionPtr host_description_;
   std::list<ActiveReadFilterPtr> upstream_filters_;
   std::list<WriteFilterPtr> downstream_filters_;
-  Upstream::HostDescriptionPtr host_description_;
 };
 
 } // Network

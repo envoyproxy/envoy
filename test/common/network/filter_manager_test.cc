@@ -6,6 +6,7 @@
 #include "test/mocks/upstream/host.h"
 
 using testing::InSequence;
+using testing::NiceMock;
 using testing::Return;
 
 namespace Network {
@@ -19,20 +20,33 @@ public:
   Buffer::OwnedImpl write_buffer_;
 };
 
+class LocalMockFilter : public MockFilter {
+public:
+  LocalMockFilter(const Upstream::HostDescription* host) : host_(host) {}
+  ~LocalMockFilter() {
+    // Make sure the upstream host is still valid in the filter destructor.
+    callbacks_->upstreamHost()->url();
+  }
+
+private:
+  const Upstream::HostDescription* host_;
+};
+
 TEST_F(NetworkFilterManagerTest, All) {
   InSequence s;
-  std::shared_ptr<MockReadFilter> read_filter(new MockReadFilter());
-  std::shared_ptr<MockWriteFilter> write_filter(new MockWriteFilter());
-  std::shared_ptr<MockFilter> filter(new MockFilter());
+
+  Upstream::HostDescription* host_description(new NiceMock<Upstream::MockHostDescription>());
+  MockReadFilter* read_filter(new MockReadFilter());
+  MockWriteFilter* write_filter(new MockWriteFilter());
+  MockFilter* filter(new LocalMockFilter(host_description));
 
   MockConnection connection;
   FilterManager manager(connection, *this);
-  manager.addReadFilter(read_filter);
-  manager.addWriteFilter(write_filter);
-  manager.addFilter(filter);
+  manager.addReadFilter(ReadFilterPtr{read_filter});
+  manager.addWriteFilter(WriteFilterPtr{write_filter});
+  manager.addFilter(FilterPtr{filter});
 
-  Upstream::HostDescriptionPtr host_description(new Upstream::MockHostDescription());
-  read_filter->callbacks_->upstreamHost(host_description);
+  read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
 
   read_buffer_.add("hello");
