@@ -65,7 +65,7 @@ entry. The following command operators are supported:
   Body bytes sent.
 
 %DURATION%
-  Total duration in milliseconds of the request from the start time to the last byte out.
+  Total duration in milliseconds of the request from the start time to the last byte out. df
 
 %FAILURE_REASON%
   Additional failure reason if any in addition to response code. Possible values are:
@@ -74,11 +74,11 @@ entry. The following command operators are supported:
             in addition to 503 response code.
   * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
   * **UT**: Upstream request timeout in addition to 504 response code.
-  * **LR**: Connection local reset in addition to 503 reponse code.
+  * **LR**: Connection local reset in addition to 503 response code.
   * **UR**: Upstream remote reset in addition to 503 response code.
   * **UF**: Upstream connection failure in addition to 503 response code.
-  * **UC**: Upstream connection termination in additon to 503 response code.
-  * **UO**: Upstream overflow (circuit breaking) in addition to 503 reponse code.
+  * **UC**: Upstream connection termination in addition to 503 response code.
+  * **UO**: Upstream overflow (circuit breaking) in addition to 503 response code.
             Envoy performed :ref:`circuit breaking <arch_overview_circuit_break>`.
   * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request
             in addition to 404 response code.
