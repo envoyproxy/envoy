@@ -3,17 +3,10 @@
 Building and installation
 =========================
 
-Requirements
---------------
+.. toctree::
+  :maxdepth: 2
 
-Building
---------
-
-Installation
-------------
-
-Reference configurations
-------------------------
-
-configgen
-^^^^^^^^^
+  requirements
+  building
+  installation
+  ref_configs
