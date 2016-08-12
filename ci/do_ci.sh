@@ -12,6 +12,10 @@ if [[ "$1" == "coverage" ]]; then
   echo "coverage build..."
   EXTRA_CMAKE_FLAGS="-DENVOY_CODE_COVERAGE:BOOL=ON"
   TEST_TARGET="envoy.check-coverage"
+elif [[ "$1" == "asan" ]]; then
+  echo "normal build..."
+  EXTRA_CMAKE_FLAGS="-DENVOY_SANITIZE:BOOL=ON"
+  TEST_TARGET="envoy.check"
 else
   echo "normal build..."
   TEST_TARGET="envoy.check"
