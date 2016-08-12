@@ -151,6 +151,7 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_504"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.internal.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.internal.upstream_rq_504"));
+  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_timeout"));
   EXPECT_CALL(conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&, ConnectionPool::Callbacks& callbacks)
                            -> ConnectionPool::Cancellable* {

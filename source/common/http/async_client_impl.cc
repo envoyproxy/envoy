@@ -126,6 +126,7 @@ void AsyncRequestImpl::onRequestTimeout() {
                                            REQUEST_TIMEOUT_HEADER, true, EMPTY_STRING,
                                            EMPTY_STRING};
   Http::CodeUtility::chargeResponseStat(info);
+  parent_.stats_store_.counter(fmt::format("{}upstream_rq_timeout", parent_.stat_prefix_)).inc();
   stream_encoder_->resetStream();
   cleanup();
   callbacks_.onFailure(Http::AsyncClient::FailureReason::RequestTimemout);
