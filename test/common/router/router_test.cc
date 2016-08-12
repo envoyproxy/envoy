@@ -566,8 +566,9 @@ TEST(RouterFilterUtilityTest, All) {
     MockRouteEntry route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::HeaderMapImpl headers;
-    EXPECT_EQ(std::chrono::milliseconds(10),
-              FilterUtility::finalTimeout(route, headers).global_timeout_);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers);
+    EXPECT_EQ(std::chrono::milliseconds(10), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
   }
   {
     MockRouteEntry route;
