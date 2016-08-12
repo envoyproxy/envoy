@@ -21,24 +21,45 @@
 
 namespace Router {
 
-std::chrono::milliseconds FilterUtility::finalTimeout(const RouteEntry& route,
-                                                      Http::HeaderMap& request_headers) {
+FilterUtility::TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
+                                                       Http::HeaderMap& request_headers) {
   // See if there is a user supplied timeout in a request header. If there is we take that,
   // otherwise we use the default.
-  std::chrono::milliseconds timeout = route.timeout();
+  TimeoutData timeout;
+  timeout.global_timeout_ = route.timeout();
   const std::string& header_timeout_string =
       request_headers.get(Http::Headers::get().EnvoyUpstreamRequestTimeoutMs);
   uint64_t header_timeout;
   if (!header_timeout_string.empty()) {
     if (StringUtil::atoul(header_timeout_string.c_str(), header_timeout)) {
-      timeout = std::chrono::milliseconds(header_timeout);
+      timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.remove(Http::Headers::get().EnvoyUpstreamRequestTimeoutMs);
   }
 
-  if (!request_headers.has(Http::Headers::get().EnvoyExpectedRequestTimeoutMs)) {
-    request_headers.addViaCopy(Http::Headers::get().EnvoyExpectedRequestTimeoutMs,
-                               std::to_string(timeout.count()));
+  // See if there is a per try/retry timeout. If it's >= global we just ignore it.
+  const std::string& per_try_timeout_string =
+      request_headers.get(Http::Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs);
+  if (!per_try_timeout_string.empty()) {
+    if (StringUtil::atoul(per_try_timeout_string.c_str(), header_timeout)) {
+      timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
+    }
+    request_headers.remove(Http::Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs);
+  }
+
+  if (timeout.per_try_timeout_ >= timeout.global_timeout_) {
+    timeout.per_try_timeout_ = std::chrono::milliseconds(0);
+  }
+
+  // See if there is any timeout to write in the expected timeout header.
+  uint64_t expected_timeout = timeout.per_try_timeout_.count();
+  if (expected_timeout == 0) {
+    expected_timeout = timeout.global_timeout_.count();
+  }
+
+  if (expected_timeout > 0) {
+    request_headers.replaceViaCopy(Http::Headers::get().EnvoyExpectedRequestTimeoutMs,
+                                   std::to_string(expected_timeout));
   }
 
   return timeout;
@@ -199,10 +220,13 @@ void Filter::onRequestComplete() {
   downstream_end_stream_ = true;
 
   // Possible that we got an immediate reset.
-  if (upstream_request_ && timeout_.count() > 0) {
-    response_timeout_ =
-        callbacks_->dispatcher().createTimer([this]() -> void { onResponseTimeout(); });
-    response_timeout_->enableTimer(timeout_);
+  if (upstream_request_) {
+    upstream_request_->setupPerTryTimeout();
+    if (timeout_.global_timeout_.count() > 0) {
+      response_timeout_ =
+          callbacks_->dispatcher().createTimer([this]() -> void { onResponseTimeout(); });
+      response_timeout_->enableTimer(timeout_.global_timeout_);
+    }
   }
 }
 
@@ -224,17 +248,18 @@ void Filter::onResponseTimeout() {
     upstream_request_->upstream_encoder_->resetStream();
   }
 
-  onUpstreamReset(true, Optional<Http::StreamResetReason>());
+  onUpstreamReset(UpstreamResetType::GlobalTimeout, Optional<Http::StreamResetReason>());
 }
 
-void Filter::onUpstreamReset(bool timeout, const Optional<Http::StreamResetReason>& reset_reason) {
-  ASSERT(timeout || upstream_request_);
-  if (!timeout) {
+void Filter::onUpstreamReset(UpstreamResetType type,
+                             const Optional<Http::StreamResetReason>& reset_reason) {
+  ASSERT(type == UpstreamResetType::GlobalTimeout || upstream_request_);
+  if (type == UpstreamResetType::Reset) {
     stream_log_debug("upstream reset", *callbacks_);
   }
 
-  // We don't retry on a timeout or if we already started the response.
-  if (!timeout && !downstream_response_started_ &&
+  // We don't retry on a global timeout or if we already started the response.
+  if (type != UpstreamResetType::GlobalTimeout && !downstream_response_started_ &&
       retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); }) &&
       setupRetry(true)) {
     return;
@@ -249,7 +274,7 @@ void Filter::onUpstreamReset(bool timeout, const Optional<Http::StreamResetReaso
   } else {
     Http::Code code;
     const char* body;
-    if (timeout) {
+    if (type == UpstreamResetType::GlobalTimeout || type == UpstreamResetType::PerTryTimeout) {
       callbacks_->requestInfo().onFailedResponse(
           Http::AccessLog::FailureReason::UpstreamRequestTimeout);
 
@@ -393,7 +418,7 @@ void Filter::doRetry() {
     return;
   }
 
-  ASSERT(response_timeout_ || timeout_.count() == 0);
+  ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
   ASSERT(!upstream_request_);
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
   upstream_request_->upstream_encoder_->encodeHeaders(*downstream_headers_,
@@ -402,6 +427,10 @@ void Filter::doRetry() {
   if (upstream_request_ && callbacks_->decodingBuffer()) {
     upstream_request_->upstream_encoder_->encodeData(*callbacks_->decodingBuffer(), true);
   }
+
+  if (upstream_request_) {
+    upstream_request_->setupPerTryTimeout();
+  }
 }
 
 Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
@@ -409,6 +438,13 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
       upstream_encoder_(new Http::PooledStreamEncoder(pool, *this, *this,
                                                       parent.callbacks_->connectionId(),
                                                       parent.callbacks_->streamId(), *this)) {}
+
+Filter::UpstreamRequest::~UpstreamRequest() {
+  if (per_try_timeout_) {
+    // Allows for testing.
+    per_try_timeout_->disableTimer();
+  }
+}
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   parent_.onUpstreamHeaders(std::move(headers), end_stream);
@@ -423,7 +459,23 @@ void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
 }
 
 void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
-  parent_.onUpstreamReset(false, Optional<Http::StreamResetReason>(reason));
+  parent_.onUpstreamReset(UpstreamResetType::Reset, Optional<Http::StreamResetReason>(reason));
+}
+
+void Filter::UpstreamRequest::setupPerTryTimeout() {
+  ASSERT(!per_try_timeout_);
+  if (parent_.timeout_.per_try_timeout_.count() > 0) {
+    per_try_timeout_ =
+        parent_.callbacks_->dispatcher().createTimer([this]() -> void { onPerTryTimeout(); });
+    per_try_timeout_->enableTimer(parent_.timeout_.per_try_timeout_);
+  }
+}
+
+void Filter::UpstreamRequest::onPerTryTimeout() {
+  stream_log_debug("upstream per try timeout", *parent_.callbacks_);
+  parent_.cm_.get(parent_.route_->clusterName())->stats().upstream_rq_per_try_timeout_.inc();
+  upstream_encoder_->resetStream();
+  parent_.onUpstreamReset(UpstreamResetType::PerTryTimeout, Optional<Http::StreamResetReason>());
 }
 
 RetryStatePtr

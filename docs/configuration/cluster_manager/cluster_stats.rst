@@ -39,6 +39,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_pending_active, Gauge, Description
   upstream_rq_cancelled, Counter, Description
   upstream_rq_timeout, Counter, Description
+  upstream_rq_per_try_timeout, Counter, Description
   upstream_rq_rx_reset, Counter, Description
   upstream_rq_tx_reset, Counter, Description
   upstream_rq_retry, Counter, Description

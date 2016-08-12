@@ -122,7 +122,18 @@ x-envoy-upstream-rq-timeout-ms
 
 Setting this header on egress requests will cause Envoy to override the :ref:`route configuration
 <config_http_conn_man_route_table_route_timeout>`. The timeout must be specified in millisecond
-units.
+units. See also :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`.
+
+.. _config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms:
+
+x-envoy-upstream-rq-per-try-timeout-ms
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Setting this header on egress requests will cause Envoy to set a *per try* timeout on routed
+requests. This timeout must be <= the global route timeout (see
+:ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`) or it is ignored. This allows a
+caller to set a tight per try timeout to allow for retries while maintaining a reasonable overall
+timeout.
 
 x-envoy-upstream-service-time
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

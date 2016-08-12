@@ -34,13 +34,18 @@ struct FilterStats {
  */
 class FilterUtility {
 public:
+  struct TimeoutData {
+    std::chrono::milliseconds global_timeout_{0};
+    std::chrono::milliseconds per_try_timeout_{0};
+  };
+
   /**
    * Determine the final timeout to use based on the route as well as the request headers.
    * @param route supplies the request route.
    * @param request_headers supplies the request headers.
+   * @return TimeoutData for both the global and per try timeouts.
    */
-  static std::chrono::milliseconds finalTimeout(const RouteEntry& route,
-                                                Http::HeaderMap& request_headers);
+  static TimeoutData finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers);
 };
 
 /**
@@ -66,6 +71,10 @@ private:
                            public Http::StreamCallbacks,
                            public Http::PooledStreamEncoderCallbacks {
     UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool);
+    ~UpstreamRequest();
+
+    void setupPerTryTimeout();
+    void onPerTryTimeout();
 
     // Http::StreamDecoder
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
@@ -83,9 +92,12 @@ private:
     Filter& parent_;
     Http::PooledStreamEncoderPtr upstream_encoder_;
     bool upstream_canary_{};
+    Event::TimerPtr per_try_timeout_;
   };
 
   typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;
+
+  enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
 
   Http::AccessLog::FailureReason
   streamResetReasonToFailureReason(Http::StreamResetReason reset_reason);
@@ -105,7 +117,8 @@ private:
   void onUpstreamData(const Buffer::Instance& data, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
   void onUpstreamComplete();
-  void onUpstreamReset(bool timeout, const Optional<Http::StreamResetReason>& reset_reason);
+  void onUpstreamReset(UpstreamResetType type,
+                       const Optional<Http::StreamResetReason>& reset_reason);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
   void doRetry();
@@ -122,7 +135,7 @@ private:
   bool downstream_response_started_{};
   Event::TimerPtr response_timeout_;
   FilterStats stats_;
-  std::chrono::milliseconds timeout_;
+  FilterUtility::TimeoutData timeout_;
   UpstreamRequestPtr upstream_request_;
   RetryStatePtr retry_state_;
   Http::HeaderMap* downstream_headers_{};
