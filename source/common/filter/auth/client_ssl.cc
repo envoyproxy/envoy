@@ -21,7 +21,7 @@ Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream:
       ip_white_list_(config), stats_(generateStats(stats_store, config.getString("stat_prefix"))),
       runtime_(runtime), local_address_(local_address) {
 
-  if (!cm_.has(auth_api_cluster_)) {
+  if (!cm_.get(auth_api_cluster_)) {
     throw EnvoyException(
         fmt::format("unknown cluster '{}' in client ssl auth config", auth_api_cluster_));
   }
@@ -83,29 +83,19 @@ void Config::onFailure(Http::AsyncClient::FailureReason) {
 }
 
 void Config::refreshPrincipals() {
-  ASSERT(!active_request_);
-  active_request_.reset(new ActiveRequest());
-  active_request_->client_ = cm_.httpAsyncClientForCluster(auth_api_cluster_);
-  if (!active_request_->client_) {
-    onFailure(Http::AsyncClient::FailureReason::Reset);
-    return;
-  }
-
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().addViaMoveValue(Http::Headers::get().Scheme, "http");
   message->headers().addViaMoveValue(Http::Headers::get().Method, "GET");
   message->headers().addViaMoveValue(Http::Headers::get().Path, "/v1/certs/list/approved");
   message->headers().addViaCopy(Http::Headers::get().Host, auth_api_cluster_);
   message->headers().addViaCopy(Http::Headers::get().ForwardedFor, local_address_);
-  active_request_->request_ = active_request_->client_->send(std::move(message), *this,
-                                                             Optional<std::chrono::milliseconds>());
+  cm_.httpAsyncClientForCluster(auth_api_cluster_)
+      .send(std::move(message), *this, Optional<std::chrono::milliseconds>());
 }
 
 void Config::requestComplete() {
   std::chrono::milliseconds interval(
       runtime_.snapshot().getInteger("auth.clientssl.refresh_interval_ms", 60000));
-
-  active_request_.reset();
   interval_timer_->enableTimer(interval);
 }
 

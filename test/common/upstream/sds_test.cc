@@ -12,7 +12,6 @@ using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnNew;
 using testing::SaveArg;
 using testing::WithArg;
 
@@ -20,7 +19,9 @@ namespace Upstream {
 
 class SdsTest : public testing::Test {
 protected:
-  SdsTest() : sds_config_{"us-east-1a", "sds", std::chrono::milliseconds(30000)} {
+  SdsTest()
+      : sds_config_{"us-east-1a", "sds", std::chrono::milliseconds(30000)},
+        request_(&cm_.async_client_) {
     std::string raw_config = R"EOF(
     {
       "name": "name",
@@ -60,9 +61,8 @@ protected:
   }
 
   void setupPoolFailure() {
-    client_ = new NiceMock<Http::MockAsyncClient>();
-    EXPECT_CALL(cm_, httpAsyncClientForCluster_("sds")).WillOnce(Return(client_));
-    EXPECT_CALL(*client_, send_(_, _, _))
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(Invoke([](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                             Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
           callbacks.onFailure(Http::AsyncClient::FailureReason::Reset);
@@ -71,11 +71,9 @@ protected:
   }
 
   void setupRequest() {
-    client_ = new NiceMock<Http::MockAsyncClient>();
-    EXPECT_CALL(cm_, httpAsyncClientForCluster_("sds")).WillOnce(Return(client_));
-    EXPECT_CALL(*client_, send_(_, _, _))
-        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callbacks_)),
-                        ReturnNew<NiceMock<Http::MockAsyncClientRequest>>(client_)));
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callbacks_)), Return(&request_)));
   }
 
   Stats::IsolatedStoreImpl stats_;
@@ -85,15 +83,16 @@ protected:
   Event::MockDispatcher dispatcher_;
   std::unique_ptr<SdsClusterImpl> cluster_;
   Event::MockTimer* timer_;
-  Http::MockAsyncClient* client_;
   Http::AsyncClient::Callbacks* callbacks_;
   ReadyWatcher membership_updated_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  Http::MockAsyncClientRequest request_;
 };
 
 TEST_F(SdsTest, Shutdown) {
   setupRequest();
   cluster_->initialize();
+  EXPECT_CALL(request_, cancel());
   cluster_->shutdown();
 }
 
@@ -167,11 +166,6 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(50U, canary_host->weight());
   EXPECT_EQ(50UL, cluster_->stats().max_host_weight_.value());
-
-  // No healthy SDS hosts.
-  EXPECT_CALL(cm_, httpAsyncClientForCluster_("sds")).WillOnce(Return(nullptr));
-  EXPECT_CALL(*timer_, enableTimer(_));
-  timer_->callback_();
 }
 
 TEST_F(SdsTest, HealthChecker) {

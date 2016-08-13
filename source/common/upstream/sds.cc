@@ -101,11 +101,6 @@ void SdsClusterImpl::parseSdsResponse(Http::Message& response) {
 void SdsClusterImpl::refreshHosts() {
   log_debug("starting sds refresh for cluster: {}", name_);
   stats_.update_attempt_.inc();
-  client_ = cm_.httpAsyncClientForCluster(sds_config_.sds_cluster_name_);
-  if (!client_) {
-    onFailure(Http::AsyncClient::FailureReason::Reset);
-    return;
-  }
 
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().addViaMoveValue(Http::Headers::get().Scheme, "http");
@@ -113,7 +108,8 @@ void SdsClusterImpl::refreshHosts() {
   message->headers().addViaMoveValue(Http::Headers::get().Path,
                                      "/v1/registration/" + service_name_);
   message->headers().addViaMoveValue(Http::Headers::get().Host, "sds");
-  active_request_ = client_->send(std::move(message), *this, Optional<std::chrono::milliseconds>());
+  active_request_ = cm_.httpAsyncClientForCluster(sds_config_.sds_cluster_name_)
+                        .send(std::move(message), *this, Optional<std::chrono::milliseconds>());
 }
 
 void SdsClusterImpl::requestComplete() {
@@ -125,8 +121,7 @@ void SdsClusterImpl::requestComplete() {
     initialize_callback_ = nullptr;
   }
 
-  active_request_.reset();
-  client_.reset();
+  active_request_ = nullptr;
 
   // Add refresh jitter based on the configured interval.
   std::chrono::milliseconds final_delay =
@@ -139,8 +134,7 @@ void SdsClusterImpl::requestComplete() {
 void SdsClusterImpl::shutdown() {
   if (active_request_) {
     active_request_->cancel();
-    active_request_.reset();
-    client_.reset();
+    active_request_ = nullptr;
   }
 
   refresh_timer_.reset();

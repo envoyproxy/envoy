@@ -26,7 +26,8 @@ TEST(ClientSslAuthAllowedPrincipalsTest, EmptyString) {
 
 class ClientSslAuthFilterTest : public testing::Test {
 public:
-  ClientSslAuthFilterTest() : interval_timer_(new Event::MockTimer(&dispatcher_)) {}
+  ClientSslAuthFilterTest()
+      : interval_timer_(new Event::MockTimer(&dispatcher_)), request_(&cm_.async_client_) {}
   ~ClientSslAuthFilterTest() { tls_.shutdownThread(); }
 
   void setup() {
@@ -39,7 +40,7 @@ public:
     )EOF";
 
     Json::StringLoader loader(json);
-    EXPECT_CALL(cm_, has("vpn")).WillOnce(Return(true));
+    EXPECT_CALL(cm_, get("vpn"));
     setupRequest();
     config_.reset(new Config(loader, tls_, cm_, dispatcher_, stats_store_, runtime_, "127.0.0.1"));
 
@@ -52,15 +53,14 @@ public:
   }
 
   void setupRequest() {
-    client_ = new NiceMock<Http::MockAsyncClient>();
-    EXPECT_CALL(cm_, httpAsyncClientForCluster_("vpn")).WillOnce(Return(client_));
-    EXPECT_CALL(*client_, send_(_, _, _))
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(
             Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                           Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
               EXPECT_EQ("127.0.0.1", request->headers().get("x-forwarded-for"));
               callbacks_ = &callbacks;
-              return new Http::MockAsyncClientRequest(client_);
+              return &request_;
             }));
   }
 
@@ -71,11 +71,11 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Instance> instance_;
   Event::MockTimer* interval_timer_;
-  Http::MockAsyncClient* client_;
   Http::AsyncClient::Callbacks* callbacks_;
   Ssl::MockConnection ssl_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
+  Http::MockAsyncClientRequest request_;
 };
 
 TEST_F(ClientSslAuthFilterTest, NoCluster) {
@@ -87,7 +87,7 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
   )EOF";
 
   Json::StringLoader loader(json);
-  EXPECT_CALL(cm_, has("bad_cluster")).WillOnce(Return(false));
+  EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
   EXPECT_THROW(new Config(loader, tls_, cm_, dispatcher_, stats_store_, runtime_, "127.0.0.1"),
                EnvoyException);
 }
@@ -174,7 +174,14 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
 
   // Interval timer fires, cannot obtain async client.
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  EXPECT_CALL(cm_, httpAsyncClientForCluster_("vpn")).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            callbacks.onFailure(Http::AsyncClient::FailureReason::Reset);
+            return nullptr;
+          }));
   interval_timer_->callback_();
 
   EXPECT_EQ(4U, stats_store_.counter("auth.clientssl.vpn.update_failure").value());

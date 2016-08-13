@@ -7,26 +7,35 @@
 
 namespace Http {
 
-const Http::HeaderMapImpl AsyncRequestImpl::SERVICE_UNAVAILABLE_HEADER{
-    {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable))}};
+const HeaderMapImpl AsyncRequestImpl::SERVICE_UNAVAILABLE_HEADER{
+    {Headers::get().Status, std::to_string(enumToInt(Code::ServiceUnavailable))}};
 
-const Http::HeaderMapImpl AsyncRequestImpl::REQUEST_TIMEOUT_HEADER{
-    {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::GatewayTimeout))}};
+const HeaderMapImpl AsyncRequestImpl::REQUEST_TIMEOUT_HEADER{
+    {Headers::get().Status, std::to_string(enumToInt(Code::GatewayTimeout))}};
 
-AsyncClientImpl::AsyncClientImpl(ConnectionPool::Instance& conn_pool, const std::string& cluster,
-                                 Stats::Store& stats_store, Event::Dispatcher& dispatcher)
-    : conn_pool_(conn_pool), stat_prefix_(fmt::format("cluster.{}.", cluster)),
-      stats_store_(stats_store), dispatcher_(dispatcher) {}
+AsyncClientImpl::AsyncClientImpl(const Upstream::Cluster& cluster,
+                                 AsyncClientConnPoolFactory& factory, Stats::Store& stats_store,
+                                 Event::Dispatcher& dispatcher)
+    : cluster_(cluster), factory_(factory), stats_store_(stats_store), dispatcher_(dispatcher),
+      stat_prefix_(fmt::format("cluster.{}.", cluster.name())) {}
 
-AsyncClient::RequestPtr AsyncClientImpl::send(MessagePtr&& request,
-                                              AsyncClient::Callbacks& callbacks,
-                                              const Optional<std::chrono::milliseconds>& timeout) {
+AsyncClientImpl::~AsyncClientImpl() { ASSERT(active_requests_.empty()); }
+
+AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
+                                            const Optional<std::chrono::milliseconds>& timeout) {
+  ConnectionPool::Instance* conn_pool = factory_.connPool();
+  if (!conn_pool) {
+    callbacks.onFailure(AsyncClient::FailureReason::Reset);
+    return nullptr;
+  }
+
   std::unique_ptr<AsyncRequestImpl> new_request{
-      new AsyncRequestImpl(std::move(request), *this, callbacks, dispatcher_, timeout)};
+      new AsyncRequestImpl(std::move(request), *this, callbacks, dispatcher_, *conn_pool, timeout)};
 
   // The request may get immediately failed. If so, we will return nullptr.
   if (new_request->stream_encoder_) {
-    return std::move(new_request);
+    new_request->moveIntoList(std::move(new_request), active_requests_);
+    return active_requests_.front().get();
   } else {
     return nullptr;
   }
@@ -34,10 +43,11 @@ AsyncClient::RequestPtr AsyncClientImpl::send(MessagePtr&& request,
 
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks, Event::Dispatcher& dispatcher,
+                                   ConnectionPool::Instance& conn_pool,
                                    const Optional<std::chrono::milliseconds>& timeout)
     : request_(std::move(request)), parent_(parent), callbacks_(callbacks) {
 
-  stream_encoder_.reset(new PooledStreamEncoder(parent_.conn_pool_, *this, *this, 0, 0, *this));
+  stream_encoder_.reset(new PooledStreamEncoder(conn_pool, *this, *this, 0, 0, *this));
   stream_encoder_->encodeHeaders(request_->headers(), !request_->body());
 
   // We might have been immediately failed.
@@ -66,9 +76,9 @@ void AsyncRequestImpl::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
                                    -> void { log_debug("  '{}':'{}'", key.get(), value); });
 #endif
 
-  Http::CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
-                                           response_->headers(), true, EMPTY_STRING, EMPTY_STRING};
-  Http::CodeUtility::chargeResponseStat(info);
+  CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
+                                     response_->headers(), true, EMPTY_STRING, EMPTY_STRING};
+  CodeUtility::chargeResponseStat(info);
 
   if (end_stream) {
     onComplete();
@@ -102,34 +112,32 @@ void AsyncRequestImpl::decodeTrailers(HeaderMapPtr&& trailers) {
 
 void AsyncRequestImpl::onComplete() {
   // TODO: Check host's canary status in addition to canary header.
-  Http::CodeUtility::ResponseTimingInfo info{
+  CodeUtility::ResponseTimingInfo info{
       parent_.stats_store_, parent_.stat_prefix_, stream_encoder_->requestCompleteTime(),
-      response_->headers().get(Http::Headers::get().EnvoyUpstreamCanary) == "true", true,
-      EMPTY_STRING, EMPTY_STRING};
-  Http::CodeUtility::chargeResponseTiming(info);
+      response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true", true, EMPTY_STRING,
+      EMPTY_STRING};
+  CodeUtility::chargeResponseTiming(info);
 
-  cleanup();
   callbacks_.onSuccess(std::move(response_));
+  cleanup();
 }
 
 void AsyncRequestImpl::onResetStream(StreamResetReason) {
-  Http::CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
-                                           SERVICE_UNAVAILABLE_HEADER, true, EMPTY_STRING,
-                                           EMPTY_STRING};
-  Http::CodeUtility::chargeResponseStat(info);
+  CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
+                                     SERVICE_UNAVAILABLE_HEADER, true, EMPTY_STRING, EMPTY_STRING};
+  CodeUtility::chargeResponseStat(info);
+  callbacks_.onFailure(AsyncClient::FailureReason::Reset);
   cleanup();
-  callbacks_.onFailure(Http::AsyncClient::FailureReason::Reset);
 }
 
 void AsyncRequestImpl::onRequestTimeout() {
-  Http::CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
-                                           REQUEST_TIMEOUT_HEADER, true, EMPTY_STRING,
-                                           EMPTY_STRING};
-  Http::CodeUtility::chargeResponseStat(info);
-  parent_.stats_store_.counter(fmt::format("{}upstream_rq_timeout", parent_.stat_prefix_)).inc();
+  CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
+                                     REQUEST_TIMEOUT_HEADER, true, EMPTY_STRING, EMPTY_STRING};
+  CodeUtility::chargeResponseStat(info);
+  parent_.cluster_.stats().upstream_rq_timeout_.inc();
   stream_encoder_->resetStream();
+  callbacks_.onFailure(AsyncClient::FailureReason::RequestTimemout);
   cleanup();
-  callbacks_.onFailure(Http::AsyncClient::FailureReason::RequestTimemout);
 }
 
 void AsyncRequestImpl::cleanup() {
@@ -137,5 +145,12 @@ void AsyncRequestImpl::cleanup() {
   if (request_timeout_) {
     request_timeout_->disableTimer();
   }
+
+  // This will destroy us, but only do so if we are actually in a list. This does not happen in
+  // the immediate failure case.
+  if (inserted()) {
+    removeFromList(parent_.active_requests_);
+  }
 }
+
 } // Http

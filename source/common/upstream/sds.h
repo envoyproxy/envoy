@@ -54,8 +54,7 @@ private:
   const std::string service_name_;
   Runtime::RandomGenerator& random_;
   Event::TimerPtr refresh_timer_;
-  Http::AsyncClientPtr client_;
-  Http::AsyncClient::RequestPtr active_request_;
+  Http::AsyncClient::Request* active_request_{};
   uint64_t pending_health_checks_{};
 };
 

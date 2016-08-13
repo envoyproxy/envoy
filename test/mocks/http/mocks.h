@@ -281,9 +281,9 @@ public:
   MOCK_METHOD0(onRequestDestroy, void());
 
   // Http::AsyncClient
-  RequestPtr send(MessagePtr&& request, Callbacks& callbacks,
-                  const Optional<std::chrono::milliseconds>& timeout) override {
-    return RequestPtr{send_(request, callbacks, timeout)};
+  Request* send(MessagePtr&& request, Callbacks& callbacks,
+                const Optional<std::chrono::milliseconds>& timeout) override {
+    return send_(request, callbacks, timeout);
   }
 
   MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks,

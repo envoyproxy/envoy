@@ -112,7 +112,7 @@ TEST(RateLimitGrpcFactoryTest, NoCluster) {
   Upstream::MockClusterManager cm;
   Stats::IsolatedStoreImpl stats_store;
 
-  EXPECT_CALL(cm, has("foo")).WillOnce(Return(false));
+  EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
   EXPECT_THROW(GrpcFactoryImpl(config, cm, stats_store), EnvoyException);
 }
 
@@ -127,7 +127,7 @@ TEST(RateLimitGrpcFactoryTest, Create) {
   Upstream::MockClusterManager cm;
   Stats::IsolatedStoreImpl stats_store;
 
-  EXPECT_CALL(cm, has("foo")).WillOnce(Return(true));
+  EXPECT_CALL(cm, get("foo"));
   GrpcFactoryImpl factory(config, cm, stats_store);
   factory.create(Optional<std::chrono::milliseconds>());
 }

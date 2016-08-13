@@ -238,8 +238,7 @@ public:
   virtual ResourceManager& resourceManager() const PURE;
 
   /**
-   * Shutdown the cluster manager prior to destroying connection pools and other thread local
-   * data.
+   * Shutdown the cluster prior to destroying connection pools and other thread local data.
    */
   virtual void shutdown() PURE;
 

@@ -10,24 +10,43 @@
 #include "envoy/http/message.h"
 
 #include "common/common/assert.h"
+#include "common/common/linked_object.h"
 #include "common/http/header_map_impl.h"
 
 namespace Http {
 
+/**
+ * Factory for obtaining a connection pool.
+ */
+class AsyncClientConnPoolFactory {
+public:
+  virtual ~AsyncClientConnPoolFactory() {}
+
+  /**
+   * Return a connection pool or nullptr if there is no healthy upstream host.
+   */
+  virtual ConnectionPool::Instance* connPool() PURE;
+};
+
+class AsyncRequestImpl;
+
 class AsyncClientImpl final : public AsyncClient {
 public:
-  AsyncClientImpl(ConnectionPool::Instance& conn_pool, const std::string& cluster,
+  AsyncClientImpl(const Upstream::Cluster& cluster, AsyncClientConnPoolFactory& factory,
                   Stats::Store& stats_store, Event::Dispatcher& dispatcher);
+  ~AsyncClientImpl();
 
   // Http::AsyncClient
-  RequestPtr send(MessagePtr&& request, Callbacks& callbacks,
-                  const Optional<std::chrono::milliseconds>& timeout) override;
+  Request* send(MessagePtr&& request, Callbacks& callbacks,
+                const Optional<std::chrono::milliseconds>& timeout) override;
 
 private:
-  ConnectionPool::Instance& conn_pool_;
-  const std::string stat_prefix_;
+  const Upstream::Cluster& cluster_;
+  AsyncClientConnPoolFactory& factory_;
   Stats::Store& stats_store_;
   Event::Dispatcher& dispatcher_;
+  const std::string stat_prefix_;
+  std::list<std::unique_ptr<AsyncRequestImpl>> active_requests_;
 
   friend class AsyncRequestImpl;
 };
@@ -40,10 +59,11 @@ class AsyncRequestImpl final : public AsyncClient::Request,
                                StreamDecoder,
                                StreamCallbacks,
                                PooledStreamEncoderCallbacks,
-                               Logger::Loggable<Logger::Id::http> {
+                               Logger::Loggable<Logger::Id::http>,
+                               LinkedObject<AsyncRequestImpl> {
 public:
   AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                   Event::Dispatcher& dispatcher,
+                   Event::Dispatcher& dispatcher, ConnectionPool::Instance& conn_pool,
                    const Optional<std::chrono::milliseconds>& timeout);
   ~AsyncRequestImpl();
 
@@ -74,8 +94,8 @@ private:
   std::unique_ptr<MessageImpl> response_;
   PooledStreamEncoderPtr stream_encoder_;
 
-  static const Http::HeaderMapImpl SERVICE_UNAVAILABLE_HEADER;
-  static const Http::HeaderMapImpl REQUEST_TIMEOUT_HEADER;
+  static const HeaderMapImpl SERVICE_UNAVAILABLE_HEADER;
+  static const HeaderMapImpl REQUEST_TIMEOUT_HEADER;
 
   friend class AsyncClientImpl;
 };

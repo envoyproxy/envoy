@@ -258,90 +258,39 @@ std::string LightStepUtility::buildJsonBody(const Http::HeaderMap& request_heade
 }
 
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                             ThreadLocal::Instance& tls, const std::string& stat_prefix,
-                             Stats::Store& stats, Runtime::RandomGenerator& random,
+                             const std::string& stat_prefix, Stats::Store& stats,
+                             Runtime::RandomGenerator& random,
                              const std::string& local_service_cluster,
                              const std::string& service_node, const std::string& access_token)
-    : cm_(cluster_manager), tls_(tls), tls_slot_(tls.allocateSlot()) {
-  collector_cluster_ = config.getString("collector_cluster");
-  if (!cm_.has(collector_cluster_)) {
+    : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
+      stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix + "tracing.lightstep."))},
+      random_(random), local_service_cluster_(local_service_cluster), service_node_(service_node),
+      access_token_(access_token) {
+  if (!cm_.get(collector_cluster_)) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
                                      collector_cluster_));
   }
-
-  tls.set(tls_slot_,
-          [this, stat_prefix, &stats, &random, local_service_cluster, service_node, access_token](
-              Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr {
-            return ThreadLocal::ThreadLocalObjectPtr{new TlsSink(*this, stat_prefix, stats, random,
-                                                                 local_service_cluster,
-                                                                 service_node, access_token)};
-          });
 }
 
-LightStepSink::TlsSink::TlsSink(LightStepSink& parent, const std::string& stat_prefix,
-                                Stats::Store& stats, Runtime::RandomGenerator& random,
-                                const std::string& service_cluster, const std::string& service_node,
-                                const std::string& access_token)
-    : parent_(parent),
-      stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix + "tracing.lightstep."))},
-      random_(random), local_service_cluster_(service_cluster), service_node_(service_node),
-      access_token_(access_token) {
-  shutdown_ = false;
-}
-
-void LightStepSink::TlsSink::shutdown() {
-  shutdown_ = true;
-
-  for (auto& active_request : active_requests_) {
-    active_request->request_->cancel();
-  }
-}
-
-void LightStepSink::TlsSink::flushTrace(const Http::HeaderMap& request_headers,
-                                        const Http::HeaderMap& response_headers,
-                                        const Http::AccessLog::RequestInfo& request_info) {
-  if (shutdown_) {
-    return;
-  }
-
-  Http::AsyncClientPtr client = parent_.cm_.httpAsyncClientForCluster(parent_.collector_cluster_);
-
-  if (!client) {
-    stats_.client_failed_.inc();
-    return;
-  }
-
+void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
+                               const Http::HeaderMap& response_headers,
+                               const Http::AccessLog::RequestInfo& request_info) {
   Http::MessagePtr msg = LightStepUtility::buildHeaders(access_token_);
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl(
       LightStepUtility::buildJsonBody(request_headers, response_headers, request_info, random_,
                                       local_service_cluster_, service_node_)));
 
   msg->body(std::move(buffer));
-
-  executeRequest(std::move(client), std::move(msg));
+  executeRequest(std::move(msg));
 }
 
-void LightStepSink::TlsSink::executeRequest(Http::AsyncClientPtr&& client, Http::MessagePtr&& msg) {
-  ActiveRequestPtr active_request(new LightStepSink::ActiveRequest(*this));
-  Http::AsyncClient::RequestPtr request =
-      client->send(std::move(msg), *active_request, std::chrono::milliseconds(5000));
-  if (request) {
-    active_request->request_ = std::move(request);
-    active_request->client_ = std::move(client);
-    active_request->moveIntoListBack(std::move(active_request), active_requests_);
-  }
+void LightStepSink::executeRequest(Http::MessagePtr&& msg) {
+  cm_.httpAsyncClientForCluster(collector_cluster_)
+      .send(std::move(msg), *this, std::chrono::milliseconds(5000));
 }
 
-void LightStepSink::ActiveRequest::onFailure(Http::AsyncClient::FailureReason) {
-  parent_.stats_.collector_failed_.inc();
-  clean();
-}
+void LightStepSink::onFailure(Http::AsyncClient::FailureReason) { stats_.collector_failed_.inc(); }
 
-void LightStepSink::ActiveRequest::onSuccess(Http::MessagePtr&&) {
-  parent_.stats_.collector_success_.inc();
-  clean();
-}
-
-void LightStepSink::ActiveRequest::clean() { removeFromList(parent_.active_requests_); }
+void LightStepSink::onSuccess(Http::MessagePtr&&) { stats_.collector_success_.inc(); }
 
 } // Tracing

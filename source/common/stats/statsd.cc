@@ -60,7 +60,7 @@ TcpStatsdSink::TcpStatsdSink(const std::string& stat_cluster, const std::string&
     : stat_cluster_(stat_cluster), stat_host_(stat_host), cluster_name_(cluster_name), tls_(tls),
       tls_slot_(tls.allocateSlot()), cluster_manager_(cluster_manager) {
 
-  if (!cluster_manager.has(cluster_name)) {
+  if (!cluster_manager.get(cluster_name)) {
     throw EnvoyException(fmt::format("unknown TCP statsd upstream cluster: {}", cluster_name));
   }
 

@@ -146,7 +146,6 @@ TEST(RouteMatcherTest, TestRoutes) {
   Json::StringLoader loader(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ON_CALL(cm, has(_)).WillByDefault(Return(true));
   ConfigImpl config(loader, runtime, cm);
 
   // Base routing testing.
@@ -351,7 +350,6 @@ TEST(RouteMatcherTest, ContentType) {
   Json::StringLoader loader(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ON_CALL(cm, has(_)).WillByDefault(Return(true));
   ConfigImpl config(loader, runtime, cm);
 
   {
@@ -403,7 +401,6 @@ TEST(RouteMatcherTest, Runtime) {
   NiceMock<Upstream::MockClusterManager> cm;
   Runtime::MockSnapshot snapshot;
 
-  ON_CALL(cm, has(_)).WillByDefault(Return(true));
   ON_CALL(runtime, snapshot()).WillByDefault(ReturnRef(snapshot));
 
   ConfigImpl config(loader, runtime, cm);
@@ -445,7 +442,6 @@ TEST(RouteMatcherTest, RateLimit) {
   Json::StringLoader loader(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ON_CALL(cm, has(_)).WillByDefault(Return(true));
   ConfigImpl config(loader, runtime, cm);
 
   EXPECT_TRUE(config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
@@ -492,7 +488,6 @@ TEST(RouteMatcherTest, Retry) {
   Json::StringLoader loader(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ON_CALL(cm, has(_)).WillByDefault(Return(true));
   ConfigImpl config(loader, runtime, cm);
 
   EXPECT_EQ(1U, config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
@@ -619,7 +614,6 @@ TEST(RouteMatcherTest, Redirect) {
   Json::StringLoader loader(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ON_CALL(cm, has(StrNe(""))).WillByDefault(Return(true));
   ConfigImpl config(loader, runtime, cm);
 
   EXPECT_EQ(nullptr,

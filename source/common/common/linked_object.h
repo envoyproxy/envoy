@@ -19,6 +19,11 @@ public:
   }
 
   /**
+   * @return whether the object is currently inserted into a list.
+   */
+  bool inserted() { return inserted_; }
+
+  /**
    * Move a linked item between 2 lists.
    * @param list1 supplies the first list.
    * @param list2 supplies the second list.

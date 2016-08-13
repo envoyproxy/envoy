@@ -7,6 +7,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/async_client_impl.h"
 #include "common/json/json_loader.h"
 
 namespace Upstream {
@@ -41,10 +42,9 @@ public:
   }
 
   const Cluster* get(const std::string& cluster) override;
-  bool has(const std::string& cluster) override { return primary_clusters_.count(cluster); }
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) override;
-  Http::AsyncClientPtr httpAsyncClientForCluster(const std::string& cluster) override;
+  Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
 
   void shutdown() override {
     for (auto& cluster : primary_clusters_) {
@@ -62,13 +62,19 @@ private:
    * connection pools.
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
-    struct ClusterEntry {
-      ClusterEntry(const Cluster& parent, Runtime::Loader& runtime,
-                   Runtime::RandomGenerator& random);
+    struct ClusterEntry : public Http::AsyncClientConnPoolFactory {
+      ClusterEntry(ThreadLocalClusterManagerImpl& parent, const Cluster& cluster,
+                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                   Stats::Store& stats_store, Event::Dispatcher& dispatcher);
 
-      HostSetImplPtr host_set_;
+      // Http::AsyncClientConnPoolFactory
+      Http::ConnectionPool::Instance* connPool() override;
+
+      ThreadLocalClusterManagerImpl& parent_;
+      HostSetImpl host_set_;
       LoadBalancerPtr lb_;
       const Cluster& primary_cluster_;
+      Http::AsyncClientImpl http_async_client_;
     };
 
     typedef std::unique_ptr<ClusterEntry> ClusterEntryPtr;
@@ -87,6 +93,7 @@ private:
     // ThreadLocal::ThreadLocalObject
     void shutdown() override;
 
+    ClusterManagerImpl& parent_;
     Event::Dispatcher& dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
     std::unordered_map<ConstHostPtr, Http::ConnectionPool::InstancePtr> host_http_conn_pool_map_;

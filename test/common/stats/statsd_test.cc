@@ -16,7 +16,7 @@ namespace Statsd {
 class TcpStatsdSinkTest : public testing::Test {
 public:
   TcpStatsdSinkTest() {
-    EXPECT_CALL(cluster_manager_, has(_)).WillOnce(Return(true));
+    EXPECT_CALL(cluster_manager_, get("statsd"));
     sink_.reset(new TcpStatsdSink("cluster", "host", "statsd", tls_, cluster_manager_));
   }
 

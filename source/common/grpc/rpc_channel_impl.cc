@@ -30,12 +30,6 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
   // here for clarity.
   ASSERT(cm_.get(cluster_)->features() & Upstream::Cluster::Features::HTTP2);
 
-  client_ = cm_.httpAsyncClientForCluster(cluster_);
-  if (!client_) {
-    onFailureWorker(Optional<uint64_t>(), "http request failure");
-    return;
-  }
-
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().addViaMoveValue(Http::Headers::get().Scheme, "http");
   message->headers().addViaMoveValue(Http::Headers::get().Method, "POST");
@@ -46,10 +40,7 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
   message->headers().addViaCopy(Http::Headers::get().ContentType, Common::GRPC_CONTENT_TYPE);
   message->body(serializeBody(*grpc_request));
 
-  http_request_ = client_->send(std::move(message), *this, timeout_);
-  if (!http_request_) {
-    onFailureWorker(Optional<uint64_t>(), "http request failure");
-  }
+  http_request_ = cm_.httpAsyncClientForCluster(cluster_).send(std::move(message), *this, timeout_);
 }
 
 void RpcChannelImpl::incStat(bool success) {
