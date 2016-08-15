@@ -33,6 +33,8 @@ miscellaneous configuration.
   *(required, object)* Configuration for the :ref:`cluster manager <arch_overview_cluster_manager>`
   which owns all upstream clusters within the server.
 
+.. _config_overview_flags_path:
+
 flags_path
   *(optional, string)* The file system path to search for :ref:`startup flag files
   <operations_file_system_flags>`.

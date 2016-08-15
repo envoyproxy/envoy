@@ -1,3 +1,5 @@
+.. _arch_overview_threading:
+
 Threading model
 ===============
 
