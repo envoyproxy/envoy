@@ -1,3 +1,5 @@
+.. _operations_stats:
+
 Statistics overview
 ===================
 
