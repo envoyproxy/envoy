@@ -32,17 +32,11 @@ public:
   virtual const Cluster* get(const std::string& cluster) PURE;
 
   /**
-   * @return whether the cluster manager knows about a particular cluster by name.
-   */
-  virtual bool has(const std::string& cluster) PURE;
-
-  /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that
    * callers do not need to worry about per thread synchronization. The load balancing policy that
    * is used is the one defined on the cluster when it was created.
    *
-   * Can return nullptr if there is no host available in the cluster or the cluster name is not
-   * valid.
+   * Can return nullptr if there is no host available in the cluster.
    */
   virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster) PURE;
 
@@ -52,15 +46,16 @@ public:
    * load balancing policy that is used is the one defined on the cluster when it was created.
    *
    * Returns both a connection and the host that backs the connection. Both can be nullptr if there
-   * is no host available in the cluster or the cluster name is not valid.
+   * is no host available in the cluster.
    */
   virtual Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) PURE;
 
   /**
-   * Returns a client that can be used to make async HTTP calls against the given cluster.  The
-   * client may be backed by a connection pool or by a multiplexed connection.
+   * Returns a client that can be used to make async HTTP calls against the given cluster. The
+   * client may be backed by a connection pool or by a multiplexed connection. The cluster manager
+   * owns the client.
    */
-  virtual Http::AsyncClientPtr httpAsyncClientForCluster(const std::string& cluster) PURE;
+  virtual Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) PURE;
 
   /**
    * Shutdown the cluster prior to destroying connection pools and other thread local data.

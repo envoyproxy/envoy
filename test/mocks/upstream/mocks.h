@@ -66,22 +66,18 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_};
   }
 
-  Http::AsyncClientPtr httpAsyncClientForCluster(const std::string& cluster) override {
-    return Http::AsyncClientPtr{httpAsyncClientForCluster_(cluster)};
-  }
-
   // Upstream::ClusterManager
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, std::unordered_map<std::string, ConstClusterPtr>());
   MOCK_METHOD1(get, const Cluster*(const std::string& cluster));
-  MOCK_METHOD1(has, bool(const std::string& cluster));
   MOCK_METHOD1(httpConnPoolForCluster, Http::ConnectionPool::Instance*(const std::string& cluster));
   MOCK_METHOD1(tcpConnForCluster_, MockHost::MockCreateConnectionData(const std::string& cluster));
-  MOCK_METHOD1(httpAsyncClientForCluster_, Http::AsyncClient*(const std::string& cluster));
+  MOCK_METHOD1(httpAsyncClientForCluster, Http::AsyncClient&(const std::string& cluster));
   MOCK_METHOD0(shutdown, void());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<MockCluster> cluster_;
+  NiceMock<Http::MockAsyncClient> async_client_;
 };
 
 class MockHealthChecker : public HealthChecker {

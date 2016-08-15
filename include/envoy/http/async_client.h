@@ -52,19 +52,18 @@ public:
     virtual void cancel() PURE;
   };
 
-  typedef std::unique_ptr<Request> RequestPtr;
-
   virtual ~AsyncClient() {}
 
   /**
    * Send an HTTP request asynchronously
-   * @param request the request to send
-   * @param callbacks the callbacks to be notified of request status
+   * @param request the request to send.
+   * @param callbacks the callbacks to be notified of request status.
    * @return a request handle or nullptr if no request could be created. NOTE: In this case
-   *         onFailure() has already been called inline.
+   *         onFailure() has already been called inline. The client owns the request and the
+   *         handle should just be used to cancel.
    */
-  virtual RequestPtr send(MessagePtr&& request, Callbacks& callbacks,
-                          const Optional<std::chrono::milliseconds>& timeout) PURE;
+  virtual Request* send(MessagePtr&& request, Callbacks& callbacks,
+                        const Optional<std::chrono::milliseconds>& timeout) PURE;
 };
 
 typedef std::unique_ptr<AsyncClient> AsyncClientPtr;

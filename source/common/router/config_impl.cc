@@ -194,7 +194,7 @@ VirtualHost::VirtualHost(const Json::Object& virtual_host, Runtime::Loader& runt
     }
 
     if (!routes_.back()->isRedirect()) {
-      if (!cm.has(routes_.back()->clusterName())) {
+      if (!cm.get(routes_.back()->clusterName())) {
         throw EnvoyException(
             fmt::format("route: unknown cluster '{}'", routes_.back()->clusterName()));
       }

@@ -78,13 +78,6 @@ public:
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
 private:
-  struct ActiveRequest {
-    Http::AsyncClientPtr client_;
-    Http::AsyncClient::RequestPtr request_;
-  };
-
-  typedef std::unique_ptr<ActiveRequest> ActiveRequestPtr;
-
   static GlobalStats generateStats(Stats::Store& store, const std::string& prefix);
   AllowedPrincipalsPtr parseAuthResponse(Http::Message& message);
   void refreshPrincipals();
@@ -94,7 +87,6 @@ private:
   uint32_t tls_slot_;
   Upstream::ClusterManager& cm_;
   const std::string auth_api_cluster_;
-  ActiveRequestPtr active_request_;
   Event::TimerPtr interval_timer_;
   Network::IpWhiteList ip_white_list_;
   GlobalStats stats_;

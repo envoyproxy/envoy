@@ -25,7 +25,7 @@ TEST(TcpProxyConfigTest, NoCluster) {
 
   Json::StringLoader config(json);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
-  EXPECT_CALL(cluster_manager, has("fake_cluster")).WillOnce(Return(false));
+  EXPECT_CALL(cluster_manager, get("fake_cluster")).WillOnce(Return(nullptr));
   EXPECT_THROW(TcpProxyConfig(config, cluster_manager, cluster_manager.cluster_.stats_store_),
                EnvoyException);
 }
@@ -41,7 +41,6 @@ public:
     )EOF";
 
     Json::StringLoader config(json);
-    EXPECT_CALL(cluster_manager_, has("fake_cluster")).WillOnce(Return(true));
     config_.reset(
         new TcpProxyConfig(config, cluster_manager_, cluster_manager_.cluster_.stats_store_));
   }

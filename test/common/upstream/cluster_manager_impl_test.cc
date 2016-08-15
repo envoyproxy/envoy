@@ -11,6 +11,7 @@
 
 using testing::_;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnNew;
 using testing::SaveArg;
 
@@ -28,46 +29,188 @@ public:
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(ConstHostPtr host));
 };
 
-TEST(ClusterManagerImplTest, DynamicHostRemove) {
+class ClusterManagerImplTest : public testing::Test {
+public:
+  void create(const Json::Object& config) {
+    cluster_manager_.reset(new ClusterManagerImplForTest(config, stats_, tls_, dns_resolver_,
+                                                         ssl_context_manager_, runtime_, random_,
+                                                         "us-east-1d"));
+  }
+
+  Stats::IsolatedStoreImpl stats_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Network::MockDnsResolver> dns_resolver_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
+  Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
+  std::unique_ptr<ClusterManagerImplForTest> cluster_manager_;
+};
+
+TEST_F(ClusterManagerImplTest, NoSdsConfig) {
   std::string json = R"EOF(
   {
-    "cluster_manager": {
-      "clusters": [
-      {
-        "name": "cluster_1",
-        "connect_timeout_ms": 250,
-        "type": "strict_dns",
-        "lb_type": "round_robin",
-        "hosts": [{"url": "tcp://localhost:11001"}]
-      }]
-    }
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "sds",
+      "lb_type": "round_robin"
+    }]
+  }
+  )EOF";
+
+  Json::StringLoader loader(json);
+  EXPECT_THROW(create(loader), EnvoyException);
+}
+
+TEST_F(ClusterManagerImplTest, UnknownClusterType) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "foo",
+      "lb_type": "round_robin"
+    }]
+  }
+  )EOF";
+
+  Json::StringLoader loader(json);
+  EXPECT_THROW(create(loader), EnvoyException);
+}
+
+TEST_F(ClusterManagerImplTest, DuplicateCluster) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    },
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    }]
+  }
+  )EOF";
+
+  Json::StringLoader loader(json);
+  EXPECT_THROW(create(loader), EnvoyException);
+}
+
+TEST_F(ClusterManagerImplTest, UnknownHcType) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}],
+      "health_check": {
+        "type": "foo"
+      }
+    }]
+  }
+  )EOF";
+
+  Json::StringLoader loader(json);
+  EXPECT_THROW(create(loader), EnvoyException);
+}
+
+TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}],
+      "health_check": {
+        "type": "tcp",
+        "timeout_ms": 1000,
+        "interval_ms": 1000,
+        "unhealthy_threshold": 2,
+        "healthy_threshold": 2,
+        "send": [
+          {"binary": "01"}
+        ],
+        "receive": [
+          {"binary": "02"}
+        ]
+      }
+    }]
+  }
+  )EOF";
+
+  Json::StringLoader loader(json);
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dns_resolver_.dispatcher_, createClientConnection_("tcp://127.0.0.1:11001"))
+      .WillOnce(Return(connection));
+  create(loader);
+}
+
+TEST_F(ClusterManagerImplTest, UnknownCluster) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    }]
+  }
+  )EOF";
+
+  Json::StringLoader loader(json);
+  create(loader);
+  EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
+  EXPECT_THROW(cluster_manager_->httpConnPoolForCluster("hello"), EnvoyException);
+  EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello"), EnvoyException);
+  EXPECT_THROW(cluster_manager_->httpAsyncClientForCluster("hello"), EnvoyException);
+}
+
+TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "strict_dns",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://localhost:11001"}]
+    }]
   }
   )EOF";
 
   Json::StringLoader loader(json);
 
-  Stats::IsolatedStoreImpl stats;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Network::MockDnsResolver> dns_resolver;
   Network::DnsResolver::ResolveCb dns_callback;
-  Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&dns_resolver.dispatcher_);
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Runtime::MockRandomGenerator> random;
-  Ssl::ContextManagerImpl ssl_context_manager(runtime);
-  EXPECT_CALL(dns_resolver, resolve(_, _)).WillRepeatedly(SaveArg<1>(&dns_callback));
-
-  ClusterManagerImplForTest cluster_manager(loader.getObject("cluster_manager"), stats, tls,
-                                            dns_resolver, ssl_context_manager, runtime, random,
-                                            "us-east-1d");
+  Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&dns_resolver_.dispatcher_);
+  EXPECT_CALL(dns_resolver_, resolve(_, _)).WillRepeatedly(SaveArg<1>(&dns_callback));
+  create(loader);
 
   // Test for no hosts returning the correct values before we have hosts.
-  EXPECT_EQ(nullptr, cluster_manager.httpConnPoolForCluster("cluster_1"));
-  EXPECT_EQ(nullptr, cluster_manager.tcpConnForCluster("cluster_1").connection_);
-  EXPECT_EQ(2UL, stats.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
+  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("cluster_1"));
+  EXPECT_EQ(nullptr, cluster_manager_->tcpConnForCluster("cluster_1").connection_);
+  EXPECT_EQ(2UL, stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
 
   // Set up for an initialize callback.
   ReadyWatcher initialized;
-  cluster_manager.setInitializedCb([&]() -> void { initialized.ready(); });
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
   dns_callback({"127.0.0.1", "127.0.0.2"});
@@ -75,17 +218,17 @@ TEST(ClusterManagerImplTest, DynamicHostRemove) {
   // After we are initialized, we should immediately get called back if someone asks for an
   // initialize callback.
   EXPECT_CALL(initialized, ready());
-  cluster_manager.setInitializedCb([&]() -> void { initialized.ready(); });
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  EXPECT_CALL(cluster_manager, allocateConnPool_(_))
+  EXPECT_CALL(*cluster_manager_, allocateConnPool_(_))
       .Times(2)
       .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
 
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 = dynamic_cast<Http::ConnectionPool::MockInstance*>(
-      cluster_manager.httpConnPoolForCluster("cluster_1"));
+      cluster_manager_->httpConnPoolForCluster("cluster_1"));
   Http::ConnectionPool::MockInstance* cp2 = dynamic_cast<Http::ConnectionPool::MockInstance*>(
-      cluster_manager.httpConnPoolForCluster("cluster_1"));
+      cluster_manager_->httpConnPoolForCluster("cluster_1"));
 
   EXPECT_NE(cp1, cp2);
 
@@ -100,7 +243,7 @@ TEST(ClusterManagerImplTest, DynamicHostRemove) {
 
   // Make sure we get back the same connection pool for the 2nd host as we did before the change.
   Http::ConnectionPool::MockInstance* cp3 = dynamic_cast<Http::ConnectionPool::MockInstance*>(
-      cluster_manager.httpConnPoolForCluster("cluster_1"));
+      cluster_manager_->httpConnPoolForCluster("cluster_1"));
   EXPECT_EQ(cp2, cp3);
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any

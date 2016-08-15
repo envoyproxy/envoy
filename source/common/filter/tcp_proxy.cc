@@ -16,7 +16,7 @@ TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
                                Upstream::ClusterManager& cluster_manager, Stats::Store& stats_store)
     : cluster_name_(config.getString("cluster")),
       stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
-  if (!cluster_manager.has(cluster_name_)) {
+  if (!cluster_manager.get(cluster_name_)) {
     throw EnvoyException(fmt::format("tcp proxy: unknown cluster '{}'", cluster_name_));
   }
 }

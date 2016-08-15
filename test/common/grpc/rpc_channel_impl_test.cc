@@ -12,20 +12,19 @@ namespace Grpc {
 
 class GrpcRequestImplTest : public testing::Test {
 public:
-  GrpcRequestImplTest() {
+  GrpcRequestImplTest() : http_async_client_request_(&cm_.async_client_) {
     ON_CALL(cm_.cluster_, features()).WillByDefault(Return(Upstream::Cluster::Features::HTTP2));
   }
 
-  void expectNormalRequest() {
-    http_async_client_ = new NiceMock<Http::MockAsyncClient>();
-    EXPECT_CALL(cm_, httpAsyncClientForCluster_("cluster")).WillOnce(Return(http_async_client_));
-    EXPECT_CALL(*http_async_client_, send_(_, _, _))
+  void expectNormalRequest(
+      const Optional<std::chrono::milliseconds> timeout = Optional<std::chrono::milliseconds>()) {
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster")).WillOnce(ReturnRef(cm_.async_client_));
+    EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
         .WillOnce(Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                              Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
           http_request_ = std::move(request);
           http_callbacks_ = &callbacks;
-          http_async_client_request_ = new Http::MockAsyncClientRequest(http_async_client_);
-          return http_async_client_request_;
+          return &http_async_client_request_;
         }));
   }
 
@@ -34,8 +33,7 @@ public:
   RpcChannelImpl grpc_request_{cm_, "cluster", grpc_callbacks_, cm_.cluster_.stats_store_,
                                Optional<std::chrono::milliseconds>()};
   helloworld::Greeter::Stub service_{&grpc_request_};
-  Http::MockAsyncClient* http_async_client_{};
-  Http::MockAsyncClientRequest* http_async_client_request_{};
+  Http::MockAsyncClientRequest http_async_client_request_;
   Http::MessagePtr http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_{};
 };
@@ -231,21 +229,16 @@ TEST_F(GrpcRequestImplTest, HttpAsyncRequestTimeout) {
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::RequestTimemout);
 }
 
-TEST_F(GrpcRequestImplTest, NoHttpAsyncClient) {
-  EXPECT_CALL(cm_, httpAsyncClientForCluster_("cluster")).WillOnce(Return(nullptr));
-  EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "http request failure"));
-
-  helloworld::HelloRequest request;
-  request.set_name("a name");
-  helloworld::HelloReply response;
-  service_.SayHello(nullptr, &request, &response, nullptr);
-}
-
 TEST_F(GrpcRequestImplTest, NoHttpAsyncRequest) {
-  Http::MockAsyncClient* http_async_client = new NiceMock<Http::MockAsyncClient>();
-  EXPECT_CALL(cm_, httpAsyncClientForCluster_("cluster")).WillOnce(Return(http_async_client));
-  EXPECT_CALL(*http_async_client, send_(_, _, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "http request failure"));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            callbacks.onFailure(Http::AsyncClient::FailureReason::Reset);
+            return nullptr;
+          }));
+  EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "stream reset"));
 
   helloworld::HelloRequest request;
   request.set_name("a name");
@@ -261,7 +254,7 @@ TEST_F(GrpcRequestImplTest, Cancel) {
   helloworld::HelloReply response;
   service_.SayHello(nullptr, &request, &response, nullptr);
 
-  EXPECT_CALL(*http_async_client_request_, cancel());
+  EXPECT_CALL(http_async_client_request_, cancel());
   grpc_request_.cancel();
 }
 
@@ -270,17 +263,7 @@ TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
   RpcChannelImpl grpc_request_timeout{cm_, "cluster", grpc_callbacks_, cm_.cluster_.stats_store_,
                                       timeout};
   helloworld::Greeter::Stub service_timeout{&grpc_request_timeout};
-  http_async_client_ = new NiceMock<Http::MockAsyncClient>();
-  EXPECT_CALL(cm_, httpAsyncClientForCluster_("cluster")).WillOnce(Return(http_async_client_));
-  EXPECT_CALL(*http_async_client_, send_(_, _, timeout))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-            http_request_ = std::move(request);
-            http_callbacks_ = &callbacks;
-            http_async_client_request_ = new Http::MockAsyncClientRequest(http_async_client_);
-            return http_async_client_request_;
-          }));
+  expectNormalRequest(timeout);
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;

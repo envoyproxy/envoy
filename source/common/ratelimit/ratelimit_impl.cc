@@ -60,7 +60,7 @@ void GrpcClientImpl::onFailure(const Optional<uint64_t>&, const std::string&) {
 GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm,
                                  Stats::Store& stats_store)
     : cluster_name_(config.getString("cluster_name")), cm_(cm), stats_store_(stats_store) {
-  if (!cm_.has(cluster_name_)) {
+  if (!cm_.get(cluster_name_)) {
     throw EnvoyException(fmt::format("unknown rate limit service cluster '{}'", cluster_name_));
   }
 }

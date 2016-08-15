@@ -62,8 +62,7 @@ private:
 
   Upstream::ClusterManager& cm_;
   const std::string cluster_;
-  Http::AsyncClientPtr client_;
-  Http::AsyncClient::RequestPtr http_request_;
+  Http::AsyncClient::Request* http_request_{};
   const proto::MethodDescriptor* grpc_method_{};
   proto::Message* grpc_response_{};
   RpcChannelCallbacks& callbacks_;

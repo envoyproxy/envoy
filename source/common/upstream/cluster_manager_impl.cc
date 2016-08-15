@@ -145,19 +145,11 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster) {
 
   // Select a host and create a connection pool for it if it does not already exist.
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
-  ConstHostPtr host = entry->second->lb_->chooseHost();
-  if (!host) {
-    entry->second->primary_cluster_.stats().upstream_cx_none_healthy_.inc();
-    return nullptr;
+  if (entry == cluster_manager.thread_local_clusters_.end()) {
+    throw EnvoyException(fmt::format("unknown cluster '{}'", cluster));
   }
 
-  if (cluster_manager.host_http_conn_pool_map_.find(host) ==
-      cluster_manager.host_http_conn_pool_map_.end()) {
-    cluster_manager.host_http_conn_pool_map_[host] =
-        allocateConnPool(cluster_manager.dispatcher_, host, stats_);
-  }
-
-  return cluster_manager.host_http_conn_pool_map_[host].get();
+  return entry->second->connPool();
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const ClusterImplBase& primary_cluster,
@@ -184,6 +176,10 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
       tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
+  if (entry == cluster_manager.thread_local_clusters_.end()) {
+    throw EnvoyException(fmt::format("unknown cluster '{}'", cluster));
+  }
+
   ConstHostPtr logical_host = entry->second->lb_->chooseHost();
   if (logical_host) {
     return logical_host->createConnection(cluster_manager.dispatcher_);
@@ -193,28 +189,28 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
   }
 }
 
-Http::AsyncClientPtr ClusterManagerImpl::httpAsyncClientForCluster(const std::string& cluster) {
-  Http::ConnectionPool::Instance* conn_pool = httpConnPoolForCluster(cluster);
+Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::string& cluster) {
   ThreadLocalClusterManagerImpl& cluster_manager =
       tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
-  if (conn_pool) {
-    return Http::AsyncClientPtr{
-        new Http::AsyncClientImpl(*conn_pool, cluster, stats_, cluster_manager.dispatcher_)};
+  auto entry = cluster_manager.thread_local_clusters_.find(cluster);
+  if (entry != cluster_manager.thread_local_clusters_.end()) {
+    return entry->second->http_async_client_;
   } else {
-    return nullptr;
+    throw EnvoyException(fmt::format("unknown cluster '{}'", cluster));
   }
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random)
-    : dispatcher_(dispatcher) {
+    : parent_(parent), dispatcher_(dispatcher) {
   for (auto& cluster : parent.primary_clusters_) {
-    thread_local_clusters_[cluster.first].reset(new ClusterEntry(*cluster.second, runtime, random));
+    thread_local_clusters_[cluster.first].reset(
+        new ClusterEntry(*this, *cluster.second, runtime, random, parent.stats_, dispatcher));
   }
 
   for (auto& cluster : thread_local_clusters_) {
-    cluster.second->host_set_->addMemberUpdateCb(
+    cluster.second->host_set_.addMemberUpdateCb(
         [this](const std::vector<HostPtr>&, const std::vector<HostPtr>& hosts_removed) -> void {
           // We need to go through and purge any connection pools for hosts that got deleted.
           // Right now hosts are specific to clusters, so even if two hosts actually point
@@ -245,7 +241,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
       tls.getTyped<ThreadLocalClusterManagerImpl>(thead_local_slot);
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
-  config.thread_local_clusters_[name]->host_set_->updateHosts(
+  config.thread_local_clusters_[name]->host_set_.updateHosts(
       hosts, healthy_hosts, local_zone_hosts, local_zone_healthy_hosts, hosts_added, hosts_removed);
 }
 
@@ -254,23 +250,41 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::shutdown() {
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
-    const Cluster& parent, Runtime::Loader& runtime, Runtime::RandomGenerator& random)
-    : host_set_(new HostSetImpl()), primary_cluster_(parent) {
+    ThreadLocalClusterManagerImpl& parent, const Cluster& cluster, Runtime::Loader& runtime,
+    Runtime::RandomGenerator& random, Stats::Store& stats_store, Event::Dispatcher& dispatcher)
+    : parent_(parent), primary_cluster_(cluster),
+      http_async_client_(cluster, *this, stats_store, dispatcher) {
 
-  switch (parent.lbType()) {
+  switch (cluster.lbType()) {
   case LoadBalancerType::LeastRequest: {
-    lb_.reset(new LeastRequestLoadBalancer(*host_set_, parent.stats(), runtime, random));
+    lb_.reset(new LeastRequestLoadBalancer(host_set_, cluster.stats(), runtime, random));
     break;
   }
   case LoadBalancerType::Random: {
-    lb_.reset(new RandomLoadBalancer(*host_set_, parent.stats(), runtime, random));
+    lb_.reset(new RandomLoadBalancer(host_set_, cluster.stats(), runtime, random));
     break;
   }
   case LoadBalancerType::RoundRobin: {
-    lb_.reset(new RoundRobinLoadBalancer(*host_set_, parent.stats(), runtime));
+    lb_.reset(new RoundRobinLoadBalancer(host_set_, cluster.stats(), runtime));
     break;
   }
   }
+}
+
+Http::ConnectionPool::Instance*
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool() {
+  ConstHostPtr host = lb_->chooseHost();
+  if (!host) {
+    primary_cluster_.stats().upstream_cx_none_healthy_.inc();
+    return nullptr;
+  }
+
+  if (parent_.host_http_conn_pool_map_.find(host) == parent_.host_http_conn_pool_map_.end()) {
+    parent_.host_http_conn_pool_map_[host] =
+        parent_.parent_.allocateConnPool(parent_.dispatcher_, host, parent_.parent_.stats_);
+  }
+
+  return parent_.host_http_conn_pool_map_[host].get();
 }
 
 Http::ConnectionPool::InstancePtr
