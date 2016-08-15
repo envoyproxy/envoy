@@ -44,6 +44,8 @@ ip_address
 port
   *(required, integer)* The port of the upstream host.
 
+.. _config_cluster_manager_sds_api_host_az:
+
 az
   *(optional, string)* The optional zone of the upstream host. Envoy uses the zone for various
   statistics and load balancing tasks documented elsewhere.

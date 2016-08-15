@@ -1,3 +1,5 @@
+.. _arch_overview_hot_restart:
+
 Hot restart
 ===========
 
@@ -12,7 +14,7 @@ hot restart functionality has has the following general architecture:
   protocol.
 * The new process fully initializes itself (loads the configuration, does an initial service
   discovery and health checking phase, etc.) before it asks for copies of the listen sockets from
-  the old process. The new process starts listening and then tells the old process to start 
+  the old process. The new process starts listening and then tells the old process to start
   draining.
 * During the draining phase, the old process attempts to gracefully close existing connections. How
   this is done depends on the configured filters. The drain time is configurable and as more time

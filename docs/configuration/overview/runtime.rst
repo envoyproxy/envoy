@@ -26,6 +26,8 @@ subdirectory
   if multiple systems share the same delivery mechanism. Envoy configuration elements can be
   contained in a dedicated subdirectory.
 
+.. _config_runtime_override_subdirectory:
+
 override_subdirectory
   *(optional, string)* Specifies an optional subdirectory to load within the root directory. If
   specified and the directory exists, configuration values within this directory will override those
