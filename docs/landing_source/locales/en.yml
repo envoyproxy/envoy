@@ -5,30 +5,23 @@ en:
     github: Github
     logo: Envoy
     search_placeholder: Search the docs
-    basics:
-      title: Basics
-      quickstart: Quickstart
-      install: Install
-      configuration: Configure
-    advanced:
-      title: Advanced
-      threat_model: Threat Model
-      contributing: Contributing
-    communication:
-      title: Communication
-      support: Support
-      security_reporting: Security Reporting
 
   introduction:
     first:
-      header: HTTP2 support
-      description: Envoy supports HTTP2.
+      header: Out of process architecture
+      description: >
+        Envoy is a self contained server. It runs alongside any application language or framework.
+        At Lyft we currently use it to proxy for PHP, Python, Go, Java, and C++.
     second:
-      header: Service discovery support
-      description: Envoy supports routing to services discovered via our service discovery service.
+      header: HTTP/2
+      description: >
+        Envoy has first class support for HTTP/2 for both incoming and outgoing connections. It is
+        a transparent HTTP/1.1 to HTTP/2 proxy.
     third:
-      header: AWS proxying
-      description: Envoy can be used as an AWS proxy.
+      header: Advanced load balancing
+      description: >
+        Envoy supports advanced load balancing features including automatic retries, circuit
+        breaking, global rate limiting, request shadowing, zone local load balancing, etc.
 
 # landing cta
   cta:
@@ -37,8 +30,8 @@ en:
 
 # index
   index:
-    headline: C++ front/service proxy
-    description: Envoy is an open source frontend and service proxy, from the developers at Lyft
+    headline: C++ L7 proxy and communication bus
+    description: Envoy is an open source edge and service proxy, from the developers at Lyft
 
 # footer
   built:

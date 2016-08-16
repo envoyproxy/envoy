@@ -63,6 +63,27 @@ layout: layout
         </div>
       </div>
     </div>
+    <p><b>Pluggable filter architecture:</b> Envoy allows filtering both at the network level
+       (TCP/IP) as well as at the HTTP level. Filters can be chained together to perform complex
+       tasks. New filters can be written to perform tasks not already supported.</p>
+    <p><b>Modern C++11 code base:</b> Envoy is written in C++11, yielding both great performance and
+       productivity.</p>
+    <p><b>HTTP L7 routing:</b> Envoy supports advanced HTTP L7 routing primitives including
+       redirection, virtual hosts, virtual clusters, matching on different request parameters, etc.
+       </p>
+    <p><b>SSL:</b> Envoy supports both SSL termination and initiation, client certificate
+        verification, and certificate pinning.</p>
+    <p><b>GRPC:</b>  Envoy has first class support for Google's GRPC framework.</p>
+    <p><b>MongoDB:</b> Envoy contains a full MongoDB wire format parser that is used to gather
+       statistics about database connections.</p>
+    <p><b>Service discovery:</b> Envoy supports multiple methods for service discovery including
+        asynchronous DNS resolution as well as integration with an external service discovery
+        service.</p>
+    <p><b>Health checking:</b> Envoy is capable of active health checking of backend servers.
+        Active health checking along with service discovery yields eventually consistent and
+        extremely resiliant load balancing.</p>
+    <p><b>Best in class observability:</b> Envoy exposes a multitude of statistics to aid in system
+        visibility and debugging.</p>
   </section>
 </div>
 
