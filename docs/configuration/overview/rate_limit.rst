@@ -32,4 +32,7 @@ config
 GRPC service IDL
 ----------------
 
-FIXFIX
+Envoy expects the rate limit service to support the GRPC IDL specified in
+:repo:`/source/common/ratelimit/ratelimit.proto`. See the IDL documentation for more information
+on how the API works. In the future Lyft will open source a reference service implementation
+written in Go.

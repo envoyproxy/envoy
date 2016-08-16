@@ -31,11 +31,11 @@ Statistics
 
 The TCP proxy filter emits both its own downstream statistics as well as many of the :ref:`cluster
 upstream statistics <config_cluster_manager_cluster_stats>` where applicable. The downstream
-statistics are rooted at *"tcp.<stat_prefix>."* with the following statistics:
+statistics are rooted at *tcp.<stat_prefix>.* with the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  downstream_cx_tx_bytes_total, Counter, Description
-  downstream_cx_tx_bytes_buffered, Gauge, Description
+  downstream_cx_tx_bytes_total, Counter, Total bytes written to the downstream connection.
+  downstream_cx_tx_bytes_buffered, Gauge, Total bytes currently buffered to the downstream connection.

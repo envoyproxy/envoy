@@ -47,12 +47,12 @@ following statistics:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  total, Counter, Description
-  error, Counter, Description
-  over_limit, Counter, Description
-  ok, Counter, Description
-  cx_closed, Counter, Description
-  active, Gauge, Description
+  total, Counter, Total requests to the rate limit service
+  error, Counter, Total errors contacting the rate limit service
+  over_limit, Counter, Total over limit responses from the rate limit service
+  ok, Counter, Total under limit responses from the rate limit service
+  cx_closed, Counter, Total connections closed due to an over limit response from the rate limit service
+  active, Gauge, Total active requests to the rate limit service
 
 Runtime
 -------
@@ -60,7 +60,8 @@ Runtime
 The network rate limit filter supports the following runtime settings:
 
 ratelimit.tcp_filter_enabled
-  FIXFIX
+  % of connections that will call the rate limit service. Defaults to 100.
 
 ratelimit.tcp_filter_enforcing
-  FIXFIX
+  % of connections that will call the rate limit service and enforce the decision. Defaults to 100.
+  This can be used to test what would happen before fully enforcing the outcome.

@@ -9,49 +9,49 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  upstream_cx_total, Counter, Description
-  upstream_cx_active, Gauge, Description
-  upstream_cx_http1_total, Counter, Description
-  upstream_cx_http2_total, Counter, Description
-  upstream_cx_connect_fail, Counter, Description
-  upstream_cx_connect_timeout, Counter, Description
-  upstream_cx_connect_ms, Timer, Description
-  upstream_cx_length_ms, Timer, Description
-  upstream_cx_destroy, Counter, Description
-  upstream_cx_destroy_local, Counter, Description
-  upstream_cx_destroy_remote, Counter, Description
-  upstream_cx_destroy_with_active_rq, Counter, Description
-  upstream_cx_destroy_local_with_active_rq, Counter, Description
-  upstream_cx_destroy_remote_with_active_rq, Counter, Description
-  upstream_cx_close_header, Counter, Description
-  upstream_cx_rx_bytes_total, Counter, Description
-  upstream_cx_rx_bytes_buffered, Gauge, Description
-  upstream_cx_tx_bytes_total, Counter, Description
-  upstream_cx_tx_bytes_buffered, Gauge, Description
-  upstream_cx_protocol_error, Counter, Description
-  upstream_cx_max_requests, Counter, Description
-  upstream_cx_none_healthy, Counter, Description
-  upstream_rq_total, Counter, Description
-  upstream_rq_active, Gauge, Description
-  upstream_rq_pending_total, Counter, Description
-  upstream_rq_pending_overflow, Counter, Description
-  upstream_rq_pending_failure_eject, Counter, Description
-  upstream_rq_pending_active, Gauge, Description
-  upstream_rq_cancelled, Counter, Description
-  upstream_rq_timeout, Counter, Description
-  upstream_rq_per_try_timeout, Counter, Description
-  upstream_rq_rx_reset, Counter, Description
-  upstream_rq_tx_reset, Counter, Description
-  upstream_rq_retry, Counter, Description
-  upstream_rq_retry_success, Counter, Description
-  upstream_rq_retry_overflow, Counter, Description
-  upstream_rq_lb_healthy_panic, Counter, Description
-  membership_change, Counter, Description
-  membership_total, Gauge, Description
-  update_attempt, Counter, Description
-  update_success, Counter, Description
-  update_failure, Counter, Description
-  max_host_weight, Gauge, Description
+  upstream_cx_total, Counter, Total connections
+  upstream_cx_active, Gauge, Total active connections
+  upstream_cx_http1_total, Counter, Total HTTP/1.1 connections
+  upstream_cx_http2_total, Counter, Total HTTP/2 connections
+  upstream_cx_connect_fail, Counter, Total connection failures
+  upstream_cx_connect_timeout, Counter, Total connection timeouts
+  upstream_cx_connect_ms, Timer, Connection establishment milliseconds
+  upstream_cx_length_ms, Timer, Connection length milliseconds
+  upstream_cx_destroy, Counter, Total destroyed connections
+  upstream_cx_destroy_local, Counter, Total connections destroyed locally
+  upstream_cx_destroy_remote, Counter, Total connections destroyed remotely
+  upstream_cx_destroy_with_active_rq, Counter, Total connections destroyed with 1+ active request
+  upstream_cx_destroy_local_with_active_rq, Counter, Total connections destroyed locally with 1+ active request
+  upstream_cx_destroy_remote_with_active_rq, Counter, Total connections destroyed remotely with 1+ active request
+  upstream_cx_close_header, Counter, Total connections closed via HTTP/1.1 connection close header
+  upstream_cx_rx_bytes_total, Counter, Total received connection bytes
+  upstream_cx_rx_bytes_buffered, Gauge, Received connection bytes currently buffered
+  upstream_cx_tx_bytes_total, Counter, Total sent connection bytes
+  upstream_cx_tx_bytes_buffered, Gauge, Send connection bytes currently buffered
+  upstream_cx_protocol_error, Counter, Total connection protocol errors
+  upstream_cx_max_requests, Counter, Total connections closed due to maximum requests
+  upstream_cx_none_healthy, Counter, Total times connection not established due to no healthy hosts
+  upstream_rq_total, Counter, Total requests
+  upstream_rq_active, Gauge, Total active requests
+  upstream_rq_pending_total, Counter, Total requests pending a connection pool connection
+  upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool circuit breaking and were failed
+  upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure
+  upstream_rq_pending_active, Gauge, Total active requests pending a connection pool connection
+  upstream_rq_cancelled, Counter, Total requests cancelled before obtaining a connection pool connection
+  upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
+  upstream_rq_per_try_timeout, Counter, Total requests that hit the per try timeout
+  upstream_rq_rx_reset, Counter, Total requests that were reset remotely
+  upstream_rq_tx_reset, Counter, Total requests that were reset locally
+  upstream_rq_retry, Counter, Total request retries
+  upstream_rq_retry_success, Counter, Total request retry successes
+  upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking
+  upstream_rq_lb_healthy_panic, Counter, Total requests load balanced with the load balancer in panic mode
+  membership_change, Counter, Total cluster membership changes
+  membership_total, Gauge, Current cluster membership total
+  update_attempt, Counter, Total cluster membership update attempts
+  update_success, Counter, Total cluster membership update successes
+  update_failure, Counter, Total cluster membership update failures
+  max_host_weight, Gauge, Maximum weight of any host in the cluster
 
 Health check statistics
 -----------------------

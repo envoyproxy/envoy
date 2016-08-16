@@ -56,6 +56,11 @@ system:
   and gather more interesting statistics based on zone, canary status, etc. The load balancer also
   supports advanced features such as retry.
 
+AWS recently released the *application load balancer* product. This product adds HTTP/2 support as
+well as basic HTTP L7 request routing to multiple backend clusters. The feature set is still small
+compared to Envoy and performance and stability are unknown, but it's clear that AWS will continue
+to invest in this area in the future.
+
 `SmartStack <http://nerds.airbnb.com/smartstack-service-discovery-cloud/>`_
 ---------------------------------------------------------------------------
 

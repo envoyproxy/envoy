@@ -43,9 +43,9 @@ The buffer filter outputs statistics in the *cluster.<route target cluster>.rate
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  ok, Counter, Description
-  error, Counter, Description
-  over_limit, Counter, Description
+  ok, Counter, Total under limit responses from the rate limit service
+  error, Counter, Total errors contacting the rate limit service
+  over_limit, Counter, total over limit responses from the rate limit service
 
 Runtime
 -------
@@ -53,7 +53,8 @@ Runtime
 The HTTP rate limit filter supports the following runtime settings:
 
 ratelimit.http_filter_enabled
-  FIXFIX
+  % of requests that will call the rate limit service. Defaults to 100.
 
 ratelimit.http_filter_enforcing
-  FIXFIX
+  % of requests that will call the rate limit service and enforce the decision. Defaults to 100.
+  This can be used to test what would happen before fully enforcing the outcome.

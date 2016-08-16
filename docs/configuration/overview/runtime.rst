@@ -44,8 +44,8 @@ The file system runtime provider emits some statistics in the *runtime.* namespa
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  load_error, Counter, Description
-  override_dir_not_exists, Counter, Description
-  override_dir_exists, Counter, Description
-  load_success, Counter, Description
-  num_keys, Gauge, Description
+  load_error, Counter, Total number of load attempts that resulted in an error
+  override_dir_not_exists, Counter, Total number of loads that did not use an override directory
+  override_dir_exists, Counter, Total number of loads that did use an override directory
+  load_success, Counter, Total number of load attempts that were successful
+  num_keys, Gauge, Number of keys currently loaded
