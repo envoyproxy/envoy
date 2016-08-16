@@ -25,15 +25,15 @@ modify different aspects of the server.
     :header: Name, Type, Description
     :widths: 1, 1, 2
 
-    cx_total, Counter, FIXFIX
-    cx_active, Gauge, FIXFIX
-    cx_connect_fail, Counter, FIXFIX
-    rq_total, Counter, FIXFIX
-    rq_active, Gauge, FIXFIX
-    healthy, Boolean, FIXFIX
-    weight, Integer, FIXFIX
-    zone, String, FIXFIX
-    canary, Boolean, FIXFIX
+    cx_total, Counter, Total connections
+    cx_active, Gauge, Total active connections
+    cx_connect_fail, Counter, Total connection failures
+    rq_total, Counter, Total requests
+    rq_active, Gauge, Total active requests
+    healthy, Boolean, Whether the host is healthy (1) or not (0)
+    weight, Integer, Load balancing weight (1-100)
+    zone, String, Service zone
+    canary, Boolean, Whether the host is a canary
 
 .. http:get:: /cpuprofiler
 

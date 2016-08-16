@@ -154,9 +154,9 @@ prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  no_route, Counter, Description
-  rq_redirect, Counter, Description
-  rq_total, Counter, Description
+  no_route, Counter, Total requests that had no route and resulted in a 404
+  rq_redirect, Counter, Total requests that resulted in a redirect response
+  rq_total, Counter, Total routed requests
 
 Runtime
 -------
@@ -164,10 +164,14 @@ Runtime
 The router filter supports the following runtime settings:
 
 upstream.base_retry_backoff_ms
-  FIXFIX
+  Base exponential retry back off time. See :ref:`here <arch_overview_http_routing_retry>` for more
+  information. Defaults to 25ms.
 
 upstream.maintenance_mode.<cluster name>
-  FIXFIX
+  % of requests that will result in an immediate 503 response. This overrides any routing behavior
+  for requests that would have been destined for <cluster name>. This can be used for load
+  shedding, failure injection, etc. Defaults to disabled.
 
 upstream.use_retry
-  FIXFIX
+  % of requests that are eligible for retry. This configuration is checked before any other retry
+  configuration and can be used to fully disable retries across all Envoys if needed.

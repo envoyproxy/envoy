@@ -36,5 +36,5 @@ prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  rq_timeout, Counter, Description
-  rq_too_large, Counter, Description
+  rq_timeout, Counter, Total requests that timed out waiting for a full request
+  rq_too_large, Counter, Total requests that failed due to being too large

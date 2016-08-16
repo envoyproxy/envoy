@@ -33,6 +33,8 @@ alpn_protocols
   * "h2,http/1.1" If the listener is going to support both HTTP/2 and HTTP/1.1.
   * "http/1.1" If the listener is only going to support HTTP/1.1
 
+.. _config_listener_ssl_context_alt_alpn:
+
 alt_alpn_protocols
   *(optional, string)* An alternate ALPN protocol string that can be switched to via runtime. This
   is useful for example to disable HTTP/2 without having to deploy a new configuration.

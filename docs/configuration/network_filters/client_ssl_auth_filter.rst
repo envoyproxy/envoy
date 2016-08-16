@@ -52,13 +52,13 @@ Every configured client SSL authentication filter has statistics rooted at
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  update_success, Counter, Description
-  update_failure, Counter, Description
-  auth_no_ssl, Counter, Description
-  auth_ip_white_list, Counter, Description
-  auth_digest_match, Counter, Description
-  auth_digest_no_match, Counter, Description
-  total_principals, Gauge, Description
+  update_success, Counter, Total principal update successes
+  update_failure, Counter, Total principal update failures
+  auth_no_ssl, Counter, Total connections ignored due to no SSL
+  auth_ip_white_list, Counter, Total connections allowed due to the IP white list
+  auth_digest_match, Counter, Total connections allowed due to certificate match
+  auth_digest_no_match, Counter, Total connections denied due to no certificate match
+  total_principals, Gauge, Total loaded principals
 
 Runtime
 -------
@@ -66,11 +66,36 @@ Runtime
 The client SSL authentication filter supports the following runtime settings:
 
 auth.clientssl.refresh_interval_ms
-  FIXFIX
+  Time in milliseconds between principal refreshes from the authentication service. Default is
+  60000 (60s).
 
 .. _config_network_filters_client_ssl_auth_rest_api:
 
 REST API
 --------
 
-FIXFIX
+.. http:get:: /v1/certs/list/approved
+
+  The authentication filter will call this API every refresh interval to fetch the current list
+  of approved certificates/principals. The expected JSON response looks like:
+
+  .. code-block:: json
+
+    {
+      "certificates": []
+    }
+
+  certificates
+    *(required, array)* list of approved certificates/principals.
+
+  Each certificate object is defined as:
+
+  .. code-block:: json
+
+    {
+      "fingerprint_sha256": "...",
+    }
+
+  fingerprint_sha256
+    *(required, string)* The SHA256 hash of the approved client certificate. Envoy will match this
+    hash to the presented client certificate to determine whether there is a digest match.

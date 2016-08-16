@@ -51,6 +51,6 @@ The filter emits statistics in the *cluster.<route target cluster>.grpc.* namesp
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  <grpc service>.<grpc method>.success, Counter, Description
-  <grpc service>.<grpc method>.failure, Counter, Description
-  <grpc service>.<grpc method>.total, Counter, Description
+  <grpc service>.<grpc method>.success, Counter, Total successful service/method calls
+  <grpc service>.<grpc method>.failure, Counter, Total failed service/method calls
+  <grpc service>.<grpc method>.total, Counter, Total service/method calls
