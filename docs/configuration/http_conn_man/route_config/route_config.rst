@@ -53,3 +53,4 @@ response_headers_to_remove
   vhost
   route
   vcluster
+  route_matching
