@@ -31,7 +31,7 @@ modify different aspects of the server.
     rq_total, Counter, Total requests
     rq_active, Gauge, Total active requests
     healthy, Boolean, Whether the host is healthy (1) or not (0)
-    weight, Integer, Load balancing weight (0-100)
+    weight, Integer, Load balancing weight (1-100)
     zone, String, Service zone
     canary, Boolean, Whether the host is a canary
 
