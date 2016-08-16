@@ -63,7 +63,7 @@ If health check is configured, the cluster has an additional statistics tree roo
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  attempt, Counter, Total number of health checks
+  attempt, Counter, Number of health checks
   success, Counter, Number of successful health checks
   failure, Counter, Number of failed health checks
   timeout, Counter, Number of timed out health checks
@@ -78,17 +78,32 @@ Dynamic HTTP statistics
 
 If HTTP is used, dynamic HTTP response code statistics are also available. These are emitted by
 various internal systems as well as some filters such as the :ref:`router filter
-<config_http_filters_router>` and :ref:`rate limit filter <config_http_filters_rate_limit>`.
+<config_http_filters_router>` and :ref:`rate limit filter <config_http_filters_rate_limit>`. They
+are rooted at *cluster.<name>.* and contain the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  stat1, Counter, Description
+  upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
+  upstream_rq<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
+  upstream_rq_time, Timer, Request time milliseconds
+  canary.upstream_rq_<\*xx>, Counter, Upstream canary aggregate HTTP response codes
+  canary.upstream_rq<\*>, Counter, Upstream canary specific HTTP response codes
+  canary.upstream_rq_time, Timer, Upstream canary request time milliseconds
+  internal.upstream_rq_<\*xx>, Counter, Internal origin aggregate HTTP response codes
+  internal.upstream_rq<\*>, Counter, Internal origin specific HTTP response codes
+  internal.upstream_rq_time, Timer, Internal origin request time milliseconds
+  external.upstream_rq_<\*xx>, Counter, External origin aggregate HTTP response codes
+  external.upstream_rq<\*>, Counter, External origin specific HTTP response codes
+  external.upstream_rq_time, Timer, External origin request time milliseconds
 
 .. _config_cluster_manager_cluster_stats_alt_tree:
 
 Alternate tree dynamic HTTP statistics
 --------------------------------------
 
-FIXFIX
+If alternate tree statistics are configured, they will be present in the
+*cluster.<name>.<alt name>.* namespace. The statistics produced are the same as documented in
+the dynamic HTTP statistics section :ref:`above
+<config_cluster_manager_cluster_stats_dynamic_http>`.

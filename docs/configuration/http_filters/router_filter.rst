@@ -147,6 +147,9 @@ responses.
 Statistics
 ----------
 
+The router outputs many statistics in the cluster namespace (depending on the cluster specified in
+the chosen route). See :ref:`here <config_cluster_manager_cluster_stats>` for more information.
+
 The router filter outputs statistics in the *http.<stat_prefix>.* namespace. The :ref:`stat
 prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection manager.
 
@@ -157,6 +160,18 @@ prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection
   no_route, Counter, Total requests that had no route and resulted in a 404
   rq_redirect, Counter, Total requests that resulted in a redirect response
   rq_total, Counter, Total routed requests
+
+Virtual cluster statistics are output in the
+*vhost.<virtual host name>.vcluster.<virtual cluster name>.* namespace and include the following
+statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
+  upstream_rq<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
+  upstream_rq_time, Timer, Request time milliseconds
 
 Runtime
 -------
