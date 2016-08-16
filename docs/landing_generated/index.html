@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta content="IE=edge,chrome=1" http-equiv="X-UA-Compatible">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Envoy: C++ front/service proxy</title>
+    <title>Envoy: C++ L7 proxy and communication bus</title>
     <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Source+Code+Pro">
     <link href="stylesheets/site-820e35f9.css" rel="stylesheet" type="text/css" />
   </head>
@@ -34,8 +34,8 @@
 </nav>
 
   <section class="body-content-container wrap-container" data-waypoint="hero-content">
-    <h2 class="hero-headline">C++ front/service proxy</h2>
-    <h3 class="hero-description">Envoy is an open source frontend and service proxy, from the developers at Lyft</h3>
+    <h2 class="hero-headline">C++ L7 proxy and communication bus</h2>
+    <h3 class="hero-description">Envoy is an open source edge and service proxy, from the developers at Lyft</h3>
     <div class="hero-banner-container">
       <div class="laptop">
       </div>
@@ -60,10 +60,11 @@
         </div>
         <div class="introduction-item-text-wrapper">
           <h4 class="introduction-item-header">
-            HTTP2 support
+            Out of process architecture
           </h4>
           <p class="introduction-item-text">
-            Envoy supports HTTP2.
+            Envoy is a self contained server. It runs alongside any application language or framework. At Lyft we currently use it to proxy for PHP, Python, Go, Java, and C++.
+
           </p>
         </div>
       </div>
@@ -71,10 +72,11 @@
       <div class="introduction-item third-graphic">
         <div class="introduction-item-text-wrapper">
           <h4 class="introduction-item-header">
-            Service discovery support
+            HTTP/2
           </h4>
           <p class="introduction-item-text">
-            Envoy supports routing to services discovered via our service discovery service.
+            Envoy has first class support for HTTP/2 for both incoming and outgoing connections. It is a transparent HTTP/1.1 to HTTP/2 proxy.
+
           </p>
         </div>
         <div class="introduction-item-graphic-wrapper">
@@ -90,14 +92,36 @@
         </div>
         <div class="introduction-item-text-wrapper">
           <h4 class="introduction-item-header">
-            AWS proxying
+            Advanced load balancing
           </h4>
           <p class="introduction-item-text">
-            Envoy can be used as an AWS proxy.
+            Envoy supports advanced load balancing features including automatic retries, circuit breaking, global rate limiting, request shadowing, zone local load balancing, etc.
+
           </p>
         </div>
       </div>
     </div>
+    <p><b>Pluggable filter architecture:</b> Envoy allows filtering both at the network level
+       (TCP/IP) as well as at the HTTP level. Filters can be chained together to perform complex
+       tasks. New filters can be written to perform tasks not already supported.</p>
+    <p><b>Modern C++11 code base:</b> Envoy is written in C++11, yielding both great performance and
+       productivity.</p>
+    <p><b>HTTP L7 routing:</b> Envoy supports advanced HTTP L7 routing primitives including
+       redirection, virtual hosts, virtual clusters, matching on different request parameters, etc.
+       </p>
+    <p><b>SSL:</b> Envoy supports both SSL termination and initiation, client certificate
+        verification, and certificate pinning.</p>
+    <p><b>GRPC:</b>  Envoy has first class support for Google's GRPC framework.</p>
+    <p><b>MongoDB:</b> Envoy contains a full MongoDB wire format parser that is used to gather
+       statistics about database connections.</p>
+    <p><b>Service discovery:</b> Envoy supports multiple methods for service discovery including
+        asynchronous DNS resolution as well as integration with an external service discovery
+        service.</p>
+    <p><b>Health checking:</b> Envoy is capable of active health checking of backend servers.
+        Active health checking along with service discovery yields eventually consistent and
+        extremely resiliant load balancing.</p>
+    <p><b>Best in class observability:</b> Envoy exposes a multitude of statistics to aid in system
+        visibility and debugging.</p>
   </section>
 </div>
 
