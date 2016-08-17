@@ -112,4 +112,4 @@ little effort has been put into micro performance optimizations of the native co
 performance tuning will find ample opportunity for improvement. The code has been written to be
 modular and easy to test versus aiming for the greatest possible absolute performance. It's our
 view that this is a more efficient use of time given that typical deployments will be alongside
-languages and runtimes many times slower and with many timers greater memory usage.
+languages and runtimes many times slower and with many times greater memory usage.
