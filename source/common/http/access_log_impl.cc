@@ -19,7 +19,8 @@
 namespace Http {
 namespace AccessLog {
 
-FilterImpl::FilterImpl(Json::Object& json) : value_(json.getInteger("value")) {
+FilterImpl::FilterImpl(Json::Object& json, Runtime::Loader& runtime)
+    : value_(json.getInteger("value")), runtime_(runtime) {
   std::string op = json.getString("op");
   if (op == ">=") {
     op_ = FilterOperation::GreaterEqual;
@@ -28,14 +29,24 @@ FilterImpl::FilterImpl(Json::Object& json) : value_(json.getInteger("value")) {
   } else {
     throw EnvoyException(fmt::format("invalid access log filter op '{}'", op));
   }
+
+  if (json.hasObject("runtime_key")) {
+    runtime_key_.value(json.getString("runtime_key"));
+  }
 }
 
 bool FilterImpl::compareAgainstValue(uint64_t lhs) {
+  uint64_t value = value_;
+
+  if (runtime_key_.valid()) {
+    value = runtime_.snapshot().getInteger(runtime_key_.value(), value);
+  }
+
   switch (op_) {
   case FilterOperation::GreaterEqual:
-    return lhs >= value_;
+    return lhs >= value;
   case FilterOperation::Equal:
-    return lhs == value_;
+    return lhs == value;
   }
 
   NOT_IMPLEMENTED;
@@ -44,9 +55,9 @@ bool FilterImpl::compareAgainstValue(uint64_t lhs) {
 FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {
   std::string type = json.getString("type");
   if (type == "status_code") {
-    return FilterPtr{new StatusCodeFilter(json)};
+    return FilterPtr{new StatusCodeFilter(json, runtime)};
   } else if (type == "duration") {
-    return FilterPtr{new DurationFilter(json)};
+    return FilterPtr{new DurationFilter(json, runtime)};
   } else if (type == "runtime") {
     return FilterPtr{new RuntimeFilter(json, runtime)};
   } else if (type == "logical_or") {
