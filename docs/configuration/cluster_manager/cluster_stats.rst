@@ -86,16 +86,16 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   :widths: 1, 1, 2
 
   upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
-  upstream_rq<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
+  upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
   upstream_rq_time, Timer, Request time milliseconds
   canary.upstream_rq_<\*xx>, Counter, Upstream canary aggregate HTTP response codes
-  canary.upstream_rq<\*>, Counter, Upstream canary specific HTTP response codes
+  canary.upstream_rq_<\*>, Counter, Upstream canary specific HTTP response codes
   canary.upstream_rq_time, Timer, Upstream canary request time milliseconds
   internal.upstream_rq_<\*xx>, Counter, Internal origin aggregate HTTP response codes
-  internal.upstream_rq<\*>, Counter, Internal origin specific HTTP response codes
+  internal.upstream_rq_<\*>, Counter, Internal origin specific HTTP response codes
   internal.upstream_rq_time, Timer, Internal origin request time milliseconds
   external.upstream_rq_<\*xx>, Counter, External origin aggregate HTTP response codes
-  external.upstream_rq<\*>, Counter, External origin specific HTTP response codes
+  external.upstream_rq_<\*>, Counter, External origin specific HTTP response codes
   external.upstream_rq_time, Timer, External origin request time milliseconds
 
 .. _config_cluster_manager_cluster_stats_alt_tree:
