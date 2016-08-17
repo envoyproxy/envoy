@@ -132,7 +132,8 @@ Status code
     "filter": {
       "type": "status_code",
       "op": "...",
-      "value": "..."
+      "value": "...",
+      "runtime_key": "..."
     }
   }
 
@@ -142,7 +143,10 @@ op
   *(required, string)* Comparison operator. Currently *>=* is the only supported operator.
 
 value
-  *(required, integer)* The value to compare against.
+  *(required, integer)* Default value to compare against if runtime value is not available.
+
+runtime_key
+  *(optional, string)* Runtime key to get value for comparision, use this value if defined.
 
 Duration
 ^^^^^^^^
@@ -153,7 +157,8 @@ Duration
     "filter": {
       "type": "duration",
       "op": "..",
-      "value": "..."
+      "value": "...",
+      "runtime_key": "..."
     }
   }
 
@@ -163,7 +168,11 @@ op
   *(required, string)* Comparison operator. Currently *>=* is the only supported operator.
 
 value
-  *(required, integer)* The value to compare against.
+  *(required, integer)* Default value to compare against if runtime values is not available.
+
+runtime_key
+  *(optional, string)* Runtime key to get value for comparision, use this value if defined.
+
 
 Not health check
 ^^^^^^^^^^^^^^^^

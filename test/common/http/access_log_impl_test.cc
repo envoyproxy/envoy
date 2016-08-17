@@ -581,5 +581,61 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   }
 }
 
+TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
+  std::string filter_json = R"EOF(
+    {
+      "filter": {"type": "duration", "op": ">=", "value": 1000000, "runtime_key": "key"}
+    }
+    )EOF";
+
+  Json::StringLoader loader(filter_json);
+  NiceMock<Runtime::MockLoader> runtime;
+
+  Json::Object filter_object = loader.getObject("filter");
+  DurationFilter filter(filter_object, runtime);
+  HeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  TestRequestInfo request_info;
+
+  request_info.duration_ = 100;
+
+  EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
+  EXPECT_TRUE(filter.evaluate(request_info, request_headers));
+
+  EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1000));
+  EXPECT_FALSE(filter.evaluate(request_info, request_headers));
+
+  request_info.duration_ = 100000001;
+  EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
+  EXPECT_TRUE(filter.evaluate(request_info, request_headers));
+
+  request_info.duration_ = 10;
+  EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
+  EXPECT_FALSE(filter.evaluate(request_info, request_headers));
+}
+
+TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
+  std::string filter_json = R"EOF(
+    {
+      "filter": {"type": "status_code", "op": ">=", "value": 300, "runtime_key": "key"}
+    }
+    )EOF";
+
+  Json::StringLoader loader(filter_json);
+  NiceMock<Runtime::MockLoader> runtime;
+
+  Json::Object filter_object = loader.getObject("filter");
+  StatusCodeFilter filter(filter_object, runtime);
+
+  HeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  TestRequestInfo info;
+
+  info.response_code_.value(400);
+  EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
+  EXPECT_TRUE(filter.evaluate(info, request_headers));
+
+  EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(500));
+  EXPECT_FALSE(filter.evaluate(info, request_headers));
+}
+
 } // AccessLog
 } // Http
