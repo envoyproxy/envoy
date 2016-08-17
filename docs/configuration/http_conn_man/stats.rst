@@ -50,4 +50,14 @@ statistics:
 Per user agent statistics
 -------------------------
 
-FIXFIX
+Additional per user agent statistics are rooted at *http.<stat_prefix>.user_agent.<user_agent>.*
+Currently Envoy matches user agent for both iOS (*ios*) and Android (*android*) and produces
+the following statistics:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   downstream_cx_total, Counter, Total connections
+   downstream_cx_destroy_remote_active_rq, Counter, Total connections destroyed remotely with 1+ active requests
+   downstream_rq_total, Counter, Total requests
