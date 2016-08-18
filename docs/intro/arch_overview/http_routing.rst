@@ -17,7 +17,7 @@ request. The router filter supports the following features:
   programmatically determine whether routing rules conflict with each other. For this reason we
   don’t recommend regex/slug routing at the reverse proxy level, however we may add support in the
   future depending on demand.
-* SSL redirection at the virtual host level.
+* TLS redirection at the virtual host level.
 * Path/host redirection at the route level.
 * Host rewriting.
 * Prefix rewriting.

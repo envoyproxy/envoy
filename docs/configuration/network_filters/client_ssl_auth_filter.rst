@@ -1,9 +1,9 @@
 .. _config_network_filters_client_ssl_auth:
 
-Client SSL authentication
+Client TLS authentication
 =========================
 
-Client SSL authentication filter :ref:`architecture overview <arch_overview_ssl_auth_filter>`.
+Client TLS authentication filter :ref:`architecture overview <arch_overview_ssl_auth_filter>`.
 
 .. code-block:: json
 
@@ -45,7 +45,7 @@ ip_white_list
 Statistics
 ----------
 
-Every configured client SSL authentication filter has statistics rooted at
+Every configured client TLS authentication filter has statistics rooted at
 *auth.clientssl.<stat_prefix>.* with the following statistics:
 
 .. csv-table::
@@ -54,7 +54,7 @@ Every configured client SSL authentication filter has statistics rooted at
 
   update_success, Counter, Total principal update successes
   update_failure, Counter, Total principal update failures
-  auth_no_ssl, Counter, Total connections ignored due to no SSL
+  auth_no_ssl, Counter, Total connections ignored due to no TLS
   auth_ip_white_list, Counter, Total connections allowed due to the IP white list
   auth_digest_match, Counter, Total connections allowed due to certificate match
   auth_digest_no_match, Counter, Total connections denied due to no certificate match
@@ -63,7 +63,7 @@ Every configured client SSL authentication filter has statistics rooted at
 Runtime
 -------
 
-The client SSL authentication filter supports the following runtime settings:
+The client TLS authentication filter supports the following runtime settings:
 
 auth.clientssl.refresh_interval_ms
   Time in milliseconds between principal refreshes from the authentication service. Default is

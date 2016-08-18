@@ -37,11 +37,11 @@ codec_type
 
   http2
     The connection manager will assume that the client is speaking HTTP/2 (Envoy does not require
-    HTTP/2 to take place over SSL or to use ALPN. Prior knowledge is allowed).
+    HTTP/2 to take place over TLS or to use ALPN. Prior knowledge is allowed).
 
   auto
     For every new connection, the connection manager will determine which codec to use. This mode
-    supports both ALPN for SSL listeners as well as protocol inference for plaintext listeners.
+    supports both ALPN for TLS listeners as well as protocol inference for plaintext listeners.
     If ALPN data is available, it is preferred, otherwise protocol inference is used. In almost
     all cases, this is the right option to choose for this setting.
 

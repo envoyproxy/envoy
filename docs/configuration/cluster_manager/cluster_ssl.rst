@@ -1,6 +1,6 @@
 .. _config_cluster_manager_cluster_ssl:
 
-SSL context
+TLS context
 ===========
 
 .. code-block:: json
@@ -27,7 +27,7 @@ alpn_protocols
 
 cert_chain_file
   *(optional, string)* The certificate chain file that should be served by the connection. This is
-  used to provide a client side SSL certificate to an upstream host.
+  used to provide a client side TLS certificate to an upstream host.
 
 private_key_file
   *(optional, string)* The private key that corresponds to the certificate chain file.
@@ -45,9 +45,9 @@ verify_subject_alt_name
   name matches the specified value.
 
 cipher_suites
-  *(optional, string)* If specified, the SSL connection will only support the specified cipher list.
+  *(optional, string)* If specified, the TLS connection will only support the specified cipher list.
   If not specified, a default list will be used.
 
 sni
-  *(optional, string)* If specified, the string will be presented as the SNI during the SSL
+  *(optional, string)* If specified, the string will be presented as the SNI during the TLS
   handshake.

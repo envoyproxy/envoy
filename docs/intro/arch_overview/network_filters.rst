@@ -14,7 +14,7 @@ filters:
   connection and when it is about to send data to a downstream connection.
 
 The API for network level filters is relatively simple since ultimately the filters operate on raw
-bytes and a small number of connection events (e.g., SSL handshake complete, connection disconnected
+bytes and a small number of connection events (e.g., TLS handshake complete, connection disconnected
 locally or remotely, etc.). Filters in the chain can stop and subsequently continue iteration to
 further filters. This allows for more complex scenarios such as calling a :ref:`rate limiting
 service <arch_overview_rate_limit>`, etc. Envoy already includes several network level filters that

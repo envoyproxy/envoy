@@ -12,7 +12,7 @@ modify different aspects of the server.
 
 .. http:get:: /certs
 
-  List out all loaded SSL certificates, including file name, serial number, and days until
+  List out all loaded TLS certificates, including file name, serial number, and days until
   expiration.
 
 .. http:get:: /clusters
