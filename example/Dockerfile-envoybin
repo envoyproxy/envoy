@@ -1,0 +1,8 @@
+FROM lyft/envoy-build:latest
+
+ADD . /source
+WORKDIR /source
+
+RUN ["example/build.sh"]
+
+RUN ["cp", "/source/build/source/exe/envoy", "/usr/local/bin"]

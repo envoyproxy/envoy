@@ -1,0 +1,6 @@
+FROM python:2.7
+RUN pip install Flask==0.11.1
+RUN mkdir /code
+ADD ./app.py /code
+WORKDIR /code
+ENTRYPOINT python app.py

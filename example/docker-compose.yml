@@ -1,0 +1,25 @@
+version: '2'
+services:
+
+  front-envoy:
+    build:
+      context: ../
+      dockerfile: example/Dockerfile-envoy
+    volumes:
+      - ./envoy.json:/etc/envoy.json
+    expose:
+      - "80"
+      - "8001"
+    ports:
+      - "8000:80"
+      - "8001:8001"
+    links:
+      - app
+    entrypoint: /usr/local/bin/wait-for-it.sh app:80 -- envoy -c /etc/envoy.json
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile-app
+    expose:
+      - "80"

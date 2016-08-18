@@ -1,0 +1,9 @@
+FROM envoybin
+
+RUN apt-get update && apt-get -y install wget
+RUN wget \
+  -O /usr/local/bin/wait-for-it.sh \
+  https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh
+RUN chmod u+x /usr/local/bin/wait-for-it.sh
+
+CMD /usr/local/bin/envoy -c /etc/envoy.json
