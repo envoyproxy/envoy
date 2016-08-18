@@ -9,7 +9,7 @@ The above diagram shows the :ref:`service to service <deployment_type_service_to
 configuration sitting behind an Envoy cluster used as an HTTP L7 edge reverse proxy. The
 reverse proxy provides the following features:
 
-* Terminates SSL.
+* Terminates TLS.
 * Supports both HTTP/1.1 and HTTP/2.
 * Full HTTP L7 routing support.
 * Talks to the service to service Envoy clusters via the standard :ref:`ingress port

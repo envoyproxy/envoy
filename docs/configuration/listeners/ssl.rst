@@ -1,9 +1,9 @@
 .. _config_listener_ssl_context:
 
-SSL context
+TLS context
 ===========
 
-SSL :ref:`architecture overview <arch_overview_ssl>`.
+TLS :ref:`architecture overview <arch_overview_ssl>`.
 
 .. code-block:: json
 
@@ -53,5 +53,5 @@ verify_subject_alt_name
   name matches the specified value.
 
 cipher_suites
-  *(optional, string)* If specified, the SSL listener will only support the specified cipher list.
+  *(optional, string)* If specified, the TLS listener will only support the specified cipher list.
   If not specified, a default list will be used.

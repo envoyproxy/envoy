@@ -11,7 +11,7 @@ statistics:
    :widths: 1, 1, 2
 
    downstream_cx_total, Counter, Total connections
-   downstream_cx_ssl_total, Counter, Total SSL connections
+   downstream_cx_ssl_total, Counter, Total TLS connections
    downstream_cx_http1_total, Counter, Total HTTP/1.1 connections
    downstream_cx_http2_total, Counter, Total HTTP/2 connections
    downstream_cx_destroy, Counter, Total connections destroyed
@@ -21,7 +21,7 @@ statistics:
    downstream_cx_destroy_local_active_rq, Counter, Total connections destroyed locally with 1+ active request
    downstream_cx_destroy_remote_active_rq, Counter, Total connections destroyed remotely with 1+ active request
    downstream_cx_active, Gauge, Total active connections
-   downstream_cx_ssl_active, Gauge, Total active SSL connections
+   downstream_cx_ssl_active, Gauge, Total active TLS connections
    downstream_cx_http1_active, Gauge, Total active HTTP/1.1 connections
    downstream_cx_http2_active, Gauge, Total active HTTP/2 connections
    downstream_cx_protocol_error, Counter, Total protocol errors

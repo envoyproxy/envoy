@@ -34,18 +34,18 @@ domains
   The first route that matches will be used.
 
 require_ssl
-  *(optional, string)* Specifies the type of SSL enforcement the virtual host expects. Possible
+  *(optional, string)* Specifies the type of TLS enforcement the virtual host expects. Possible
   values are:
 
   all
-    All requests must use SSL. If a request is not using SSL, a 302 redirect will be sent telling
+    All requests must use TLS. If a request is not using TLS, a 302 redirect will be sent telling
     the client to use HTTPS.
 
   external_only
-    External requests must use SSL. If a request is external and it is not using SSL, a 302 redirect
+    External requests must use TLS. If a request is external and it is not using TLS, a 302 redirect
     will be sent telling the client to use HTTPS.
 
-  If this option is not specified, there is no SSL requirement for the virtual host.
+  If this option is not specified, there is no TLS requirement for the virtual host.
 
 :ref:`virtual_clusters <config_http_conn_man_route_table_vcluster>`
   *(optional, array)* A list of virtual clusters defined for this virtual host. Virtual clusters

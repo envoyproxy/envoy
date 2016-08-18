@@ -116,8 +116,8 @@ max_retries
   <arch_overview_circuit_break>` for more information.
 
 :ref:`ssl_context <config_cluster_manager_cluster_ssl>`
-  *(optional, object)* The SSL configuration for connections to the upstream cluster. If no SSL
-  configuration is specified, SSL will not be used for new connections.
+  *(optional, object)* The TLS configuration for connections to the upstream cluster. If no TLS
+  configuration is specified, TLS will not be used for new connections.
 
 .. _config_cluster_manager_cluster_features:
 
@@ -128,7 +128,7 @@ features
   http2
     If *http2* is specified, Envoy will assume that the upstream supports HTTP/2 when making new
     HTTP connection pool connections. Currently, Envoy only supports prior knowledge for upstream
-    connections. Even if SSL is used with ALPN, *http2* must be specified. As an aside this allows
+    connections. Even if TLS is used with ALPN, *http2* must be specified. As an aside this allows
     HTTP/2 connections to happen over plain text.
 
 .. _config_cluster_manager_cluster_http_codec_options:

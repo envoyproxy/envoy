@@ -47,7 +47,7 @@ Internal services often want to know which service is calling them. This header 
 external requests, but for internal requests will contain the service cluster of the caller. Note
 that in the current implementation, this should be considered a hint as it is set by the caller and
 could be easily spoofed by any internal entity. In the future Envoy will support a mutual
-authentication  SSL mesh which will make this header fully secure. Like *user-agent*, the value
+authentication TLS mesh which will make this header fully secure. Like *user-agent*, the value
 is determined by the :option:`--service-cluster` command line option.
 
 .. _config_http_conn_man_headers_x-envoy-external-address:

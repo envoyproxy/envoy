@@ -25,8 +25,8 @@ port
   filters are processed sequentially as connection events happen.
 
 :ref:`ssl_context <config_listener_ssl_context>`
-  *(optional, object)* The :ref:`SSL <arch_overview_ssl>` context configuration for an SSL listener.
-  If no SSL context block is defined, the listener is a plain text listener.
+  *(optional, object)* The :ref:`TLS <arch_overview_ssl>` context configuration for a TLS listener.
+  If no TLS context block is defined, the listener is a plain text listener.
 
 use_proxy_proto
   *(optional, boolean)* Whether the listener should expect a

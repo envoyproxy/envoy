@@ -37,7 +37,7 @@ developer productivity and performance.
 :ref:`filter <arch_overview_network_filters>` chain mechanism allows filters to be written to
 perform different TCP proxy tasks and inserted into the main server. Filters have already been
 written to support various tasks such as raw :ref:`TCP proxy <arch_overview_tcp_proxy>`,
-:ref:`HTTP proxy <arch_overview_http_conn_man>`, :ref:`SSL client certificate
+:ref:`HTTP proxy <arch_overview_http_conn_man>`, :ref:`TLS client certificate
 authentication <arch_overview_ssl_auth_filter>`, etc.
 
 **HTTP L7 filter architecture:** HTTP is such a critical component of modern application
@@ -93,7 +93,7 @@ shadowing.
 communication system, there is benefit in using the same software at the edge (observability,
 management, identical service discovery and load balancing algorithms, etc.). Envoy includes enough
 features to make it usable as an edge proxy for most modern web application use cases. This includes
-:ref:`SSL <arch_overview_ssl>` termination, HTTP/1.1 and HTTP/2 :ref:`support
+:ref:`TLS <arch_overview_ssl>` termination, HTTP/1.1 and HTTP/2 :ref:`support
 <arch_overview_http_protocols>`, as well as HTTP L7 :ref:`routing <arch_overview_http_routing>`.
 
 **Best in class observability:** As stated above, the primary goal of Envoy is to make the network
