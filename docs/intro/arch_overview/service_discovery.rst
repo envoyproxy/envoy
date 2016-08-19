@@ -79,8 +79,9 @@ of pain.
 Envoy was designed from the beginning with the idea that service discovery does not require full
 consistency. Instead, Envoy assumes that hosts come and go from the mesh in an eventually consistent
 way. Our recommended way of deploying a service to service Envoy mesh configuration uses eventually
-consistent service discovery along with active health checking (Envoy explicitly health checking
-upstream cluster members) to determine cluster health. This paradigm has a number of benefits:
+consistent service discovery along with :ref:`active health checking <arch_overview_health_checking>`
+(Envoy explicitly health checking upstream cluster members) to determine cluster health. This
+paradigm has a number of benefits:
 
 * All health decisions are fully distributed. Thus, network partitions are gracefully handled
   (whether the application gracefully handles the partition is a different story).
