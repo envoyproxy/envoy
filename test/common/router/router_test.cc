@@ -8,6 +8,7 @@
 #include "test/mocks/upstream/mocks.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -34,7 +35,11 @@ public:
 
 class RouterTest : public testing::Test {
 public:
-  RouterTest() : router_("test.", stats_store_, cm_, runtime_, random_) {
+  RouterTest()
+      : shadow_writer_(new MockShadowWriter()),
+        config_(new FilterConfig("test.", stats_store_, cm_, runtime_, random_,
+                                 ShadowWriterPtr{shadow_writer_})),
+        router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     ON_CALL(*cm_.conn_pool_.host_, url()).WillByDefault(ReturnRef(host_url_));
   }
@@ -57,6 +62,8 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::ConnectionPool::MockCancellable cancellable_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
+  MockShadowWriter* shadow_writer_;
+  FilterConfigPtr config_;
   TestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
@@ -483,7 +490,10 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
   Buffer::OwnedImpl body_data("hello");
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(body_data, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(body_data, false));
+
+  Http::HeaderMapImpl trailers{{"some", "trailer"}};
+  router_.decodeTrailers(trailers);
 
   // 5xx response.
   router_.retry_state_->expectRetry();
@@ -502,7 +512,8 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
                            }));
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(&body_data));
   EXPECT_CALL(encoder2, encodeHeaders(_, false));
-  EXPECT_CALL(encoder2, encodeData(_, true));
+  EXPECT_CALL(encoder2, encodeData(_, false));
+  EXPECT_CALL(encoder2, encodeTrailers(_));
   router_.retry_state_->callback_();
 
   // Normal response.
@@ -512,6 +523,45 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.retry.upstream_rq_503").value());
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.upstream_rq_200").value());
+}
+
+TEST_F(RouterTest, Shadow) {
+  callbacks_.route_table_.route_entry_.shadow_policy_.cluster_ = "foo";
+  callbacks_.route_table_.route_entry_.shadow_policy_.runtime_key_ = "bar";
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+                             response_decoder = &decoder;
+                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+  expectResponseTimerCreate();
+
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("bar", 0, 43, 10000)).WillOnce(Return(true));
+
+  Http::HeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+
+  Buffer::OwnedImpl body_data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(body_data, false));
+
+  Http::HeaderMapImpl trailers{{"some", "trailer"}};
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(AtLeast(1)).WillRepeatedly(Return(&body_data));
+  EXPECT_CALL(*shadow_writer_, shadow_("foo", _, std::chrono::milliseconds(10)))
+      .WillOnce(Invoke([](const std::string&, Http::MessagePtr& request, std::chrono::milliseconds)
+                           -> void {
+                             EXPECT_NE(nullptr, request->body());
+                             EXPECT_NE(nullptr, request->trailers());
+                           }));
+  router_.decodeTrailers(trailers);
+
+  Http::HeaderMapPtr response_headers(new Http::HeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
 TEST_F(RouterTest, AltStatName) {
@@ -561,7 +611,7 @@ TEST_F(RouterTest, Redirect) {
   router_.decodeHeaders(headers, true);
 }
 
-TEST(RouterFilterUtilityTest, All) {
+TEST(RouterFilterUtilityTest, finalTimeout) {
   {
     MockRouteEntry route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
@@ -613,6 +663,38 @@ TEST(RouterFilterUtilityTest, All) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("5", headers.get("x-envoy-expected-rq-timeout-ms"));
+  }
+}
+
+TEST(RouterFilterUtilityTest, shouldShadow) {
+  {
+    TestShadowPolicy policy;
+    NiceMock<Runtime::MockLoader> runtime;
+    EXPECT_CALL(runtime.snapshot_, featureEnabled(_, _, _, _)).Times(0);
+    EXPECT_FALSE(FilterUtility::shouldShadow(policy, runtime, 5));
+  }
+  {
+    TestShadowPolicy policy;
+    policy.cluster_ = "cluster";
+    NiceMock<Runtime::MockLoader> runtime;
+    EXPECT_CALL(runtime.snapshot_, featureEnabled(_, _, _, _)).Times(0);
+    EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
+  }
+  {
+    TestShadowPolicy policy;
+    policy.cluster_ = "cluster";
+    policy.runtime_key_ = "foo";
+    NiceMock<Runtime::MockLoader> runtime;
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(false));
+    EXPECT_FALSE(FilterUtility::shouldShadow(policy, runtime, 5));
+  }
+  {
+    TestShadowPolicy policy;
+    policy.cluster_ = "cluster";
+    policy.runtime_key_ = "foo";
+    NiceMock<Runtime::MockLoader> runtime;
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(true));
+    EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
 }
 

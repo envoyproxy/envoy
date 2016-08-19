@@ -15,7 +15,7 @@ public:
    */
   enum class FailureReason {
     // Request timeout has been reached.
-    RequestTimemout,
+    RequestTimeout,
     // The stream has been reset.
     Reset
   };

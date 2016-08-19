@@ -1,4 +1,5 @@
 #include "common/router/router.h"
+#include "common/router/shadow_writer_impl.h"
 #include "server/config/network/http_connection_manager.h"
 
 namespace Server {
@@ -16,10 +17,13 @@ public:
       return nullptr;
     }
 
-    return [&server, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{
-          new Router::ProdFilter(stat_prefix, server.stats(), server.clusterManager(),
-                                 server.runtime(), server.random())});
+    Router::FilterConfigPtr config(new Router::FilterConfig(
+        stat_prefix, server.stats(), server.clusterManager(), server.runtime(), server.random(),
+        Router::ShadowWriterPtr{new Router::ShadowWriterImpl(server.clusterManager())}));
+
+    return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamDecoderFilter(
+          Http::StreamDecoderFilterPtr{new Router::ProdFilter(config)});
     };
   }
 };

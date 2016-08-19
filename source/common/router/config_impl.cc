@@ -36,6 +36,15 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config) {
   do_global_limiting_ = config.getObject("rate_limit").getBoolean("global", false);
 }
 
+ShadowPolicyImpl::ShadowPolicyImpl(const Json::Object& config) {
+  if (!config.hasObject("shadow")) {
+    return;
+  }
+
+  cluster_ = config.getObject("shadow").getString("cluster");
+  runtime_key_ = config.getObject("shadow").getString("runtime_key", "");
+}
+
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Object& route,
                                        Runtime::Loader& loader)
     : case_sensitive_(route.getBoolean("case_sensitive", true)),
@@ -46,7 +55,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Obj
       runtime_(loadRuntimeData(route)), loader_(loader),
       host_redirect_(route.getString("host_redirect", "")),
       path_redirect_(route.getString("path_redirect", "")), retry_policy_(route),
-      content_type_(route.getString("content_type", "")), rate_limit_policy_(route) {
+      content_type_(route.getString("content_type", "")), rate_limit_policy_(route),
+      shadow_policy_(route) {
 
   // Check to make sure that we are either a redirect route or we have a cluster.
   if (!(isRedirect() ^ !cluster_name_.empty())) {
@@ -197,6 +207,13 @@ VirtualHost::VirtualHost(const Json::Object& virtual_host, Runtime::Loader& runt
       if (!cm.get(routes_.back()->clusterName())) {
         throw EnvoyException(
             fmt::format("route: unknown cluster '{}'", routes_.back()->clusterName()));
+      }
+    }
+
+    if (!routes_.back()->shadowPolicy().cluster().empty()) {
+      if (!cm.get(routes_.back()->shadowPolicy().cluster())) {
+        throw EnvoyException(fmt::format("route: unknown shadow cluster '{}'",
+                                         routes_.back()->shadowPolicy().cluster()));
       }
     }
   }

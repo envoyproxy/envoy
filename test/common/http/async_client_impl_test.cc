@@ -208,7 +208,7 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
                            }));
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
-  EXPECT_CALL(callbacks_, onFailure(Http::AsyncClient::FailureReason::RequestTimemout));
+  EXPECT_CALL(callbacks_, onFailure(Http::AsyncClient::FailureReason::RequestTimeout));
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40)));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
