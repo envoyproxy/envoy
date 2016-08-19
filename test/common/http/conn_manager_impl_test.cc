@@ -165,6 +165,94 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, XRequestIdNotReturned) {
+  setup(false, "envoy-custom-server");
+  const std::string x_request_id = "02e96120-f003-41dd-b145-b208069c4e94";
+
+  NiceMock<Http::MockStreamDecoderFilter>* filter = new NiceMock<Http::MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{filter});
+      }));
+
+  // Make request look like internal request.
+  std::string local_address = "10.0.0.1";
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
+      .WillRepeatedly(ReturnRef(local_address));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, _))
+      .WillOnce(Invoke([&](Http::HeaderMap&, bool) -> Http::FilterHeadersStatus {
+        return Http::FilterHeadersStatus::StopIteration;
+      }));
+
+  Http::StreamDecoder* decoder = nullptr;
+  NiceMock<Http::MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
+        decoder = &conn_manager_->newStream(encoder);
+        Http::HeaderMapPtr headers{new HeaderMapImpl{{":version", "HTTP/1.1"},
+                                                     {":authority", "host"},
+                                                     {":path", "/"},
+                                                     {"x-request-id", x_request_id}}};
+        decoder->decodeHeaders(std::move(headers), false);
+      }));
+
+  Buffer::OwnedImpl fake_input("hello");
+  conn_manager_->onData(fake_input);
+
+  Http::HeaderMapPtr response_headers{new HeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(encoder, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool)
+                           -> void { EXPECT_FALSE(headers.has("x-request-id")); }));
+
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(HttpConnectionManagerImplTest, XRequestIdReturned) {
+  setup(false, "envoy-custom-server");
+  const std::string x_request_id = "02e96120-f003-41dd-b145-b208069c4e94";
+  const std::string traced_request_id = "02e96120-f003-91dd-b145-b208069c4e94";
+
+  NiceMock<Http::MockStreamDecoderFilter>* filter = new NiceMock<Http::MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{filter});
+      }));
+
+  // Make request look like internal request.
+  std::string local_address = "10.0.0.1";
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
+      .WillRepeatedly(ReturnRef(local_address));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, _))
+      .WillOnce(Invoke([&](Http::HeaderMap&, bool) -> Http::FilterHeadersStatus {
+        return Http::FilterHeadersStatus::StopIteration;
+      }));
+
+  Http::StreamDecoder* decoder = nullptr;
+  NiceMock<Http::MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
+        decoder = &conn_manager_->newStream(encoder);
+        Http::HeaderMapPtr headers{new HeaderMapImpl{{":version", "HTTP/1.1"},
+                                                     {":authority", "host"},
+                                                     {":path", "/"},
+                                                     {"x-request-id", x_request_id},
+                                                     {"x-envoy-force-trace", "true"}}};
+        decoder->decodeHeaders(std::move(headers), false);
+      }));
+
+  Buffer::OwnedImpl fake_input("hello");
+  conn_manager_->onData(fake_input);
+
+  Http::HeaderMapPtr response_headers{new HeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(encoder, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool)
+                           -> void { EXPECT_EQ(traced_request_id, headers.get("x-request-id")); }));
+
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+}
+
 TEST_F(HttpConnectionManagerImplTest, InvalidPath) {
   setup(false, "");
   EXPECT_CALL(tracer_, trace(_, _, _));
