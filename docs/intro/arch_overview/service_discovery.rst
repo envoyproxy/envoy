@@ -62,8 +62,8 @@ SDS is the preferred service discovery mechanism for a few reasons:
   host’s load balancing weight, canary status, zone, etc. These additional facts are used globally
   by the Envoy mesh during load balancing, statistic gathering, etc.
 
-Generally active health checking is used in conjunction with the eventually consistent discovery
-service service data to making load balancing and routing decisions. This is discussed further in
+Generally active health checking is used in conjunction with the eventually consistent service discovery
+ service data to making load balancing and routing decisions. This is discussed further in
 the following section.
 
 .. _arch_overview_service_discovery_eventually_consistent:
