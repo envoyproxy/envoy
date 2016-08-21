@@ -21,7 +21,7 @@ connect to.
 **Cluster**: A cluster is a group of logically similar upstream hosts that Envoy connects to. Envoy
 discovers the members of a cluster via :ref:`service discovery <arch_overview_service_discovery>`.
 It optionally determines the health of cluster members via :ref:`active health checking
-<arch_overview_health_checking>`. The cluster member that is connected to is determined by the
+<arch_overview_health_checking>`. The cluster member that Envoy is connected to is determined by the
 :ref:`load balancing policy <arch_overview_load_balancing>`.
 
 **Mesh**: A group of hosts that coordinate to provide a consistent network topology. In this

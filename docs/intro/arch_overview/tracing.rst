@@ -7,7 +7,7 @@ Overview
 --------
 Distributed tracing allows developers to obtain visualizations of call flows in large service
 oriented architectures. It can be invaluable in understanding serialization, parallelism, and
-sources of latency. Envoy supports two features related to system wide tracing:
+sources of latency. Envoy supports three features related to system wide tracing:
 
 * **Request ID generation**: Envoy will generate UUIDs when needed and populate the
   :ref:`config_http_conn_man_headers_x-request-id` HTTP header. Applications can forward the
