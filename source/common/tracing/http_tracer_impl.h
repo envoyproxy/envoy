@@ -67,11 +67,6 @@ public:
    **/
   static Decision isTracing(const Http::AccessLog::RequestInfo& request_info,
                             const Http::HeaderMap& request_headers, Runtime::Loader& runtime);
-
-  /**
-   * @return true if request is forced by service and it's internal request.
-   */
-  static bool isForcedTracing(const Http::HeaderMap& request_headers);
 };
 
 class HttpTracerImpl : public HttpTracer {
