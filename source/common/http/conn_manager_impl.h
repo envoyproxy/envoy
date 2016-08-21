@@ -11,8 +11,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/upstream/upstream.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/utility.h"
