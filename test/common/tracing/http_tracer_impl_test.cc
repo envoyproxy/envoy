@@ -20,6 +20,17 @@ using testing::Test;
 
 namespace Tracing {
 
+TEST(HttpTracerUtilityTest, isForcedTracing) {
+  Http::HeaderMapImpl forced_header{{"x-envoy-internal", "true"}, {"x-envoy-force-trace", "true"}};
+  EXPECT_TRUE(HttpTracerUtility::isForcedTracing(forced_header));
+
+  Http::HeaderMapImpl not_internal{{"x-envoy-force-trace", "true"}};
+  EXPECT_FALSE(HttpTracerUtility::isForcedTracing(not_internal));
+
+  Http::HeaderMapImpl not_forced{{"x-envoy-internal", "true"}};
+  EXPECT_FALSE(HttpTracerUtility::isForcedTracing(not_forced));
+}
+
 TEST(HttpTracerUtilityTest, IsTracing) {
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
   NiceMock<Runtime::MockLoader> runtime;
