@@ -25,12 +25,14 @@ public:
   static FilterPtr fromJson(Json::Object& json, Runtime::Loader& runtime);
 
 protected:
-  FilterImpl(Json::Object& json);
+  FilterImpl(Json::Object& json, Runtime::Loader& runtime);
 
   bool compareAgainstValue(uint64_t lhs);
 
   FilterOperation op_;
   uint64_t value_;
+  Runtime::Loader& runtime_;
+  Optional<std::string> runtime_key_;
 };
 
 /**
@@ -38,7 +40,7 @@ protected:
  */
 class StatusCodeFilter : public FilterImpl {
 public:
-  StatusCodeFilter(Json::Object& json) : FilterImpl(json) {}
+  StatusCodeFilter(Json::Object& json, Runtime::Loader& runtime) : FilterImpl(json, runtime) {}
 
   // Http::AccessLog::Filter
   bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
@@ -49,7 +51,7 @@ public:
  */
 class DurationFilter : public FilterImpl {
 public:
-  DurationFilter(Json::Object& json) : FilterImpl(json) {}
+  DurationFilter(Json::Object& json, Runtime::Loader& runtime) : FilterImpl(json, runtime) {}
 
   // Http::AccessLog::Filter
   bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
