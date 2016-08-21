@@ -146,7 +146,7 @@ value
   *(required, integer)* Default value to compare against if runtime value is not available.
 
 runtime_key
-  *(optional, string)* Runtime key to get value for comparision, use this value if defined.
+  *(optional, string)* Runtime key to get value for comparision. This value is used if defined.
 
 Duration
 ^^^^^^^^
@@ -171,7 +171,7 @@ value
   *(required, integer)* Default value to compare against if runtime values is not available.
 
 runtime_key
-  *(optional, string)* Runtime key to get value for comparision, use this value if defined.
+  *(optional, string)* Runtime key to get value for comparision. This value is used if defined.
 
 
 Not health check
