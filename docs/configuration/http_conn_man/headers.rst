@@ -71,11 +71,12 @@ x-envoy-force-trace
 
 If an internal request sets this header, Envoy will modify the generated
 :ref:`config_http_conn_man_headers_x-request-id` such that it forces traces to be collected.
-This also forces to return final :ref:`config_http_conn_man_headers_x-request-id` in response
-headers. If this request ID is then propagated to other hosts, traces will also be collected on those hosts which
-will provide a consistent trace for an entire request flow. See the :ref:`tracing.global_enabled
-<config_http_conn_man_runtime_global_enabled>` and :ref:`tracing.random_sampling
-<config_http_conn_man_runtime_random_sampling>` runtime configuration settings.
+This also forces :ref:`config_http_conn_man_headers_x-request-id` to be returned in the response
+headers. If this request ID is then propagated to other hosts, traces will also be collected on 
+those hosts which will provide a consistent trace for an entire request flow. See the 
+:ref:`tracing.global_enabled <config_http_conn_man_runtime_global_enabled>` and 
+:ref:`tracing.random_sampling <config_http_conn_man_runtime_random_sampling>` runtime 
+configuration settings.
 
 .. _config_http_conn_man_headers_x-envoy-internal:
 
