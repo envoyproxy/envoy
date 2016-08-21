@@ -103,13 +103,14 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
   }
 
   {
-    // Not internal request, force trace should be ignored
+    // Not internal request, force trace header should be cleaned.
     HeaderMapImpl headers{{"x-forwarded-for", external_remote_address},
                           {"x-request-id", uuid},
                           {"x-envoy-force-trace", "true"}};
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, random_,
                                                    runtime_);
     EXPECT_EQ(uuid, headers.get(Headers::get().RequestId));
+    EXPECT_FALSE(headers.has(Headers::get().ForceTrace));
   }
 }
 
@@ -327,9 +328,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
 
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   HeaderMapImpl response_headers;
-  HeaderMapImpl request_headers{{"x-request-id", "request-id"},
-                                {"x-envoy-internal", "true"},
-                                {"x-envoy-force-trace", "true"}};
+  HeaderMapImpl request_headers{{"x-request-id", "request-id"}, {"x-envoy-force-trace", "true"}};
 
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, config_);
   EXPECT_EQ("request-id", response_headers.get("x-request-id"));

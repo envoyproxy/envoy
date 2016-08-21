@@ -55,11 +55,6 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
   return {Reason::NotTraceableRequestId, false};
 }
 
-bool HttpTracerUtility::isForcedTracing(const Http::HeaderMap& request_headers) {
-  return request_headers.has(Http::Headers::get().EnvoyInternalRequest) &&
-         request_headers.has(Http::Headers::get().ForceTrace);
-}
-
 HttpTracerImpl::HttpTracerImpl(Runtime::Loader& runtime, Stats::Store& stats)
     : runtime_(runtime),
       stats_{HTTP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.http_tracer."))} {}

@@ -66,6 +66,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     request_headers.remove(Headers::get().EnvoyUpstreamRequestTimeoutMs);
     request_headers.remove(Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs);
     request_headers.remove(Headers::get().EnvoyExpectedRequestTimeoutMs);
+    request_headers.remove(Headers::get().ForceTrace);
 
     for (const Http::LowerCaseString& header : config.routeConfig().internalOnlyHeaders()) {
       request_headers.remove(header);
@@ -108,8 +109,8 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     }
   }
 
-  // Make request traceable if it's internal and ForceTrace header is set.
-  if (internal_request && request_headers.has(Headers::get().ForceTrace)) {
+  // Make request traceable if x-envoy-force-trace header is set.
+  if (request_headers.has(Headers::get().ForceTrace)) {
     std::string uuid = request_headers.get(Headers::get().RequestId);
     UuidUtils::setTraceableUuid(uuid);
     request_headers.replaceViaMoveValue(Headers::get().RequestId, std::move(uuid));
@@ -132,7 +133,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
     response_headers.addViaCopy(to_add.first, to_add.second);
   }
 
-  if (Tracing::HttpTracerUtility::isForcedTracing(request_headers)) {
+  if (request_headers.has(Headers::get().ForceTrace)) {
     response_headers.replaceViaCopy(Headers::get().RequestId,
                                     request_headers.get(Headers::get().RequestId));
   }
