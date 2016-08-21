@@ -4,6 +4,7 @@
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/runtime/uuid_util.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
 
@@ -116,6 +117,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
+                                                     const Http::HeaderMap& request_headers,
                                                      ConnectionManagerConfig& config) {
   response_headers.remove(Headers::get().Connection);
   response_headers.remove(Headers::get().TransferEncoding);
@@ -128,6 +130,11 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
   for (const std::pair<Http::LowerCaseString, std::string>& to_add :
        config.routeConfig().responseHeadersToAdd()) {
     response_headers.addViaCopy(to_add.first, to_add.second);
+  }
+
+  if (Tracing::HttpTracerUtility::isForcedTracing(request_headers)) {
+    response_headers.replaceViaCopy(Headers::get().RequestId,
+                                    request_headers.get(Headers::get().RequestId));
   }
 }
 

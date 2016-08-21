@@ -7,6 +7,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/stats/stats.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -507,12 +508,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   headers.replaceViaMoveValue(Headers::get().Date, date_formatter_.now());
   headers.replaceViaCopy(Headers::get().EnvoyProtocolVersion,
                          connection_manager_.codec_->protocolString());
-  ConnectionManagerUtility::mutateResponseHeaders(headers, connection_manager_.config_);
-
-  if (Tracing::HttpTracerUtility::isForcedTracing(*request_headers_)) {
-    headers.replaceViaCopy(Headers::get().RequestId,
-                           request_headers_->get(Headers::get().RequestId));
-  }
+  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
+                                                  connection_manager_.config_);
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.

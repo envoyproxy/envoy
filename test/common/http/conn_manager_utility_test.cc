@@ -312,14 +312,27 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   config_.route_config_.response_headers_to_remove_.push_back("custom_header");
   config_.route_config_.response_headers_to_add_.push_back({"to_add", "foo"});
 
-  HeaderMapImpl headers{{"connection", "foo"},
-                        {"transfer-encoding", "foo"},
-                        {":version", "foo"},
-                        {"custom_header", "foo"}};
-  ConnectionManagerUtility::mutateResponseHeaders(headers, config_);
+  HeaderMapImpl response_headers{{"connection", "foo"},
+                                 {"transfer-encoding", "foo"},
+                                 {":version", "foo"},
+                                 {"custom_header", "foo"}};
+  HeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
-  EXPECT_EQ(1UL, headers.size());
-  EXPECT_EQ("foo", headers.get("to_add"));
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, config_);
+
+  EXPECT_EQ(1UL, response_headers.size());
+  EXPECT_EQ("foo", response_headers.get("to_add"));
+  EXPECT_FALSE(response_headers.has("x-request-id"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
+  HeaderMapImpl response_headers;
+  HeaderMapImpl request_headers{{"x-request-id", "request-id"},
+                                {"x-envoy-internal", "true"},
+                                {"x-envoy-force-trace", "true"}};
+
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, config_);
+  EXPECT_EQ("request-id", response_headers.get("x-request-id"));
 }
 
 } // Http
