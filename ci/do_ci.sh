@@ -8,7 +8,11 @@ NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 
 echo "building using $NUM_CPUS CPUs"
 
-if [[ "$1" == "coverage" ]]; then
+if [[ "$1" == "docs" ]]; then
+  echo "docs build..."
+  make docs
+  exit 0
+elif [[ "$1" == "coverage" ]]; then
   echo "coverage build..."
   EXTRA_CMAKE_FLAGS="-DENVOY_CODE_COVERAGE:BOOL=ON"
   TEST_TARGET="envoy.check-coverage"
