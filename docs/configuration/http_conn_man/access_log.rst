@@ -143,7 +143,7 @@ op
   *(required, string)* Comparison operator. Currently *>=* is the only supported operator.
 
 value
-  *(required, integer)* The value to compare against if runtime value is not available.
+  *(required, integer)* Default value to compare against if runtime value is not available.
 
 runtime_key
   *(optional, string)* Runtime key to get value for comparision, use this value if defined.
@@ -168,7 +168,7 @@ op
   *(required, string)* Comparison operator. Currently *>=* is the only supported operator.
 
 value
-  *(required, integer)* The value to compare against if runtime values is not available.
+  *(required, integer)* Default value to compare against if runtime values is not available.
 
 runtime_key
   *(optional, string)* Runtime key to get value for comparision, use this value if defined.
