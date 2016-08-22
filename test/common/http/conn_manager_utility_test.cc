@@ -110,7 +110,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, random_,
                                                    runtime_);
     EXPECT_EQ(uuid, headers.get(Headers::get().RequestId));
-    EXPECT_FALSE(headers.has(Headers::get().ForceTrace));
+    EXPECT_FALSE(headers.has(Headers::get().EnvoyForceTrace));
   }
 }
 

@@ -19,6 +19,7 @@ public:
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
+  const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
@@ -33,7 +34,6 @@ public:
   const LowerCaseString EnvoyUpstreamServiceTime{"x-envoy-upstream-service-time"};
   const LowerCaseString EnvoyUpstreamHealthCheckedCluster{"x-envoy-upstream-healthchecked-cluster"};
   const LowerCaseString Expect{"expect"};
-  const LowerCaseString ForceTrace{"x-envoy-force-trace"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
   const LowerCaseString Host{":authority"};
