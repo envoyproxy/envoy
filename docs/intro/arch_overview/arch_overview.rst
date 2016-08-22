@@ -8,8 +8,8 @@ Architecture overview
   threading_model
   listeners
   network_filters
-  http_filters
   http_connection_management
+  http_filters
   http_routing
   grpc
   cluster_manager
