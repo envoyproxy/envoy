@@ -48,8 +48,8 @@ void IntegrationStreamDecoder::decodeData(const Buffer::Instance& data, bool end
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
   data.getRawSlices(slices, num_slices);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    body_.append(static_cast<const char*>(slices[i].mem_), slices[i].len_);
+  for (Buffer::RawSlice& slice : slices) {
+    body_.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 
   if (end_stream && waiting_for_end_stream_) {

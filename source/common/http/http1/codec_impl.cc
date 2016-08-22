@@ -217,8 +217,8 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
     uint64_t num_slices = data.getRawSlices(nullptr, 0);
     Buffer::RawSlice slices[num_slices];
     data.getRawSlices(slices, num_slices);
-    for (uint64_t i = 0; i < num_slices; i++) {
-      total_parsed += dispatchSlice(static_cast<const char*>(slices[i].mem_), slices[i].len_);
+    for (Buffer::RawSlice& slice : slices) {
+      total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
     }
   } else {
     dispatchSlice(nullptr, 0);

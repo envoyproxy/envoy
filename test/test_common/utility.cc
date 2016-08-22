@@ -35,8 +35,8 @@ std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
   buffer.getRawSlices(slices, num_slices);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    output.append(static_cast<const char*>(slices[i].mem_), slices[i].len_);
+  for (Buffer::RawSlice& slice : slices) {
+    output.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 
   return output;

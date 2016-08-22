@@ -265,8 +265,8 @@ void ConnectionImpl::write(Buffer::Instance& data) {
     uint64_t num_slices = data.getRawSlices(nullptr, 0);
     Buffer::RawSlice slices[num_slices];
     data.getRawSlices(slices, num_slices);
-    for (uint64_t i = 0; i < num_slices; i++) {
-      int rc = bufferevent_write(bev_.get(), slices[i].mem_, slices[i].len_);
+    for (Buffer::RawSlice& slice : slices) {
+      int rc = bufferevent_write(bev_.get(), slice.mem_, slice.len_);
       ASSERT(rc == 0);
       UNREFERENCED_PARAMETER(rc);
     }

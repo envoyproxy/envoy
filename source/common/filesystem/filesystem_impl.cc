@@ -100,9 +100,9 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
   buffer.getRawSlices(slices, num_slices);
-  for (uint64_t i = 0; i < num_slices; i++) {
-    ssize_t rc = os_sys_calls_.write(fd_, slices[i].mem_, slices[i].len_);
-    ASSERT(rc == static_cast<ssize_t>(slices[i].len_));
+  for (Buffer::RawSlice& slice : slices) {
+    ssize_t rc = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
+    ASSERT(rc == static_cast<ssize_t>(slice.len_));
     UNREFERENCED_PARAMETER(rc);
     stats_.write_completed_.inc();
   }
