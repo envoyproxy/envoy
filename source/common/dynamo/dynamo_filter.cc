@@ -107,12 +107,18 @@ std::string DynamoFilter::buildBody(const Buffer::Instance* buffered,
                                     const Buffer::Instance& last) {
   std::string body;
   if (buffered) {
-    for (const Buffer::RawSlice& slice : buffered->getRawSlices()) {
+    uint64_t num_slices = buffered->getRawSlices(nullptr, 0);
+    Buffer::RawSlice slices[num_slices];
+    buffered->getRawSlices(slices, num_slices);
+    for (Buffer::RawSlice& slice : slices) {
       body.append(static_cast<const char*>(slice.mem_), slice.len_);
     }
   }
 
-  for (const Buffer::RawSlice& slice : last.getRawSlices()) {
+  uint64_t num_slices = last.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  last.getRawSlices(slices, num_slices);
+  for (Buffer::RawSlice& slice : slices) {
     body.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

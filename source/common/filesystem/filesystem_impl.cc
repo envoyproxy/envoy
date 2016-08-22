@@ -97,7 +97,10 @@ FileImpl::~FileImpl() {
 }
 
 void FileImpl::doWrite(Buffer::Instance& buffer) {
-  for (Buffer::RawSlice& slice : buffer.getRawSlices()) {
+  uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  buffer.getRawSlices(slices, num_slices);
+  for (Buffer::RawSlice& slice : slices) {
     ssize_t rc = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
     ASSERT(rc == static_cast<ssize_t>(slice.len_));
     UNREFERENCED_PARAMETER(rc);
@@ -120,10 +123,11 @@ void FileImpl::flushThreadFunc() {
     }
 
     ASSERT(flush_buffer_.length() > 0);
-    std::vector<Buffer::RawSlice> current_slices = flush_buffer_.getRawSlices();
-    Buffer::OwnedImpl copy(current_slices[0].mem_, current_slices[0].len_);
-    flush_buffer_.drain(current_slices[0].len_);
-    stats_.write_total_buffered_.sub(current_slices[0].len_);
+    Buffer::RawSlice slices[1];
+    flush_buffer_.getRawSlices(slices, 1);
+    Buffer::OwnedImpl copy(slices[0].mem_, slices[0].len_);
+    flush_buffer_.drain(slices[0].len_);
+    stats_.write_total_buffered_.sub(slices[0].len_);
 
     lock.unlock();
 

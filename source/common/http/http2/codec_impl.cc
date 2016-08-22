@@ -141,7 +141,10 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
   // TODO: Back pressure.
   uint64_t length_remaining = length;
   Buffer::OwnedImpl output(framehd, FRAME_HEADER_SIZE);
-  for (Buffer::RawSlice& slice : pending_send_data_.getRawSlices()) {
+  uint64_t num_slices = pending_send_data_.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  pending_send_data_.getRawSlices(slices, num_slices);
+  for (Buffer::RawSlice& slice : slices) {
     if (length_remaining == 0) {
       break;
     }
@@ -215,7 +218,10 @@ ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   conn_log_trace("dispatching {} bytes", connection_, data.length());
-  for (Buffer::RawSlice& slice : data.getRawSlices()) {
+  uint64_t num_slices = data.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  data.getRawSlices(slices, num_slices);
+  for (Buffer::RawSlice& slice : slices) {
     dispatching_ = true;
     ssize_t rc =
         nghttp2_session_mem_recv(session_, static_cast<const uint8_t*>(slice.mem_), slice.len_);

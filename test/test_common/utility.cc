@@ -7,13 +7,17 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
     return false;
   }
 
-  std::vector<Buffer::RawSlice> lhs_slices = lhs.getRawSlices();
-  std::vector<Buffer::RawSlice> rhs_slices = rhs.getRawSlices();
-  if (lhs_slices.size() != rhs_slices.size()) {
+  uint64_t lhs_num_slices = lhs.getRawSlices(nullptr, 0);
+  uint64_t rhs_num_slices = rhs.getRawSlices(nullptr, 0);
+  if (lhs_num_slices != rhs_num_slices) {
     return false;
   }
 
-  for (size_t i = 0; i < lhs_slices.size(); i++) {
+  Buffer::RawSlice lhs_slices[lhs_num_slices];
+  lhs.getRawSlices(lhs_slices, lhs_num_slices);
+  Buffer::RawSlice rhs_slices[rhs_num_slices];
+  rhs.getRawSlices(rhs_slices, rhs_num_slices);
+  for (size_t i = 0; i < lhs_num_slices; i++) {
     if (lhs_slices[i].len_ != rhs_slices[i].len_) {
       return false;
     }
@@ -28,7 +32,10 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
 
 std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
   std::string output;
-  for (Buffer::RawSlice& slice : buffer.getRawSlices()) {
+  uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  buffer.getRawSlices(slices, num_slices);
+  for (Buffer::RawSlice& slice : slices) {
     output.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

@@ -214,7 +214,10 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
-    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    uint64_t num_slices = data.getRawSlices(nullptr, 0);
+    Buffer::RawSlice slices[num_slices];
+    data.getRawSlices(slices, num_slices);
+    for (Buffer::RawSlice& slice : slices) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
     }
   } else {

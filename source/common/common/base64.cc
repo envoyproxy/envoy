@@ -13,7 +13,10 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
   bio = BIO_push(b64, bio);
   BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
 
-  for (Buffer::RawSlice& slice : buffer.getRawSlices()) {
+  uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  buffer.getRawSlices(slices, num_slices);
+  for (Buffer::RawSlice& slice : slices) {
     uint64_t to_write = std::min(length, slice.len_);
     length -= to_write;
     BIO_write(bio, slice.mem_, to_write);
