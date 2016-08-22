@@ -8,11 +8,9 @@ Architecture overview
   threading_model
   listeners
   network_filters
-  http_connection_management
-  http_protocols
   http_filters
+  http_connection_management
   http_routing
-  http_access_logs
   grpc
   cluster_manager
   service_discovery
