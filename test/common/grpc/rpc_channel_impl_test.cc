@@ -226,7 +226,7 @@ TEST_F(GrpcRequestImplTest, HttpAsyncRequestTimeout) {
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "request timeout"));
-  http_callbacks_->onFailure(Http::AsyncClient::FailureReason::RequestTimemout);
+  http_callbacks_->onFailure(Http::AsyncClient::FailureReason::RequestTimeout);
 }
 
 TEST_F(GrpcRequestImplTest, NoHttpAsyncRequest) {

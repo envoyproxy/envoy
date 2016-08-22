@@ -136,7 +136,7 @@ void AsyncRequestImpl::onRequestTimeout() {
   CodeUtility::chargeResponseStat(info);
   parent_.cluster_.stats().upstream_rq_timeout_.inc();
   stream_encoder_->resetStream();
-  callbacks_.onFailure(AsyncClient::FailureReason::RequestTimemout);
+  callbacks_.onFailure(AsyncClient::FailureReason::RequestTimeout);
   cleanup();
 }
 

@@ -19,10 +19,14 @@ void MockRetryState::expectRetry() {
 
 MockRetryState::~MockRetryState() {}
 
+MockShadowWriter::MockShadowWriter() {}
+MockShadowWriter::~MockShadowWriter() {}
+
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
   ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(retry_policy_));
+  ON_CALL(*this, shadowPolicy()).WillByDefault(ReturnRef(shadow_policy_));
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
   ON_CALL(*this, virtualClusterName(_)).WillByDefault(ReturnRef(virtual_cluster_));
   ON_CALL(*this, virtualHostName()).WillByDefault(ReturnRef(vhost_name_));

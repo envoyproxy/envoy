@@ -87,7 +87,7 @@ TEST(RouteMatcherTest, TestRoutes) {
           "cluster": "instant-server",
           "case_sensitive": true
         },
-	    {
+        {
           "path": "/tar",
           "prefix_rewrite": "/car",
           "cluster": "instant-server",
@@ -450,6 +450,96 @@ TEST(RouteMatcherTest, RateLimit) {
   EXPECT_FALSE(config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                    ->rateLimitPolicy()
                    .doGlobalLimiting());
+}
+
+TEST(RouteMatcherTest, ShadowClusterNotFound) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "shadow": {
+            "cluster": "some_cluster"
+          },
+          "cluster": "www2"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::StringLoader loader(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_CALL(cm, get("www2")).WillRepeatedly(Return(&cm.cluster_));
+  EXPECT_CALL(cm, get("some_cluster")).WillRepeatedly(Return(nullptr));
+
+  EXPECT_THROW(ConfigImpl(loader, runtime, cm), EnvoyException);
+}
+
+TEST(RouteMatcherTest, Shadow) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "shadow": {
+            "cluster": "some_cluster"
+          },
+          "cluster": "www2"
+        },
+        {
+          "prefix": "/bar",
+          "shadow": {
+            "cluster": "some_cluster2",
+            "runtime_key": "foo"
+          },
+          "cluster": "www2"
+        },
+        {
+          "prefix": "/baz",
+          "cluster": "www2"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::StringLoader loader(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(loader, runtime, cm);
+
+  EXPECT_EQ("some_cluster", config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                                ->shadowPolicy()
+                                .cluster());
+  EXPECT_EQ("", config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->shadowPolicy()
+                    .runtimeKey());
+
+  EXPECT_EQ("some_cluster2", config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                                 ->shadowPolicy()
+                                 .cluster());
+  EXPECT_EQ("foo", config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                       ->shadowPolicy()
+                       .runtimeKey());
+
+  EXPECT_EQ("", config.routeForRequest(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+                    ->shadowPolicy()
+                    .cluster());
+  EXPECT_EQ("", config.routeForRequest(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+                    ->shadowPolicy()
+                    .runtimeKey());
 }
 
 TEST(RouteMatcherTest, Retry) {

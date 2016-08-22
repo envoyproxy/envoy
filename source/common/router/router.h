@@ -3,6 +3,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -40,6 +41,17 @@ public:
   };
 
   /**
+   * Determine whether a request should be shadowed.
+   * @param policy supplies the route's shadow policy.
+   * @param runtime supplies the runtime to lookup the shadow key in.
+   * @param stable_random supplies the random number to use when determining whether shadowing
+   *        should take place.
+   * @return TRUE if shadowing should take place.
+   */
+  static bool shouldShadow(const ShadowPolicy& policy, Runtime::Loader& runtime,
+                           uint64_t stable_random);
+
+  /**
    * Determine the final timeout to use based on the route as well as the request headers.
    * @param route supplies the request route.
    * @param request_headers supplies the request headers.
@@ -49,12 +61,37 @@ public:
 };
 
 /**
+ * Configuration for the router filter.
+ */
+class FilterConfig {
+public:
+  FilterConfig(const std::string& stat_prefix, Stats::Store& stats, Upstream::ClusterManager& cm,
+               Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+               ShadowWriterPtr&& shadow_writer)
+      : stats_store_(stats), cm_(cm), runtime_(runtime), random_(random),
+        stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))},
+        shadow_writer_(std::move(shadow_writer)) {}
+
+  ShadowWriter& shadowWriter() { return *shadow_writer_; }
+
+  Stats::Store& stats_store_;
+  Upstream::ClusterManager& cm_;
+  Runtime::Loader& runtime_;
+  Runtime::RandomGenerator& random_;
+  FilterStats stats_;
+
+private:
+  ShadowWriterPtr shadow_writer_;
+};
+
+typedef std::shared_ptr<FilterConfig> FilterConfigPtr;
+
+/**
  * Service routing filter.
  */
 class Filter : Logger::Loggable<Logger::Id::router>, public Http::StreamDecoderFilter {
 public:
-  Filter(const std::string& stat_prefix, Stats::Store& stats, Upstream::ClusterManager& cm,
-         Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+  Filter(FilterConfigPtr);
   ~Filter();
 
   // Http::StreamDecoderFilter
@@ -110,6 +147,7 @@ private:
                                          const Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                          Runtime::RandomGenerator& random,
                                          Event::Dispatcher& dispatcher) PURE;
+  void maybeDoShadowing();
   void onRequestComplete();
   void onResetStream();
   void onResponseTimeout();
@@ -123,10 +161,7 @@ private:
   bool setupRetry(bool end_stream);
   void doRetry();
 
-  Stats::Store& stats_store_;
-  Upstream::ClusterManager& cm_;
-  Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  FilterConfigPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   const RouteEntry* route_;
   std::string stat_prefix_;
@@ -134,12 +169,13 @@ private:
   std::string request_vcluster_name_;
   bool downstream_response_started_{};
   Event::TimerPtr response_timeout_;
-  FilterStats stats_;
   FilterUtility::TimeoutData timeout_;
   UpstreamRequestPtr upstream_request_;
   RetryStatePtr retry_state_;
   Http::HeaderMap* downstream_headers_{};
+  Http::HeaderMap* downstream_trailers_{};
   bool downstream_end_stream_{};
+  bool do_shadowing_{};
 };
 
 class ProdFilter : public Filter {

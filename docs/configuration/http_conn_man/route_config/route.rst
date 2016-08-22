@@ -22,6 +22,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "runtime": "{...}",
     "retry_policy": "{...}",
     "rate_limit": "{...}",
+    "shadow": "{...}"
   }
 
 prefix
@@ -84,6 +85,9 @@ content_type
 
 :ref:`rate_limit <config_http_conn_man_route_table_route_rate_limit>`
   *(optional, object)* Indicates that the route has a rate limit policy.
+
+:ref:`shadow <config_http_conn_man_route_table_route_shadow>`
+  *(optional, object)* Indicates that the route has a shadow policy.
 
 .. _config_http_conn_man_route_table_route_runtime:
 
@@ -151,3 +155,26 @@ global
   *(optional, boolean)* Specifies whether the global rate limit service should be called for a
   request that matches this route. This information is used by the :ref:`rate limit filter
   <config_http_filters_rate_limit>` if it is installed. Defaults to false if not specified.
+
+.. _config_http_conn_man_route_table_route_shadow:
+
+Shadow
+------
+
+.. code-block:: json
+
+  {
+    "cluster": "...",
+    "runtime_key": "..."
+  }
+
+cluster
+  *(required, string)* Specifies the cluster that requests will be shadowed to. The cluster must
+  exist in the :ref:`cluster manager configuration <config_cluster_manager>`.
+
+runtime_key
+  *(optional, string)* If not specified, **all** requests to the target cluster will be shadowed.
+  If specified, Envoy will lookup the runtime key to get the % of requests to shadow. Valid values are
+  from 0 to 10000, allowing for increments of 0.01% of requests to be shadowed. If the runtime key
+  is specified in the configuration but not present in runtime, 0 is the default and thus 0% of
+  requests will be shadowed.

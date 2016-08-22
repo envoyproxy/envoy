@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/router/router.h"
+#include "envoy/router/shadow_writer.h"
 
 namespace Router {
 
@@ -46,6 +47,31 @@ public:
   bool do_global_limiting_{};
 };
 
+class TestShadowPolicy : public ShadowPolicy {
+public:
+  // Router::ShadowPolicy
+  const std::string& cluster() const override { return cluster_; }
+  const std::string& runtimeKey() const override { return runtime_key_; }
+
+  std::string cluster_;
+  std::string runtime_key_;
+};
+
+class MockShadowWriter : public ShadowWriter {
+public:
+  MockShadowWriter();
+  ~MockShadowWriter();
+
+  // Router::ShadowWriter
+  void shadow(const std::string& cluster, Http::MessagePtr&& request,
+              std::chrono::milliseconds timeout) override {
+    shadow_(cluster, request, timeout);
+  }
+
+  MOCK_METHOD3(shadow_, void(const std::string& cluster, Http::MessagePtr& request,
+                             std::chrono::milliseconds timeout));
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -56,6 +82,7 @@ public:
   MOCK_CONST_METHOD1(finalizeRequestHeaders, void(Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(retryPolicy, const RetryPolicy&());
+  MOCK_CONST_METHOD0(shadowPolicy, const ShadowPolicy&());
   MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD1(virtualClusterName, const std::string&(const Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
@@ -65,6 +92,7 @@ public:
   std::string virtual_cluster_{"fake_virtual_cluster"};
   TestRetryPolicy retry_policy_;
   TestRateLimitPolicy rate_limit_policy_;
+  TestShadowPolicy shadow_policy_;
 };
 
 class MockConfig : public Config {

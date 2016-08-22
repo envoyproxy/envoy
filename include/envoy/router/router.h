@@ -91,6 +91,28 @@ public:
 };
 
 /**
+ * Per route policy for request shadowing.
+ */
+class ShadowPolicy {
+public:
+  virtual ~ShadowPolicy() {}
+
+  /**
+   * @return the name of the cluster that a matching request should be shadowed to. Returns empty
+   *         string if no shadowing should take place.
+   */
+  virtual const std::string& cluster() const PURE;
+
+  /**
+   * @return the runtime key that will be used to determine whether an individual request should
+   *         be shadowed. The lack of a key means that all requests will be shadowed. If a key is
+   *         present it will be used to drive random selection in the range 0-10000 for 0.01%
+   *         increments.
+   */
+  virtual const std::string& runtimeKey() const PURE;
+};
+
+/**
  * An individual resolved route entry.
  */
 class RouteEntry {
@@ -120,6 +142,12 @@ public:
    *         if it is empty and does not allow retries.
    */
   virtual const RetryPolicy& retryPolicy() const PURE;
+
+  /**
+   * @return const ShadowPolicy& the shadow policy for the route. All routes have a shadow policy
+   *         even if no shadowing takes place.
+   */
+  virtual const ShadowPolicy& shadowPolicy() const PURE;
 
   /**
    * @return std::chrono::milliseconds the route's timeout.

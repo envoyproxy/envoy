@@ -71,6 +71,7 @@ add_executable(envoy-test
   common/router/config_impl_test.cc
   common/router/retry_state_impl_test.cc
   common/router/router_test.cc
+  common/router/shadow_writer_impl_test.cc
   common/runtime/runtime_impl_test.cc
   common/runtime/uuid_util_test.cc
   common/ssl/connection_impl_test.cc

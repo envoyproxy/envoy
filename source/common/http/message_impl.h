@@ -34,6 +34,7 @@ private:
 class RequestMessageImpl : public MessageImpl {
 public:
   RequestMessageImpl() : MessageImpl(HeaderMapPtr{new HeaderMapImpl()}) {}
+  RequestMessageImpl(HeaderMapPtr&& headers) : MessageImpl(std::move(headers)) {}
 };
 
 class ResponseMessageImpl : public MessageImpl {

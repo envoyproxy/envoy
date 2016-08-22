@@ -104,6 +104,22 @@ private:
 };
 
 /**
+ * Implementation of ShadowPolicy that reads from the JSON route config.
+ */
+class ShadowPolicyImpl : public ShadowPolicy {
+public:
+  ShadowPolicyImpl(const Json::Object& config);
+
+  // Router::ShadowPolicy
+  const std::string& cluster() const override { return cluster_; }
+  const std::string& runtimeKey() const override { return runtime_key_; }
+
+private:
+  std::string cluster_;
+  std::string runtime_key_;
+};
+
+/**
  * Base implementation for all route entries.
  */
 class RouteEntryImplBase : public RouteEntry, public Matchable, public RedirectEntry {
@@ -117,6 +133,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
+  const ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
   const std::string& virtualClusterName(const Http::HeaderMap& headers) const override {
     return vhost_.virtualClusterFromEntries(headers);
   }
@@ -157,6 +174,7 @@ private:
   const RetryPolicyImpl retry_policy_;
   const std::string content_type_;
   const RateLimitPolicyImpl rate_limit_policy_;
+  const ShadowPolicyImpl shadow_policy_;
 };
 
 /**
