@@ -14,6 +14,8 @@ also handles functionality common to all HTTP connections and requests such as :
 
 HTTP connection manager :ref:`configuration <config_http_conn_man>`.
 
+.. _arch_overview_http_protocols:
+
 HTTP protocols
 --------------
 
@@ -26,11 +28,12 @@ HTTP/1.1, the codec translates the serial/pipelining capabilities of the protoco
 that looks like HTTP/2 to higher layers. This means that the majority of the code does not need to
 understand whether a stream originated on an HTTP/1.1 or HTTP/2 connection.
 
+.. _arch_overview_http_access_logs:
 
 HTTP access logging
 -------------------
 
-The :ref:`HTTP connection manager <arch_overview_http_conn_man>` supports extensible access
+The HTTP connection manager supports extensible access
 logging with the following features:
 
 * Any number of access logs per connection manager.
