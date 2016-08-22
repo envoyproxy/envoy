@@ -508,7 +508,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   headers.replaceViaMoveValue(Headers::get().Date, date_formatter_.now());
   headers.replaceViaCopy(Headers::get().EnvoyProtocolVersion,
                          connection_manager_.codec_->protocolString());
-  ConnectionManagerUtility::mutateResponseHeaders(headers, connection_manager_.config_);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
+                                                  connection_manager_.config_);
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.

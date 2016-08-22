@@ -37,7 +37,7 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
       return {Reason::ClientForced, true};
     }
 
-    if (request_headers.has(Http::Headers::get().ForceTrace)) {
+    if (request_headers.has(Http::Headers::get().EnvoyForceTrace)) {
       return {Reason::ServiceForced, true};
     }
 

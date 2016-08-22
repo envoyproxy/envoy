@@ -4,6 +4,7 @@
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/runtime/uuid_util.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
 
@@ -65,6 +66,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     request_headers.remove(Headers::get().EnvoyUpstreamRequestTimeoutMs);
     request_headers.remove(Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs);
     request_headers.remove(Headers::get().EnvoyExpectedRequestTimeoutMs);
+    request_headers.remove(Headers::get().EnvoyForceTrace);
 
     for (const Http::LowerCaseString& header : config.routeConfig().internalOnlyHeaders()) {
       request_headers.remove(header);
@@ -107,8 +109,8 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     }
   }
 
-  // Make request traceable if it's internal and ForceTrace header is set.
-  if (internal_request && request_headers.has(Headers::get().ForceTrace)) {
+  // Make request traceable if x-envoy-force-trace header is set.
+  if (request_headers.has(Headers::get().EnvoyForceTrace)) {
     std::string uuid = request_headers.get(Headers::get().RequestId);
     UuidUtils::setTraceableUuid(uuid);
     request_headers.replaceViaMoveValue(Headers::get().RequestId, std::move(uuid));
@@ -116,6 +118,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
+                                                     const Http::HeaderMap& request_headers,
                                                      ConnectionManagerConfig& config) {
   response_headers.remove(Headers::get().Connection);
   response_headers.remove(Headers::get().TransferEncoding);
@@ -128,6 +131,11 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
   for (const std::pair<Http::LowerCaseString, std::string>& to_add :
        config.routeConfig().responseHeadersToAdd()) {
     response_headers.addViaCopy(to_add.first, to_add.second);
+  }
+
+  if (request_headers.has(Headers::get().EnvoyForceTrace)) {
+    response_headers.replaceViaCopy(Headers::get().RequestId,
+                                    request_headers.get(Headers::get().RequestId));
   }
 }
 

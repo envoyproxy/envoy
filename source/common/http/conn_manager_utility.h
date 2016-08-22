@@ -17,6 +17,7 @@ public:
                                    Runtime::RandomGenerator& random, Runtime::Loader& runtime);
 
   static void mutateResponseHeaders(Http::HeaderMap& response_headers,
+                                    const Http::HeaderMap& request_headers,
                                     ConnectionManagerConfig& config);
 };
 

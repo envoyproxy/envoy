@@ -103,13 +103,14 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
   }
 
   {
-    // Not internal request, force trace should be ignored
+    // Not internal request, force trace header should be cleaned.
     HeaderMapImpl headers{{"x-forwarded-for", external_remote_address},
                           {"x-request-id", uuid},
                           {"x-envoy-force-trace", "true"}};
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, random_,
                                                    runtime_);
     EXPECT_EQ(uuid, headers.get(Headers::get().RequestId));
+    EXPECT_FALSE(headers.has(Headers::get().EnvoyForceTrace));
   }
 }
 
@@ -312,14 +313,25 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   config_.route_config_.response_headers_to_remove_.push_back("custom_header");
   config_.route_config_.response_headers_to_add_.push_back({"to_add", "foo"});
 
-  HeaderMapImpl headers{{"connection", "foo"},
-                        {"transfer-encoding", "foo"},
-                        {":version", "foo"},
-                        {"custom_header", "foo"}};
-  ConnectionManagerUtility::mutateResponseHeaders(headers, config_);
+  HeaderMapImpl response_headers{{"connection", "foo"},
+                                 {"transfer-encoding", "foo"},
+                                 {":version", "foo"},
+                                 {"custom_header", "foo"}};
+  HeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
-  EXPECT_EQ(1UL, headers.size());
-  EXPECT_EQ("foo", headers.get("to_add"));
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, config_);
+
+  EXPECT_EQ(1UL, response_headers.size());
+  EXPECT_EQ("foo", response_headers.get("to_add"));
+  EXPECT_FALSE(response_headers.has("x-request-id"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
+  HeaderMapImpl response_headers;
+  HeaderMapImpl request_headers{{"x-request-id", "request-id"}, {"x-envoy-force-trace", "true"}};
+
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, config_);
+  EXPECT_EQ("request-id", response_headers.get("x-request-id"));
 }
 
 } // Http
