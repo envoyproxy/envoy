@@ -4,11 +4,14 @@ set -e
 
 # Setup basic requirements and install them.
 apt-get update
-apt-get install -y wget software-properties-common make cmake git python clang-format-3.6 bc
+apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc
 add-apt-repository -y ppa:ubuntu-toolchain-r/test
 apt-get update
 apt-get install -y g++-4.9
 rm -rf /var/lib/apt/lists/*
+
+# virtualenv
+pip install virtualenv
 
 # Build artifacts
 THIRDPARTY_BUILD=/thirdparty_build
