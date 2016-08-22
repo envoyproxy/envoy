@@ -8,8 +8,8 @@ namespace Buffer {
  * A raw memory data slice including location and length.
  */
 struct RawSlice {
-  const void* mem_;
-  const uint64_t len_;
+  void* mem_;
+  uint64_t len_;
 };
 
 /**
@@ -45,9 +45,14 @@ public:
   virtual void drain(uint64_t size) PURE;
 
   /**
-   * @return std::vector<RawSlice> the non-contiguous segments that make up the buffer.
+   * Fetch the raw buffer slices. This routine is optimized for performance.
+   * @param out supplies an array of RawSlice objects to fill.
+   * @param out_size supplies the size of out.
+   * @return the actual number of slices needed, which may be greater than out_size. Passing
+   *         nullptr for out and 0 for out_size will just return the size of the array needed
+   *         to capture all of the slice data.
    */
-  virtual std::vector<RawSlice> getRawSlices() const PURE;
+  virtual uint64_t getRawSlices(RawSlice* out, uint64_t out_size) const PURE;
 
   /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).

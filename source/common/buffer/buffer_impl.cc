@@ -11,7 +11,9 @@ void ImplBase::add(const void* data, uint64_t size) { evbuffer_add(&buffer(), da
 void ImplBase::add(const std::string& data) { evbuffer_add(&buffer(), data.c_str(), data.size()); }
 
 void ImplBase::add(const Instance& data) {
-  std::vector<RawSlice> slices = data.getRawSlices();
+  uint64_t num_slices = data.getRawSlices(nullptr, 0);
+  RawSlice slices[num_slices];
+  data.getRawSlices(slices, num_slices);
   for (RawSlice& slice : slices) {
     add(slice.mem_, slice.len_);
   }
@@ -24,17 +26,14 @@ void ImplBase::drain(uint64_t size) {
   UNREFERENCED_PARAMETER(rc);
 }
 
-std::vector<RawSlice> ImplBase::getRawSlices() const {
-  int num_needed = evbuffer_peek(&buffer(), -1, nullptr, nullptr, 0);
-
-  std::vector<RawSlice> slices;
-  evbuffer_iovec iovecs[num_needed];
-  evbuffer_peek(&buffer(), -1, nullptr, iovecs, num_needed);
-  for (int i = 0; i < num_needed; i++) {
-    slices.emplace_back(RawSlice{iovecs[i].iov_base, iovecs[i].iov_len});
+uint64_t ImplBase::getRawSlices(RawSlice* out, uint64_t out_size) const {
+  evbuffer_iovec iovecs[out_size];
+  uint64_t needed_size = evbuffer_peek(&buffer(), -1, nullptr, iovecs, out_size);
+  for (uint64_t i = 0; i < std::min(out_size, needed_size); i++) {
+    out[i].mem_ = iovecs[i].iov_base;
+    out[i].len_ = iovecs[i].iov_len;
   }
-
-  return slices;
+  return needed_size;
 }
 
 uint64_t ImplBase::length() const { return evbuffer_get_length(&buffer()); }

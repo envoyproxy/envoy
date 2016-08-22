@@ -262,8 +262,11 @@ void ConnectionImpl::write(Buffer::Instance& data) {
 
   if (data.length() > 0) {
     conn_log_trace("writing {} bytes", *this, data.length());
-    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
-      int rc = bufferevent_write(bev_.get(), slice.mem_, slice.len_);
+    uint64_t num_slices = data.getRawSlices(nullptr, 0);
+    Buffer::RawSlice slices[num_slices];
+    data.getRawSlices(slices, num_slices);
+    for (uint64_t i = 0; i < num_slices; i++) {
+      int rc = bufferevent_write(bev_.get(), slices[i].mem_, slices[i].len_);
       ASSERT(rc == 0);
       UNREFERENCED_PARAMETER(rc);
     }

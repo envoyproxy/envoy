@@ -141,13 +141,16 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
   // TODO: Back pressure.
   uint64_t length_remaining = length;
   Buffer::OwnedImpl output(framehd, FRAME_HEADER_SIZE);
-  for (Buffer::RawSlice& slice : pending_send_data_.getRawSlices()) {
+  uint64_t num_slices = pending_send_data_.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  pending_send_data_.getRawSlices(slices, num_slices);
+  for (uint64_t i = 0; i < num_slices; i++) {
     if (length_remaining == 0) {
       break;
     }
 
-    uint64_t data_to_write = std::min(length_remaining, slice.len_);
-    output.add(slice.mem_, data_to_write);
+    uint64_t data_to_write = std::min(length_remaining, slices[i].len_);
+    output.add(slices[i].mem_, data_to_write);
     length_remaining -= data_to_write;
   }
 
@@ -215,11 +218,14 @@ ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   conn_log_trace("dispatching {} bytes", connection_, data.length());
-  for (Buffer::RawSlice& slice : data.getRawSlices()) {
+  uint64_t num_slices = data.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  data.getRawSlices(slices, num_slices);
+  for (uint64_t i = 0; i < num_slices; i++) {
     dispatching_ = true;
-    ssize_t rc =
-        nghttp2_session_mem_recv(session_, static_cast<const uint8_t*>(slice.mem_), slice.len_);
-    if (rc != static_cast<ssize_t>(slice.len_)) {
+    ssize_t rc = nghttp2_session_mem_recv(session_, static_cast<const uint8_t*>(slices[i].mem_),
+                                          slices[i].len_);
+    if (rc != static_cast<ssize_t>(slices[i].len_)) {
       throw CodecProtocolException(fmt::format("{}", nghttp2_strerror(rc)));
     }
 
