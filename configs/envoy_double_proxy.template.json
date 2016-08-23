@@ -75,10 +75,12 @@
 
 {
   "listeners": [
-    {# TCP listener for external port 443 (SSL). #}
+    {# TCP listener for external port 443 (SSL). Assumes a TCP LB in front such as ELB which
+       supports proxy proto. #}
     {{ listener(9300,True,True) }},
 
-    {# TCP listener for external port 80 (non-SSL). #}
+    {# TCP listener for external port 80 (non-SSL). Assumes a TCP LB in front such as ELB which
+       supports proxy proto. #}
     {{ listener(9301,False,True) }}
   ],
 
