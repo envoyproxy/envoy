@@ -84,6 +84,7 @@ add_executable(envoy-test
   common/upstream/logical_dns_cluster_test.cc
   common/upstream/sds_test.cc
   common/upstream/upstream_impl_test.cc
+  example_configs_test.cc
   generated/helloworld.pb.cc
   integration/fake_upstream.cc
   integration/http2_integration_test.cc
@@ -141,14 +142,20 @@ target_link_libraries(envoy-test anl)
 target_link_libraries(envoy-test dl)
 
 add_custom_target(
+  envoy.generate_example_configs configs/configgen.sh generated/configs
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_custom_target(
   ${PROJECT_NAME}.check ${PROJECT_SOURCE_DIR}/test/run_envoy_tests.sh ${PROJECT_SOURCE_DIR}
                         ${PROJECT_BINARY_DIR}
-  DEPENDS envoy envoy-test)
+  DEPENDS envoy envoy-test envoy.generate_example_configs
+)
 
 if (ENVOY_CODE_COVERAGE)
 add_custom_target(
   ${PROJECT_NAME}.check-coverage
-  DEPENDS envoy envoy-test
+  DEPENDS envoy envoy-test envoy.generate_example_configs
   COMMAND ${PROJECT_SOURCE_DIR}/test/run_envoy_coverage.sh ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}
           ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR} ${ENVOY_GCOVR} ${ENVOY_GCOVR_EXTRA_ARGS}
 )

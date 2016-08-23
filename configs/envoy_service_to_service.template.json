@@ -1,0 +1,372 @@
+{% import 'routing_helper.template.json' as helper -%}
+{% import 'access_log_format_helper.template.json' as access_log_helper -%}
+
+{% macro ingress_listener(port) %}
+{
+  "port": {{ port }},
+  "filters": [
+  {
+    "type": "read",
+    "name": "http_connection_manager",
+    "config": {
+      "codec_type": "auto",
+      "http_codec_options": "no_compression",
+      "tracing_enabled": true,
+      "idle_timeout_s": 840,
+      "access_log": [
+      {
+        "path": "/var/log/envoy/ingress_http.log",
+        "filter": {"type": "not_healthcheck"},
+        {{ access_log_helper.ingress_full() }}
+      },
+      {
+        "path": "/var/log/envoy/ingress_http_error.log",
+        "filter": {"type": "logical_and", "filters": [
+            {"type": "logical_or", "filters": [
+                {"type": "status_code", "op": ">=", "value": 400},
+                {"type": "status_code", "op": "=", "value": 0},
+                {"type": "duration", "op": ">=", "value": 2000},
+                {"type": "traceable_request"}
+              ]
+            },
+            {"type": "not_healthcheck"}
+          ]
+        },
+        {{ access_log_helper.ingress_error_log() }}
+      },
+      {
+        "path": "/var/log/envoy/ingress_http_sampled.log",
+        "filter": {"type": "logical_and", "filters": [
+            {"type": "not_healthcheck"},
+            {"type": "runtime", "key": "access_log.ingress_http"}
+          ]
+        },
+        {{ access_log_helper.ingress_sampled_log() }}
+      }],
+      "stat_prefix": "ingress_http",
+      "route_config":
+      {
+        "virtual_hosts": [
+          {
+            "name": "local_service",
+            "domains": ["*"],
+            "routes": [
+              {
+                "timeout_ms": 0,
+                "prefix": "/",
+                "content_type": "application/grpc",
+                "cluster": "local_service_grpc"
+              },
+              {
+                "timeout_ms": 0,
+                "prefix": "/",
+                "cluster": "local_service"
+              }]
+          }
+        ]
+      },
+      "filters": [
+        { "type": "both", "name": "health_check",
+          "config": {
+            "pass_through_mode": true, "cache_time_ms": 2500, "endpoint": "/healthcheck"
+           }
+        },
+        { "type": "decoder", "name": "buffer",
+          "config": {
+            "max_request_bytes": 5242880,
+            "max_request_time_s": 120
+          }
+        },
+        { "type": "decoder", "name": "router", "config": {} }
+      ]
+    }
+  }]
+}
+{% endmacro %}
+
+{
+  "listeners": [
+  {{ ingress_listener(9211) }},
+  {
+    "port": 9001,
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "auto",
+        "add_user_agent": true,
+        "idle_timeout_s": 840,
+        "access_log": [
+        {
+          "path": "/var/log/envoy/egress_http_error.log",
+          "filter": {"type": "logical_or", "filters": [
+              {"type": "status_code", "op": ">=", "value": 400},
+              {"type": "duration", "op": ">=", "value": 2000}
+            ]
+          },
+          {{ access_log_helper.egress_error_log() }}
+        }],
+        "stat_prefix": "egress_http",
+        "use_remote_address": true,
+        "route_config":
+        {
+          "virtual_hosts": [
+            {% for service, options in internal_virtual_hosts.iteritems() -%}
+            {
+              "name": "{{ service }}",
+              {# NOTE: The following domain is synthetic and is used so that envoy deals with
+                       devbox vs. prod, etc. #}
+              "domains": ["{{ service }}"],
+              "routes": [
+                {
+                  "prefix": "/",
+                  {{ helper.make_route_internal(service, options) }}
+                }
+              ]
+            }{% if not loop.last %},{% endif -%}
+            {% endfor -%}
+          ]
+        },
+        "filters": [
+          {"type": "decoder", "name": "rate_limit",
+            "config": {
+              "domain": "envoy_service_to_service"
+            }
+          },
+          {"type": "both", "name": "grpc_http1_bridge", "config": {}},
+          {"type": "decoder", "name": "router", "config": {}}
+        ]
+      }
+    }]
+  }{% if external_virtual_hosts|length > 0 or mongos_servers|length > 0 %},{% endif -%}
+
+  {% for mapping in external_virtual_hosts -%}
+  {
+    "port": {{ mapping['port'] }},
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "auto",
+        "idle_timeout_s": 840,
+        "access_log": [
+        {
+          "path": "/var/log/envoy/egress_{{ mapping['name'] }}_http_error.log",
+          "filter": {"type": "logical_or", "filters": [
+              {"type": "status_code", "op": ">=", "value": 400},
+              {"type": "status_code", "op": "=", "value": 0}
+              {% if mapping.get('log_high_latency_requests', True) %}
+              ,{"type": "duration", "op": ">=", "value": 2000}
+              {% endif %}
+            ]
+          }
+          {% if mapping.get('is_amzn_service', False) -%}
+            ,{{ access_log_helper.egress_error_amazon_service() }}
+          {% else -%}
+            ,{{ access_log_helper.egress_error_log() }}
+          {% endif %}
+        }],
+        "stat_prefix": "egress_{{ mapping['name'] }}",
+        "route_config":
+        {
+          "virtual_hosts": [
+            {% for host in mapping['hosts'] -%}
+            {
+              "name": "egress_{{ host['name'] }}",
+              "domains": ["{{ host['domain'] }}"],
+              "routes": [
+                {
+                  "prefix": "/",
+                  "cluster": "egress_{{ host['name'] }}",
+                  "retry_policy": { "retry_on": "connect-failure" }
+                  {% if host.get('host_rewrite', False) -%}
+                  ,"host_rewrite": "{{host['host_rewrite']}}"
+                  {% endif -%}
+                }]
+            }{% if not loop.last %},{% endif -%}
+            {% endfor -%}
+          ]
+        },
+        "filters": [
+          {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] %}
+            { "type": "both", "name": "http_dynamo_filter", "config": {}},
+          {% endif %}
+          { "type": "decoder", "name": "router", "config": {} }
+        ]
+      }
+    }]
+  }{% if (mongos_servers|length > 0) or (mongos_servers|length == 0 and not loop.last ) %},{% endif -%}
+  {% endfor -%}
+
+  {% for key, value in mongos_servers.iteritems() -%}
+  {
+    "port": {{ value['port'] }},
+    "filters": [
+    {% if value.get('ratelimit', False) %}
+    {
+      "type": "read",
+      "name": "ratelimit",
+      "config": {
+        "stat_prefix": "{{ key }}",
+        "domain": "envoy_mongo_cps",
+        "descriptors": [[{"key": "database", "value": "{{ key }}"}]]
+      }
+    },
+    {% endif %}
+    {
+      "type": "both",
+      "name": "mongo_proxy",
+      "config": {
+        "stat_prefix": "{{ key }}",
+        "access_log": "/var/log/envoy/mongo_{{ key }}.log"
+      }
+    },
+    {
+      "type": "read",
+      "name": "tcp_proxy",
+      "config": {
+        "cluster": "mongo_{{ key }}",
+        "stat_prefix": "mongo_{{ key }}"
+      }
+    }]
+  }{% if not loop.last %},{% endif -%}
+  {% endfor -%}
+  ],
+
+  "admin": { "access_log_path": "/var/log/envoy/admin_access.log",
+             "port": 9901 },
+  "flags_path": "/etc/envoy/flags",
+  "statsd_tcp_cluster_name": "statsd",
+
+  "tracing": {
+    "http": {
+      "sinks": [
+        {
+          "type": "lightstep",
+          "access_token_file": "/etc/envoy/lightstep_access_token",
+          "config": {
+            "collector_cluster": "lightstep_saas"
+          }
+        }
+      ]
+    }
+  },
+
+  "rate_limit_service": {
+    "type": "grpc_service",
+    "config": {
+      "cluster_name": "ratelimit"
+    }
+  },
+
+  "runtime": {
+    "symlink_root": "/srv/runtime_data/current",
+    "subdirectory": "envoy",
+    "override_subdirectory": "envoy_override"
+  },
+
+  "cluster_manager": {
+    "sds": {
+      "cluster": {
+        "name": "sds",
+        "connect_timeout_ms": 250,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [{"url": "tcp://discovery.yourcompany.net:80"}]
+      },
+      "refresh_delay_ms": 30000
+    },
+
+    "clusters": [
+    {% for service, options in internal_virtual_hosts.iteritems() -%}
+    {
+      {{ helper.internal_cluster_definition(service, options) }}
+    },
+    {% endfor -%}
+
+    {% for mapping in external_virtual_hosts -%}
+    {% for host in mapping['hosts'] -%}
+    {
+      "name": "egress_{{ host['name'] }}",
+      {% if host.get('ssl', False) -%}
+      "ssl_context": {
+        "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt"
+        {% if host.get('sni', False) -%}
+        ,"sni": "{{ host['sni'] }}"
+        {% endif -%}
+        {% if host.get('verify_subject_alt_name', False) -%}
+        ,"verify_subject_alt_name": "{{ host['verify_subject_alt_name'] }}"
+        {% endif -%}
+      },
+      "connect_timeout_ms": 1000,
+      {% else -%}
+      "connect_timeout_ms": 250,
+      {% endif -%}
+      "type": "{{ mapping.get("cluster_type", "strict_dns") }}",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://{{ host['remote_address'] }}"}]
+    },
+    {% endfor -%}
+    {% endfor -%}
+
+    {% for key, value in mongos_servers.iteritems() -%}
+    {
+      "name": "mongo_{{ key }}",
+      "connect_timeout_ms": 250,
+      "type": "strict_dns",
+      "lb_type": "random", {# We use random LB policy here because we don't HC mongo routers. If
+                              a router drops, we want to converge on an even distribution.
+                              Without HC, least connection would perform terribly as we would
+                              continue to hit the bad router. #}
+      "hosts": [
+      {% for server in value['hosts'] -%}
+        {% set host = server.split(':')[0] -%}
+        {% set port = server.split(':')[1] -%}
+        {"url": "tcp://{{ host }}:{{ port }}"}{% if not loop.last %},{% endif %}
+      {% endfor -%}
+      ]
+    },
+    {% endfor -%}
+    {
+      "name": "local_service",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "max_pending_requests": 30, {# Apply back pressure quickly at the local host level. NOTE: This
+                                     only is applicable with the HTTP/1.1 connection pool. #}
+      "max_connections": 100,
+      "hosts": [{"url": "tcp://127.0.0.1:8080"}]
+
+    },
+    {
+      "name": "local_service_grpc",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "features": "http2",
+      "max_requests": 200,
+      "hosts": [{"url": "tcp://127.0.0.1:8081"}]
+    },
+    {
+      "name": "statsd",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:8125"}]
+    },
+    {
+      "name": "lightstep_saas",
+      "ssl_context": {
+        "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt",
+        "verify_subject_alt_name": "collector.lightstep.com"
+      },
+      "connect_timeout_ms": 1000,
+      "type": "logical_dns",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://collector.lightstep.com:443"}]
+    }
+    ]
+  }
+}
