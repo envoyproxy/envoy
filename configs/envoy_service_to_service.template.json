@@ -96,7 +96,7 @@
       "config": {
         "codec_type": "auto",
         "add_user_agent": true,
-        "idle_timeout_s": 840, {# 1 minute less than ELB if applicable #}
+        "idle_timeout_s": 840,
         "access_log": [
         {
           "path": "/var/log/envoy/egress_http_error.log",
@@ -150,7 +150,7 @@
       "name": "http_connection_manager",
       "config": {
         "codec_type": "auto",
-        "idle_timeout_s": 840, {# 1 minute less than ELB if applicable #}
+        "idle_timeout_s": 840,
         "access_log": [
         {
           "path": "/var/log/envoy/egress_{{ mapping['name'] }}_http_error.log",

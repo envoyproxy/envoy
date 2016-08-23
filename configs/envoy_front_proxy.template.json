@@ -72,7 +72,7 @@
     {{ listener(9300, ssl=True, proxy_proto=True, router_file='envoy_router.template.json') }},
     {{ listener(9301, ssl=False, proxy_proto=True, router_file='envoy_router.template.json') }},
 
-    {# TCP ELB listener for backhaul traffic from US-West (SSL) #}
+    {# TCP listener for backhaul traffic from US-West (SSL) #}
     {{ listener(9400, ssl=True, proxy_proto=False, pin_double_proxy_client=True,
                 router_file='envoy_router.template.json') }}
   ],

@@ -75,10 +75,10 @@
 
 {
   "listeners": [
-    {# TCP ELB listener for external port 443 (SSL). #}
+    {# TCP listener for external port 443 (SSL). #}
     {{ listener(9300,True,True) }},
 
-    {# TCP ELB listener for external port 80 (non-SSL). #}
+    {# TCP listener for external port 80 (non-SSL). #}
     {{ listener(9301,False,True) }}
   ],
 
