@@ -15,3 +15,7 @@ env:
   - TEST_TYPE=docs
 
 script: docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
+
+after_success:
+  - ./ci/docker_push.sh
+

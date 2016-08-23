@@ -4,22 +4,43 @@ services:
   front-envoy:
     build:
       context: ../
-      dockerfile: example/Dockerfile-envoy
+      dockerfile: example/Dockerfile-frontenvoy
     volumes:
-      - ./envoy.json:/etc/envoy.json
+      - ./front-envoy.json:/etc/front-envoy.json
+    networks:
+      - envoymesh
     expose:
       - "80"
       - "8001"
     ports:
       - "8000:80"
       - "8001:8001"
-    links:
-      - app
-    entrypoint: /usr/local/bin/wait-for-it.sh app:80 -- envoy -c /etc/envoy.json
 
-  app:
+  service1:
     build:
       context: .
-      dockerfile: Dockerfile-app
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./service-envoy.json:/etc/service-envoy.json
+    networks:
+      envoymesh:
+        aliases:
+          - service1
     expose:
       - "80"
+
+  service2:
+    build:
+      context: .
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./service-envoy.json:/etc/service-envoy.json
+    networks:
+      envoymesh:
+        aliases:
+          - service2
+    expose:
+      - "80"
+
+networks:
+  envoymesh: {}

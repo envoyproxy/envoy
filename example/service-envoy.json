@@ -12,13 +12,13 @@
             "route_config": {
               "virtual_hosts": [
                 {
-                  "name": "backend",
+                  "name": "service",
                   "domains": ["*"],
                   "routes": [
                     {
                       "timeout_ms": 0,
-                      "prefix": "/",
-                      "cluster": "app"
+                      "prefix": "/service",
+                      "cluster": "local_service"
                     }
                   ]
                 }
@@ -53,16 +53,17 @@
   "cluster_manager": {
     "clusters": [
       {
-        "name": "app",
+        "name": "local_service",
         "connect_timeout_ms": 250,
         "type": "strict_dns",
         "lb_type": "round_robin",
         "hosts": [
           {
-            "url": "tcp://app:80"
+            "url": "tcp://127.0.0.1:8080"
           }
         ]
       }
     ]
   }
 }
+
