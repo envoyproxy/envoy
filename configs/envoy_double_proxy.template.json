@@ -127,8 +127,8 @@
                                                up with a better solution just limit the requests
                                                so we can cycle and get better spread. #}
       "ssl_context": {
-        "cert_chain_file": "/etc/envoy/envoy-sfo.pem",
-        "private_key_file": "/etc/envoy/envoy-sfo.key",
+        "cert_chain_file": "/etc/envoy/envoy-double-proxy.pem",
+        "private_key_file": "/etc/envoy/envoy-double-proxy.key",
         "verify_subject_alt_name": "front-proxy.yourcompany.com"
       },
       "hosts": [{"url": "tcp://front-proxy.yourcompany.com:9400"}]
