@@ -85,9 +85,9 @@ components in a distributed system is a complex problem. Because Envoy is a self
 instead of a library, it is able to implement advanced load balancing techniques in a single place
 and have them be accessible to any application. Currently Envoy includes support for :ref:`automatic
 retries <arch_overview_http_routing_retry>`, :ref:`circuit breaking <arch_overview_circuit_break>`,
-and :ref:`global rate limiting <arch_overview_rate_limit>` via an external rate limiting service.
-Future support is planned for automatic bad host outlier ejection, request racing, and request
-shadowing.
+:ref:`global rate limiting <arch_overview_rate_limit>` via an external rate limiting service, and
+request shadowing. Future support is planned for automatic bad host outlier ejection and request
+racing.
 
 **Front/edge proxy support:** Although Envoy is primarily designed as a service to service
 communication system, there is benefit in using the same software at the edge (observability,
