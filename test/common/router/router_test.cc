@@ -37,11 +37,12 @@ class RouterTest : public testing::Test {
 public:
   RouterTest()
       : shadow_writer_(new MockShadowWriter()),
-        config_(new FilterConfig("test.", stats_store_, cm_, runtime_, random_,
+        config_(new FilterConfig("test.", "from_az", stats_store_, cm_, runtime_, random_,
                                  ShadowWriterPtr{shadow_writer_})),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     ON_CALL(*cm_.conn_pool_.host_, url()).WillByDefault(ReturnRef(host_url_));
+    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
   }
 
   void expectResponseTimerCreate() {
@@ -56,6 +57,7 @@ public:
     EXPECT_CALL(*per_try_timeout_, disableTimer());
   }
 
+  std::string upstream_zone_{"to_az"};
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -523,6 +525,10 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.retry.upstream_rq_503").value());
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.upstream_rq_200").value());
+  EXPECT_EQ(
+      1U, stats_store_.counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_200").value());
+  EXPECT_EQ(
+      1U, stats_store_.counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_2xx").value());
 }
 
 TEST_F(RouterTest, Shadow) {
@@ -597,6 +603,12 @@ TEST_F(RouterTest, AltStatName) {
                 .value());
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.alt_stat.upstream_rq_200").value());
+  EXPECT_EQ(1U,
+            stats_store_.counter("cluster.fake_cluster.alt_stat.zone.from_az.to_az.upstream_rq_200")
+                .value());
+  EXPECT_EQ(1U,
+            stats_store_.counter("cluster.fake_cluster.alt_stat.zone.from_az.to_az.upstream_rq_200")
+                .value());
 }
 
 TEST_F(RouterTest, Redirect) {

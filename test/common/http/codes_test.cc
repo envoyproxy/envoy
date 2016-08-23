@@ -1,3 +1,4 @@
+#include "common/common/empty_string.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/stats/stats_impl.h"
@@ -11,15 +12,17 @@ namespace Http {
 class CodeUtilityTest : public testing::Test {
 public:
   void addResponse(uint64_t code, bool canary, bool internal_request,
-                   const std::string& request_vhost_name,
-                   const std::string& request_vcluster_name) {
+                   const std::string& request_vhost_name = EMPTY_STRING,
+                   const std::string& request_vcluster_name = EMPTY_STRING,
+                   const std::string& from_az = EMPTY_STRING,
+                   const std::string& to_az = EMPTY_STRING) {
     HeaderMapImpl headers{{":status", std::to_string(code)}};
     if (canary) {
       headers.addViaMove("x-envoy-upstream-canary", "true");
     }
 
     CodeUtility::ResponseStatInfo info{store_, "prefix.", headers, internal_request,
-                                       request_vhost_name, request_vcluster_name};
+                                       request_vhost_name, request_vcluster_name, from_az, to_az};
 
     CodeUtility::chargeResponseStat(info);
   }
@@ -28,10 +31,10 @@ public:
 };
 
 TEST_F(CodeUtilityTest, NoCanary) {
-  addResponse(201, false, false, "", "");
-  addResponse(301, false, true, "", "");
-  addResponse(401, false, false, "", "");
-  addResponse(501, false, true, "", "");
+  addResponse(201, false, false);
+  addResponse(301, false, true);
+  addResponse(401, false, false);
+  addResponse(501, false, true);
 
   EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_2xx").value());
   EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_201").value());
@@ -54,9 +57,9 @@ TEST_F(CodeUtilityTest, NoCanary) {
 }
 
 TEST_F(CodeUtilityTest, Canary) {
-  addResponse(200, true, true, "", "");
-  addResponse(300, false, false, "", "");
-  addResponse(500, true, false, "", "");
+  addResponse(200, true, true);
+  addResponse(300, false, false);
+  addResponse(500, true, false);
 
   EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_2xx").value());
   EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_200").value());
@@ -146,17 +149,25 @@ TEST_F(CodeUtilityTest, RequestVirtualCluster) {
   EXPECT_EQ(1U, store_.counter("vhost.test-vhost.vcluster.test-cluster.upstream_rq_200").value());
 }
 
+TEST_F(CodeUtilityTest, PerZoneStats) {
+  addResponse(200, false, false, "", "", "from_az", "to_az");
+
+  EXPECT_EQ(1U, store_.counter("prefix.zone.from_az.to_az.upstream_rq_200").value());
+  EXPECT_EQ(1U, store_.counter("prefix.zone.from_az.to_az.upstream_rq_2xx").value());
+}
+
 TEST(CodeUtilityResponseTimingTest, All) {
   Stats::MockStore store;
 
   CodeUtility::ResponseTimingInfo info{store, "prefix.", std::chrono::system_clock::now(), true,
-                                       true, "vhost_name", "req_vcluster_name"};
+                                       true, "vhost_name", "req_vcluster_name", "from_az", "to_az"};
 
   EXPECT_CALL(store, deliverTimingToSinks("prefix.upstream_rq_time", _));
   EXPECT_CALL(store, deliverTimingToSinks("prefix.canary.upstream_rq_time", _));
   EXPECT_CALL(store, deliverTimingToSinks("prefix.internal.upstream_rq_time", _));
   EXPECT_CALL(store, deliverTimingToSinks(
                          "vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time", _));
+  EXPECT_CALL(store, deliverTimingToSinks("prefix.zone.from_az.to_az.upstream_rq_time", _));
   CodeUtility::chargeResponseTiming(info);
 }
 

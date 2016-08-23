@@ -77,7 +77,8 @@ void AsyncRequestImpl::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
 #endif
 
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
-                                     response_->headers(), true, EMPTY_STRING, EMPTY_STRING};
+                                     response_->headers(), true, EMPTY_STRING, EMPTY_STRING,
+                                     EMPTY_STRING, EMPTY_STRING};
   CodeUtility::chargeResponseStat(info);
 
   if (end_stream) {
@@ -115,7 +116,7 @@ void AsyncRequestImpl::onComplete() {
   CodeUtility::ResponseTimingInfo info{
       parent_.stats_store_, parent_.stat_prefix_, stream_encoder_->requestCompleteTime(),
       response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true", true, EMPTY_STRING,
-      EMPTY_STRING};
+      EMPTY_STRING, EMPTY_STRING, EMPTY_STRING};
   CodeUtility::chargeResponseTiming(info);
 
   callbacks_.onSuccess(std::move(response_));
@@ -124,7 +125,8 @@ void AsyncRequestImpl::onComplete() {
 
 void AsyncRequestImpl::onResetStream(StreamResetReason) {
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
-                                     SERVICE_UNAVAILABLE_HEADER, true, EMPTY_STRING, EMPTY_STRING};
+                                     SERVICE_UNAVAILABLE_HEADER, true, EMPTY_STRING, EMPTY_STRING,
+                                     EMPTY_STRING, EMPTY_STRING};
   CodeUtility::chargeResponseStat(info);
   callbacks_.onFailure(AsyncClient::FailureReason::Reset);
   cleanup();
@@ -132,7 +134,8 @@ void AsyncRequestImpl::onResetStream(StreamResetReason) {
 
 void AsyncRequestImpl::onRequestTimeout() {
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
-                                     REQUEST_TIMEOUT_HEADER, true, EMPTY_STRING, EMPTY_STRING};
+                                     REQUEST_TIMEOUT_HEADER, true, EMPTY_STRING, EMPTY_STRING,
+                                     EMPTY_STRING, EMPTY_STRING};
   CodeUtility::chargeResponseStat(info);
   parent_.cluster_.stats().upstream_rq_timeout_.inc();
   stream_encoder_->resetStream();
