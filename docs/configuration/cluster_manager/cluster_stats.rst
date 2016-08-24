@@ -113,8 +113,8 @@ the dynamic HTTP statistics section :ref:`above
 Per service zone dynamic HTTP statistics
 ----------------------------------------
 
-If service zone is available for local service :option:`--service-zone`
-and :ref:`upstream cluster <arch_overview_service_discovery_sds>`,
+If service zone is available for the local service via the :option:`--service-zone` option
+and the :ref:`upstream cluster <arch_overview_service_discovery_sds>`,
 Envoy will track the following statistics in *cluster.<name>.zone.<from_zone>.<to_zone>.* namespace.
 
 .. csv-table::
