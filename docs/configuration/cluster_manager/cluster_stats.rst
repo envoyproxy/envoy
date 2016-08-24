@@ -85,8 +85,8 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  upstream_rq_<\*xx>, Counter, Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)
-  upstream_rq_<\*>, Counter, Specific HTTP response codes (e.g., 201, 302, etc.)
+  upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
+  upstream_rq_<\*>, "Counter, Specific HTTP response codes (e.g., 201, 302, etc.)"
   upstream_rq_time, Timer, Request time milliseconds
   canary.upstream_rq_<\*xx>, Counter, Upstream canary aggregate HTTP response codes
   canary.upstream_rq_<\*>, Counter, Upstream canary specific HTTP response codes
@@ -121,6 +121,6 @@ Envoy will track the following statistics in *cluster.<name>.zone.<from_zone>.<t
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  upstream_rq_<\*xx>, Counter, Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)
-  upstream_rq_<\*>, Counter, Specific HTTP response codes (e.g., 201, 302, etc.)
+  upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
+  upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
   upstream_rq_time, Timer, Request time milliseconds
