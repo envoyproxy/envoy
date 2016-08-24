@@ -13,16 +13,21 @@ using testing::ByRef;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
+using testing::ReturnRef;
 
 namespace Http {
 
 class AsyncClientImplTest : public testing::Test, public AsyncClientConnPoolFactory {
 public:
-  AsyncClientImplTest() { HttpTestUtility::addDefaultHeaders(message_->headers()); }
+  AsyncClientImplTest() {
+    HttpTestUtility::addDefaultHeaders(message_->headers());
+    ON_CALL(*conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
+  }
 
   // Http::AsyncClientConnPoolFactory
   Http::ConnectionPool::Instance* connPool() override { return &conn_pool_; }
 
+  std::string upstream_zone_{"to_az"};
   MessagePtr message_{new RequestMessageImpl()};
   MockAsyncClientCallbacks callbacks_;
   ConnectionPool::MockInstance conn_pool_;
@@ -50,16 +55,20 @@ TEST_F(AsyncClientImplTest, Basic) {
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
   EXPECT_CALL(callbacks_, onSuccess_(_));
 
-  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_);
+  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
-  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_2xx"));
+  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_200"));
+  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_2xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_200"));
+  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_2xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.internal.upstream_rq_2xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.internal.upstream_rq_200"));
   EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.upstream_rq_time", _));
   EXPECT_CALL(stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.internal.upstream_rq_time", _));
+  EXPECT_CALL(stats_store_,
+              deliverTimingToSinks("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_time", _));
 
   HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
@@ -82,7 +91,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
 
-  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_);
+  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
   // Send request 2.
@@ -129,7 +138,7 @@ TEST_F(AsyncClientImplTest, Trailers) {
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
   EXPECT_CALL(callbacks_, onSuccess_(_));
 
-  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_);
+  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
@@ -140,6 +149,8 @@ TEST_F(AsyncClientImplTest, Trailers) {
 TEST_F(AsyncClientImplTest, FailRequest) {
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_503"));
+  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_503"));
+  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.internal.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.internal.upstream_rq_503"));
 
@@ -153,7 +164,7 @@ TEST_F(AsyncClientImplTest, FailRequest) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
   EXPECT_CALL(callbacks_, onFailure(Http::AsyncClient::FailureReason::Reset));
 
-  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_);
+  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
@@ -169,7 +180,7 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
-  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_);
+  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   AsyncClient::Request* request =
       client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   request->cancel();
@@ -178,6 +189,8 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
 TEST_F(AsyncClientImplTest, PoolFailure) {
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_503"));
+  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_5xx"));
+  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_503"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.internal.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.internal.upstream_rq_503"));
 
@@ -190,7 +203,7 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
       }));
 
   EXPECT_CALL(callbacks_, onFailure(Http::AsyncClient::FailureReason::Reset));
-  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_);
+  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   EXPECT_EQ(nullptr,
             client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>()));
 }
@@ -198,6 +211,8 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
 TEST_F(AsyncClientImplTest, RequestTimeout) {
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_504"));
+  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_5xx"));
+  EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_504"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.internal.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.internal.upstream_rq_504"));
   EXPECT_CALL(conn_pool_, newStream(_, _))
@@ -212,7 +227,7 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40)));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
-  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_);
+  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   client.send(std::move(message_), callbacks_, std::chrono::milliseconds(40));
   timer_->callback_();
 
@@ -232,7 +247,7 @@ TEST_F(AsyncClientImplTest, DisableTimer) {
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(200)));
   EXPECT_CALL(*timer_, disableTimer());
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
-  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_);
+  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   AsyncClient::Request* request =
       client.send(std::move(message_), callbacks_, std::chrono::milliseconds(200));
   request->cancel();
