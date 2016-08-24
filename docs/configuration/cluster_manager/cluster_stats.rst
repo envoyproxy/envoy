@@ -85,8 +85,8 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
-  upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
+  upstream_rq_<\*xx>, Counter, Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)
+  upstream_rq_<\*>, Counter, Specific HTTP response codes (e.g., 201, 302, etc.)
   upstream_rq_time, Timer, Request time milliseconds
   canary.upstream_rq_<\*xx>, Counter, Upstream canary aggregate HTTP response codes
   canary.upstream_rq_<\*>, Counter, Upstream canary specific HTTP response codes
@@ -107,3 +107,20 @@ If alternate tree statistics are configured, they will be present in the
 *cluster.<name>.<alt name>.* namespace. The statistics produced are the same as documented in
 the dynamic HTTP statistics section :ref:`above
 <config_cluster_manager_cluster_stats_dynamic_http>`.
+
+.. _config_cluster_manager_cluster_per_az_stats:
+
+Per service zone dynamic HTTP statistics
+----------------------------------------
+
+If service zone is available for local service :option:`--service-zone`
+and :ref:`upstream cluster <arch_overview_service_discovery_sds>`,
+Envoy will track the following statistics in *cluster.<name>.zone.<from_zone>.<to_zone>.* namespace.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  upstream_rq_<\*xx>, Counter, Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)
+  upstream_rq_<\*>, Counter, Specific HTTP response codes (e.g., 201, 302, etc.)
+  upstream_rq_time, Timer, Request time milliseconds
