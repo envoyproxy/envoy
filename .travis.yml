@@ -5,6 +5,9 @@ services:
 
 install: true
 
+matrix:
+  fast_finish: true
+
 env:
   - TEST_TYPE=normal
   - TEST_TYPE=coverage
