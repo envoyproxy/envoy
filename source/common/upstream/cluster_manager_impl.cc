@@ -41,10 +41,10 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, Stats::Store&
   }
 
   tls.set(thread_local_slot_,
-          [this, &stats, &runtime, &random](Event::Dispatcher& dispatcher)
+          [this, &stats, &runtime, &random, local_zone_name](Event::Dispatcher& dispatcher)
               -> ThreadLocal::ThreadLocalObjectPtr {
-                return ThreadLocal::ThreadLocalObjectPtr{
-                    new ThreadLocalClusterManagerImpl(*this, dispatcher, runtime, random)};
+                return ThreadLocal::ThreadLocalObjectPtr{new ThreadLocalClusterManagerImpl(
+                    *this, dispatcher, runtime, random, local_zone_name)};
               });
 
   // To avoid threading issues, for those clusters that start with hosts already in them (like
@@ -202,11 +202,11 @@ Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::stri
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random)
+    Runtime::RandomGenerator& random, const std::string& local_zone_name)
     : parent_(parent), dispatcher_(dispatcher) {
   for (auto& cluster : parent.primary_clusters_) {
-    thread_local_clusters_[cluster.first].reset(
-        new ClusterEntry(*this, *cluster.second, runtime, random, parent.stats_, dispatcher));
+    thread_local_clusters_[cluster.first].reset(new ClusterEntry(
+        *this, *cluster.second, runtime, random, parent.stats_, dispatcher, local_zone_name));
   }
 
   for (auto& cluster : thread_local_clusters_) {
@@ -251,9 +251,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::shutdown() {
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, const Cluster& cluster, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, Stats::Store& stats_store, Event::Dispatcher& dispatcher)
+    Runtime::RandomGenerator& random, Stats::Store& stats_store, Event::Dispatcher& dispatcher,
+    const std::string& local_zone_name)
     : parent_(parent), primary_cluster_(cluster),
-      http_async_client_(cluster, *this, stats_store, dispatcher) {
+      http_async_client_(cluster, *this, stats_store, dispatcher, local_zone_name) {
 
   switch (cluster.lbType()) {
   case LoadBalancerType::LeastRequest: {

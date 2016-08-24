@@ -65,16 +65,17 @@ public:
  */
 class FilterConfig {
 public:
-  FilterConfig(const std::string& stat_prefix, Stats::Store& stats, Upstream::ClusterManager& cm,
-               Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-               ShadowWriterPtr&& shadow_writer)
-      : stats_store_(stats), cm_(cm), runtime_(runtime), random_(random),
-        stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))},
+  FilterConfig(const std::string& stat_prefix, const std::string& service_zone, Stats::Store& stats,
+               Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+               Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer)
+      : stats_store_(stats), service_zone_(service_zone), cm_(cm), runtime_(runtime),
+        random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))},
         shadow_writer_(std::move(shadow_writer)) {}
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
 
   Stats::Store& stats_store_;
+  const std::string service_zone_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
@@ -123,6 +124,7 @@ private:
 
     // Http::PooledStreamEncoderCallbacks
     void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override {
+      parent_.upstream_host_ = host;
       parent_.callbacks_->requestInfo().onUpstreamHostSelected(host);
     }
 
@@ -139,6 +141,7 @@ private:
   Http::AccessLog::FailureReason
   streamResetReasonToFailureReason(Http::StreamResetReason reset_reason);
 
+  const std::string& upstreamZone();
   void chargeUpstreamCode(const Http::HeaderMap& response_headers);
   void chargeUpstreamCode(Http::Code code);
   void cleanup();
@@ -176,6 +179,7 @@ private:
   Http::HeaderMap* downstream_trailers_{};
   bool downstream_end_stream_{};
   bool do_shadowing_{};
+  Upstream::HostDescriptionPtr upstream_host_;
 };
 
 class ProdFilter : public Filter {

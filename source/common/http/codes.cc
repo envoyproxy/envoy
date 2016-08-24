@@ -48,6 +48,14 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
     info.store_.counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}", info.request_vhost_name_,
                                     info.request_vcluster_name_, response_code)).inc();
   }
+
+  // Handle per zone stats.
+  if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
+    info.store_.counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
+                                    info.to_zone_, group_string)).inc();
+    info.store_.counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
+                                    info.to_zone_, response_code)).inc();
+  }
 }
 
 void CodeUtility::chargeResponseTiming(const ResponseTimingInfo& info) {
@@ -69,6 +77,13 @@ void CodeUtility::chargeResponseTiming(const ResponseTimingInfo& info) {
     if (!info.request_vcluster_name_.empty()) {
       info.store_.deliverTimingToSinks("vhost." + info.request_vhost_name_ + ".vcluster." +
                                            info.request_vcluster_name_ + ".upstream_rq_time",
+                                       ms);
+    }
+
+    // Handle per zone stats.
+    if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
+      info.store_.deliverTimingToSinks(fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_,
+                                                   info.from_zone_, info.to_zone_),
                                        ms);
     }
   }

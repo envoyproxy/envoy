@@ -65,7 +65,8 @@ private:
     struct ClusterEntry : public Http::AsyncClientConnPoolFactory {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, const Cluster& cluster,
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                   Stats::Store& stats_store, Event::Dispatcher& dispatcher);
+                   Stats::Store& stats_store, Event::Dispatcher& dispatcher,
+                   const std::string& local_zone_name);
 
       // Http::AsyncClientConnPoolFactory
       Http::ConnectionPool::Instance* connPool() override;
@@ -80,7 +81,8 @@ private:
     typedef std::unique_ptr<ClusterEntry> ClusterEntryPtr;
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
-                                  Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+                                  Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                  const std::string& local_zone_name);
 
     static void updateClusterMembership(const std::string& name, ConstHostVectorPtr hosts,
                                         ConstHostVectorPtr healthy_hosts,

@@ -33,7 +33,8 @@ class AsyncRequestImpl;
 class AsyncClientImpl final : public AsyncClient {
 public:
   AsyncClientImpl(const Upstream::Cluster& cluster, AsyncClientConnPoolFactory& factory,
-                  Stats::Store& stats_store, Event::Dispatcher& dispatcher);
+                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
+                  const std::string& local_zone_name);
   ~AsyncClientImpl();
 
   // Http::AsyncClient
@@ -45,6 +46,7 @@ private:
   AsyncClientConnPoolFactory& factory_;
   Stats::Store& stats_store_;
   Event::Dispatcher& dispatcher_;
+  const std::string local_zone_name_;
   const std::string stat_prefix_;
   std::list<std::unique_ptr<AsyncRequestImpl>> active_requests_;
 
@@ -71,6 +73,8 @@ public:
   void cancel() override;
 
 private:
+  const std::string& upstreamZone();
+
   // Http::StreamDecoder
   void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(const Buffer::Instance& data, bool end_stream) override;
@@ -80,7 +84,9 @@ private:
   void onResetStream(StreamResetReason reason) override;
 
   // Http::PooledStreamEncoderCallbacks
-  void onUpstreamHostSelected(Upstream::HostDescriptionPtr) override {}
+  void onUpstreamHostSelected(Upstream::HostDescriptionPtr upstream_host) override {
+    upstream_host_ = upstream_host;
+  }
 
   void onComplete();
 
@@ -93,6 +99,7 @@ private:
   Event::TimerPtr request_timeout_;
   std::unique_ptr<MessageImpl> response_;
   PooledStreamEncoderPtr stream_encoder_;
+  Upstream::HostDescriptionPtr upstream_host_;
 
   static const HeaderMapImpl SERVICE_UNAVAILABLE_HEADER;
   static const HeaderMapImpl REQUEST_TIMEOUT_HEADER;

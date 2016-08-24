@@ -18,7 +18,8 @@ public:
     }
 
     Router::FilterConfigPtr config(new Router::FilterConfig(
-        stat_prefix, server.stats(), server.clusterManager(), server.runtime(), server.random(),
+        stat_prefix, server.options().serviceZone(), server.stats(), server.clusterManager(),
+        server.runtime(), server.random(),
         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(server.clusterManager())}));
 
     return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

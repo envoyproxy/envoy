@@ -25,6 +25,8 @@ public:
     bool internal_request_;
     const std::string& request_vhost_name_;
     const std::string& request_vcluster_name_;
+    const std::string& from_zone_;
+    const std::string& to_zone_;
   };
 
   /**
@@ -42,6 +44,8 @@ public:
     bool internal_request_;
     const std::string& request_vhost_name_;
     const std::string& request_vcluster_name_;
+    const std::string& from_zone_;
+    const std::string& to_zone_;
   };
 
   /**
