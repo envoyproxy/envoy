@@ -41,7 +41,7 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, Stats::Store&
   }
 
   tls.set(thread_local_slot_,
-          [this, &stats, &runtime, &random, &local_zone_name](Event::Dispatcher& dispatcher)
+          [this, &stats, &runtime, &random, local_zone_name](Event::Dispatcher& dispatcher)
               -> ThreadLocal::ThreadLocalObjectPtr {
                 return ThreadLocal::ThreadLocalObjectPtr{new ThreadLocalClusterManagerImpl(
                     *this, dispatcher, runtime, random, local_zone_name)};

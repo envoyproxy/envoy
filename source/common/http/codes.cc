@@ -50,11 +50,11 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
   }
 
   // Handle per zone stats.
-  if (!info.from_az_.empty() && !info.to_az_.empty()) {
-    info.store_.counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_az_,
-                                    info.to_az_, group_string)).inc();
-    info.store_.counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_az_,
-                                    info.to_az_, response_code)).inc();
+  if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
+    info.store_.counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
+                                    info.to_zone_, group_string)).inc();
+    info.store_.counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
+                                    info.to_zone_, response_code)).inc();
   }
 }
 
@@ -81,9 +81,9 @@ void CodeUtility::chargeResponseTiming(const ResponseTimingInfo& info) {
     }
 
     // Handle per zone stats.
-    if (!info.from_az_.empty() && !info.to_az_.empty()) {
+    if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
       info.store_.deliverTimingToSinks(
-          fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_, info.from_az_, info.to_az_),
+          fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_, info.from_zone_, info.to_zone_),
           ms);
     }
   }
