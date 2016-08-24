@@ -131,9 +131,9 @@
       "ssl_context": {
         "cert_chain_file": "/etc/envoy/envoy-double-proxy.pem",
         "private_key_file": "/etc/envoy/envoy-double-proxy.key",
-        "verify_subject_alt_name": "front-proxy.yourcompany.com"
+        "verify_subject_alt_name": "front-proxy.yourcompany.net"
       },
-      "hosts": [{"url": "tcp://front-proxy.yourcompany.com:9400"}]
+      "hosts": [{"url": "tcp://front-proxy.yourcompany.net:9400"}]
     },
     {
       "name": "lightstep_saas",

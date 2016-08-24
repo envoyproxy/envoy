@@ -1,3 +1,5 @@
+.. _deployment_type_double_proxy:
+
 Service to service, front proxy, and double proxy
 -------------------------------------------------
 
@@ -19,4 +21,6 @@ ordinarily would not be trustable (such as the x-forwaded-for HTTP header).
 Configuration template
 ^^^^^^^^^^^^^^^^^^^^^^
 
-FIXFIX
+The source distribution includes an example double proxy configuration that is very similar to
+the version that Lyft runs in production. See :ref:`here <install_ref_configs>` for more
+information.
