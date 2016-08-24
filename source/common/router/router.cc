@@ -89,15 +89,16 @@ Filter::~Filter() {
   ASSERT(!retry_state_);
 }
 
+const std::string& Filter::upstreamZone() {
+  return upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
+}
+
 void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers) {
   if (!callbacks_->requestInfo().healthCheck()) {
-    const std::string& from_az = config_->service_zone_;
-    const std::string& to_az = upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
-
     Http::CodeUtility::ResponseStatInfo info{
         config_->stats_store_, stat_prefix_, response_headers,
         downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true",
-        route_->virtualHostName(), request_vcluster_name_, from_az, to_az};
+        route_->virtualHostName(), request_vcluster_name_, config_->service_zone_, upstreamZone()};
 
     Http::CodeUtility::chargeResponseStat(info);
 
@@ -105,7 +106,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers) {
       Http::CodeUtility::ResponseStatInfo info{
           config_->stats_store_, alt_prefix, response_headers,
           downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true", "", "",
-          from_az, to_az};
+          config_->service_zone_, upstreamZone()};
 
       Http::CodeUtility::chargeResponseStat(info);
     }
@@ -413,16 +414,13 @@ void Filter::onUpstreamComplete() {
     upstream_request_->upstream_encoder_->resetStream();
   }
 
-  const std::string& from_az = config_->service_zone_;
-  const std::string& to_az = upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
-
   if (!callbacks_->requestInfo().healthCheck()) {
     Http::CodeUtility::ResponseTimingInfo info{
         config_->stats_store_, stat_prefix_,
         upstream_request_->upstream_encoder_->requestCompleteTime(),
         upstream_request_->upstream_canary_,
         downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true",
-        route_->virtualHostName(), request_vcluster_name_, from_az, to_az};
+        route_->virtualHostName(), request_vcluster_name_, config_->service_zone_, upstreamZone()};
 
     Http::CodeUtility::chargeResponseTiming(info);
 
@@ -432,7 +430,7 @@ void Filter::onUpstreamComplete() {
           upstream_request_->upstream_encoder_->requestCompleteTime(),
           upstream_request_->upstream_canary_,
           downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true", "", "",
-          from_az, to_az};
+          config_->service_zone_, upstreamZone()};
 
       Http::CodeUtility::chargeResponseTiming(info);
     }

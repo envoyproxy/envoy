@@ -82,9 +82,9 @@ void CodeUtility::chargeResponseTiming(const ResponseTimingInfo& info) {
 
     // Handle per zone stats.
     if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-      info.store_.deliverTimingToSinks(
-          fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_, info.from_zone_, info.to_zone_),
-          ms);
+      info.store_.deliverTimingToSinks(fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_,
+                                                   info.from_zone_, info.to_zone_),
+                                       ms);
     }
   }
 }

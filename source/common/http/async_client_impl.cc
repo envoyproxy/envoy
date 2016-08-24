@@ -62,6 +62,10 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
 
 AsyncRequestImpl::~AsyncRequestImpl() { ASSERT(!stream_encoder_); }
 
+const std::string& AsyncRequestImpl::upstreamZone() {
+  return upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
+}
+
 void AsyncRequestImpl::cancel() {
   ASSERT(stream_encoder_);
   stream_encoder_->resetStream();
@@ -76,10 +80,9 @@ void AsyncRequestImpl::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
                                    -> void { log_debug("  '{}':'{}'", key.get(), value); });
 #endif
 
-  const std::string& to_az = upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
                                      response_->headers(), true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, to_az};
+                                     parent_.local_zone_name_, upstreamZone()};
   CodeUtility::chargeResponseStat(info);
 
   if (end_stream) {
@@ -113,12 +116,11 @@ void AsyncRequestImpl::decodeTrailers(HeaderMapPtr&& trailers) {
 }
 
 void AsyncRequestImpl::onComplete() {
-  const std::string& to_az = upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
   // TODO: Check host's canary status in addition to canary header.
   CodeUtility::ResponseTimingInfo info{
       parent_.stats_store_, parent_.stat_prefix_, stream_encoder_->requestCompleteTime(),
       response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true", true, EMPTY_STRING,
-      EMPTY_STRING, parent_.local_zone_name_, to_az};
+      EMPTY_STRING, parent_.local_zone_name_, upstreamZone()};
   CodeUtility::chargeResponseTiming(info);
 
   callbacks_.onSuccess(std::move(response_));
@@ -126,21 +128,18 @@ void AsyncRequestImpl::onComplete() {
 }
 
 void AsyncRequestImpl::onResetStream(StreamResetReason) {
-  const std::string& to_az = upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
-
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
                                      SERVICE_UNAVAILABLE_HEADER, true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, to_az};
+                                     parent_.local_zone_name_, upstreamZone()};
   CodeUtility::chargeResponseStat(info);
   callbacks_.onFailure(AsyncClient::FailureReason::Reset);
   cleanup();
 }
 
 void AsyncRequestImpl::onRequestTimeout() {
-  const std::string& to_az = upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
                                      REQUEST_TIMEOUT_HEADER, true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, to_az};
+                                     parent_.local_zone_name_, upstreamZone()};
   CodeUtility::chargeResponseStat(info);
   parent_.cluster_.stats().upstream_rq_timeout_.inc();
   stream_encoder_->resetStream();

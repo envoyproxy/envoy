@@ -141,6 +141,7 @@ private:
   Http::AccessLog::FailureReason
   streamResetReasonToFailureReason(Http::StreamResetReason reset_reason);
 
+  const std::string& upstreamZone();
   void chargeUpstreamCode(const Http::HeaderMap& response_headers);
   void chargeUpstreamCode(Http::Code code);
   void cleanup();

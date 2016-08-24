@@ -73,6 +73,8 @@ public:
   void cancel() override;
 
 private:
+  const std::string& upstreamZone();
+
   // Http::StreamDecoder
   void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(const Buffer::Instance& data, bool end_stream) override;
