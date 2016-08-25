@@ -57,11 +57,24 @@ TEST(UUIDUtilsTest, setAndCheckTraceable) {
   Runtime::RandomGeneratorImpl random;
 
   std::string uuid = random.uuid();
-  EXPECT_FALSE(UuidUtils::isTraceableUuid(uuid));
+  TraceDecision decision = UuidUtils::isTraceableUuid(uuid);
+  EXPECT_FALSE(decision.is_traced);
 
-  EXPECT_TRUE(UuidUtils::setTraceableUuid(uuid));
-  EXPECT_TRUE(UuidUtils::isTraceableUuid(uuid));
+  EXPECT_TRUE(UuidUtils::setTraceableUuid(uuid, TraceReason::Sampled));
+  decision = UuidUtils::isTraceableUuid(uuid);
+  EXPECT_TRUE(decision.is_traced);
+  EXPECT_EQ(decision.reason, Optional<TraceReason>(TraceReason::Sampled));
+
+  EXPECT_TRUE(UuidUtils::setTraceableUuid(uuid, TraceReason::Client));
+  decision = UuidUtils::isTraceableUuid(uuid);
+  EXPECT_TRUE(decision.is_traced);
+  EXPECT_EQ(decision.reason, Optional<TraceReason>(TraceReason::Client));
+
+  EXPECT_TRUE(UuidUtils::setTraceableUuid(uuid, TraceReason::Forced));
+  decision = UuidUtils::isTraceableUuid(uuid);
+  EXPECT_TRUE(decision.is_traced);
+  EXPECT_EQ(decision.reason, Optional<TraceReason>(TraceReason::Forced));
 
   std::string invalid_uuid = "";
-  EXPECT_FALSE(UuidUtils::setTraceableUuid(invalid_uuid));
+  EXPECT_FALSE(UuidUtils::setTraceableUuid(invalid_uuid, TraceReason::Forced));
 }

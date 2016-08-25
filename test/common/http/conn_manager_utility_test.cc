@@ -99,7 +99,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
                           {"x-envoy-force-trace", "true"}};
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, random_,
                                                    runtime_);
-    EXPECT_EQ("f4dca0a9-12c7-9307-8002-969403baf480", headers.get(Headers::get().RequestId));
+    EXPECT_EQ("f4dca0a9-12c7-a307-8002-969403baf480", headers.get(Headers::get().RequestId));
   }
 
   {
@@ -165,7 +165,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    runtime_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
-    EXPECT_EQ("f4dca0a9-12c7-9307-8002-969403baf480", headers.get(Headers::get().RequestId));
+    EXPECT_EQ("f4dca0a9-12c7-b307-8002-969403baf480", headers.get(Headers::get().RequestId));
   }
 }
 

@@ -28,28 +28,23 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
     return {Reason::InvalidRequestId, false};
   }
 
-  if (UuidUtils::isTraceableUuid(x_request_id)) {
+  TraceDecision x_rq_id_trace_decision = UuidUtils::isTraceableUuid(x_request_id);
+
+  if (x_rq_id_trace_decision.is_traced) {
+    TraceReason trace_reason = x_rq_id_trace_decision.reason.value();
+
     if (!runtime.snapshot().featureEnabled("tracing.global_enabled", 100, result)) {
       return {Reason::GlobalSwitchOff, false};
     }
 
-    if (request_headers.has(Http::Headers::get().ClientTraceId)) {
+    switch (trace_reason) {
+    case TraceReason::Client:
       return {Reason::ClientForced, true};
-    }
-
-    if (request_headers.has(Http::Headers::get().EnvoyForceTrace)) {
+    case TraceReason::Forced:
       return {Reason::ServiceForced, true};
+    case TraceReason::Sampled:
+      return {Reason::Sampling, true};
     }
-
-    return {Reason::TraceableRequest, true};
-  }
-
-  if (runtime.snapshot().featureEnabled("tracing.random_sampling", 0, result, 10000)) {
-    if (!runtime.snapshot().featureEnabled("tracing.global_enabled", 100, result)) {
-      return {Reason::GlobalSwitchOff, false};
-    }
-
-    return {Reason::Sampling, true};
   }
 
   return {Reason::NotTraceableRequestId, false};
