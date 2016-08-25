@@ -10,7 +10,7 @@ major Envoy deployment types:
 * :ref:`Front proxy <deployment_type_front_proxy>`
 * :ref:`Double proxy <deployment_type_double_proxy>`
 
-The goal of this set of example configurations is to demonstrate the full capabiltiies of Envoy in
+The goal of this set of example configurations is to demonstrate the full capabilities of Envoy in
 a complex deployment. All features will not be applicable to all use cases. For full documentation
 see the :ref:`configuration reference <config>`.
 
