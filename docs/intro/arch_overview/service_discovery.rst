@@ -89,14 +89,27 @@ paradigm has a number of benefits:
 * When health checking is configured for an upstream cluster, Envoy uses a 4x4 matrix to determine
   whether to route to a host:
 
-  * Host discovered / health check OK: Envoy **will route** to the target host.
-  * Host absent / health check OK: Envoy **will route** to the target host. This is very important
-    since the design assumes that the discovery service can fail at any time. If a host continues to
-    pass health check even after becoming absent from the discovery data, Envoy will still route.
-    Although it would be impossible to add new hosts in this scenario, existing hosts will continue
-    to operate normally. When the discovery service is operating normally again the data will
-    eventually re-converge.
-  * Host discovered / health check FAIL: Envoy **will not route** to the target host. Health check
-    data is assumed to be more accurate than discovery data.
-  * Host absent / health check FAIL: Envoy **will not route and will delete** the target host. This
-    is the only state in which Envoy will purge host data.
+.. csv-table::
+  :header: Discovery Status, HC OK, HC Failed
+  :widths: 1, 1, 2
+
+  Discovered, Route, Don't Route
+  Absent, Route, Don't Route / Delete
+
+Host discovered / health check OK
+  Envoy **will route** to the target host.
+
+Host absent / health check OK:
+  Envoy **will route** to the target host. This is very important since the design assumes that the
+  discovery service can fail at any time. If a host continues to pass health check even after becoming
+  absent from the discovery data, Envoy will still route. Although it would be impossible to add new
+  hosts in this scenario, existing hosts will continue to operate normally. When the discovery service
+  is operating normally again the data will eventually re-converge.
+
+Host discovered / health check FAIL
+  Envoy **will not route** to the target host. Health check data is assumed to be more accurate than
+  discovery data.
+
+Host absent / health check FAIL
+  Envoy **will not route and will delete** the target host. This
+  is the only state in which Envoy will purge host data.
