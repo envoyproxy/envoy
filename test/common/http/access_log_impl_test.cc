@@ -313,10 +313,10 @@ TEST_F(AccessLogImplTest, requestTracing) {
   std::string not_traceable_guid = random.uuid();
 
   std::string force_tracing_guid = random.uuid();
-  UuidUtils::setTraceableUuid(force_tracing_guid, TraceReason::Forced);
+  UuidUtils::setTraceableUuid(force_tracing_guid, UuidTraceStatus::Forced);
 
   std::string sample_tracing_guid = random.uuid();
-  UuidUtils::setTraceableUuid(sample_tracing_guid, TraceReason::Sampled);
+  UuidUtils::setTraceableUuid(sample_tracing_guid, UuidTraceStatus::Sampled);
 
   std::string json = R"EOF(
   {
@@ -332,8 +332,6 @@ TEST_F(AccessLogImplTest, requestTracing) {
 
   {
     HeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(true));
     EXPECT_CALL(*file_, write(_));
     log->log(&forced_header, &response_headers_, request_info_);
   }
@@ -346,8 +344,6 @@ TEST_F(AccessLogImplTest, requestTracing) {
 
   {
     HeaderMapImpl sampled_header{{"x-request-id", sample_tracing_guid}};
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(true));
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&sampled_header, &response_headers_, request_info_);
   }

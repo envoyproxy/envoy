@@ -22,89 +22,58 @@ namespace Tracing {
 
 TEST(HttpTracerUtilityTest, IsTracing) {
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Stats::MockStore> stats;
   Runtime::RandomGeneratorImpl random;
   std::string not_traceable_guid = random.uuid();
 
   std::string forced_guid = random.uuid();
-  UuidUtils::setTraceableUuid(forced_guid, TraceReason::Forced);
+  UuidUtils::setTraceableUuid(forced_guid, UuidTraceStatus::Forced);
   Http::HeaderMapImpl forced_header{{"x-request-id", forced_guid}};
 
   std::string sampled_guid = random.uuid();
-  UuidUtils::setTraceableUuid(sampled_guid, TraceReason::Sampled);
+  UuidUtils::setTraceableUuid(sampled_guid, UuidTraceStatus::Sampled);
   Http::HeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};
 
   std::string client_guid = random.uuid();
-  UuidUtils::setTraceableUuid(client_guid, TraceReason::Client);
+  UuidUtils::setTraceableUuid(client_guid, UuidTraceStatus::Client);
   Http::HeaderMapImpl client_header{{"x-request-id", client_guid}};
 
   Http::HeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
   Http::HeaderMapImpl empty_header{};
 
-  // Global tracing enabled and x-request-id is forced.
+  // Force traced.
   {
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(true));
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
 
-    Decision result = HttpTracerUtility::isTracing(request_info, forced_header, runtime);
+    Decision result = HttpTracerUtility::isTracing(request_info, forced_header);
     EXPECT_EQ(Reason::ServiceForced, result.reason);
     EXPECT_TRUE(result.is_tracing);
   }
 
-  // Global tracing disabled and x-request-id is force traced.
+  // Sample traced.
   {
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(false));
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
 
-    Decision result = HttpTracerUtility::isTracing(request_info, forced_header, runtime);
-    EXPECT_EQ(Reason::GlobalSwitchOff, result.reason);
-    EXPECT_FALSE(result.is_tracing);
-  }
-
-  // Global tracing enabled and x-request-id is sample traced.
-  {
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(true));
-    EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
-
-    Decision result = HttpTracerUtility::isTracing(request_info, sampled_header, runtime);
+    Decision result = HttpTracerUtility::isTracing(request_info, sampled_header);
     EXPECT_EQ(Reason::Sampling, result.reason);
     EXPECT_TRUE(result.is_tracing);
   }
 
   // HC request.
   {
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _)).Times(0);
-
     Http::HeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(true));
 
-    Decision result = HttpTracerUtility::isTracing(request_info, traceable_header_hc, runtime);
+    Decision result = HttpTracerUtility::isTracing(request_info, traceable_header_hc);
     EXPECT_EQ(Reason::HealthCheck, result.reason);
     EXPECT_FALSE(result.is_tracing);
   }
 
-  // Sampled x-request-id, global is off.
+  // Client traced.
   {
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(false));
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
 
-    Decision result = HttpTracerUtility::isTracing(request_info, sampled_header, runtime);
-    EXPECT_EQ(Reason::GlobalSwitchOff, result.reason);
-    EXPECT_FALSE(result.is_tracing);
-  }
-
-  // x-request-id is traceable, client called.
-  {
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(true));
-    EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
-
-    Decision result = HttpTracerUtility::isTracing(request_info, client_header, runtime);
+    Decision result = HttpTracerUtility::isTracing(request_info, client_header);
     EXPECT_EQ(Reason::ClientForced, result.reason);
     EXPECT_TRUE(result.is_tracing);
   }
@@ -117,11 +86,11 @@ TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
   std::string not_traceable_guid = random.uuid();
 
   std::string forced_guid = random.uuid();
-  UuidUtils::setTraceableUuid(forced_guid, TraceReason::Forced);
+  UuidUtils::setTraceableUuid(forced_guid, UuidTraceStatus::Forced);
   Http::HeaderMapImpl forced_header{{"x-request-id", forced_guid}};
 
   std::string sampled_guid = random.uuid();
-  UuidUtils::setTraceableUuid(sampled_guid, TraceReason::Sampled);
+  UuidUtils::setTraceableUuid(sampled_guid, UuidTraceStatus::Sampled);
   Http::HeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};
 
   Http::HeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
@@ -135,31 +104,17 @@ TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
   tracer.addSink(HttpSinkPtr{sink1});
   tracer.addSink(HttpSinkPtr{sink2});
 
-  // Global tracing enabled and x-request-id is traceable.
+  // Force traced request.
   {
     EXPECT_CALL(*sink1, flushTrace(_, _, _));
     EXPECT_CALL(*sink2, flushTrace(_, _, _));
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(true));
     tracer.trace(&forced_header, &empty_header, request_info);
   }
 
-  // Global tracing disabled and x-request-id is traceable.
-  {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _)).Times(0);
-    EXPECT_CALL(*sink2, flushTrace(_, _, _)).Times(0);
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(false));
-
-    tracer.trace(&forced_header, &empty_header, request_info);
-  }
-
-  // x-request-id is sample traced, global is on.
+  // x-request-id is sample traced.
   {
     EXPECT_CALL(*sink1, flushTrace(_, _, _));
     EXPECT_CALL(*sink2, flushTrace(_, _, _));
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(true));
 
     tracer.trace(&sampled_header, &empty_header, request_info);
   }
@@ -168,7 +123,6 @@ TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
   {
     EXPECT_CALL(*sink1, flushTrace(_, _, _)).Times(0);
     EXPECT_CALL(*sink2, flushTrace(_, _, _)).Times(0);
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _)).Times(0);
 
     Http::HeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
     NiceMock<Http::AccessLog::MockRequestInfo> request_info;
@@ -176,21 +130,10 @@ TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
     tracer.trace(&traceable_header_hc, &empty_header, request_info);
   }
 
-  // x-request-id is sample traced, global is off.
+  // x-request-id is not traceable.
   {
     EXPECT_CALL(*sink1, flushTrace(_, _, _)).Times(0);
     EXPECT_CALL(*sink2, flushTrace(_, _, _)).Times(0);
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-        .WillOnce(Return(false));
-
-    tracer.trace(&sampled_header, &empty_header, request_info);
-  }
-
-  // x-request-id is not traceable, global not called.
-  {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _)).Times(0);
-    EXPECT_CALL(*sink2, flushTrace(_, _, _)).Times(0);
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _)).Times(0);
 
     tracer.trace(&not_traceable_header, &empty_header, request_info);
   }

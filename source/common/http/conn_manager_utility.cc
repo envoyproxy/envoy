@@ -99,35 +99,11 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     }
 
     if (!uuid.empty()) {
-      // If client sends x-client-trace-id we set x-request-id to be traceable for edge requests.
-      if (edge_request && request_headers.has(Headers::get().ClientTraceId) &&
-          runtime.snapshot().featureEnabled("tracing.client_enabled", 100)) {
-        UuidUtils::setTraceableUuid(uuid, TraceReason::Client);
-      }
-
       request_headers.replaceViaMoveValue(Headers::get().RequestId, std::move(uuid));
     }
   }
 
-  // Make request traceable if x-envoy-force-trace header is set.
-  if (request_headers.has(Headers::get().EnvoyForceTrace)) {
-    std::string uuid = request_headers.get(Headers::get().RequestId);
-    UuidUtils::setTraceableUuid(uuid, TraceReason::Forced);
-    request_headers.replaceViaMoveValue(Headers::get().RequestId, std::move(uuid));
-  } else { // Check if we need to random sample request for tracing.
-    std::string uuid = request_headers.get(Http::Headers::get().RequestId);
-    uint16_t result;
-
-    // Skip if x-request-id is corrupted.
-    if (!UuidUtils::uuidModBy(uuid, result, 10000)) {
-      return;
-    }
-
-    if (runtime.snapshot().featureEnabled("tracing.random_sampling", 0, result, 10000)) {
-      UuidUtils::setTraceableUuid(uuid, TraceReason::Sampled);
-      request_headers.replaceViaMoveValue(Headers::get().RequestId, std::move(uuid));
-    }
-  }
+  Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,

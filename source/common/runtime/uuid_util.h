@@ -1,11 +1,6 @@
 #pragma once
 
-enum class TraceReason { Sampled, Client, Forced };
-
-struct TraceDecision {
-  bool is_traced;
-  Optional<TraceReason> reason;
-};
+enum class UuidTraceStatus { NoTrace, Sampled, Client, Forced };
 
 /*
  * Utils for uuid4.
@@ -23,15 +18,15 @@ public:
   /**
    * Modify uuid in a way it can be detected if uuid is traceable or not.
    * @param uuid is expected to be well formed uuid4.
-   * @param trace_reason is to specify why we modify uuid.
+   * @param trace_status is to specify why we modify uuid.
    * @return true on success, false on failure.
    */
-  static bool setTraceableUuid(std::string& uuid, TraceReason trace_reason);
+  static bool setTraceableUuid(std::string& uuid, UuidTraceStatus trace_status);
 
   /**
-   * @return bool to indicate if @param uuid is traceable uuid4.
+   * @return status of the uuid, to differentiate reason for tracing, etc.
    */
-  static TraceDecision isTraceableUuid(const std::string& uuid);
+  static UuidTraceStatus isTraceableUuid(const std::string& uuid);
 
 private:
   // Byte on this position has predefined value of 4 for UUID4.
@@ -48,4 +43,7 @@ private:
   // Value of 'a' is chosen randomly to distinguish between freshly generated uuid4 and the
   // one modified because of client trace.
   static const char TRACE_CLIENT = 'b';
+
+  // Initial value for freshly generated uuid4.
+  static const char NO_TRACE = '4';
 };
