@@ -42,7 +42,8 @@ each query. If strict DNS were used in this scenario, Envoy would assume that th
 were changing during every resolution interval which would lead to draining connection pools,
 connection cycling, etc. Instead, with logical DNS, connections stay alive until they get cycled.
 When interacting with large scale web services, this is the best of all possible worlds:
-asynchronous/eventually consistent resolution coupled with long lived connections.
+asynchronous/eventually consistent DNS resolution, long lived connections, and zero blocking in the
+forwarding path.
 
 .. _arch_overview_service_discovery_sds:
 
