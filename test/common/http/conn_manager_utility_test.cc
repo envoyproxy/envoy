@@ -97,9 +97,12 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     HeaderMapImpl headers{{"x-forwarded-for", internal_remote_address},
                           {"x-request-id", uuid},
                           {"x-envoy-force-trace", "true"}};
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+        .WillOnce(Return(true));
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, random_,
                                                    runtime_);
-    EXPECT_EQ("f4dca0a9-12c7-9307-8002-969403baf480", headers.get(Headers::get().RequestId));
+
+    EXPECT_EQ("f4dca0a9-12c7-a307-8002-969403baf480", headers.get(Headers::get().RequestId));
   }
 
   {
@@ -107,6 +110,8 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     HeaderMapImpl headers{{"x-forwarded-for", external_remote_address},
                           {"x-request-id", uuid},
                           {"x-envoy-force-trace", "true"}};
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+        .WillOnce(Return(true));
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, random_,
                                                    runtime_);
     EXPECT_EQ(uuid, headers.get(Headers::get().RequestId));
@@ -120,6 +125,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_remote_address));
+  ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillByDefault(Return(true));
 
   {
     HeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
@@ -165,7 +172,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    runtime_);
 
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
-    EXPECT_EQ("f4dca0a9-12c7-9307-8002-969403baf480", headers.get(Headers::get().RequestId));
+    EXPECT_EQ("f4dca0a9-12c7-b307-8002-969403baf480", headers.get(Headers::get().RequestId));
   }
 }
 

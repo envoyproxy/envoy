@@ -17,17 +17,42 @@ bool UuidUtils::uuidModBy(const std::string& uuid, uint16_t& out, uint16_t mod) 
   return true;
 }
 
-bool UuidUtils::isTraceableUuid(const std::string& uuid) {
-  return uuid.length() == Runtime::RandomGeneratorImpl::UUID_LENGTH &&
-         uuid[TRACE_BYTE_POSITION] == TRACE_BYTE_VALUE;
+UuidTraceStatus UuidUtils::isTraceableUuid(const std::string& uuid) {
+  if (uuid.length() != Runtime::RandomGeneratorImpl::UUID_LENGTH) {
+    return UuidTraceStatus::NoTrace;
+  }
+
+  switch (uuid[TRACE_BYTE_POSITION]) {
+  case TRACE_FORCED:
+    return UuidTraceStatus::Forced;
+  case TRACE_SAMPLED:
+    return UuidTraceStatus::Sampled;
+  case TRACE_CLIENT:
+    return UuidTraceStatus::Client;
+  default:
+    return UuidTraceStatus::NoTrace;
+  }
 }
 
-bool UuidUtils::setTraceableUuid(std::string& uuid) {
+bool UuidUtils::setTraceableUuid(std::string& uuid, UuidTraceStatus trace_status) {
   if (uuid.length() != Runtime::RandomGeneratorImpl::UUID_LENGTH) {
     return false;
   }
 
-  uuid[TRACE_BYTE_POSITION] = TRACE_BYTE_VALUE;
+  switch (trace_status) {
+  case UuidTraceStatus::Forced:
+    uuid[TRACE_BYTE_POSITION] = TRACE_FORCED;
+    break;
+  case UuidTraceStatus::Client:
+    uuid[TRACE_BYTE_POSITION] = TRACE_CLIENT;
+    break;
+  case UuidTraceStatus::Sampled:
+    uuid[TRACE_BYTE_POSITION] = TRACE_SAMPLED;
+    break;
+  case UuidTraceStatus::NoTrace:
+    uuid[TRACE_BYTE_POSITION] = NO_TRACE;
+    break;
+  }
 
   return true;
 }
