@@ -11,10 +11,10 @@ In practice, achieving the previously stated goal is incredibly difficult. Envoy
 by providing the following high level features:
 
 **Out of process architecture:** Envoy is a self contained process that is designed to run
-alongside every application server. All of the Envoys form a transparent communication mesh that
-allows each application to send and receive messages to and from localhost and be unaware of the
-network topology. The out of process architecture has two substantial benefits over the traditional
-library approach to service to service communication:
+alongside every application server. All of the Envoys form a transparent communication mesh in which
+each application sends and receives messages to and from localhost and is unaware of the network
+topology. The out of process architecture has two substantial benefits over the traditional library
+approach to service to service communication:
 
 * Envoy works with any application language. A single Envoy deployment can form a mesh between
   Java, C++, Go, PHP, Python, etc. It is becoming increasingly common for service oriented
@@ -25,13 +25,13 @@ library approach to service to service communication:
   entire infrastructure transparently.
 
 **Modern C++11 code base:** Envoy is written in C++11. Native code was chosen because we
-believe that an architectural component such as Envoy should get out of the way as much as
-possible. Modern application developers already deal with tail latencies that are difficult
-to reason about due to deployments in shared cloud environments and the use of very productive but
-not particularly well performing languages such as PHP, Python, Ruby, etc. Native code provides
-generally excellent latency properties that don't add additional confusion to an already confusing
-situation. Unlike other native code proxy solutions written in C, C++11 provides both excellent
-developer productivity and performance.
+believe that an architectural component such as Envoy should get out of the way as much as possible.
+Modern application developers already deal with tail latencies that are difficult to reason about
+due to deployments in shared cloud environments and the use of very productive but not particularly
+well performing languages such as PHP, Python, Ruby, Scala, etc. Native code provides generally
+excellent latency properties that don't add additional confusion to an already confusing situation.
+Unlike other native code proxy solutions written in C, C++11 provides both excellent developer
+productivity and performance.
 
 **L3/L4 filter architecture:** At its core, Envoy is an L3/L4 network proxy. A pluggable
 :ref:`filter <arch_overview_network_filters>` chain mechanism allows filters to be written to
