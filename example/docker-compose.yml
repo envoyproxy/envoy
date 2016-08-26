@@ -26,6 +26,8 @@ services:
       envoymesh:
         aliases:
           - service1
+    environment:
+      - SERVICE_NAME=1
     expose:
       - "80"
 
@@ -39,6 +41,8 @@ services:
       envoymesh:
         aliases:
           - service2
+    environment:
+      - SERVICE_NAME=2
     expose:
       - "80"
 
