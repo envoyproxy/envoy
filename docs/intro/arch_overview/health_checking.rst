@@ -14,8 +14,8 @@ unhealthy, successes required before marking a host healthy, etc.):
 * **HTTP**: During HTTP health checking Envoy will send an HTTP request to the upstream host. It
   expects a 200 response if the host is healthy. The upstream host can return 503 if it wants to
   immediately notify downstream hosts to no longer forward traffic to it.
-* **L3/L4**: During L3/L4 health checking, Envoy will send a configured byte buffer to the upstream
-  host. It expects a configured byte buffer to be returned in response if the host is to be
+* **L3/L4**: During L3/L4 health checking, Envoy will send a configurable byte buffer to the 
+  upstream host. It expects the byte buffer to be echoed in the response if the host is to be
   considered healthy.
 
 .. _arch_overview_health_checking_filter:
@@ -38,9 +38,10 @@ operation:
   check request will be passed to the local service. This is the recommended mode of operation when
   operating a large mesh. Envoy uses persistent connections for health checking traffic and health
   check requests have very little cost to Envoy itself. Thus, this mode of operation yields an
-  eventually view of the health state of each upstream host without overwhelming the local service
-  with a large number of health check requests.
+  eventually consistent view of the health state of each upstream host without overwhelming the 
+  local service with a large number of health check requests.
 
-Health check filter appends x-envoy-upstream-healthchecked-cluster header to the response headers,
-the value is determined by the :option:`--service-cluster` command line option.
+The health check filter appends the x-envoy-upstream-healthchecked-cluster header to the response 
+headers, the value is determined by the :option:`--service-cluster` command line option.
+
 Health check filter :ref:`configuration <config_http_filters_health_check>`.

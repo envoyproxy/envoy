@@ -20,7 +20,7 @@ network name (IP address/port, unix domain socket, etc.) of each upstream host.
 Strict DNS
 ^^^^^^^^^^
 
-When using strict DNS service discovery, Envoy will continuously asynchronously resolve the
+When using strict DNS service discovery, Envoy will continuously and asynchronously resolve the
 specified DNS targets. Each returned IP address in the DNS result will be considered an explicit
 host in the upstream cluster. This means that if the query returns three IP addresses, Envoy will
 assume the cluster has three hosts, and all three should be load balanced to. If a host is removed
@@ -59,8 +59,8 @@ SDS is the preferred service discovery mechanism for a few reasons:
 
 * Envoy has explicit knowledge of each upstream host (vs. routing through a DNS resolved load
   balancer) and can make more intelligent load balancing decisions.
-* Extra metadata carried in the discovery API response for each host tells Envoy facts such as the
-  host’s load balancing weight, canary status, zone, etc. These additional facts are used globally
+* Extra attributes carried in the discovery API response for each host inform Envoy of the host’s 
+  load balancing weight, canary status, zone, etc. These additional attributes are used globally
   by the Envoy mesh during load balancing, statistic gathering, etc.
 
 Generally active health checking is used in conjunction with the eventually consistent service
@@ -74,8 +74,7 @@ On eventually consistent service discovery
 
 Many existing RPC systems treat service discovery as a fully consistent process. To this end, they
 use fully consistent leader election backing stores such as Zookeeper, etcd, Consul, etc. Our
-experience has been that operating these backing stores at scale generally leads to a massive amount
-of pain.
+experience has been that operating these backing stores at scale is painful.
 
 Envoy was designed from the beginning with the idea that service discovery does not require full
 consistency. Instead, Envoy assumes that hosts come and go from the mesh in an eventually consistent
@@ -86,7 +85,7 @@ paradigm has a number of benefits:
 
 * All health decisions are fully distributed. Thus, network partitions are gracefully handled
   (whether the application gracefully handles the partition is a different story).
-* When health checking is configured for an upstream cluster, Envoy uses a 4x4 matrix to determine
+* When health checking is configured for an upstream cluster, Envoy uses a 2x2 matrix to determine
   whether to route to a host:
 
 .. csv-table::

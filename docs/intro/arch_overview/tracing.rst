@@ -22,13 +22,13 @@ sources of latency. Envoy supports three features related to system wide tracing
 
 How to initiate a trace
 -----------------------
-There are several ways trace can be initiated:
+The HTTP connection manager that handles the request must have the :ref:`tracing_enabled
+<config_http_conn_man_tracing_enabled>` option set. There are several ways tracing can be 
+initiated:
 
-* The HTTP connection manager that handles the request must have the :ref:`tracing_enabled
-  <config_http_conn_man_tracing_enabled>` option set.
-* Initiated by an external client via the :ref:`config_http_conn_man_headers_x-client-trace-id`
+* By an external client via the :ref:`config_http_conn_man_headers_x-client-trace-id`
   header.
-* Initiated by an internal service via the :ref:`config_http_conn_man_headers_x-envoy-force-trace`
+* By an internal service via the :ref:`config_http_conn_man_headers_x-envoy-force-trace`
   header.
 * Randomly sampled via the :ref:`random_sampling <config_http_conn_man_runtime_random_sampling>`
   runtime setting.

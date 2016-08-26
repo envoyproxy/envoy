@@ -3,7 +3,7 @@
 Runtime configuration
 =====================
 
-Envoy supports “runtime” configuration. Configuration settings can be altered that will effect
+Envoy supports “runtime” configuration. Configuration settings can be altered that will affect
 operation without needing to restart Envoy or change the primary configuration. The currently
 supported implementation uses a tree of file system files. Envoy watches for a symbolic link swap in
 a configured directory and reloads the tree when that happens. This type of system is very commonly

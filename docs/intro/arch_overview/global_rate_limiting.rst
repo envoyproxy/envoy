@@ -4,7 +4,7 @@ Global rate limiting
 ====================
 
 Although distributed :ref:`circuit breaking <arch_overview_circuit_break>` is generally extremely
-effective in controlling throughput in distributed systems, there are times in which it is not very
+effective in controlling throughput in distributed systems, there are times when it is not very
 effective and global rate limiting is desired. The most common case is when a large number of hosts
 are forwarding to a small number of hosts and the average request latency is low (e.g.,
 connections/requests to a database server). If the target hosts become backed up, the downstream
@@ -24,8 +24,8 @@ written in Go which uses a Redis backend. Envoy’s rate limit integration has t
   <config_network_filters_rate_limit>`.
 * **HTTP level rate limit filter**: Envoy will call the rate limit service for every new request on
   the listener where the filter is installed and where the route table specifies that the global
-  rate limit service should be called. Both all requests to the target upstream cluster as well as
-  all requests from the originating cluster to the target cluster can be rate limited.
+  rate limit service should be called. All requests to the target upstream cluster as well as all 
+  requests from the originating cluster to the target cluster can be rate limited.
   :ref:`Configuration reference <config_http_filters_rate_limit>`
 
 Rate limit service :ref:`configuration <config_rate_limit_service>`.
