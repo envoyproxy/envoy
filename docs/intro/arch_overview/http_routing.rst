@@ -48,7 +48,7 @@ Retry semantics
 
 Envoy allows retries to be configured both in the :ref:`route configuration
 <config_http_conn_man_route_table_route_retry>` as well as for specific requests via :ref:`request
-headers <config_http_filters_router_headers>`. The following configurations possible:
+headers <config_http_filters_router_headers>`. The following configurations are possible:
 
 * **Maximum number of retries**: Envoy will continue to retry any number of times. An exponential
   backoff algorithm is used between each retry. Additionally, *all retries are contained within the
