@@ -49,7 +49,8 @@ public:
     Event::MockTimer* connect_timer_;
   };
 
-  Http2ConnPoolImplTest() : pool_(dispatcher_, host_, cluster_.stats_store_) {}
+  Http2ConnPoolImplTest()
+      : pool_(dispatcher_, host_, cluster_.stats_store_, Upstream::ResourcePriority::Default) {}
 
   ~Http2ConnPoolImplTest() {
     // Make sure all gauges are 0.

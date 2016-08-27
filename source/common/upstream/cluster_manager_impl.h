@@ -42,7 +42,8 @@ public:
   }
 
   const Cluster* get(const std::string& cluster) override;
-  Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster) override;
+  Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
+                                                         ResourcePriority priority) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
 
@@ -62,6 +63,13 @@ private:
    * connection pools.
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
+    struct ConnPoolsContainer {
+      typedef std::array<Http::ConnectionPool::InstancePtr, NumResourcePriorities> ConnPools;
+
+      ConnPools pools_;
+      uint64_t drains_remaining_{};
+    };
+
     struct ClusterEntry : public Http::AsyncClientConnPoolFactory {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, const Cluster& cluster,
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
@@ -69,7 +77,7 @@ private:
                    const std::string& local_zone_name);
 
       // Http::AsyncClientConnPoolFactory
-      Http::ConnectionPool::Instance* connPool() override;
+      Http::ConnectionPool::Instance* connPool(ResourcePriority priority) override;
 
       ThreadLocalClusterManagerImpl& parent_;
       HostSetImpl host_set_;
@@ -83,7 +91,7 @@ private:
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                   const std::string& local_zone_name);
-
+    void drainConnPools(HostPtr old_host, ConnPoolsContainer& container);
     static void updateClusterMembership(const std::string& name, ConstHostVectorPtr hosts,
                                         ConstHostVectorPtr healthy_hosts,
                                         ConstHostVectorPtr local_zone_hosts,
@@ -98,11 +106,12 @@ private:
     ClusterManagerImpl& parent_;
     Event::Dispatcher& dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
-    std::unordered_map<ConstHostPtr, Http::ConnectionPool::InstancePtr> host_http_conn_pool_map_;
+    std::unordered_map<ConstHostPtr, ConnPoolsContainer> host_http_conn_pool_map_;
   };
 
-  virtual Http::ConnectionPool::InstancePtr
-  allocateConnPool(Event::Dispatcher& dispatcher, ConstHostPtr host, Stats::Store& store) PURE;
+  virtual Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
+                                                             ConstHostPtr host, Stats::Store& store,
+                                                             ResourcePriority priority) PURE;
   void loadCluster(const Json::Object& cluster, Stats::Store& stats,
                    Network::DnsResolver& dns_resolver, Ssl::ContextManager& ssl_context_manager,
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random);
@@ -129,8 +138,9 @@ public:
 
 private:
   // ClusterManagerImpl
-  Http::ConnectionPool::InstancePtr
-  allocateConnPool(Event::Dispatcher& dispatcher, ConstHostPtr host, Stats::Store& store) override;
+  Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
+                                                     ConstHostPtr host, Stats::Store& store,
+                                                     ResourcePriority priority) override;
 };
 
 } // Upstream

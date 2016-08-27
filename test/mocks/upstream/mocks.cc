@@ -33,14 +33,15 @@ MockCluster::MockCluster()
   ON_CALL(*this, maxRequestsPerConnection())
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
-  ON_CALL(*this, resourceManager())
-      .WillByDefault(Invoke([this]() -> Upstream::ResourceManager& { return *resource_manager_; }));
+  ON_CALL(*this, resourceManager(_))
+      .WillByDefault(Invoke([this](ResourcePriority)
+                                -> Upstream::ResourceManager& { return *resource_manager_; }));
 }
 
 MockCluster::~MockCluster() {}
 
 MockClusterManager::MockClusterManager() {
-  ON_CALL(*this, httpConnPoolForCluster(_)).WillByDefault(Return(&conn_pool_));
+  ON_CALL(*this, httpConnPoolForCluster(_, _)).WillByDefault(Return(&conn_pool_));
   ON_CALL(*this, get(_)).WillByDefault(Return(&cluster_));
 }
 

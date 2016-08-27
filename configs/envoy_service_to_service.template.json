@@ -334,9 +334,14 @@
       "connect_timeout_ms": 250,
       "type": "static",
       "lb_type": "round_robin",
-      "max_pending_requests": 30, {# Apply back pressure quickly at the local host level. NOTE: This
-                                     only is applicable with the HTTP/1.1 connection pool. #}
-      "max_connections": 100,
+      "circuit_breakers": {
+        "default": {
+          "max_pending_requests": 30, {# Apply back pressure quickly at the local host level. NOTE:
+                                         This only is applicable with the HTTP/1.1 connection
+                                         pool. #}
+          "max_connections": 100
+        }
+      },
       "hosts": [{"url": "tcp://127.0.0.1:8080"}]
 
     },
@@ -346,7 +351,11 @@
       "type": "static",
       "lb_type": "round_robin",
       "features": "http2",
-      "max_requests": 200,
+      "circuit_breakers": {
+        "default": {
+          "max_requests": 200
+        }
+      },
       "hosts": [{"url": "tcp://127.0.0.1:8081"}]
     },
     {

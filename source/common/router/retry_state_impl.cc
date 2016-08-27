@@ -16,8 +16,10 @@ const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
 
 RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
                                const Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                               Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher)
-    : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher) {
+                               Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                               Upstream::ResourcePriority priority)
+    : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
+      priority_(priority) {
   retry_on_ = parseRetryOn(request_headers.get(Http::Headers::get().EnvoyRetryOn));
   if (retry_on_ != 0) {
     const std::string& max_retries = request_headers.get(Http::Headers::get().EnvoyMaxRetries);
@@ -71,7 +73,7 @@ uint32_t RetryStateImpl::parseRetryOn(const std::string& config) {
 
 void RetryStateImpl::resetRetry() {
   if (callback_) {
-    cluster_.resourceManager().retries().dec();
+    cluster_.resourceManager(priority_).retries().dec();
     callback_ = nullptr;
   }
 }
@@ -100,14 +102,14 @@ bool RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
     return false;
   }
 
-  if (!cluster_.resourceManager().retries().canCreate()) {
+  if (!cluster_.resourceManager(priority_).retries().canCreate()) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();
     return false;
   }
 
   ASSERT(!callback_);
   callback_ = callback;
-  cluster_.resourceManager().retries().inc();
+  cluster_.resourceManager(priority_).retries().inc();
   cluster_.stats().upstream_rq_retry_.inc();
   enableBackoffTimer();
   return true;

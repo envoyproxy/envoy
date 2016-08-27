@@ -52,4 +52,6 @@ private:
   ResourceImpl retries_;
 };
 
+typedef std::unique_ptr<ResourceManagerImpl> ResourceManagerImplPtr;
+
 } // Upstream

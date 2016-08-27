@@ -30,7 +30,7 @@ public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::Cluster& cluster)
       : ConnPoolImpl(dispatcher, Upstream::HostPtr{new Upstream::HostImpl(
                                      cluster, "tcp://127.0.0.1:9000", false, 1, "")},
-                     stats_store_),
+                     stats_store_, Upstream::ResourcePriority::Default),
         mock_dispatcher_(dispatcher) {}
 
   ~ConnPoolImplForTest() {

@@ -5,6 +5,13 @@
 namespace Upstream {
 
 /**
+ * Resource priority classes. The parallel NumResourcePriorities constant allows defining fixed
+ * arrays for each priority, but does not pollute the enum.
+ */
+enum class ResourcePriority { Default, High };
+const size_t NumResourcePriorities = 2;
+
+/**
  * An individual resource tracked by the resource manager.
  */
 class Resource {

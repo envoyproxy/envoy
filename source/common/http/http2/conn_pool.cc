@@ -13,8 +13,8 @@ namespace Http {
 namespace Http2 {
 
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host,
-                           Stats::Store& store)
-    : dispatcher_(dispatcher), host_(host), stats_store_(store) {}
+                           Stats::Store& store, Upstream::ResourcePriority priority)
+    : dispatcher_(dispatcher), host_(host), stats_store_(store), priority_(priority) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
   if (primary_client_) {
@@ -81,7 +81,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
   }
 
   if (primary_client_->client_->numActiveRequests() >= maxConcurrentStreams() ||
-      !host_->cluster().resourceManager().requests().canCreate()) {
+      !host_->cluster().resourceManager(priority_).requests().canCreate()) {
     log_debug("max requests overflow");
     callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
@@ -92,7 +92,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     host_->stats().rq_active_.inc();
     host_->cluster().stats().upstream_rq_total_.inc();
     host_->cluster().stats().upstream_rq_active_.inc();
-    host_->cluster().resourceManager().requests().inc();
+    host_->cluster().resourceManager(priority_).requests().inc();
     callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
                           primary_client_->real_host_description_);
   }
@@ -176,7 +176,7 @@ void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
                  client.client_->numActiveRequests());
   host_->stats().rq_active_.dec();
   host_->cluster().stats().upstream_rq_active_.dec();
-  host_->cluster().resourceManager().requests().dec();
+  host_->cluster().resourceManager(priority_).requests().dec();
   if (&client == draining_client_.get() && client.client_->numActiveRequests() == 0) {
     // Close out the draining client if we no long have active requests.
     client.client_->close();

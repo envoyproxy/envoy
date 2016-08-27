@@ -103,6 +103,17 @@ TEST(JsonLoaderTest, Basic) {
     std::vector<Object> array = config.getObjectArray("descriptors");
     EXPECT_THROW(array[0].asObjectArray(), Exception);
   }
+
+  {
+    std::string json = R"EOF(
+    {
+    }
+    )EOF";
+
+    Json::StringLoader config(json);
+    Object object = config.getObject("foo", true);
+    EXPECT_EQ(2, object.getInteger("bar", 2));
+  }
 }
 
 TEST(JsonLoaderTest, Integer) {
