@@ -30,8 +30,7 @@
                 "name": "router",
                 "config": {}
               }
-            ],
-            "add_user_agent": true
+            ]
           }
         }
       ]
