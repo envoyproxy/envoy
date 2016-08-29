@@ -51,4 +51,3 @@ $EXTRA_CMAKE_FLAGS -DENVOY_DEBUG:BOOL=OFF \
 
 make check_format
 make -j$NUM_CPUS $TEST_TARGET
-
