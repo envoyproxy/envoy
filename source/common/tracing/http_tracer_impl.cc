@@ -12,47 +12,53 @@
 
 namespace Tracing {
 
+void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
+  std::string x_request_id = request_headers.get(Http::Headers::get().RequestId);
+
+  uint16_t result;
+  // Skip if x-request-id is corrupted.
+  if (!UuidUtils::uuidModBy(x_request_id, result, 10000)) {
+    return;
+  }
+
+  if (request_headers.has(Http::Headers::get().ClientTraceId) &&
+      runtime.snapshot().featureEnabled("tracing.client_enabled", 100)) {
+    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
+  } else if (request_headers.has(Http::Headers::get().EnvoyForceTrace)) {
+    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
+  } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", 0, result, 10000)) {
+    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
+  }
+
+  if (!runtime.snapshot().featureEnabled("tracing.global_enabled", 100, result)) {
+    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
+  }
+
+  request_headers.replaceViaCopy(Http::Headers::get().RequestId, x_request_id);
+}
+
 Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& request_info,
-                                      const Http::HeaderMap& request_headers,
-                                      Runtime::Loader& runtime) {
+                                      const Http::HeaderMap& request_headers) {
   // Exclude HC requests immediately.
   if (request_info.healthCheck()) {
     return {Reason::HealthCheck, false};
   }
 
-  const std::string& x_request_id = request_headers.get(Http::Headers::get().RequestId);
-  uint16_t result;
+  UuidTraceStatus trace_status =
+      UuidUtils::isTraceableUuid(request_headers.get(Http::Headers::get().RequestId));
 
-  // If x-request-id is corrupted then return not tracing immediately.
-  if (!UuidUtils::uuidModBy(x_request_id, result, 10000)) {
-    return {Reason::InvalidRequestId, false};
-  }
-
-  if (UuidUtils::isTraceableUuid(x_request_id)) {
-    if (!runtime.snapshot().featureEnabled("tracing.global_enabled", 100, result)) {
-      return {Reason::GlobalSwitchOff, false};
-    }
-
-    if (request_headers.has(Http::Headers::get().ClientTraceId)) {
-      return {Reason::ClientForced, true};
-    }
-
-    if (request_headers.has(Http::Headers::get().EnvoyForceTrace)) {
-      return {Reason::ServiceForced, true};
-    }
-
-    return {Reason::TraceableRequest, true};
-  }
-
-  if (runtime.snapshot().featureEnabled("tracing.random_sampling", 0, result, 10000)) {
-    if (!runtime.snapshot().featureEnabled("tracing.global_enabled", 100, result)) {
-      return {Reason::GlobalSwitchOff, false};
-    }
-
+  switch (trace_status) {
+  case UuidTraceStatus::Client:
+    return {Reason::ClientForced, true};
+  case UuidTraceStatus::Forced:
+    return {Reason::ServiceForced, true};
+  case UuidTraceStatus::Sampled:
     return {Reason::Sampling, true};
+  case UuidTraceStatus::NoTrace:
+    return {Reason::NotTraceableRequestId, false};
   }
 
-  return {Reason::NotTraceableRequestId, false};
+  throw std::invalid_argument("Unknown trace_status");
 }
 
 HttpTracerImpl::HttpTracerImpl(Runtime::Loader& runtime, Stats::Store& stats)
@@ -74,7 +80,7 @@ void HttpTracerImpl::trace(const Http::HeaderMap* request_headers,
 
   stats_.flush_.inc();
 
-  Decision decision = HttpTracerUtility::isTracing(request_info, *request_headers, runtime_);
+  Decision decision = HttpTracerUtility::isTracing(request_info, *request_headers);
   populateStats(decision);
 
   if (decision.is_tracing) {
@@ -91,14 +97,8 @@ void HttpTracerImpl::populateStats(const Decision& decision) {
   case Reason::ClientForced:
     stats_.client_enabled_.inc();
     break;
-  case Reason::GlobalSwitchOff:
-    stats_.global_switch_off_.inc();
-    break;
   case Reason::HealthCheck:
     stats_.health_check_.inc();
-    break;
-  case Reason::InvalidRequestId:
-    stats_.invalid_request_id_.inc();
     break;
   case Reason::NotTraceableRequestId:
     stats_.not_traceable_.inc();
@@ -108,9 +108,6 @@ void HttpTracerImpl::populateStats(const Decision& decision) {
     break;
   case Reason::ServiceForced:
     stats_.service_forced_.inc();
-    break;
-  case Reason::TraceableRequest:
-    stats_.traceable_.inc();
     break;
   }
 }

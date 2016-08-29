@@ -42,14 +42,11 @@ public:
 };
 
 enum class Reason {
-  InvalidRequestId,
   NotTraceableRequestId,
   HealthCheck,
-  GlobalSwitchOff,
   Sampling,
   ServiceForced,
   ClientForced,
-  TraceableRequest
 };
 
 struct Decision {
@@ -66,7 +63,12 @@ public:
    * @return decision if request is traceable or not and Reason why.
    **/
   static Decision isTracing(const Http::AccessLog::RequestInfo& request_info,
-                            const Http::HeaderMap& request_headers, Runtime::Loader& runtime);
+                            const Http::HeaderMap& request_headers);
+
+  /**
+   * Mutate request headers if request needs to be traced.
+   */
+  static void mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime);
 };
 
 class HttpTracerImpl : public HttpTracer {

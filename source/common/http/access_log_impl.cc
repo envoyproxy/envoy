@@ -76,7 +76,9 @@ FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {
 TraceableRequestFilter::TraceableRequestFilter(Runtime::Loader& runtime) : runtime_(runtime) {}
 
 bool TraceableRequestFilter::evaluate(const RequestInfo& info, const HeaderMap& request_headers) {
-  return Tracing::HttpTracerUtility::isTracing(info, request_headers, runtime_).is_tracing;
+  Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
+
+  return decision.is_tracing && decision.reason == Tracing::Reason::ServiceForced;
 }
 
 bool StatusCodeFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
