@@ -194,7 +194,7 @@ enter the ``front-envoy`` container, and ``curl`` for services locally::
   root@81288499f9d7:/# curl localhost:80/service/2
   Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2
 
-** Step 8: enter containers and curl admin**
+**Step 8: enter containers and curl admin**
 
 When envoy runs it also attaches an ``admin`` to your desired port. In the example
 configs the admin is bound to port ``8001``. We can ``curl`` it to gain useful information.
@@ -206,195 +206,24 @@ statistics. For example inside ``frontenvoy`` we can get::
   root@e654c2c83277:/# curl localhost:8001/server_info
   envoy 10e00b/RELEASE live 142 142 0
   root@e654c2c83277:/# curl localhost:8001/stats
-  cluster.service1.external.upstream_rq_200: 3
-  cluster.service1.external.upstream_rq_2xx: 3
-  cluster.service1.max_host_weight: 1
+  cluster.service1.external.upstream_rq_200: 7
+  ...
   cluster.service1.membership_change: 2
   cluster.service1.membership_total: 3
-  cluster.service1.update_attempt: 30
-  cluster.service1.update_failure: 0
-  cluster.service1.update_success: 30
-  cluster.service1.upstream_cx_active: 3
-  cluster.service1.upstream_cx_close_header: 0
-  cluster.service1.upstream_cx_connect_fail: 0
-  cluster.service1.upstream_cx_connect_timeout: 0
-  cluster.service1.upstream_cx_destroy: 0
-  cluster.service1.upstream_cx_destroy_local: 0
-  cluster.service1.upstream_cx_destroy_local_with_active_rq: 0
-  cluster.service1.upstream_cx_destroy_remote: 0
-  cluster.service1.upstream_cx_destroy_remote_with_active_rq: 0
-  cluster.service1.upstream_cx_destroy_with_active_rq: 0
-  cluster.service1.upstream_cx_http1_total: 0
+  ...
   cluster.service1.upstream_cx_http2_total: 3
-  cluster.service1.upstream_cx_max_requests: 0
-  cluster.service1.upstream_cx_none_healthy: 0
-  cluster.service1.upstream_cx_protocol_error: 0
-  cluster.service1.upstream_cx_rx_bytes_buffered: 0
-  cluster.service1.upstream_cx_rx_bytes_total: 798
-  cluster.service1.upstream_cx_total: 3
-  cluster.service1.upstream_cx_tx_bytes_buffered: 0
-  cluster.service1.upstream_cx_tx_bytes_total: 502
-  cluster.service1.upstream_rq_200: 3
-  cluster.service1.upstream_rq_2xx: 3
-  cluster.service1.upstream_rq_active: 0
-  cluster.service1.upstream_rq_cancelled: 0
-  cluster.service1.upstream_rq_lb_healthy_panic: 0
-  cluster.service1.upstream_rq_pending_active: 0
-  cluster.service1.upstream_rq_pending_failure_eject: 0
-  cluster.service1.upstream_rq_pending_overflow: 0
-  cluster.service1.upstream_rq_pending_total: 0
-  cluster.service1.upstream_rq_per_try_timeout: 0
-  cluster.service1.upstream_rq_retry: 0
-  cluster.service1.upstream_rq_retry_overflow: 0
-  cluster.service1.upstream_rq_retry_success: 0
-  cluster.service1.upstream_rq_rx_reset: 0
-  cluster.service1.upstream_rq_timeout: 0
-  cluster.service1.upstream_rq_total: 3
-  cluster.service1.upstream_rq_tx_reset: 0
-  cluster.service2.external.upstream_rq_200: 1
-  cluster.service2.external.upstream_rq_2xx: 1
-  cluster.service2.max_host_weight: 1
+  ...
+  cluster.service1.upstream_rq_total: 7
+  ...
+  cluster.service2.external.upstream_rq_200: 2
+  ...
   cluster.service2.membership_change: 1
   cluster.service2.membership_total: 1
-  cluster.service2.update_attempt: 30
-  cluster.service2.update_failure: 0
-  cluster.service2.update_success: 30
-  cluster.service2.upstream_cx_active: 1
-  cluster.service2.upstream_cx_close_header: 0
-  cluster.service2.upstream_cx_connect_fail: 0
-  cluster.service2.upstream_cx_connect_timeout: 0
-  cluster.service2.upstream_cx_destroy: 0
-  cluster.service2.upstream_cx_destroy_local: 0
-  cluster.service2.upstream_cx_destroy_local_with_active_rq: 0
-  cluster.service2.upstream_cx_destroy_remote: 0
-  cluster.service2.upstream_cx_destroy_remote_with_active_rq: 0
-  cluster.service2.upstream_cx_destroy_with_active_rq: 0
-  cluster.service2.upstream_cx_http1_total: 0
+  ...
   cluster.service2.upstream_cx_http2_total: 1
-  cluster.service2.upstream_cx_max_requests: 0
-  cluster.service2.upstream_cx_none_healthy: 0
-  cluster.service2.upstream_cx_protocol_error: 0
-  cluster.service2.upstream_cx_rx_bytes_buffered: 0
-  cluster.service2.upstream_cx_rx_bytes_total: 266
-  cluster.service2.upstream_cx_total: 1
-  cluster.service2.upstream_cx_tx_bytes_buffered: 0
-  cluster.service2.upstream_cx_tx_bytes_total: 167
-  cluster.service2.upstream_rq_200: 1
-  cluster.service2.upstream_rq_2xx: 1
-  cluster.service2.upstream_rq_active: 0
-  cluster.service2.upstream_rq_cancelled: 0
-  cluster.service2.upstream_rq_lb_healthy_panic: 0
-  cluster.service2.upstream_rq_pending_active: 0
-  cluster.service2.upstream_rq_pending_failure_eject: 0
-  cluster.service2.upstream_rq_pending_overflow: 0
-  cluster.service2.upstream_rq_pending_total: 0
-  cluster.service2.upstream_rq_per_try_timeout: 0
-  cluster.service2.upstream_rq_retry: 0
-  cluster.service2.upstream_rq_retry_overflow: 0
-  cluster.service2.upstream_rq_retry_success: 0
-  cluster.service2.upstream_rq_rx_reset: 0
-  cluster.service2.upstream_rq_timeout: 0
-  cluster.service2.upstream_rq_total: 1
-  cluster.service2.upstream_rq_tx_reset: 0
-  downstream_cx_proxy_proto_error: 0
-  filesystem.flushed_by_timer: 9
-  filesystem.reopen_failed: 0
-  filesystem.write_buffered: 3
-  filesystem.write_completed: 2
-  filesystem.write_total_buffered: 157
-  http.admin.downstream_cx_active: 1
-  http.admin.downstream_cx_destroy: 3
-  http.admin.downstream_cx_destroy_active_rq: 0
-  http.admin.downstream_cx_destroy_local: 0
-  http.admin.downstream_cx_destroy_local_active_rq: 0
-  http.admin.downstream_cx_destroy_remote: 3
-  http.admin.downstream_cx_destroy_remote_active_rq: 0
-  http.admin.downstream_cx_drain_close: 0
-  http.admin.downstream_cx_http1_active: 1
-  http.admin.downstream_cx_http1_total: 4
-  http.admin.downstream_cx_http2_active: 0
-  http.admin.downstream_cx_http2_total: 0
-  http.admin.downstream_cx_idle_timeout: 0
-  http.admin.downstream_cx_protocol_error: 0
-  http.admin.downstream_cx_rx_bytes_buffered: 83
-  http.admin.downstream_cx_rx_bytes_total: 344
-  http.admin.downstream_cx_ssl_active: 0
-  http.admin.downstream_cx_ssl_total: 0
-  http.admin.downstream_cx_total: 4
-  http.admin.downstream_cx_tx_bytes_buffered: 0
-  http.admin.downstream_cx_tx_bytes_total: 7952
-  http.admin.downstream_rq_2xx: 3
-  http.admin.downstream_rq_3xx: 0
-  http.admin.downstream_rq_4xx: 0
-  http.admin.downstream_rq_5xx: 0
-  http.admin.downstream_rq_active: 1
-  http.admin.downstream_rq_http1_total: 4
-  http.admin.downstream_rq_http2_total: 0
-  http.admin.downstream_rq_non_relative_path: 0
-  http.admin.downstream_rq_response_before_rq_complete: 0
-  http.admin.downstream_rq_rx_reset: 0
-  http.admin.downstream_rq_total: 4
-  http.admin.downstream_rq_tx_reset: 0
-  http.admin.failed_generate_uuid: 0
-  http.ingress_http.downstream_cx_active: 0
-  http.ingress_http.downstream_cx_destroy: 4
-  http.ingress_http.downstream_cx_destroy_active_rq: 0
-  http.ingress_http.downstream_cx_destroy_local: 0
-  http.ingress_http.downstream_cx_destroy_local_active_rq: 0
-  http.ingress_http.downstream_cx_destroy_remote: 4
-  http.ingress_http.downstream_cx_destroy_remote_active_rq: 0
-  http.ingress_http.downstream_cx_drain_close: 0
-  http.ingress_http.downstream_cx_http1_active: 0
-  http.ingress_http.downstream_cx_http1_total: 4
-  http.ingress_http.downstream_cx_http2_active: 0
-  http.ingress_http.downstream_cx_http2_total: 0
-  http.ingress_http.downstream_cx_idle_timeout: 0
-  http.ingress_http.downstream_cx_protocol_error: 0
-  http.ingress_http.downstream_cx_rx_bytes_buffered: 0
-  http.ingress_http.downstream_cx_rx_bytes_total: 328
-  http.ingress_http.downstream_cx_ssl_active: 0
-  http.ingress_http.downstream_cx_ssl_total: 0
-  http.ingress_http.downstream_cx_total: 4
-  http.ingress_http.downstream_cx_tx_bytes_buffered: 0
-  http.ingress_http.downstream_cx_tx_bytes_total: 1160
-  http.ingress_http.downstream_rq_2xx: 4
-  http.ingress_http.downstream_rq_3xx: 0
-  http.ingress_http.downstream_rq_4xx: 0
-  http.ingress_http.downstream_rq_5xx: 0
-  http.ingress_http.downstream_rq_active: 0
-  http.ingress_http.downstream_rq_http1_total: 4
-  http.ingress_http.downstream_rq_http2_total: 0
-  http.ingress_http.downstream_rq_non_relative_path: 0
-  http.ingress_http.downstream_rq_response_before_rq_complete: 0
-  http.ingress_http.downstream_rq_rx_reset: 0
-  http.ingress_http.downstream_rq_total: 4
-  http.ingress_http.downstream_rq_tx_reset: 0
-  http.ingress_http.failed_generate_uuid: 0
-  http.ingress_http.no_route: 0
-  http.ingress_http.rq_redirect: 0
-  http.ingress_http.rq_total: 4
-  http2.header_overflow: 0
-  http2.headers_cb_no_stream: 0
-  http2.rx_reset: 0
-  http2.trailers: 0
-  http2.tx_reset: 0
-  listener.80.downstream_cx_active: 0
-  listener.80.downstream_cx_destroy: 4
-  listener.80.downstream_cx_total: 4
-  listener.8001.downstream_cx_active: 1
-  listener.8001.downstream_cx_destroy: 3
-  listener.8001.downstream_cx_total: 4
-  server.days_until_first_cert_expiring: 2147483647
-  server.live: 1
-  server.memory_allocated: 520272
-  server.memory_heap_size: 1048576
-  server.parent_connections: 0
-  server.total_connections: 0
-  server.uptime: 145
-  server.version: 1105931
-  server.watchdog_mega_miss: 0
-  server.watchdog_miss: 0
-  stats.overflow: 0
+  ...
+  cluster.service2.upstream_rq_total: 2
+  ...
 
 Notice that we can get the number of members of upstream clusters, number of requests
 fulfilled by them, information about http ingress, and a plethora of other useful
