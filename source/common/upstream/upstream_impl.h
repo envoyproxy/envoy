@@ -147,7 +147,7 @@ public:
   void setHealthChecker(HealthCheckerPtr&& health_checker);
 
   // Upstream::Cluster
-  const std::string& altStatName() const { return alt_stat_name_; }
+  const std::string& altStatName() const override { return alt_stat_name_; }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
   uint64_t features() const override { return features_; }
   uint64_t httpCodecOptions() const override { return http_codec_options_; }

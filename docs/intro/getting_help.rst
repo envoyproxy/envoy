@@ -14,7 +14,7 @@ Google Groups
 IRC
 ---
 
-* `#envoy <http://webchat.freenode.net/?channels=envoy>`_
+* `#lyft-envoy <http://webchat.freenode.net/?channels=lyft-envoy>`_
 * `lyft/envoy on Gitter <https://gitter.im/lyft/envoy>`_
 
 Feel free to drop into either Gitter or the IRC channel for any reason, even
