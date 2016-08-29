@@ -47,12 +47,13 @@ First let's create a new machine which will hold the containers::
     $ docker-machine create --driver virtualbox default
     $ eval $(docker-machine env default)
 
-**Step 4: Start all of our containers**
+**Step 4: Clone the Envoy repo, and start all of our containers**
 
-::
+If you have not cloned the envoy repo, clone it with ``git clone git@github.com:lyft/envoy``
+or ``git clone https://github.com/lyft/envoy.git``::
 
     $ pwd
-    /src/envoy/example
+    envoy/example
     $ docker-compose up --build -d
     $ docker-compose ps
             Name                       Command               State      Ports
@@ -119,8 +120,8 @@ of envoy.::
     Creating and starting example_service1_2 ... done
     Creating and starting example_service1_3 ... done
 
-Now if we send a request to service1, the fron envoy will load balance the
-request by doing a round robin of the three service1 machines::
+Now if we send a request to service1 multiple times, the front envoy will load balance the
+requests by doing a round robin of the three service1 machines::
 
     $ curl -v $(docker-machine ip default):8000/service/1
     *   Trying 192.168.99.100...
