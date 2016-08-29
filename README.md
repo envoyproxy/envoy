@@ -7,8 +7,8 @@ https://lyft.github.io/envoy
 # Contact
 
 * [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce): Low frequency mailing
-  list where we will email announcements only.
-* [envoy-users](https://groups.google.com/forum/#!forum/envoy-users): General user discussion.
+  list where we will email announcements only
+* [envoy-users](https://groups.google.com/forum/#!forum/envoy-users): General user discussion
 * [#lyft-envoy](http://webchat.freenode.net/?channels=lyft-envoy): IRC
 * [lyft/envoy](https://gitter.im/lyft/envoy): Gitter
 
