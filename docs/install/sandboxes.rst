@@ -176,3 +176,20 @@ request by doing a round robin of the three service1 machines::
     <
     Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
     * Connection #0 to host 192.168.99.100 left intact
+
+**Step 7: enter containers and curl services**
+
+In addition of using ``curl`` from your host machine, you can also enter the
+containers themselves and ``curl`` from inside them. To enter a container you
+can use ``docker-compose exec <container_name> /bin/bash``. For example we can
+enter the ``front-envoy`` container, and ``curl`` for services locally::
+
+  $ docker-compose exec front-envoy /bin/bash
+  root@81288499f9d7:/# curl localhost:80/service/1
+  Hello from behind Envoy (service 1)! hostname: 85ac151715c6 resolvedhostname: 172.19.0.3
+  root@81288499f9d7:/# curl localhost:80/service/1
+  Hello from behind Envoy (service 1)! hostname: 20da22cfc955 resolvedhostname: 172.19.0.5
+  root@81288499f9d7:/# curl localhost:80/service/1
+  Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
+  root@81288499f9d7:/# curl localhost:80/service/2
+  Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2

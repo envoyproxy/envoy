@@ -32,15 +32,6 @@
             },
             "filters": [
               {
-                "type": "both",
-                "name": "health_check",
-                "config": {
-                  "pass_through_mode": true,
-                  "cache_time_ms": 1000,
-                  "endpoint": "/healthcheck"
-                }
-              },
-              {
                 "type": "decoder",
                 "name": "router",
                 "config": {}
