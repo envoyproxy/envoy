@@ -84,7 +84,7 @@ parse it as JSON and look for the following structure:
   }
 
 callingFunction
-  *(required, string)* the function that made the query. If available, the fucntion will be used
+  *(required, string)* the function that made the query. If available, the function will be used
   in :ref:`callsite <config_network_filters_mongo_proxy_callsite_stats>` query statistics.
 
 Per command statistics

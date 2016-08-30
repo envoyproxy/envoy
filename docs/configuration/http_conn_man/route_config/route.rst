@@ -112,7 +112,7 @@ key
 default
   *(required, integer)* An integer between 0-100. Every time the route is considered for a match,
   a random number between 0-99 is selected. If the number is <= the value found in the *key*
-  (checked first) or if the key is not present this default value, the route is a match (assuming
+  (checked first) or, if the key is not present, the default value, the route is a match (assuming
   everything also about the route matches).
 
 .. _config_http_conn_man_route_table_route_retry:

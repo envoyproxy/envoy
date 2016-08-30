@@ -29,7 +29,7 @@ HTTP connection manager
 .. _config_http_conn_man_codec_type:
 
 codec_type
-  *(required, string)* Supplies the type codec that the connection manager should use. Possible
+  *(required, string)* Supplies the type of codec that the connection manager should use. Possible
   values are:
 
   http1
@@ -111,8 +111,8 @@ idle_timeout_s
 
 use_remote_address
   *(optional, boolean)* If set to true, the connection manager will use the real remote address
-  of the client connection when determining internal versus external and manipulating various
-  headers. If set to false or absent, the connection manager will use the
+  of the client connection when determining internal versus external origin and manipulating 
+  various headers. If set to false or absent, the connection manager will use the
   :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header. See the documentation for
   :ref:`config_http_conn_man_headers_x-forwarded-for`,
   :ref:`config_http_conn_man_headers_x-envoy-internal`, and
