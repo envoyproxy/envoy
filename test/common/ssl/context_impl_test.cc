@@ -90,7 +90,7 @@ TEST(SslContextImplTest, TestGetCertInformation) {
   // every build. For cert_chain output, we check only for the certificate path.
   std::string ca_cert_partial_output(
       "Certificate Path: test/common/ssl/test_data/ca.crt, Serial Number: F0DE921A0515EB45, "
-      "Days until Expiration: 33");
+      "Days until Expiration: ");
   std::string cert_chain_partial_output("Certificate Path: /tmp/envoy_test/unittestcert.pem");
 
   EXPECT_TRUE(context.getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
