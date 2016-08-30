@@ -116,11 +116,11 @@ void AsyncRequestImpl::decodeTrailers(HeaderMapPtr&& trailers) {
 }
 
 void AsyncRequestImpl::onComplete() {
-  // TODO: Check host's canary status in addition to canary header.
   CodeUtility::ResponseTimingInfo info{
       parent_.stats_store_, parent_.stat_prefix_, stream_encoder_->requestCompleteTime(),
-      response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true", true, EMPTY_STRING,
-      EMPTY_STRING, parent_.local_zone_name_, upstreamZone()};
+      response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true" ||
+      upstream_host_ ? upstream_host_->canary() : false,
+      true, EMPTY_STRING, EMPTY_STRING, parent_.local_zone_name_, upstreamZone()};
   CodeUtility::chargeResponseTiming(info);
 
   callbacks_.onSuccess(std::move(response_));
