@@ -35,7 +35,7 @@ as is described in the image above.
 
 **Step 1: Install Docker**
 
-Ensure that you have a recent versions of ``docker`, ``docker-compose`` and
+Ensure that you have a recent versions of ``docker, docker-compose`` and
 ``docker-machine`` installed.
 
 A simple way to achieve this is via the `Docker Toolbox <https://www.docker.com/products/docker-toolbox>`_.

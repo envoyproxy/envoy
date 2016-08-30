@@ -25,7 +25,7 @@ name
 
 domains
   *(required, array)* A list of domains (host/authority header) that will be matched to this
-  virtual host. Currently, wildcard matching is not supported of the form "\*.foo.com", however
+  virtual host. Currently, wildcard matching of the form "\*.foo.com" is not supported, however
   a special entry "\*" is allowed which will match any host/authority header. Only a single virtual
   host in the entire route configuration can match on "\*".
 
