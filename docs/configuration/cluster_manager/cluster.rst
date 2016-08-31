@@ -14,7 +14,7 @@ Cluster
     "service_name": "...",
     "health_check": "{...}",
     "max_requests_per_connection": "...",
-    "circuit_breakers": "...",
+    "circuit_breakers": "{...}",
     "ssl_context": "{...}",
     "features": "...",
     "http_codec_options": "...",

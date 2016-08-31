@@ -12,8 +12,8 @@ them.
 .. code-block:: json
 
   {
-    "default": "...",
-    "high": "..."
+    "default": "{...}",
+    "high": "{...}"
   }
 
 default
