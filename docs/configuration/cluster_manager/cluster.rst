@@ -14,10 +14,7 @@ Cluster
     "service_name": "...",
     "health_check": "{...}",
     "max_requests_per_connection": "...",
-    "max_connections": "...",
-    "max_pending_requests": "...",
-    "max_requests": "...",
-    "max_retries": "...",
+    "circuit_breakers": "...",
     "ssl_context": "{...}",
     "features": "...",
     "http_codec_options": "...",
@@ -96,25 +93,9 @@ max_requests_per_connection
   parameter is respected by both the HTTP/1.1 and HTTP/2 connection pool implementations. If not
   specified, there is no limit. Setting this parameter to 1 will effectively disable keep alive.
 
-max_connections
-  *(optional, integer)* The maximum number of connections that Envoy will make to the upstream
-  cluster. If not specified, the default is 1024. See the :ref:`circuit breaking overview
-  <arch_overview_circuit_break>` for more information.
-
-max_pending_requests
-  *(optional, integer)* The maximum number of pending requests that Envoy will allow to the upstream
-  cluster. If not specified, the default is 1024. See the :ref:`circuit breaking overview
-  <arch_overview_circuit_break>` for more information.
-
-max_requests
-  *(optional, integer)* The maximum number of parallel requests that Envoy will make to the upstream
-  cluster. If not specified, the default is 1024. See the :ref:`circuit breaking overview
-  <arch_overview_circuit_break>` for more information.
-
-max_retries
-  *(optional, integer)* The maximum number of parallel retries that Envoy will allow to the upstream
-  cluster. If not specified, the default is 3. See the :ref:`circuit breaking overview
-  <arch_overview_circuit_break>` for more information.
+:ref:`circuit_breakers <config_cluster_manager_cluster_circuit_breakers>`
+  *(optional, object)* Optional :ref:`circuit breaking <arch_overview_circuit_break>` settings
+  for the cluster.
 
 :ref:`ssl_context <config_cluster_manager_cluster_ssl>`
   *(optional, object)* The TLS configuration for connections to the upstream cluster. If no TLS
@@ -150,6 +131,7 @@ alt_stat_name
   :hidden:
 
   cluster_hc
+  cluster_circuit_breakers
   cluster_ssl
   cluster_stats
   cluster_runtime
