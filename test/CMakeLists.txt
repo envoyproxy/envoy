@@ -142,7 +142,7 @@ target_link_libraries(envoy-test anl)
 target_link_libraries(envoy-test dl)
 
 add_custom_target(
-  envoy.generate_example_configs configs/configgen.sh generated/configs
+  envoy.generate_example_configs configs/configgen.sh generated/configs ${PROJECT_BINARY_DIR}
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
