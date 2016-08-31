@@ -233,9 +233,10 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
-   * @return ResourceManager& the resource manager to use by proxy agents for this cluster.
+   * @return ResourceManager& the resource manager to use by proxy agents for for this cluster (at
+   *         a particular priority).
    */
-  virtual ResourceManager& resourceManager() const PURE;
+  virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
 
   /**
    * Shutdown the cluster prior to destroying connection pools and other thread local data.

@@ -22,7 +22,7 @@ public:
   using ClusterManagerImpl::ClusterManagerImpl;
 
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher&, ConstHostPtr host,
-                                                     Stats::Store&) override {
+                                                     Stats::Store&, ResourcePriority) override {
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(host)};
   }
 
@@ -177,7 +177,8 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   Json::StringLoader loader(json);
   create(loader);
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
-  EXPECT_THROW(cluster_manager_->httpConnPoolForCluster("hello"), EnvoyException);
+  EXPECT_THROW(cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default),
+               EnvoyException);
   EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello"), EnvoyException);
   EXPECT_THROW(cluster_manager_->httpAsyncClientForCluster("hello"), EnvoyException);
 }
@@ -204,7 +205,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   create(loader);
 
   // Test for no hosts returning the correct values before we have hosts.
-  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("cluster_1"));
+  EXPECT_EQ(nullptr,
+            cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default));
   EXPECT_EQ(nullptr, cluster_manager_->tcpConnForCluster("cluster_1").connection_);
   EXPECT_EQ(2UL, stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
 
@@ -221,30 +223,44 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
   EXPECT_CALL(*cluster_manager_, allocateConnPool_(_))
-      .Times(2)
+      .Times(4)
       .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
 
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 = dynamic_cast<Http::ConnectionPool::MockInstance*>(
-      cluster_manager_->httpConnPoolForCluster("cluster_1"));
+      cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default));
   Http::ConnectionPool::MockInstance* cp2 = dynamic_cast<Http::ConnectionPool::MockInstance*>(
-      cluster_manager_->httpConnPoolForCluster("cluster_1"));
+      cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default));
+  Http::ConnectionPool::MockInstance* cp1_high = dynamic_cast<Http::ConnectionPool::MockInstance*>(
+      cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::High));
+  Http::ConnectionPool::MockInstance* cp2_high = dynamic_cast<Http::ConnectionPool::MockInstance*>(
+      cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::High));
 
   EXPECT_NE(cp1, cp2);
+  EXPECT_NE(cp1_high, cp2_high);
+  EXPECT_NE(cp1, cp1_high);
 
   Http::ConnectionPool::Instance::DrainedCb drained_cb;
   EXPECT_CALL(*cp1, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
+  Http::ConnectionPool::Instance::DrainedCb drained_cb_high;
+  EXPECT_CALL(*cp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb_high));
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->callback_();
   dns_callback({"127.0.0.2"});
   drained_cb();
   drained_cb = nullptr;
+  EXPECT_CALL(tls_.dispatcher_, deferredDelete_(_)).Times(2);
+  drained_cb_high();
+  drained_cb_high = nullptr;
 
   // Make sure we get back the same connection pool for the 2nd host as we did before the change.
   Http::ConnectionPool::MockInstance* cp3 = dynamic_cast<Http::ConnectionPool::MockInstance*>(
-      cluster_manager_->httpConnPoolForCluster("cluster_1"));
+      cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default));
+  Http::ConnectionPool::MockInstance* cp3_high = dynamic_cast<Http::ConnectionPool::MockInstance*>(
+      cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::High));
   EXPECT_EQ(cp2, cp3);
+  EXPECT_EQ(cp2_high, cp3_high);
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.

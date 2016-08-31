@@ -38,7 +38,8 @@ public:
    *
    * Can return nullptr if there is no host available in the cluster.
    */
-  virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster) PURE;
+  virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
+                                                                 ResourcePriority priority) PURE;
 
   /**
    * Allocate a load balanced TCP connection for a cluster. The created connection is already

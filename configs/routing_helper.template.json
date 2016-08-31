@@ -26,7 +26,11 @@
   "http_codec_options": "no_compression",
   "service_name": "{{ service }}",
   {% if 'max_requests' in options %}
-  "max_requests": {{ options['max_requests'] }},
+  "circuit_breakers": {
+    "default": {
+      "max_requests": {{ options['max_requests'] }}
+    }
+  },
   {% endif %}
   "health_check":  {
     "type": "http",

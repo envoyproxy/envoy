@@ -7,6 +7,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 
+#include "common/common/enum_to_int.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/http/async_client_impl.h"
@@ -139,7 +140,7 @@ const Cluster* ClusterManagerImpl::get(const std::string& cluster) {
 }
 
 Http::ConnectionPool::Instance*
-ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster) {
+ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority) {
   ThreadLocalClusterManagerImpl& cluster_manager =
       tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
 
@@ -149,7 +150,7 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster) {
     throw EnvoyException(fmt::format("unknown cluster '{}'", cluster));
   }
 
-  return entry->second->connPool();
+  return entry->second->connPool(priority);
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const ClusterImplBase& primary_cluster,
@@ -213,21 +214,42 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     cluster.second->host_set_.addMemberUpdateCb(
         [this](const std::vector<HostPtr>&, const std::vector<HostPtr>& hosts_removed) -> void {
           // We need to go through and purge any connection pools for hosts that got deleted.
-          // Right now hosts are specific to clusters, so even if two hosts actually point
-          // to the same address this will be safe.
-
+          // Even if two hosts actually point to the same address this will be safe, since if a
+          // host is readded it will be a different physical HostPtr.
           for (const HostPtr& old_host : hosts_removed) {
-            // Set a drained callback on the connection pool. When it is fully drained, we will
-            // destroy it.
-            auto conn_pool = host_http_conn_pool_map_.find(old_host);
-            if (conn_pool != host_http_conn_pool_map_.end()) {
-              conn_pool->second->addDrainedCallback([this, old_host]() -> void {
-                dispatcher_.deferredDelete(std::move(host_http_conn_pool_map_[old_host]));
-                host_http_conn_pool_map_.erase(old_host);
-              });
+            auto container = host_http_conn_pool_map_.find(old_host);
+            if (container != host_http_conn_pool_map_.end()) {
+              drainConnPools(old_host, container->second);
             }
           }
         });
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
+    HostPtr old_host, ConnPoolsContainer& container) {
+  for (const Http::ConnectionPool::InstancePtr& pool : container.pools_) {
+    if (pool) {
+      container.drains_remaining_++;
+    }
+  }
+
+  for (const Http::ConnectionPool::InstancePtr& pool : container.pools_) {
+    if (!pool) {
+      continue;
+    }
+
+    pool->addDrainedCallback([this, old_host]() -> void {
+      ConnPoolsContainer& container = host_http_conn_pool_map_[old_host];
+      ASSERT(container.drains_remaining_ > 0);
+      container.drains_remaining_--;
+      if (container.drains_remaining_ == 0) {
+        for (Http::ConnectionPool::InstancePtr& pool : container.pools_) {
+          dispatcher_.deferredDelete(std::move(pool));
+        }
+        host_http_conn_pool_map_.erase(old_host);
+      }
+    });
   }
 }
 
@@ -273,31 +295,34 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
 }
 
 Http::ConnectionPool::Instance*
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool() {
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
+    ResourcePriority priority) {
   ConstHostPtr host = lb_->chooseHost();
   if (!host) {
     primary_cluster_.stats().upstream_cx_none_healthy_.inc();
     return nullptr;
   }
 
-  if (parent_.host_http_conn_pool_map_.find(host) == parent_.host_http_conn_pool_map_.end()) {
-    parent_.host_http_conn_pool_map_[host] =
-        parent_.parent_.allocateConnPool(parent_.dispatcher_, host, parent_.parent_.stats_);
+  ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
+  ASSERT(enumToInt(priority) < container.pools_.size());
+  if (!container.pools_[enumToInt(priority)]) {
+    container.pools_[enumToInt(priority)] = parent_.parent_.allocateConnPool(
+        parent_.dispatcher_, host, parent_.parent_.stats_, priority);
   }
 
-  return parent_.host_http_conn_pool_map_[host].get();
+  return container.pools_[enumToInt(priority)].get();
 }
 
 Http::ConnectionPool::InstancePtr
 ProdClusterManagerImpl::allocateConnPool(Event::Dispatcher& dispatcher, ConstHostPtr host,
-                                         Stats::Store& store) {
+                                         Stats::Store& store, ResourcePriority priority) {
   if ((host->cluster().features() & Cluster::Features::HTTP2) &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::ConnectionPool::InstancePtr{
-        new Http::Http2::ProdConnPoolImpl(dispatcher, host, store)};
+        new Http::Http2::ProdConnPoolImpl(dispatcher, host, store, priority)};
   } else {
     return Http::ConnectionPool::InstancePtr{
-        new Http::Http1::ConnPoolImplProd(dispatcher, host, store)};
+        new Http::Http1::ConnPoolImplProd(dispatcher, host, store, priority)};
   }
 }
 

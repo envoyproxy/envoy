@@ -71,10 +71,10 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     return nullptr;
   }
 
-  if (host_->cluster().resourceManager().pendingRequests().canCreate()) {
+  if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
     // If we have no connections at all, make one no matter what so we don't starve.
     if ((ready_clients_.size() == 0 && busy_clients_.size() == 0) ||
-        host_->cluster().resourceManager().connections().canCreate()) {
+        host_->cluster().resourceManager(priority_).connections().canCreate()) {
       createNewConnection();
     }
 
@@ -243,12 +243,12 @@ ConnPoolImpl::PendingRequest::PendingRequest(ConnPoolImpl& parent, StreamDecoder
     : parent_(parent), decoder_(decoder), callbacks_(callbacks) {
   parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
   parent_.host_->cluster().stats().upstream_rq_pending_active_.inc();
-  parent_.host_->cluster().resourceManager().pendingRequests().inc();
+  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().inc();
 }
 
 ConnPoolImpl::PendingRequest::~PendingRequest() {
   parent_.host_->cluster().stats().upstream_rq_pending_active_.dec();
-  parent_.host_->cluster().resourceManager().pendingRequests().dec();
+  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().dec();
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
@@ -268,14 +268,14 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->stats().cx_active_.inc();
   conn_length_ = parent_.host_->cluster().stats().upstream_cx_length_ms_.allocateSpan();
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
-  parent_.host_->cluster().resourceManager().connections().inc();
+  parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 }
 
 ConnPoolImpl::ActiveClient::~ActiveClient() {
   parent_.host_->cluster().stats().upstream_cx_active_.dec();
   parent_.host_->stats().cx_active_.dec();
   conn_length_->complete();
-  parent_.host_->cluster().resourceManager().connections().dec();
+  parent_.host_->cluster().resourceManager(parent_.priority_).connections().dec();
 }
 
 void ConnPoolImpl::ActiveClient::onBufferChange(Network::ConnectionBufferType type, uint64_t,

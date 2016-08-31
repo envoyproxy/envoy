@@ -155,13 +155,12 @@ public:
   LoadBalancerType lbType() const override { return lb_type_; }
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const std::string& name() const override { return name_; }
-  ResourceManager& resourceManager() const override { return resource_manager_; }
+  ResourceManager& resourceManager(ResourcePriority priority) const override;
   ClusterStats& stats() const override { return stats_; }
 
 protected:
   ClusterImplBase(const Json::Object& config, Stats::Store& stats,
                   Ssl::ContextManager& ssl_context_manager);
-  ~ClusterImplBase();
 
   static ConstHostVectorPtr createHealthyHostList(const std::vector<HostPtr>& hosts);
   void runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
@@ -177,13 +176,22 @@ protected:
   mutable ClusterStats stats_;
   HealthCheckerPtr health_checker_;
   std::string alt_stat_name_;
-  mutable ResourceManagerImpl resource_manager_;
   uint64_t features_;
 
 private:
+  struct ResourceManagers {
+    ResourceManagers(const Json::Object& config);
+    ResourceManagerImplPtr load(const Json::Object& config, const std::string& priority);
+
+    typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
+
+    Managers managers_;
+  };
+
   uint64_t parseFeatures(const Json::Object& config);
 
   const uint64_t http_codec_options_;
+  mutable ResourceManagers resource_managers_;
 };
 
 typedef std::shared_ptr<ClusterImplBase> ClusterImplBasePtr;

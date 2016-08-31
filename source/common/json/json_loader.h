@@ -67,9 +67,10 @@ public:
   /**
    * Get a sub-object by name.
    * @param name supplies the key name.
+   * @param allow_empty supplies whether to return an empty object if the key does not exist.
    * @return Object the sub-object.
    */
-  Object getObject(const std::string& name) const;
+  Object getObject(const std::string& name, bool allow_empty = false) const;
 
   /**
    * Get an array by name.
@@ -116,6 +117,16 @@ protected:
 
   json_t* json_;
   std::string name_;
+
+private:
+  struct EmptyObject {
+    EmptyObject();
+    ~EmptyObject();
+
+    json_t* json_;
+  };
+
+  static EmptyObject empty_;
 };
 
 /**

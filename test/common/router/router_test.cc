@@ -122,7 +122,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
 }
 
 TEST_F(RouterTest, NoHost) {
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _)).WillOnce(Return(nullptr));
 
   Http::HeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
@@ -294,7 +294,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   router_.retry_state_->expectRetry();
   encoder1.stream_.resetStream(Http::StreamResetReason::LocalReset);
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _)).WillOnce(Return(nullptr));
   Http::HeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(response_headers), false));

@@ -41,7 +41,7 @@ public:
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
-  MOCK_CONST_METHOD0(resourceManager, ResourceManager&());
+  MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
   MOCK_METHOD0(shutdown, void());
   MOCK_CONST_METHOD0(stats, ClusterStats&());
 
@@ -70,7 +70,8 @@ public:
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, std::unordered_map<std::string, ConstClusterPtr>());
   MOCK_METHOD1(get, const Cluster*(const std::string& cluster));
-  MOCK_METHOD1(httpConnPoolForCluster, Http::ConnectionPool::Instance*(const std::string& cluster));
+  MOCK_METHOD2(httpConnPoolForCluster, Http::ConnectionPool::Instance*(const std::string& cluster,
+                                                                       ResourcePriority priority));
   MOCK_METHOD1(tcpConnForCluster_, MockHost::MockCreateConnectionData(const std::string& cluster));
   MOCK_METHOD1(httpAsyncClientForCluster, Http::AsyncClient&(const std::string& cluster));
   MOCK_METHOD0(shutdown, void());
