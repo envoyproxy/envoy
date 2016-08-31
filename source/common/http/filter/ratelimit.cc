@@ -84,7 +84,7 @@ void RateLimitFilter::complete(RateLimit::LimitStatus status) {
     config_->stats().counter(cluster_ratelimit_stat_prefix_ + "over_limit").inc();
     Http::CodeUtility::ResponseStatInfo info{config_->stats(), cluster_stat_prefix_,
                                              TOO_MANY_REQUESTS_HEADER, true, EMPTY_STRING,
-                                             EMPTY_STRING, EMPTY_STRING, EMPTY_STRING};
+                                             EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, false};
     Http::CodeUtility::chargeResponseStat(info);
     break;
   }

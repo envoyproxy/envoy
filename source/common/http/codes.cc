@@ -25,7 +25,7 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
   std::string group_string = groupStringForResponseCode(static_cast<Code>(response_code));
 
   // If the response is from a canary, also create canary stats.
-  if (info.response_headers_.get(Headers::get().EnvoyUpstreamCanary) == "true") {
+  if (info.upstream_canary_) {
     info.store_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, group_string)).inc();
     info.store_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, response_code)).inc();
   }

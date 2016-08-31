@@ -13,8 +13,8 @@ using testing::ByRef;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
-using testing::ReturnRef;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Http {
 
@@ -273,8 +273,8 @@ TEST_F(AsyncClientImplTest, CanaryStatusTrue) {
   AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
-  HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}, 
-          {"x-envoy-upstream-canary", "false"}});
+  HeaderMapPtr response_headers(
+      new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(true));
   EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.upstream_rq_time", _));
@@ -283,10 +283,10 @@ TEST_F(AsyncClientImplTest, CanaryStatusTrue) {
   EXPECT_CALL(stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_time", _));
 
-  EXPECT_CALL(stats_store_, 
-              deliverTimingToSinks("cluster.fake_cluster.canary.upstream_rq_time", _)); 
+  EXPECT_CALL(stats_store_,
+              deliverTimingToSinks("cluster.fake_cluster.canary.upstream_rq_time", _));
   response_decoder_->decodeData(data, true);
-  }
+}
 
 TEST_F(AsyncClientImplTest, CanaryStatusFalse) {
   message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
@@ -307,8 +307,8 @@ TEST_F(AsyncClientImplTest, CanaryStatusFalse) {
   AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
-  HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}, 
-          {"x-envoy-upstream-canary", "false"}});
+  HeaderMapPtr response_headers(
+      new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(false));
   EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.upstream_rq_time", _));
@@ -317,6 +317,6 @@ TEST_F(AsyncClientImplTest, CanaryStatusFalse) {
   EXPECT_CALL(stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_time", _));
   response_decoder_->decodeData(data, true);
-  }
+}
 
 } // Http

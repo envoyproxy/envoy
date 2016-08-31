@@ -22,7 +22,8 @@ public:
     }
 
     CodeUtility::ResponseStatInfo info{store_, "prefix.", headers, internal_request,
-                                       request_vhost_name, request_vcluster_name, from_az, to_az};
+                                       request_vhost_name, request_vcluster_name, from_az, to_az,
+                                       true};
 
     CodeUtility::chargeResponseStat(info);
   }
