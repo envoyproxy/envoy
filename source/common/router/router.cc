@@ -94,12 +94,16 @@ const std::string& Filter::upstreamZone() {
 }
 
 void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers) {
+  bool is_canary = 
+      response_headers.get(Http::Headers::get().EnvoyUpstreamCanary) == "true" || upstream_host_
+          ? upstream_host_->canary()
+          : false;
   if (!callbacks_->requestInfo().healthCheck()) {
     Http::CodeUtility::ResponseStatInfo info{
         config_->stats_store_, stat_prefix_, response_headers,
         downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true",
-        route_->virtualHostName(), request_vcluster_name_, config_->service_zone_, upstreamZone(),
-        upstream_request_->upstream_canary_};
+        route_->virtualHostName(), request_vcluster_name_, config_->service_zone_, 
+        upstreamZone(), is_canary};
 
     Http::CodeUtility::chargeResponseStat(info);
 
@@ -107,7 +111,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers) {
       Http::CodeUtility::ResponseStatInfo info{
           config_->stats_store_, alt_prefix, response_headers,
           downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true", "", "",
-          config_->service_zone_, upstreamZone(), upstream_request_->upstream_canary_};
+          config_->service_zone_, upstreamZone(), is_canary};
 
       Http::CodeUtility::chargeResponseStat(info);
     }
