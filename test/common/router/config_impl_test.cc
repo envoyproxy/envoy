@@ -642,7 +642,7 @@ TEST(RouteMatcherTest, TestBadDefaultConfig) {
 }
 
 TEST(RouteMatcherTest, TestDuplicateDomainConfig) {
-std::string json = R"EOF(
+  std::string json = R"EOF(
 {
   "virtual_hosts": [
     {
@@ -665,18 +665,14 @@ std::string json = R"EOF(
         }
       ]
     }
-  ],
-
-  "internal_only_headers": [
-    "x-lyft-user-id"
   ]
 }
   )EOF";
 
-Json::StringLoader loader(json);
-NiceMock<Runtime::MockLoader> runtime;
-NiceMock<Upstream::MockClusterManager> cm;
-EXPECT_THROW(ConfigImpl config(loader, runtime, cm), EnvoyException);
+  Json::StringLoader loader(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ConfigImpl config(loader, runtime, cm), EnvoyException);
 }
 
 static Http::HeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
