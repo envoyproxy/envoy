@@ -244,6 +244,11 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
         }
         default_virtual_host_ = virtual_host;
       } else {
+        if (virtual_hosts_.find(domain) != virtual_hosts_.end()) {
+          throw EnvoyException(fmt::format(
+              "Only unique values for domains are permitted. Duplicate entry of domain {}",
+              domain));
+        }
         virtual_hosts_.emplace(domain, virtual_host);
       }
     }
