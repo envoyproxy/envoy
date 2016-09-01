@@ -276,14 +276,8 @@ TEST_F(AsyncClientImplTestIsolatedStats, CanaryStatusCounterTrue) {
                              response_decoder_ = &decoder;
                              return nullptr;
                            }));
-
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
-  EXPECT_CALL(callbacks_, onSuccess_(_));
-
   AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
-
   HeaderMapPtr response_headers(
       new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
   EXPECT_CALL(*conn_pool_.host_, canary()).WillRepeatedly(Return(true));
@@ -303,14 +297,8 @@ TEST_F(AsyncClientImplTestIsolatedStats, CanaryStatusCounterFalse) {
                              response_decoder_ = &decoder;
                              return nullptr;
                            }));
-
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
-  EXPECT_CALL(callbacks_, onSuccess_(_));
-
   AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
-
   HeaderMapPtr response_headers(
       new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
   EXPECT_CALL(*conn_pool_.host_, canary()).WillRepeatedly(Return(false));
@@ -318,73 +306,4 @@ TEST_F(AsyncClientImplTestIsolatedStats, CanaryStatusCounterFalse) {
   EXPECT_EQ(0U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
   response_decoder_->decodeData(data, true);
 }
-
-TEST_F(AsyncClientImplTestMockStats, CanaryStatusTimingTrue) {
-  message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
-  Buffer::Instance& data = *message_->body();
-
-  EXPECT_CALL(conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks)
-                           -> ConnectionPool::Cancellable* {
-                             callbacks.onPoolReady(stream_encoder_, conn_pool_.host_);
-                             response_decoder_ = &decoder;
-                             return nullptr;
-                           }));
-
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
-  EXPECT_CALL(callbacks_, onSuccess_(_));
-
-  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
-  client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
-
-  HeaderMapPtr response_headers(
-      new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
-  response_decoder_->decodeHeaders(std::move(response_headers), false);
-  EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.upstream_rq_time", _));
-  EXPECT_CALL(stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.internal.upstream_rq_time", _));
-  EXPECT_CALL(stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_time", _));
-
-  EXPECT_CALL(stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.canary.upstream_rq_time", _));
-  EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(true));
-  response_decoder_->decodeData(data, true);
-}
-
-TEST_F(AsyncClientImplTestMockStats, CanaryStatusTimingFalse) {
-  message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
-  Buffer::Instance& data = *message_->body();
-
-  EXPECT_CALL(conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks)
-                           -> ConnectionPool::Cancellable* {
-                             callbacks.onPoolReady(stream_encoder_, conn_pool_.host_);
-                             response_decoder_ = &decoder;
-                             return nullptr;
-                           }));
-
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
-  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
-  EXPECT_CALL(callbacks_, onSuccess_(_));
-
-  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
-  client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
-
-  HeaderMapPtr response_headers(
-      new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
-  response_decoder_->decodeHeaders(std::move(response_headers), false);
-  EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.upstream_rq_time", _));
-  EXPECT_CALL(stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.internal.upstream_rq_time", _));
-  EXPECT_CALL(stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_time", _));
-
-  EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.canary.upstream_rq_time", _))
-      .Times(0);
-  EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(false));
-  response_decoder_->decodeData(data, true);
-}
-
 } // Http
