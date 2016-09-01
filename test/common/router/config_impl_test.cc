@@ -641,6 +641,40 @@ TEST(RouteMatcherTest, TestBadDefaultConfig) {
   EXPECT_THROW(ConfigImpl config(loader, runtime, cm), EnvoyException);
 }
 
+TEST(RouteMatcherTest, TestDuplicateDomainConfig) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2"
+        }
+      ]
+    },
+    {
+      "name": "www2_staging",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2_staging"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::StringLoader loader(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ConfigImpl config(loader, runtime, cm), EnvoyException);
+}
+
 static Http::HeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
                                               bool ssl, bool internal) {
   Http::HeaderMapImpl headers{

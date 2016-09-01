@@ -6,6 +6,7 @@
 #include "envoy/ssl/context.h"
 #include "envoy/upstream/health_checker.h"
 
+#include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/http/utility.h"
 #include "common/json/json_loader.h"
@@ -57,12 +58,8 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Stats::Store& stats
       max_requests_per_connection_(config.getInteger("max_requests_per_connection", 0)),
       connect_timeout_(std::chrono::milliseconds(config.getInteger("connect_timeout_ms"))),
       stats_(generateStats(name_, stats)), alt_stat_name_(config.getString("alt_stat_name", "")),
-      resource_manager_(config.getInteger("max_connections", 1024),
-                        config.getInteger("max_pending_requests", 1024),
-                        config.getInteger("max_requests", 1024),
-                        config.getInteger("max_retries", 3)),
       features_(parseFeatures(config)),
-      http_codec_options_(Http::Utility::parseCodecOptions(config)) {
+      http_codec_options_(Http::Utility::parseCodecOptions(config)), resource_managers_(config) {
 
   std::string string_lb_type = config.getString("lb_type");
   if (string_lb_type == "round_robin") {
@@ -82,8 +79,6 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Stats::Store& stats
                                                            context_config);
   }
 }
-
-ClusterImplBase::~ClusterImplBase() {}
 
 ConstHostVectorPtr ClusterImplBase::createHealthyHostList(const std::vector<HostPtr>& hosts) {
   HostVectorPtr healthy_list(new std::vector<HostPtr>());
@@ -109,6 +104,11 @@ uint64_t ClusterImplBase::parseFeatures(const Json::Object& config) {
   return features;
 }
 
+ResourceManager& ClusterImplBase::resourceManager(ResourcePriority priority) const {
+  ASSERT(enumToInt(priority) < resource_managers_.managers_.size());
+  return *resource_managers_.managers_[enumToInt(priority)];
+}
+
 void ClusterImplBase::runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
                                          const std::vector<HostPtr>& hosts_removed) {
   if (!hosts_added.empty() || !hosts_removed.empty()) {
@@ -131,6 +131,28 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
                   createHealthyHostList(*rawLocalZoneHosts()), {}, {});
     }
   });
+}
+
+ClusterImplBase::ResourceManagers::ResourceManagers(const Json::Object& config) {
+  managers_[enumToInt(ResourcePriority::Default)] = load(config, "default");
+  managers_[enumToInt(ResourcePriority::High)] = load(config, "high");
+}
+
+ResourceManagerImplPtr ClusterImplBase::ResourceManagers::load(const Json::Object& config,
+                                                               const std::string& priority) {
+  uint64_t max_connections = 1024;
+  uint64_t max_pending_requests = 1024;
+  uint64_t max_requests = 1024;
+  uint64_t max_retries = 3;
+
+  Json::Object settings = config.getObject("circuit_breakers", true).getObject(priority, true);
+  max_connections = settings.getInteger("max_connections", max_connections);
+  max_pending_requests = settings.getInteger("max_pending_requests", max_pending_requests);
+  max_requests = settings.getInteger("max_requests", max_requests);
+  max_retries = settings.getInteger("max_retries", max_retries);
+
+  return ResourceManagerImplPtr{
+      new ResourceManagerImpl(max_connections, max_pending_requests, max_requests, max_retries)};
 }
 
 StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Stats::Store& stats,

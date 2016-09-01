@@ -26,6 +26,12 @@ StringLoader::StringLoader(const std::string& json) {
 
 StringLoader::~StringLoader() { json_decref(json_); }
 
+Object::EmptyObject Object::empty_;
+
+Object::EmptyObject::EmptyObject() : json_(json_object()) {}
+
+Object::EmptyObject::~EmptyObject() { json_decref(json_); }
+
 std::vector<Object> Object::asObjectArray() const {
   if (!json_is_array(json_)) {
     throw Exception(fmt::format("'{}' is not an array", name_));
@@ -73,8 +79,12 @@ int64_t Object::getInteger(const std::string& name, int64_t default_value) const
   }
 }
 
-Object Object::getObject(const std::string& name) const {
+Object Object::getObject(const std::string& name, bool allow_empty) const {
   json_t* object = json_object_get(json_, name.c_str());
+  if (!object && allow_empty) {
+    object = empty_.json_;
+  }
+
   if (!object) {
     throw Exception(fmt::format("key '{}' missing in '{}'", name, name_));
   }

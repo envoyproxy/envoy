@@ -182,8 +182,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Fetch a connection pool for the upstream cluster.
-  Http::ConnectionPool::Instance* conn_pool =
-      config_->cm_.httpConnPoolForCluster(route_->clusterName());
+  // TODO: In follow up commit, specify priority.
+  Http::ConnectionPool::Instance* conn_pool = config_->cm_.httpConnPoolForCluster(
+      route_->clusterName(), Upstream::ResourcePriority::Default);
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
@@ -465,8 +466,9 @@ bool Filter::setupRetry(bool end_stream) {
 }
 
 void Filter::doRetry() {
-  Http::ConnectionPool::Instance* conn_pool =
-      config_->cm_.httpConnPoolForCluster(route_->clusterName());
+  // TODO: In follow up commit, specify priority.
+  Http::ConnectionPool::Instance* conn_pool = config_->cm_.httpConnPoolForCluster(
+      route_->clusterName(), Upstream::ResourcePriority::Default);
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();
@@ -544,8 +546,9 @@ RetryStatePtr
 ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request_headers,
                              const Upstream::Cluster& cluster, Runtime::Loader& runtime,
                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher) {
-  return RetryStatePtr{
-      new RetryStateImpl(policy, request_headers, cluster, runtime, random, dispatcher)};
+  // TODO: In follow up commit, specify priority.
+  return RetryStatePtr{new RetryStateImpl(policy, request_headers, cluster, runtime, random,
+                                          dispatcher, Upstream::ResourcePriority::Default)};
 }
 
 } // Router

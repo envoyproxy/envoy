@@ -25,7 +25,7 @@ public:
   /**
    * Return a connection pool or nullptr if there is no healthy upstream host.
    */
-  virtual ConnectionPool::Instance* connPool() PURE;
+  virtual ConnectionPool::Instance* connPool(Upstream::ResourcePriority priority) PURE;
 };
 
 class AsyncRequestImpl;

@@ -23,7 +23,9 @@ AsyncClientImpl::~AsyncClientImpl() { ASSERT(active_requests_.empty()); }
 
 AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
                                             const Optional<std::chrono::milliseconds>& timeout) {
-  ConnectionPool::Instance* conn_pool = factory_.connPool();
+  // For now we use default priority for all requests. We could eventually expose priority out of
+  // send if needed.
+  ConnectionPool::Instance* conn_pool = factory_.connPool(Upstream::ResourcePriority::Default);
   if (!conn_pool) {
     callbacks.onFailure(AsyncClient::FailureReason::Reset);
     return nullptr;

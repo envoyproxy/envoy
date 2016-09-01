@@ -17,7 +17,8 @@ class RetryStateImpl : public RetryState {
 public:
   RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
                  const Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher);
+                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                 Upstream::ResourcePriority priority);
   ~RetryStateImpl();
 
   static uint32_t parseRetryOn(const std::string& config);
@@ -43,6 +44,7 @@ private:
   uint32_t current_retry_{};
   DoRetryCallback callback_;
   Event::TimerPtr retry_timer_;
+  Upstream::ResourcePriority priority_;
 };
 
 } // Router

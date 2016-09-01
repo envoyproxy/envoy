@@ -20,8 +20,8 @@ public:
   }
 
   void setup(Http::HeaderMap& request_headers) {
-    state_.reset(
-        new RetryStateImpl{policy_, request_headers, cluster_, runtime_, random_, dispatcher_});
+    state_.reset(new RetryStateImpl{policy_, request_headers, cluster_, runtime_, random_,
+                                    dispatcher_, Upstream::ResourcePriority::Default});
   }
 
   void expectTimerCreateAndEnable() {

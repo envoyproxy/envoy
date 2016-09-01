@@ -26,7 +26,9 @@ public:
   }
 
   // Http::AsyncClientConnPoolFactory
-  Http::ConnectionPool::Instance* connPool() override { return &conn_pool_; }
+  Http::ConnectionPool::Instance* connPool(Upstream::ResourcePriority) override {
+    return &conn_pool_;
+  }
 
   std::string upstream_zone_{"to_az"};
   MessagePtr message_{new RequestMessageImpl()};

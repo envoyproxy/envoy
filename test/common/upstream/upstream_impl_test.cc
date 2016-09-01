@@ -57,9 +57,20 @@ TEST(StrictDnsClusterImplTest, Basic) {
     "connect_timeout_ms": 250,
     "type": "strict_dns",
     "lb_type": "round_robin",
-    "max_connections": 43,
-    "max_pending_requests": 57,
-    "max_requests": 50,
+    "circuit_breakers": {
+      "default": {
+        "max_connections": 43,
+        "max_pending_requests": 57,
+        "max_requests": 50,
+        "max_retries": 10
+      },
+      "high": {
+        "max_connections": 1,
+        "max_pending_requests": 2,
+        "max_requests": 3,
+        "max_retries": 4
+      }
+    },
     "max_requests_per_connection": 3,
     "http_codec_options": "no_compression",
     "hosts": [{"url": "tcp://localhost:11001"},
@@ -69,9 +80,14 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   Json::StringLoader loader(json);
   StrictDnsClusterImpl cluster(loader, stats, ssl_context_manager, dns_resolver);
-  EXPECT_EQ(43U, cluster.resourceManager().connections().max());
-  EXPECT_EQ(57U, cluster.resourceManager().pendingRequests().max());
-  EXPECT_EQ(50U, cluster.resourceManager().requests().max());
+  EXPECT_EQ(43U, cluster.resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_EQ(57U, cluster.resourceManager(ResourcePriority::Default).pendingRequests().max());
+  EXPECT_EQ(50U, cluster.resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_EQ(10U, cluster.resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_EQ(1U, cluster.resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_EQ(2U, cluster.resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_EQ(3U, cluster.resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_EQ(4U, cluster.resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.maxRequestsPerConnection());
   EXPECT_EQ(Http::CodecOptions::NoCompression, cluster.httpCodecOptions());
   ReadyWatcher membership_updated;
@@ -183,9 +199,14 @@ TEST(StaticClusterImplTest, UrlConfig) {
 
   Json::StringLoader config(json);
   StaticClusterImpl cluster(config, stats, ssl_context_manager);
-  EXPECT_EQ(1024U, cluster.resourceManager().connections().max());
-  EXPECT_EQ(1024U, cluster.resourceManager().pendingRequests().max());
-  EXPECT_EQ(1024U, cluster.resourceManager().requests().max());
+  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).pendingRequests().max());
+  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_EQ(3U, cluster.resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_EQ(3U, cluster.resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(0U, cluster.maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.httpCodecOptions());
   EXPECT_EQ(LoadBalancerType::Random, cluster.lbType());
@@ -205,7 +226,6 @@ TEST(StaticClusterImplTest, BothAddressPortAndURLConfig) {
     "connect_timeout_ms": 250,
     "type": "static",
     "lb_type": "round_robin",
-    "max_connections": 43,
     "hosts": [{"address": "1.2.3.4", "port": 99, "url": "tcp://192.168.1.1:22"},
               {"address":"5.6.7.8", "port": 63, "url": "tcp://192.168.1.2:44"}]
   }
@@ -226,7 +246,6 @@ TEST(StaticClusterImplTest, AddressMissingPortConfig) {
     "connect_timeout_ms": 250,
     "type": "static",
     "lb_type": "round_robin",
-    "max_connections": 43,
     "hosts": [{"address": "1.2.3.4"},
               {"address":"5.6.7.8"}]
   }
@@ -245,7 +264,6 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
     "connect_timeout_ms": 250,
     "type": "static",
     "lb_type": "fakelbtype",
-    "max_connections": 43,
     "hosts": [{"address": "1.2.3.4", "port": 99, "url": "tcp://192.168.1.1:22"},
               {"address":"5.6.7.8", "port": 63, "url": "tcp://192.168.1.2:44"}]
   }
@@ -265,7 +283,6 @@ TEST(StaticClusterImplTest, UnsupportedFeature) {
     "type": "static",
     "lb_type": "round_robin",
     "features": "fake",
-    "max_connections": 43,
     "hosts": [{"address": "1.2.3.4", "port": 99, "url": "tcp://192.168.1.1:22"},
               {"address":"5.6.7.8", "port": 63, "url": "tcp://192.168.1.2:44"}]
   }
