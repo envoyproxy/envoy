@@ -139,7 +139,8 @@ void AsyncRequestImpl::onComplete() {
 void AsyncRequestImpl::onResetStream(StreamResetReason) {
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
                                      SERVICE_UNAVAILABLE_HEADER, true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, upstreamZone(), false};
+                                     parent_.local_zone_name_, upstreamZone(),
+                                     upstream_host_ ? upstream_host_.canary() : false};
   CodeUtility::chargeResponseStat(info);
   callbacks_.onFailure(AsyncClient::FailureReason::Reset);
   cleanup();
@@ -148,7 +149,8 @@ void AsyncRequestImpl::onResetStream(StreamResetReason) {
 void AsyncRequestImpl::onRequestTimeout() {
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
                                      REQUEST_TIMEOUT_HEADER, true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, upstreamZone(), false};
+                                     parent_.local_zone_name_, upstreamZone(),
+                                     upstream_host_ ? upstream_host_.canary() : false};
   CodeUtility::chargeResponseStat(info);
   parent_.cluster_.stats().upstream_rq_timeout_.inc();
   stream_encoder_->resetStream();
