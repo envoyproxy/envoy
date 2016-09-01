@@ -87,6 +87,8 @@ void AsyncRequestImpl::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
                                      response_->headers(), true, EMPTY_STRING, EMPTY_STRING,
                                      parent_.local_zone_name_, upstreamZone(), is_canary};
+  std::cout << "In decodeHeaders with canary:";
+  std::cout << is_canary;
   CodeUtility::chargeResponseStat(info);
 
   if (end_stream) {

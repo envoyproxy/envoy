@@ -274,9 +274,12 @@ TEST_F(AsyncClientImplTest, CanaryStatusTrue) {
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
   HeaderMapPtr response_headers(
-      new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
-  response_decoder_->decodeHeaders(std::move(response_headers), false);
+      new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "true"}});
   EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(true));
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
+
+
   EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.upstream_rq_time", _));
   EXPECT_CALL(stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.internal.upstream_rq_time", _));
@@ -285,7 +288,9 @@ TEST_F(AsyncClientImplTest, CanaryStatusTrue) {
 
   EXPECT_CALL(stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.canary.upstream_rq_time", _));
+  EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(true));
   response_decoder_->decodeData(data, true);
+
 }
 
 TEST_F(AsyncClientImplTest, CanaryStatusFalse) {
@@ -309,14 +314,16 @@ TEST_F(AsyncClientImplTest, CanaryStatusFalse) {
 
   HeaderMapPtr response_headers(
       new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
+  EXPECT_CALL(*conn_pool_.host_, canary()).WillRepeatedly(Return(false));
   response_decoder_->decodeHeaders(std::move(response_headers), false);
-  EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(false));
   EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.upstream_rq_time", _));
   EXPECT_CALL(stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.internal.upstream_rq_time", _));
   EXPECT_CALL(stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_time", _));
   response_decoder_->decodeData(data, true);
+  EXPECT_EQ(0U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
+
 }
 
 } // Http

@@ -26,8 +26,13 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
 
   // If the response is from a canary, also create canary stats.
   if (info.upstream_canary_) {
+    std::cout << "\n";
+    std::cout << fmt::format("{}canary.upstream_rq_{}", info.prefix_, response_code);
+    std::cout << "\n";
     info.store_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, group_string)).inc();
     info.store_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, response_code)).inc();
+    std::cout << info.store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value();
+    std::cout << "\n";
   }
 
   // Split stats into external vs. internal.
