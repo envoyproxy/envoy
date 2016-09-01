@@ -770,4 +770,5 @@ TEST_F(RouterTest, CanaryStatusFalse) {
 
   EXPECT_EQ(0U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
 }
+
 } // Router

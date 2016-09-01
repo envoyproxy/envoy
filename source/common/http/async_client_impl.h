@@ -74,7 +74,7 @@ public:
 
 private:
   const std::string& upstreamZone();
-  bool isCanary();
+  bool isUpstreamCanary();
 
   // Http::StreamDecoder
   void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
