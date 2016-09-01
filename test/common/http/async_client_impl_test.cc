@@ -18,9 +18,9 @@ using testing::ReturnRef;
 
 namespace Http {
 
-class AsyncClientImplTest : public testing::Test, public AsyncClientConnPoolFactory {
+class AsyncClientImplTestBase : public testing::Test, public AsyncClientConnPoolFactory {
 public:
-  AsyncClientImplTest() {
+  AsyncClientImplTestBase() {
     HttpTestUtility::addDefaultHeaders(message_->headers());
     ON_CALL(*conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
   }
@@ -34,13 +34,22 @@ public:
   ConnectionPool::MockInstance conn_pool_;
   NiceMock<MockStreamEncoder> stream_encoder_;
   StreamDecoder* response_decoder_{};
-  NiceMock<Stats::MockStore> stats_store_;
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockCluster> cluster_;
 };
 
-TEST_F(AsyncClientImplTest, Basic) {
+class AsyncClientImplTestMockStats : public AsyncClientImplTestBase {
+public:
+  NiceMock<Stats::MockStore> stats_store_;
+};
+
+class AsyncClientImplTestIsolatedStats : public AsyncClientImplTestBase {
+public:
+  Stats::IsolatedStoreImpl stats_store_;
+};
+
+TEST_F(AsyncClientImplTestMockStats, Basic) {
   message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
   Buffer::Instance& data = *message_->body();
 
@@ -76,7 +85,7 @@ TEST_F(AsyncClientImplTest, Basic) {
   response_decoder_->decodeData(data, true);
 }
 
-TEST_F(AsyncClientImplTest, MultipleRequests) {
+TEST_F(AsyncClientImplTestMockStats, MultipleRequests) {
   // Send request 1
   message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
   Buffer::Instance& data = *message_->body();
@@ -123,7 +132,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
   response_decoder_->decodeData(data, true);
 }
 
-TEST_F(AsyncClientImplTest, Trailers) {
+TEST_F(AsyncClientImplTestMockStats, Trailers) {
   message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
   Buffer::Instance& data = *message_->body();
 
@@ -147,7 +156,7 @@ TEST_F(AsyncClientImplTest, Trailers) {
   response_decoder_->decodeTrailers(HeaderMapPtr{new HeaderMapImpl{{"some", "trailer"}}});
 }
 
-TEST_F(AsyncClientImplTest, FailRequest) {
+TEST_F(AsyncClientImplTestMockStats, FailRequest) {
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_503"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_503"));
@@ -170,7 +179,7 @@ TEST_F(AsyncClientImplTest, FailRequest) {
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
 
-TEST_F(AsyncClientImplTest, CancelRequest) {
+TEST_F(AsyncClientImplTestMockStats, CancelRequest) {
   EXPECT_CALL(conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&, ConnectionPool::Callbacks& callbacks)
                            -> ConnectionPool::Cancellable* {
@@ -187,7 +196,7 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
   request->cancel();
 }
 
-TEST_F(AsyncClientImplTest, PoolFailure) {
+TEST_F(AsyncClientImplTestMockStats, PoolFailure) {
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_503"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_5xx"));
@@ -209,7 +218,7 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
             client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>()));
 }
 
-TEST_F(AsyncClientImplTest, RequestTimeout) {
+TEST_F(AsyncClientImplTestMockStats, RequestTimeout) {
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_5xx"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.upstream_rq_504"));
   EXPECT_CALL(stats_store_, counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_5xx"));
@@ -235,7 +244,7 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
   EXPECT_EQ(1UL, cluster_.stats_store_.counter("cluster.fake_cluster.upstream_rq_timeout").value());
 }
 
-TEST_F(AsyncClientImplTest, DisableTimer) {
+TEST_F(AsyncClientImplTestMockStats, DisableTimer) {
   EXPECT_CALL(conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&, ConnectionPool::Callbacks& callbacks)
                            -> ConnectionPool::Cancellable* {
@@ -254,7 +263,7 @@ TEST_F(AsyncClientImplTest, DisableTimer) {
   request->cancel();
 }
 
-TEST_F(AsyncClientImplTest, CanaryStatusTrue) {
+TEST_F(AsyncClientImplTestIsolatedStats, CanaryStatusCounterTrue) {
   message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
   Buffer::Instance& data = *message_->body();
 
@@ -274,26 +283,14 @@ TEST_F(AsyncClientImplTest, CanaryStatusTrue) {
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
   HeaderMapPtr response_headers(
-      new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "true"}});
-  EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(true));
+      new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
+  EXPECT_CALL(*conn_pool_.host_, canary()).WillRepeatedly(Return(true));
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
-
-
-  EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.upstream_rq_time", _));
-  EXPECT_CALL(stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.internal.upstream_rq_time", _));
-  EXPECT_CALL(stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_time", _));
-
-  EXPECT_CALL(stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.canary.upstream_rq_time", _));
-  EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(true));
   response_decoder_->decodeData(data, true);
-
 }
 
-TEST_F(AsyncClientImplTest, CanaryStatusFalse) {
+TEST_F(AsyncClientImplTestIsolatedStats, CanaryStatusCounterFalse) {
   message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
   Buffer::Instance& data = *message_->body();
 
@@ -316,14 +313,76 @@ TEST_F(AsyncClientImplTest, CanaryStatusFalse) {
       new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
   EXPECT_CALL(*conn_pool_.host_, canary()).WillRepeatedly(Return(false));
   response_decoder_->decodeHeaders(std::move(response_headers), false);
+  EXPECT_EQ(0U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
+  response_decoder_->decodeData(data, true);
+}
+
+TEST_F(AsyncClientImplTestMockStats, CanaryStatusTimingTrue) {
+  message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
+  Buffer::Instance& data = *message_->body();
+
+  EXPECT_CALL(conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks)
+                           -> ConnectionPool::Cancellable* {
+                             callbacks.onPoolReady(stream_encoder_, conn_pool_.host_);
+                             response_decoder_ = &decoder;
+                             return nullptr;
+                           }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+  EXPECT_CALL(callbacks_, onSuccess_(_));
+
+  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
+  client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+
+  HeaderMapPtr response_headers(
+      new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
   EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.upstream_rq_time", _));
   EXPECT_CALL(stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.internal.upstream_rq_time", _));
   EXPECT_CALL(stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_time", _));
-  response_decoder_->decodeData(data, true);
-  EXPECT_EQ(0U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
 
+  EXPECT_CALL(stats_store_,
+              deliverTimingToSinks("cluster.fake_cluster.canary.upstream_rq_time", _));
+  EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(true));
+  response_decoder_->decodeData(data, true);
+}
+
+TEST_F(AsyncClientImplTestMockStats, CanaryStatusTimingFalse) {
+  message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
+  Buffer::Instance& data = *message_->body();
+
+  EXPECT_CALL(conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks)
+                           -> ConnectionPool::Cancellable* {
+                             callbacks.onPoolReady(stream_encoder_, conn_pool_.host_);
+                             response_decoder_ = &decoder;
+                             return nullptr;
+                           }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+  EXPECT_CALL(callbacks_, onSuccess_(_));
+
+  AsyncClientImpl client(cluster_, *this, stats_store_, dispatcher_, "from_az");
+  client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+
+  HeaderMapPtr response_headers(
+      new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.upstream_rq_time", _));
+  EXPECT_CALL(stats_store_,
+              deliverTimingToSinks("cluster.fake_cluster.internal.upstream_rq_time", _));
+  EXPECT_CALL(stats_store_,
+              deliverTimingToSinks("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_time", _));
+
+  EXPECT_CALL(stats_store_, deliverTimingToSinks("cluster.fake_cluster.canary.upstream_rq_time", _))
+      .Times(0);
+  EXPECT_CALL(*conn_pool_.host_, canary()).WillOnce(Return(false));
+  response_decoder_->decodeData(data, true);
 }
 
 } // Http
