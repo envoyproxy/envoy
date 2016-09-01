@@ -161,6 +161,14 @@ global
 Shadow
 ------
 
+The router is capable of shadowing traffic from one cluster to another. The current implementation
+is "fire and forget," meaning Envoy will not wait for the shadow cluster to respond before returning
+the response from the primary cluster. All normal statistics are collected however for the shadow
+cluster making thie feature useful for testing.
+
+During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
+useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
+
 .. code-block:: json
 
   {
