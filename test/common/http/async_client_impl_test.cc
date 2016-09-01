@@ -280,7 +280,7 @@ TEST_F(AsyncClientImplTestIsolatedStats, CanaryStatusCounterTrue) {
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   HeaderMapPtr response_headers(
       new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
-  EXPECT_CALL(*conn_pool_.host_, canary()).WillRepeatedly(Return(true));
+  ON_CALL(*conn_pool_.host_, canary()).WillByDefault(Return(true));
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
   response_decoder_->decodeData(data, true);
@@ -301,7 +301,6 @@ TEST_F(AsyncClientImplTestIsolatedStats, CanaryStatusCounterFalse) {
   client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   HeaderMapPtr response_headers(
       new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "false"}});
-  EXPECT_CALL(*conn_pool_.host_, canary()).WillRepeatedly(Return(false));
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   EXPECT_EQ(0U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
   response_decoder_->decodeData(data, true);

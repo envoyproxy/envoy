@@ -94,10 +94,8 @@ const std::string& Filter::upstreamZone() {
 }
 
 void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers) {
-  bool is_canary =
-      response_headers.get(Http::Headers::get().EnvoyUpstreamCanary) == "true" || upstream_host_
-          ? upstream_host_->canary()
-          : false;
+  bool is_canary = (response_headers.get(Http::Headers::get().EnvoyUpstreamCanary) == "true") ||
+                   (upstream_host_ ? upstream_host_->canary() : false);
   if (!callbacks_->requestInfo().healthCheck()) {
     Http::CodeUtility::ResponseStatInfo info{
         config_->stats_store_, stat_prefix_, response_headers,
@@ -389,9 +387,8 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   }
 
   upstream_request_->upstream_canary_ =
-      headers->get(Http::Headers::get().EnvoyUpstreamCanary) == "true" || upstream_host_
-          ? upstream_host_->canary()
-          : false;
+      (headers->get(Http::Headers::get().EnvoyUpstreamCanary) == "true") ||
+      (upstream_host_ ? upstream_host_->canary() : false);
   chargeUpstreamCode(*headers);
 
   downstream_response_started_ = true;

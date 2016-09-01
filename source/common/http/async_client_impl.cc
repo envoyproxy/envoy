@@ -68,6 +68,11 @@ const std::string& AsyncRequestImpl::upstreamZone() {
   return upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
 }
 
+bool AsyncRequestImpl::isCanary() {
+  return (response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true") ||
+         (upstream_host_ ? upstream_host_->canary() : false);
+}
+
 void AsyncRequestImpl::cancel() {
   ASSERT(stream_encoder_);
   stream_encoder_->resetStream();
@@ -81,14 +86,9 @@ void AsyncRequestImpl::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   response_->headers().iterate([](const LowerCaseString& key, const std::string& value)
                                    -> void { log_debug("  '{}':'{}'", key.get(), value); });
 #endif
-  bool is_canary =
-      response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true" || upstream_host_
-          ? upstream_host_->canary()
-          : false;
-
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
                                      response_->headers(), true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, upstreamZone(), is_canary};
+                                     parent_.local_zone_name_, upstreamZone(), isCanary()};
   CodeUtility::chargeResponseStat(info);
 
   if (end_stream) {
@@ -122,14 +122,9 @@ void AsyncRequestImpl::decodeTrailers(HeaderMapPtr&& trailers) {
 }
 
 void AsyncRequestImpl::onComplete() {
-  bool is_canary =
-      response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true" || upstream_host_
-          ? upstream_host_->canary()
-          : false;
-
   CodeUtility::ResponseTimingInfo info{
-      parent_.stats_store_, parent_.stat_prefix_, stream_encoder_->requestCompleteTime(), is_canary,
-      true, EMPTY_STRING, EMPTY_STRING, parent_.local_zone_name_, upstreamZone()};
+      parent_.stats_store_, parent_.stat_prefix_, stream_encoder_->requestCompleteTime(),
+      isCanary(), true, EMPTY_STRING, EMPTY_STRING, parent_.local_zone_name_, upstreamZone()};
   CodeUtility::chargeResponseTiming(info);
 
   callbacks_.onSuccess(std::move(response_));

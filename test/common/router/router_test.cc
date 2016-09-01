@@ -596,7 +596,6 @@ TEST_F(RouterTest, AltStatName) {
       new Http::HeaderMapImpl{{":status", "200"},
                               {"x-envoy-upstream-canary", "true"},
                               {"x-envoy-virtual-cluster", "hello"}});
-  EXPECT_CALL(*cm_.conn_pool_.host_, canary()).WillRepeatedly(Return(true));
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
   EXPECT_EQ(1U,
@@ -736,7 +735,7 @@ TEST_F(RouterTest, CanaryStatusTrue) {
       new Http::HeaderMapImpl{{":status", "200"},
                               {"x-envoy-upstream-canary", "false"},
                               {"x-envoy-virtual-cluster", "hello"}});
-  EXPECT_CALL(*cm_.conn_pool_.host_, canary()).WillRepeatedly(Return(true));
+  ON_CALL(*cm_.conn_pool_.host_, canary()).WillByDefault(Return(true));
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
@@ -767,7 +766,6 @@ TEST_F(RouterTest, CanaryStatusFalse) {
       new Http::HeaderMapImpl{{":status", "200"},
                               {"x-envoy-upstream-canary", "false"},
                               {"x-envoy-virtual-cluster", "hello"}});
-  EXPECT_CALL(*cm_.conn_pool_.host_, canary()).WillRepeatedly(Return(false));
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
   EXPECT_EQ(0U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
