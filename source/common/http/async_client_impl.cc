@@ -69,8 +69,9 @@ const std::string& AsyncRequestImpl::upstreamZone() {
 }
 
 bool AsyncRequestImpl::isUpstreamCanary() {
-  return (response_ ? (response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true") 
-          : false) || (upstream_host_ ? upstream_host_->canary() : false);
+  return (response_ ? (response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true")
+                    : false) ||
+         (upstream_host_ ? upstream_host_->canary() : false);
 }
 
 void AsyncRequestImpl::cancel() {
@@ -136,8 +137,7 @@ void AsyncRequestImpl::onComplete() {
 void AsyncRequestImpl::onResetStream(StreamResetReason) {
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
                                      SERVICE_UNAVAILABLE_HEADER, true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, upstreamZone(),
-                                     isUpstreamCanary()};
+                                     parent_.local_zone_name_, upstreamZone(), isUpstreamCanary()};
   CodeUtility::chargeResponseStat(info);
   callbacks_.onFailure(AsyncClient::FailureReason::Reset);
   cleanup();
@@ -146,8 +146,7 @@ void AsyncRequestImpl::onResetStream(StreamResetReason) {
 void AsyncRequestImpl::onRequestTimeout() {
   CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
                                      REQUEST_TIMEOUT_HEADER, true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, upstreamZone(),
-                                     isUpstreamCanary()};
+                                     parent_.local_zone_name_, upstreamZone(), isUpstreamCanary()};
   CodeUtility::chargeResponseStat(info);
   parent_.cluster_.stats().upstream_rq_timeout_.inc();
   stream_encoder_->resetStream();
