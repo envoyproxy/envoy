@@ -1,5 +1,8 @@
+$white: #FFFFFF;
+
 .hero {
-  background: $base-hero-color;
+  background: $envoy-blue;
+  background: linear-gradient(to bottom,  $envoy-blue 0%, $envoy-black-blue 100%);
   height: 572px;
   margin-bottom: 1em;
   text-align: center;
@@ -10,14 +13,14 @@
 }
 
 .hero-headline {
-  color: $dark-brown;
+  color: $white;
   font-size: $base-font-size * 2.2;
   font-weight: 600;
   margin: 1.2em 0 0.5em;
 }
 
 .hero-description {
-  color: tint($dark-brown, 20%);
+  color: darken($white, 20%);
   display: inline-block;
   font-size: $base-font-size;
   line-height: 1.4;
@@ -31,8 +34,8 @@
 }
 
 .hero-banner-container {
-  .laptop {
-    background: image_url("laptop.png");
+  .envoy-logo {
+    background: image_url("envoy.png");
     background-size: 350px;
     background-repeat: no-repeat;
     background-position: 50%;

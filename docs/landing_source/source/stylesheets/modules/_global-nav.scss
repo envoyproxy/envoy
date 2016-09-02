@@ -30,10 +30,10 @@
   margin-right: 0;
 
   a {
-    color: $global-nav-link-color;
+    color: darken($white, 20%);
 
     &:hover {
-      color: $global-nav-link-hover-color;
+      color: tint($white, 20%);
     }
   }
 }
