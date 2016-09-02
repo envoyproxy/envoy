@@ -80,7 +80,14 @@
               "pass_through_mode": false, "endpoint": "/healthcheck"
             }
           },
-          { "type": "decoder", "name": "rate_limit", "config": { "domain": "foo" } },
+          { "type": "decoder", "name": "rate_limit",
+            "config": {
+              "domain": "foo",
+              "actions": [
+                {"type": "service_to_service"}
+              ]
+            }
+          },
           { "type": "decoder", "name": "router", "config": {} }
         ]
       }
@@ -153,7 +160,14 @@
               "pass_through_mode": false, "endpoint": "/healthcheck"
             }
           },
-          { "type": "decoder", "name": "rate_limit", "config": { "domain": "foo" } },
+          { "type": "decoder", "name": "rate_limit",
+            "config": {
+              "domain": "foo",
+              "actions": [
+                {"type": "service_to_service"}
+              ]
+            }
+          },
           { "type": "decoder", "name": "buffer",
             "config": {
               "max_request_bytes": 5242880,

@@ -18,10 +18,10 @@ public:
       return nullptr;
     }
 
-    Http::RateLimitFilterConfigPtr filter_config(new Http::RateLimitFilterConfig(
+    Http::RateLimit::FilterConfigPtr filter_config(new Http::RateLimit::FilterConfig(
         config, server.options().serviceClusterName(), server.stats(), server.runtime()));
     return [filter_config, &server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{new Http::RateLimitFilter(
+      callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{new Http::RateLimit::Filter(
           filter_config, server.rateLimitClient(std::chrono::milliseconds(20)))});
     };
   }

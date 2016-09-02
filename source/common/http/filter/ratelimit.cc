@@ -9,39 +9,58 @@
 #include "common/http/headers.h"
 
 namespace Http {
+namespace RateLimit {
 
-const Http::HeaderMapImpl RateLimitFilter::TOO_MANY_REQUESTS_HEADER{
+const Http::HeaderMapImpl Filter::TOO_MANY_REQUESTS_HEADER{
     {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}};
 
-RateLimitFilterConfig::RateLimitFilterConfig(const Json::Object& config,
-                                             const std::string& local_service_cluster,
-                                             Stats::Store& stats_store, Runtime::Loader& runtime)
-    : domain_(config.getString("domain")), local_service_cluster_(local_service_cluster),
-      stats_store_(stats_store), runtime_(runtime) {}
+void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route,
+                                                 std::vector<::RateLimit::Descriptor>& descriptors,
+                                                 FilterConfig& config) {
+  // We limit on 2 dimensions.
+  // 1) All calls to the given cluster.
+  // 2) Calls to the given cluster and from this cluster.
+  // The service side configuration can choose to limit on 1 or both of the above.
+  descriptors.push_back({{{"to_cluster", route.clusterName()}}});
+  descriptors.push_back(
+      {{{"to_cluster", route.clusterName()}, {"from_cluster", config.localServiceCluster()}}});
+}
 
-FilterHeadersStatus RateLimitFilter::decodeHeaders(HeaderMap& headers, bool) {
+FilterConfig::FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
+                           Stats::Store& stats_store, Runtime::Loader& runtime)
+    : domain_(config.getString("domain")), local_service_cluster_(local_service_cluster),
+      stats_store_(stats_store), runtime_(runtime) {
+  for (const Json::Object& action : config.getObjectArray("actions")) {
+    std::string type = action.getString("type");
+    if (type == "service_to_service") {
+      actions_.emplace_back(new ServiceToServiceAction());
+    } else {
+      throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
+    }
+  }
+}
+
+FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   if (!config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enabled", 100)) {
     return FilterHeadersStatus::Continue;
   }
 
   const Router::RouteEntry* route = callbacks_->routeTable().routeForRequest(headers);
   if (route && route->rateLimitPolicy().doGlobalLimiting()) {
-    cluster_stat_prefix_ = fmt::format("cluster.{}.", route->clusterName());
-    cluster_ratelimit_stat_prefix_ = fmt::format("{}ratelimit.", cluster_stat_prefix_);
+    std::vector<::RateLimit::Descriptor> descriptors;
+    for (const ActionPtr& action : config_->actions()) {
+      action->populateDescriptors(*route, descriptors, *config_);
+    }
 
-    // We limit on 2 dimensions.
-    // 1) All calls to the given cluster.
-    // 2) Calls to the given cluster and from this cluster.
-    // The service side configuration can choose to limit on 1 or both of the above.
-    // NOTE: In the future we might add more things such as the path of the request.
-    std::vector<RateLimit::Descriptor> descriptors = {
-        {{{"to_cluster", route->clusterName()}}},
-        {{{"to_cluster", route->clusterName()}, {"from_cluster", config_->localServiceCluster()}}}};
+    if (!descriptors.empty()) {
+      cluster_stat_prefix_ = fmt::format("cluster.{}.", route->clusterName());
+      cluster_ratelimit_stat_prefix_ = fmt::format("{}ratelimit.", cluster_stat_prefix_);
 
-    state_ = State::Calling;
-    initiating_call_ = true;
-    client_->limit(*this, config_->domain(), descriptors);
-    initiating_call_ = false;
+      state_ = State::Calling;
+      initiating_call_ = true;
+      client_->limit(*this, config_->domain(), descriptors);
+      initiating_call_ = false;
+    }
   }
 
   return (state_ == State::Calling || state_ == State::Responded)
@@ -49,19 +68,19 @@ FilterHeadersStatus RateLimitFilter::decodeHeaders(HeaderMap& headers, bool) {
              : FilterHeadersStatus::Continue;
 }
 
-FilterDataStatus RateLimitFilter::decodeData(Buffer::Instance&, bool) {
+FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   ASSERT(state_ != State::Responded);
   return state_ == State::Calling ? FilterDataStatus::StopIterationAndBuffer
                                   : FilterDataStatus::Continue;
 }
 
-FilterTrailersStatus RateLimitFilter::decodeTrailers(HeaderMap&) {
+FilterTrailersStatus Filter::decodeTrailers(HeaderMap&) {
   ASSERT(state_ != State::Responded);
   return state_ == State::Calling ? FilterTrailersStatus::StopIteration
                                   : FilterTrailersStatus::Continue;
 }
 
-void RateLimitFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
+void Filter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
   callbacks.addResetStreamCallback([this]() -> void {
     if (state_ == State::Calling) {
@@ -70,17 +89,17 @@ void RateLimitFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& ca
   });
 }
 
-void RateLimitFilter::complete(RateLimit::LimitStatus status) {
+void Filter::complete(::RateLimit::LimitStatus status) {
   state_ = State::Complete;
 
   switch (status) {
-  case RateLimit::LimitStatus::OK:
+  case ::RateLimit::LimitStatus::OK:
     config_->stats().counter(cluster_ratelimit_stat_prefix_ + "ok").inc();
     break;
-  case RateLimit::LimitStatus::Error:
+  case ::RateLimit::LimitStatus::Error:
     config_->stats().counter(cluster_ratelimit_stat_prefix_ + "error").inc();
     break;
-  case RateLimit::LimitStatus::OverLimit:
+  case ::RateLimit::LimitStatus::OverLimit:
     config_->stats().counter(cluster_ratelimit_stat_prefix_ + "over_limit").inc();
     Http::CodeUtility::ResponseStatInfo info{config_->stats(), cluster_stat_prefix_,
                                              TOO_MANY_REQUESTS_HEADER, true, EMPTY_STRING,
@@ -89,7 +108,7 @@ void RateLimitFilter::complete(RateLimit::LimitStatus status) {
     break;
   }
 
-  if (status == RateLimit::LimitStatus::OverLimit &&
+  if (status == ::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
     Http::HeaderMapPtr response_headers{new HeaderMapImpl(TOO_MANY_REQUESTS_HEADER)};
@@ -99,4 +118,5 @@ void RateLimitFilter::complete(RateLimit::LimitStatus status) {
   }
 }
 
+} // RateLimit
 } // Http
