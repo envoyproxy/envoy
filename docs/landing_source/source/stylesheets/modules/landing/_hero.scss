@@ -36,20 +36,17 @@ $white: #FFFFFF;
 .hero-banner-container {
   .envoy-logo {
     background: image_url("envoy.png");
-    background-size: 350px;
+    background-size: 330px;
     background-repeat: no-repeat;
     background-position: 50%;
     height: 13em;
     margin: 0 auto;
-    width: 330px;
+    width: 100%;
 
     @include media($medium-screen-up) {
-      @include span-columns(8 of 12);
-      @include shift(2);
-      background-size: 549px;
-      height: 21em;
-      position: absolute;
-      width: 680px;
+      background-size: 500px;
+      height: 20em;
+      width: 100%;
     }
   }
 }
