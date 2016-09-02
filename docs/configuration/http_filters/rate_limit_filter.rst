@@ -7,17 +7,10 @@ Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
 
 The HTTP rate limit filter will call the rate limit service when the request's route has the
 *global* property set in the :ref:`rate limit configuration
-<config_http_conn_man_route_table_route_rate_limit>`. If the rate limit service is called, the
-following descriptors are sent:
+<config_http_conn_man_route_table_route_rate_limit>`.
 
-  * ("to_cluster", "<:ref:`route target cluster <config_http_conn_man_route_table_route_cluster>`>")
-  * ("to_cluster", "<:ref:`route target cluster <config_http_conn_man_route_table_route_cluster>`>"),
-    ("from_cluster", "<local service cluster>")
-
-<local service cluster> is derived from the :option:`--service-cluster` option.
-
-If the rate limit service is called, and the response for either of the above descriptors is over
-limit, a 429 response is returned.
+If the rate limit service is called, and the response for any of the descriptors is over limit, a
+429 response is returned.
 
 .. code-block:: json
 
@@ -25,12 +18,47 @@ limit, a 429 response is returned.
     "type": "decoder",
     "name": "rate_limit",
     "config": {
-      "domain": "..."
+      "domain": "...",
+      "actions": []
     }
   }
 
 domain
   *(required, string)* The rate limit domain to use when calling the rate limit service.
+
+actions
+  *(required, array)* An array of rate limiting actions to perform. Multiple actions can be
+  specified. The supported action types are documented below.
+
+Actions
+-------
+
+.. code-block:: json
+
+  {
+    "type": "..."
+  }
+
+type
+  *(required, string) The type of rate limit action to perform. The currently supported action
+  type is *service_to_service*.
+
+Service to service
+^^^^^^^^^^^^^^^^^^
+
+.. code-block:: json
+
+  {
+    "type": "service_to_service"
+  }
+
+The following descriptors are sent:
+
+  * ("to_cluster", "<:ref:`route target cluster <config_http_conn_man_route_table_route_cluster>`>")
+  * ("to_cluster", "<:ref:`route target cluster <config_http_conn_man_route_table_route_cluster>`>"),
+    ("from_cluster", "<local service cluster>")
+
+<local service cluster> is derived from the :option:`--service-cluster` option.
 
 Statistics
 ----------
