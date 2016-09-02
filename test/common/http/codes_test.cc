@@ -17,12 +17,10 @@ public:
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
     HeaderMapImpl headers{{":status", std::to_string(code)}};
-    if (canary) {
-      headers.addViaMove("x-envoy-upstream-canary", "true");
-    }
 
     CodeUtility::ResponseStatInfo info{store_, "prefix.", headers, internal_request,
-                                       request_vhost_name, request_vcluster_name, from_az, to_az};
+                                       request_vhost_name, request_vcluster_name, from_az, to_az,
+                                       canary};
 
     CodeUtility::chargeResponseStat(info);
   }

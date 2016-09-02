@@ -710,4 +710,65 @@ TEST(RouterFilterUtilityTest, shouldShadow) {
   }
 }
 
+TEST_F(RouterTest, CanaryStatusTrue) {
+  NiceMock<MockRouteEntry> route_entry;
+  EXPECT_CALL(callbacks_.route_table_, routeForRequest(_)).WillOnce(Return(&route_entry));
+  EXPECT_CALL(route_entry, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+                             response_decoder = &decoder;
+                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+
+  Http::HeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
+                              {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(
+      new Http::HeaderMapImpl{{":status", "200"},
+                              {"x-envoy-upstream-canary", "false"},
+                              {"x-envoy-virtual-cluster", "hello"}});
+  ON_CALL(*cm_.conn_pool_.host_, canary()).WillByDefault(Return(true));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+
+  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
+}
+
+TEST_F(RouterTest, CanaryStatusFalse) {
+  NiceMock<MockRouteEntry> route_entry;
+  EXPECT_CALL(callbacks_.route_table_, routeForRequest(_)).WillOnce(Return(&route_entry));
+  EXPECT_CALL(route_entry, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+                             response_decoder = &decoder;
+                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+
+  Http::HeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
+                              {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(
+      new Http::HeaderMapImpl{{":status", "200"},
+                              {"x-envoy-upstream-canary", "false"},
+                              {"x-envoy-virtual-cluster", "hello"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+
+  EXPECT_EQ(0U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
+}
+
 } // Router
