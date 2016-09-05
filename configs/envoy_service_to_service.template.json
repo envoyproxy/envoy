@@ -32,7 +32,7 @@
             {"type": "not_healthcheck"}
           ]
         },
-        {{ access_log_helper.ingress_error_log() }}
+        {{ access_log_helper.ingress_sampled_log() }}
       },
       {
         "path": "/var/log/envoy/ingress_http_sampled.log",
