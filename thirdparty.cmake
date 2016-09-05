@@ -15,7 +15,7 @@ set(ENVOY_SPDLOG_INCLUDE_DIR "" CACHE FILEPATH "location of spdlog includes")
 set(ENVOY_HTTP_PARSER_INCLUDE_DIR "" CACHE FILEPATH "location of http-parser includes")
 
 # https://github.com/nghttp2/nghttp2
-# Last tested with 1.9.2
+# Last tested with 1.14.0
 set(ENVOY_NGHTTP2_INCLUDE_DIR "" CACHE FILEPATH "location of nghttp2 includes")
 
 # http://libevent.org/
@@ -51,7 +51,7 @@ set(ENVOY_EXE_EXTRA_LINKER_FLAGS "" CACHE STRING "envoy extra linker flags")
 #
 
 # https://github.com/google/googletest
-# Last tested with 1.7.0
+# Last tested with 1.8.0
 set(ENVOY_GTEST_INCLUDE_DIR "" CACHE FILEPATH "location of gtest includes")
 set(ENVOY_GMOCK_INCLUDE_DIR "" CACHE FILEPATH "location of gmock includes")
 

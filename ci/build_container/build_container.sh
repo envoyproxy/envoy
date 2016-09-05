@@ -64,9 +64,9 @@ cd ..
 rm -fr jansson*
 
 # nghttp2
-wget https://github.com/nghttp2/nghttp2/releases/download/v1.9.2/nghttp2-1.9.2.tar.gz
-tar xf nghttp2-1.9.2.tar.gz
-cd nghttp2-1.9.2
+wget https://github.com/nghttp2/nghttp2/releases/download/v1.14.0/nghttp2-1.14.0.tar.gz
+tar xf nghttp2-1.14.0.tar.gz
+cd nghttp2-1.14.0
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-lib-only
 make install
 cd ..
@@ -108,9 +108,10 @@ wget -O tclap-1.2.1.tar.gz https://sourceforge.net/projects/tclap/files/tclap-1.
 tar xf tclap-1.2.1.tar.gz
 rm tclap-1.2.1.tar.gz
 
-# googletest (new repo layout is not tagged. Use master for now since test code).
-git clone https://github.com/google/googletest
-cd googletest
+# googletest
+wget -O googletest-1.8.0.tar.gz https://github.com/google/googletest/archive/release-1.8.0.tar.gz
+tar xf googletest-1.8.0.tar.gz
+cd googletest-release-1.8.0
 cmake -DCMAKE_INSTALL_PREFIX:PATH=$THIRDPARTY_BUILD .
 make install
 cd ..
