@@ -25,6 +25,7 @@ public:
 
 private:
   // Grpc::RpcChannelCallbacks
+  void onPreRequestCustomizeHeaders(Http::HeaderMap&) override {}
   void onSuccess() override;
   void onFailure(const Optional<uint64_t>& grpc_status, const std::string& message) override;
 

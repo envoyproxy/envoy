@@ -44,13 +44,16 @@ TEST_F(GrpcRequestImplTest, NoError) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_))
+      .WillOnce(Invoke([](Http::HeaderMap& headers) -> void { headers.addViaCopy("foo", "bar"); }));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::HeaderMapImpl expected_request_headers{{":scheme", "http"},
                                                {":method", "POST"},
                                                {":path", "/helloworld.Greeter/SayHello"},
                                                {":authority", "cluster"},
-                                               {"content-type", "application/grpc"}};
+                                               {"content-type", "application/grpc"},
+                                               {"foo", "bar"}};
 
   EXPECT_THAT(http_request_->headers(), HeaderMapEqualRef(expected_request_headers));
 
@@ -77,6 +80,7 @@ TEST_F(GrpcRequestImplTest, Non200Response) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
@@ -96,6 +100,7 @@ TEST_F(GrpcRequestImplTest, NoResponseTrailers) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
@@ -111,6 +116,7 @@ TEST_F(GrpcRequestImplTest, BadGrpcStatusInHeaderOnlyResponse) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
@@ -126,6 +132,7 @@ TEST_F(GrpcRequestImplTest, HeaderOnlyFailure) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(
@@ -142,6 +149,7 @@ TEST_F(GrpcRequestImplTest, BadGrpcStatusInResponse) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
@@ -158,6 +166,7 @@ TEST_F(GrpcRequestImplTest, GrpcStatusNonZeroInResponse) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
@@ -175,6 +184,7 @@ TEST_F(GrpcRequestImplTest, ShortBodyInResponse) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
@@ -193,6 +203,7 @@ TEST_F(GrpcRequestImplTest, BadMessageInResponse) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
@@ -211,6 +222,7 @@ TEST_F(GrpcRequestImplTest, HttpAsyncRequestFailure) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "stream reset"));
@@ -223,6 +235,7 @@ TEST_F(GrpcRequestImplTest, HttpAsyncRequestTimeout) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "request timeout"));
@@ -243,6 +256,7 @@ TEST_F(GrpcRequestImplTest, NoHttpAsyncRequest) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 }
 
@@ -252,6 +266,7 @@ TEST_F(GrpcRequestImplTest, Cancel) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   EXPECT_CALL(http_async_client_request_, cancel());
@@ -267,6 +282,7 @@ TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
   service_timeout.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
