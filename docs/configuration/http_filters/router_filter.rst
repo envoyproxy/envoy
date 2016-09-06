@@ -87,7 +87,7 @@ retriable-4xx
   Envoy will attempt a retry if the upstream server responds with a retriable 4xx response code.
   Currently, the only response code in this category is 409.
 
-  * NOTE: Be careful turning on this retry type. There are certain cases where a 409 can indicate
+  * **NOTE:** Be careful turning on this retry type. There are certain cases where a 409 can indicate
     that an optimistic locking revision needs to be updated. Thus, the caller should not retry and
     needs to read then attempt another write. If a retry happens in this type of case it will always
     fail with another 409.

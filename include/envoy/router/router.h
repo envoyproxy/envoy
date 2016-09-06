@@ -3,6 +3,7 @@
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/upstream/resource_manager.h"
 
 namespace Router {
 
@@ -113,6 +114,25 @@ public:
 };
 
 /**
+ * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
+ * routes for stat tracking and priority purposes).
+ */
+class VirtualCluster {
+public:
+  virtual ~VirtualCluster() {}
+
+  /**
+   * @return the name of the virtual cluster.
+   */
+  virtual const std::string& name() const PURE;
+
+  /**
+   * @return the priority of the virtual cluster.
+   */
+  virtual Upstream::ResourcePriority priority() const PURE;
+};
+
+/**
  * An individual resolved route entry.
  */
 class RouteEntry {
@@ -131,6 +151,11 @@ public:
    * @param headers supplise the request headers, which may be modified during this call.
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers) const PURE;
+
+  /**
+   * @return the priority of the route.
+   */
+  virtual Upstream::ResourcePriority priority() const PURE;
 
   /**
    * @return const RateLimitPolicy& the rate limit policy for the route.
@@ -157,9 +182,9 @@ public:
   /**
    * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
    * @param headers supplies the request headers.
-   * @return the virtual cluster or empty string if there is no match.
+   * @return the virtual cluster or nullptr if there is no match.
    */
-  virtual const std::string& virtualClusterName(const Http::HeaderMap& headers) const PURE;
+  virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
 
   /**
    * @return const std::string& the virtual host that owns the route.

@@ -23,8 +23,8 @@ public:
 
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::HeaderMap&, const Upstream::Cluster&,
-                                 Runtime::Loader&, Runtime::RandomGenerator&,
-                                 Event::Dispatcher&) override {
+                                 Runtime::Loader&, Runtime::RandomGenerator&, Event::Dispatcher&,
+                                 Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<MockRetryState>();
     return RetryStatePtr{retry_state_};
@@ -83,7 +83,12 @@ TEST_F(RouterTest, RouteNotFound) {
   router_.decodeHeaders(headers, true);
 }
 
-TEST_F(RouterTest, PoolFailure) {
+TEST_F(RouterTest, PoolFailureWithPriority) {
+  NiceMock<MockRouteEntry> route_entry;
+  EXPECT_CALL(callbacks_.route_table_, routeForRequest(_)).WillOnce(Return(&route_entry));
+  route_entry.virtual_cluster_.priority_ = Upstream::ResourcePriority::High;
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High));
+
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {

@@ -28,7 +28,7 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(retry_policy_));
   ON_CALL(*this, shadowPolicy()).WillByDefault(ReturnRef(shadow_policy_));
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
-  ON_CALL(*this, virtualClusterName(_)).WillByDefault(ReturnRef(virtual_cluster_));
+  ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
   ON_CALL(*this, virtualHostName()).WillByDefault(ReturnRef(vhost_name_));
 }
 

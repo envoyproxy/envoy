@@ -45,6 +45,17 @@ ShadowPolicyImpl::ShadowPolicyImpl(const Json::Object& config) {
   runtime_key_ = config.getObject("shadow").getString("runtime_key", "");
 }
 
+Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& config) {
+  std::string priority_string = config.getString("priority", "default");
+  if (priority_string == "default") {
+    return Upstream::ResourcePriority::Default;
+  } else if (priority_string == "high") {
+    return Upstream::ResourcePriority::High;
+  } else {
+    throw EnvoyException(fmt::format("invalid resource priority '{}'", priority_string));
+  }
+}
+
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Object& route,
                                        Runtime::Loader& loader)
     : case_sensitive_(route.getBoolean("case_sensitive", true)),
@@ -56,7 +67,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Obj
       host_redirect_(route.getString("host_redirect", "")),
       path_redirect_(route.getString("path_redirect", "")), retry_policy_(route),
       content_type_(route.getString("content_type", "")), rate_limit_policy_(route),
-      shadow_policy_(route) {
+      shadow_policy_(route), priority_(ConfigUtility::parsePriority(route)) {
 
   // Check to make sure that we are either a redirect route or we have a cluster.
   if (!(isRedirect() ^ !cluster_name_.empty())) {
@@ -220,16 +231,19 @@ VirtualHost::VirtualHost(const Json::Object& virtual_host, Runtime::Loader& runt
 
   if (virtual_host.hasObject("virtual_clusters")) {
     for (const Json::Object& virtual_cluster : virtual_host.getObjectArray("virtual_clusters")) {
-      Optional<std::string> method;
-      if (virtual_cluster.hasObject("method")) {
-        method = virtual_cluster.getString("method");
-      }
-
-      virtual_clusters_.push_back(
-          {std::regex{virtual_cluster.getString("pattern"), std::regex::optimize}, method,
-           virtual_cluster.getString("name")});
+      virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster));
     }
   }
+}
+
+VirtualHost::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& virtual_cluster) {
+  if (virtual_cluster.hasObject("method")) {
+    method_ = virtual_cluster.getString("method");
+  }
+
+  pattern_ = std::regex{virtual_cluster.getString("pattern"), std::regex::optimize};
+  name_ = virtual_cluster.getString("name");
+  priority_ = ConfigUtility::parsePriority(virtual_cluster);
 }
 
 RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
@@ -315,25 +329,25 @@ const RouteEntry* RouteMatcher::routeForRequest(const Http::HeaderMap& headers,
   }
 }
 
-const std::string VirtualHost::VIRTUAL_CLUSTER_CATCH_ALL_NAME = "other";
+const VirtualHost::CatchAllVirtualCluster VirtualHost::VIRTUAL_CLUSTER_CATCH_ALL;
 const SslRedirector VirtualHost::SSL_REDIRECTOR;
 
-const std::string& VirtualHost::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
+const VirtualCluster* VirtualHost::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
   for (const VirtualClusterEntry& entry : virtual_clusters_) {
     bool method_matches =
         !entry.method_.valid() || headers.get(Http::Headers::get().Method) == entry.method_.value();
 
     if (method_matches &&
         std::regex_match(headers.get(Http::Headers::get().Path), entry.pattern_)) {
-      return entry.name_;
+      return &entry;
     }
   }
 
   if (virtual_clusters_.size() > 0) {
-    return VIRTUAL_CLUSTER_CATCH_ALL_NAME;
+    return &VIRTUAL_CLUSTER_CATCH_ALL;
   }
 
-  return EMPTY_STRING;
+  return nullptr;
 }
 
 ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
