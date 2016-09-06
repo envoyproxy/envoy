@@ -9,6 +9,7 @@ public:
   MockRpcChannelCallbacks();
   ~MockRpcChannelCallbacks();
 
+  MOCK_METHOD1(onPreRequestCustomizeHeaders, void(Http::HeaderMap& headers));
   MOCK_METHOD0(onSuccess, void());
   MOCK_METHOD2(onFailure, void(const Optional<uint64_t>& grpc_status, const std::string& message));
 };

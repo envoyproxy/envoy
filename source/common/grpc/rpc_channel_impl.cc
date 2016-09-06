@@ -40,6 +40,7 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
   message->headers().addViaCopy(Http::Headers::get().ContentType, Common::GRPC_CONTENT_TYPE);
   message->body(serializeBody(*grpc_request));
 
+  callbacks_.onPreRequestCustomizeHeaders(message->headers());
   http_request_ = cm_.httpAsyncClientForCluster(cluster_).send(std::move(message), *this, timeout_);
 }
 

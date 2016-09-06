@@ -2,6 +2,7 @@
 
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
+#include "envoy/http/header_map.h"
 
 #include "google/protobuf/service.h"
 
@@ -15,6 +16,12 @@ namespace Grpc {
 class RpcChannelCallbacks {
 public:
   virtual ~RpcChannelCallbacks() {}
+
+  /**
+   * Called before the channel dispatches an HTTP/2 request. This can be used to customize the
+   * transport headers for the RPC.
+   */
+  virtual void onPreRequestCustomizeHeaders(Http::HeaderMap& headers) PURE;
 
   /**
    * Called when the request has succeeded and the response object is populated.
