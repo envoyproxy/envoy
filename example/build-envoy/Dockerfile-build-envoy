@@ -1,0 +1,6 @@
+FROM lyft/envoy-build:latest
+
+ADD . /envoy
+WORKDIR /envoy
+RUN example/build-envoy/build_envoy.sh
+
