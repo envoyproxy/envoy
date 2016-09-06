@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="197px" height="69px" viewBox="0 0 197 69" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 39.1 (31720) - http://www.bohemiancoding.com/sketch -->
+    <title>Group 5</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <linearGradient x1="0%" y1="50%" x2="100%" y2="50%" id="linearGradient-1">
+            <stop stop-color="#E400FF" offset="0%"></stop>
+            <stop stop-color="#FF00BF" offset="100%"></stop>
+        </linearGradient>
+        <polygon id="path-2" points="0.912689696 35.4365306 12.8719707 29.255405 27.2881036 35.4365306 29.1236997 50.3964839 15.0794654 57.4866333 0.912689696 50.396484"></polygon>
+        <filter x="-50%" y="-50%" width="200%" height="200%" filterUnits="objectBoundingBox" id="filter-3">
+            <feMorphology radius="1.6" operator="dilate" in="SourceAlpha" result="shadowSpreadOuter1"></feMorphology>
+            <feOffset dx="0" dy="2" in="shadowSpreadOuter1" result="shadowOffsetOuter1"></feOffset>
+            <feMorphology radius="1.6" operator="erode" in="SourceAlpha" result="shadowInner"></feMorphology>
+            <feOffset dx="0" dy="2" in="shadowInner" result="shadowInner"></feOffset>
+            <feComposite in="shadowOffsetOuter1" in2="shadowInner" operator="out" result="shadowOffsetOuter1"></feComposite>
+            <feGaussianBlur stdDeviation="2" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.5 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+        <polygon id="path-4" points="14.9440792 21.2494405 34.2897607 13 53.68931 23.1876974 55.6933594 44.7753906 36.939674 56 14.9440792 42.8408203"></polygon>
+        <filter x="-50%" y="-50%" width="200%" height="200%" filterUnits="objectBoundingBox" id="filter-5">
+            <feMorphology radius="2.1" operator="dilate" in="SourceAlpha" result="shadowSpreadOuter1"></feMorphology>
+            <feOffset dx="0" dy="2" in="shadowSpreadOuter1" result="shadowOffsetOuter1"></feOffset>
+            <feMorphology radius="2.1" operator="erode" in="SourceAlpha" result="shadowInner"></feMorphology>
+            <feOffset dx="0" dy="2" in="shadowInner" result="shadowInner"></feOffset>
+            <feComposite in="shadowOffsetOuter1" in2="shadowInner" operator="out" result="shadowOffsetOuter1"></feComposite>
+            <feGaussianBlur stdDeviation="2" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.5 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+        <polygon id="path-6" points="29 10.130208 52.578125 0.86328124 76.6145821 13.71875 80.1627617 38.1770821 55.0346546 50.0221367 29 35.5708955"></polygon>
+        <filter x="-50%" y="-50%" width="200%" height="200%" filterUnits="objectBoundingBox" id="filter-7">
+            <feMorphology radius="2.5" operator="dilate" in="SourceAlpha" result="shadowSpreadOuter1"></feMorphology>
+            <feOffset dx="0" dy="2" in="shadowSpreadOuter1" result="shadowOffsetOuter1"></feOffset>
+            <feMorphology radius="2.5" operator="erode" in="SourceAlpha" result="shadowInner"></feMorphology>
+            <feOffset dx="0" dy="2" in="shadowInner" result="shadowInner"></feOffset>
+            <feComposite in="shadowOffsetOuter1" in2="shadowInner" operator="out" result="shadowOffsetOuter1"></feComposite>
+            <feGaussianBlur stdDeviation="2" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.5 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+    </defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Artboard" transform="translate(-701.000000, -360.000000)">
+            <g id="Group-5" transform="translate(706.000000, 360.000000)">
+                <g id="Group-3" transform="translate(100.000000, 40.000000)" fill="#FFFFFF">
+                    <text id="by" font-family="AndaleMono, Andale Mono" font-size="12" font-weight="normal" letter-spacing="-0.666666746">
+                        <tspan x="0" y="11.5">by</tspan>
+                    </text>
+                    <path d="M19.658702,11.2778603 C19.0441534,10.7625557 18.6769231,9.87147103 18.6769231,8.89435364 L18.6769231,0.253707136 L21.4692308,0.253707136 L21.4692308,8.92421991 C21.5656519,10.4041605 22.3324734,11.1864785 22.6944135,11.4976226 C22.4030098,11.6897474 21.8955884,11.8667162 21.3154263,11.8667162 C20.8798639,11.8667162 20.2388641,11.764636 19.658702,11.2778603 Z M30.6076923,11.6389302 L30.6076923,4.18796434 C30.6076923,1.87890045 32.3504385,0 34.6340553,0 C36.5716028,0 38.1880308,1.3872214 38.597142,3.2986627 L38.6196255,3.55932203 L39.4923077,3.55932203 L39.4923077,6.3559322 L38.7307692,6.3559322 L38.7307692,7.43536404 C38.6914845,8.0692422 39.4796163,8.59257058 40,8.65943536 L40,11.6210996 C37.8660955,11.5506686 35.8245918,9.70029718 35.9384615,7.43536404 L35.9384615,4.18796434 C35.8245918,3.50906389 35.3067965,2.95676077 34.6692308,2.95677896 C34.0071628,2.95676077 33.5473257,3.43774146 33.4,4.05423477 L33.4,4.18796434 L33.4,5.33898305 L34.9230769,5.33898305 L34.9230769,8.13559322 L33.4,8.13559322 L33.4,8.68751857 C33.4701765,9.66419019 33.0168012,10.5552749 32.4022525,11.0705795 C31.9468517,11.4521545 31.3803561,11.6545319 30.7644849,11.6545319 C30.665293,11.6545319 30.7086476,11.6491828 30.6076923,11.6389302 Z M23.5,14.6925506 L23.5,12.0534918 C24.0027808,12.1970282 24.4075669,12.3298663 24.9176335,12.3298663 C25.00889,12.3298663 25.0988239,12.3258544 25.1856719,12.3164933 C26.0783985,12.2233284 26.6669369,11.7806835 26.7599568,11.1334324 L26.8146225,10.7540862 L26.5382079,11.0175334 C26.5329176,11.0224368 25.9800884,11.5377415 25.0216747,11.5377415 C24.7659801,11.5377415 24.5005868,11.5011887 24.2334301,11.4289747 C22.7658316,11.0331352 22.4292545,9.81619614 22.4846154,8.86525494 L22.4846154,3.55932203 L25.2769231,3.55932203 L25.2769231,8.02627111 C25.3124587,8.37013373 25.6807494,8.64962853 26.0384615,8.64915169 C26.3720064,8.64962853 26.7691591,8.37013373 26.8,8.02627111 L26.8,3.55932203 L29.5923077,3.55932203 L29.5923077,10.7745756 C29.6523634,12.9057949 28.380972,14.5216939 26.5024988,14.8903418 C26.1313009,14.9634473 25.7446731,15 25.3540776,15 C24.7271851,15 24.2540669,14.8775431 23.5,14.6925506 Z" id="vector-fixed-thin-copy"></path>
+                </g>
+                <g id="Group-2" transform="translate(0.000000, 4.000000)">
+                    <g id="Path-4-Copy-2">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-3)" xlink:href="#path-2"></use>
+                        <use stroke="url(#linearGradient-1)" stroke-width="3.2" xlink:href="#path-2"></use>
+                    </g>
+                    <g id="Path-4-Copy">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-5)" xlink:href="#path-4"></use>
+                        <use stroke="url(#linearGradient-1)" stroke-width="4.2" xlink:href="#path-4"></use>
+                    </g>
+                    <g id="Path-4">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-7)" xlink:href="#path-6"></use>
+                        <use stroke="url(#linearGradient-1)" stroke-width="5" xlink:href="#path-6"></use>
+                    </g>
+                </g>
+                <text id="envoy" font-family="AndaleMono, Andale Mono" font-size="36" font-weight="normal" letter-spacing="-2" fill="#FFFFFF">
+                    <tspan x="95" y="33">envoy</tspan>
+                </text>
+            </g>
+        </g>
+    </g>
+</svg>
