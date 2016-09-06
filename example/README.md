@@ -14,7 +14,7 @@ putting that in a clean ubuntu container.
 
 Using `build-envoy/Dockerfile-build-envoy` you will run a container that will 
 compile envoy. This container is based on the `lyft/envoy-build` container, 
-which has all software needed to build envoy. From a fresh envoy clone run:
+which has all software needed to build envoy. From your envoy directory:
 
 ```shell
 $ pwd
@@ -22,7 +22,7 @@ src/envoy
 $ docker build -f example/build-envoy/Dockerfile-build-envoy -t envoybinary .
 ```
 
-That command will take some time to run, because it is compiling an envoy binary
+That command will take some time to run because it is compiling an envoy binary.
 
 #### Step 2: Copy the envoy binary
 
