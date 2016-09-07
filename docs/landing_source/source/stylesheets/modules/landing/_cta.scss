@@ -12,10 +12,10 @@
   }
 
   &-button-fill {
-    @include button-filled($red);
+    @include button-filled($confidant-red);
   }
 
   &-button-outline {
-    @include button-outline($red, $red);
+    @include button-outline($confidant-red, $confidant-red);
   }
 }

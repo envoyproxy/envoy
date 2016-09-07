@@ -4,6 +4,7 @@ body {
 
 .wrap-container {
   @include outer-container;
+  max-width: 68rem;
   padding: 0 $gutter;
 }
 

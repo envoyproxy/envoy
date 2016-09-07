@@ -1,5 +1,9 @@
-.introduction-container.active {
-  margin-top: $global-nav-height;
+.introduction-container {
+  margin-bottom: 7rem;
+
+  &.active {
+      margin-top: $global-nav-height;
+  }
 }
 
 .introduction-item {
@@ -106,12 +110,13 @@
   text-align: center;
 
   @include media($medium-screen-up) {
-    margin-top: 4em;
     text-align: left;
   }
 }
 
 .introduction-item-header {
+  font-size: 2rem;
+  margin-top: 0;
   color: $dark-gray;
 }
 
