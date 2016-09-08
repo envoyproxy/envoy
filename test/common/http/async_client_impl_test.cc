@@ -303,4 +303,5 @@ TEST_F(AsyncClientImplTestIsolatedStats, CanaryStatusCounterFalse) {
   response_decoder_->decodeHeaders(std::move(response_headers), true);
   EXPECT_EQ(0U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
 }
+
 } // Http
