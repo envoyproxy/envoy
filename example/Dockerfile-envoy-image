@@ -1,6 +1,6 @@
 FROM ubuntu:14.04
 
-ADD envoy /usr/local/bin/envoy
+ADD build/source/exe/envoy /usr/local/bin/envoy
 RUN apt-get update && apt-get install -y \
     curl \
     python-pip
