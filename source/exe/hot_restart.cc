@@ -119,8 +119,9 @@ sockaddr_un HotRestartImpl::createDomainSocketAddress(uint64_t id) {
   sockaddr_un address;
   memset(&address, 0, sizeof(address));
   address.sun_family = AF_UNIX;
-  strcpy(&address.sun_path[1],
-         fmt::format("envoy_domain_socket_{}", options_.baseId() + id).c_str());
+  strncpy(&address.sun_path[1],
+          fmt::format("envoy_domain_socket_{}", options_.baseId() + id).c_str(),
+          sizeof(address.sun_path) - 1);
   address.sun_path[0] = 0;
   return address;
 }
