@@ -119,7 +119,7 @@ sockaddr_un Utility::resolveUnixDomainSocket(const std::string& path) {
   sockaddr_un address;
   memset(&address, 0, sizeof(address));
   address.sun_family = AF_UNIX;
-  strcpy(&address.sun_path[0], path.c_str());
+  strncpy(&address.sun_path[0], path.c_str(), sizeof(address.sun_path));
   return address;
 }
 
