@@ -3,10 +3,10 @@ Terminology
 
 A few definitions before we dive into the main architecture documentation. Some of the definitions
 are slightly contentious within the industry, however they are how Envoy uses them throughout the
-documentation and codebase, so c'est la vie.
+documentation and codebase, so *c'est la vie*.
 
 **Host**: An entity capable of network communication (application on a mobile phone, server, etc.).
-In this documentation a host is a logical network application. A physical piece of hardware could 
+In this documentation a host is a logical network application. A physical piece of hardware could
 possibly have multiple hosts running on it as long as each of them can be independently addressed.
 
 **Downstream**: A downstream host connects to Envoy, sends requests, and receives responses.
@@ -20,7 +20,7 @@ connect to.
 **Cluster**: A cluster is a group of logically similar upstream hosts that Envoy connects to. Envoy
 discovers the members of a cluster via :ref:`service discovery <arch_overview_service_discovery>`.
 It optionally determines the health of cluster members via :ref:`active health checking
-<arch_overview_health_checking>`. The cluster member that Envoy routes a request to is determined 
+<arch_overview_health_checking>`. The cluster member that Envoy routes a request to is determined
 by the :ref:`load balancing policy <arch_overview_load_balancing>`.
 
 **Mesh**: A group of hosts that coordinate to provide a consistent network topology. In this

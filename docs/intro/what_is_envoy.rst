@@ -69,6 +69,10 @@ and responses. The two systems are very complementary.
 web applications. Envoy :ref:`supports <arch_overview_mongo>` L7 sniffing, statistics production,
 and logging for MongoDB connections.
 
+**DynamoDB L7 support**: `DynamoDB <https://aws.amazon.com/dynamodb/>`_ is Amazon’s hosted key/value
+NOSQL datastore. Envoy :ref:`supports <arch_overview_dynamo>` L7 sniffing and statistics production
+for DynamoDB connections.
+
 **Service discovery:** :ref:`Service discovery <arch_overview_service_discovery>` is a critical
 component of service oriented architectures. Envoy supports multiple service discovery methods
 including asynchronous DNS resolution and REST based lookup via a :ref:`service discovery service
