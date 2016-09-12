@@ -27,7 +27,8 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), access_log_lock_(access_log_lock),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
-      handler_(stats_store_, log(), options.flushIntervalMsec()), dns_resolver_(handler_.dispatcher().createDnsResolver()),
+      handler_(stats_store_, log(), options.flushIntervalMsec()),
+      dns_resolver_(handler_.dispatcher().createDnsResolver()),
       local_address_(Network::Utility::getLocalAddress()) {
 
   failHealthcheck(false);
