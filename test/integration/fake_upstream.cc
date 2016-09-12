@@ -171,7 +171,7 @@ FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& listen_socket,
                            FakeHttpConnection::Type type)
-    : ssl_ctx_(ssl_ctx), socket_(std::move(listen_socket)), handler_(stats_store_, log()),
+    : ssl_ctx_(ssl_ctx), socket_(std::move(listen_socket)), handler_(stats_store_, log(), std::chrono::milliseconds(10000)),
       http_type_(type) {
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
   server_initialized_.waitReady();
