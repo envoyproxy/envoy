@@ -19,6 +19,7 @@ public:
   const std::string& serviceClusterName() override { return service_cluster_; }
   const std::string& serviceNodeName() override { return service_node_; }
   const std::string& serviceZone() override { return service_zone_; }
+  std::chrono::milliseconds logFlushMsec() { return log_flush_msec_; }
 
 private:
   uint64_t base_id_;
@@ -29,4 +30,5 @@ private:
   std::string service_cluster_;
   std::string service_node_;
   std::string service_zone_;
+  std::chrono::milliseconds log_flush_msec_;
 };
