@@ -1,0 +1,363 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Service discovery &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Architecture overview" href="arch_overview.html"/>
+        <link rel="next" title="Health checking" href="health_checking.html"/>
+        <link rel="prev" title="Cluster manager" href="cluster_manager.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="terminology.html">Terminology</a></li>
+<li class="toctree-l3"><a class="reference internal" href="threading_model.html">Threading model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="network_filters.html">Network (L3/L4) filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="http_connection_management.html">HTTP connection management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="http_filters.html">HTTP filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="http_routing.html">HTTP routing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="grpc.html">gRPC</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cluster_manager.html">Cluster manager</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Service discovery</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#supported-service-discovery-types">Supported service discovery types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#on-eventually-consistent-service-discovery">On eventually consistent service discovery</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="health_checking.html">Health checking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="connection_pooling.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="load_balancing.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_breaking.html">Circuit breaking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="global_rate_limiting.html">Global rate limiting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ssl.html">TLS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="statistics.html">Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="runtime.html">Runtime configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tracing.html">Tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tcp_proxy.html">TCP proxy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mongo.html">MongoDB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamo.html">DynamoDB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hot_restart.html">Hot restart</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../real_world_deployments.html">Real world deployments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../comparison.html">Comparison to similar systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../getting_help.html">Getting help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../version_history.html">Version history</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../intro.html">Introduction</a> &raquo;</li>
+      
+          <li><a href="arch_overview.html">Architecture overview</a> &raquo;</li>
+      
+    <li>Service discovery</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/intro/arch_overview/service_discovery.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="service-discovery">
+<span id="arch-overview-service-discovery"></span><h1>Service discovery<a class="headerlink" href="#service-discovery" title="Permalink to this headline">¶</a></h1>
+<p>When an upstream cluster is defined in the <a class="reference internal" href="../../configuration/cluster_manager/cluster.html#config-cluster-manager-cluster"><span class="std std-ref">configuration</span></a>,
+Envoy needs to know how to resolve the members of the cluster. This is known as <em>service discovery</em>.</p>
+<div class="section" id="supported-service-discovery-types">
+<span id="arch-overview-service-discovery-types"></span><h2>Supported service discovery types<a class="headerlink" href="#supported-service-discovery-types" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="static">
+<h3>Static<a class="headerlink" href="#static" title="Permalink to this headline">¶</a></h3>
+<p>Static is the simplest service discovery type. The configuration explicitly specifies the resolved
+network name (IP address/port, unix domain socket, etc.) of each upstream host.</p>
+</div>
+<div class="section" id="strict-dns">
+<h3>Strict DNS<a class="headerlink" href="#strict-dns" title="Permalink to this headline">¶</a></h3>
+<p>When using strict DNS service discovery, Envoy will continuously and asynchronously resolve the
+specified DNS targets. Each returned IP address in the DNS result will be considered an explicit
+host in the upstream cluster. This means that if the query returns three IP addresses, Envoy will
+assume the cluster has three hosts, and all three should be load balanced to. If a host is removed
+from the result Envoy assumes it no longer exists and will drain traffic from any existing
+connection pools. Note that Envoy never synchronously resolves DNS in the forwarding path. At the
+expense of eventual consistency, there is never a worry of blocking on a long running DNS query.</p>
+</div>
+<div class="section" id="logical-dns">
+<h3>Logical DNS<a class="headerlink" href="#logical-dns" title="Permalink to this headline">¶</a></h3>
+<p>Logical DNS uses a similar asynchronous resolution mechanism to strict DNS. However, instead of
+strictly taking the results of the DNS query and assuming that they comprise the entire upstream
+cluster, a logical DNS cluster only uses the first IP address returned <em>when a new connection needs
+to be initiated</em>. Thus, a single logical connection pool may contain physical connections to a
+variety of different upstream hosts. Connections are never drained. This service discovery type is
+optimal for large scale web services that must be accessed via DNS. Such services typically use
+round robin DNS to return many different IP addresses. Typically a different result is returned for
+each query. If strict DNS were used in this scenario, Envoy would assume that the cluster’s members
+were changing during every resolution interval which would lead to draining connection pools,
+connection cycling, etc. Instead, with logical DNS, connections stay alive until they get cycled.
+When interacting with large scale web services, this is the best of all possible worlds:
+asynchronous/eventually consistent DNS resolution, long lived connections, and zero blocking in the
+forwarding path.</p>
+</div>
+<div class="section" id="service-discovery-service-sds">
+<span id="arch-overview-service-discovery-sds"></span><h3>Service discovery service (SDS)<a class="headerlink" href="#service-discovery-service-sds" title="Permalink to this headline">¶</a></h3>
+<p>The <em>service discovery service</em> is a generic <a class="reference internal" href="../../configuration/cluster_manager/sds_api.html#config-cluster-manager-sds-api"><span class="std std-ref">REST based API</span></a>
+used by Envoy to fetch cluster members. Lyft provides a reference implementation via the Python
+<a class="reference external" href="https://github.com/lyft/discovery">discovery service</a>. That implementation uses AWS DynamoDB as
+the backing store, however the API is simple enough that it could easily be implemented on top of a
+variety of different backing stores. For each SDS cluster, Envoy will periodically fetch the cluster
+members from the discovery service. SDS is the preferred service discovery mechanism for a few
+reasons:</p>
+<ul class="simple">
+<li>Envoy has explicit knowledge of each upstream host (vs. routing through a DNS resolved load
+balancer) and can make more intelligent load balancing decisions.</li>
+<li>Extra attributes carried in the discovery API response for each host inform Envoy of the host’s
+load balancing weight, canary status, zone, etc. These additional attributes are used globally
+by the Envoy mesh during load balancing, statistic gathering, etc.</li>
+</ul>
+<p>Generally active health checking is used in conjunction with the eventually consistent service
+discovery service data to making load balancing and routing decisions. This is discussed further in
+the following section.</p>
+</div>
+</div>
+<div class="section" id="on-eventually-consistent-service-discovery">
+<span id="arch-overview-service-discovery-eventually-consistent"></span><h2>On eventually consistent service discovery<a class="headerlink" href="#on-eventually-consistent-service-discovery" title="Permalink to this headline">¶</a></h2>
+<p>Many existing RPC systems treat service discovery as a fully consistent process. To this end, they
+use fully consistent leader election backing stores such as Zookeeper, etcd, Consul, etc. Our
+experience has been that operating these backing stores at scale is painful.</p>
+<p>Envoy was designed from the beginning with the idea that service discovery does not require full
+consistency. Instead, Envoy assumes that hosts come and go from the mesh in an eventually consistent
+way. Our recommended way of deploying a service to service Envoy mesh configuration uses eventually
+consistent service discovery along with <a class="reference internal" href="health_checking.html#arch-overview-health-checking"><span class="std std-ref">active health checking</span></a>
+(Envoy explicitly health checking upstream cluster members) to determine cluster health. This
+paradigm has a number of benefits:</p>
+<ul class="simple">
+<li>All health decisions are fully distributed. Thus, network partitions are gracefully handled
+(whether the application gracefully handles the partition is a different story).</li>
+<li>When health checking is configured for an upstream cluster, Envoy uses a 2x2 matrix to determine
+whether to route to a host:</li>
+</ul>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Discovery Status</th>
+<th class="head">HC OK</th>
+<th class="head">HC Failed</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>Discovered</td>
+<td>Route</td>
+<td>Don&#8217;t Route</td>
+</tr>
+<tr class="row-odd"><td>Absent</td>
+<td>Route</td>
+<td>Don&#8217;t Route / Delete</td>
+</tr>
+</tbody>
+</table>
+<dl class="docutils">
+<dt>Host discovered / health check OK</dt>
+<dd>Envoy <strong>will route</strong> to the target host.</dd>
+<dt>Host absent / health check OK:</dt>
+<dd>Envoy <strong>will route</strong> to the target host. This is very important since the design assumes that the
+discovery service can fail at any time. If a host continues to pass health check even after becoming
+absent from the discovery data, Envoy will still route. Although it would be impossible to add new
+hosts in this scenario, existing hosts will continue to operate normally. When the discovery service
+is operating normally again the data will eventually re-converge.</dd>
+<dt>Host discovered / health check FAIL</dt>
+<dd>Envoy <strong>will not route</strong> to the target host. Health check data is assumed to be more accurate than
+discovery data.</dd>
+<dt>Host absent / health check FAIL</dt>
+<dd>Envoy <strong>will not route and will delete</strong> the target host. This
+is the only state in which Envoy will purge host data.</dd>
+</dl>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="health_checking.html" class="btn btn-neutral float-right" title="Health checking" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="cluster_manager.html" class="btn btn-neutral" title="Cluster manager" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

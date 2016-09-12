@@ -1,0 +1,351 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Client TLS authentication &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Network filters" href="network_filters.html"/>
+        <link rel="next" title="Echo" href="echo_filter.html"/>
+        <link rel="prev" title="Network filters" href="network_filters.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="network_filters.html">Network filters</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Client TLS authentication</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#statistics">Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#runtime">Runtime</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#rest-api">REST API</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="echo_filter.html">Echo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mongo_proxy_filter.html">Mongo proxy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="rate_limit_filter.html">Rate limit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tcp_proxy_filter.html">TCP proxy</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cluster_manager/cluster_manager.html">Cluster manager</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../configuration.html">Configuration reference</a> &raquo;</li>
+      
+          <li><a href="network_filters.html">Network filters</a> &raquo;</li>
+      
+    <li>Client TLS authentication</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/configuration/network_filters/client_ssl_auth_filter.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="client-tls-authentication">
+<span id="config-network-filters-client-ssl-auth"></span><h1>Client TLS authentication<a class="headerlink" href="#client-tls-authentication" title="Permalink to this headline">¶</a></h1>
+<p>Client TLS authentication filter <a class="reference internal" href="../../intro/arch_overview/ssl.html#arch-overview-ssl-auth-filter"><span class="std std-ref">architecture overview</span></a>.</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;read&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;client_ssl_auth&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;config&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;auth_api_cluster&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;stat_prefix&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;ip_white_list&quot;</span><span class="p">:</span> <span class="p">[]</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>auth_api_cluster</dt>
+<dd><em>(required, string)</em> The <a class="reference internal" href="../../intro/arch_overview/cluster_manager.html#arch-overview-cluster-manager"><span class="std std-ref">cluster manager</span></a> cluster that runs
+the authentication service. The filter will connect to the service every 60s to fetch the list
+of principals. The service must support the expected <a class="reference internal" href="#config-network-filters-client-ssl-auth-rest-api"><span class="std std-ref">REST API</span></a>.</dd>
+<dt>stat_prefix</dt>
+<dd><em>(required, string)</em> The prefix to use when emitting <a class="reference internal" href="#config-network-filters-client-ssl-auth-stats"><span class="std std-ref">statistics</span></a>.</dd>
+<dt>ip_white_list</dt>
+<dd><p class="first"><em>(optional, array)</em> An optional list of IP address and subnet masks that should be white listed
+for access by the filter. If no list is provided, there is no IP white list. The list is
+specified as in the following example:</p>
+<div class="last highlight-json"><div class="highlight"><pre><span></span><span class="p">[</span>
+  <span class="s2">&quot;192.168.3.0/24&quot;</span><span class="p">,</span>
+  <span class="s2">&quot;50.1.2.3/32&quot;</span><span class="p">,</span>
+  <span class="s2">&quot;10.15.0.0/16&quot;</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<div class="section" id="statistics">
+<span id="config-network-filters-client-ssl-auth-stats"></span><h2>Statistics<a class="headerlink" href="#statistics" title="Permalink to this headline">¶</a></h2>
+<p>Every configured client TLS authentication filter has statistics rooted at
+<em>auth.clientssl.&lt;stat_prefix&gt;.</em> with the following statistics:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>update_success</td>
+<td>Counter</td>
+<td>Total principal update successes</td>
+</tr>
+<tr class="row-odd"><td>update_failure</td>
+<td>Counter</td>
+<td>Total principal update failures</td>
+</tr>
+<tr class="row-even"><td>auth_no_ssl</td>
+<td>Counter</td>
+<td>Total connections ignored due to no TLS</td>
+</tr>
+<tr class="row-odd"><td>auth_ip_white_list</td>
+<td>Counter</td>
+<td>Total connections allowed due to the IP white list</td>
+</tr>
+<tr class="row-even"><td>auth_digest_match</td>
+<td>Counter</td>
+<td>Total connections allowed due to certificate match</td>
+</tr>
+<tr class="row-odd"><td>auth_digest_no_match</td>
+<td>Counter</td>
+<td>Total connections denied due to no certificate match</td>
+</tr>
+<tr class="row-even"><td>total_principals</td>
+<td>Gauge</td>
+<td>Total loaded principals</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="runtime">
+<h2>Runtime<a class="headerlink" href="#runtime" title="Permalink to this headline">¶</a></h2>
+<p>The client TLS authentication filter supports the following runtime settings:</p>
+<dl class="docutils">
+<dt>auth.clientssl.refresh_interval_ms</dt>
+<dd>Time in milliseconds between principal refreshes from the authentication service. Default is
+60000 (60s).</dd>
+</dl>
+</div>
+<div class="section" id="rest-api">
+<span id="config-network-filters-client-ssl-auth-rest-api"></span><h2>REST API<a class="headerlink" href="#rest-api" title="Permalink to this headline">¶</a></h2>
+<dl class="get">
+<dt id="get--v1-certs-list-approved">
+<code class="descname">GET </code><code class="descname">/v1/certs/list/approved</code><a class="headerlink" href="#get--v1-certs-list-approved" title="Permalink to this definition">¶</a></dt>
+<dd><p>The authentication filter will call this API every refresh interval to fetch the current list
+of approved certificates/principals. The expected JSON response looks like:</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;certificates&quot;</span><span class="p">:</span> <span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>certificates</dt>
+<dd><em>(required, array)</em> list of approved certificates/principals.</dd>
+</dl>
+<p>Each certificate object is defined as:</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;fingerprint_sha256&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>fingerprint_sha256</dt>
+<dd><em>(required, string)</em> The SHA256 hash of the approved client certificate. Envoy will match this
+hash to the presented client certificate to determine whether there is a digest match.</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="echo_filter.html" class="btn btn-neutral float-right" title="Echo" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="network_filters.html" class="btn btn-neutral" title="Network filters" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

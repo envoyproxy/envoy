@@ -1,0 +1,486 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Mongo proxy &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Network filters" href="network_filters.html"/>
+        <link rel="next" title="Rate limit" href="rate_limit_filter.html"/>
+        <link rel="prev" title="Echo" href="echo_filter.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="network_filters.html">Network filters</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="client_ssl_auth_filter.html">Client TLS authentication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="echo_filter.html">Echo</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Mongo proxy</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#statistics">Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#runtime">Runtime</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#access-log-format">Access log format</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="rate_limit_filter.html">Rate limit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tcp_proxy_filter.html">TCP proxy</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cluster_manager/cluster_manager.html">Cluster manager</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../configuration.html">Configuration reference</a> &raquo;</li>
+      
+          <li><a href="network_filters.html">Network filters</a> &raquo;</li>
+      
+    <li>Mongo proxy</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/configuration/network_filters/mongo_proxy_filter.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="mongo-proxy">
+<span id="config-network-filters-mongo-proxy"></span><h1>Mongo proxy<a class="headerlink" href="#mongo-proxy" title="Permalink to this headline">¶</a></h1>
+<p>MongoDB <a class="reference internal" href="../../intro/arch_overview/mongo.html#arch-overview-mongo"><span class="std std-ref">architecture overview</span></a>.</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;both&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;mongo_proxy&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;config&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;stat_prefix&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;access_log&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>stat_prefix</dt>
+<dd><em>(required, string)</em> The prefix to use when emitting <a class="reference internal" href="#config-network-filters-mongo-proxy-stats"><span class="std std-ref">statistics</span></a>.</dd>
+<dt>access_log</dt>
+<dd><em>(optional, string)</em> The optional path to use for writing Mongo access logs. If not access log
+path is specified no access logs will be written. Note that access log is also gated by
+<a class="reference internal" href="#config-network-filters-mongo-proxy-runtime"><span class="std std-ref">runtime</span></a>.</dd>
+</dl>
+<div class="section" id="statistics">
+<span id="config-network-filters-mongo-proxy-stats"></span><h2>Statistics<a class="headerlink" href="#statistics" title="Permalink to this headline">¶</a></h2>
+<p>Every configured MongoDB proxy filter has statistics rooted at <em>mongo.&lt;stat_prefix&gt;.</em> with the
+following statistics:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>decoding_error</td>
+<td>Counter</td>
+<td>Number of MongoDB protocol decoding errors</td>
+</tr>
+<tr class="row-odd"><td>op_get_more</td>
+<td>Counter</td>
+<td>Number of OP_GET_MORE messages</td>
+</tr>
+<tr class="row-even"><td>op_insert</td>
+<td>Counter</td>
+<td>Number of OP_INSERT messages</td>
+</tr>
+<tr class="row-odd"><td>op_kill_cursors</td>
+<td>Counter</td>
+<td>Number of OP_KILL_CURSORS messages</td>
+</tr>
+<tr class="row-even"><td>op_query</td>
+<td>Counter</td>
+<td>Number of OP_QUERY messages</td>
+</tr>
+<tr class="row-odd"><td>op_query_tailable_cursor</td>
+<td>Counter</td>
+<td>Number of OP_QUERY with tailable cursor flag set</td>
+</tr>
+<tr class="row-even"><td>op_query_no_cursor_timeout</td>
+<td>Counter</td>
+<td>Number of OP_QUERY with no cursor timeout flag set</td>
+</tr>
+<tr class="row-odd"><td>op_query_await_data</td>
+<td>Counter</td>
+<td>Number of OP_QUERY with await data flag set</td>
+</tr>
+<tr class="row-even"><td>op_query_exhaust</td>
+<td>Counter</td>
+<td>Number of OP_QUERY with exhaust flag set</td>
+</tr>
+<tr class="row-odd"><td>op_query_scatter_get</td>
+<td>Counter</td>
+<td>Number of scatter get queries</td>
+</tr>
+<tr class="row-even"><td>op_query_multi_get</td>
+<td>Counter</td>
+<td>Number of multi get queries</td>
+</tr>
+<tr class="row-odd"><td>op_query_active</td>
+<td>Gauge</td>
+<td>Number of active queries</td>
+</tr>
+<tr class="row-even"><td>op_reply</td>
+<td>Counter</td>
+<td>Number of OP_REPLY messages</td>
+</tr>
+<tr class="row-odd"><td>op_reply_cursor_not_found</td>
+<td>Counter</td>
+<td>Number of OP_REPLY with cursor not found flag set</td>
+</tr>
+<tr class="row-even"><td>op_reply_query_failure</td>
+<td>Counter</td>
+<td>Number of OP_REPLY with query failure flag set</td>
+</tr>
+<tr class="row-odd"><td>op_reply_valid_cursor</td>
+<td>Counter</td>
+<td>Number of OP_REPLY with a valid cursor</td>
+</tr>
+<tr class="row-even"><td>cx_destroy_local_with_active_rq</td>
+<td>Counter</td>
+<td>Connections destroyed locally with an active query</td>
+</tr>
+<tr class="row-odd"><td>cx_destroy_remote_with_active_rq</td>
+<td>Counter</td>
+<td>Connections destroyed remotely with an active query</td>
+</tr>
+</tbody>
+</table>
+<div class="section" id="scatter-gets">
+<h3>Scatter gets<a class="headerlink" href="#scatter-gets" title="Permalink to this headline">¶</a></h3>
+<p>Envoy defines a <em>scatter get</em> as any query that does not use an <em>_id</em> field as a query parameter.
+Envoy looks in both the top level document as well as within a <em>$query</em> field for <em>_id</em>.</p>
+</div>
+<div class="section" id="multi-gets">
+<h3>Multi gets<a class="headerlink" href="#multi-gets" title="Permalink to this headline">¶</a></h3>
+<p>Envoy defines a <em>multi get</em> as any query that does use an <em>_id</em> field as a query parameter, but
+where <em>_id</em> is not a scalar value (i.e., a document or an array). Envoy looks in both the top level
+document as well as within a <em>$query</em> field for <em>_id</em>.</p>
+</div>
+<div class="section" id="comment-parsing">
+<span id="config-network-filters-mongo-proxy-comment-parsing"></span><h3>$comment parsing<a class="headerlink" href="#comment-parsing" title="Permalink to this headline">¶</a></h3>
+<p>If a query has a top level <em>$comment</em> field (typically in addition to a <em>$query</em> field), Envoy will
+parse it as JSON and look for the following structure:</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;callingFunction&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>callingFunction</dt>
+<dd><em>(required, string)</em> the function that made the query. If available, the function will be used
+in <a class="reference internal" href="#config-network-filters-mongo-proxy-callsite-stats"><span class="std std-ref">callsite</span></a> query statistics.</dd>
+</dl>
+</div>
+<div class="section" id="per-command-statistics">
+<h3>Per command statistics<a class="headerlink" href="#per-command-statistics" title="Permalink to this headline">¶</a></h3>
+<p>The MongoDB filter will gather statistics for commands in the <em>mongo.&lt;stat_prefix&gt;.cmd.&lt;cmd&gt;.</em>
+namespace.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>total</td>
+<td>Counter</td>
+<td>Number of commands</td>
+</tr>
+<tr class="row-odd"><td>reply_num_docs</td>
+<td>Histogram</td>
+<td>Number of documents in reply</td>
+</tr>
+<tr class="row-even"><td>reply_size</td>
+<td>Histogram</td>
+<td>Size of the reply in bytes</td>
+</tr>
+<tr class="row-odd"><td>reply_time_ms</td>
+<td>Timer</td>
+<td>Command time in milliseconds</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="per-collection-query-statistics">
+<span id="config-network-filters-mongo-proxy-collection-stats"></span><h3>Per collection query statistics<a class="headerlink" href="#per-collection-query-statistics" title="Permalink to this headline">¶</a></h3>
+<p>The MongoDB filter will gather statistics for queries in the
+<em>mongo.&lt;stat_prefix&gt;.collection.&lt;collection&gt;.query.</em> namespace.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>total</td>
+<td>Counter</td>
+<td>Number of queries</td>
+</tr>
+<tr class="row-odd"><td>scatter_get</td>
+<td>Counter</td>
+<td>Number of scatter gets</td>
+</tr>
+<tr class="row-even"><td>multi_get</td>
+<td>Counter</td>
+<td>Number of multi gets</td>
+</tr>
+<tr class="row-odd"><td>reply_num_docs</td>
+<td>Histogram</td>
+<td>Number of documents in reply</td>
+</tr>
+<tr class="row-even"><td>reply_size</td>
+<td>Histogram</td>
+<td>Size of the reply in bytes</td>
+</tr>
+<tr class="row-odd"><td>reply_time_ms</td>
+<td>Timer</td>
+<td>Query time in milliseconds</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="per-collection-and-callsite-query-statistics">
+<span id="config-network-filters-mongo-proxy-callsite-stats"></span><h3>Per collection and callsite query statistics<a class="headerlink" href="#per-collection-and-callsite-query-statistics" title="Permalink to this headline">¶</a></h3>
+<p>If the application provides the <a class="reference internal" href="#config-network-filters-mongo-proxy-comment-parsing"><span class="std std-ref">calling function</span></a> in the <em>$comment</em> field, Envoy will generate
+per callsite statistics. These statistics match the <a class="reference internal" href="#config-network-filters-mongo-proxy-collection-stats"><span class="std std-ref">per collection statistics</span></a> but are found in the
+<em>mongo.&lt;stat_prefix&gt;.collection.&lt;collection&gt;.callsite.&lt;callsite&gt;.query.</em> namespace.</p>
+</div>
+</div>
+<div class="section" id="runtime">
+<span id="config-network-filters-mongo-proxy-runtime"></span><h2>Runtime<a class="headerlink" href="#runtime" title="Permalink to this headline">¶</a></h2>
+<p>The Mongo proxy filter supports the following runtime settings:</p>
+<dl class="docutils">
+<dt>mongo.connection_logging_enabled</dt>
+<dd>% of connections that will have logging enabled. Defaults to 100. This allows only a % of
+connections to have logging, but for all messages on those connections to be logged.</dd>
+<dt>mongo.proxy_enabled</dt>
+<dd>% of connections that will have the proxy enabled at all. Defaults to 100.</dd>
+<dt>mongo.logging_enabled</dt>
+<dd>% of messages that will be logged. Defaults to 100. If less than 100, queries may be logged
+without replies, etc.</dd>
+</dl>
+</div>
+<div class="section" id="access-log-format">
+<h2>Access log format<a class="headerlink" href="#access-log-format" title="Permalink to this headline">¶</a></h2>
+<p>The access log format is not customizable and has the following layout:</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;time&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span> <span class="nt">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span> <span class="nt">&quot;upstream_host&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>time</dt>
+<dd>System time that complete message was parsed, including milliseconds.</dd>
+<dt>message</dt>
+<dd>Textual expansion of the message. Whether the message is fully expanded depends on the context.
+Sometimes summary data is presented to avoid extremely large log sizes.</dd>
+<dt>upstream_host</dt>
+<dd>The upstream host that the connection is proxying to, if available. This is populated if the
+filter is used along with the <a class="reference internal" href="tcp_proxy_filter.html#config-network-filters-tcp-proxy"><span class="std std-ref">TCP proxy filter</span></a>.</dd>
+</dl>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="rate_limit_filter.html" class="btn btn-neutral float-right" title="Rate limit" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="echo_filter.html" class="btn btn-neutral" title="Echo" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

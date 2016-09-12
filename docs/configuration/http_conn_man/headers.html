@@ -1,0 +1,376 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>HTTP header manipulation &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="HTTP connection manager" href="http_conn_man.html"/>
+        <link rel="next" title="Statistics" href="stats.html"/>
+        <link rel="prev" title="Access logging" href="access_log.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../network_filters/network_filters.html">Network filters</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="http_conn_man.html">HTTP connection manager</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="route_config/route_config.html">Route configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html">Filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="access_log.html">Access logging</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">HTTP header manipulation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#user-agent">user-agent</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#server">server</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#x-client-trace-id">x-client-trace-id</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#x-envoy-downstream-service-cluster">x-envoy-downstream-service-cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#x-envoy-external-address">x-envoy-external-address</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#x-envoy-force-trace">x-envoy-force-trace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#x-envoy-internal">x-envoy-internal</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#x-forwarded-for">x-forwarded-for</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#x-forwarded-proto">x-forwarded-proto</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#x-request-id">x-request-id</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="stats.html">Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="runtime.html">Runtime</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cluster_manager/cluster_manager.html">Cluster manager</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../configuration.html">Configuration reference</a> &raquo;</li>
+      
+          <li><a href="http_conn_man.html">HTTP connection manager</a> &raquo;</li>
+      
+    <li>HTTP header manipulation</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/configuration/http_conn_man/headers.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="http-header-manipulation">
+<span id="config-http-conn-man-headers"></span><h1>HTTP header manipulation<a class="headerlink" href="#http-header-manipulation" title="Permalink to this headline">¶</a></h1>
+<p>The HTTP connection manager manipulates several HTTP headers both during decoding (when the request
+is being received) as well as during encoding (when the response is being sent).</p>
+<div class="contents local topic" id="contents">
+<ul class="simple">
+<li><a class="reference internal" href="#user-agent" id="id1">user-agent</a></li>
+<li><a class="reference internal" href="#server" id="id2">server</a></li>
+<li><a class="reference internal" href="#x-client-trace-id" id="id3">x-client-trace-id</a></li>
+<li><a class="reference internal" href="#x-envoy-downstream-service-cluster" id="id4">x-envoy-downstream-service-cluster</a></li>
+<li><a class="reference internal" href="#x-envoy-external-address" id="id5">x-envoy-external-address</a></li>
+<li><a class="reference internal" href="#x-envoy-force-trace" id="id6">x-envoy-force-trace</a></li>
+<li><a class="reference internal" href="#x-envoy-internal" id="id7">x-envoy-internal</a></li>
+<li><a class="reference internal" href="#x-forwarded-for" id="id8">x-forwarded-for</a></li>
+<li><a class="reference internal" href="#x-forwarded-proto" id="id9">x-forwarded-proto</a></li>
+<li><a class="reference internal" href="#x-request-id" id="id10">x-request-id</a></li>
+</ul>
+</div>
+<div class="section" id="user-agent">
+<span id="config-http-conn-man-headers-user-agent"></span><h2><a class="toc-backref" href="#id1">user-agent</a><a class="headerlink" href="#user-agent" title="Permalink to this headline">¶</a></h2>
+<p>The <em>user-agent</em> header may be set by the connection manager during decoding if the
+<a class="reference internal" href="http_conn_man.html#config-http-conn-man-add-user-agent"><span class="std std-ref">add_user_agent</span></a> option is enabled. The header is only
+modified if it is not already set. If the connection manager does set the header, the value is
+determined by the <a class="reference internal" href="../../operations/cli.html#cmdoption--service-cluster"><code class="xref std std-option docutils literal"><span class="pre">--service-cluster</span></code></a> command line option.</p>
+</div>
+<div class="section" id="server">
+<span id="config-http-conn-man-headers-server"></span><h2><a class="toc-backref" href="#id2">server</a><a class="headerlink" href="#server" title="Permalink to this headline">¶</a></h2>
+<p>The <em>server</em> header will be set during encoding to the value in the <a class="reference internal" href="http_conn_man.html#config-http-conn-man-server-name"><span class="std std-ref">server_name</span></a> option.</p>
+</div>
+<div class="section" id="x-client-trace-id">
+<span id="config-http-conn-man-headers-x-client-trace-id"></span><h2><a class="toc-backref" href="#id3">x-client-trace-id</a><a class="headerlink" href="#x-client-trace-id" title="Permalink to this headline">¶</a></h2>
+<p>If an external client sets this header, Envoy will join the provided trace ID with the internally
+generated <a class="reference internal" href="#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a>. x-client-trace-id needs to be globally
+unique and generating a uuid4 is recommended. If this header is set, it has similar effect to
+<a class="reference internal" href="#config-http-conn-man-headers-x-envoy-force-trace"><span class="std std-ref">x-envoy-force-trace</span></a>. See the <a class="reference internal" href="runtime.html#config-http-conn-man-runtime-client-enabled"><span class="std std-ref">tracing.client_enabled</span></a> runtime configuration setting.</p>
+</div>
+<div class="section" id="x-envoy-downstream-service-cluster">
+<span id="config-http-conn-man-headers-downstream-service-cluster"></span><h2><a class="toc-backref" href="#id4">x-envoy-downstream-service-cluster</a><a class="headerlink" href="#x-envoy-downstream-service-cluster" title="Permalink to this headline">¶</a></h2>
+<p>Internal services often want to know which service is calling them. This header is cleaned from
+external requests, but for internal requests will contain the service cluster of the caller. Note
+that in the current implementation, this should be considered a hint as it is set by the caller and
+could be easily spoofed by any internal entity. In the future Envoy will support a mutual
+authentication TLS mesh which will make this header fully secure. Like <em>user-agent</em>, the value
+is determined by the <a class="reference internal" href="../../operations/cli.html#cmdoption--service-cluster"><code class="xref std std-option docutils literal"><span class="pre">--service-cluster</span></code></a> command line option.</p>
+</div>
+<div class="section" id="x-envoy-external-address">
+<span id="config-http-conn-man-headers-x-envoy-external-address"></span><h2><a class="toc-backref" href="#id5">x-envoy-external-address</a><a class="headerlink" href="#x-envoy-external-address" title="Permalink to this headline">¶</a></h2>
+<p>It is a common case where a service wants to perform analytics based on the client IP address. Per
+the lengthy discussion on <a class="reference internal" href="#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">XFF</span></a>, this can get
+quite complicated. A proper implementation involves forwarding XFF, and then choosing the first non
+RFC1918 address <em>from the right</em>. Since this is such a common occurrence, Envoy simplifies this by
+setting <em>x-envoy-external-address</em> during decoding if and only if the request ingresses externally
+(i.e., it&#8217;s from an external client). <em>x-envoy-external-address</em> is not set or overwritten for
+internal requests. This header can be safely forwarded between internal services for analytics
+purposes without having to deal with the complexities of XFF.</p>
+</div>
+<div class="section" id="x-envoy-force-trace">
+<span id="config-http-conn-man-headers-x-envoy-force-trace"></span><h2><a class="toc-backref" href="#id6">x-envoy-force-trace</a><a class="headerlink" href="#x-envoy-force-trace" title="Permalink to this headline">¶</a></h2>
+<p>If an internal request sets this header, Envoy will modify the generated
+<a class="reference internal" href="#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a> such that it forces traces to be collected.
+This also forces <a class="reference internal" href="#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a> to be returned in the response
+headers. If this request ID is then propagated to other hosts, traces will also be collected on
+those hosts which will provide a consistent trace for an entire request flow. See the
+<a class="reference internal" href="runtime.html#config-http-conn-man-runtime-global-enabled"><span class="std std-ref">tracing.global_enabled</span></a> and
+<a class="reference internal" href="runtime.html#config-http-conn-man-runtime-random-sampling"><span class="std std-ref">tracing.random_sampling</span></a> runtime
+configuration settings.</p>
+</div>
+<div class="section" id="x-envoy-internal">
+<span id="config-http-conn-man-headers-x-envoy-internal"></span><h2><a class="toc-backref" href="#id7">x-envoy-internal</a><a class="headerlink" href="#x-envoy-internal" title="Permalink to this headline">¶</a></h2>
+<p>It is a common case where a service wants to know whether a request is internal origin or not. Envoy
+uses <a class="reference internal" href="#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">XFF</span></a> to determine this and then will set
+the header value to <em>true</em>.</p>
+<p>This is a convenience to avoid having to parse and understand XFF.</p>
+</div>
+<div class="section" id="x-forwarded-for">
+<span id="config-http-conn-man-headers-x-forwarded-for"></span><h2><a class="toc-backref" href="#id8">x-forwarded-for</a><a class="headerlink" href="#x-forwarded-for" title="Permalink to this headline">¶</a></h2>
+<p><em>x-forwarded-for</em> (XFF) is a standard proxy header which indicates the IP addresses that a request has
+flowed through on its way from the client to the server. A compliant proxy will <em>append</em> the IP
+address of the nearest client to the XFF list before proxying the request. Some examples of XFF are:</p>
+<ol class="arabic simple">
+<li><code class="docutils literal"><span class="pre">x-forwarded-for:</span> <span class="pre">50.0.0.1</span></code> (single client)</li>
+<li><code class="docutils literal"><span class="pre">x-forwarded-for:</span> <span class="pre">50.0.0.1,</span> <span class="pre">40.0.0.1</span></code> (external proxy hop)</li>
+<li><code class="docutils literal"><span class="pre">x-forwarded-for:</span> <span class="pre">50.0.0.1,</span> <span class="pre">10.0.0.1</span></code> (internal proxy hop)</li>
+</ol>
+<p>Envoy will only append to XFF if the <a class="reference internal" href="http_conn_man.html#config-http-conn-man-use-remote-address"><span class="std std-ref">use_remote_address</span></a> HTTP connection manager option is set to true. This means
+that if <em>use_remote_address</em> is false, the connection manager operates in a transparent mode where
+it does not modify XFF. This is needed for certain types of mesh deployments depending on whether
+the Envoy in question is an edge node or an internal service node.</p>
+<p>Envoy uses the final XFF contents to determine whether a request originated externally or
+internally. This influences whether the <a class="reference internal" href="#config-http-conn-man-headers-x-envoy-internal"><span class="std std-ref">x-envoy-internal</span></a> header
+is set.</p>
+<p>A few very important notes about XFF:</p>
+<ol class="arabic simple">
+<li>Since IP addresses are appended to XFF, only the last address (furthest to the right) can be
+trusted. More specifically, the first external (non RFC1918) address from <em>the right</em> is the only
+trustable addresses. Anything to the left of that can be spoofed. To make this easier to deal
+with for analytics, etc., front Envoy will also set the
+<a class="reference internal" href="#config-http-conn-man-headers-x-envoy-external-address"><span class="std std-ref">x-envoy-external-address</span></a> header.</li>
+<li>XFF is what Envoy uses to determine whether a request is internal origin or external origin. It
+does this by checking to see if XFF contains a <em>single</em> IP address which is an RFC1918 address.<ul>
+<li><strong>NOTE</strong>: If an internal service proxies an external request to another internal service, and
+includes the original XFF header, Envoy will append to it on egress if
+<a class="reference internal" href="http_conn_man.html#config-http-conn-man-use-remote-address"><span class="std std-ref">use_remote_address</span></a> is set. This will cause
+the other side to think the request is external. Generally, this is what is intended if XFF is
+being forwarded. If it is not intended, do not forward XFF, and forward
+<a class="reference internal" href="#config-http-conn-man-headers-x-envoy-internal"><span class="std std-ref">x-envoy-internal</span></a> instead.</li>
+<li><strong>NOTE</strong>: If an internal service call is forwarded to another internal service (preserving XFF),
+Envoy will not consider it internal. This is a known &#8220;bug&#8221; due to the simplification of how
+XFF is parsed to determine if a request is internal. In this scenario, do not forward XFF and
+allow Envoy to generate a new one with a single internal origin IP.</li>
+</ul>
+</li>
+</ol>
+</div>
+<div class="section" id="x-forwarded-proto">
+<h2><a class="toc-backref" href="#id9">x-forwarded-proto</a><a class="headerlink" href="#x-forwarded-proto" title="Permalink to this headline">¶</a></h2>
+<p>It is a common case where a service wants to know what the originating protocol (HTTP or HTTPS) was
+of the connection terminated by front/edge Envoy. <em>x-forwarded-proto</em> contains this information. It
+will be set to either <em>http</em> or <em>https</em>.</p>
+</div>
+<div class="section" id="x-request-id">
+<span id="config-http-conn-man-headers-x-request-id"></span><h2><a class="toc-backref" href="#id10">x-request-id</a><a class="headerlink" href="#x-request-id" title="Permalink to this headline">¶</a></h2>
+<p>The <em>x-request-id</em> header is used by Envoy to uniquely identify a request as well as perform stable
+access logging and tracing. Envoy will generate an <em>x-request-id</em> header for all external origin
+requests (the header is sanitized). It will also generate an <em>x-request-id</em> header for internal
+requests that do not already have one. This means that <em>x-request-id</em> can and should be propagated
+between client applications in order to have stable IDs across the entire mesh. Due to the out of
+process architecture of Envoy, the header can not be automatically forwarded by Envoy itself. This
+is one of the few areas where a thin client library is needed to perform this duty. How that is done
+is out of scope for this documentation. If <em>x-request-id</em> is propagated across all hosts, the
+following features are available:</p>
+<ul class="simple">
+<li>Stable <a class="reference internal" href="access_log.html#config-http-conn-man-access-log"><span class="std std-ref">access logging</span></a> via the sampling filter.</li>
+<li>Stable tracing when performing random sampling via the <a class="reference internal" href="runtime.html#config-http-conn-man-runtime-random-sampling"><span class="std std-ref">tracing.random_sampling</span></a> runtime setting or via forced tracing using the
+<a class="reference internal" href="#config-http-conn-man-headers-x-envoy-force-trace"><span class="std std-ref">x-envoy-force-trace</span></a> and
+<a class="reference internal" href="#config-http-conn-man-headers-x-client-trace-id"><span class="std std-ref">x-client-trace-id</span></a> headers.</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="stats.html" class="btn btn-neutral float-right" title="Statistics" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="access_log.html" class="btn btn-neutral" title="Access logging" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

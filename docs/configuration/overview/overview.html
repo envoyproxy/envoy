@@ -1,0 +1,272 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Overview &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Configuration reference" href="../configuration.html"/>
+        <link rel="next" title="Administration interface" href="admin.html"/>
+        <link rel="prev" title="Configuration reference" href="../configuration.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="admin.html">Administration interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tracing.html">Tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="rate_limit.html">Rate limit service</a></li>
+<li class="toctree-l3"><a class="reference internal" href="runtime.html">Runtime</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../network_filters/network_filters.html">Network filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cluster_manager/cluster_manager.html">Cluster manager</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../configuration.html">Configuration reference</a> &raquo;</li>
+      
+    <li>Overview</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/configuration/overview/overview.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="overview">
+<span id="config-overview"></span><h1>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h1>
+<p>The Envoy configuration format is written in JSON. The main configuration for the server is
+contained within the listeners and cluster manager sections. The other top level elements specify
+miscellaneous configuration.</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;listeners&quot;</span><span class="p">:</span> <span class="p">[],</span>
+  <span class="nt">&quot;admin&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;cluster_manager&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;flags_path&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;statsd_local_udp_port&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;statsd_tcp_cluster_name&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;tracing&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;rate_limit_service&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;runtime&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt><a class="reference internal" href="../listeners/listeners.html#config-listeners"><span class="std std-ref">listeners</span></a></dt>
+<dd><em>(required, array)</em> An array of <a class="reference internal" href="../../intro/arch_overview/listeners.html#arch-overview-listeners"><span class="std std-ref">listeners</span></a> that will be
+instantiated by the server. A single Envoy process can contain any number of listeners.</dd>
+<dt><a class="reference internal" href="admin.html#config-admin"><span class="std std-ref">admin</span></a></dt>
+<dd><em>(required, object)</em> Configuration for the <a class="reference internal" href="../../operations/admin.html#operations-admin-interface"><span class="std std-ref">local administration HTTP server</span></a>.</dd>
+<dt><a class="reference internal" href="../cluster_manager/cluster_manager.html#config-cluster-manager"><span class="std std-ref">cluster_manager</span></a></dt>
+<dd><em>(required, object)</em> Configuration for the <a class="reference internal" href="../../intro/arch_overview/cluster_manager.html#arch-overview-cluster-manager"><span class="std std-ref">cluster manager</span></a>
+which owns all upstream clusters within the server.</dd>
+</dl>
+<dl class="docutils" id="config-overview-flags-path">
+<dt>flags_path</dt>
+<dd><em>(optional, string)</em> The file system path to search for <a class="reference internal" href="../../operations/fs_flags.html#operations-file-system-flags"><span class="std std-ref">startup flag files</span></a>.</dd>
+<dt>statsd_local_udp_port</dt>
+<dd><em>(optional, integer)</em> The UDP port of a locally running statsd compliant listener. If specified,
+<a class="reference internal" href="../../intro/arch_overview/statistics.html#arch-overview-statistics"><span class="std std-ref">statistics</span></a> will be flushed to this port.</dd>
+<dt>statsd_tcp_cluster_name</dt>
+<dd><em>(optional, string)</em> The name of a cluster manager cluster that is running a TCP statsd compliant
+listener. If specified, Envoy will connect to this cluster to flush <a class="reference internal" href="../../intro/arch_overview/statistics.html#arch-overview-statistics"><span class="std std-ref">statistics</span></a>.</dd>
+<dt><a class="reference internal" href="tracing.html#config-tracing"><span class="std std-ref">tracing</span></a></dt>
+<dd><em>(optional, object)</em> Configuration for an external <a class="reference internal" href="../../intro/arch_overview/tracing.html#arch-overview-tracing"><span class="std std-ref">tracing</span></a>
+provider. If not specified, no tracing will be performed.</dd>
+<dt><a class="reference internal" href="rate_limit.html#config-rate-limit-service"><span class="std std-ref">rate_limit_service</span></a></dt>
+<dd><em>(optional, object)</em> Configuration for an external <a class="reference internal" href="../../intro/arch_overview/global_rate_limiting.html#arch-overview-rate-limit"><span class="std std-ref">rate limit service</span></a> provider. If not specified, any calls to the rate limit service will
+immediately return success.</dd>
+<dt><a class="reference internal" href="runtime.html#config-runtime"><span class="std std-ref">runtime</span></a></dt>
+<dd><em>(optional, object)</em> Configuration for the <a class="reference internal" href="../../intro/arch_overview/runtime.html#arch-overview-runtime"><span class="std std-ref">runtime configuration</span></a>
+provider. If not specified, a &#8220;null&#8221; provider will be used which will result in all defaults being
+used.</dd>
+</dl>
+<div class="toctree-wrapper compound">
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="admin.html" class="btn btn-neutral float-right" title="Administration interface" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="../configuration.html" class="btn btn-neutral" title="Configuration reference" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -1,0 +1,426 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Sandboxes &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../index.html"/>
+        <link rel="up" title="Building and installation" href="install.html"/>
+        <link rel="next" title="Configuration reference" href="../configuration/configuration.html"/>
+        <link rel="prev" title="Reference configurations" href="ref_configs.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="install.html">Building and installation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="requirements.html">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="building.html">Building</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ref_configs.html">Reference configurations</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Sandboxes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#running-the-sandbox">Running the Sandbox</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="install.html">Building and installation</a> &raquo;</li>
+      
+    <li>Sandboxes</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/install/sandboxes.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="sandboxes">
+<span id="install-sandboxes"></span><h1>Sandboxes<a class="headerlink" href="#sandboxes" title="Permalink to this headline">¶</a></h1>
+<p>To get a flavor of what Envoy has to offer, we are releasing a
+<a class="reference external" href="https://docs.docker.com/compose/">docker compose</a> sandbox that deploys a front
+envoy and a couple of services (simple flask apps) colocated with a running
+service envoy. The three containers will be deployed inside a virtual network
+called <code class="docutils literal"><span class="pre">envoymesh</span></code>.</p>
+<p>Below you can see a graphic showing the docker compose deployment:</p>
+<a class="reference internal image-reference" href="../_images/docker_compose_v0.1.svg"><img alt="../_images/docker_compose_v0.1.svg" src="../_images/docker_compose_v0.1.svg" width="100%" /></a>
+<p>All incoming requests are routed via the front envoy, which is acting as a reverse proxy sitting on
+the edge of the <code class="docutils literal"><span class="pre">envoymesh</span></code> network. Port <code class="docutils literal"><span class="pre">80</span></code> is mapped to  port <code class="docutils literal"><span class="pre">8000</span></code> by docker compose
+(see <a class="reference external" href="https://github.com/lyft/envoy/blob/master//example/docker-compose.yml&gt;">/example/docker-compose.yml&gt;</a>). Moreover, notice
+that all  traffic routed by the front envoy to the service containers is actually routed to the
+service envoys (routes setup in <a class="reference external" href="https://github.com/lyft/envoy/blob/master//example/front-envoy.json&gt;">/example/front-envoy.json&gt;</a>). In turn the service
+envoys route the  request to the flask app via the loopback address (routes setup in
+<a class="reference external" href="https://github.com/lyft/envoy/blob/master//example/service-envoy.json&gt;">/example/service-envoy.json&gt;</a>). This setup
+illustrates the advantage of running service envoys  collocated with your services: all requests are
+handled by the service envoy, and efficiently routed to your services.</p>
+<div class="section" id="running-the-sandbox">
+<h2>Running the Sandbox<a class="headerlink" href="#running-the-sandbox" title="Permalink to this headline">¶</a></h2>
+<p>The following documentation runs through the setup of an envoy cluster organized
+as is described in the image above.</p>
+<p><strong>Step 1: Install Docker</strong></p>
+<p>Ensure that you have a recent versions of <code class="docutils literal"><span class="pre">docker,</span> <span class="pre">docker-compose</span></code> and
+<code class="docutils literal"><span class="pre">docker-machine</span></code> installed.</p>
+<p>A simple way to achieve this is via the <a class="reference external" href="https://www.docker.com/products/docker-toolbox">Docker Toolbox</a>.</p>
+<p><strong>Step 2: Docker Machine setup</strong></p>
+<p>First let&#8217;s create a new machine which will hold the containers:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ docker-machine create --driver virtualbox default
+$ eval $(docker-machine env default)
+</pre></div>
+</div>
+<p><strong>Step 4: Clone the Envoy repo, and start all of our containers</strong></p>
+<p>If you have not cloned the envoy repo, clone it with <code class="docutils literal"><span class="pre">git</span> <span class="pre">clone</span> <span class="pre">git&#64;github.com:lyft/envoy</span></code>
+or <code class="docutils literal"><span class="pre">git</span> <span class="pre">clone</span> <span class="pre">https://github.com/lyft/envoy.git</span></code>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ pwd
+envoy/example
+$ docker-compose up --build -d
+$ docker-compose ps
+        Name                       Command               State      Ports
+-------------------------------------------------------------------------------------------------------------
+example_service1_1      /bin/sh -c /usr/local/bin/ ...    Up       80/tcp
+example_service2_1      /bin/sh -c /usr/local/bin/ ...    Up       80/tcp
+example_front-envoy_1   /bin/sh -c /usr/local/bin/ ...    Up       0.0.0.0:8000-&gt;80/tcp, 0.0.0.0:8001-&gt;8001/tcp
+</pre></div>
+</div>
+<p><strong>Step 5: Test Envoy&#8217;s routing capabilities</strong></p>
+<p>You can now send a request to both services via the front-envoy.</p>
+<p>For service1:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ curl -v $(docker-machine ip default):8000/service/1
+*   Trying 192.168.99.100...
+* Connected to 192.168.99.100 (192.168.99.100) port 8000 (#0)
+&gt; GET /service/1 HTTP/1.1
+&gt; Host: 192.168.99.100:8000
+&gt; User-Agent: curl/7.43.0
+&gt; Accept: */*
+&gt;
+&lt; HTTP/1.1 200 OK
+&lt; content-type: text/html; charset=utf-8
+&lt; content-length: 89
+&lt; x-envoy-upstream-service-time: 1
+&lt; server: envoy
+&lt; date: Fri, 26 Aug 2016 19:39:19 GMT
+&lt; x-envoy-protocol-version: HTTP/1.1
+&lt;
+Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
+* Connection #0 to host 192.168.99.100 left intact
+</pre></div>
+</div>
+<p>For service2:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ curl -v $(docker-machine ip default):8000/service/2
+*   Trying 192.168.99.100...
+* Connected to 192.168.99.100 (192.168.99.100) port 8000 (#0)
+&gt; GET /service/2 HTTP/1.1
+&gt; Host: 192.168.99.100:8000
+&gt; User-Agent: curl/7.43.0
+&gt; Accept: */*
+&gt;
+&lt; HTTP/1.1 200 OK
+&lt; content-type: text/html; charset=utf-8
+&lt; content-length: 89
+&lt; x-envoy-upstream-service-time: 2
+&lt; server: envoy
+&lt; date: Fri, 26 Aug 2016 19:39:23 GMT
+&lt; x-envoy-protocol-version: HTTP/1.1
+&lt;
+Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2
+* Connection #0 to host 192.168.99.100 left intact
+</pre></div>
+</div>
+<p>Notice that each request, while sent to the front envoy, was correctly routed
+to the respective application.</p>
+<p><strong>Step 6: Test Envoy&#8217;s load balancing capabilities</strong></p>
+<p>Now let&#8217;s scale up our service1 nodes to demonstrate the clustering abilities
+of envoy.:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ docker-compose scale service1=3
+Creating and starting example_service1_2 ... done
+Creating and starting example_service1_3 ... done
+</pre></div>
+</div>
+<p>Now if we send a request to service1 multiple times, the front envoy will load balance the
+requests by doing a round robin of the three service1 machines:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ curl -v $(docker-machine ip default):8000/service/1
+*   Trying 192.168.99.100...
+* Connected to 192.168.99.100 (192.168.99.100) port 8000 (#0)
+&gt; GET /service/1 HTTP/1.1
+&gt; Host: 192.168.99.100:8000
+&gt; User-Agent: curl/7.43.0
+&gt; Accept: */*
+&gt;
+&lt; HTTP/1.1 200 OK
+&lt; content-type: text/html; charset=utf-8
+&lt; content-length: 89
+&lt; x-envoy-upstream-service-time: 1
+&lt; server: envoy
+&lt; date: Fri, 26 Aug 2016 19:40:21 GMT
+&lt; x-envoy-protocol-version: HTTP/1.1
+&lt;
+Hello from behind Envoy (service 1)! hostname: 85ac151715c6 resolvedhostname: 172.19.0.3
+* Connection #0 to host 192.168.99.100 left intact
+$ curl -v $(docker-machine ip default):8000/service/1
+*   Trying 192.168.99.100...
+* Connected to 192.168.99.100 (192.168.99.100) port 8000 (#0)
+&gt; GET /service/1 HTTP/1.1
+&gt; Host: 192.168.99.100:8000
+&gt; User-Agent: curl/7.43.0
+&gt; Accept: */*
+&gt;
+&lt; HTTP/1.1 200 OK
+&lt; content-type: text/html; charset=utf-8
+&lt; content-length: 89
+&lt; x-envoy-upstream-service-time: 1
+&lt; server: envoy
+&lt; date: Fri, 26 Aug 2016 19:40:22 GMT
+&lt; x-envoy-protocol-version: HTTP/1.1
+&lt;
+Hello from behind Envoy (service 1)! hostname: 20da22cfc955 resolvedhostname: 172.19.0.5
+* Connection #0 to host 192.168.99.100 left intact
+$ curl -v $(docker-machine ip default):8000/service/1
+*   Trying 192.168.99.100...
+* Connected to 192.168.99.100 (192.168.99.100) port 8000 (#0)
+&gt; GET /service/1 HTTP/1.1
+&gt; Host: 192.168.99.100:8000
+&gt; User-Agent: curl/7.43.0
+&gt; Accept: */*
+&gt;
+&lt; HTTP/1.1 200 OK
+&lt; content-type: text/html; charset=utf-8
+&lt; content-length: 89
+&lt; x-envoy-upstream-service-time: 1
+&lt; server: envoy
+&lt; date: Fri, 26 Aug 2016 19:40:24 GMT
+&lt; x-envoy-protocol-version: HTTP/1.1
+&lt;
+Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
+* Connection #0 to host 192.168.99.100 left intact
+</pre></div>
+</div>
+<p><strong>Step 7: enter containers and curl services</strong></p>
+<p>In addition of using <code class="docutils literal"><span class="pre">curl</span></code> from your host machine, you can also enter the
+containers themselves and <code class="docutils literal"><span class="pre">curl</span></code> from inside them. To enter a container you
+can use <code class="docutils literal"><span class="pre">docker-compose</span> <span class="pre">exec</span> <span class="pre">&lt;container_name&gt;</span> <span class="pre">/bin/bash</span></code>. For example we can
+enter the <code class="docutils literal"><span class="pre">front-envoy</span></code> container, and <code class="docutils literal"><span class="pre">curl</span></code> for services locally:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ docker-compose exec front-envoy /bin/bash
+root@81288499f9d7:/# curl localhost:80/service/1
+Hello from behind Envoy (service 1)! hostname: 85ac151715c6 resolvedhostname: 172.19.0.3
+root@81288499f9d7:/# curl localhost:80/service/1
+Hello from behind Envoy (service 1)! hostname: 20da22cfc955 resolvedhostname: 172.19.0.5
+root@81288499f9d7:/# curl localhost:80/service/1
+Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
+root@81288499f9d7:/# curl localhost:80/service/2
+Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2
+</pre></div>
+</div>
+<p><strong>Step 8: enter containers and curl admin</strong></p>
+<p>When envoy runs it also attaches an <code class="docutils literal"><span class="pre">admin</span></code> to your desired port. In the example
+configs the admin is bound to port <code class="docutils literal"><span class="pre">8001</span></code>. We can <code class="docutils literal"><span class="pre">curl</span></code> it to gain useful information.
+For example you can <code class="docutils literal"><span class="pre">curl</span></code> <code class="docutils literal"><span class="pre">/server_info</span></code> to get information about the
+envoy version you are running. Addionally you can <code class="docutils literal"><span class="pre">curl</span></code> <code class="docutils literal"><span class="pre">/stats</span></code> to get
+statistics. For example inside <code class="docutils literal"><span class="pre">frontenvoy</span></code> we can get:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ docker-compose exec front-envoy /bin/bash
+root@e654c2c83277:/# curl localhost:8001/server_info
+envoy 10e00b/RELEASE live 142 142 0
+root@e654c2c83277:/# curl localhost:8001/stats
+cluster.service1.external.upstream_rq_200: 7
+...
+cluster.service1.membership_change: 2
+cluster.service1.membership_total: 3
+...
+cluster.service1.upstream_cx_http2_total: 3
+...
+cluster.service1.upstream_rq_total: 7
+...
+cluster.service2.external.upstream_rq_200: 2
+...
+cluster.service2.membership_change: 1
+cluster.service2.membership_total: 1
+...
+cluster.service2.upstream_cx_http2_total: 1
+...
+cluster.service2.upstream_rq_total: 2
+...
+</pre></div>
+</div>
+<p>Notice that we can get the number of members of upstream clusters, number of requests
+fulfilled by them, information about http ingress, and a plethora of other useful
+stats.</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../configuration/configuration.html" class="btn btn-neutral float-right" title="Configuration reference" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="ref_configs.html" class="btn btn-neutral" title="Reference configurations" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

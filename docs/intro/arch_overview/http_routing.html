@@ -1,0 +1,316 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>HTTP routing &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Architecture overview" href="arch_overview.html"/>
+        <link rel="next" title="gRPC" href="grpc.html"/>
+        <link rel="prev" title="HTTP filters" href="http_filters.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="terminology.html">Terminology</a></li>
+<li class="toctree-l3"><a class="reference internal" href="threading_model.html">Threading model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="network_filters.html">Network (L3/L4) filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="http_connection_management.html">HTTP connection management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="http_filters.html">HTTP filters</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">HTTP routing</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#route-table">Route table</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#retry-semantics">Retry semantics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#priority-routing">Priority routing</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="grpc.html">gRPC</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cluster_manager.html">Cluster manager</a></li>
+<li class="toctree-l3"><a class="reference internal" href="service_discovery.html">Service discovery</a></li>
+<li class="toctree-l3"><a class="reference internal" href="health_checking.html">Health checking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="connection_pooling.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="load_balancing.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_breaking.html">Circuit breaking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="global_rate_limiting.html">Global rate limiting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ssl.html">TLS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="statistics.html">Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="runtime.html">Runtime configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tracing.html">Tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tcp_proxy.html">TCP proxy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mongo.html">MongoDB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamo.html">DynamoDB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hot_restart.html">Hot restart</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../real_world_deployments.html">Real world deployments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../comparison.html">Comparison to similar systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../getting_help.html">Getting help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../version_history.html">Version history</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../intro.html">Introduction</a> &raquo;</li>
+      
+          <li><a href="arch_overview.html">Architecture overview</a> &raquo;</li>
+      
+    <li>HTTP routing</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/intro/arch_overview/http_routing.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="http-routing">
+<span id="arch-overview-http-routing"></span><h1>HTTP routing<a class="headerlink" href="#http-routing" title="Permalink to this headline">¶</a></h1>
+<p>Envoy includes an HTTP <a class="reference internal" href="../../configuration/http_filters/router_filter.html#config-http-filters-router"><span class="std std-ref">router filter</span></a> which can be installed to
+perform advanced routing tasks. This is useful both for handling edge traffic (traditional reverse
+proxy request handling) as well as for building a service to service Envoy mesh (typically via
+routing on the host/authority HTTP header to reach a particular upstream service cluster). At a high
+level the router takes an incoming HTTP request, matches it to an upstream cluster, acquires a
+<a class="reference internal" href="connection_pooling.html#arch-overview-conn-pool"><span class="std std-ref">connection pool</span></a> to a host in the upstream cluster, and forwards the
+request. The router filter supports the following features:</p>
+<ul class="simple">
+<li>Virtual hosts that map domains/authorities to a set of routing rules.</li>
+<li>Prefix and exact path matching rules (both case sensitive and case insensitive). Regex/slug
+matching is not currently supported, mainly because it makes it difficult/impossible to
+programmatically determine whether routing rules conflict with each other. For this reason we
+don’t recommend regex/slug routing at the reverse proxy level, however we may add support in the
+future depending on demand.</li>
+<li>TLS redirection at the virtual host level.</li>
+<li>Path/host redirection at the route level.</li>
+<li>Host rewriting.</li>
+<li>Prefix rewriting.</li>
+<li>Request retries specified either via HTTP header or via route configuration.</li>
+<li>Request timeout specified either via HTTP header or via route configuration.</li>
+<li>Runtime configuration routing rules.</li>
+<li>Content type routing rules.</li>
+<li>Virtual cluster specifications. A virtual cluster is specified at the virtual host level and is
+used by Envoy to generate additional statistics on top of the standard cluster level ones. Virtual
+clusters can use regex matching.</li>
+<li><a class="reference internal" href="#arch-overview-http-routing-priority"><span class="std std-ref">Priority</span></a> based routing.</li>
+</ul>
+<div class="section" id="route-table">
+<h2>Route table<a class="headerlink" href="#route-table" title="Permalink to this headline">¶</a></h2>
+<p>The <a class="reference internal" href="../../configuration/http_conn_man/http_conn_man.html#config-http-conn-man"><span class="std std-ref">configuration</span></a> for the HTTP connection manager owns the <a class="reference internal" href="../../configuration/http_conn_man/route_config/route_config.html#config-http-conn-man-route-table"><span class="std std-ref">route
+table</span></a> that is used by all configured HTTP filters. Although the
+router filter is the primary consumer of the route table, other filters also have access in case
+they want to make decisions based on the ultimate destination of the request. For example, the built
+in rate limit filter consults the route table to determine whether the global rate limit service
+should be called based on the route. The connection manager makes sure that all calls to acquire a
+route are stable for a particular request, even if the decision involves randomness (e.g. in the
+case of a runtime configuration route rule).</p>
+</div>
+<div class="section" id="retry-semantics">
+<span id="arch-overview-http-routing-retry"></span><h2>Retry semantics<a class="headerlink" href="#retry-semantics" title="Permalink to this headline">¶</a></h2>
+<p>Envoy allows retries to be configured both in the <a class="reference internal" href="../../configuration/http_conn_man/route_config/route.html#config-http-conn-man-route-table-route-retry"><span class="std std-ref">route configuration</span></a> as well as for specific requests via <a class="reference internal" href="../../configuration/http_filters/router_filter.html#config-http-filters-router-headers"><span class="std std-ref">request
+headers</span></a>. The following configurations are possible:</p>
+<ul class="simple">
+<li><strong>Maximum number of retries</strong>: Envoy will continue to retry any number of times. An exponential
+backoff algorithm is used between each retry. Additionally, <em>all retries are contained within the
+overall request timeout</em>. This avoids long request times due to a large number of retries.</li>
+<li><strong>Retry conditions</strong>: Envoy can retry on different types of conditions depending on application
+requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,
+etc.</li>
+</ul>
+</div>
+<div class="section" id="priority-routing">
+<span id="arch-overview-http-routing-priority"></span><h2>Priority routing<a class="headerlink" href="#priority-routing" title="Permalink to this headline">¶</a></h2>
+<p>Envoy supports priority routing both at the <a class="reference internal" href="../../configuration/http_conn_man/route_config/route.html#config-http-conn-man-route-table-route"><span class="std std-ref">route</span></a>
+and the <a class="reference internal" href="../../configuration/http_conn_man/route_config/vcluster.html#config-http-conn-man-route-table-vcluster"><span class="std std-ref">virtual cluster</span></a> level. The current
+priority implementation uses different <a class="reference internal" href="connection_pooling.html#arch-overview-conn-pool"><span class="std std-ref">connection pool</span></a> and
+<a class="reference internal" href="../../configuration/cluster_manager/cluster_circuit_breakers.html#config-cluster-manager-cluster-circuit-breakers"><span class="std std-ref">circuit breaking</span></a> settings for each priority
+level. This means that even for HTTP/2 requests, two physical connections will be used to an
+upstream host. In the future Envoy will likely support true HTTP/2 priority over a single
+connection.</p>
+<p>Note that if a route matches a virtual cluster, the virtual cluster priority is used. This feature
+is useful for splitting circuit breaking limits between different traffic priorities such that low
+priority traffic does not starve higher priority traffic.</p>
+<p>The currently supported priorities are <em>default</em> and <em>high</em>.</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="grpc.html" class="btn btn-neutral float-right" title="gRPC" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="http_filters.html" class="btn btn-neutral" title="HTTP filters" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

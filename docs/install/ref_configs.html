@@ -1,0 +1,261 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Reference configurations &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../index.html"/>
+        <link rel="up" title="Building and installation" href="install.html"/>
+        <link rel="next" title="Sandboxes" href="sandboxes.html"/>
+        <link rel="prev" title="Installation" href="installation.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="install.html">Building and installation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="requirements.html">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="building.html">Building</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Reference configurations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#configuration-generator">Configuration generator</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sandboxes.html">Sandboxes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="install.html">Building and installation</a> &raquo;</li>
+      
+    <li>Reference configurations</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/install/ref_configs.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="reference-configurations">
+<span id="install-ref-configs"></span><h1>Reference configurations<a class="headerlink" href="#reference-configurations" title="Permalink to this headline">¶</a></h1>
+<p>The source distribution includes a set of example configuration templates for each of the three
+major Envoy deployment types:</p>
+<ul class="simple">
+<li><a class="reference internal" href="../intro/deployment_types/service_to_service.html#deployment-type-service-to-service"><span class="std std-ref">Service to service</span></a></li>
+<li><a class="reference internal" href="../intro/deployment_types/front_proxy.html#deployment-type-front-proxy"><span class="std std-ref">Front proxy</span></a></li>
+<li><a class="reference internal" href="../intro/deployment_types/double_proxy.html#deployment-type-double-proxy"><span class="std std-ref">Double proxy</span></a></li>
+</ul>
+<p>The goal of this set of example configurations is to demonstrate the full capabilities of Envoy in
+a complex deployment. All features will not be applicable to all use cases. For full documentation
+see the <a class="reference internal" href="../configuration/configuration.html#config"><span class="std std-ref">configuration reference</span></a>.</p>
+<div class="section" id="configuration-generator">
+<h2>Configuration generator<a class="headerlink" href="#configuration-generator" title="Permalink to this headline">¶</a></h2>
+<p>Envoy configurations can become relatively complicated. At Lyft we use <a class="reference external" href="http://jinja.pocoo.org/">jinja</a> templating to make the configurations easier to create and manage. The
+source distribution includes a version of the configuration generator that loosely approximates what
+we use at Lyft. We have also included three example configuration templates for each of the above
+three scenarios.</p>
+<ul class="simple">
+<li>Generator script: <a class="reference external" href="https://github.com/lyft/envoy/blob/master/configs/configgen.py">configs/configgen.py</a></li>
+<li>Service to service template: <a class="reference external" href="https://github.com/lyft/envoy/blob/master/configs/envoy_service_to_service.template.json">configs/envoy_service_to_service.template.json</a></li>
+<li>Front proxy template: <a class="reference external" href="https://github.com/lyft/envoy/blob/master/configs/envoy_front_proxy.template.json">configs/envoy_front_proxy.template.json</a></li>
+<li>Double proxy template: <a class="reference external" href="https://github.com/lyft/envoy/blob/master/configs/envoy_double_proxy.template.json">configs/envoy_double_proxy.template.json</a></li>
+</ul>
+<p>To generate the example configurations run the following from the root of the repo:</p>
+<div class="highlight-console"><div class="highlight"><pre><span></span><span class="go">mkdir -p generated/configs</span>
+<span class="go">configs/configgen.sh generated/configs</span>
+</pre></div>
+</div>
+<p>The previous command will produce three fully expanded configurations using some variables
+defined inside of <cite>configgen.py</cite>. See the comments inside of <cite>configgen.py</cite> for detailed
+information on how the different expansions work.</p>
+<p>A few notes about the example configurations:</p>
+<ul class="simple">
+<li>An instance of <a class="reference internal" href="../intro/arch_overview/service_discovery.html#arch-overview-service-discovery-sds"><span class="std std-ref">service discovery service</span></a> is assumed
+to be running at <cite>discovery.yourcompany.net</cite>.</li>
+<li>DNS for <cite>yourcompany.net</cite> is assumed to be setup for various things. Search the configuration
+templates for different instances of this.</li>
+<li>Tracing is configured for <a class="reference external" href="http://lightstep.com/">LightStep</a>. To disable this delete the
+<a class="reference internal" href="../configuration/overview/tracing.html#config-tracing"><span class="std std-ref">tracing configuration</span></a>.</li>
+<li>The configuration demonstrates the use of a <a class="reference internal" href="../intro/arch_overview/global_rate_limiting.html#arch-overview-rate-limit"><span class="std std-ref">global rate limiting service</span></a>. To disable this delete the <a class="reference internal" href="../configuration/overview/rate_limit.html#config-rate-limit-service"><span class="std std-ref">rate limit configuration</span></a>.</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="sandboxes.html" class="btn btn-neutral float-right" title="Sandboxes" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="installation.html" class="btn btn-neutral" title="Installation" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

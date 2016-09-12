@@ -1,0 +1,287 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Health checking &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Architecture overview" href="arch_overview.html"/>
+        <link rel="next" title="Connection pooling" href="connection_pooling.html"/>
+        <link rel="prev" title="Service discovery" href="service_discovery.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="terminology.html">Terminology</a></li>
+<li class="toctree-l3"><a class="reference internal" href="threading_model.html">Threading model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="network_filters.html">Network (L3/L4) filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="http_connection_management.html">HTTP connection management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="http_filters.html">HTTP filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="http_routing.html">HTTP routing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="grpc.html">gRPC</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cluster_manager.html">Cluster manager</a></li>
+<li class="toctree-l3"><a class="reference internal" href="service_discovery.html">Service discovery</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Health checking</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#http-health-checking-filter">HTTP health checking filter</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="connection_pooling.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="load_balancing.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_breaking.html">Circuit breaking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="global_rate_limiting.html">Global rate limiting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ssl.html">TLS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="statistics.html">Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="runtime.html">Runtime configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tracing.html">Tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tcp_proxy.html">TCP proxy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mongo.html">MongoDB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamo.html">DynamoDB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hot_restart.html">Hot restart</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../real_world_deployments.html">Real world deployments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../comparison.html">Comparison to similar systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../getting_help.html">Getting help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../version_history.html">Version history</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../intro.html">Introduction</a> &raquo;</li>
+      
+          <li><a href="arch_overview.html">Architecture overview</a> &raquo;</li>
+      
+    <li>Health checking</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/intro/arch_overview/health_checking.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="health-checking">
+<span id="arch-overview-health-checking"></span><h1>Health checking<a class="headerlink" href="#health-checking" title="Permalink to this headline">¶</a></h1>
+<p>Active health checking can be <a class="reference internal" href="../../configuration/cluster_manager/cluster_hc.html#config-cluster-manager-cluster-hc"><span class="std std-ref">configured</span></a> on a per
+upstream cluster basis. As described in the <a class="reference internal" href="service_discovery.html#arch-overview-service-discovery"><span class="std std-ref">service discovery</span></a> section, active health checking and the SDS service discovery
+type go hand in hand. However, there are other scenarios where active health checking is desired
+even when using the other service discovery types. Envoy supports two different types of health
+checking along with various settings (check interval, failures required before marking a host
+unhealthy, successes required before marking a host healthy, etc.):</p>
+<ul class="simple">
+<li><strong>HTTP</strong>: During HTTP health checking Envoy will send an HTTP request to the upstream host. It
+expects a 200 response if the host is healthy. The upstream host can return 503 if it wants to
+immediately notify downstream hosts to no longer forward traffic to it.</li>
+<li><strong>L3/L4</strong>: During L3/L4 health checking, Envoy will send a configurable byte buffer to the
+upstream host. It expects the byte buffer to be echoed in the response if the host is to be
+considered healthy.</li>
+</ul>
+<div class="section" id="http-health-checking-filter">
+<span id="arch-overview-health-checking-filter"></span><h2>HTTP health checking filter<a class="headerlink" href="#http-health-checking-filter" title="Permalink to this headline">¶</a></h2>
+<p>When an Envoy mesh is deployed with active health checking between clusters, a large amount of
+health checking traffic can be generated. Envoy includes an HTTP health checking filter that can be
+installed in a configured HTTP listener. This filter is capable of a few different modes of
+operation:</p>
+<ul class="simple">
+<li><strong>No pass through</strong>: In this mode, the health check request is never passed to the local service.
+Envoy will respond with a 200 or a 503 depending on the current draining state of the server.</li>
+<li><strong>Pass through</strong>: In this mode, Envoy will pass every health check request to the local service.
+The service is expected to return a 200 or a 503 depending on its health state.</li>
+<li><strong>Pass through with caching</strong>: In this mode, Envoy will pass health check requests to the local
+service, but then cache the result for some period of time. Subsequent health check requests will
+return the cached value up to the cache time. When the cache time is reached, the next health
+check request will be passed to the local service. This is the recommended mode of operation when
+operating a large mesh. Envoy uses persistent connections for health checking traffic and health
+check requests have very little cost to Envoy itself. Thus, this mode of operation yields an
+eventually consistent view of the health state of each upstream host without overwhelming the
+local service with a large number of health check requests.</li>
+</ul>
+<p>The health check filter appends the x-envoy-upstream-healthchecked-cluster header to the response
+headers, the value is determined by the <a class="reference internal" href="../../operations/cli.html#cmdoption--service-cluster"><code class="xref std std-option docutils literal"><span class="pre">--service-cluster</span></code></a> command line option.</p>
+<p>Health check filter <a class="reference internal" href="../../configuration/http_filters/health_check_filter.html#config-http-filters-health-check"><span class="std std-ref">configuration</span></a>.</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="connection_pooling.html" class="btn btn-neutral float-right" title="Connection pooling" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="service_discovery.html" class="btn btn-neutral" title="Service discovery" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

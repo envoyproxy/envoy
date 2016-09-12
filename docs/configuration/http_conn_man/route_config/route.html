@@ -1,0 +1,392 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Route &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../../index.html"/>
+        <link rel="up" title="Route configuration" href="route_config.html"/>
+        <link rel="next" title="Virtual cluster" href="vcluster.html"/>
+        <link rel="prev" title="Virtual host" href="vhost.html"/> 
+
+  
+  <script src="../../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../network_filters/network_filters.html">Network filters</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../http_conn_man.html">HTTP connection manager</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="route_config.html">Route configuration</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="vhost.html">Virtual host</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Route</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vcluster.html">Virtual cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="route_matching.html">Route matching</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../filters.html">Filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../access_log.html">Access logging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../headers.html">HTTP header manipulation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../stats.html">Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../runtime.html">Runtime</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cluster_manager/cluster_manager.html">Cluster manager</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../../configuration.html">Configuration reference</a> &raquo;</li>
+      
+          <li><a href="../http_conn_man.html">HTTP connection manager</a> &raquo;</li>
+      
+          <li><a href="route_config.html">Route configuration</a> &raquo;</li>
+      
+    <li>Route</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../../_sources/configuration/http_conn_man/route_config/route.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="route">
+<span id="config-http-conn-man-route-table-route"></span><h1>Route<a class="headerlink" href="#route" title="Permalink to this headline">¶</a></h1>
+<p>A route is both a specification of how to match a request as well as in indication of what to do
+next (e.g., redirect, forward, rewrite, etc.).</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;prefix&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;path&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;cluster&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;host_redirect&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;path_redirect&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;prefix_rewrite&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;host_rewrite&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;case_sensitive&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;timeout_ms&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;content_type&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;runtime&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;retry_policy&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;rate_limit&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;shadow&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;priority&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>prefix</dt>
+<dd><em>(sometimes required, string)</em> If specified, the route is a prefix rule meaning that the prefix
+must match the beginning of the :path header. Either <em>prefix</em> or <em>path</em> must be specified.</dd>
+<dt>path</dt>
+<dd><em>(sometimes required, string)</em> If specified, the route is an exact path rule meaning that the path
+must exactly match the :path header once the query string is removed. Either <em>prefix</em> or <em>path</em>
+must be specified.</dd>
+</dl>
+<dl class="docutils" id="config-http-conn-man-route-table-route-cluster">
+<dt>cluster</dt>
+<dd><em>(sometimes required, string)</em> If the route is not a redirect (<em>host_redirect</em> and/or
+<em>path_redirect</em> is specified), <em>cluster</em> must be specified and indicates which upstream cluster
+the request should be forwarded to.</dd>
+<dt>host_redirect</dt>
+<dd><em>(sometimes required, string)</em> Indicates that the route is a redirect rule. If there is a match,
+A 302 redirect response will be sent which swaps the host portion of the URL with this value.
+<em>path_redirect</em> can also be specified along with this option.</dd>
+<dt>path_redirect</dt>
+<dd><em>(sometimes required, string)</em> Indicates that the route is a redirect rule. If there is a match,
+A 302 redirect response will be sent which swaps the path portion of the URL with this value.
+<em>host_redirect</em>  can also be specified along with this option.</dd>
+<dt>prefix_rewrite</dt>
+<dd><em>(optional, string)</em> Indicates that during forwarding, the matched prefix (or path) should be
+swapped with this value. This option allows application URLs to be rooted at a different path
+from those exposed at the reverse proxy layer.</dd>
+<dt>host_rewrite</dt>
+<dd><em>(optional, string)</em> Indicates that during forwarding, the host header will be swapped with this
+value.</dd>
+<dt>case_sensitive</dt>
+<dd><em>(optional, string)</em> Indicates that prefix/path matching should be case sensitive. The default
+is true.</dd>
+</dl>
+<dl class="docutils" id="config-http-conn-man-route-table-route-timeout">
+<dt>timeout_ms</dt>
+<dd><em>(optional, integer)</em> Specifies the timeout for the route. If not specified, the default is 15s.
+Note that this timeout includes all retries. See also
+<a class="reference internal" href="../../http_filters/router_filter.html#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a>,
+<a class="reference internal" href="../../http_filters/router_filter.html#config-http-filters-router-x-envoy-upstream-rq-per-try-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-per-try-timeout-ms</span></a>, and the
+<a class="reference internal" href="../../../intro/arch_overview/http_routing.html#arch-overview-http-routing-retry"><span class="std std-ref">retry overview</span></a>.</dd>
+<dt>content_type</dt>
+<dd><em>(optional, string)</em> Indicates that the route should additionally match on the <em>content-type</em>
+HTTP header.</dd>
+<dt><a class="reference internal" href="#config-http-conn-man-route-table-route-runtime"><span class="std std-ref">runtime</span></a></dt>
+<dd><em>(optional, object)</em> Indicates that the route should additionally match on a runtime key.</dd>
+<dt><a class="reference internal" href="#config-http-conn-man-route-table-route-retry"><span class="std std-ref">retry_policy</span></a></dt>
+<dd><em>(optional, object)</em> Indicates that the route has a retry policy.</dd>
+<dt><a class="reference internal" href="#config-http-conn-man-route-table-route-rate-limit"><span class="std std-ref">rate_limit</span></a></dt>
+<dd><em>(optional, object)</em> Indicates that the route has a rate limit policy.</dd>
+<dt><a class="reference internal" href="#config-http-conn-man-route-table-route-shadow"><span class="std std-ref">shadow</span></a></dt>
+<dd><em>(optional, object)</em> Indicates that the route has a shadow policy.</dd>
+<dt>priority</dt>
+<dd><em>(optional, string)</em> Optionally specifies the <a class="reference internal" href="../../../intro/arch_overview/http_routing.html#arch-overview-http-routing-priority"><span class="std std-ref">routing priority</span></a>.</dd>
+</dl>
+<div class="section" id="runtime">
+<span id="config-http-conn-man-route-table-route-runtime"></span><h2>Runtime<a class="headerlink" href="#runtime" title="Permalink to this headline">¶</a></h2>
+<p>A <a class="reference internal" href="../../../intro/arch_overview/runtime.html#arch-overview-runtime"><span class="std std-ref">runtime</span></a> route configuration can be used to roll out route changes
+in a gradual manner without full code/config deploys.</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;default&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>key</dt>
+<dd><em>(required, string)</em> Specifies the runtime key name that should be consulted to determine whether
+the route matches or not. See the <a class="reference internal" href="../../../operations/runtime.html#operations-runtime"><span class="std std-ref">runtime documentation</span></a> for how key
+names map to the underlying implementation.</dd>
+<dt>default</dt>
+<dd><em>(required, integer)</em> An integer between 0-100. Every time the route is considered for a match,
+a random number between 0-99 is selected. If the number is &lt;= the value found in the <em>key</em>
+(checked first) or, if the key is not present, the default value, the route is a match (assuming
+everything also about the route matches).</dd>
+</dl>
+</div>
+<div class="section" id="retry-policy">
+<span id="config-http-conn-man-route-table-route-retry"></span><h2>Retry policy<a class="headerlink" href="#retry-policy" title="Permalink to this headline">¶</a></h2>
+<p>HTTP retry <a class="reference internal" href="../../../intro/arch_overview/http_routing.html#arch-overview-http-routing-retry"><span class="std std-ref">architecture overview</span></a>.</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;retry_on&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;num_retries&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>retry_on</dt>
+<dd><em>(required, string)</em> specifies the conditions under which retry takes place. These are the same
+conditions documented for <a class="reference internal" href="../../http_filters/router_filter.html#config-http-filters-router-x-envoy-retry-on"><span class="std std-ref">x-envoy-retry-on</span></a>.</dd>
+<dt>num_retries</dt>
+<dd><em>(optional, integer)</em> specifies the allowed number of retries. This parameter is optional and
+defaults to 1. These are the same conditions documented for
+<a class="reference internal" href="../../http_filters/router_filter.html#config-http-filters-router-x-envoy-max-retries"><span class="std std-ref">x-envoy-max-retries</span></a>.</dd>
+</dl>
+</div>
+<div class="section" id="rate-limit">
+<span id="config-http-conn-man-route-table-route-rate-limit"></span><h2>Rate limit<a class="headerlink" href="#rate-limit" title="Permalink to this headline">¶</a></h2>
+<p>Global rate limit <a class="reference internal" href="../../../intro/arch_overview/global_rate_limiting.html#arch-overview-rate-limit"><span class="std std-ref">architecture overview</span></a>.</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;global&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>global</dt>
+<dd><em>(optional, boolean)</em> Specifies whether the global rate limit service should be called for a
+request that matches this route. This information is used by the <a class="reference internal" href="../../http_filters/rate_limit_filter.html#config-http-filters-rate-limit"><span class="std std-ref">rate limit filter</span></a> if it is installed. Defaults to false if not specified.</dd>
+</dl>
+</div>
+<div class="section" id="shadow">
+<span id="config-http-conn-man-route-table-route-shadow"></span><h2>Shadow<a class="headerlink" href="#shadow" title="Permalink to this headline">¶</a></h2>
+<p>The router is capable of shadowing traffic from one cluster to another. The current implementation
+is &#8220;fire and forget,&#8221; meaning Envoy will not wait for the shadow cluster to respond before returning
+the response from the primary cluster. All normal statistics are collected however for the shadow
+cluster making thie feature useful for testing.</p>
+<p>During shadowing, the host/authority header is altered such that <em>-shadow</em> is appended. This is
+useful for logging. For example, <em>cluster1</em> becomes <em>cluster1-shadow</em>.</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;cluster&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;runtime_key&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>cluster</dt>
+<dd><em>(required, string)</em> Specifies the cluster that requests will be shadowed to. The cluster must
+exist in the <a class="reference internal" href="../../cluster_manager/cluster_manager.html#config-cluster-manager"><span class="std std-ref">cluster manager configuration</span></a>.</dd>
+<dt>runtime_key</dt>
+<dd><em>(optional, string)</em> If not specified, <strong>all</strong> requests to the target cluster will be shadowed.
+If specified, Envoy will lookup the runtime key to get the % of requests to shadow. Valid values are
+from 0 to 10000, allowing for increments of 0.01% of requests to be shadowed. If the runtime key
+is specified in the configuration but not present in runtime, 0 is the default and thus 0% of
+requests will be shadowed.</dd>
+</dl>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="vcluster.html" class="btn btn-neutral float-right" title="Virtual cluster" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="vhost.html" class="btn btn-neutral" title="Virtual host" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -1,0 +1,578 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Statistics &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Cluster" href="cluster.html"/>
+        <link rel="next" title="Runtime" href="cluster_runtime.html"/>
+        <link rel="prev" title="TLS context" href="cluster_ssl.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../network_filters/network_filters.html">Network filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="cluster_manager.html">Cluster manager</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="cluster.html">Cluster</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="cluster_hc.html">Health checking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster_circuit_breakers.html">Circuit breakers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster_ssl.html">TLS context</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster_runtime.html">Runtime</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sds.html">Service discovery service</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sds_api.html">Service discovery service REST API</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../configuration.html">Configuration reference</a> &raquo;</li>
+      
+          <li><a href="cluster_manager.html">Cluster manager</a> &raquo;</li>
+      
+          <li><a href="cluster.html">Cluster</a> &raquo;</li>
+      
+    <li>Statistics</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/configuration/cluster_manager/cluster_stats.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="statistics">
+<span id="config-cluster-manager-cluster-stats"></span><h1>Statistics<a class="headerlink" href="#statistics" title="Permalink to this headline">¶</a></h1>
+<p>Every cluster has a statistics tree rooted at <em>cluster.&lt;name&gt;.</em> with the following statistics:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>upstream_cx_total</td>
+<td>Counter</td>
+<td>Total connections</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_active</td>
+<td>Gauge</td>
+<td>Total active connections</td>
+</tr>
+<tr class="row-even"><td>upstream_cx_http1_total</td>
+<td>Counter</td>
+<td>Total HTTP/1.1 connections</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_http2_total</td>
+<td>Counter</td>
+<td>Total HTTP/2 connections</td>
+</tr>
+<tr class="row-even"><td>upstream_cx_connect_fail</td>
+<td>Counter</td>
+<td>Total connection failures</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_connect_timeout</td>
+<td>Counter</td>
+<td>Total connection timeouts</td>
+</tr>
+<tr class="row-even"><td>upstream_cx_connect_ms</td>
+<td>Timer</td>
+<td>Connection establishment milliseconds</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_length_ms</td>
+<td>Timer</td>
+<td>Connection length milliseconds</td>
+</tr>
+<tr class="row-even"><td>upstream_cx_destroy</td>
+<td>Counter</td>
+<td>Total destroyed connections</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_destroy_local</td>
+<td>Counter</td>
+<td>Total connections destroyed locally</td>
+</tr>
+<tr class="row-even"><td>upstream_cx_destroy_remote</td>
+<td>Counter</td>
+<td>Total connections destroyed remotely</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_destroy_with_active_rq</td>
+<td>Counter</td>
+<td>Total connections destroyed with 1+ active request</td>
+</tr>
+<tr class="row-even"><td>upstream_cx_destroy_local_with_active_rq</td>
+<td>Counter</td>
+<td>Total connections destroyed locally with 1+ active request</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_destroy_remote_with_active_rq</td>
+<td>Counter</td>
+<td>Total connections destroyed remotely with 1+ active request</td>
+</tr>
+<tr class="row-even"><td>upstream_cx_close_header</td>
+<td>Counter</td>
+<td>Total connections closed via HTTP/1.1 connection close header</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_rx_bytes_total</td>
+<td>Counter</td>
+<td>Total received connection bytes</td>
+</tr>
+<tr class="row-even"><td>upstream_cx_rx_bytes_buffered</td>
+<td>Gauge</td>
+<td>Received connection bytes currently buffered</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_tx_bytes_total</td>
+<td>Counter</td>
+<td>Total sent connection bytes</td>
+</tr>
+<tr class="row-even"><td>upstream_cx_tx_bytes_buffered</td>
+<td>Gauge</td>
+<td>Send connection bytes currently buffered</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_protocol_error</td>
+<td>Counter</td>
+<td>Total connection protocol errors</td>
+</tr>
+<tr class="row-even"><td>upstream_cx_max_requests</td>
+<td>Counter</td>
+<td>Total connections closed due to maximum requests</td>
+</tr>
+<tr class="row-odd"><td>upstream_cx_none_healthy</td>
+<td>Counter</td>
+<td>Total times connection not established due to no healthy hosts</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_total</td>
+<td>Counter</td>
+<td>Total requests</td>
+</tr>
+<tr class="row-odd"><td>upstream_rq_active</td>
+<td>Gauge</td>
+<td>Total active requests</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_pending_total</td>
+<td>Counter</td>
+<td>Total requests pending a connection pool connection</td>
+</tr>
+<tr class="row-odd"><td>upstream_rq_pending_overflow</td>
+<td>Counter</td>
+<td>Total requests that overflowed connection pool circuit breaking and were failed</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_pending_failure_eject</td>
+<td>Counter</td>
+<td>Total requests that were failed due to a connection pool connection failure</td>
+</tr>
+<tr class="row-odd"><td>upstream_rq_pending_active</td>
+<td>Gauge</td>
+<td>Total active requests pending a connection pool connection</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_cancelled</td>
+<td>Counter</td>
+<td>Total requests cancelled before obtaining a connection pool connection</td>
+</tr>
+<tr class="row-odd"><td>upstream_rq_timeout</td>
+<td>Counter</td>
+<td>Total requests that timed out waiting for a response</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_per_try_timeout</td>
+<td>Counter</td>
+<td>Total requests that hit the per try timeout</td>
+</tr>
+<tr class="row-odd"><td>upstream_rq_rx_reset</td>
+<td>Counter</td>
+<td>Total requests that were reset remotely</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_tx_reset</td>
+<td>Counter</td>
+<td>Total requests that were reset locally</td>
+</tr>
+<tr class="row-odd"><td>upstream_rq_retry</td>
+<td>Counter</td>
+<td>Total request retries</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_retry_success</td>
+<td>Counter</td>
+<td>Total request retry successes</td>
+</tr>
+<tr class="row-odd"><td>upstream_rq_retry_overflow</td>
+<td>Counter</td>
+<td>Total requests not retried due to circuit breaking</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_lb_healthy_panic</td>
+<td>Counter</td>
+<td>Total requests load balanced with the load balancer in panic mode</td>
+</tr>
+<tr class="row-odd"><td>membership_change</td>
+<td>Counter</td>
+<td>Total cluster membership changes</td>
+</tr>
+<tr class="row-even"><td>membership_total</td>
+<td>Gauge</td>
+<td>Current cluster membership total</td>
+</tr>
+<tr class="row-odd"><td>update_attempt</td>
+<td>Counter</td>
+<td>Total cluster membership update attempts</td>
+</tr>
+<tr class="row-even"><td>update_success</td>
+<td>Counter</td>
+<td>Total cluster membership update successes</td>
+</tr>
+<tr class="row-odd"><td>update_failure</td>
+<td>Counter</td>
+<td>Total cluster membership update failures</td>
+</tr>
+<tr class="row-even"><td>max_host_weight</td>
+<td>Gauge</td>
+<td>Maximum weight of any host in the cluster</td>
+</tr>
+</tbody>
+</table>
+<div class="section" id="health-check-statistics">
+<h2>Health check statistics<a class="headerlink" href="#health-check-statistics" title="Permalink to this headline">¶</a></h2>
+<p>If health check is configured, the cluster has an additional statistics tree rooted at
+<em>cluster.&lt;name&gt;.health_check.</em> with the following statistics:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>attempt</td>
+<td>Counter</td>
+<td>Number of health checks</td>
+</tr>
+<tr class="row-odd"><td>success</td>
+<td>Counter</td>
+<td>Number of successful health checks</td>
+</tr>
+<tr class="row-even"><td>failure</td>
+<td>Counter</td>
+<td>Number of failed health checks</td>
+</tr>
+<tr class="row-odd"><td>timeout</td>
+<td>Counter</td>
+<td>Number of timed out health checks</td>
+</tr>
+<tr class="row-even"><td>protocol_error</td>
+<td>Counter</td>
+<td>Number of protocol errors</td>
+</tr>
+<tr class="row-odd"><td>verify_cluster</td>
+<td>Counter</td>
+<td>Number of health checks that attempted cluster name verification</td>
+</tr>
+<tr class="row-even"><td>healthy</td>
+<td>Gauge</td>
+<td>Number of healthy members</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="dynamic-http-statistics">
+<span id="config-cluster-manager-cluster-stats-dynamic-http"></span><h2>Dynamic HTTP statistics<a class="headerlink" href="#dynamic-http-statistics" title="Permalink to this headline">¶</a></h2>
+<p>If HTTP is used, dynamic HTTP response code statistics are also available. These are emitted by
+various internal systems as well as some filters such as the <a class="reference internal" href="../http_filters/router_filter.html#config-http-filters-router"><span class="std std-ref">router filter</span></a> and <a class="reference internal" href="../http_filters/rate_limit_filter.html#config-http-filters-rate-limit"><span class="std std-ref">rate limit filter</span></a>. They
+are rooted at <em>cluster.&lt;name&gt;.</em> and contain the following statistics:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>upstream_rq_&lt;*xx&gt;</td>
+<td>Counter</td>
+<td>Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)</td>
+</tr>
+<tr class="row-odd"><td>upstream_rq_&lt;*&gt;</td>
+<td>Counter</td>
+<td>Specific HTTP response codes (e.g., 201, 302, etc.)</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_time</td>
+<td>Timer</td>
+<td>Request time milliseconds</td>
+</tr>
+<tr class="row-odd"><td>canary.upstream_rq_&lt;*xx&gt;</td>
+<td>Counter</td>
+<td>Upstream canary aggregate HTTP response codes</td>
+</tr>
+<tr class="row-even"><td>canary.upstream_rq_&lt;*&gt;</td>
+<td>Counter</td>
+<td>Upstream canary specific HTTP response codes</td>
+</tr>
+<tr class="row-odd"><td>canary.upstream_rq_time</td>
+<td>Timer</td>
+<td>Upstream canary request time milliseconds</td>
+</tr>
+<tr class="row-even"><td>internal.upstream_rq_&lt;*xx&gt;</td>
+<td>Counter</td>
+<td>Internal origin aggregate HTTP response codes</td>
+</tr>
+<tr class="row-odd"><td>internal.upstream_rq_&lt;*&gt;</td>
+<td>Counter</td>
+<td>Internal origin specific HTTP response codes</td>
+</tr>
+<tr class="row-even"><td>internal.upstream_rq_time</td>
+<td>Timer</td>
+<td>Internal origin request time milliseconds</td>
+</tr>
+<tr class="row-odd"><td>external.upstream_rq_&lt;*xx&gt;</td>
+<td>Counter</td>
+<td>External origin aggregate HTTP response codes</td>
+</tr>
+<tr class="row-even"><td>external.upstream_rq_&lt;*&gt;</td>
+<td>Counter</td>
+<td>External origin specific HTTP response codes</td>
+</tr>
+<tr class="row-odd"><td>external.upstream_rq_time</td>
+<td>Timer</td>
+<td>External origin request time milliseconds</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="alternate-tree-dynamic-http-statistics">
+<span id="config-cluster-manager-cluster-stats-alt-tree"></span><h2>Alternate tree dynamic HTTP statistics<a class="headerlink" href="#alternate-tree-dynamic-http-statistics" title="Permalink to this headline">¶</a></h2>
+<p>If alternate tree statistics are configured, they will be present in the
+<em>cluster.&lt;name&gt;.&lt;alt name&gt;.</em> namespace. The statistics produced are the same as documented in
+the dynamic HTTP statistics section <a class="reference internal" href="#config-cluster-manager-cluster-stats-dynamic-http"><span class="std std-ref">above</span></a>.</p>
+</div>
+<div class="section" id="per-service-zone-dynamic-http-statistics">
+<span id="config-cluster-manager-cluster-per-az-stats"></span><h2>Per service zone dynamic HTTP statistics<a class="headerlink" href="#per-service-zone-dynamic-http-statistics" title="Permalink to this headline">¶</a></h2>
+<p>If the service zone is available for the local service (via <a class="reference internal" href="../../operations/cli.html#cmdoption--service-zone"><code class="xref std std-option docutils literal"><span class="pre">--service-zone</span></code></a>)
+and the <a class="reference internal" href="../../intro/arch_overview/service_discovery.html#arch-overview-service-discovery-sds"><span class="std std-ref">upstream cluster</span></a>,
+Envoy will track the following statistics in <em>cluster.&lt;name&gt;.zone.&lt;from_zone&gt;.&lt;to_zone&gt;.</em> namespace.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>upstream_rq_&lt;*xx&gt;</td>
+<td>Counter</td>
+<td>Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)</td>
+</tr>
+<tr class="row-odd"><td>upstream_rq_&lt;*&gt;</td>
+<td>Counter</td>
+<td>Specific HTTP response codes (e.g., 201, 302, etc.)</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_time</td>
+<td>Timer</td>
+<td>Request time milliseconds</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="cluster_runtime.html" class="btn btn-neutral float-right" title="Runtime" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="cluster_ssl.html" class="btn btn-neutral" title="TLS context" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

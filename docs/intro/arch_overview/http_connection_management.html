@@ -1,0 +1,283 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>HTTP connection management &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Architecture overview" href="arch_overview.html"/>
+        <link rel="next" title="HTTP filters" href="http_filters.html"/>
+        <link rel="prev" title="Network (L3/L4) filters" href="network_filters.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="terminology.html">Terminology</a></li>
+<li class="toctree-l3"><a class="reference internal" href="threading_model.html">Threading model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="network_filters.html">Network (L3/L4) filters</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">HTTP connection management</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#http-protocols">HTTP protocols</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#http-access-logging">HTTP access logging</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="http_filters.html">HTTP filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="http_routing.html">HTTP routing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="grpc.html">gRPC</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cluster_manager.html">Cluster manager</a></li>
+<li class="toctree-l3"><a class="reference internal" href="service_discovery.html">Service discovery</a></li>
+<li class="toctree-l3"><a class="reference internal" href="health_checking.html">Health checking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="connection_pooling.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="load_balancing.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_breaking.html">Circuit breaking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="global_rate_limiting.html">Global rate limiting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ssl.html">TLS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="statistics.html">Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="runtime.html">Runtime configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tracing.html">Tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="tcp_proxy.html">TCP proxy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mongo.html">MongoDB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamo.html">DynamoDB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hot_restart.html">Hot restart</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../real_world_deployments.html">Real world deployments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../comparison.html">Comparison to similar systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../getting_help.html">Getting help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../version_history.html">Version history</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../intro.html">Introduction</a> &raquo;</li>
+      
+          <li><a href="arch_overview.html">Architecture overview</a> &raquo;</li>
+      
+    <li>HTTP connection management</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/intro/arch_overview/http_connection_management.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="http-connection-management">
+<span id="arch-overview-http-conn-man"></span><h1>HTTP connection management<a class="headerlink" href="#http-connection-management" title="Permalink to this headline">¶</a></h1>
+<p>HTTP is such a critical component of modern service oriented architectures that Envoy implements a
+large amount of HTTP specific functionality. Envoy has a built in network level filter called the
+<a class="reference internal" href="../../configuration/http_conn_man/http_conn_man.html#config-http-conn-man"><span class="std std-ref">HTTP connection manager</span></a>. This filter translates raw bytes into HTTP
+level messages and events (e.g., headers received, body data received, trailers received, etc.). It
+also handles functionality common to all HTTP connections and requests such as <a class="reference internal" href="#arch-overview-http-access-logs"><span class="std std-ref">access logging</span></a>, <a class="reference internal" href="tracing.html#arch-overview-tracing"><span class="std std-ref">request ID generation and tracing</span></a>,
+<a class="reference internal" href="../../configuration/http_conn_man/headers.html#config-http-conn-man-headers"><span class="std std-ref">request/response header manipulation</span></a>, <a class="reference internal" href="http_routing.html#arch-overview-http-routing"><span class="std std-ref">route table</span></a> management, and <a class="reference internal" href="../../configuration/http_conn_man/stats.html#config-http-conn-man-stats"><span class="std std-ref">statistics</span></a>.</p>
+<p>HTTP connection manager <a class="reference internal" href="../../configuration/http_conn_man/http_conn_man.html#config-http-conn-man"><span class="std std-ref">configuration</span></a>.</p>
+<div class="section" id="http-protocols">
+<span id="arch-overview-http-protocols"></span><h2>HTTP protocols<a class="headerlink" href="#http-protocols" title="Permalink to this headline">¶</a></h2>
+<p>Envoy’s HTTP connection manager has native support for both HTTP/1.1 and HTTP/2. It does not support
+SPDY. Envoy’s HTTP support was designed to first and foremost be an HTTP/2 multiplexing proxy.
+Internally, HTTP/2 terminology is used to describe system components. For example, an HTTP request
+and response take place on a <em>stream</em>. A codec API is used to translate from different wire
+protocols into a protocol agnostic form for streams, requests, responses, etc. In the case of
+HTTP/1.1, the codec translates the serial/pipelining capabilities of the protocol into something
+that looks like HTTP/2 to higher layers. This means that the majority of the code does not need to
+understand whether a stream originated on an HTTP/1.1 or HTTP/2 connection.</p>
+</div>
+<div class="section" id="http-access-logging">
+<span id="arch-overview-http-access-logs"></span><h2>HTTP access logging<a class="headerlink" href="#http-access-logging" title="Permalink to this headline">¶</a></h2>
+<p>The HTTP connection manager supports extensible access
+logging with the following features:</p>
+<ul class="simple">
+<li>Any number of access logs per connection manager.</li>
+<li>Asynchronous IO flushing architecture. Access logging will never block the main network processing
+threads.</li>
+<li>Customizable access log formats using predefined fields as well as arbitrary HTTP request and
+response headers.</li>
+<li>Customizable access log filters that allow different types of requests and responses to be written
+to different access logs.</li>
+</ul>
+<p>HTTP access log <a class="reference internal" href="../../configuration/http_conn_man/access_log.html#config-http-conn-man-access-log"><span class="std std-ref">configuration</span></a>.</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="http_filters.html" class="btn btn-neutral float-right" title="HTTP filters" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="network_filters.html" class="btn btn-neutral" title="Network (L3/L4) filters" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

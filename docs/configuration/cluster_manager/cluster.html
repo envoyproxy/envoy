@@ -1,0 +1,343 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Cluster &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Cluster manager" href="cluster_manager.html"/>
+        <link rel="next" title="Health checking" href="cluster_hc.html"/>
+        <link rel="prev" title="Cluster manager" href="cluster_manager.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../network_filters/network_filters.html">Network filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="cluster_manager.html">Cluster manager</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Cluster</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="cluster_hc.html">Health checking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster_circuit_breakers.html">Circuit breakers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster_ssl.html">TLS context</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster_stats.html">Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster_runtime.html">Runtime</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sds.html">Service discovery service</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sds_api.html">Service discovery service REST API</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../configuration.html">Configuration reference</a> &raquo;</li>
+      
+          <li><a href="cluster_manager.html">Cluster manager</a> &raquo;</li>
+      
+    <li>Cluster</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/configuration/cluster_manager/cluster.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="cluster">
+<span id="config-cluster-manager-cluster"></span><h1>Cluster<a class="headerlink" href="#cluster" title="Permalink to this headline">¶</a></h1>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;connect_timeout_ms&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;lb_type&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;hosts&quot;</span><span class="p">:</span> <span class="p">[],</span>
+  <span class="nt">&quot;service_name&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;health_check&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;max_requests_per_connection&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;circuit_breakers&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;ssl_context&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;features&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;http_codec_options&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;alt_stat_name&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>name</dt>
+<dd><em>(required, string)</em> Supplies the name of the cluster which must be unique across all clusters.
+The cluster name is used when emitting <a class="reference internal" href="cluster_stats.html#config-cluster-manager-cluster-stats"><span class="std std-ref">statistics</span></a>.</dd>
+<dt>type</dt>
+<dd><em>(required, string)</em> The <a class="reference internal" href="../../intro/arch_overview/service_discovery.html#arch-overview-service-discovery-types"><span class="std std-ref">service discovery type</span></a> to
+use for resolving the cluster. Possible options are <em>static</em>, <em>strict_dns</em>, <em>logical_dns</em>, and
+<em>sds</em>.</dd>
+<dt>connect_timeout_ms</dt>
+<dd><em>(required, integer)</em> The timeout for new network connections to hosts in the cluster specified
+in milliseconds.</dd>
+<dt>lb_type</dt>
+<dd><em>(required, string)</em> The <a class="reference internal" href="../../intro/arch_overview/load_balancing.html#arch-overview-load-balancing-types"><span class="std std-ref">load balancer type</span></a> to use
+when picking a host in the cluster. Possible options are <em>round_robin</em>, <em>least_request</em>, and
+<em>random</em>.</dd>
+<dt>hosts</dt>
+<dd><p class="first"><em>(sometimes required, array)</em> If the service discovery type is <em>static</em>, <em>strict_dns</em>, or
+<em>logical_dns</em> the hosts array is required. How it is specified depends on the type of service
+discovery:</p>
+<dl class="last docutils">
+<dt>static</dt>
+<dd><p class="first">Static clusters must use fully resolved hosts that require no DNS lookups. Both TCP and unix
+domain sockets (UDS) addresses are supported. A TCP address looks like:</p>
+<p><code class="docutils literal"><span class="pre">tcp://&lt;ip&gt;:&lt;port&gt;</span></code></p>
+<p>A UDS address looks like:</p>
+<p><code class="docutils literal"><span class="pre">unix://&lt;file</span> <span class="pre">name&gt;</span></code></p>
+<p>A list of addresses can be specified as in the following example:</p>
+<div class="last highlight-json"><div class="highlight"><pre><span></span><span class="p">[{</span><span class="nt">&quot;url&quot;</span><span class="p">:</span> <span class="s2">&quot;tcp://10.0.0.2:1234&quot;</span><span class="p">},</span> <span class="p">{</span><span class="nt">&quot;url&quot;</span><span class="p">:</span> <span class="s2">&quot;tcp://10.0.0.3:5678&quot;</span><span class="p">}]</span>
+</pre></div>
+</div>
+</dd>
+<dt>strict_dns</dt>
+<dd><p class="first">Strict DNS clusters can specify any number of DNS/port combinations. All DNS addresses will be
+resolved and grouped together to form the final cluster. For example:</p>
+<div class="last highlight-json"><div class="highlight"><pre><span></span><span class="p">[{</span><span class="nt">&quot;url&quot;</span><span class="p">:</span> <span class="s2">&quot;tcp://foo1.bar.com:1234&quot;</span><span class="p">},</span> <span class="p">{</span><span class="nt">&quot;url&quot;</span><span class="p">:</span> <span class="s2">&quot;tcp://foo2.bar.com:5678&quot;</span><span class="p">}]</span>
+</pre></div>
+</div>
+</dd>
+<dt>logical_dns</dt>
+<dd><p class="first">Logical DNS clusters specify a host much like strict DNS, however only the first host will be
+used. For example:</p>
+<div class="last highlight-json"><div class="highlight"><pre><span></span><span class="p">[{</span><span class="nt">&quot;url&quot;</span><span class="p">:</span> <span class="s2">&quot;tcp://foo1.bar.com:1234&quot;</span><span class="p">}]</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="docutils" id="config-cluster-manager-cluster-service-name">
+<dt>service_name</dt>
+<dd><em>(sometimes required, string)</em> This parameter is required if the service discovery type is <em>sds</em>.
+It will be passed to the <a class="reference internal" href="sds_api.html#config-cluster-manager-sds-api"><span class="std std-ref">SDS API</span></a> when fetching cluster
+members.</dd>
+<dt><a class="reference internal" href="cluster_hc.html#config-cluster-manager-cluster-hc"><span class="std std-ref">health_check</span></a></dt>
+<dd><em>(optional, object)</em> Optional <a class="reference internal" href="../../intro/arch_overview/health_checking.html#arch-overview-health-checking"><span class="std std-ref">active health checking</span></a>
+configuration for the cluster. If no configuration is specified no health checking will be done
+and all cluster members will be considered healthy at all times.</dd>
+<dt>max_requests_per_connection</dt>
+<dd><em>(optional, integer)</em> Optional maximum requests for a single upstream connection. This
+parameter is respected by both the HTTP/1.1 and HTTP/2 connection pool implementations. If not
+specified, there is no limit. Setting this parameter to 1 will effectively disable keep alive.</dd>
+<dt><a class="reference internal" href="cluster_circuit_breakers.html#config-cluster-manager-cluster-circuit-breakers"><span class="std std-ref">circuit_breakers</span></a></dt>
+<dd><em>(optional, object)</em> Optional <a class="reference internal" href="../../intro/arch_overview/circuit_breaking.html#arch-overview-circuit-break"><span class="std std-ref">circuit breaking</span></a> settings
+for the cluster.</dd>
+<dt><a class="reference internal" href="cluster_ssl.html#config-cluster-manager-cluster-ssl"><span class="std std-ref">ssl_context</span></a></dt>
+<dd><em>(optional, object)</em> The TLS configuration for connections to the upstream cluster. If no TLS
+configuration is specified, TLS will not be used for new connections.</dd>
+</dl>
+<dl class="docutils" id="config-cluster-manager-cluster-features">
+<dt>features</dt>
+<dd><p class="first"><em>(optional, string)</em> A comma delimited list of features that the upstream cluster supports.
+The currently supported features are:</p>
+<dl class="last docutils">
+<dt>http2</dt>
+<dd>If <em>http2</em> is specified, Envoy will assume that the upstream supports HTTP/2 when making new
+HTTP connection pool connections. Currently, Envoy only supports prior knowledge for upstream
+connections. Even if TLS is used with ALPN, <em>http2</em> must be specified. As an aside this allows
+HTTP/2 connections to happen over plain text.</dd>
+</dl>
+</dd>
+</dl>
+<dl class="docutils" id="config-cluster-manager-cluster-http-codec-options">
+<dt>http_codec_options</dt>
+<dd><em>(optional, string)</em> Additional options that are passed directly to the codec when initiating
+HTTP connection pool connections. These are the same options supported in the HTTP connection
+manager <a class="reference internal" href="../http_conn_man/http_conn_man.html#config-http-conn-man-http-codec-options"><span class="std std-ref">http_codec_options</span></a> option. When building
+an HTTP/2 mesh, if it&#8217;s desired to disable HTTP/2 header compression the <em>no_compression</em>
+option should be specified both here as well as in the HTTP connection manager.</dd>
+<dt>alt_stat_name</dt>
+<dd><em>(optional, string)</em> If an alternate stat name is specified, some <a class="reference internal" href="cluster_stats.html#config-cluster-manager-cluster-stats"><span class="std std-ref">statistics</span></a> will be duplicated between the standard statistics and a
+tree specified by this parameter (e.g., <em>cluster.&lt;alt_stat_name&gt;.</em>).</dd>
+</dl>
+<div class="toctree-wrapper compound">
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="cluster_hc.html" class="btn btn-neutral float-right" title="Health checking" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="cluster_manager.html" class="btn btn-neutral" title="Cluster manager" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

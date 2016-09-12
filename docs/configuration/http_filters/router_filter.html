@@ -1,0 +1,442 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Router &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="HTTP filters" href="http_filters.html"/>
+        <link rel="next" title="Cluster manager" href="../cluster_manager/cluster_manager.html"/>
+        <link rel="prev" title="Rate limit" href="rate_limit_filter.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../network_filters/network_filters.html">Network filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../http_conn_man/http_conn_man.html">HTTP connection manager</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="http_filters.html">HTTP filters</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="buffer_filter.html">Buffer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamodb_filter.html">DynamoDB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="grpc_http1_bridge_filter.html">gRPC HTTP/1.1 bridge</a></li>
+<li class="toctree-l3"><a class="reference internal" href="health_check_filter.html">Health check</a></li>
+<li class="toctree-l3"><a class="reference internal" href="rate_limit_filter.html">Rate limit</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Router</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#http-headers">HTTP headers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#statistics">Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#runtime">Runtime</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../cluster_manager/cluster_manager.html">Cluster manager</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../configuration.html">Configuration reference</a> &raquo;</li>
+      
+          <li><a href="http_filters.html">HTTP filters</a> &raquo;</li>
+      
+    <li>Router</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/configuration/http_filters/router_filter.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="router">
+<span id="config-http-filters-router"></span><h1>Router<a class="headerlink" href="#router" title="Permalink to this headline">¶</a></h1>
+<p>The router filter implements HTTP forwarding. It will be used in almost all HTTP proxy scenarios
+that Envoy is deployed for. The filter&#8217;s main job is to follow the instructions specified in the
+configured <a class="reference internal" href="../http_conn_man/route_config/route_config.html#config-http-conn-man-route-table"><span class="std std-ref">route table</span></a>. In addition to forwarding and
+redirection, the filter also handles retry, statistics, etc.</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;decoder&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;router&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;config&quot;</span><span class="p">:</span> <span class="p">{}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="section" id="http-headers">
+<span id="config-http-filters-router-headers"></span><h2>HTTP headers<a class="headerlink" href="#http-headers" title="Permalink to this headline">¶</a></h2>
+<p>The router responds to various HTTP headers both on the egress/request path as well as on the
+ingress/response path. They are documented in this section.</p>
+<div class="contents local topic" id="contents">
+<ul class="simple">
+<li><a class="reference internal" href="#x-envoy-expected-rq-timeout-ms" id="id1">x-envoy-expected-rq-timeout-ms</a></li>
+<li><a class="reference internal" href="#x-envoy-max-retries" id="id2">x-envoy-max-retries</a></li>
+<li><a class="reference internal" href="#x-envoy-retry-on" id="id3">x-envoy-retry-on</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-alt-stat-name" id="id4">x-envoy-upstream-alt-stat-name</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-canary" id="id5">x-envoy-upstream-canary</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-rq-timeout-ms" id="id6">x-envoy-upstream-rq-timeout-ms</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-rq-per-try-timeout-ms" id="id7">x-envoy-upstream-rq-per-try-timeout-ms</a></li>
+<li><a class="reference internal" href="#x-envoy-upstream-service-time" id="id8">x-envoy-upstream-service-time</a></li>
+</ul>
+</div>
+<div class="section" id="x-envoy-expected-rq-timeout-ms">
+<h3><a class="toc-backref" href="#id1">x-envoy-expected-rq-timeout-ms</a><a class="headerlink" href="#x-envoy-expected-rq-timeout-ms" title="Permalink to this headline">¶</a></h3>
+<p>This is the time in milliseconds the router expects the request to be completed. Envoy sets this
+header so that the upstream host receiving the request can make decisions based on the request
+timeout, e.g., early exit. This is set on internal requests and is either taken from the
+<a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a> header or the <a class="reference internal" href="../http_conn_man/route_config/route.html#config-http-conn-man-route-table-route-timeout"><span class="std std-ref">route timeout</span></a>, in that order.</p>
+</div>
+<div class="section" id="x-envoy-max-retries">
+<span id="config-http-filters-router-x-envoy-max-retries"></span><h3><a class="toc-backref" href="#id2">x-envoy-max-retries</a><a class="headerlink" href="#x-envoy-max-retries" title="Permalink to this headline">¶</a></h3>
+<p>If a retry policy is in place, setting this header controls the number of retries that Envoy will
+perform on the request&#8217;s behalf. If the header is not specified and there is no <a class="reference internal" href="../http_conn_man/route_config/route.html#config-http-conn-man-route-table-route-retry"><span class="std std-ref">route
+configuration</span></a> Envoy will perform a single retry. A
+few notes on how Envoy does retries:</p>
+<ul class="simple">
+<li>The route timeout (set via <a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a> or the
+<a class="reference internal" href="../http_conn_man/route_config/route.html#config-http-conn-man-route-table-route-timeout"><span class="std std-ref">route configuration</span></a>) <strong>includes</strong> all
+retries. Thus if the request timeout is set to 3s, and the first request attempt takes 2.7s, the
+retry (including backoff) has .3s to complete. This is by design to avoid an exponential
+retry/timeout explosion.</li>
+<li>Envoy uses a fully jittered exponential backoff algorithm for retries with a base time of 25ms.
+The first retry will be delayed randomly between 0-24ms, the 2nd between 0-74ms, the 3rd between
+0-174ms and so on.</li>
+<li>If max retries is set both by header as well as in the route configuration, the maximum value is
+taken when determining the max retries to use for the request.</li>
+</ul>
+</div>
+<div class="section" id="x-envoy-retry-on">
+<span id="config-http-filters-router-x-envoy-retry-on"></span><h3><a class="toc-backref" href="#id3">x-envoy-retry-on</a><a class="headerlink" href="#x-envoy-retry-on" title="Permalink to this headline">¶</a></h3>
+<p>Setting this header on egress requests will cause Envoy to attempt to retry failed requests. The
+value that the header is set to indicates the retry policy. One or more policies can be specified
+using a &#8216;,&#8217; delimited list. The supported policies are:</p>
+<dl class="docutils">
+<dt>5xx</dt>
+<dd><p class="first">Envoy will attempt a retry if the upstream server responds with any 5xx response code, or does not
+respond at all (disconnect/reset/etc.). (Includes <em>connect-failure</em> and <em>refused-stream</em>)</p>
+<ul class="last simple">
+<li><strong>NOTE:</strong> Envoy will not retry when a request times out (resulting in a 504 error code). This is
+by design. The request timeout is an outer time limit for a request, including any retries that
+take place.</li>
+</ul>
+</dd>
+<dt>connect-failure</dt>
+<dd><p class="first">Envoy will attempt a retry if a request is failed because of a connection failure to the upstream
+server (connect timeout, etc.). (Included in <em>5xx</em>)</p>
+<ul class="last simple">
+<li><strong>NOTE:</strong> A connection failure/timeout is a the TCP level, not the request level. This does not
+include upstream request timeouts specified via
+<a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a> or via <a class="reference internal" href="../http_conn_man/route_config/route.html#config-http-conn-man-route-table-route-retry"><span class="std std-ref">route
+configuration</span></a>.</li>
+</ul>
+</dd>
+<dt>retriable-4xx</dt>
+<dd><p class="first">Envoy will attempt a retry if the upstream server responds with a retriable 4xx response code.
+Currently, the only response code in this category is 409.</p>
+<ul class="last simple">
+<li><strong>NOTE:</strong> Be careful turning on this retry type. There are certain cases where a 409 can indicate
+that an optimistic locking revision needs to be updated. Thus, the caller should not retry and
+needs to read then attempt another write. If a retry happens in this type of case it will always
+fail with another 409.</li>
+</ul>
+</dd>
+<dt>refused-stream</dt>
+<dd>Envoy will attempt a retry if the upstream server resets the stream with a REFUSED_STREAM error
+code. This reset type indicates that a request is safe to retry. (Included in <em>5xx</em>)</dd>
+</dl>
+<p>The number of retries can be controlled via the
+<a class="reference internal" href="#config-http-filters-router-x-envoy-max-retries"><span class="std std-ref">x-envoy-max-retries</span></a> header or via the <a class="reference internal" href="../http_conn_man/route_config/route.html#config-http-conn-man-route-table-route-retry"><span class="std std-ref">route
+configuration</span></a>.</p>
+<p>Note that retry policies can also be applied at the <a class="reference internal" href="../http_conn_man/route_config/route.html#config-http-conn-man-route-table-route-retry"><span class="std std-ref">route level</span></a>.</p>
+<p>By default, Envoy will <em>not</em> perform retries unless you&#8217;ve configured them per above.</p>
+</div>
+<div class="section" id="x-envoy-upstream-alt-stat-name">
+<h3><a class="toc-backref" href="#id4">x-envoy-upstream-alt-stat-name</a><a class="headerlink" href="#x-envoy-upstream-alt-stat-name" title="Permalink to this headline">¶</a></h3>
+<p>Setting this header on egress requests will cause Envoy to emit upstream response code/timing
+statistics to a dual stat tree. This can be useful for application level categories that Envoy
+doesn&#8217;t know about. The output tree is documented <a class="reference internal" href="../cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats-alt-tree"><span class="std std-ref">here</span></a>.</p>
+</div>
+<div class="section" id="x-envoy-upstream-canary">
+<h3><a class="toc-backref" href="#id5">x-envoy-upstream-canary</a><a class="headerlink" href="#x-envoy-upstream-canary" title="Permalink to this headline">¶</a></h3>
+<p>If an upstream host sets this header, the router will use it to generate canary specific statistics.
+The output tree is documented <a class="reference internal" href="../cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats-dynamic-http"><span class="std std-ref">here</span></a>.</p>
+</div>
+<div class="section" id="x-envoy-upstream-rq-timeout-ms">
+<span id="config-http-filters-router-x-envoy-upstream-rq-timeout-ms"></span><h3><a class="toc-backref" href="#id6">x-envoy-upstream-rq-timeout-ms</a><a class="headerlink" href="#x-envoy-upstream-rq-timeout-ms" title="Permalink to this headline">¶</a></h3>
+<p>Setting this header on egress requests will cause Envoy to override the <a class="reference internal" href="../http_conn_man/route_config/route.html#config-http-conn-man-route-table-route-timeout"><span class="std std-ref">route configuration</span></a>. The timeout must be specified in millisecond
+units. See also <a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-per-try-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-per-try-timeout-ms</span></a>.</p>
+</div>
+<div class="section" id="x-envoy-upstream-rq-per-try-timeout-ms">
+<span id="config-http-filters-router-x-envoy-upstream-rq-per-try-timeout-ms"></span><h3><a class="toc-backref" href="#id7">x-envoy-upstream-rq-per-try-timeout-ms</a><a class="headerlink" href="#x-envoy-upstream-rq-per-try-timeout-ms" title="Permalink to this headline">¶</a></h3>
+<p>Setting this header on egress requests will cause Envoy to set a <em>per try</em> timeout on routed
+requests. This timeout must be &lt;= the global route timeout (see
+<a class="reference internal" href="#config-http-filters-router-x-envoy-upstream-rq-timeout-ms"><span class="std std-ref">x-envoy-upstream-rq-timeout-ms</span></a>) or it is ignored. This allows a
+caller to set a tight per try timeout to allow for retries while maintaining a reasonable overall
+timeout.</p>
+</div>
+<div class="section" id="x-envoy-upstream-service-time">
+<h3><a class="toc-backref" href="#id8">x-envoy-upstream-service-time</a><a class="headerlink" href="#x-envoy-upstream-service-time" title="Permalink to this headline">¶</a></h3>
+<p>Contains the time in milliseconds spent by the upstream host processing the request. This is useful
+if the client wants to determine service time compared to network latency. This header is set on
+responses.</p>
+</div>
+</div>
+<div class="section" id="statistics">
+<span id="config-http-filters-router-stats"></span><h2>Statistics<a class="headerlink" href="#statistics" title="Permalink to this headline">¶</a></h2>
+<p>The router outputs many statistics in the cluster namespace (depending on the cluster specified in
+the chosen route). See <a class="reference internal" href="../cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats"><span class="std std-ref">here</span></a> for more information.</p>
+<p>The router filter outputs statistics in the <em>http.&lt;stat_prefix&gt;.</em> namespace. The <a class="reference internal" href="../http_conn_man/http_conn_man.html#config-http-conn-man-stat-prefix"><span class="std std-ref">stat
+prefix</span></a> comes from the owning HTTP connection manager.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>no_route</td>
+<td>Counter</td>
+<td>Total requests that had no route and resulted in a 404</td>
+</tr>
+<tr class="row-odd"><td>rq_redirect</td>
+<td>Counter</td>
+<td>Total requests that resulted in a redirect response</td>
+</tr>
+<tr class="row-even"><td>rq_total</td>
+<td>Counter</td>
+<td>Total routed requests</td>
+</tr>
+</tbody>
+</table>
+<p>Virtual cluster statistics are output in the
+<em>vhost.&lt;virtual host name&gt;.vcluster.&lt;virtual cluster name&gt;.</em> namespace and include the following
+statistics:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="50%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Name</th>
+<th class="head">Type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>upstream_rq_&lt;*xx&gt;</td>
+<td>Counter</td>
+<td>Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)</td>
+</tr>
+<tr class="row-odd"><td>upstream_rq_&lt;*&gt;</td>
+<td>Counter</td>
+<td>Specific HTTP response codes (e.g., 201, 302, etc.)</td>
+</tr>
+<tr class="row-even"><td>upstream_rq_time</td>
+<td>Timer</td>
+<td>Request time milliseconds</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="runtime">
+<h2>Runtime<a class="headerlink" href="#runtime" title="Permalink to this headline">¶</a></h2>
+<p>The router filter supports the following runtime settings:</p>
+<dl class="docutils">
+<dt>upstream.base_retry_backoff_ms</dt>
+<dd>Base exponential retry back off time. See <a class="reference internal" href="../../intro/arch_overview/http_routing.html#arch-overview-http-routing-retry"><span class="std std-ref">here</span></a> for more
+information. Defaults to 25ms.</dd>
+<dt>upstream.maintenance_mode.&lt;cluster name&gt;</dt>
+<dd>% of requests that will result in an immediate 503 response. This overrides any routing behavior
+for requests that would have been destined for &lt;cluster name&gt;. This can be used for load
+shedding, failure injection, etc. Defaults to disabled.</dd>
+<dt>upstream.use_retry</dt>
+<dd>% of requests that are eligible for retry. This configuration is checked before any other retry
+configuration and can be used to fully disable retries across all Envoys if needed.</dd>
+</dl>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../cluster_manager/cluster_manager.html" class="btn btn-neutral float-right" title="Cluster manager" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="rate_limit_filter.html" class="btn btn-neutral" title="Rate limit" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

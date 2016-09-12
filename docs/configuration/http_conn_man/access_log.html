@@ -1,0 +1,429 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Access logging &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="HTTP connection manager" href="http_conn_man.html"/>
+        <link rel="next" title="HTTP header manipulation" href="headers.html"/>
+        <link rel="prev" title="Filters" href="filters.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../network_filters/network_filters.html">Network filters</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="http_conn_man.html">HTTP connection manager</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="route_config/route_config.html">Route configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html">Filters</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Access logging</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#configuration">Configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#format-rules">Format rules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#default-format">Default format</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#filters">Filters</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="headers.html">HTTP header manipulation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stats.html">Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="runtime.html">Runtime</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cluster_manager/cluster_manager.html">Cluster manager</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../configuration.html">Configuration reference</a> &raquo;</li>
+      
+          <li><a href="http_conn_man.html">HTTP connection manager</a> &raquo;</li>
+      
+    <li>Access logging</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/configuration/http_conn_man/access_log.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="access-logging">
+<span id="config-http-conn-man-access-log"></span><h1>Access logging<a class="headerlink" href="#access-logging" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
+<p>Access logs are configured as part of the <a class="reference internal" href="http_conn_man.html#config-http-conn-man"><span class="std std-ref">HTTP connection manager config</span></a>.</p>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;access_log&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;path&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;format&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;filter&quot;</span><span class="p">:</span> <span class="s2">&quot;{...}&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+  <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="docutils" id="config-http-conn-man-access-log-path-param">
+<dt>path</dt>
+<dd><em>(required, string)</em> Path the access log is written to.</dd>
+</dl>
+<dl class="docutils" id="config-http-conn-man-access-log-format-param">
+<dt>format</dt>
+<dd><em>(optional, string)</em> Access log format. Envoy supports <a class="reference internal" href="#config-http-con-manager-access-log-format"><span class="std std-ref">custom access log formats</span></a> as well as a <a class="reference internal" href="#config-http-con-manager-access-log-default-format"><span class="std std-ref">default format</span></a>.</dd>
+</dl>
+<dl class="docutils" id="config-http-conn-man-access-log-filter-param">
+<dt>filter</dt>
+<dd><em>(optional, string)</em> <a class="reference internal" href="#config-http-con-manager-access-log-filters"><span class="std std-ref">Filter</span></a> which is used to
+determine if the access log needs to be written.</dd>
+</dl>
+</div>
+<div class="section" id="format-rules">
+<span id="config-http-con-manager-access-log-format"></span><h2>Format rules<a class="headerlink" href="#format-rules" title="Permalink to this headline">¶</a></h2>
+<p>The access log format string contains either command operators or other characters interpreted as a
+plain string. Note, if one of the parameters are not available &#8216;-&#8216; will be present in the log
+entry. The following command operators are supported:</p>
+<dl class="docutils">
+<dt>%START_TIME%</dt>
+<dd>Request start time including milliseconds.</dd>
+<dt>%BYTES_RECEIVED%</dt>
+<dd>Body bytes received.</dd>
+<dt>%PROTOCOL%</dt>
+<dd>Protocol. Currently either <em>HTTP/1.1</em> or <em>HTTP/2</em>.</dd>
+<dt>%RESPONSE_CODE%</dt>
+<dd>HTTP response code. Note that a response code of &#8216;0&#8217; means that the server never sent the
+beginning of a response. This generally means that the (downstream) client disconnected.</dd>
+<dt>%BYTES_SENT%</dt>
+<dd>Body bytes sent.</dd>
+<dt>%DURATION%</dt>
+<dd>Total duration in milliseconds of the request from the start time to the last byte out.</dd>
+<dt>%FAILURE_REASON%</dt>
+<dd><p class="first">Additional failure reason if any in addition to response code. Possible values are:</p>
+<ul class="last simple">
+<li><strong>LH</strong>: Local service failed <a class="reference internal" href="../../intro/arch_overview/health_checking.html#arch-overview-health-checking"><span class="std std-ref">health check request</span></a> in addition to 503 response code.</li>
+<li><strong>UH</strong>: No healthy upstream hosts in upstream cluster in addition to 503 response code.</li>
+<li><strong>UT</strong>: Upstream request timeout in addition to 504 response code.</li>
+<li><strong>LR</strong>: Connection local reset in addition to 503 response code.</li>
+<li><strong>UR</strong>: Upstream remote reset in addition to 503 response code.</li>
+<li><strong>UF</strong>: Upstream connection failure in addition to 503 response code.</li>
+<li><strong>UC</strong>: Upstream connection termination in addition to 503 response code.</li>
+<li><strong>UO</strong>: Upstream overflow (<a class="reference internal" href="../../intro/arch_overview/circuit_breaking.html#arch-overview-circuit-break"><span class="std std-ref">circuit breaking</span></a>) in addition to 503 response code.</li>
+<li><strong>NR</strong>: No <a class="reference internal" href="../../intro/arch_overview/http_routing.html#arch-overview-http-routing"><span class="std std-ref">route configured</span></a> for a given request in addition to 404 response code.</li>
+</ul>
+</dd>
+<dt>%UPSTREAM_HOST%</dt>
+<dd>Upstream host URL (e.g., <a class="reference external" href="tcp://ip:port">tcp://ip:port</a> for TCP connections).</dd>
+<dt>%REQ(X?Y):Z%</dt>
+<dd>An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
+optional parameter denoting string truncation up to Z characters long. The value is taken from the
+HTTP request header named X first and if it&#8217;s not set, then request header Y is used. If none of
+the headers are present &#8216;-&#8216; symbol will be in the log.</dd>
+<dt>%RESP(X?Y):Z%</dt>
+<dd>Same as <strong>%REQ(X?Y):Z%</strong> but taken from HTTP response headers.</dd>
+</dl>
+</div>
+<div class="section" id="default-format">
+<span id="config-http-con-manager-access-log-default-format"></span><h2>Default format<a class="headerlink" href="#default-format" title="Permalink to this headline">¶</a></h2>
+<p>If custom format is not specified, Envoy uses the following default format:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>[%START_TIME%] &quot;%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%&quot;
+%RESPONSE_CODE% %FAILURE_REASON% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
+%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% &quot;%REQ(X-FORWARDED-FOR)%&quot; &quot;%REQ(USER-AGENT)%&quot;
+&quot;%REQ(X-REQUEST-ID)%&quot; &quot;%REQ(:AUTHORITY)%&quot; &quot;%UPSTREAM_HOST%&quot;
+</pre></div>
+</div>
+<p>Example of the default Envoy access log format:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>[2016-04-15T20:17:00.310Z] &quot;POST /api/v1/locations HTTP/2&quot; 204 - 154 0 226 100 &quot;10.0.35.28&quot;
+&quot;nsq2http&quot; &quot;cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2&quot; &quot;locations&quot; &quot;tcp://10.0.2.1:80&quot;
+</pre></div>
+</div>
+</div>
+<div class="section" id="filters">
+<span id="config-http-con-manager-access-log-filters"></span><h2>Filters<a class="headerlink" href="#filters" title="Permalink to this headline">¶</a></h2>
+<p>Envoy supports the following access log filters:</p>
+<div class="contents local topic" id="contents">
+<ul class="simple">
+<li><a class="reference internal" href="#status-code" id="id1">Status code</a></li>
+<li><a class="reference internal" href="#duration" id="id2">Duration</a></li>
+<li><a class="reference internal" href="#not-health-check" id="id3">Not health check</a></li>
+<li><a class="reference internal" href="#traceable" id="id4">Traceable</a></li>
+<li><a class="reference internal" href="#and" id="id5">And</a></li>
+<li><a class="reference internal" href="#or" id="id6">Or</a></li>
+</ul>
+</div>
+<div class="section" id="status-code">
+<h3><a class="toc-backref" href="#id1">Status code</a><a class="headerlink" href="#status-code" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;filter&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;status_code&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;op&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;runtime_key&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Filters on HTTP response/status code.</p>
+<dl class="docutils">
+<dt>op</dt>
+<dd><em>(required, string)</em> Comparison operator. Currently <em>&gt;=</em> is the only supported operator.</dd>
+<dt>value</dt>
+<dd><em>(required, integer)</em> Default value to compare against if runtime value is not available.</dd>
+<dt>runtime_key</dt>
+<dd><em>(optional, string)</em> Runtime key to get value for comparision. This value is used if defined.</dd>
+</dl>
+</div>
+<div class="section" id="duration">
+<h3><a class="toc-backref" href="#id2">Duration</a><a class="headerlink" href="#duration" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;filter&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;duration&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;op&quot;</span><span class="p">:</span> <span class="s2">&quot;..&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;runtime_key&quot;</span><span class="p">:</span> <span class="s2">&quot;...&quot;</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Filters on total request duration in milliseconds.</p>
+<dl class="docutils">
+<dt>op</dt>
+<dd><em>(required, string)</em> Comparison operator. Currently <em>&gt;=</em> is the only supported operator.</dd>
+<dt>value</dt>
+<dd><em>(required, integer)</em> Default value to compare against if runtime values is not available.</dd>
+<dt>runtime_key</dt>
+<dd><em>(optional, string)</em> Runtime key to get value for comparision. This value is used if defined.</dd>
+</dl>
+</div>
+<div class="section" id="not-health-check">
+<h3><a class="toc-backref" href="#id3">Not health check</a><a class="headerlink" href="#not-health-check" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;filter&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;not_healthcheck&quot;</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Filters for requests that are not health check requests. A health check request is marked by
+the <a class="reference internal" href="../http_filters/health_check_filter.html#config-http-filters-health-check"><span class="std std-ref">health check filter</span></a>.</p>
+</div>
+<div class="section" id="traceable">
+<h3><a class="toc-backref" href="#id4">Traceable</a><a class="headerlink" href="#traceable" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;filter&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;traceable_request&quot;</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Filters for requests that are traceable. See the <a class="reference internal" href="../../intro/arch_overview/tracing.html#arch-overview-tracing"><span class="std std-ref">tracing overview</span></a> for
+more information on how a request becomes traceable.</p>
+</div>
+<div class="section" id="and">
+<h3><a class="toc-backref" href="#id5">And</a><a class="headerlink" href="#and" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;filter&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logical_and&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;filters&quot;</span><span class="p">:</span> <span class="p">[]</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Performs a logical &#8220;and&#8221; operation on the result of each filter in <em>filters</em>. Filters are evaluated
+sequentially and if one of them returns false, the filter returns false immediately.</p>
+</div>
+<div class="section" id="or">
+<h3><a class="toc-backref" href="#id6">Or</a><a class="headerlink" href="#or" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-json"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;filter&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logical_or&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;filters&quot;</span><span class="p">:</span> <span class="p">[]</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Performs a logical &#8220;or&#8221; operation on the result of each individual filter. Filters are evaluated
+sequentially and if one of them returns true, the filter returns true immediately.</p>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="headers.html" class="btn btn-neutral float-right" title="HTTP header manipulation" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="filters.html" class="btn btn-neutral" title="Filters" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -1,0 +1,324 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>HTTP Routing Table &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="index.html"/>
+ 
+
+    <script type="text/javascript">
+      DOCUMENTATION_OPTIONS.COLLAPSE_INDEX = true;
+    </script>
+
+
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install/install.html">Building and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li></li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+
+   <h1>HTTP Routing Table</h1>
+
+   <div class="modindex-jumpbox">
+   <a href="#cap-/"><strong>/</strong></a> | 
+   <a href="#cap-/certs"><strong>/certs</strong></a> | 
+   <a href="#cap-/clusters"><strong>/clusters</strong></a> | 
+   <a href="#cap-/cpuprofiler"><strong>/cpuprofiler</strong></a> | 
+   <a href="#cap-/healthcheck"><strong>/healthcheck</strong></a> | 
+   <a href="#cap-/hot_restart_version"><strong>/hot_restart_version</strong></a> | 
+   <a href="#cap-/logging"><strong>/logging</strong></a> | 
+   <a href="#cap-/quitquitquit"><strong>/quitquitquit</strong></a> | 
+   <a href="#cap-/reset_counters"><strong>/reset_counters</strong></a> | 
+   <a href="#cap-/server_info"><strong>/server_info</strong></a> | 
+   <a href="#cap-/stats"><strong>/stats</strong></a> | 
+   <a href="#cap-/v1"><strong>/v1</strong></a>
+   </div>
+
+   <table class="indextable modindextable" cellspacing="0" cellpadding="2">
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/"><td></td><td>
+       <strong>/</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--"><code class="xref">GET /</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/certs"><td></td><td>
+       <strong>/certs</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--certs"><code class="xref">GET /certs</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/clusters"><td></td><td>
+       <strong>/clusters</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--clusters"><code class="xref">GET /clusters</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/cpuprofiler"><td></td><td>
+       <strong>/cpuprofiler</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--cpuprofiler"><code class="xref">GET /cpuprofiler</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/healthcheck"><td></td><td>
+       <strong>/healthcheck</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--healthcheck-fail"><code class="xref">GET /healthcheck/fail</code></a></td><td>
+       <em></em></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--healthcheck-ok"><code class="xref">GET /healthcheck/ok</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/hot_restart_version"><td></td><td>
+       <strong>/hot_restart_version</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--hot_restart_version"><code class="xref">GET /hot_restart_version</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/logging"><td></td><td>
+       <strong>/logging</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--logging"><code class="xref">GET /logging</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/quitquitquit"><td></td><td>
+       <strong>/quitquitquit</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--quitquitquit"><code class="xref">GET /quitquitquit</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/reset_counters"><td></td><td>
+       <strong>/reset_counters</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--reset_counters"><code class="xref">GET /reset_counters</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/server_info"><td></td><td>
+       <strong>/server_info</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--server_info"><code class="xref">GET /server_info</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/stats"><td></td><td>
+       <strong>/stats</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="operations/admin.html#get--stats"><code class="xref">GET /stats</code></a></td><td>
+       <em></em></td></tr>
+     <tr class="pcap"><td></td><td>&nbsp;</td><td></td></tr>
+     <tr class="cap" id="cap-/v1"><td></td><td>
+       <strong>/v1</strong></td><td></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="configuration/network_filters/client_ssl_auth_filter.html#get--v1-certs-list-approved"><code class="xref">GET /v1/certs/list/approved</code></a></td><td>
+       <em></em></td></tr>
+     <tr>
+       <td></td>
+       <td>
+       <a href="configuration/cluster_manager/sds_api.html#get--v1-registration-(string- service_name)"><code class="xref">GET /v1/registration/(string: service_name)</code></a></td><td>
+       <em></em></td></tr>
+   </table>
+
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

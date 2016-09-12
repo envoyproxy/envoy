@@ -1,0 +1,279 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Service to service only &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Deployment types" href="deployment_types.html"/>
+        <link rel="next" title="Service to service plus front proxy" href="front_proxy.html"/>
+        <link rel="prev" title="Deployment types" href="deployment_types.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../arch_overview/arch_overview.html">Architecture overview</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="deployment_types.html">Deployment types</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Service to service only</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#service-to-service-egress-listener">Service to service egress listener</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#service-to-service-ingress-listener">Service to service ingress listener</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#optional-external-service-egress-listeners">Optional external service egress listeners</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#discovery-service-integration">Discovery service integration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#configuration-template">Configuration template</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="front_proxy.html">Service to service plus front proxy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="double_proxy.html">Service to service, front proxy, and double proxy</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../real_world_deployments.html">Real world deployments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../comparison.html">Comparison to similar systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../getting_help.html">Getting help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../version_history.html">Version history</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../install/install.html">Building and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../intro.html">Introduction</a> &raquo;</li>
+      
+          <li><a href="deployment_types.html">Deployment types</a> &raquo;</li>
+      
+    <li>Service to service only</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/intro/deployment_types/service_to_service.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="service-to-service-only">
+<span id="deployment-type-service-to-service"></span><h1>Service to service only<a class="headerlink" href="#service-to-service-only" title="Permalink to this headline">¶</a></h1>
+<a class="reference internal image-reference" href="../../_images/service_to_service.svg"><img alt="../../_images/service_to_service.svg" src="../../_images/service_to_service.svg" width="60%" /></a>
+<p>The above diagram shows the simplest Envoy deployment which uses Envoy as a communication bus for
+all traffic internal to a service oriented architecture (SOA). In this scenario, Envoy exposes
+several listeners that are used for local origin traffic as well as service to service traffic.</p>
+<div class="section" id="service-to-service-egress-listener">
+<h2>Service to service egress listener<a class="headerlink" href="#service-to-service-egress-listener" title="Permalink to this headline">¶</a></h2>
+<p>This is the port used by applications to talk to other services in the infrastructure. For example,
+<em>http://localhost:9001</em>. HTTP and gRPC requests use the HTTP/1.1 <em>host</em> header or the HTTP/2
+<em>:authority</em> header to indicate which remote cluster the request is destined for. Envoy handles
+service discovery, load balancing, rate limiting, etc. depending on the details in the
+configuration. Services only need to know about the local Envoy and do not need to concern
+themselves with network topology, whether they are running in development or production, etc.</p>
+<p>This listener supports both HTTP/1.1 or HTTP/2 depending on the capabilities of the application.</p>
+</div>
+<div class="section" id="service-to-service-ingress-listener">
+<span id="deployment-type-service-to-service-ingress"></span><h2>Service to service ingress listener<a class="headerlink" href="#service-to-service-ingress-listener" title="Permalink to this headline">¶</a></h2>
+<p>This is the port used by remote Envoys when they want to talk to the local Envoy. For example,
+<em>http://localhost:9211</em>. Incoming requests are routed to the local service on the configured
+port(s). Multiple application ports may be involved depending on application or load balancing
+needs (for example if the service needs both an HTTP port and a gRPC port). The local Envoy
+performs buffering, circuit breaking, etc. as needed.</p>
+<p>Our default configurations use HTTP/2 for all Envoy to Envoy communication, regardless of whether
+the application uses HTTP/1.1 or HTTP/2 when egressing out of a local Envoy. HTTP/2 provides
+better performance via long lived connections and explicit reset notifications.</p>
+</div>
+<div class="section" id="optional-external-service-egress-listeners">
+<h2>Optional external service egress listeners<a class="headerlink" href="#optional-external-service-egress-listeners" title="Permalink to this headline">¶</a></h2>
+<p>Generally, an explicit egress port is used for each external service that a local service wants
+to talk to. This is done because some external service SDKs do not easily support overriding the
+<em>host</em> header to allow for standard HTTP reverse proxy behavior. For example,
+<em>http://localhost:9250</em> might be allocated for connections destined for DynamoDB. Instead of using
+<em>host</em> routing for some external services and dedicated local port routing for others, we recommend
+being consistent and using local port routing for all external services.</p>
+</div>
+<div class="section" id="discovery-service-integration">
+<h2>Discovery service integration<a class="headerlink" href="#discovery-service-integration" title="Permalink to this headline">¶</a></h2>
+<p>The recommended service to service configuration uses an external discovery service for all cluster
+lookups. This provides Envoy with the most detailed information possible for use when performing
+load balancing, statistics gathering, etc.</p>
+</div>
+<div class="section" id="configuration-template">
+<h2>Configuration template<a class="headerlink" href="#configuration-template" title="Permalink to this headline">¶</a></h2>
+<p>The source distribution includes an example service to service configuration that is very similar to
+the version that Lyft runs in production. See <a class="reference internal" href="../../install/ref_configs.html#install-ref-configs"><span class="std std-ref">here</span></a> for more
+information.</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="front_proxy.html" class="btn btn-neutral float-right" title="Service to service plus front proxy" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="deployment_types.html" class="btn btn-neutral" title="Deployment types" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

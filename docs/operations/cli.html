@@ -1,0 +1,299 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Command line options &mdash; envoy 1.0.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="envoy 1.0.0 documentation" href="../index.html"/>
+        <link rel="up" title="Operations and administration" href="operations.html"/>
+        <link rel="next" title="Hot restart Python wrapper" href="hot_restarter.html"/>
+        <link rel="prev" title="Operations and administration" href="operations.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> envoy
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install/install.html">Building and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="operations.html">Operations and administration</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Command line options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hot_restarter.html">Hot restart Python wrapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="admin.html">Administration interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stats_overview.html">Statistics overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime.html">Runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fs_flags.html">File system flags</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../extending/extending.html">Extending Envoy for custom use cases</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">envoy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="operations.html">Operations and administration</a> &raquo;</li>
+      
+    <li>Command line options</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/operations/cli.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="command-line-options">
+<h1>Command line options<a class="headerlink" href="#command-line-options" title="Permalink to this headline">¶</a></h1>
+<p>Envoy is driven both by a JSON configuration file as well as a set of command line options. The
+following are the command line options that Envoy supports.</p>
+<dl class="option">
+<dt id="cmdoption-c">
+<span id="cmdoption--config-path"></span><code class="descname">-c</code><code class="descclassname"> &lt;path string&gt;</code><code class="descclassname">, </code><code class="descname">--config-path</code><code class="descclassname"> &lt;path string&gt;</code><a class="headerlink" href="#cmdoption-c" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(required)</em> The path to the <a class="reference internal" href="../configuration/configuration.html#config"><span class="std std-ref">JSON configuration file</span></a>.</p>
+</dd></dl>
+
+<dl class="option">
+<dt id="cmdoption--base-id">
+<code class="descname">--base-id</code><code class="descclassname"> &lt;integer&gt;</code><a class="headerlink" href="#cmdoption--base-id" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(optional)</em> The base ID to use when allocating shared memory regions. Envoy uses shared memory
+regions during <a class="reference internal" href="../intro/arch_overview/hot_restart.html#arch-overview-hot-restart"><span class="std std-ref">hot restart</span></a>. Most users will never have to
+set this option. However, if Envoy needs to be run multiple times on the same machine, each
+running Envoy will need a unique base ID so that the shared memory regions do not conflict.</p>
+</dd></dl>
+
+<dl class="option">
+<dt id="cmdoption--concurrency">
+<code class="descname">--concurrency</code><code class="descclassname"> &lt;integer&gt;</code><a class="headerlink" href="#cmdoption--concurrency" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(optional)</em> The number of <a class="reference internal" href="../intro/arch_overview/threading_model.html#arch-overview-threading"><span class="std std-ref">worker threads</span></a> to run. If not
+specified defaults to the number of hardware threads on the machine.</p>
+</dd></dl>
+
+<dl class="option">
+<dt id="cmdoption-l">
+<span id="cmdoption--log-level"></span><code class="descname">-l</code><code class="descclassname"> &lt;integer&gt;</code><code class="descclassname">, </code><code class="descname">--log-level</code><code class="descclassname"> &lt;integer&gt;</code><a class="headerlink" href="#cmdoption-l" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(optional)</em> The logging level. Defaults to <em>NOTICE</em>. Non developers should never set this option.</p>
+</dd></dl>
+
+<dl class="option">
+<dt id="cmdoption--restart-epoch">
+<code class="descname">--restart-epoch</code><code class="descclassname"> &lt;integer&gt;</code><a class="headerlink" href="#cmdoption--restart-epoch" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(optional)</em> The <a class="reference internal" href="../intro/arch_overview/hot_restart.html#arch-overview-hot-restart"><span class="std std-ref">hot restart</span></a> epoch. (The number of times
+Envoy has been hot restarted instead of a fresh start). Defaults to 0 for the first start. This
+option tells Envoy whether to attempt to create the shared memory region needed for hot restart,
+or whether to open an existing one. It should be incremented every time a hot restart takes place.
+The <a class="reference internal" href="hot_restarter.html#operations-hot-restarter"><span class="std std-ref">hot restart wrapper</span></a> sets the <em>RESTART_EPOCH</em> environment
+variable which should be passed to this option in most cases.</p>
+</dd></dl>
+
+<dl class="option">
+<dt id="cmdoption--hot-restart-version">
+<code class="descname">--hot-restart-version</code><code class="descclassname"></code><a class="headerlink" href="#cmdoption--hot-restart-version" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(optional)</em> Outputs an opaque hot restart compatibility version for the binary. This can be
+matched against the output of the <a class="reference internal" href="admin.html#get--hot_restart_version" title="GET /hot_restart_version"><code class="xref http http-get docutils literal"><span class="pre">GET</span> <span class="pre">/hot_restart_version</span></code></a> admin endpoint to determine
+whether the new binary and the running binary are hot restart compatible.</p>
+</dd></dl>
+
+<dl class="option">
+<dt id="cmdoption--service-cluster">
+<code class="descname">--service-cluster</code><code class="descclassname"> &lt;string&gt;</code><a class="headerlink" href="#cmdoption--service-cluster" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(optional)</em> Defines the local service cluster name where Envoy is running. Though optional,
+it should be set if any of the following features are used: <a class="reference internal" href="../intro/arch_overview/statistics.html#arch-overview-statistics"><span class="std std-ref">statsd</span></a>, <a class="reference internal" href="../configuration/cluster_manager/cluster_hc.html#config-cluster-manager-cluster-hc-service-name"><span class="std std-ref">health check cluster verification</span></a>, <a class="reference internal" href="../configuration/overview/runtime.html#config-runtime-override-subdirectory"><span class="std std-ref">runtime override directory</span></a>, <a class="reference internal" href="../configuration/http_conn_man/http_conn_man.html#config-http-conn-man-add-user-agent"><span class="std std-ref">user agent addition</span></a>, <a class="reference internal" href="../configuration/http_filters/rate_limit_filter.html#config-http-filters-rate-limit"><span class="std std-ref">HTTP global rate limiting</span></a>, and <a class="reference internal" href="../intro/arch_overview/tracing.html#arch-overview-tracing"><span class="std std-ref">HTTP tracing</span></a>.</p>
+</dd></dl>
+
+<dl class="option">
+<dt id="cmdoption--service-node">
+<code class="descname">--service-node</code><code class="descclassname"> &lt;string&gt;</code><a class="headerlink" href="#cmdoption--service-node" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(optional)</em> Defines the local service node name where Envoy is running. Though optional,
+it should be set if any of the following features are used: <a class="reference internal" href="../intro/arch_overview/statistics.html#arch-overview-statistics"><span class="std std-ref">statsd</span></a>, and <a class="reference internal" href="../intro/arch_overview/tracing.html#arch-overview-tracing"><span class="std std-ref">HTTP tracing</span></a>.</p>
+</dd></dl>
+
+<dl class="option">
+<dt id="cmdoption--service-zone">
+<code class="descname">--service-zone</code><code class="descclassname"> &lt;string&gt;</code><a class="headerlink" href="#cmdoption--service-zone" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(optional)</em> Defines the local service zone where Envoy is running. Though optional, it should
+be set if discovery service routing is used and the discovery service exposes <a class="reference internal" href="../configuration/cluster_manager/sds_api.html#config-cluster-manager-sds-api-host-az"><span class="std std-ref">zone data</span></a>.</p>
+</dd></dl>
+
+<dl class="option">
+<dt id="cmdoption--file-flush-interval-msec">
+<code class="descname">--file-flush-interval-msec</code><code class="descclassname"> &lt;integer&gt;</code><a class="headerlink" href="#cmdoption--file-flush-interval-msec" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(optional)</em> The file flushing interval in milliseconds. Defaults to 10 seconds.
+This setting is used during file creation to determine the duration between flushes
+of buffers to files. The buffer will flush every time it gets full, or every time
+the interval has elapsed, whichever comes first. Adjusting this setting is useful
+when tailing <a class="reference internal" href="../intro/arch_overview/http_connection_management.html#arch-overview-http-access-logs"><span class="std std-ref">access logs</span></a> in order to
+get more (or less) immediate flushing.</p>
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="hot_restarter.html" class="btn btn-neutral float-right" title="Hot restart Python wrapper" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="operations.html" class="btn btn-neutral" title="Operations and administration" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Lyft.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.0.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
