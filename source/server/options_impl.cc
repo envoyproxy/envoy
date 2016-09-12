@@ -26,9 +26,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
                                             cmd);
   TCLAP::ValueArg<std::string> service_zone("", "service-zone", "Zone name", false, "", "string",
                                             cmd);
-  TCLAP::ValueArg<uint64_t> log_flush_msec("", "log-flush-msec", "Interval for log flushing in msec", 
-                                           false, 10000,  "uint64_t", cmd);
-
+  TCLAP::ValueArg<uint64_t> log_flush_msec(
+      "", "log-flush-msec", "Interval for log flushing in msec", false, 10000, "uint64_t", cmd);
 
   try {
     cmd.parse(argc, argv);
