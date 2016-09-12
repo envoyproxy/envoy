@@ -33,7 +33,7 @@ struct ListenerStats {
  */
 class ConnectionHandler final : NonCopyable {
 public:
-  ConnectionHandler(Stats::Store& stats_store, spdlog::logger& logger);
+  ConnectionHandler(Stats::Store& stats_store, spdlog::logger& logger, std::chrono::milliseconds flush_interval_msec = std::chrono::milliseconds(10000));
   ~ConnectionHandler();
 
   Api::Api& api() { return *api_; }
