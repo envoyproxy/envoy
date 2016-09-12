@@ -52,14 +52,15 @@ Service discovery service (SDS)
 
 The *service discovery service* is a generic :ref:`REST based API <config_cluster_manager_sds_api>`
 used by Envoy to fetch cluster members. Lyft provides a reference implementation via the Python
-discovery service. That implementation uses AWS DynamoDB as the backing store, however the API is
-simple enough that it could easily be implemented on top of a variety of different backing stores.
-For each SDS cluster, Envoy will periodically fetch the cluster members from the discovery service.
-SDS is the preferred service discovery mechanism for a few reasons:
+`discovery service <https://github.com/lyft/discovery>`_. That implementation uses AWS DynamoDB as
+the backing store, however the API is simple enough that it could easily be implemented on top of a
+variety of different backing stores. For each SDS cluster, Envoy will periodically fetch the cluster
+members from the discovery service. SDS is the preferred service discovery mechanism for a few
+reasons:
 
 * Envoy has explicit knowledge of each upstream host (vs. routing through a DNS resolved load
   balancer) and can make more intelligent load balancing decisions.
-* Extra attributes carried in the discovery API response for each host inform Envoy of the host’s 
+* Extra attributes carried in the discovery API response for each host inform Envoy of the host’s
   load balancing weight, canary status, zone, etc. These additional attributes are used globally
   by the Envoy mesh during load balancing, statistic gathering, etc.
 

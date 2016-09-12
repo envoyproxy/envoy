@@ -1,4 +1,4 @@
-# Envoy
+![Envoy Logo](docs/envoy-logo-bg.png)
 
 C++ L7 proxy and communication bus
 

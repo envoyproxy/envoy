@@ -3,7 +3,8 @@
 Service discovery service REST API
 ==================================
 
-Envoy expects the service discovery service to expose the following API:
+Envoy expects the service discovery service to expose the following API (See Lyft's
+`reference implementation <https://github.com/lyft/discovery>`_):
 
 .. http:get:: /v1/registration/(string: service_name)
 
