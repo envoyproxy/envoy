@@ -16,14 +16,11 @@ Below you can see a graphic showing the docker compose deployment:
 
 All incoming requests are routed via the front envoy, which is acting as a reverse proxy sitting on
 the edge of the ``envoymesh`` network. Port ``80`` is mapped to  port ``8000`` by docker compose
-(see `docker-compose.yml
-<https://github.com/lyft/envoy/blob/docker-example/example/docker-compose.yml>`_). Moreover, notice
+(see :repo:`/example/docker-compose.yml>`). Moreover, notice
 that all  traffic routed by the front envoy to the service containers is actually routed to the
-service envoys (routes setup in `front-envoy.json
-<https://github.com/lyft/envoy/blob/docker-example/example/front-envoy.json>`_). In turn the service
+service envoys (routes setup in :repo:`/example/front-envoy.json>`). In turn the service
 envoys route the  request to the flask app via the loopback address (routes setup in
-`service-envoy.json
-<https://github.com/lyft/envoy/blob/docker-example/example/service-envoy.json>`_). This setup
+:repo:`/example/service-envoy.json>`). This setup
 illustrates the advantage of running service envoys  collocated with your services: all requests are
 handled by the service envoy, and efficiently routed to your services.
 
