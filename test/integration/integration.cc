@@ -202,7 +202,7 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {
 }
 
 BaseIntegrationTest::BaseIntegrationTest()
-    : api_(new Api::Impl()), dispatcher_(api_->allocateDispatcher()) {
+    : api_(new Api::Impl(std::chrono::milliseconds(10000))), dispatcher_(api_->allocateDispatcher()) {
 
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.

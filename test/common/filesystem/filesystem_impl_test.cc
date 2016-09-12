@@ -20,7 +20,7 @@ TEST(FileSystemImpl, BadFile) {
   Thread::MutexBasicLockable lock;
   Stats::IsolatedStoreImpl store;
   Filesystem::OsSysCallsImpl os_sys_calls;
-  EXPECT_THROW(Filesystem::FileImpl("", dispatcher, lock, os_sys_calls, store), EnvoyException);
+  EXPECT_THROW(Filesystem::FileImpl("", dispatcher, lock, os_sys_calls, store, std::chrono::milliseconds(10000)), EnvoyException);
 }
 
 TEST(FileSystemImpl, fileExists) {

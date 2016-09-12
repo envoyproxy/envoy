@@ -42,7 +42,7 @@ BufferingStreamDecoderPtr IntegrationUtil::makeSingleRequest(uint32_t port, std:
                                                              std::string url,
                                                              Http::CodecClient::Type type,
                                                              std::string host) {
-  Api::Impl api;
+  Api::Impl api = Api::Impl(std::chrono::milliseconds(10000));
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   Stats::IsolatedStoreImpl stats_store;
   Http::CodecClientStats stats{ALL_CODEC_CLIENT_STATS(POOL_COUNTER(stats_store))};
@@ -66,7 +66,7 @@ BufferingStreamDecoderPtr IntegrationUtil::makeSingleRequest(uint32_t port, std:
 
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
                                          ReadCallback data_callback) {
-  api_.reset(new Api::Impl());
+  api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
   dispatcher_ = api_->allocateDispatcher();
   client_ = dispatcher_->createClientConnection(fmt::format("tcp://127.0.0.1:{}", port));
   client_->addReadFilter(Network::ReadFilterPtr{new ForwardingFilter(*this, data_callback)});
