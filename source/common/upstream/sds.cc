@@ -109,7 +109,8 @@ void SdsClusterImpl::refreshHosts() {
                                      "/v1/registration/" + service_name_);
   message->headers().addViaMoveValue(Http::Headers::get().Host, "sds");
   active_request_ = cm_.httpAsyncClientForCluster(sds_config_.sds_cluster_name_)
-                        .send(std::move(message), *this, Optional<std::chrono::milliseconds>());
+                        .send(std::move(message), *this,
+                              Optional<std::chrono::milliseconds>(std::chrono::milliseconds(1000)));
 }
 
 void SdsClusterImpl::requestComplete() {
