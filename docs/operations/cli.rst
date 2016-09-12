@@ -60,3 +60,11 @@ following are the command line options that Envoy supports.
   *(optional)* Defines the local service zone where Envoy is running. Though optional, it should
   be set if discovery service routing is used and the discovery service exposes :ref:`zone data
   <config_cluster_manager_sds_api_host_az>`.
+
+.. option:: --flush-interval-msec <string>
+
+  *(optional)* The time duration in msec between flushing of logs. Bare in mind 
+  that the logs have a buffer that when full flushes to the file specified in the envoy
+  config. However, if the interval is up and the buffer hasn't filled up, the log will flush. 
+  This option currently, universally changes the rate of log flushing for all logs created with 
+  the api call `createFile`. An example of where this affects log flushing can be seen here :repo:`/source/common/http/access_log_impl.cc`.
