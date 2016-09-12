@@ -57,7 +57,7 @@ class FileImpl : public File {
 public:
   FileImpl(const std::string& path, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
            OsSysCalls& osSysCalls, Stats::Store& stats_store,
-           std::chrono::milliseconds flush_interval_msec = FLUSH_INTERVAL_MSEC);
+           std::chrono::milliseconds flush_interval_msec);
   ~FileImpl();
 
   // Filesystem::File
@@ -79,8 +79,6 @@ private:
 
   // Minimum size before the flush thread will be told to flush.
   static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;
-  // Time interval buffer gets flushed no matter if it reached the MIN_FLUSH_SIZE or not.
-  static const std::chrono::milliseconds FLUSH_INTERVAL_MSEC;
 
   int fd_;
   std::string path_;
@@ -93,6 +91,7 @@ private:
   Event::TimerPtr flush_timer_;
   Event::Dispatcher& dispatcher_;
   OsSysCalls& os_sys_calls_;
+  // Time interval buffer gets flushed no matter if it reached the MIN_FLUSH_SIZE or not.
   const std::chrono::milliseconds flush_interval_msec_;
   FileSystemStats stats_;
 };
