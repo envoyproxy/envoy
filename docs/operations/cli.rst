@@ -67,4 +67,5 @@ following are the command line options that Envoy supports.
   that the logs have a buffer that when full flushes to the file specified in the envoy
   config. However, if the interval is up and the buffer hasn't filled up, the log will flush. 
   This option currently, universally changes the rate of log flushing for all logs created with 
-  the api call `createFile`. An example of where this affects log flushing can be seen here :repo:`/source/common/http/access_log_impl.cc`.
+  the api call `createFile`. An example of where this affects log flushing can be seen here 
+  :repo:`/source/common/mongo/proxy.cc`.
