@@ -21,7 +21,7 @@ public:
 
 private:
   Filesystem::OsSysCallsPtr os_sys_calls_;
-  std::chrono::milliseconds flush_interval_msec_;
+  std::chrono::milliseconds file_flush_interval_msec_;
 };
 
 } // Api

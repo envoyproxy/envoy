@@ -61,7 +61,7 @@ following are the command line options that Envoy supports.
   be set if discovery service routing is used and the discovery service exposes :ref:`zone data
   <config_cluster_manager_sds_api_host_az>`.
 
-.. option:: --flush-interval-msec <string>
+.. option:: --file-flush-interval-msec <string>
 
   *(optional)* The file flushing interval in milliseconds. Defaults to 10 seconds.
   This setting is used during file creation to determine the duration between flushes

@@ -10,7 +10,7 @@ Event::DispatcherPtr Impl::allocateDispatcher() {
 }
 
 Impl::Impl(std::chrono::milliseconds flush_interval_msec)
-    : os_sys_calls_(new Filesystem::OsSysCallsImpl()), flush_interval_msec_(flush_interval_msec) {}
+    : os_sys_calls_(new Filesystem::OsSysCallsImpl()), file_flush_interval_msec_(file_flush_interval_msec) {}
 
 Filesystem::FilePtr Impl::createFile(const std::string& path, Event::Dispatcher& dispatcher,
                                      Thread::BasicLockable& lock, Stats::Store& stats_store) {
