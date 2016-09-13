@@ -16,7 +16,7 @@ typedef std::map<Server::Configuration::Listener*, Network::TcpListenSocketPtr> 
 class Worker : Logger::Loggable<Logger::Id::main> {
 public:
   Worker(Stats::Store& stats_store, ThreadLocal::Instance& tls,
-         std::chrono::milliseconds flush_interval_msec);
+         std::chrono::milliseconds file_flush_interval_msec);
   ~Worker();
 
   Event::Dispatcher& dispatcher() { return handler_->dispatcher(); }
