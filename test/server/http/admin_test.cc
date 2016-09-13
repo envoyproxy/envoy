@@ -9,8 +9,9 @@ namespace Server {
 
 class AdminFilterTest : public testing::Test {
 public:
+  // TODO: Switch to mocks and do not bind to a real port.
   AdminFilterTest()
-      : admin_("/dev/null", 9001, server_), filter_(admin_), request_headers_{{":path", "/"}} {
+      : admin_("/dev/null", 9002, server_), filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
