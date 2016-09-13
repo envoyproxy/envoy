@@ -7,8 +7,8 @@
 #include "common/api/api_impl.h"
 
 ConnectionHandler::ConnectionHandler(Stats::Store& stats_store, spdlog::logger& logger,
-                                     std::chrono::milliseconds flush_interval_msec)
-    : stats_store_(stats_store), logger_(logger), api_(new Api::Impl(flush_interval_msec)),
+                                     std::chrono::milliseconds file_flush_interval_msec)
+    : stats_store_(stats_store), logger_(logger), api_(new Api::Impl(file_flush_interval_msec)),
       dispatcher_(api_->allocateDispatcher()),
       watchdog_miss_counter_(stats_store.counter("server.watchdog_miss")),
       watchdog_mega_miss_counter_(stats_store.counter("server.watchdog_mega_miss")) {}
