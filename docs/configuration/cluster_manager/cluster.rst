@@ -58,7 +58,7 @@ hosts
 
     .. code-block:: json
 
-      ["tcp://10.0.0.2:1234", "tcp://10.0.0.3:5678"]
+      [{"url": "tcp://10.0.0.2:1234"}, {"url": "tcp://10.0.0.3:5678"}]
 
   strict_dns
     Strict DNS clusters can specify any number of DNS/port combinations. All DNS addresses will be
@@ -66,7 +66,7 @@ hosts
 
     .. code-block:: json
 
-      ["tcp://foo1.bar.com:1234", "tcp://foo2.bar.com:5678"]
+      [{"url": "tcp://foo1.bar.com:1234"}, {"url": "tcp://foo2.bar.com:5678"}]
 
   logical_dns
     Logical DNS clusters specify a host much like strict DNS, however only the first host will be
@@ -74,7 +74,7 @@ hosts
 
     .. code-block:: json
 
-      ["tcp://foo1.bar.com:1234"]
+      [{"url": "tcp://foo1.bar.com:1234"}]
 
 .. _config_cluster_manager_cluster_service_name:
 
