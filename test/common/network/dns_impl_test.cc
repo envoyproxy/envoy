@@ -4,7 +4,7 @@
 #include "common/api/api_impl.h"
 
 TEST(DnsImplTest, LocalAsyncLookup) {
-  Api::Impl api = Api::Impl(std::chrono::milliseconds(10000));
+  Api::Impl api(std::chrono::milliseconds(10000));
   Event::DispatcherPtr dispatcher = api.allocateDispatcher();
   Network::DnsResolverPtr resolver = dispatcher->createDnsResolver();
 

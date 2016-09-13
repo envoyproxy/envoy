@@ -42,7 +42,7 @@ BufferingStreamDecoderPtr IntegrationUtil::makeSingleRequest(uint32_t port, std:
                                                              std::string url,
                                                              Http::CodecClient::Type type,
                                                              std::string host) {
-  Api::Impl api = Api::Impl(std::chrono::milliseconds(10000));
+  Api::Impl api(std::chrono::milliseconds(9000));
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   Stats::IsolatedStoreImpl stats_store;
   Http::CodecClientStats stats{ALL_CODEC_CLIENT_STATS(POOL_COUNTER(stats_store))};
