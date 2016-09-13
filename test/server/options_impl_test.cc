@@ -17,6 +17,8 @@ TEST(OptionsImplTest, All) {
   argv.push_back("node");
   argv.push_back("--service-zone");
   argv.push_back("zone");
+  argv.push_back("--file-flush-interval-msec");
+  argv.push_back("9000");
   OptionsImpl options(argv.size(), const_cast<char**>(&argv[0]), "1", spdlog::level::notice);
   EXPECT_EQ(2U, options.concurrency());
   EXPECT_EQ("hello", options.configPath());
@@ -25,4 +27,5 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ("cluster", options.serviceClusterName());
   EXPECT_EQ("node", options.serviceNodeName());
   EXPECT_EQ("zone", options.serviceZone());
+  EXPECT_EQ(std::chrono::milliseconds(9000), options.fileFlushIntervalMsec());
 }

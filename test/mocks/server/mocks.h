@@ -37,6 +37,7 @@ public:
   MOCK_METHOD0(serviceClusterName, const std::string&());
   MOCK_METHOD0(serviceNodeName, const std::string&());
   MOCK_METHOD0(serviceZone, const std::string&());
+  MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
 };
 
 class MockAdmin : public Admin {

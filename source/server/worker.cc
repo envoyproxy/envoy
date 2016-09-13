@@ -7,8 +7,9 @@
 
 #include "common/common/thread.h"
 
-Worker::Worker(Stats::Store& stats_store, ThreadLocal::Instance& tls)
-    : tls_(tls), handler_(new ConnectionHandler(stats_store, log())) {
+Worker::Worker(Stats::Store& stats_store, ThreadLocal::Instance& tls,
+               std::chrono::milliseconds file_flush_interval_msec)
+    : tls_(tls), handler_(new ConnectionHandler(stats_store, log(), file_flush_interval_msec)) {
   tls_.registerThread(handler_->dispatcher(), false);
 }
 

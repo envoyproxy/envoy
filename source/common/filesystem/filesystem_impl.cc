@@ -13,9 +13,6 @@
 #include <iostream>
 
 namespace Filesystem {
-const std::chrono::milliseconds FileImpl::FLUSH_INTERVAL_MSEC =
-    std::chrono::milliseconds(10 * 1000);
-
 bool fileExists(const std::string& path) {
   std::ifstream input_file(path);
   return input_file.is_open();
