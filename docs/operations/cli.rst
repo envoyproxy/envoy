@@ -63,9 +63,9 @@ following are the command line options that Envoy supports.
 
 .. option:: --flush-interval-msec <string>
 
-  *(optional)* The time duration in msec between flushing of logs. Bare in mind 
-  that the logs have a buffer that when full flushes to the file specified in the envoy
-  config. However, if the interval is up and the buffer hasn't filled up, the log will flush. 
-  This option currently, universally changes the rate of log flushing for all logs created with 
-  the api call `createFile`. An example of where this affects log flushing can be seen here 
-  :repo:`/source/common/mongo/proxy.cc`.
+  *(optional)* The file flushing interval in milliseconds. Defaults to 10 seconds.
+  This setting is used during file creation to determine the duration between flushes
+  of buffers to files. The buffer will flush every time it gets full, or every time
+  the interval has elapsed, whichever comes first. Adjusting this setting is useful
+  when tailing :ref:`access logs <arch_overview_http_access_logs>` in order to
+  get more (or less) immediate flushing.
