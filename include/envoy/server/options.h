@@ -55,9 +55,9 @@ public:
   virtual const std::string& serviceZone() PURE;
 
   /**
-    * @return const std::chrono::milliseconds the duration in msec between log flushes
+    * @return std::chrono::milliseconds the duration in msec between log flushes
     */
-  virtual std::chrono::milliseconds flushIntervalMsec() PURE;
+  virtual std::chrono::milliseconds fileFlushIntervalMsec() PURE;
 };
 
 } // Server

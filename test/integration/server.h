@@ -27,7 +27,7 @@ public:
   const std::string& serviceClusterName() override { return cluster_name_; }
   const std::string& serviceNodeName() override { return node_name_; }
   const std::string& serviceZone() override { return zone_name_; }
-  std::chrono::milliseconds flushIntervalMsec() override {
+  std::chrono::milliseconds fileFlushIntervalMsec() override {
     return std::chrono::milliseconds(10000);
   }
 

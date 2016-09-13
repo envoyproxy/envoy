@@ -27,7 +27,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), access_log_lock_(access_log_lock),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
-      handler_(stats_store_, log(), options.flushIntervalMsec()),
+      handler_(stats_store_, log(), options.fileFlushIntervalMsec()),
       dns_resolver_(handler_.dispatcher().createDnsResolver()),
       local_address_(Network::Utility::getLocalAddress()) {
 
@@ -145,7 +145,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
   // Workers get created first so they register for thread local updates.
   for (uint32_t i = 0; i < std::max(1U, options.concurrency()); i++) {
-    workers_.emplace_back(new Worker(stats_store_, thread_local_, options.flushIntervalMsec()));
+    workers_.emplace_back(new Worker(stats_store_, thread_local_, options.fileFlushIntervalMsec()));
   }
 
   // The main thread is also registered for thread local updates so that code that does not care
