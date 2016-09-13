@@ -217,44 +217,6 @@ TEST(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(0UL, cluster.localZoneHealthyHosts().size());
 }
 
-TEST(StaticClusterImplTest, BothAddressPortAndURLConfig) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  std::string json = R"EOF(
-  {
-    "name": "addressportconfig",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"address": "1.2.3.4", "port": 99, "url": "tcp://192.168.1.1:22"},
-              {"address":"5.6.7.8", "port": 63, "url": "tcp://192.168.1.2:44"}]
-  }
-  )EOF";
-
-  Json::StringLoader config(json);
-  StaticClusterImpl cluster(config, stats, ssl_context_manager);
-  EXPECT_THAT(std::list<std::string>({"tcp://192.168.1.1:22", "tcp://192.168.1.2:44"}),
-              ContainerEq(hostListToURLs(cluster.hosts())));
-}
-
-TEST(StaticClusterImplTest, AddressMissingPortConfig) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  std::string json = R"EOF(
-  {
-    "name": "addressportconfig",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"address": "1.2.3.4"},
-              {"address":"5.6.7.8"}]
-  }
-  )EOF";
-
-  Json::StringLoader config(json);
-  EXPECT_THROW(StaticClusterImpl(config, stats, ssl_context_manager), EnvoyException);
-}
-
 TEST(StaticClusterImplTest, UnsupportedLBType) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
@@ -264,8 +226,8 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
     "connect_timeout_ms": 250,
     "type": "static",
     "lb_type": "fakelbtype",
-    "hosts": [{"address": "1.2.3.4", "port": 99, "url": "tcp://192.168.1.1:22"},
-              {"address":"5.6.7.8", "port": 63, "url": "tcp://192.168.1.2:44"}]
+    "hosts": [{"url": "tcp://192.168.1.1:22"},
+              {"url": "tcp://192.168.1.2:44"}]
   }
   )EOF";
 
@@ -283,8 +245,8 @@ TEST(StaticClusterImplTest, UnsupportedFeature) {
     "type": "static",
     "lb_type": "round_robin",
     "features": "fake",
-    "hosts": [{"address": "1.2.3.4", "port": 99, "url": "tcp://192.168.1.1:22"},
-              {"address":"5.6.7.8", "port": 63, "url": "tcp://192.168.1.2:44"}]
+    "hosts": [{"url": "tcp://192.168.1.1:22"},
+              {"url": "tcp://192.168.1.2:44"}]
   }
   )EOF";
 
