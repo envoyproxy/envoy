@@ -9,8 +9,9 @@ namespace Server {
 
 class AdminFilterTest : public testing::Test {
 public:
+  //TODO: change the port. This is a hacky fix for CI. 
   AdminFilterTest()
-      : admin_("/dev/null", 9001, server_), filter_(admin_), request_headers_{{":path", "/"}} {
+      : admin_("/dev/null", 9002, server_), filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
