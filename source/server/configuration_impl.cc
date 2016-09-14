@@ -77,14 +77,17 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
         log().notice(fmt::format("    loading {}", type));
 
         if (type == "lightstep") {
-          std::string access_token =
+	  lightstep::TracerOptions opts;
+          opts.access_token =
               server_.api().fileReadToEnd(sink.getString("access_token_file"));
-          StringUtil::rtrim(access_token);
+          StringUtil::rtrim(opts.access_token);
+
+	  opts.tracer_attributes["lightstep.guid"] = fmt::format("{}", server_.random().uuid());
+	  opts.tracer_attributes["lightstep.component_name"] = server_.options().serviceClusterName();
 
           http_tracer_->addSink(Tracing::HttpSinkPtr{new Tracing::LightStepSink(
               sink.getObject("config"), *cluster_manager_, "", server_.stats(), server_.random(),
-              server_.options().serviceClusterName(), server_.options().serviceNodeName(),
-              access_token)});
+              server_.options().serviceNodeName(), opts)});
         } else {
           throw EnvoyException(fmt::format("Unsupported sink type: '{}'", type));
         }
