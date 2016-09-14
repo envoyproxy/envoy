@@ -99,16 +99,12 @@ private:
 class LightStepSink : public HttpSink {
 public:
   LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                const std::string& stat_prefix, Stats::Store& stats, Runtime::RandomGenerator& random,
+                const std::string& stat_prefix, Stats::Store& stats,
                 const std::string& service_node, const lightstep::TracerOptions& options);
 
   // Tracer::HttpSink
   void flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
                   const Http::AccessLog::RequestInfo& request_info) override;
-
-  // lightstep::Recorder
-  void RecordSpan(lightstep::collector::Span&&);
-  bool FlushWithTimeout(lightstep::Duration);
 
 private:
 
@@ -119,7 +115,6 @@ private:
   const std::string collector_cluster_;
   Upstream::ClusterManager& cm_;
   LightStepStats stats_;
-  Runtime::RandomGenerator& random_;
   const std::string service_node_;
   lightstep::Tracer tracer_;
 };

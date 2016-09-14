@@ -119,10 +119,22 @@ namespace {
 class LightStepRecorder : public lightstep::Recorder {
 public:
   LightStepRecorder(LightStepSink *sink, const lightstep::TracerImpl& tracer)
-    : sink_(sink), tracer_(tracer) { }
+    : sink_(sink), builder_(tracer) { }
 
   // lightstep::Recorder
-  void RecordSpan(lightstep::collector::Span&&) override {
+  void RecordSpan(lightstep::collector::Span&& span) override {
+    // REVIEWER: This is unlocked, should be one tracer/recorder per thread.
+    builder_.addSpan(std::move(span));
+
+    // When the buffer has accumulated N spans, send to LightStep.
+    const int N = 10;
+    if (builder_.pendingSpans() == N) {
+      lightstep::collector::ReportRequest request;
+      std::swap(request, builder_.pending());
+
+      // REVIEWER: Here, call gRPC to collector-grpc.lightstep.com:443
+      // with std::move(request).
+    }
   }
 
   bool FlushWithTimeout(lightstep::Duration) override {
@@ -137,7 +149,7 @@ public:
 
 private:
   LightStepSink *sink_;
-  const lightstep::TracerImpl& tracer_;
+  lightstep::ReportBuilder builder_;
 };
 
 const std::string& orDash(const std::string& s) {
@@ -150,15 +162,17 @@ const std::string& orDash(const std::string& s) {
 
 } // namespace
 
+// REVIEWER: Either this object or its tracer_ field should be
+// thread-local, for this to work.
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                              const std::string& stat_prefix, Stats::Store& stats,
-                             Runtime::RandomGenerator& random,
                              const std::string& service_node, const lightstep::TracerOptions& options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
       stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix + "tracing.lightstep."))},
-      random_(random), service_node_(service_node),
-      tracer_(lightstep::NewUserDefinedTransportLightStepTracer(options,
-                  std::bind(&LightStepRecorder::New, this, std::placeholders::_1))) {
+      service_node_(service_node),
+      tracer_(lightstep::NewUserDefinedTransportLightStepTracer(
+	  options,
+	  std::bind(&LightStepRecorder::New, this, std::placeholders::_1))) {
   if (!cm_.get(collector_cluster_)) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
 				     collector_cluster_));
@@ -189,27 +203,25 @@ std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo&
 void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
                                const Http::HeaderMap& /*response_headers*/,
                                const Http::AccessLog::RequestInfo& request_info) {
-  // REVIEWER: several of the span attributes are apparently optional
-  // (where downstream_cluster == "-", user_agent == "-", and
-  // response_code == "0". These could be simply left off.
-  lightstep::Span span = tracer_.StartSpan("TODO:operation_name_goes_here",
-					   { lightstep::StartTimestamp(request_info.startTime()),
-					     lightstep::SetTag("join:x-request-id",
-							       request_headers.get(Http::Headers::get().RequestId)),
-					     lightstep::SetTag("request-line",
-							       buildRequestLine(request_headers, request_info)),
-					     lightstep::SetTag("response-code",
-							       buildResponseCode(request_info)),
-					     lightstep::SetTag("downstream-cluster",
-							       orDash(request_headers.get(Http::Headers::get().
-											  EnvoyDownstreamServiceCluster))),
-					     lightstep::SetTag("user-agent",
-							       orDash(request_headers.get(Http::Headers::get().
-											  UserAgent))),
-					     lightstep::SetTag("node-id", service_node_),
-					   });
   // REVIEWER: Note that the span_id and trace_id are supplied
-  // automatically.
+  // automatically using the provided uuid generator.
+  lightstep::Span span =
+    tracer_.StartSpan("TODO:operation_name_goes_here",
+		      { lightstep::StartTimestamp(request_info.startTime()),
+			lightstep::SetTag("join:x-request-id",
+					  request_headers.get(Http::Headers::get().RequestId)),
+			lightstep::SetTag("request line",
+					  buildRequestLine(request_headers, request_info)),
+			lightstep::SetTag("response code",
+					  buildResponseCode(request_info)),
+			lightstep::SetTag("downstream cluster",
+					  orDash(request_headers.get(Http::Headers::get().
+								     EnvoyDownstreamServiceCluster))),
+			lightstep::SetTag("user agent",
+					  orDash(request_headers.get(Http::Headers::get().
+								     UserAgent))),
+			lightstep::SetTag("node id", service_node_),
+		      });
 
   if (request_headers.has(Http::Headers::get().ClientTraceId)) {
     span.SetTag("join:x-client-trace-id", request_headers.get(Http::Headers::get().ClientTraceId));
@@ -221,17 +233,6 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
   // otherwise could pass the lightstep::FinishTimestamp() option to
   // be explicit, here:
   span.Finish();
-}
-
-void LightStepSink::RecordSpan(lightstep::collector::Span&&) {
-  
-}
-
-bool LightStepSink::FlushWithTimeout(lightstep::Duration) {
-  // Note: FlushWithTimeout would be called as a result of an explicit
-  // tracer.Flush(). We do not expect Flush to be called, since we are
-  // using user-defined transport and the Tracer reference is not exposed.
-  return true;
 }
 
 } // Tracing
