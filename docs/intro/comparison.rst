@@ -93,8 +93,7 @@ proxygen is Facebook's high performance C++11 HTTP proxy library, written on top
 C++ library called wangle. From a code perspective, Envoy uses most of the same techniques as
 proxygen to obtain high performance as an HTTP library/proxy. Beyond that however the two projects
 are not really comparable as Envoy is a complete self contained server with a large feature set
-versus a library that must be built into something by each project individually. As of this writing
-proxygen also does not support HTTP/2.
+versus a library that must be built into something by each project individually.
 
 `gRPC <http://www.grpc.io/>`_
 -----------------------------
