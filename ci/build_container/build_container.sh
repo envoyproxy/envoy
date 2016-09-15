@@ -108,6 +108,16 @@ wget -O tclap-1.2.1.tar.gz https://sourceforge.net/projects/tclap/files/tclap-1.
 tar xf tclap-1.2.1.tar.gz
 rm tclap-1.2.1.tar.gz
 
+# lightstep
+wget https://github.com/lightstep/lightstep-tracer-cpp/releases/download/v0_14/lightstep-tracer-cpp-0.14.tar.gz
+tar xf lightstep-tracer-cpp-0.14.tar.gz
+cd lightstep-tracer-cpp-0.14
+./configure --disable-grpc --prefix=$THIRDPARTY_BUILD --enable-shared=no \
+	    protobuf_CFLAGS="-I$THIRDPARTY_BUILD/include" protobuf_LIBS="-L$THIRDPARTY_BUILD/lib -lprotobuf"
+make install
+rm -rf lightstep-tracer-cpp-0.14
+cd ..
+
 # googletest
 wget -O googletest-1.8.0.tar.gz https://github.com/google/googletest/archive/release-1.8.0.tar.gz
 tar xf googletest-1.8.0.tar.gz
