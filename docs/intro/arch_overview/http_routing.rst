@@ -28,6 +28,7 @@ request. The router filter supports the following features:
 * Virtual cluster specifications. A virtual cluster is specified at the virtual host level and is
   used by Envoy to generate additional statistics on top of the standard cluster level ones. Virtual
   clusters can use regex matching.
+* :ref:`Priority <arch_overview_http_routing_priority>` based routing.
 
 Route table
 -----------
@@ -56,3 +57,22 @@ headers <config_http_filters_router_headers>`. The following configurations are 
 * **Retry conditions**: Envoy can retry on different types of conditions depending on application
   requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,
   etc.
+
+.. _arch_overview_http_routing_priority:
+
+Priority routing
+----------------
+
+Envoy supports priority routing both at the :ref:`route <config_http_conn_man_route_table_route>`
+and the :ref:`virtual cluster <config_http_conn_man_route_table_vcluster>` level. The current
+priority implementation uses different :ref:`connection pool <arch_overview_conn_pool>` and
+:ref:`circuit breaking <config_cluster_manager_cluster_circuit_breakers>` settings for each priority
+level. This means that even for HTTP/2 requests, two physical connections will be used to an
+upstream host. In the future Envoy will likely support true HTTP/2 priority over a single
+connection.
+
+Note that if a route matches a virtual cluster, the virtual cluster priority is used. This feature
+is useful for splitting circuit breaking limits between different traffic priorities such that low
+priority traffic does not starve higher priority traffic.
+
+The currently supported priorities are *default* and *high*.

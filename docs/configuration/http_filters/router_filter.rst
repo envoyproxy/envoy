@@ -68,7 +68,7 @@ using a ',' delimited list. The supported policies are:
 
 5xx
   Envoy will attempt a retry if the upstream server responds with any 5xx response code, or does not
-  respond at all (disconnect/reset/etc.). (Includes *connect-failure*)
+  respond at all (disconnect/reset/etc.). (Includes *connect-failure* and *refused-stream*)
 
   * **NOTE:** Envoy will not retry when a request times out (resulting in a 504 error code). This is
     by design. The request timeout is an outer time limit for a request, including any retries that
@@ -87,10 +87,14 @@ retriable-4xx
   Envoy will attempt a retry if the upstream server responds with a retriable 4xx response code.
   Currently, the only response code in this category is 409.
 
-  * NOTE: Be careful turning on this retry type. There are certain cases where a 409 can indicate
+  * **NOTE:** Be careful turning on this retry type. There are certain cases where a 409 can indicate
     that an optimistic locking revision needs to be updated. Thus, the caller should not retry and
     needs to read then attempt another write. If a retry happens in this type of case it will always
     fail with another 409.
+
+refused-stream
+  Envoy will attempt a retry if the upstream server resets the stream with a REFUSED_STREAM error
+  code. This reset type indicates that a request is safe to retry. (Included in *5xx*)
 
 The number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header or via the :ref:`route

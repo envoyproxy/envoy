@@ -194,8 +194,10 @@ void ConnectionImpl::StreamImpl::encodeData(const Buffer::Instance& data, bool e
 void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // Higher layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(reason);
-  int rc =
-      nghttp2_submit_rst_stream(parent_.session_, NGHTTP2_FLAG_NONE, stream_id_, NGHTTP2_NO_ERROR);
+  int rc = nghttp2_submit_rst_stream(parent_.session_, NGHTTP2_FLAG_NONE, stream_id_,
+                                     reason == StreamResetReason::LocalRefusedStreamReset
+                                         ? NGHTTP2_REFUSED_STREAM
+                                         : NGHTTP2_NO_ERROR);
   ASSERT(rc == 0);
   UNREFERENCED_PARAMETER(rc);
 
@@ -344,7 +346,9 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
   if (stream) {
     conn_log_debug("stream closed: {}", connection_, error_code);
     if (!stream->remote_end_stream_ || !stream->local_end_stream_) {
-      stream->runResetCallbacks(StreamResetReason::RemoteReset);
+      stream->runResetCallbacks(error_code == NGHTTP2_REFUSED_STREAM
+                                    ? StreamResetReason::RemoteRefusedStreamReset
+                                    : StreamResetReason::RemoteReset);
     }
 
     connection_.dispatcher().deferredDelete(std::move(stream->removeFromList(active_streams_)));

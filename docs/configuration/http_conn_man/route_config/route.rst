@@ -22,7 +22,8 @@ next (e.g., redirect, forward, rewrite, etc.).
     "runtime": "{...}",
     "retry_policy": "{...}",
     "rate_limit": "{...}",
-    "shadow": "{...}"
+    "shadow": "{...}",
+    "priority": "..."
   }
 
 prefix
@@ -88,6 +89,10 @@ content_type
 
 :ref:`shadow <config_http_conn_man_route_table_route_shadow>`
   *(optional, object)* Indicates that the route has a shadow policy.
+
+priority
+  *(optional, string)* Optionally specifies the :ref:`routing priority
+  <arch_overview_http_routing_priority>`.
 
 .. _config_http_conn_man_route_table_route_runtime:
 

@@ -18,9 +18,8 @@ proxy:
 
 * Full HTTP/2 transparent proxy. Envoy supports HTTP/2 for both downstream and upstream
   communication. nginx only supports HTTP/2 for downstream connections.
-* Advanced load balancing. Though nginx plus (the paid server) supports some advanced load
-  balancing features such as out of band health checking, even that version does not have the
-  advanced service discovery and asynchronous DNS resolution features that Envoy does.
+* Freely available advanced load balancing. Only nginx plus (the paid server) supports similar 
+  advanced load balancing capabilities as Envoy.
 * Ability to run the same software at the edge as well as on each service node. Many infrastructures
   run a mix of nginx and haproxy. A single proxy solution at every hop is substantially simpler from
   an operations perspective.
@@ -93,8 +92,7 @@ proxygen is Facebook's high performance C++11 HTTP proxy library, written on top
 C++ library called wangle. From a code perspective, Envoy uses most of the same techniques as
 proxygen to obtain high performance as an HTTP library/proxy. Beyond that however the two projects
 are not really comparable as Envoy is a complete self contained server with a large feature set
-versus a library that must be built into something by each project individually. As of this writing
-proxygen also does not support HTTP/2.
+versus a library that must be built into something by each project individually.
 
 `gRPC <http://www.grpc.io/>`_
 -----------------------------

@@ -274,53 +274,127 @@ TEST(RouteMatcherTest, TestRoutes) {
   // Virtual cluster testing.
   {
     Http::HeaderMapImpl headers = genHeaders("api.lyft.com", "/rides", "GET");
-    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/blah", "POST");
-    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers = genHeaders("api.lyft.com", "/rides", "POST");
-    EXPECT_EQ("ride_request", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("ride_request", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/123", "PUT");
-    EXPECT_EQ("update_ride", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("update_ride", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers = genHeaders("api.lyft.com", "/users/123/chargeaccounts", "POST");
-    EXPECT_EQ("cc_add", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("cc_add", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers =
         genHeaders("api.lyft.com", "/users/123/chargeaccounts/hello123", "PUT");
-    EXPECT_EQ("cc_add", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("cc_add", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers =
         genHeaders("api.lyft.com", "/users/123/chargeaccounts/validate", "PUT");
-    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers = genHeaders("api.lyft.com", "/foo/bar", "PUT");
-    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers = genHeaders("api.lyft.com", "/users", "POST");
-    EXPECT_EQ("create_user_login", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("create_user_login",
+              config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers = genHeaders("api.lyft.com", "/users/123", "PUT");
-    EXPECT_EQ("update_user", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("update_user", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers = genHeaders("api.lyft.com", "/users/123/location", "POST");
-    EXPECT_EQ("ulu", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("ulu", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
   }
   {
     Http::HeaderMapImpl headers = genHeaders("api.lyft.com", "/something/else", "GET");
-    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualClusterName(headers));
+    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+  }
+}
+
+TEST(RouteMatcherTest, InvalidPriority) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "local_service",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "local_service_grpc",
+          "priority": "foo"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::StringLoader loader(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ConfigImpl(loader, runtime, cm), EnvoyException);
+}
+
+TEST(RouteMatcherTest, Priority) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "local_service",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "cluster": "local_service_grpc",
+          "priority": "high"
+        },
+        {
+          "prefix": "/bar",
+          "cluster": "local_service_grpc"
+        }
+      ],
+      "virtual_clusters": [
+        {"pattern": "^/bar$", "method": "POST", "name": "foo", "priority": "high"}]
+    }
+  ]
+}
+  )EOF";
+
+  Json::StringLoader loader(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(loader, runtime, cm);
+
+  EXPECT_EQ(Upstream::ResourcePriority::High,
+            config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)->priority());
+  EXPECT_EQ(Upstream::ResourcePriority::Default,
+            config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)->priority());
+
+  {
+    Http::HeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "POST");
+    EXPECT_EQ(Upstream::ResourcePriority::High,
+              config.routeForRequest(headers, 0)->virtualCluster(headers)->priority());
+  }
+
+  {
+    Http::HeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
+    EXPECT_EQ(Upstream::ResourcePriority::Default,
+              config.routeForRequest(headers, 0)->virtualCluster(headers)->priority());
   }
 }
 
@@ -774,6 +848,16 @@ TEST(RouteMatcherTest, Redirect) {
     Http::HeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
     EXPECT_EQ("https://new.lyft.com/new_baz", config.redirectRequest(headers, 0)->newPath(headers));
   }
+}
+
+TEST(NullConfigImplTest, All) {
+  NullConfigImpl config;
+  Http::HeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
+  EXPECT_EQ(nullptr, config.redirectRequest(headers, 0));
+  EXPECT_EQ(nullptr, config.routeForRequest(headers, 0));
+  EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
+  EXPECT_EQ(0UL, config.responseHeadersToAdd().size());
+  EXPECT_EQ(0UL, config.responseHeadersToRemove().size());
 }
 
 } // Router
