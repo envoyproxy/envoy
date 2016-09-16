@@ -38,6 +38,9 @@ set(ENVOY_JANSSON_INCLUDE_DIR "" CACHE FILEPATH "location of jansson includes")
 # Last tested with 1.0.2h
 set(ENVOY_OPENSSL_INCLUDE_DIR "" CACHE FILEPATH "location of openssl includes")
 
+# http://lightstep.com/
+set(ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR "" CACHE FILEPATH "location of lighstep tracer includes")
+
 # https://github.com/google/protobuf
 # Last tested with 3.0.0
 set(ENVOY_PROTOBUF_INCLUDE_DIR "" CACHE FILEPATH "location of protobuf includes")

@@ -42,6 +42,7 @@ $EXTRA_CMAKE_FLAGS -DENVOY_DEBUG:BOOL=OFF \
 -DENVOY_JANSSON_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_OPENSSL_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_PROTOBUF_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
+-DENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_PROTOBUF_PROTOC:FILEPATH=/thirdparty_build/bin/protoc \
 -DENVOY_GCOVR:FILEPATH=/thirdparty/gcovr-3.3/scripts/gcovr \
 -DENVOY_GCOVR_EXTRA_ARGS:STRING="-e test/* -e build/*" \
