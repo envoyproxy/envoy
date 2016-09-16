@@ -18,9 +18,6 @@ proxy:
 
 * Full HTTP/2 transparent proxy. Envoy supports HTTP/2 for both downstream and upstream
   communication. nginx only supports HTTP/2 for downstream connections.
-* Advanced load balancing. Though nginx plus (the paid server) supports some advanced load
-  balancing features such as out of band health checking, even that version does not have the
-  advanced service discovery and asynchronous DNS resolution features that Envoy does.
 * Ability to run the same software at the edge as well as on each service node. Many infrastructures
   run a mix of nginx and haproxy. A single proxy solution at every hop is substantially simpler from
   an operations perspective.
