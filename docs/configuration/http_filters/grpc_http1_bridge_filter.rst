@@ -1,12 +1,12 @@
 .. _config_http_filters_grpc_bridge:
 
-GRPC HTTP/1.1 bridge
+gRPC HTTP/1.1 bridge
 ====================
 
-GRPC :ref:`architecture overview <arch_overview_grpc>`.
+gRPC :ref:`architecture overview <arch_overview_grpc>`.
 
 This is a simple filter which enables the bridging of an HTTP/1.1 client which does not support
-response trailers to a compliant GRPC server. It works by doing the following:
+response trailers to a compliant gRPC server. It works by doing the following:
 
 * When a request is sent, the filter sees if the connection is HTTP/1.1 and the request content type
   is *application/grpc*.
@@ -17,7 +17,7 @@ response trailers to a compliant GRPC server. It works by doing the following:
 * The client should send HTTP/1.1 requests that translate to the following psuedo headers:
 
   * *\:method*: POST
-  * *\:path*: <GRPC-METHOD-NAME>
+  * *\:path*: <gRPC-METHOD-NAME>
   * *content-type*: application/grpc
 
 * The body should be the serialized grpc body which is:
@@ -27,12 +27,12 @@ response trailers to a compliant GRPC server. It works by doing the following:
   * serialized proto message.
 
 * Because this scheme must buffer the response to look for the *grpc-status* trailer it will only
-  work with unary GRPC APIs.
+  work with unary gRPC APIs.
 
 More info: http://www.grpc.io/docs/guides/wire.html
 
-This filter also collects stats for all GRPC requests that transit, even if those requests are
-normal GRPC requests over HTTP/2.
+This filter also collects stats for all gRPC requests that transit, even if those requests are
+normal gRPC requests over HTTP/2.
 
 .. code-block:: json
 
