@@ -100,8 +100,8 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers) {
     Http::CodeUtility::ResponseStatInfo info{
         config_->stats_store_, stat_prefix_, response_headers,
         downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true",
-        route_->virtualHostName(), request_vcluster_name_, config_->service_zone_, upstreamZone(),
-        is_canary};
+        route_->virtualHostName(), request_vcluster_ ? request_vcluster_->name() : "",
+        config_->service_zone_, upstreamZone(), is_canary};
 
     Http::CodeUtility::chargeResponseStat(info);
 
@@ -152,7 +152,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Set up stat prefixes, etc.
-  request_vcluster_name_ = route_->virtualClusterName(headers);
+  request_vcluster_ = route_->virtualCluster(headers);
   stat_prefix_ = fmt::format("cluster.{}.", route_->clusterName());
   stream_log_debug("cluster '{}' match for URL '{}'", *callbacks_, route_->clusterName(),
                    headers.get(Http::Headers::get().Path));
@@ -180,9 +180,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Fetch a connection pool for the upstream cluster.
-  // TODO: In follow up commit, specify priority.
-  Http::ConnectionPool::Instance* conn_pool = config_->cm_.httpConnPoolForCluster(
-      route_->clusterName(), Upstream::ResourcePriority::Default);
+  Http::ConnectionPool::Instance* conn_pool =
+      config_->cm_.httpConnPoolForCluster(route_->clusterName(), finalPriority());
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
@@ -191,7 +190,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   timeout_ = FilterUtility::finalTimeout(*route_, headers);
   route_->finalizeRequestHeaders(headers);
   retry_state_ = createRetryState(route_->retryPolicy(), headers, cluster, config_->runtime_,
-                                  config_->random_, callbacks_->dispatcher());
+                                  config_->random_, callbacks_->dispatcher(), finalPriority());
   do_shadowing_ = FilterUtility::shouldShadow(route_->shadowPolicy(), config_->runtime_,
                                               callbacks_->streamId());
 
@@ -239,6 +238,15 @@ void Filter::cleanup() {
   if (response_timeout_) {
     response_timeout_->disableTimer();
     response_timeout_.reset();
+  }
+}
+
+Upstream::ResourcePriority Filter::finalPriority() {
+  // Virtual cluster priority trumps route priority if the route has a virtual cluster.
+  if (request_vcluster_) {
+    return request_vcluster_->priority();
+  } else {
+    return route_->priority();
   }
 }
 
@@ -424,7 +432,8 @@ void Filter::onUpstreamComplete() {
         upstream_request_->upstream_encoder_->requestCompleteTime(),
         upstream_request_->upstream_canary_,
         downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true",
-        route_->virtualHostName(), request_vcluster_name_, config_->service_zone_, upstreamZone()};
+        route_->virtualHostName(), request_vcluster_ ? request_vcluster_->name() : "",
+        config_->service_zone_, upstreamZone()};
 
     Http::CodeUtility::chargeResponseTiming(info);
 
@@ -463,9 +472,8 @@ bool Filter::setupRetry(bool end_stream) {
 }
 
 void Filter::doRetry() {
-  // TODO: In follow up commit, specify priority.
-  Http::ConnectionPool::Instance* conn_pool = config_->cm_.httpConnPoolForCluster(
-      route_->clusterName(), Upstream::ResourcePriority::Default);
+  Http::ConnectionPool::Instance* conn_pool =
+      config_->cm_.httpConnPoolForCluster(route_->clusterName(), finalPriority());
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();
@@ -542,10 +550,10 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
 RetryStatePtr
 ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request_headers,
                              const Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher) {
-  // TODO: In follow up commit, specify priority.
-  return RetryStatePtr{new RetryStateImpl(policy, request_headers, cluster, runtime, random,
-                                          dispatcher, Upstream::ResourcePriority::Default)};
+                             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                             Upstream::ResourcePriority priority) {
+  return RetryStatePtr{
+      new RetryStateImpl(policy, request_headers, cluster, runtime, random, dispatcher, priority)};
 }
 
 } // Router

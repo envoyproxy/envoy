@@ -149,7 +149,9 @@ private:
                                          Http::HeaderMap& request_headers,
                                          const Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                          Runtime::RandomGenerator& random,
-                                         Event::Dispatcher& dispatcher) PURE;
+                                         Event::Dispatcher& dispatcher,
+                                         Upstream::ResourcePriority priority) PURE;
+  Upstream::ResourcePriority finalPriority();
   void maybeDoShadowing();
   void onRequestComplete();
   void onResetStream();
@@ -169,7 +171,7 @@ private:
   const RouteEntry* route_;
   std::string stat_prefix_;
   std::list<std::string> alt_stat_prefixes_;
-  std::string request_vcluster_name_;
+  const VirtualCluster* request_vcluster_;
   bool downstream_response_started_{};
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
@@ -190,8 +192,8 @@ private:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::HeaderMap& request_headers,
                                  const Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                                 Runtime::RandomGenerator& random,
-                                 Event::Dispatcher& dispatcher) override;
+                                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                                 Upstream::ResourcePriority priority) override;
 };
 
 } // Router

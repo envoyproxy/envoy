@@ -72,6 +72,16 @@ public:
                              std::chrono::milliseconds timeout));
 };
 
+class TestVirtualCluster : public VirtualCluster {
+public:
+  // Router::VirtualCluster
+  const std::string& name() const override { return name_; }
+  Upstream::ResourcePriority priority() const override { return priority_; }
+
+  std::string name_{"fake_virtual_cluster"};
+  Upstream::ResourcePriority priority_{Upstream::ResourcePriority::Default};
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -80,16 +90,17 @@ public:
   // Router::Config
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD1(finalizeRequestHeaders, void(Http::HeaderMap& headers));
+  MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(retryPolicy, const RetryPolicy&());
   MOCK_CONST_METHOD0(shadowPolicy, const ShadowPolicy&());
   MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
-  MOCK_CONST_METHOD1(virtualClusterName, const std::string&(const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD1(virtualCluster, const VirtualCluster*(const Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
 
   std::string cluster_name_{"fake_cluster"};
   std::string vhost_name_{"fake_vhost"};
-  std::string virtual_cluster_{"fake_virtual_cluster"};
+  TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   TestRateLimitPolicy rate_limit_policy_;
   TestShadowPolicy shadow_policy_;

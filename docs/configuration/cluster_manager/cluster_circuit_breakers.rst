@@ -3,7 +3,8 @@
 Circuit breakers
 ================
 
-Circuit breaking :ref:`architecture overview <arch_overview_circuit_break>`.
+* Circuit breaking :ref:`architecture overview <arch_overview_circuit_break>`.
+* Priority routing :ref:`architecture overview <arch_overview_http_routing_priority>`.
 
 Circuit breaking settings can be specified individually for each defined priority. How the
 different priorities are used are documented in the sections of the configuration guide that use

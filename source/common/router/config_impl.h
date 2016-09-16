@@ -34,8 +34,19 @@ typedef std::shared_ptr<RouteEntryImplBase> RouteEntryImplBasePtr;
  */
 class SslRedirector : public RedirectEntry {
 public:
-  // RedirectEntry
+  // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
+};
+
+/**
+ * Utility routines for loading route configuration.
+ */
+class ConfigUtility {
+public:
+  /**
+   * @return the resource priority parsed from JSON.
+   */
+  static Upstream::ResourcePriority parsePriority(const Json::Object& config);
 };
 
 /**
@@ -51,18 +62,35 @@ public:
                                            uint64_t random_value) const;
   const RouteEntryImplBase* routeFromEntries(const Http::HeaderMap& headers, bool redirect,
                                              uint64_t random_value) const;
-  const std::string& virtualClusterFromEntries(const Http::HeaderMap& headers) const;
+  const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
 
-  struct VirtualClusterEntry {
+  struct VirtualClusterEntry : public VirtualCluster {
+    VirtualClusterEntry(const Json::Object& virtual_cluster);
+
+    // Router::VirtualCluster
+    const std::string& name() const override { return name_; }
+    Upstream::ResourcePriority priority() const override { return priority_; }
+
     std::regex pattern_;
     Optional<std::string> method_;
     std::string name_;
+    Upstream::ResourcePriority priority_;
   };
 
-  static const std::string VIRTUAL_CLUSTER_CATCH_ALL_NAME;
+  struct CatchAllVirtualCluster : public VirtualCluster {
+    // Router::VirtualCluster
+    const std::string& name() const override { return name_; }
+    Upstream::ResourcePriority priority() const override {
+      return Upstream::ResourcePriority::Default;
+    }
+
+    std::string name_{"other"};
+  };
+
+  static const CatchAllVirtualCluster VIRTUAL_CLUSTER_CATCH_ALL;
   static const SslRedirector SSL_REDIRECTOR;
 
   const std::string name_;
@@ -131,10 +159,11 @@ public:
   // Router::RouteEntry
   const std::string& clusterName() const override;
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
+  Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
   const ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
-  const std::string& virtualClusterName(const Http::HeaderMap& headers) const override {
+  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
     return vhost_.virtualClusterFromEntries(headers);
   }
   const std::string& virtualHostName() const override { return vhost_.name(); }
@@ -175,6 +204,7 @@ private:
   const std::string content_type_;
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
+  const Upstream::ResourcePriority priority_;
 };
 
 /**
