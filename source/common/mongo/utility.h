@@ -5,16 +5,23 @@
 namespace Mongo {
 
 /**
- * General utilities for dealing with mongo messages.
+ * Parses a query into information that can be used for stat gathering.
  */
-class MessageUtility {
+class QueryMessageInfo {
 public:
   enum class QueryType { PrimaryKey, MultiGet, ScatterGet };
 
+  QueryMessageInfo(const QueryMessage& query);
+
   /**
-   * @return the collection name with the database name removed or throw if this cannot be done.
+   * @return the query's request ID.
    */
-  static std::string collectionFromFullCollectionName(const std::string& full_collection_name);
+  int32_t requestId() { return request_id_; }
+
+  /**
+   * @return the collection name with the database name removed, or "" if a command.
+   */
+  const std::string& collection() { return collection_; }
 
   /**
    * @return calling function if it can be found in the query. The calling function is found by:
@@ -23,20 +30,32 @@ public:
    *         3) Accessing the 'callingFunction' field in the JSON.
    *         "" is returned if any of the above fails.
    */
-  static std::string queryCallingFunction(const QueryMessage& query);
+  const std::string& callsite() { return callsite_; }
 
   /**
    * @return the type of a query message.
    */
-  static QueryType queryType(const QueryMessage& query);
+  QueryType type() { return type_; }
 
   /**
    * @return the name of the command if the query is a command, otherwise "".
    */
-  static std::string queryCommand(const QueryMessage& query);
+  const std::string& command() { return command_; }
 
 private:
-  static QueryType queryTypeFromDocument(const Bson::Document& document);
+  std::string parseCallingFunction(const QueryMessage& query);
+  std::string parseCallingFunctionJson(const std::string& json_string);
+  std::string parseCollection(const std::string& full_collection_name);
+  const Bson::Document* parseCommand(const QueryMessage& query);
+  void parseFindCommand(const Bson::Document& command);
+  QueryType parseType(const QueryMessage& query);
+  QueryType parseTypeFromDocument(const Bson::Document& document);
+
+  int32_t request_id_;
+  std::string collection_;
+  std::string callsite_;
+  QueryType type_{QueryType::ScatterGet};
+  std::string command_;
 };
 
 } // Mongo

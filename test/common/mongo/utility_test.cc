@@ -4,65 +4,111 @@
 
 namespace Mongo {
 
-TEST(MongoMessageUtilityTest, QueryType) {
+TEST(QueryMessageInfoTest, FindCommand) {
+  std::string json = R"EOF(
+    {"hostname":"api-production-iad-canary","httpUniqueId":"VqqX7H8AAQEAAE@8EUkAAAAR","callingFunction":"getByMongoId"}
+  )EOF";
+
+  QueryMessageImpl q(0, 0);
+  q.fullCollectionName("db.$cmd");
+  q.query(Bson::DocumentImpl::create()
+              ->addString("find", "foo_collection")
+              ->addString("comment", std::move(json))
+              ->addDocument("filter", Bson::DocumentImpl::create()->addString("_id", "foo")));
+  QueryMessageInfo info(q);
+  EXPECT_EQ("", info.command());
+  EXPECT_EQ("foo_collection", info.collection());
+  EXPECT_EQ("getByMongoId", info.callsite());
+  EXPECT_EQ(QueryMessageInfo::QueryType::PrimaryKey, info.type());
+}
+
+TEST(QueryMessageInfoTest, Type) {
   {
-    QueryMessageImpl q(0, 0);
+    QueryMessageImpl q(1, 0);
+    q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create());
-    EXPECT_EQ(MessageUtility::QueryType::ScatterGet, MessageUtility::queryType(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ(QueryMessageInfo::QueryType::ScatterGet, info.type());
+    EXPECT_EQ(1, info.requestId());
   }
 
   {
     QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addInt32("_id", 2));
-    EXPECT_EQ(MessageUtility::QueryType::PrimaryKey, MessageUtility::queryType(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ(QueryMessageInfo::QueryType::PrimaryKey, info.type());
   }
 
   {
     QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addDocument(
         "_id", Bson::DocumentImpl::create()->addArray("$in", Bson::DocumentImpl::create())));
-    EXPECT_EQ(MessageUtility::QueryType::MultiGet, MessageUtility::queryType(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ(QueryMessageInfo::QueryType::MultiGet, info.type());
   }
 
   {
     QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addDocument("$query", Bson::DocumentImpl::create()));
-    EXPECT_EQ(MessageUtility::QueryType::ScatterGet, MessageUtility::queryType(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ(QueryMessageInfo::QueryType::ScatterGet, info.type());
   }
 
   {
     QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addDocument(
         "$query", Bson::DocumentImpl::create()->addInt32("_id", 2)));
-    EXPECT_EQ(MessageUtility::QueryType::PrimaryKey, MessageUtility::queryType(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ(QueryMessageInfo::QueryType::PrimaryKey, info.type());
   }
 
   {
     QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addDocument(
         "$query",
         Bson::DocumentImpl::create()->addDocument(
             "_id", Bson::DocumentImpl::create()->addArray("$in", Bson::DocumentImpl::create()))));
-    EXPECT_EQ(MessageUtility::QueryType::MultiGet, MessageUtility::queryType(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ(QueryMessageInfo::QueryType::MultiGet, info.type());
   }
 }
 
-TEST(MongoMessageUtilityTest, CollectionFromFullCollectionName) {
-  EXPECT_EQ("foo", MessageUtility::collectionFromFullCollectionName("db.foo"));
-  EXPECT_THROW(MessageUtility::collectionFromFullCollectionName("foo"), EnvoyException);
-}
-
-TEST(MongoMessageUtilityTest, QueryCallingFunction) {
+TEST(QueryMessageInfoTest, CollectionFromFullCollectionName) {
   {
     QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create());
-    EXPECT_EQ("", MessageUtility::queryCallingFunction(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ("foo", info.collection());
   }
 
   {
     QueryMessageImpl q(0, 0);
+    q.fullCollectionName("foo");
+    EXPECT_THROW((QueryMessageInfo(q)), EnvoyException);
+  }
+}
+
+TEST(QueryMessageInfoTest, Callsite) {
+  {
+    QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
+    q.query(Bson::DocumentImpl::create());
+    QueryMessageInfo info(q);
+    EXPECT_EQ("", info.callsite());
+  }
+
+  {
+    QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addString("$comment", "bad json"));
-    EXPECT_EQ("", MessageUtility::queryCallingFunction(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ("", info.callsite());
   }
 
   {
@@ -71,31 +117,35 @@ TEST(MongoMessageUtilityTest, QueryCallingFunction) {
     )EOF";
 
     QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addString("$comment", std::move(json)));
-    EXPECT_EQ("getByMongoId", MessageUtility::queryCallingFunction(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ("getByMongoId", info.callsite());
   }
 }
 
-TEST(MongoMessageUtilityTest, QueryCommand) {
+TEST(QueryMessageInfoTest, Command) {
   {
     QueryMessageImpl q(0, 0);
     q.fullCollectionName("db.$cmd");
     q.query(Bson::DocumentImpl::create()->addString("foo", "bar"));
-    EXPECT_EQ("foo", MessageUtility::queryCommand(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ("foo", info.command());
   }
 
   {
     QueryMessageImpl q(0, 0);
     q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addString("foo", "bar"));
-    EXPECT_EQ("", MessageUtility::queryCommand(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ("", info.command());
   }
 
   {
     QueryMessageImpl q(0, 0);
     q.fullCollectionName("db.$cmd");
     q.query(Bson::DocumentImpl::create());
-    EXPECT_THROW(MessageUtility::queryCommand(q), EnvoyException);
+    EXPECT_THROW((QueryMessageInfo(q)), EnvoyException);
   }
 
   {
@@ -103,7 +153,8 @@ TEST(MongoMessageUtilityTest, QueryCommand) {
     q.fullCollectionName("db.$cmd");
     q.query(Bson::DocumentImpl::create()->addDocument(
         "$query", Bson::DocumentImpl::create()->addInt32("ismaster", 1)));
-    EXPECT_EQ("ismaster", MessageUtility::queryCommand(q));
+    QueryMessageInfo info(q);
+    EXPECT_EQ("ismaster", info.command());
   }
 }
 
