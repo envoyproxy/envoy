@@ -77,11 +77,11 @@ public:
 enum class StreamResetReason {
   // If a local codec level reset was sent on the stream.
   LocalReset,
-  // FIXFIX
+  // If a local codec level refused stream reset was sent on the stream (allowing for retry).
   LocalRefusedStreamReset,
   // If a remote codec level reset was received on the stream.
   RemoteReset,
-  // FIXFIX
+  // If a remove codec level refused stream reset was received on the stream (allowing for retry).
   RemoteRefusedStreamReset,
   // If the stream was locally reset by a connection pool due to an initial connection failure.
   ConnectionFailure,
