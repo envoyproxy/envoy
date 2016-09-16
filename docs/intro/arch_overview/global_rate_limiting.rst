@@ -13,7 +13,7 @@ tight enough circuit breaking limit on each downstream host such that the system
 normally during typical request patterns but still prevent cascading failure when the system starts
 to fail. Global rate limiting is a good solution for this case.
 
-Envoy integrates directly with a global GRPC rate limiting service. Although any service that
+Envoy integrates directly with a global gRPC rate limiting service. Although any service that
 implements the defined RPC/IDL protocol can be used, Lyft provides a reference implementation
 written in Go which uses a Redis backend. Envoy’s rate limit integration has the following features:
 
