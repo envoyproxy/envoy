@@ -65,6 +65,8 @@ uint32_t RetryStateImpl::parseRetryOn(const std::string& config) {
       ret |= RetryPolicy::RETRY_ON_CONNECT_FAILURE;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Retriable4xx) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_4XX;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RefusedStream) {
+      ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
     }
   }
 
@@ -125,6 +127,11 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
         Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(*response_headers))) {
       return true;
     }
+  }
+
+  if ((retry_on_ & RetryPolicy::RETRY_ON_REFUSED_STREAM) && reset_reason.valid() &&
+      reset_reason.value() == Http::StreamResetReason::RemoteRefusedStreamReset) {
+    return true;
   }
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) && reset_reason.valid() &&

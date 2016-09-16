@@ -31,6 +31,7 @@ public:
   static const uint32_t RETRY_ON_5XX             = 0x1;
   static const uint32_t RETRY_ON_CONNECT_FAILURE = 0x2;
   static const uint32_t RETRY_ON_RETRIABLE_4XX   = 0x4;
+  static const uint32_t RETRY_ON_REFUSED_STREAM  = 0x8;
   // clang-format on
 
   virtual ~RetryPolicy() {}

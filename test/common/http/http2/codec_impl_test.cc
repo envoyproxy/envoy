@@ -60,6 +60,29 @@ public:
   ConnectionWrapper server_wrapper_;
 };
 
+TEST_P(Http2CodecImplTest, RefusedStreamReset) {
+  MockStreamDecoder response_decoder;
+  StreamEncoder& request_encoder = client_.newStream(response_decoder);
+
+  MockStreamDecoder request_decoder;
+  StreamEncoder* response_encoder;
+  EXPECT_CALL(server_callbacks_, newStream(_))
+      .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+        response_encoder = &encoder;
+        return request_decoder;
+      }));
+
+  HeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder, decodeHeaders_(_, false));
+  request_encoder.encodeHeaders(request_headers, false);
+
+  MockStreamCallbacks callbacks;
+  request_encoder.getStream().addCallbacks(callbacks);
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset));
+  response_encoder->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
+}
+
 TEST_P(Http2CodecImplTest, InvalidFrame) {
   MockStreamDecoder response_decoder;
   StreamEncoder& request_encoder = client_.newStream(response_decoder);
