@@ -41,6 +41,8 @@ public:
 
   const Optional<Http::StreamResetReason> no_reset_;
   const Optional<Http::StreamResetReason> remote_reset_{Http::StreamResetReason::RemoteReset};
+  const Optional<Http::StreamResetReason> remote_refused_stream_reset_{
+      Http::StreamResetReason::RemoteRefusedStreamReset};
   const Optional<Http::StreamResetReason> connect_failure_{
       Http::StreamResetReason::ConnectionFailure};
 };
@@ -50,6 +52,19 @@ TEST_F(RouterRetryStateImplTest, PolicyNoneRemoteReset) {
   setup(request_headers);
   EXPECT_FALSE(state_->enabled());
   EXPECT_FALSE(state_->shouldRetry(nullptr, remote_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyRefusedStream) {
+  Http::HeaderMapImpl request_headers{{"x-envoy-retry-on", "refused-stream"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  EXPECT_TRUE(state_->shouldRetry(nullptr, remote_refused_stream_reset_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_FALSE(state_->shouldRetry(nullptr, remote_refused_stream_reset_, callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, Policy5xxRemoteReset) {

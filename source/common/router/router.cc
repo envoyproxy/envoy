@@ -358,10 +358,12 @@ Filter::streamResetReasonToFailureReason(Http::StreamResetReason reset_reason) {
   case Http::StreamResetReason::ConnectionTermination:
     return Http::AccessLog::FailureReason::UpstreamConnectionTermination;
   case Http::StreamResetReason::LocalReset:
+  case Http::StreamResetReason::LocalRefusedStreamReset:
     return Http::AccessLog::FailureReason::LocalReset;
   case Http::StreamResetReason::Overflow:
     return Http::AccessLog::FailureReason::UpstreamOverflow;
   case Http::StreamResetReason::RemoteReset:
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
     return Http::AccessLog::FailureReason::UpstreamRemoteReset;
   }
 
