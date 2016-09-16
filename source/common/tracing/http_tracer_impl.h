@@ -107,9 +107,8 @@ public:
                   const Http::AccessLog::RequestInfo& request_info) override;
 
 private:
-
   std::string buildRequestLine(const Http::HeaderMap& request_headers,
-			       const Http::AccessLog::RequestInfo& info);
+                               const Http::AccessLog::RequestInfo& info);
   std::string buildResponseCode(const Http::AccessLog::RequestInfo& info);
 
   const std::string collector_cluster_;

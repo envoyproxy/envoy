@@ -77,17 +77,18 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
         log().notice(fmt::format("    loading {}", type));
 
         if (type == "lightstep") {
-	  auto& rand = server_.random();
-	  lightstep::TracerOptions opts;
+          auto& rand = server_.random();
+          lightstep::TracerOptions opts;
           opts.access_token = server_.api().fileReadToEnd(sink.getString("access_token_file"));
           StringUtil::rtrim(opts.access_token);
 
-	  opts.tracer_attributes["lightstep.guid"] = fmt::format("{0:x}", rand.random());
-	  opts.tracer_attributes["lightstep.component_name"] = server_.options().serviceClusterName();
-	  opts.guid_generator = [&rand]() { return rand.random(); };
+          opts.tracer_attributes["lightstep.guid"] = fmt::format("{0:x}", rand.random());
+          opts.tracer_attributes["lightstep.component_name"] =
+              server_.options().serviceClusterName();
+          opts.guid_generator = [&rand]() { return rand.random(); };
 
-	  // REVIEWER: Either LightStepSink or its tracer_ field
-	  // should be thread-local for this to work.
+          // REVIEWER: Either LightStepSink or its tracer_ field
+          // should be thread-local for this to work.
           http_tracer_->addSink(Tracing::HttpSinkPtr{new Tracing::LightStepSink(
               sink.getObject("config"), *cluster_manager_, "", server_.stats(),
               server_.options().serviceNodeName(), opts)});
