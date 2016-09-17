@@ -124,7 +124,7 @@ void BufferHelper::writeString(Buffer::Instance& data, const std::string& value)
 }
 
 void BufferHelper::writeBinary(Buffer::Instance& data, const std::string& value) {
-  // Write now we do not actually store the binary subtype and always use zero.
+  // Right now we do not actually store the binary subtype and always use zero.
   writeInt32(data, value.size());
   uint8_t subtype = 0;
   data.add(&subtype, sizeof(subtype));
