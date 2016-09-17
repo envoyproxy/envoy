@@ -107,15 +107,15 @@ public:
 
 private:
   struct ActiveQuery {
-    ActiveQuery(ProxyFilter& parent, QueryMessagePtr&& query)
-        : parent_(parent), query_(std::move(query)), start_time_(std::chrono::system_clock::now()) {
+    ActiveQuery(ProxyFilter& parent, const QueryMessage& query)
+        : parent_(parent), query_info_(query), start_time_(std::chrono::system_clock::now()) {
       parent_.stats_.op_query_active_.inc();
     }
 
     ~ActiveQuery() { parent_.stats_.op_query_active_.dec(); }
 
     ProxyFilter& parent_;
-    QueryMessagePtr query_;
+    QueryMessageInfo query_info_;
     SystemTime start_time_;
   };
 
@@ -127,7 +127,7 @@ private:
                                                  POOL_TIMER_PREFIX(store, prefix))};
   }
 
-  void chargeQueryStats(const std::string& prefix, MessageUtility::QueryType query_type);
+  void chargeQueryStats(const std::string& prefix, QueryMessageInfo::QueryType query_type);
   void chargeReplyStats(ActiveQuery& active_query, const std::string& prefix,
                         const ReplyMessage& message);
   void doDecode(Buffer::Instance& buffer);

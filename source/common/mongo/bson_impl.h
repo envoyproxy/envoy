@@ -21,11 +21,13 @@ public:
   static int32_t removeInt32(Buffer::Instance& data);
   static int64_t removeInt64(Buffer::Instance& data);
   static std::string removeString(Buffer::Instance& data);
+  static std::string removeBinary(Buffer::Instance& data);
   static void writeCString(Buffer::Instance& data, const std::string& value);
   static void writeInt32(Buffer::Instance& data, int32_t value);
   static void writeInt64(Buffer::Instance& data, int64_t value);
   static void writeDouble(Buffer::Instance& data, double value);
   static void writeString(Buffer::Instance& data, const std::string& value);
+  static void writeBinary(Buffer::Instance& data, const std::string& value);
 };
 
 class FieldImpl : public Field {
@@ -34,7 +36,8 @@ public:
     value_.double_value_ = value;
   }
 
-  explicit FieldImpl(const std::string& key, std::string&& value) : type_(Type::STRING), key_(key) {
+  explicit FieldImpl(Type type, const std::string& key, std::string&& value)
+      : type_(type), key_(key) {
     value_.string_value_ = std::move(value);
   }
 
@@ -84,6 +87,11 @@ public:
   const Document& asArray() const override {
     checkType(Type::ARRAY);
     return *value_.document_value_;
+  }
+
+  const std::string& asBinary() const override {
+    checkType(Type::BINARY);
+    return value_.string_value_;
   }
 
   const ObjectId& asObjectId() const override {
@@ -173,7 +181,7 @@ public:
   }
 
   DocumentPtr addString(const std::string& key, std::string&& value) override {
-    fields_.emplace_back(new FieldImpl(key, std::move(value)));
+    fields_.emplace_back(new FieldImpl(Field::Type::STRING, key, std::move(value)));
     return shared_from_this();
   }
 
@@ -184,6 +192,11 @@ public:
 
   DocumentPtr addArray(const std::string& key, DocumentPtr value) override {
     fields_.emplace_back(new FieldImpl(Field::Type::ARRAY, key, value));
+    return shared_from_this();
+  }
+
+  DocumentPtr addBinary(const std::string& key, std::string&& value) override {
+    fields_.emplace_back(new FieldImpl(Field::Type::BINARY, key, std::move(value)));
     return shared_from_this();
   }
 

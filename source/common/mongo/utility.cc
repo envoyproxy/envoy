@@ -6,8 +6,28 @@
 
 namespace Mongo {
 
-std::string
-MessageUtility::collectionFromFullCollectionName(const std::string& full_collection_name) {
+QueryMessageInfo::QueryMessageInfo(const QueryMessage& query) : request_id_{query.requestId()} {
+  // First see if this is a command, if so we are done.
+  const Bson::Document* command = parseCommand(query);
+  if (command) {
+    command_ = command->values().front()->key();
+
+    // Special case the 3.2 'find' command since it is a query.
+    if (command_ == "find") {
+      command_ = "";
+      parseFindCommand(*command);
+    }
+
+    return;
+  }
+
+  // Standard query.
+  collection_ = parseCollection(query.fullCollectionName());
+  callsite_ = parseCallingFunction(query);
+  type_ = parseType(query);
+}
+
+std::string QueryMessageInfo::parseCollection(const std::string& full_collection_name) {
   size_t collection_index = full_collection_name.find('.');
   if (collection_index == std::string::npos) {
     throw EnvoyException("invalid full collection name");
@@ -16,54 +36,60 @@ MessageUtility::collectionFromFullCollectionName(const std::string& full_collect
   return full_collection_name.substr(collection_index + 1);
 }
 
-std::string MessageUtility::queryCommand(const QueryMessage& query) {
+const Bson::Document* QueryMessageInfo::parseCommand(const QueryMessage& query) {
   if (query.fullCollectionName().find("$cmd") == std::string::npos) {
-    return "";
+    return nullptr;
   }
 
   // See if there is a $query document, and use that to find the command if so.
   const Bson::Document* doc_to_use = query.query();
-  if (query.query()->find("$query", Bson::Field::Type::DOCUMENT)) {
-    doc_to_use = &query.query()->find("$query", Bson::Field::Type::DOCUMENT)->asDocument();
+  const Bson::Field* field = query.query()->find("$query", Bson::Field::Type::DOCUMENT);
+  if (field) {
+    doc_to_use = &field->asDocument();
   }
 
   if (doc_to_use->values().empty()) {
     throw EnvoyException("invalid query command");
   }
 
-  return doc_to_use->values().front()->key();
+  return doc_to_use;
 }
 
-std::string MessageUtility::queryCallingFunction(const QueryMessage& query) {
+std::string QueryMessageInfo::parseCallingFunction(const QueryMessage& query) {
   const Bson::Field* field = query.query()->find("$comment", Bson::Field::Type::STRING);
   if (!field) {
     return "";
   }
 
+  return parseCallingFunctionJson(field->asString());
+}
+
+std::string QueryMessageInfo::parseCallingFunctionJson(const std::string& json_string) {
   try {
-    Json::StringLoader json(field->asString());
+    Json::StringLoader json(json_string);
     return json.getString("callingFunction");
   } catch (Json::Exception&) {
     return "";
   }
 }
 
-MessageUtility::QueryType MessageUtility::queryType(const QueryMessage& query) {
+QueryMessageInfo::QueryType QueryMessageInfo::parseType(const QueryMessage& query) {
   // First check the top level for _id.
-  QueryType type = queryTypeFromDocument(*query.query());
+  QueryType type = parseTypeFromDocument(*query.query());
   if (type == QueryType::ScatterGet) {
     // If we didn't find it in the top level, see if we have a top level $query element and look
     // there.
     const Bson::Field* field = query.query()->find("$query", Bson::Field::Type::DOCUMENT);
     if (field) {
-      type = queryTypeFromDocument(field->asDocument());
+      type = parseTypeFromDocument(field->asDocument());
     }
   }
 
   return type;
 }
 
-MessageUtility::QueryType MessageUtility::queryTypeFromDocument(const Bson::Document& document) {
+QueryMessageInfo::QueryType
+QueryMessageInfo::parseTypeFromDocument(const Bson::Document& document) {
   const Bson::Field* field = document.find("_id");
   if (!field) {
     return QueryType::ScatterGet;
@@ -75,6 +101,19 @@ MessageUtility::QueryType MessageUtility::queryTypeFromDocument(const Bson::Docu
   }
 
   return QueryType::PrimaryKey;
+}
+
+void QueryMessageInfo::parseFindCommand(const Bson::Document& command) {
+  collection_ = command.values().front()->asString();
+  const Bson::Field* comment = command.find("comment", Bson::Field::Type::STRING);
+  if (comment) {
+    callsite_ = parseCallingFunctionJson(comment->asString());
+  }
+
+  const Bson::Field* filter = command.find("filter", Bson::Field::Type::DOCUMENT);
+  if (filter) {
+    type_ = parseTypeFromDocument(filter->asDocument());
+  }
 }
 
 } // Mongo

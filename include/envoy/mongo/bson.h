@@ -25,6 +25,7 @@ public:
     STRING = 0x02,
     DOCUMENT = 0x03,
     ARRAY = 0x04,
+    BINARY = 0x05,
     OBJECT_ID = 0x07,
     BOOLEAN = 0x08,
     DATETIME = 0x09,
@@ -58,6 +59,7 @@ public:
   virtual const std::string& asString() const PURE;
   virtual const Document& asDocument() const PURE;
   virtual const Document& asArray() const PURE;
+  virtual const std::string& asBinary() const PURE;
   virtual const ObjectId& asObjectId() const PURE;
   virtual bool asBoolean() const PURE;
   virtual int64_t asDatetime() const PURE;
@@ -87,6 +89,7 @@ public:
   virtual DocumentPtr addString(const std::string& key, std::string&& value) PURE;
   virtual DocumentPtr addDocument(const std::string& key, DocumentPtr value) PURE;
   virtual DocumentPtr addArray(const std::string& key, DocumentPtr value) PURE;
+  virtual DocumentPtr addBinary(const std::string& key, std::string&& value) PURE;
   virtual DocumentPtr addObjectId(const std::string& key, Field::ObjectId&& value) PURE;
   virtual DocumentPtr addBoolean(const std::string& key, bool value) PURE;
   virtual DocumentPtr addDatetime(const std::string& key, int64_t value) PURE;
