@@ -11,6 +11,7 @@
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/http/async_client_impl.h"
+#include "common/router/shadow_writer_impl.h"
 
 namespace Upstream {
 
@@ -276,7 +277,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     Runtime::RandomGenerator& random, Stats::Store& stats_store, Event::Dispatcher& dispatcher,
     const std::string& local_zone_name)
     : parent_(parent), primary_cluster_(cluster),
-      http_async_client_(cluster, *this, stats_store, dispatcher, local_zone_name) {
+      http_async_client_(cluster, stats_store, dispatcher, local_zone_name, parent.parent_, runtime,
+                         random,
+                         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
 
   switch (cluster.lbType()) {
   case LoadBalancerType::LeastRequest: {

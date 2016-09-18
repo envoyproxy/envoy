@@ -1,5 +1,6 @@
 #include "http_tracer_impl.h"
 
+#include "common/common/enum_to_int.h"
 #include "common/common/macros.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
@@ -288,6 +289,13 @@ void LightStepSink::executeRequest(Http::MessagePtr&& msg) {
 
 void LightStepSink::onFailure(Http::AsyncClient::FailureReason) { stats_.collector_failed_.inc(); }
 
-void LightStepSink::onSuccess(Http::MessagePtr&&) { stats_.collector_success_.inc(); }
+void LightStepSink::onSuccess(Http::MessagePtr&& response) {
+  uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
+  if (response_code == enumToInt(Http::Code::OK)) {
+    stats_.collector_success_.inc();
+  } else {
+    stats_.collector_failed_.inc();
+  }
+}
 
 } // Tracing

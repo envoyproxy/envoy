@@ -16,6 +16,7 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/utility.h"
+#include "common/http/access_log/request_info_impl.h"
 
 namespace Http {
 
@@ -193,11 +194,10 @@ private:
                                   public Router::StableRouteTable {
     ActiveStreamFilterBase(ActiveStream& parent) : parent_(parent) {}
 
-    bool commonHandleAfterHeadersCallback(Http::FilterHeadersStatus status);
+    bool commonHandleAfterHeadersCallback(FilterHeadersStatus status);
     void commonHandleBufferData(Buffer::Instance& provided_data);
-    bool commonHandleAfterDataCallback(Http::FilterDataStatus status,
-                                       Buffer::Instance& provided_data);
-    bool commonHandleAfterTrailersCallback(Http::FilterTrailersStatus status);
+    bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data);
+    bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
 
     void commonContinue();
     virtual Buffer::InstancePtr& bufferedData() PURE;
@@ -214,14 +214,14 @@ private:
     void resetStream() override;
     const Router::StableRouteTable& routeTable() override { return *this; }
     uint64_t streamId() override;
-    Http::AccessLog::RequestInfo& requestInfo() override;
+    AccessLog::RequestInfo& requestInfo() override;
 
     // Router::StableRouteTable
-    const Router::RedirectEntry* redirectRequest(const Http::HeaderMap& headers) const {
+    const Router::RedirectEntry* redirectRequest(const HeaderMap& headers) const {
       return parent_.connection_manager_.config_.routeConfig().redirectRequest(headers,
                                                                                parent_.stream_id_);
     }
-    const Router::RouteEntry* routeForRequest(const Http::HeaderMap& headers) const {
+    const Router::RouteEntry* routeForRequest(const HeaderMap& headers) const {
       return parent_.connection_manager_.config_.routeConfig().routeForRequest(headers,
                                                                                parent_.stream_id_);
     }
@@ -306,8 +306,7 @@ private:
                         public Event::DeferredDeletable,
                         public StreamCallbacks,
                         public StreamDecoder,
-                        public FilterChainFactoryCallbacks,
-                        public AccessLog::RequestInfo {
+                        public FilterChainFactoryCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
 
@@ -337,32 +336,6 @@ private:
     void addStreamEncoderFilter(StreamEncoderFilterPtr filter) override;
     void addStreamFilter(StreamFilterPtr filter) override;
 
-    // Http::AccessLog::RequestInfo
-    SystemTime startTime() const override { return start_time_; }
-    uint64_t bytesReceived() const override { return bytes_received_; }
-    const std::string& protocol() const override {
-      return connection_manager_.codec_->protocolString();
-    }
-
-    const Optional<uint32_t>& responseCode() const override { return response_code_; }
-    uint64_t bytesSent() const override { return bytes_sent_; }
-    std::chrono::milliseconds duration() const override {
-      return std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::system_clock::now() - start_time_);
-    }
-
-    void onFailedResponse(Http::AccessLog::FailureReason failure_reason) override {
-      failure_reason_ = failure_reason;
-    }
-    Http::AccessLog::FailureReason failureReason() const override { return failure_reason_; }
-
-    void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override {
-      upstream_host_ = host;
-    }
-    Upstream::HostDescriptionPtr upstreamHost() const override { return upstream_host_; }
-    bool healthCheck() const override { return hc_request_; }
-    void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
-
     static DateFormatter date_formatter_;
 
     // All state for the stream. Put here for readability. We could move this to a bit field
@@ -383,16 +356,10 @@ private:
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
-    SystemTime start_time_;
     Stats::TimespanPtr request_timer_;
-    uint64_t bytes_received_{};
-    Optional<uint32_t> response_code_;
-    uint64_t bytes_sent_{};
     std::list<std::function<void()>> reset_callbacks_;
     State state_;
-    Http::AccessLog::FailureReason failure_reason_{Http::AccessLog::FailureReason::None};
-    Upstream::HostDescriptionPtr upstream_host_{};
-    bool hc_request_{};
+    AccessLog::RequestInfoImpl request_info_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

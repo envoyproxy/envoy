@@ -1,41 +1,29 @@
 #include "async_client_impl.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/http/codes.h"
-#include "common/http/headers.h"
-
 namespace Http {
 
-const HeaderMapImpl AsyncRequestImpl::SERVICE_UNAVAILABLE_HEADER{
-    {Headers::get().Status, std::to_string(enumToInt(Code::ServiceUnavailable))}};
+const AsyncRequestImpl::NullRateLimitPolicy AsyncRequestImpl::RouteEntryImpl::rate_limit_policy_;
+const AsyncRequestImpl::NullRetryPolicy AsyncRequestImpl::RouteEntryImpl::retry_policy_;
+const AsyncRequestImpl::NullShadowPolicy AsyncRequestImpl::RouteEntryImpl::shadow_policy_;
 
-const HeaderMapImpl AsyncRequestImpl::REQUEST_TIMEOUT_HEADER{
-    {Headers::get().Status, std::to_string(enumToInt(Code::GatewayTimeout))}};
-
-AsyncClientImpl::AsyncClientImpl(const Upstream::Cluster& cluster,
-                                 AsyncClientConnPoolFactory& factory, Stats::Store& stats_store,
-                                 Event::Dispatcher& dispatcher, const std::string& local_zone_name)
-    : cluster_(cluster), factory_(factory), stats_store_(stats_store), dispatcher_(dispatcher),
-      local_zone_name_(local_zone_name), stat_prefix_(fmt::format("cluster.{}.", cluster.name())) {}
+AsyncClientImpl::AsyncClientImpl(const Upstream::Cluster& cluster, Stats::Store& stats_store,
+                                 Event::Dispatcher& dispatcher, const std::string& local_zone_name,
+                                 Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+                                 Runtime::RandomGenerator& random,
+                                 Router::ShadowWriterPtr&& shadow_writer)
+    : cluster_(cluster), config_("http.async-client.", local_zone_name, stats_store, cm, runtime,
+                                 random, std::move(shadow_writer)),
+      dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() { ASSERT(active_requests_.empty()); }
 
 AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
                                             const Optional<std::chrono::milliseconds>& timeout) {
-  // For now we use default priority for all requests. We could eventually expose priority out of
-  // send if needed.
-  ConnectionPool::Instance* conn_pool = factory_.connPool(Upstream::ResourcePriority::Default);
-  if (!conn_pool) {
-    callbacks.onFailure(AsyncClient::FailureReason::Reset);
-    return nullptr;
-  }
-
   std::unique_ptr<AsyncRequestImpl> new_request{
-      new AsyncRequestImpl(std::move(request), *this, callbacks, dispatcher_, *conn_pool, timeout)};
+      new AsyncRequestImpl(std::move(request), *this, callbacks, timeout)};
 
   // The request may get immediately failed. If so, we will return nullptr.
-  if (new_request->stream_encoder_) {
+  if (!new_request->complete_) {
     new_request->moveIntoList(std::move(new_request), active_requests_);
     return active_requests_.front().get();
   } else {
@@ -44,43 +32,24 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 }
 
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
-                                   AsyncClient::Callbacks& callbacks, Event::Dispatcher& dispatcher,
-                                   ConnectionPool::Instance& conn_pool,
+                                   AsyncClient::Callbacks& callbacks,
                                    const Optional<std::chrono::milliseconds>& timeout)
-    : request_(std::move(request)), parent_(parent), callbacks_(callbacks) {
+    : request_(std::move(request)), parent_(parent), callbacks_(callbacks),
+      stream_id_(parent.config_.random_.random()), router_(parent.config_),
+      request_info_(EMPTY_STRING), route_(parent_.cluster_.name(), timeout) {
 
-  stream_encoder_.reset(new PooledStreamEncoder(conn_pool, *this, *this, 0, 0, *this));
-  stream_encoder_->encodeHeaders(request_->headers(), !request_->body());
-
-  // We might have been immediately failed.
-  if (stream_encoder_ && request_->body()) {
-    stream_encoder_->encodeData(*request_->body(), true);
+  router_.setDecoderFilterCallbacks(*this);
+  router_.decodeHeaders(request_->headers(), !request_->body());
+  if (!complete_ && request_->body()) {
+    router_.decodeData(*request_->body(), true);
   }
-  if (stream_encoder_ && timeout.valid()) {
-    request_timeout_ = dispatcher.createTimer([this]() -> void { onRequestTimeout(); });
-    request_timeout_->enableTimer(timeout.value());
-  }
+
+  // TODO: Support request trailers.
 }
 
-AsyncRequestImpl::~AsyncRequestImpl() { ASSERT(!stream_encoder_); }
+AsyncRequestImpl::~AsyncRequestImpl() { ASSERT(!reset_callback_); }
 
-const std::string& AsyncRequestImpl::upstreamZone() {
-  return upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
-}
-
-bool AsyncRequestImpl::isUpstreamCanary() {
-  return (response_ ? (response_->headers().get(Headers::get().EnvoyUpstreamCanary) == "true")
-                    : false) ||
-         (upstream_host_ ? upstream_host_->canary() : false);
-}
-
-void AsyncRequestImpl::cancel() {
-  ASSERT(stream_encoder_);
-  stream_encoder_->resetStream();
-  cleanup();
-}
-
-void AsyncRequestImpl::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
+void AsyncRequestImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   response_.reset(new ResponseMessageImpl(std::move(headers)));
 #ifndef NDEBUG
   log_debug("async http request response headers (end_stream={}):", end_stream);
@@ -88,17 +57,12 @@ void AsyncRequestImpl::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
                                    -> void { log_debug("  '{}':'{}'", key.get(), value); });
 #endif
 
-  CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
-                                     response_->headers(), true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, upstreamZone(), isUpstreamCanary()};
-  CodeUtility::chargeResponseStat(info);
-
   if (end_stream) {
     onComplete();
   }
 }
 
-void AsyncRequestImpl::decodeData(const Buffer::Instance& data, bool end_stream) {
+void AsyncRequestImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   log_trace("async http request response data (length={} end_stream={})", data.length(),
             end_stream);
   if (!response_->body()) {
@@ -112,7 +76,7 @@ void AsyncRequestImpl::decodeData(const Buffer::Instance& data, bool end_stream)
   }
 }
 
-void AsyncRequestImpl::decodeTrailers(HeaderMapPtr&& trailers) {
+void AsyncRequestImpl::encodeTrailers(HeaderMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
 #ifndef NDEBUG
   log_debug("async http request response trailers:");
@@ -123,48 +87,32 @@ void AsyncRequestImpl::decodeTrailers(HeaderMapPtr&& trailers) {
   onComplete();
 }
 
-void AsyncRequestImpl::onComplete() {
-  CodeUtility::ResponseTimingInfo info{parent_.stats_store_, parent_.stat_prefix_,
-                                       stream_encoder_->requestCompleteTime(), isUpstreamCanary(),
-                                       true, EMPTY_STRING, EMPTY_STRING, parent_.local_zone_name_,
-                                       upstreamZone()};
-  CodeUtility::chargeResponseTiming(info);
+void AsyncRequestImpl::cancel() {
+  reset_callback_();
+  cleanup();
+}
 
+void AsyncRequestImpl::onComplete() {
+  complete_ = true;
   callbacks_.onSuccess(std::move(response_));
   cleanup();
 }
 
-void AsyncRequestImpl::onResetStream(StreamResetReason) {
-  CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
-                                     SERVICE_UNAVAILABLE_HEADER, true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, upstreamZone(), isUpstreamCanary()};
-  CodeUtility::chargeResponseStat(info);
-  callbacks_.onFailure(AsyncClient::FailureReason::Reset);
-  cleanup();
-}
-
-void AsyncRequestImpl::onRequestTimeout() {
-  CodeUtility::ResponseStatInfo info{parent_.stats_store_, parent_.stat_prefix_,
-                                     REQUEST_TIMEOUT_HEADER, true, EMPTY_STRING, EMPTY_STRING,
-                                     parent_.local_zone_name_, upstreamZone(), isUpstreamCanary()};
-  CodeUtility::chargeResponseStat(info);
-  parent_.cluster_.stats().upstream_rq_timeout_.inc();
-  stream_encoder_->resetStream();
-  callbacks_.onFailure(AsyncClient::FailureReason::RequestTimeout);
-  cleanup();
-}
-
 void AsyncRequestImpl::cleanup() {
-  stream_encoder_.reset();
-  if (request_timeout_) {
-    request_timeout_->disableTimer();
-  }
+  response_.reset();
+  reset_callback_ = nullptr;
 
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.
   if (inserted()) {
     removeFromList(parent_.active_requests_);
   }
+}
+
+void AsyncRequestImpl::resetStream() {
+  // In this case we don't have a valid response so we do need to raise a failure.
+  callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+  cleanup();
 }
 
 } // Http

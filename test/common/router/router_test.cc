@@ -37,8 +37,8 @@ class RouterTest : public testing::Test {
 public:
   RouterTest()
       : shadow_writer_(new MockShadowWriter()),
-        config_(new FilterConfig("test.", "from_az", stats_store_, cm_, runtime_, random_,
-                                 ShadowWriterPtr{shadow_writer_})),
+        config_("test.", "from_az", stats_store_, cm_, runtime_, random_,
+                ShadowWriterPtr{shadow_writer_}),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     ON_CALL(*cm_.conn_pool_.host_, url()).WillByDefault(ReturnRef(host_url_));
@@ -65,7 +65,7 @@ public:
   Http::ConnectionPool::MockCancellable cancellable_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   MockShadowWriter* shadow_writer_;
-  FilterConfigPtr config_;
+  FilterConfig config_;
   TestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
