@@ -1,0 +1,74 @@
+{
+  "listeners": [
+    {
+      "port": 9001,
+      "filters": [
+        {
+          "type": "read",
+          "name": "http_connection_manager",
+          "config": {
+            "codec_type": "auto",
+            "add_user_agent": true,
+            "idle_timeout_s": 840,
+            "access_log": [
+              {
+                "path": "/var/log/envoy/egress_http.log",
+                "format": "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %FAILURE_REASON% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n"
+              }
+            ],
+            "stat_prefix": "egress_http",
+            "use_remote_address": true,
+            "route_config": {
+              "virtual_hosts": [
+                {
+                  "name": "grpc",
+                  "domains": [
+                    "grpc"
+                  ],
+                  "routes": [
+                    {
+                      "prefix": "/",
+                      "cluster": "grpc"
+                    }
+                  ]
+                }
+              ]
+            },
+            "filters": [
+              {
+                "type": "both",
+                "name": "grpc_http1_bridge",
+                "config": {}
+              },
+              {
+                "type": "decoder",
+                "name": "router",
+                "config": {}
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "admin": {
+    "access_log_path": "/var/log/envoy/admin_access.log",
+    "port": 9901
+  },
+  "cluster_manager": {
+    "clusters": [
+      {
+        "name": "grpc",
+        "type": "logical_dns",
+        "lb_type": "round_robin",
+        "connect_timeout_ms": 250,
+        "features": "http2",
+        "hosts": [
+          {
+            "url": "tcp://grpc:9211"
+          }
+        ]
+      }
+    ]
+  }
+}
