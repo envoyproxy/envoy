@@ -26,9 +26,11 @@ public:
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
   void encodeTrailers(Http::HeaderMapImpl trailers);
+  void encodeResetStream();
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   void waitForHeadersComplete();
+  void waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length);
   void waitForEndStream(Event::Dispatcher& client_dispatcher);
   void waitForReset();
 

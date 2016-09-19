@@ -304,8 +304,8 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
       }));
   filter->callbacks_->encodeHeaders(std::move(response_headers), false);
 
-  // Finish the request. Since we already started, we expect the data to get eaten.
-  EXPECT_CALL(*filter, decodeData(_, _)).Times(0);
+  // Finish the request.
+  EXPECT_CALL(*filter, decodeData(_, true));
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> void { decoder->decodeData(data, true); }));
 
@@ -461,7 +461,7 @@ TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
         return Http::FilterHeadersStatus::StopIteration;
       }));
 
-  EXPECT_CALL(*decoder_filter2, decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter2, decodeData(_, true));
   decoder_filter1->callbacks_->continueDecoding();
 }
 

@@ -416,11 +416,6 @@ void ConnectionManagerImpl::ActiveStream::decodeData(const Buffer::Instance& dat
 
 void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
-  // If a response has been started, filters do not care about further body data. Just drop it.
-  if (state_.local_started_) {
-    return;
-  }
-
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   if (!filter) {
     entry = decoder_filters_.begin();
@@ -447,11 +442,6 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilter* filter,
                                                          HeaderMap& trailers) {
-  // If a response has been started, filters do not care about trailers. Just drop it.
-  if (state_.local_started_) {
-    return;
-  }
-
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   if (!filter) {
     entry = decoder_filters_.begin();

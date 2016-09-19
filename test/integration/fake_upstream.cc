@@ -58,6 +58,11 @@ void FakeStream::encodeTrailers(Http::HeaderMapImpl trailers) {
                                              -> void { encoder_.encodeTrailers(trailers); });
 }
 
+void FakeStream::encodeResetStream() {
+  parent_.connection().dispatcher().post(
+      [this]() -> void { encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset); });
+}
+
 void FakeStream::onResetStream(Http::StreamResetReason) {
   std::unique_lock<std::mutex> lock(lock_);
   saw_reset_ = true;
@@ -68,6 +73,18 @@ void FakeStream::waitForHeadersComplete() {
   std::unique_lock<std::mutex> lock(lock_);
   while (!headers_) {
     decoder_event_.wait(lock);
+  }
+}
+
+void FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length) {
+  std::unique_lock<std::mutex> lock(lock_);
+  while (body_length_ != body_length) {
+    decoder_event_.wait_until(lock,
+                              std::chrono::system_clock::now() + std::chrono::milliseconds(5));
+    if (body_length_ != body_length) {
+      // Run the client dispatcher since we may need to process window updates, etc.
+      client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+    }
   }
 }
 

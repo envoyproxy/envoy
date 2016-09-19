@@ -221,8 +221,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   }
 
   // If we are potentially going to retry or shadow this request we need to buffer.
-  return retry_state_->enabled() || do_shadowing_ ? Http::FilterDataStatus::StopIterationAndBuffer
-                                                  : Http::FilterDataStatus::StopIterationNoBuffer;
+  return (retry_state_ && retry_state_->enabled()) || do_shadowing_
+             ? Http::FilterDataStatus::StopIterationAndBuffer
+             : Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
@@ -316,7 +317,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   }
 
   // We don't retry on a global timeout or if we already started the response.
-  if (type != UpstreamResetType::GlobalTimeout && !downstream_response_started_ &&
+  if (type != UpstreamResetType::GlobalTimeout && !downstream_response_started_ && retry_state_ &&
       retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); }) &&
       setupRetry(true)) {
     return;
