@@ -7,39 +7,6 @@ The docker-compose sandboxes give you different environments to test out Envoy's
 features. As we gauge people's interests we will add more sandboxes demonstrating
 different features.
 
-Locally building a docker image with an envoy binary
-----------------------------------------------------
-
-The following steps guide you through building your own envoy binary, and
-putting that in a clean ubuntu container.
-
-**Step 1: Build Envoy**
-
-Using ``lyft/envoy-buld`` you will compile envoy.
-This image has all software needed to build envoy. From your envoy directory::
-
-  $ pwd
-  src/envoy
-  $ docker run -t -i -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh normal"
-
-That command will take some time to run because it is compiling an envoy binary.
-
-**Step 2: Build image with only envoy binary**
-
-In this step we'll build an image that only has the envoy binary, and none
-of the software used to build it.::
-
-  $ pwd
-  src/envoy/
-  $ docker build -f example/Dockerfile-envoy-image -t envoy .
-
-Now you can use this ``envoy`` image to build the any of the sandboxes if you change
-the ``FROM`` line in any dockerfile.
-
-This will be particularly useful if you are interested in modifying envoy, and testing
-your changes.
-
-
 Front Proxy
 -----------
 
@@ -310,3 +277,35 @@ To use the python service and sent gRPC requests::
   # get a key
   docker-compose exec python /client/client.py get foo
   => bar
+
+Locally building a docker image with an envoy binary
+----------------------------------------------------
+
+The following steps guide you through building your own envoy binary, and
+putting that in a clean ubuntu container.
+
+**Step 1: Build Envoy**
+
+Using ``lyft/envoy-build`` you will compile envoy.
+This image has all software needed to build envoy. From your envoy directory::
+
+  $ pwd
+  src/envoy
+  $ docker run -t -i -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh normal"
+
+That command will take some time to run because it is compiling an envoy binary.
+
+**Step 2: Build image with only envoy binary**
+
+In this step we'll build an image that only has the envoy binary, and none
+of the software used to build it.::
+
+  $ pwd
+  src/envoy/
+  $ docker build -f example/Dockerfile-envoy-image -t envoy .
+
+Now you can use this ``envoy`` image to build the any of the sandboxes if you change
+the ``FROM`` line in any dockerfile.
+
+This will be particularly useful if you are interested in modifying envoy, and testing
+your changes.
