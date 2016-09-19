@@ -14,7 +14,7 @@ unhealthy, successes required before marking a host healthy, etc.):
 * **HTTP**: During HTTP health checking Envoy will send an HTTP request to the upstream host. It
   expects a 200 response if the host is healthy. The upstream host can return 503 if it wants to
   immediately notify downstream hosts to no longer forward traffic to it.
-* **L3/L4**: During L3/L4 health checking, Envoy will send a configurable byte buffer to the 
+* **L3/L4**: During L3/L4 health checking, Envoy will send a configurable byte buffer to the
   upstream host. It expects the byte buffer to be echoed in the response if the host is to be
   considered healthy.
 
@@ -38,10 +38,26 @@ operation:
   check request will be passed to the local service. This is the recommended mode of operation when
   operating a large mesh. Envoy uses persistent connections for health checking traffic and health
   check requests have very little cost to Envoy itself. Thus, this mode of operation yields an
-  eventually consistent view of the health state of each upstream host without overwhelming the 
+  eventually consistent view of the health state of each upstream host without overwhelming the
   local service with a large number of health check requests.
 
-The health check filter appends the x-envoy-upstream-healthchecked-cluster header to the response 
-headers, the value is determined by the :option:`--service-cluster` command line option.
-
 Health check filter :ref:`configuration <config_http_filters_health_check>`.
+
+.. _arch_overview_health_checking_identity:
+
+Health check identity
+---------------------
+
+Just verifying that an upstream host responds to a particular health check URL does not necessarily
+mean that the upstream host is valid. For example, when using eventually consistent service
+discovery in a cloud auto scaling or container environment, it's possible for a host to go away and
+then come back with the same IP address, but as a different host type. One solution to this problem
+is having a different HTTP health checking URL for every service type. The downside of that approach
+is that overall configuration becomes more complicated as every health check URL is fully custom.
+
+The Envoy HTTP health checker supports the :ref:`service_name
+<config_cluster_manager_cluster_hc_service_name>` option. If this option is set, the health checker
+additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* response header to
+*service_name*. If the values do not match, the health check does not pass. The upstream health
+check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers. The appended
+value is determined by the :option:`--service-cluster` command line option.
