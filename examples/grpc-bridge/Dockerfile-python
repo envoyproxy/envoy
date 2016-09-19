@@ -1,0 +1,8 @@
+FROM lyft/envoy:latest
+
+RUN apt-get install -y python-dev
+RUN pip install grpcio requests
+ADD ./client /client
+RUN chmod a+x /client/client.py
+RUN mkdir /var/log/envoy/
+CMD /usr/local/bin/envoy -c /etc/s2s-python-envoy.json
