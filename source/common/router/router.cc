@@ -547,7 +547,8 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
       ->stats()
       .upstream_rq_per_try_timeout_.inc();
   upstream_encoder_->resetStream();
-  parent_.onUpstreamReset(UpstreamResetType::PerTryTimeout, Optional<Http::StreamResetReason>());
+  parent_.onUpstreamReset(UpstreamResetType::PerTryTimeout,
+                          Optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));
 }
 
 RetryStatePtr

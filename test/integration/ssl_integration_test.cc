@@ -109,11 +109,4 @@ TEST_F(SslIntegrationTest, AltAlpn) {
   checkStats();
 }
 
-TEST_F(SslIntegrationTest, AdminCertEndpoint) {
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      ADMIN_PORT, "GET", "/certs", Http::CodecClient::Type::HTTP1);
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().get(":status"));
-}
-
 } // Ssl

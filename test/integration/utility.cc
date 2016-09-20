@@ -4,6 +4,7 @@
 #include "envoy/network/connection.h"
 
 #include "common/api/api_impl.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -38,10 +39,10 @@ void BufferingStreamDecoder::onComplete() {
 
 void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
 
-BufferingStreamDecoderPtr IntegrationUtil::makeSingleRequest(uint32_t port, std::string method,
-                                                             std::string url,
-                                                             Http::CodecClient::Type type,
-                                                             std::string host) {
+BufferingStreamDecoderPtr
+IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
+                                   const std::string& body, Http::CodecClient::Type type,
+                                   const std::string& host) {
   Api::Impl api(std::chrono::milliseconds(9000));
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   Stats::IsolatedStoreImpl stats_store;
@@ -54,11 +55,14 @@ BufferingStreamDecoderPtr IntegrationUtil::makeSingleRequest(uint32_t port, std:
   encoder.getStream().addCallbacks(*response);
 
   Http::HeaderMapImpl headers;
-  headers.addViaMoveValue(Http::Headers::get().Method, std::move(method));
-  headers.addViaMoveValue(Http::Headers::get().Path, std::move(url));
-  headers.addViaMoveValue(Http::Headers::get().Host, std::move(host));
+  headers.addViaCopy(Http::Headers::get().Method, method);
+  headers.addViaCopy(Http::Headers::get().Path, url);
+  headers.addViaCopy(Http::Headers::get().Host, host);
   headers.addViaMoveValue(Http::Headers::get().Scheme, "http");
-  encoder.encodeHeaders(headers, true);
+  encoder.encodeHeaders(headers, body.empty());
+  if (!body.empty()) {
+    encoder.encodeData(Buffer::OwnedImpl(body), true);
+  }
 
   dispatcher->run(Event::Dispatcher::RunType::Block);
   return response;

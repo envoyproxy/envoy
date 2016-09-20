@@ -172,6 +172,7 @@ public:
 protected:
   void testRouterRedirect(Http::CodecClient::Type type);
   void testRouterNotFound(Http::CodecClient::Type type);
+  void testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type);
   void testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
                                             Http::CodecClient::Type type, uint64_t request_size,
                                             uint64_t response_size);

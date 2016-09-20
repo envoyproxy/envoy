@@ -461,7 +461,8 @@ TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
         return Http::FilterHeadersStatus::StopIteration;
       }));
 
-  EXPECT_CALL(*decoder_filter2, decodeData(_, true));
+  // Response is already complete so we drop buffered body data when we continue.
+  EXPECT_CALL(*decoder_filter2, decodeData(_, _)).Times(0);
   decoder_filter1->callbacks_->continueDecoding();
 }
 

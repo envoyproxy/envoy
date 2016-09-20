@@ -84,7 +84,9 @@ public:
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
    *         remote easly disconnection.
    */
-  static BufferingStreamDecoderPtr makeSingleRequest(uint32_t port, std::string method,
-                                                     std::string url, Http::CodecClient::Type type,
-                                                     std::string host = "host");
+  static BufferingStreamDecoderPtr makeSingleRequest(uint32_t port, const std::string& method,
+                                                     const std::string& url,
+                                                     const std::string& body,
+                                                     Http::CodecClient::Type type,
+                                                     const std::string& host = "host");
 };
