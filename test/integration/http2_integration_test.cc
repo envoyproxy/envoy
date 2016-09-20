@@ -9,6 +9,16 @@
 
 TEST_F(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP2); }
 
+TEST_F(Http2IntegrationTest, RouterNotFoundBodyNoBuffer) {
+  // TODO: Right now this test does not work IMO because of an issue in nghttp2.
+  // https://github.com/nghttp2/nghttp2/issues/692
+  // testRouterNotFoundWithBody(HTTP_PORT, Http::CodecClient::Type::HTTP2);
+}
+
+TEST_F(Http2IntegrationTest, RouterNotFoundBodyBuffer) {
+  testRouterNotFoundWithBody(HTTP_BUFFER_PORT, Http::CodecClient::Type::HTTP2);
+}
+
 TEST_F(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::Type::HTTP2); }
 
 TEST_F(Http2IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP2); }

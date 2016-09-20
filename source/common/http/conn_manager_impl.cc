@@ -92,6 +92,9 @@ void ConnectionManagerImpl::destroyStream(ActiveStream& stream) {
   // deleted first.
   bool reset_stream = false;
   if (!stream.state_.remote_complete_ || !stream.state_.local_complete_) {
+    // Indicate local is complete at this point so that if we reset during a continuation, we don't
+    // raise further data or trailers.
+    stream.state_.local_complete_ = true;
     stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
     reset_stream = true;
   }
@@ -416,6 +419,12 @@ void ConnectionManagerImpl::ActiveStream::decodeData(const Buffer::Instance& dat
 
 void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
+  // If a response is complete or a reset has been sent, filters do not care about further body
+  // data. Just drop it.
+  if (state_.local_complete_) {
+    return;
+  }
+
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   if (!filter) {
     entry = decoder_filters_.begin();
@@ -442,6 +451,11 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilter* filter,
                                                          HeaderMap& trailers) {
+  // See decodeData() above for why we check local_complete_ here.
+  if (state_.local_complete_) {
+    return;
+  }
+
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   if (!filter) {
     entry = decoder_filters_.begin();
@@ -478,11 +492,6 @@ ConnectionManagerImpl::ActiveStream::commonEncodePrefix(ActiveStreamEncoderFilte
 
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         Http::HeaderMap& headers, bool end_stream) {
-  if (filter == nullptr) {
-    ASSERT(!state_.local_started_);
-    state_.local_started_ = true;
-  }
-
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   for (; entry != encoder_filters_.end(); entry++) {
     Http::FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, end_stream);

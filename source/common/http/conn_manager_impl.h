@@ -370,7 +370,6 @@ private:
     struct State {
       bool remote_complete_{};
       bool local_complete_{};
-      bool local_started_{};
     };
 
     ConnectionManagerImpl& connection_manager_;
