@@ -62,7 +62,7 @@
 
 .intro-graphic {
   &-one {
-    background: image_url("key.png");
+    background: image_url("languages.svg");
     background-size: 130px;
     background-repeat: no-repeat;
     background-position: 50%;
@@ -71,12 +71,12 @@
 
     @include media($medium-screen-up) {
       background-size: 239px;
-      height: 21em;
+      height: 17em;
     }
   }
 
   &-two {
-    background: image_url("safe.png");
+    background: image_url("speed.svg");
     background-size: 163px;
     background-repeat: no-repeat;
     background-position: 50%;
@@ -85,12 +85,12 @@
 
     @include media($medium-screen-up) {
       background-size: 256px;
-      height: 21em;
+      height: 18em;
     }
   }
 
   &-three {
-    background: image_url("browser.png");
+    background: image_url("fork.svg");
     background-size: 183px;
     background-repeat: no-repeat;
     background-position: 50%;
@@ -99,7 +99,7 @@
 
     @include media($medium-screen-up) {
       background-size: 256px;
-      height: 21em;
+      height: 16em;
     }
   }
 }
@@ -111,6 +111,7 @@
 
   @include media($medium-screen-up) {
     text-align: left;
+    margin-top: 4em;
   }
 }
 
