@@ -79,6 +79,7 @@ public:
    * @param port supplies the port to connect to on localhost.
    * @param method supplies the request method.
    * @param url supplies the request url.
+   * @param body supplies the optional request body to send.
    * @param type supplies the codec to use for the request.
    * @param host supplies the host header to use for the request.
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
