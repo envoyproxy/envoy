@@ -105,7 +105,6 @@ add_library(
 
 include_directories(SYSTEM ${ENVOY_HTTP_PARSER_INCLUDE_DIR})
 include_directories(${ENVOY_JANSSON_INCLUDE_DIR})
-include_directories(${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
 
 if (NOT ENVOY_SANITIZE)
   include_directories(${ENVOY_GPERFTOOLS_INCLUDE_DIR})
@@ -114,6 +113,7 @@ endif()
 include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 include_directories(${ENVOY_NGHTTP2_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
+include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
 
 set_target_properties(envoy-common PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT
                       "../precompiled/precompiled.h")
