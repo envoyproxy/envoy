@@ -66,6 +66,68 @@ TEST_F(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(3UL, stats_.upstream_rq_lb_healthy_panic_.value());
 }
 
+TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingDone) {
+  cluster_.healthy_hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80"),
+                             newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:81"),
+                             newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:82")};
+  cluster_.hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80"),
+                     newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:81"),
+                     newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:82")};
+  cluster_.local_zone_hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:81")};
+  cluster_.local_zone_healthy_hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:81")};
+  stats_.upstream_zone_count_.set(3UL);
+
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 0))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.healthy_panic_threshold", 80))
+      .WillRepeatedly(Return(80));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 0))
+      .WillRepeatedly(Return(2));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+
+  // There is only one host in the given zone for zone aware routing.
+  EXPECT_EQ(cluster_.local_zone_healthy_hosts_[0], lb_.chooseHost());
+  EXPECT_EQ(1UL, stats_.upstream_zone_within_threshold_.value());
+
+  EXPECT_EQ(cluster_.local_zone_healthy_hosts_[0], lb_.chooseHost());
+  EXPECT_EQ(2UL, stats_.upstream_zone_within_threshold_.value());
+
+  // Disable runtime global zone routing.
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 0))
+      .WillRepeatedly(Return(false));
+  EXPECT_EQ(cluster_.healthy_hosts_[2], lb_.chooseHost());
+  EXPECT_EQ(2UL, stats_.upstream_zone_within_threshold_.value());
+}
+
+TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingNotHealthy) {
+  cluster_.healthy_hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80"),
+                             newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:81"),
+                             newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:82")};
+  cluster_.hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80"),
+                     newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:81"),
+                     newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:82")};
+  cluster_.local_zone_hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:81")};
+  cluster_.local_zone_healthy_hosts_ = {};
+  stats_.upstream_zone_count_.set(3UL);
+
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 0))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.healthy_panic_threshold", 80))
+      .WillRepeatedly(Return(80));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 0))
+      .WillRepeatedly(Return(2));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+
+  // There is only one host in the given zone for zone aware routing.
+  EXPECT_EQ(cluster_.healthy_hosts_[0], lb_.chooseHost());
+  EXPECT_EQ(1UL, stats_.upstream_zone_above_threshold_.value());
+
+  EXPECT_EQ(cluster_.healthy_hosts_[1], lb_.chooseHost());
+  EXPECT_EQ(2UL, stats_.upstream_zone_above_threshold_.value());
+}
+
 class LeastRequestLoadBalancerTest : public testing::Test {
 public:
   LeastRequestLoadBalancerTest() : stats_(ClusterImplBase::generateStats("", stats_store_)) {}
@@ -135,7 +197,7 @@ TEST_F(LeastRequestLoadBalancerTest, Normal) {
   EXPECT_EQ(cluster_.healthy_hosts_[1], lb_.chooseHost());
 }
 
-TEST_F(LeastRequestLoadBalancerTest, WeightImbalanceRuntimOff) {
+TEST_F(LeastRequestLoadBalancerTest, WeightImbalanceRuntimeOff) {
   // Disable weight balancing.
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.weight_enabled", 1))
       .WillRepeatedly(Return(0));

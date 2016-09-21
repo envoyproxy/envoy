@@ -47,6 +47,8 @@ public:
 
   std::vector<HostPtr> hosts_;
   std::vector<HostPtr> healthy_hosts_;
+  std::vector<HostPtr> local_zone_hosts_;
+  std::vector<HostPtr> local_zone_healthy_hosts_;
   std::string name_{"fake_cluster"};
   std::string alt_stat_name_{"fake_alt_cluster"};
   std::list<MemberUpdateCb> callbacks_;

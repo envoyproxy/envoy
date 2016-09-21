@@ -25,6 +25,8 @@ MockCluster::MockCluster()
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
+  ON_CALL(*this, localZoneHosts()).WillByDefault(ReturnRef(local_zone_hosts_));
+  ON_CALL(*this, localZoneHealthyHosts()).WillByDefault(ReturnRef(local_zone_healthy_hosts_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, altStatName()).WillByDefault(ReturnRef(alt_stat_name_));
   ON_CALL(*this, lbType()).WillByDefault(Return(Upstream::LoadBalancerType::RoundRobin));

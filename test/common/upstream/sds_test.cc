@@ -129,6 +129,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ("us-east-1d", canary_host->zone());
   EXPECT_EQ(1U, canary_host->weight());
   EXPECT_EQ(1UL, cluster_->stats().max_host_weight_.value());
+  EXPECT_EQ(3UL, cluster_->stats().upstream_zone_count_.value());
 
   // Test response with weight change. We should still have the same host.
   setupRequest();
@@ -146,6 +147,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ("us-east-1d", canary_host->zone());
   EXPECT_EQ(50U, canary_host->weight());
   EXPECT_EQ(50UL, cluster_->stats().max_host_weight_.value());
+  EXPECT_EQ(3UL, cluster_->stats().upstream_zone_count_.value());
 
   // Now test the failure case, our cluster size should not change.
   setupRequest();
@@ -156,6 +158,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(50U, canary_host->weight());
   EXPECT_EQ(50UL, cluster_->stats().max_host_weight_.value());
+  EXPECT_EQ(3UL, cluster_->stats().upstream_zone_count_.value());
 
   // 503 response.
   setupRequest();
@@ -168,6 +171,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(50U, canary_host->weight());
   EXPECT_EQ(50UL, cluster_->stats().max_host_weight_.value());
+  EXPECT_EQ(3UL, cluster_->stats().upstream_zone_count_.value());
 }
 
 TEST_F(SdsTest, HealthChecker) {
