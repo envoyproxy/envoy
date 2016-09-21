@@ -3,6 +3,7 @@
 #include "http_tracer_impl.h"
 
 #include "common/common/macros.h"
+#include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
@@ -114,70 +115,52 @@ void HttpTracerImpl::populateStats(const Decision& decision) {
   }
 }
 
-namespace {
+LightStepRecorder::LightStepRecorder(LightStepSink* sink, const lightstep::TracerImpl& tracer)
+    : sink_(sink), builder_(tracer) {}
 
-class LightStepRecorder : public lightstep::Recorder {
-public:
-  LightStepRecorder(LightStepSink* sink, const lightstep::TracerImpl& tracer)
-      : sink_(sink), builder_(tracer) {}
+void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
+  builder_.addSpan(std::move(span));
 
-  // lightstep::Recorder
-  void RecordSpan(lightstep::collector::Span&& span) override {
-    // REVIEWER: This is unlocked, should be one tracer/recorder per thread.
-    builder_.addSpan(std::move(span));
+  // When the buffer has accumulated N spans, send to LightStep.
+  const int N = 5;
+  if (builder_.pendingSpans() == N) {
+    lightstep::collector::ReportRequest request;
+    std::swap(request, builder_.pending());
 
-    // When the buffer has accumulated N spans, send to LightStep.
-    const int N = 10;
-    if (builder_.pendingSpans() == N) {
-      lightstep::collector::ReportRequest request;
-      std::swap(request, builder_.pending());
-
-      // REVIEWER: Here, call gRPC to collector-grpc.lightstep.com:443
-      // with std::move(request).
-    }
+    // REVIEWER: Here, call gRPC to collector-grpc.lightstep.com:443
+    // with std::move(request).
   }
-
-  bool FlushWithTimeout(lightstep::Duration) override {
-    // Note: We don't expect this to be called, since the Tracer
-    // reference is private to its LightStepSink.
-    return true;
-  }
-
-  static std::unique_ptr<lightstep::Recorder> New(LightStepSink* sink,
-                                                  const lightstep::TracerImpl& tracer) {
-    return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(sink, tracer));
-  }
-
-private:
-  LightStepSink* sink_;
-  lightstep::ReportBuilder builder_;
-};
-
-const std::string& orDash(const std::string& s) {
-  if (s.empty()) {
-    static const std::string dash = "-";
-    return dash;
-  }
-  return s;
 }
 
-} // namespace
+bool LightStepRecorder::FlushWithTimeout(lightstep::Duration) {
+  // Note: We don't expect this to be called, since the Tracer
+  // reference is private to its LightStepSink.
+  return true;
+}
 
-// REVIEWER: Either this object or its tracer_ field should be
-// thread-local, for this to work.
+std::unique_ptr<lightstep::Recorder>
+LightStepRecorder::NewInstance(LightStepSink* sink, const lightstep::TracerImpl& tracer) {
+  return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(sink, tracer));
+}
+
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                              const std::string& stat_prefix, Stats::Store& stats,
                              const std::string& service_node,
                              const lightstep::TracerOptions& options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
       stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix + "tracing.lightstep."))},
-      service_node_(service_node),
-      tracer_(lightstep::NewUserDefinedTransportLightStepTracer(
-          options, std::bind(&LightStepRecorder::New, this, std::placeholders::_1))) {
+      service_node_(service_node), options_(options) {
   if (!cm_.get(collector_cluster_)) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
                                      collector_cluster_));
   }
+}
+
+lightstep::Tracer& LightStepSink::thread_local_tracer() {
+  static thread_local lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
+      options_, std::bind(&LightStepRecorder::NewInstance, this, std::placeholders::_1)));
+
+  return tracer;
 }
 
 std::string LightStepSink::buildRequestLine(const Http::HeaderMap& request_headers,
@@ -202,19 +185,19 @@ std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo&
 void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
                                const Http::HeaderMap& /*response_headers*/,
                                const Http::AccessLog::RequestInfo& request_info) {
-  // REVIEWER: Note that the span_id and trace_id are supplied
-  // automatically using the provided uuid generator.
-  lightstep::Span span = tracer_.StartSpan(
+
+  lightstep::Span span = thread_local_tracer().StartSpan(
       "TODO:operation_name_goes_here",
       {
        lightstep::StartTimestamp(request_info.startTime()),
        lightstep::SetTag("join:x-request-id", request_headers.get(Http::Headers::get().RequestId)),
        lightstep::SetTag("request line", buildRequestLine(request_headers, request_info)),
        lightstep::SetTag("response code", buildResponseCode(request_info)),
-       lightstep::SetTag(
-           "downstream cluster",
-           orDash(request_headers.get(Http::Headers::get().EnvoyDownstreamServiceCluster))),
-       lightstep::SetTag("user agent", orDash(request_headers.get(Http::Headers::get().UserAgent))),
+       lightstep::SetTag("downstream cluster",
+                         StringUtil::valueOrDefault(request_headers.get(
+                             Http::Headers::get().EnvoyDownstreamServiceCluster))),
+       lightstep::SetTag("user agent", StringUtil::valueOrDefault(
+                                           request_headers.get(Http::Headers::get().UserAgent))),
        lightstep::SetTag("node id", service_node_),
       });
 
@@ -222,11 +205,6 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
     span.SetTag("join:x-client-trace-id", request_headers.get(Http::Headers::get().ClientTraceId));
   }
 
-  // REVIEWER: The implementation of request_info.duration() uses the
-  // current system_time to compute a duration.  Calling span.Finish()
-  // computes the same result by default (with less arithmetic),
-  // otherwise could pass the lightstep::FinishTimestamp() option to
-  // be explicit, here:
   span.Finish();
 }
 

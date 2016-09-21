@@ -92,4 +92,10 @@ public:
    */
   static bool startsWith(const std::string& source, const std::string& start,
                          bool case_sensitive = true);
+
+  /**
+   * fixfixfix comment
+   */
+  static const std::string& valueOrDefault(const std::string& input,
+                                           const std::string& default_value = "-");
 };

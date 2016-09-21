@@ -107,6 +107,7 @@ public:
                   const Http::AccessLog::RequestInfo& request_info) override;
 
 private:
+  lightstep::Tracer& thread_local_tracer();
   std::string buildRequestLine(const Http::HeaderMap& request_headers,
                                const Http::AccessLog::RequestInfo& info);
   std::string buildResponseCode(const Http::AccessLog::RequestInfo& info);
@@ -115,7 +116,23 @@ private:
   Upstream::ClusterManager& cm_;
   LightStepStats stats_;
   const std::string service_node_;
-  lightstep::Tracer tracer_;
+  lightstep::TracerOptions options_;
+};
+
+class LightStepRecorder : public lightstep::Recorder {
+public:
+  LightStepRecorder(LightStepSink* sink, const lightstep::TracerImpl& tracer);
+
+  // lightstep::Recorder
+  void RecordSpan(lightstep::collector::Span&& span) override;
+  bool FlushWithTimeout(lightstep::Duration) override;
+
+  static std::unique_ptr<lightstep::Recorder> NewInstance(LightStepSink* sink,
+                                                          const lightstep::TracerImpl& tracer);
+
+private:
+  LightStepSink* sink_;
+  lightstep::ReportBuilder builder_;
 };
 
 } // Tracing
