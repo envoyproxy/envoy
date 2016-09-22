@@ -6,7 +6,7 @@
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
-#include "common/http/access_log_impl.h"
+#include "common/http/access_log/access_log_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"

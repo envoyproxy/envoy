@@ -135,7 +135,7 @@ public:
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
    */
-  virtual void encodeHeaders(HeaderMapPtr&& headers, bool bool_stream) PURE;
+  virtual void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
 
   /**
    * Called with data to be encoded, optionally indicating end of stream.
@@ -226,7 +226,7 @@ public:
    * @param end_stream supplies whether this is a header only request/response.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    */
-  virtual FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool bool_stream) PURE;
+  virtual FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Called with data to be encoded, optionally indicating end of stream.

@@ -2,7 +2,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/thread.h"
-#include "common/http/access_log_impl.h"
+#include "common/http/access_log/access_log_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"

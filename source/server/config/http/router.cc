@@ -24,7 +24,7 @@ public:
 
     return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(
-          Http::StreamDecoderFilterPtr{new Router::ProdFilter(config)});
+          Http::StreamDecoderFilterPtr{new Router::ProdFilter(*config)});
     };
   }
 };

@@ -247,9 +247,8 @@ DateFormatter ConnectionManagerImpl::ActiveStream::date_formatter_("%a, %d %b %Y
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
       stream_id_(connection_manager.random_generator_.random()),
-      start_time_(std::chrono::system_clock::now()),
-      request_timer_(
-          connection_manager_.config_.stats().named_.downstream_rq_time_.allocateSpan()) {
+      request_timer_(connection_manager_.config_.stats().named_.downstream_rq_time_.allocateSpan()),
+      request_info_(connection_manager_.codec_->protocolString()) {
   connection_manager_.config_.stats().named_.downstream_rq_total_.inc();
   connection_manager_.config_.stats().named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocolString() == Http::Http1::PROTOCOL_STRING) {
@@ -263,11 +262,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   connection_manager_.config_.stats().named_.downstream_rq_active_.dec();
   for (Http::AccessLog::InstancePtr access_log : connection_manager_.config_.accessLogs()) {
-    access_log->log(request_headers_.get(), response_headers_.get(), *this);
+    access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
   if (connection_manager_.config_.isTracing()) {
-    connection_manager_.tracer_.trace(request_headers_.get(), response_headers_.get(), *this);
+    connection_manager_.tracer_.trace(request_headers_.get(), response_headers_.get(),
+                                      request_info_);
   }
 }
 
@@ -292,9 +292,9 @@ void ConnectionManagerImpl::ActiveStream::addStreamFilter(Http::StreamFilterPtr 
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(Http::HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
-  response_code_.value(response_code);
+  request_info_.response_code_.value(response_code);
 
-  if (hc_request_) {
+  if (request_info_.hc_request_) {
     return;
   }
 
@@ -404,7 +404,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 
 void ConnectionManagerImpl::ActiveStream::decodeData(const Buffer::Instance& data,
                                                      bool end_stream) {
-  bytes_received_ += data.length();
+  request_info_.bytes_received_ += data.length();
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;
   if (state_.remote_complete_) {
@@ -563,7 +563,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   stream_log_trace("encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
 
-  bytes_sent_ += data.length();
+  request_info_.bytes_sent_ += data.length();
   response_encoder_->encodeData(data, end_stream);
   maybeEndEncode(end_stream);
 }
@@ -724,7 +724,7 @@ Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
 }
 
 Http::AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestInfo() {
-  return parent_;
+  return parent_.request_info_;
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }

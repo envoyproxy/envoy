@@ -79,13 +79,6 @@ TEST_F(IntegrationTest, AdminLogging) {
   }
 }
 
-TEST_F(IntegrationTest, AdminCertEndpoint) {
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      ADMIN_PORT, "GET", "/certs", "", Http::CodecClient::Type::HTTP1);
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().get(":status"));
-}
-
 TEST_F(IntegrationTest, Admin) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       ADMIN_PORT, "GET", "/", "", Http::CodecClient::Type::HTTP1);

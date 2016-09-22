@@ -70,14 +70,13 @@ private:
       uint64_t drains_remaining_{};
     };
 
-    struct ClusterEntry : public Http::AsyncClientConnPoolFactory {
+    struct ClusterEntry {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, const Cluster& cluster,
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                    Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                    const std::string& local_zone_name);
 
-      // Http::AsyncClientConnPoolFactory
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority) override;
+      Http::ConnectionPool::Instance* connPool(ResourcePriority priority);
 
       ThreadLocalClusterManagerImpl& parent_;
       HostSetImpl host_set_;

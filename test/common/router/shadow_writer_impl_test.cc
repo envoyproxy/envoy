@@ -48,7 +48,7 @@ TEST(ShadowWriterImplTest, All) {
             return &request;
           }));
   writer.shadow("bar", std::move(message), std::chrono::milliseconds(10));
-  callback->onFailure(Http::AsyncClient::FailureReason::RequestTimeout);
+  callback->onFailure(Http::AsyncClient::FailureReason::Reset);
 }
 
 } // Router

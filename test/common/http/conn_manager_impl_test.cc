@@ -4,8 +4,8 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/thread.h"
-#include "common/http/access_log_impl.h"
-#include "common/http/access_log_formatter.h"
+#include "common/http/access_log/access_log_impl.h"
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
