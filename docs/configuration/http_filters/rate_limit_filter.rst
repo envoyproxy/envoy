@@ -82,7 +82,7 @@ The following descriptor is sent when a header contains a key that matches the *
 
   * ("<descriptor_key>", "<header_value_queried_from_header>")
 
-If *rate_limit_key* is set in the :ref:`route <config_http_conn_man_route_table_route_rate_limit>`, the following descriptor is sent:
+If *route_key* is set in the :ref:`route <config_http_conn_man_route_table_route_rate_limit>`, the following descriptor is sent:
 
   * ("route_key", "<route_key>"), ("<descriptor_key>", "<header_value_queried_from_header>")
 
