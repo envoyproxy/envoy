@@ -81,7 +81,7 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingDone) {
       .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.healthy_panic_threshold", 80))
       .WillRepeatedly(Return(80));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 0))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 3))
       .WillRepeatedly(Return(2));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
@@ -110,7 +110,7 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100)).Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.healthy_panic_threshold", 80))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 0)).Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 3)).Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
 
@@ -135,7 +135,7 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingNotHealthy) {
       .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.healthy_panic_threshold", 80))
       .WillRepeatedly(Return(80));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 0))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 3))
       .WillRepeatedly(Return(2));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
