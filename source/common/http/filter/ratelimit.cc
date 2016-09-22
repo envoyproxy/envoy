@@ -36,7 +36,7 @@ void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
 
   descriptors.push_back({{{descriptor_key_, header_value}}});
 
-  std::string route_key = route.rateLimitPolicy().routeKey();
+  const std::string& route_key = route.rateLimitPolicy().routeKey();
   if (route_key.empty()) {
     return;
   }

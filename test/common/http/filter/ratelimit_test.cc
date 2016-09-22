@@ -37,8 +37,9 @@ TEST(HttpRateLimitFilterBadConfigTest, NoDescriptorKey) {
   {
     "domain": "foo",
     "actions": [
-      {"type": "request_headers",
-       "header_name" : "test"
+      {
+        "type": "request_headers",
+        "header_name" : "test"
       }
     ]
   }
