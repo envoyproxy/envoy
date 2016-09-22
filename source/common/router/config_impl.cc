@@ -28,15 +28,6 @@ RetryPolicyImpl::RetryPolicyImpl(const Json::Object& config) {
   retry_on_ = RetryStateImpl::parseRetryOn(config.getObject("retry_policy").getString("retry_on"));
 }
 
-RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config) {
-  if (!config.hasObject("rate_limit")) {
-    return;
-  }
-
-  do_global_limiting_ = config.getObject("rate_limit").getBoolean("global", false);
-  rate_limit_key_ = config.getObject("rate_limit").getString("rate_limit_key", "");
-}
-
 ShadowPolicyImpl::ShadowPolicyImpl(const Json::Object& config) {
   if (!config.hasObject("shadow")) {
     return;

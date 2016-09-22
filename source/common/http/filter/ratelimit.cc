@@ -29,13 +29,15 @@ void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route
 void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
                                                std::vector<::RateLimit::Descriptor>& descriptors,
                                                FilterConfig&, const HeaderMap& headers) {
-  if (headers.has(header_name_)) {
-    if (!route.rateLimitPolicy().rateLimitKey().empty()) {
-      descriptors.push_back({{{"rate_limit_key", route.rateLimitPolicy().rateLimitKey()},
-                              {descriptor_key_, headers.get(header_name_)}}});
-    } else {
-      descriptors.push_back({{{descriptor_key_, headers.get(header_name_)}}});
-    }
+  std::string header_value = headers.get(header_name_);
+  if (header_value.empty()) {
+    return;
+  }
+
+  descriptors.push_back({{{descriptor_key_, header_value}}});
+  if (!route.rateLimitPolicy().rateLimitKey().empty()) {
+    descriptors.push_back({{{"rate_limit_key", route.rateLimitPolicy().rateLimitKey()},
+                            {descriptor_key_, header_value}}});
   }
 }
 
