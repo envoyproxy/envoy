@@ -1,5 +1,3 @@
-#include <functional>
-
 #include "http_tracer_impl.h"
 
 #include "common/common/macros.h"
@@ -185,7 +183,6 @@ std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo&
 void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
                                const Http::HeaderMap& /*response_headers*/,
                                const Http::AccessLog::RequestInfo& request_info) {
-
   lightstep::Span span = thread_local_tracer().StartSpan(
       "TODO:operation_name_goes_here",
       {
