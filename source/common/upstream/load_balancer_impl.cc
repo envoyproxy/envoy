@@ -25,14 +25,15 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.hosts();
   }
 
-  // Check if we need to perform zone aware routing, by default disabled.
-  if (runtime_.snapshot().featureEnabled("upstream.zone_routing.enabled", 0)) {
+  // Attempt to do zone aware routing if there are at least 2 upstream zones and it's enabled.
+  if (stats_.upstream_zone_count_.value() > 1 &&
+      runtime_.snapshot().featureEnabled("upstream.zone_routing.enabled", 100)) {
     double zone_to_all_percent =
         100.0 * host_set_.localZoneHealthyHosts().size() / host_set_.healthyHosts().size();
     double expected_percent = 100.0 / stats_.upstream_zone_count_.value();
 
     uint64_t zone_percent_diff =
-        runtime_.snapshot().getInteger("upstream.zone_routing.percent_diff", 0);
+        runtime_.snapshot().getInteger("upstream.zone_routing.percent_diff", 3);
 
     // Hosts should be roughly equally distributed between zones.
     if (std::abs(zone_to_all_percent - expected_percent) > zone_percent_diff) {

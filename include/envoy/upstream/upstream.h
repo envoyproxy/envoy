@@ -2,6 +2,7 @@
 
 #include "envoy/common/optional.h"
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context.h"
 #include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/resource_manager.h"

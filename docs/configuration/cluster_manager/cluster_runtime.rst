@@ -33,7 +33,7 @@ upstream.weight_enabled
   is enabled. Defaults to enabled.
 
 upstream.zone_routing.enabled
-  What % of requests will be attempted to be routed to the same upstream zone. Defaults to 0%.
+  What % of requests will be attempted to be routed to the same upstream zone. By default enabled.
 
 upstream.zone_routing.percent_diff
   Perform zone aware routing only if percent of upstream hosts in the same zone within

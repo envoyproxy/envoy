@@ -77,7 +77,7 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingDone) {
   cluster_.local_zone_healthy_hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:81")};
   stats_.upstream_zone_count_.set(3UL);
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 0))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.healthy_panic_threshold", 80))
       .WillRepeatedly(Return(80));
@@ -94,10 +94,30 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingDone) {
   EXPECT_EQ(2UL, stats_.upstream_zone_within_threshold_.value());
 
   // Disable runtime global zone routing.
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 0))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(false));
   EXPECT_EQ(cluster_.healthy_hosts_[2], lb_.chooseHost());
   EXPECT_EQ(2UL, stats_.upstream_zone_within_threshold_.value());
+}
+
+TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
+  cluster_.healthy_hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80")};
+  cluster_.hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80")};
+  cluster_.local_zone_hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80")};
+  cluster_.local_zone_healthy_hosts_ = {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80")};
+  stats_.upstream_zone_count_.set(1UL);
+
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100)).Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.healthy_panic_threshold", 80))
+      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 0)).Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+
+  // There is only one host in the given zone for zone aware routing.
+  EXPECT_EQ(cluster_.healthy_hosts_[0], lb_.chooseHost());
+  EXPECT_EQ(0UL, stats_.upstream_zone_within_threshold_.value());
+  EXPECT_EQ(0UL, stats_.upstream_zone_above_threshold_.value());
 }
 
 TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingNotHealthy) {
@@ -111,7 +131,7 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingNotHealthy) {
   cluster_.local_zone_healthy_hosts_ = {};
   stats_.upstream_zone_count_.set(3UL);
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 0))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.healthy_panic_threshold", 80))
       .WillRepeatedly(Return(80));
