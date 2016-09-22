@@ -127,8 +127,12 @@ public:
   // Router::RateLimitPolicy
   bool doGlobalLimiting() const override { return do_global_limiting_; }
 
+  // Router::RateLimitPolicy
+  const std::string& rateLimitKey() const override { return rate_limit_key_; }
+
 private:
   bool do_global_limiting_{};
+  std::string rate_limit_key_;
 };
 
 /**

@@ -16,12 +16,30 @@ using testing::WithArgs;
 namespace Http {
 namespace RateLimit {
 
-TEST(HttpRateLimitFilterBadConfigTest, All) {
+TEST(HttpRateLimitFilterBadConfigTest, BadType) {
   std::string json = R"EOF(
   {
     "domain": "foo",
     "actions": [
       {"type": "foo"}
+    ]
+  }
+  )EOF";
+
+  Json::StringLoader config(json);
+  Stats::IsolatedStoreImpl stats_store;
+  NiceMock<Runtime::MockLoader> runtime;
+  EXPECT_THROW(FilterConfig(config, "service_cluster", stats_store, runtime), EnvoyException);
+}
+
+TEST(HttpRateLimitFilterBadConfigTest, NoDescriptorKey) {
+  std::string json = R"EOF(
+  {
+    "domain": "foo",
+    "actions": [
+      {"type": "request_headers",
+       "header_name" : "test"
+      }
     ]
   }
   )EOF";
@@ -213,6 +231,95 @@ TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
 
   EXPECT_CALL(*client_, cancel());
   filter_callbacks_.reset_callback_();
+}
+
+class HttpRateLimitFilterRequestHeadersTest : public testing::Test {
+public:
+  HttpRateLimitFilterRequestHeadersTest() {
+    std::string json = R"EOF(
+    {
+      "domain": "foobar",
+      "actions": [
+        {
+          "type": "request_headers",
+          "header_name": "x-header-name",
+          "descriptor_key" : "my_header_name"
+        }
+      ]
+    }
+    )EOF";
+
+    ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enabled", 100))
+        .WillByDefault(Return(true));
+    ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enforcing", 100))
+        .WillByDefault(Return(true));
+
+    Json::StringLoader config(json);
+    config_.reset(new FilterConfig(config, "service_cluster", stats_store_, runtime_));
+
+    client_ = new ::RateLimit::MockClient();
+    filter_.reset(new Filter(config_, ::RateLimit::ClientPtr{client_}));
+    filter_->setDecoderFilterCallbacks(filter_callbacks_);
+  }
+
+  FilterConfigPtr config_;
+  ::RateLimit::MockClient* client_;
+  std::unique_ptr<Filter> filter_;
+  NiceMock<MockStreamDecoderFilterCallbacks> filter_callbacks_;
+  ::RateLimit::RequestCallbacks* request_callbacks_{};
+  HeaderMapImpl request_headers_{{"x-header-name", "test_value"}};
+  Buffer::OwnedImpl data_;
+  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Runtime::MockLoader> runtime_;
+};
+
+TEST_F(HttpRateLimitFilterRequestHeadersTest, OkResponse) {
+  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.do_global_limiting_ = true;
+
+  EXPECT_CALL(*client_,
+              limit(_, "foobar", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
+                                     {{{"my_header_name", "test_value"}}}})))
+      .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
+                                       -> void { request_callbacks_ = &callbacks; })));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  request_callbacks_->complete(::RateLimit::LimitStatus::OK);
+
+  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.ratelimit.ok").value());
+}
+
+TEST_F(HttpRateLimitFilterRequestHeadersTest, RateLimitKeyOkResponse) {
+  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.do_global_limiting_ = true;
+  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.rate_limit_key_ = "test_key";
+
+  EXPECT_CALL(*client_,
+              limit(_, "foobar",
+                    testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
+                        {{{"rate_limit_key", "test_key"}, {"my_header_name", "test_value"}}}})))
+      .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
+                                       -> void { request_callbacks_ = &callbacks; })));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  request_callbacks_->complete(::RateLimit::LimitStatus::OK);
+
+  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.ratelimit.ok").value());
+}
+
+TEST_F(HttpRateLimitFilterRequestHeadersTest, NoRateLimitHeaderMatch) {
+  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.do_global_limiting_ = true;
+  HeaderMapImpl empty_request_header;
+  EXPECT_CALL(*client_, limit(_, _, _)).Times(0);
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(empty_request_header, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(empty_request_header));
 }
 
 } // RateLimit

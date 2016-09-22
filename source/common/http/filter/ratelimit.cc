@@ -16,7 +16,7 @@ const Http::HeaderMapImpl Filter::TOO_MANY_REQUESTS_HEADER{
 
 void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route,
                                                  std::vector<::RateLimit::Descriptor>& descriptors,
-                                                 FilterConfig& config) {
+                                                 FilterConfig& config, const HeaderMap&) {
   // We limit on 2 dimensions.
   // 1) All calls to the given cluster.
   // 2) Calls to the given cluster and from this cluster.
@@ -24,6 +24,19 @@ void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route
   descriptors.push_back({{{"to_cluster", route.clusterName()}}});
   descriptors.push_back(
       {{{"to_cluster", route.clusterName()}, {"from_cluster", config.localServiceCluster()}}});
+}
+
+void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
+                                               std::vector<::RateLimit::Descriptor>& descriptors,
+                                               FilterConfig&, const HeaderMap& headers) {
+  if (headers.has(header_name_)) {
+    if (!route.rateLimitPolicy().rateLimitKey().empty()) {
+      descriptors.push_back({{{"rate_limit_key", route.rateLimitPolicy().rateLimitKey()},
+                              {descriptor_key_, headers.get(header_name_)}}});
+    } else {
+      descriptors.push_back({{{descriptor_key_, headers.get(header_name_)}}});
+    }
+  }
 }
 
 FilterConfig::FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
@@ -34,6 +47,8 @@ FilterConfig::FilterConfig(const Json::Object& config, const std::string& local_
     std::string type = action.getString("type");
     if (type == "service_to_service") {
       actions_.emplace_back(new ServiceToServiceAction());
+    } else if (type == "request_headers") {
+      actions_.emplace_back(new RequestHeadersAction(action));
     } else {
       throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
     }
@@ -49,7 +64,7 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   if (route && route->rateLimitPolicy().doGlobalLimiting()) {
     std::vector<::RateLimit::Descriptor> descriptors;
     for (const ActionPtr& action : config_->actions()) {
-      action->populateDescriptors(*route, descriptors, *config_);
+      action->populateDescriptors(*route, descriptors, *config_, headers);
     }
 
     if (!descriptors.empty()) {

@@ -34,6 +34,7 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config) {
   }
 
   do_global_limiting_ = config.getObject("rate_limit").getBoolean("global", false);
+  rate_limit_key_ = config.getObject("rate_limit").getString("rate_limit_key", "");
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const Json::Object& config) {
