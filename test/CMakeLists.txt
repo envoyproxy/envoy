@@ -34,8 +34,8 @@ add_executable(envoy-test
   common/filesystem/watcher_impl_test.cc
   common/grpc/http1_bridge_filter_test.cc
   common/grpc/rpc_channel_impl_test.cc
-  common/http/access_log_formatter_test.cc
-  common/http/access_log_impl_test.cc
+  common/http/access_log/access_log_formatter_test.cc
+  common/http/access_log/access_log_impl_test.cc
   common/http/async_client_impl_test.cc
   common/http/codec_client_test.cc
   common/http/codes_test.cc

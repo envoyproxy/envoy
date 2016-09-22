@@ -1,40 +1,30 @@
 #pragma once
 
 #include "message_impl.h"
-#include "pooled_stream_encoder.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
+#include "envoy/router/router.h"
+#include "envoy/router/shadow_writer.h"
 
-#include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
-#include "common/http/header_map_impl.h"
+#include "common/http/access_log/request_info_impl.h"
+#include "common/router/router.h"
 
 namespace Http {
-
-/**
- * Factory for obtaining a connection pool.
- */
-class AsyncClientConnPoolFactory {
-public:
-  virtual ~AsyncClientConnPoolFactory() {}
-
-  /**
-   * Return a connection pool or nullptr if there is no healthy upstream host.
-   */
-  virtual ConnectionPool::Instance* connPool(Upstream::ResourcePriority priority) PURE;
-};
 
 class AsyncRequestImpl;
 
 class AsyncClientImpl final : public AsyncClient {
 public:
-  AsyncClientImpl(const Upstream::Cluster& cluster, AsyncClientConnPoolFactory& factory,
-                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
-                  const std::string& local_zone_name);
+  AsyncClientImpl(const Upstream::Cluster& cluster, Stats::Store& stats_store,
+                  Event::Dispatcher& dispatcher, const std::string& local_zone_name,
+                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+                  Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer);
   ~AsyncClientImpl();
 
   // Http::AsyncClient
@@ -43,11 +33,8 @@ public:
 
 private:
   const Upstream::Cluster& cluster_;
-  AsyncClientConnPoolFactory& factory_;
-  Stats::Store& stats_store_;
+  Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
-  const std::string local_zone_name_;
-  const std::string stat_prefix_;
   std::list<std::unique_ptr<AsyncRequestImpl>> active_requests_;
 
   friend class AsyncRequestImpl;
@@ -58,14 +45,12 @@ private:
  * ConnectionPool asynchronously.
  */
 class AsyncRequestImpl final : public AsyncClient::Request,
-                               StreamDecoder,
-                               StreamCallbacks,
-                               PooledStreamEncoderCallbacks,
+                               StreamDecoderFilterCallbacks,
+                               Router::StableRouteTable,
                                Logger::Loggable<Logger::Id::http>,
                                LinkedObject<AsyncRequestImpl> {
 public:
   AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                   Event::Dispatcher& dispatcher, ConnectionPool::Instance& conn_pool,
                    const Optional<std::chrono::milliseconds>& timeout);
   ~AsyncRequestImpl();
 
@@ -73,37 +58,94 @@ public:
   void cancel() override;
 
 private:
-  const std::string& upstreamZone();
-  bool isUpstreamCanary();
+  struct NullRateLimitPolicy : public Router::RateLimitPolicy {
+    // Router::RateLimitPolicy
+    bool doGlobalLimiting() const override { return false; }
+  };
 
-  // Http::StreamDecoder
-  void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
-  void decodeData(const Buffer::Instance& data, bool end_stream) override;
-  void decodeTrailers(HeaderMapPtr&& trailers) override;
+  struct NullRetryPolicy : public Router::RetryPolicy {
+    // Router::RetryPolicy
+    uint32_t numRetries() const override { return 0; }
+    uint32_t retryOn() const override { return 0; }
+  };
 
-  // Http::StreamCallbacks
-  void onResetStream(StreamResetReason reason) override;
+  struct NullShadowPolicy : public Router::ShadowPolicy {
+    // Router::ShadowPolicy
+    const std::string& cluster() const override { return EMPTY_STRING; }
+    const std::string& runtimeKey() const override { return EMPTY_STRING; }
+  };
 
-  // Http::PooledStreamEncoderCallbacks
-  void onUpstreamHostSelected(Upstream::HostDescriptionPtr upstream_host) override {
-    upstream_host_ = upstream_host;
-  }
+  struct RouteEntryImpl : public Router::RouteEntry {
+    RouteEntryImpl(const std::string& cluster_name,
+                   const Optional<std::chrono::milliseconds>& timeout)
+        : cluster_name_(cluster_name), timeout_(timeout) {}
 
+    // Router::RouteEntry
+    const std::string& clusterName() const override { return cluster_name_; }
+    void finalizeRequestHeaders(Http::HeaderMap&) const override {}
+    Upstream::ResourcePriority priority() const override {
+      return Upstream::ResourcePriority::Default;
+    }
+    const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+    const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
+    const Router::ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
+    std::chrono::milliseconds timeout() const override {
+      if (timeout_.valid()) {
+        return timeout_.value();
+      } else {
+        return std::chrono::milliseconds(0);
+      }
+    }
+    const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
+      return nullptr;
+    }
+    const std::string& virtualHostName() const { return EMPTY_STRING; }
+
+    static const NullRateLimitPolicy rate_limit_policy_;
+    static const NullRetryPolicy retry_policy_;
+    static const NullShadowPolicy shadow_policy_;
+
+    const std::string& cluster_name_;
+    Optional<std::chrono::milliseconds> timeout_;
+  };
+
+  void cleanup();
   void onComplete();
 
-  void onRequestTimeout();
-  void cleanup();
+  // Http::StreamDecoderFilterCallbacks
+  void addResetStreamCallback(std::function<void()> callback) override {
+    reset_callback_ = callback;
+  }
+  uint64_t connectionId() override { return 0; }
+  Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
+  void resetStream() override;
+  const Router::StableRouteTable& routeTable() { return *this; }
+  uint64_t streamId() override { return stream_id_; }
+  AccessLog::RequestInfo& requestInfo() override { return request_info_; }
+  void continueDecoding() override { NOT_IMPLEMENTED; }
+  const Buffer::Instance* decodingBuffer() override { return request_->body(); }
+  void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
+  void encodeData(Buffer::Instance& data, bool end_stream) override;
+  void encodeTrailers(HeaderMapPtr&& trailers) override;
+
+  // Router::StableRouteTable
+  const Router::RedirectEntry* redirectRequest(const Http::HeaderMap&) const override {
+    return nullptr;
+  }
+  const Router::RouteEntry* routeForRequest(const Http::HeaderMap&) const override {
+    return &route_;
+  }
 
   MessagePtr request_;
   AsyncClientImpl& parent_;
   AsyncClient::Callbacks& callbacks_;
-  Event::TimerPtr request_timeout_;
+  const uint64_t stream_id_;
   std::unique_ptr<MessageImpl> response_;
-  PooledStreamEncoderPtr stream_encoder_;
-  Upstream::HostDescriptionPtr upstream_host_;
-
-  static const HeaderMapImpl SERVICE_UNAVAILABLE_HEADER;
-  static const HeaderMapImpl REQUEST_TIMEOUT_HEADER;
+  Router::ProdFilter router_;
+  std::function<void()> reset_callback_;
+  AccessLog::RequestInfoImpl request_info_;
+  RouteEntryImpl route_;
+  bool complete_{};
 
   friend class AsyncClientImpl;
 };

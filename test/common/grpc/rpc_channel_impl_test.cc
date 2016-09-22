@@ -229,29 +229,17 @@ TEST_F(GrpcRequestImplTest, HttpAsyncRequestFailure) {
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
 }
 
-TEST_F(GrpcRequestImplTest, HttpAsyncRequestTimeout) {
-  expectNormalRequest();
-
-  helloworld::HelloRequest request;
-  request.set_name("a name");
-  helloworld::HelloReply response;
-  EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_));
-  service_.SayHello(nullptr, &request, &response, nullptr);
-
-  EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "request timeout"));
-  http_callbacks_->onFailure(Http::AsyncClient::FailureReason::RequestTimeout);
-}
-
 TEST_F(GrpcRequestImplTest, NoHttpAsyncRequest) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
           Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-            callbacks.onFailure(Http::AsyncClient::FailureReason::Reset);
+            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
+                Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
-  EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "stream reset"));
+  EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "non-200 response code"));
 
   helloworld::HelloRequest request;
   request.set_name("a name");

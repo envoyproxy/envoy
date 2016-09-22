@@ -92,7 +92,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigPtr;
  */
 class Filter : Logger::Loggable<Logger::Id::router>, public Http::StreamDecoderFilter {
 public:
-  Filter(FilterConfigPtr);
+  Filter(FilterConfig& config);
   ~Filter();
 
   // Http::StreamDecoderFilter
@@ -166,7 +166,7 @@ private:
   bool setupRetry(bool end_stream);
   void doRetry();
 
-  FilterConfigPtr config_;
+  FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   const RouteEntry* route_;
   std::string stat_prefix_;

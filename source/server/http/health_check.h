@@ -66,7 +66,7 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool bool_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }

@@ -179,7 +179,8 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
       .WillOnce(
           Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-            callbacks.onFailure(Http::AsyncClient::FailureReason::Reset);
+            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
+                Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
   interval_timer_->callback_();
