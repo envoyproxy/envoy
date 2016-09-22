@@ -35,10 +35,13 @@ void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
   }
 
   descriptors.push_back({{{descriptor_key_, header_value}}});
-  if (!route.rateLimitPolicy().rateLimitKey().empty()) {
-    descriptors.push_back({{{"rate_limit_key", route.rateLimitPolicy().rateLimitKey()},
-                            {descriptor_key_, header_value}}});
+
+  std::string route_key = route.rateLimitPolicy().routeKey();
+  if (route_key.empty()) {
+    return;
   }
+
+  descriptors.push_back({{{"route_key", route_key}, {descriptor_key_, header_value}}});
 }
 
 FilterConfig::FilterConfig(const Json::Object& config, const std::string& local_service_cluster,

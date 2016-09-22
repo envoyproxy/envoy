@@ -92,9 +92,9 @@ public:
   virtual bool doGlobalLimiting() const PURE;
 
   /**
-   * @return  the rate limit key for a service, if it exists.
+   * @return the rate limit key for a service, if it exists.
    */
-  virtual const std::string& rateLimitKey() const PURE;
+  virtual const std::string& routeKey() const PURE;
 };
 
 /**

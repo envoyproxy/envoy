@@ -286,13 +286,13 @@ TEST_F(HttpRateLimitFilterTest, RateLimitKeyOkResponse) {
   SetUpTest(request_headers_json);
 
   filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.do_global_limiting_ = true;
-  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.rate_limit_key_ = "test_key";
+  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.route_key_ = "test_key";
 
-  EXPECT_CALL(*client_,
-              limit(_, "foobar",
-                    testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
-                        {{{"my_header_name", "test_value"}}},
-                        {{{"rate_limit_key", "test_key"}, {"my_header_name", "test_value"}}}})))
+  EXPECT_CALL(
+      *client_,
+      limit(_, "foobar", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
+                             {{{"my_header_name", "test_value"}}},
+                             {{{"route_key", "test_key"}, {"my_header_name", "test_value"}}}})))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks_ = &callbacks; })));
 

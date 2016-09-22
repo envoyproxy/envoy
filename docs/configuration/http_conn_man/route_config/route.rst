@@ -154,7 +154,7 @@ Global rate limit :ref:`architecture overview <arch_overview_rate_limit>`.
 
   {
     "global": "...",
-    "rate_limit_key": "..."
+    "route_key": "..."
   }
 
 global
@@ -162,8 +162,8 @@ global
   request that matches this route. This information is used by the :ref:`rate limit filter
   <config_http_filters_rate_limit>` if it is installed. Defaults to false if not specified.
 
-rate_limit_key
-  *(optional, string)* Specifies a descriptor value to be used for request header rate limiting.
+route_key
+  *(optional, string)* Specifies a descriptor value to be used when rate limiting for a route.
   This information is used by :ref:`rate limit filter
   <config_http_filters_rate_limit>` if it is installed.
 
