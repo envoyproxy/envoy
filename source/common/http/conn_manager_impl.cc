@@ -65,10 +65,10 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
   }
 
   if (codec_) {
-    if (codec_->protocolString() == Http::Http1::PROTOCOL_STRING) {
+    if (codec_->protocolString() == Http1::PROTOCOL_STRING) {
       config_.stats().named_.downstream_cx_http1_active_.dec();
     } else {
-      ASSERT(codec_->protocolString() == Http::Http2::PROTOCOL_STRING);
+      ASSERT(codec_->protocolString() == Http2::PROTOCOL_STRING);
       config_.stats().named_.downstream_cx_http2_active_.dec();
     }
   }
@@ -78,7 +78,8 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 }
 
 void ConnectionManagerImpl::checkForDeferredClose() {
-  if (close_when_drained_ && streams_.empty() && !codec_->wantsToWrite()) {
+  if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
+    codec_->goAway();
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -104,14 +105,14 @@ void ConnectionManagerImpl::destroyStream(ActiveStream& stream) {
         std::move(stream.removeFromList(streams_)));
   }
 
-  if (reset_stream && !(codec_->features() & Http::CodecFeatures::Multiplexing)) {
-    close_when_drained_ = true;
+  if (reset_stream && !(codec_->features() & CodecFeatures::Multiplexing)) {
+    drain_state_ = DrainState::Closing;
   }
 
   checkForDeferredClose();
 
   // Reading may have been disabled for the non-multiplexing case, so enable it again.
-  if (!close_when_drained_ && !(codec_->features() & Http::CodecFeatures::Multiplexing) &&
+  if (drain_state_ != DrainState::Closing && !(codec_->features() & CodecFeatures::Multiplexing) &&
       !read_callbacks_->connection().readEnabled()) {
     read_callbacks_->connection().readDisable(false);
   }
@@ -121,7 +122,7 @@ void ConnectionManagerImpl::destroyStream(ActiveStream& stream) {
   }
 }
 
-Http::StreamDecoder& ConnectionManagerImpl::newStream(Http::StreamEncoder& response_encoder) {
+StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder) {
   if (idle_timer_) {
     idle_timer_->disableTimer();
   }
@@ -138,11 +139,11 @@ Http::StreamDecoder& ConnectionManagerImpl::newStream(Http::StreamEncoder& respo
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
   if (!codec_) {
     codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
-    if (codec_->protocolString() == Http::Http1::PROTOCOL_STRING) {
+    if (codec_->protocolString() == Http1::PROTOCOL_STRING) {
       config_.stats().named_.downstream_cx_http1_total_.inc();
       config_.stats().named_.downstream_cx_http1_active_.inc();
     } else {
-      ASSERT(codec_->protocolString() == Http::Http2::PROTOCOL_STRING);
+      ASSERT(codec_->protocolString() == Http2::PROTOCOL_STRING);
       config_.stats().named_.downstream_cx_http2_total_.inc();
       config_.stats().named_.downstream_cx_http2_active_.inc();
     }
@@ -168,7 +169,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
     // The HTTP/1.1 codec will pause dispatch after a single message is complete. We want to
     // either redispatch if there are no streams and we have more data, or if we have a single
     // complete stream but have not responded yet we will pause socket reads to apply back pressure.
-    if (!(codec_->features() & Http::CodecFeatures::Multiplexing)) {
+    if (!(codec_->features() & CodecFeatures::Multiplexing)) {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
         redispatch = true;
@@ -207,6 +208,11 @@ void ConnectionManagerImpl::onEvent(uint32_t events) {
       idle_timer_->disableTimer();
       idle_timer_.reset();
     }
+
+    if (drain_timer_) {
+      drain_timer_->disableTimer();
+      drain_timer_.reset();
+    }
   }
 
   if (!streams_.empty()) {
@@ -235,11 +241,17 @@ void ConnectionManagerImpl::onGoAway() {
 void ConnectionManagerImpl::onIdleTimeout() {
   conn_log_debug("idle timeout", read_callbacks_->connection());
   config_.stats().named_.downstream_cx_idle_timeout_.inc();
-  if (codec_) {
-    codec_->goAway();
+  if (!codec_) {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  } else if (drain_state_ == DrainState::NotDraining) {
+    startDrainSequence();
   }
+}
 
-  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+void ConnectionManagerImpl::onDrainTimeout() {
+  ASSERT(drain_state_ != DrainState::NotDraining)
+  drain_state_ = DrainState::Closing;
+  checkForDeferredClose();
 }
 
 DateFormatter ConnectionManagerImpl::ActiveStream::date_formatter_("%a, %d %b %Y %H:%M:%S GMT");
@@ -251,17 +263,17 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       request_info_(connection_manager_.codec_->protocolString()) {
   connection_manager_.config_.stats().named_.downstream_rq_total_.inc();
   connection_manager_.config_.stats().named_.downstream_rq_active_.inc();
-  if (connection_manager_.codec_->protocolString() == Http::Http1::PROTOCOL_STRING) {
+  if (connection_manager_.codec_->protocolString() == Http1::PROTOCOL_STRING) {
     connection_manager_.config_.stats().named_.downstream_rq_http1_total_.inc();
   } else {
-    ASSERT(connection_manager_.codec_->protocolString() == Http::Http2::PROTOCOL_STRING);
+    ASSERT(connection_manager_.codec_->protocolString() == Http2::PROTOCOL_STRING);
     connection_manager_.config_.stats().named_.downstream_rq_http2_total_.inc();
   }
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   connection_manager_.config_.stats().named_.downstream_rq_active_.dec();
-  for (Http::AccessLog::InstancePtr access_log : connection_manager_.config_.accessLogs()) {
+  for (AccessLog::InstancePtr access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
@@ -271,26 +283,24 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilter(
-    Http::StreamDecoderFilterPtr filter) {
+void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilter(StreamDecoderFilterPtr filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter));
   filter->setDecoderFilterCallbacks(*wrapper);
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
-void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilter(
-    Http::StreamEncoderFilterPtr filter) {
+void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilter(StreamEncoderFilterPtr filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter));
   filter->setEncoderFilterCallbacks(*wrapper);
   wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
 }
 
-void ConnectionManagerImpl::ActiveStream::addStreamFilter(Http::StreamFilterPtr filter) {
+void ConnectionManagerImpl::ActiveStream::addStreamFilter(StreamFilterPtr filter) {
   addStreamDecoderFilter(filter);
   addStreamEncoderFilter(filter);
 }
 
-void ConnectionManagerImpl::ActiveStream::chargeStats(Http::HeaderMap& headers) {
+void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
   request_info_.response_code_.value(response_code);
 
@@ -313,8 +323,7 @@ uint64_t ConnectionManagerImpl::ActiveStream::connectionId() {
   return connection_manager_.read_callbacks_->connection().id();
 }
 
-void ConnectionManagerImpl::ActiveStream::decodeHeaders(Http::HeaderMapPtr&& headers,
-                                                        bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;
 
@@ -334,15 +343,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(Http::HeaderMapPtr&& hea
   const std::string& codec_version = request_headers_->get(Headers::get().Version);
   if (!(codec_version == "HTTP/1.1" || codec_version == "HTTP/2")) {
     HeaderMapImpl headers{
-        {Headers::get().Status, std::to_string(enumToInt(Http::Code::UpgradeRequired))}};
+        {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
     encodeHeaders(nullptr, headers, true);
     return;
   }
 
   // Require host header. For HTTP/1.1 Host has already been translated to :host.
   if (request_headers_->get(Headers::get().Host).empty()) {
-    HeaderMapImpl headers{
-        {Headers::get().Status, std::to_string(enumToInt(Http::Code::BadRequest))}};
+    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
     encodeHeaders(nullptr, headers, true);
     return;
   }
@@ -358,8 +366,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(Http::HeaderMapPtr&& hea
   // here and keep it under 60K. Ultimately it would be nice to bring this to a lower value but
   // unclear if that is possible or not.
   if (request_headers_->byteSize() > (60 * 1024)) {
-    HeaderMapImpl headers{
-        {Headers::get().Status, std::to_string(enumToInt(Http::Code::BadRequest))}};
+    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
     encodeHeaders(nullptr, headers, true);
     return;
   }
@@ -370,7 +377,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(Http::HeaderMapPtr&& hea
   // https://tools.ietf.org/html/rfc7230#section-5.3
   if (request_headers_->get(Headers::get().Path).find('/') != 0) {
     connection_manager_.config_.stats().named_.downstream_rq_non_relative_path_.inc();
-    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound))}};
+    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::NotFound))}};
     encodeHeaders(nullptr, headers, true);
     return;
   }
@@ -384,7 +391,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(Http::HeaderMapPtr&& hea
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
-                                                        Http::HeaderMap& headers, bool end_stream) {
+                                                        HeaderMap& headers, bool end_stream) {
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   if (!filter) {
     entry = decoder_filters_.begin();
@@ -393,7 +400,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
-    Http::FilterHeadersStatus status = (*entry)->handle_->decodeHeaders(headers, end_stream);
+    FilterHeadersStatus status = (*entry)->handle_->decodeHeaders(headers, end_stream);
     stream_log_trace("decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterHeadersCallback(status)) {
@@ -433,7 +440,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
-    Http::FilterDataStatus status = (*entry)->handle_->decodeData(data, end_stream);
+    FilterDataStatus status = (*entry)->handle_->decodeData(data, end_stream);
     stream_log_trace("decode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterDataCallback(status, data)) {
@@ -464,7 +471,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
-    Http::FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
+    FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
     stream_log_trace("decode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
@@ -490,11 +497,20 @@ ConnectionManagerImpl::ActiveStream::commonEncodePrefix(ActiveStreamEncoderFilte
   }
 }
 
+void ConnectionManagerImpl::startDrainSequence() {
+  ASSERT(drain_state_ == DrainState::NotDraining);
+  drain_state_ = DrainState::Draining;
+  codec_->shutdownNotice();
+  drain_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+      [this]() -> void { onDrainTimeout(); });
+  drain_timer_->enableTimer(config_.drainTimeout());
+}
+
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
-                                                        Http::HeaderMap& headers, bool end_stream) {
+                                                        HeaderMap& headers, bool end_stream) {
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   for (; entry != encoder_filters_.end(); entry++) {
-    Http::FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, end_stream);
+    FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, end_stream);
     stream_log_trace("encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterHeadersCallback(status)) {
@@ -512,9 +528,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.
-  if (!connection_manager_.close_when_drained_ && connection_manager_.drain_close_.drainClose()) {
-    connection_manager_.codec_->goAway();
-    connection_manager_.close_when_drained_ = true;
+  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+      connection_manager_.drain_close_.drainClose()) {
+
+    // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
+    // of time to race with incoming requests. It mainly just keeps the logic the same between
+    // HTTP/1.1 and HTTP/2.
+    connection_manager_.startDrainSequence();
     connection_manager_.config_.stats().named_.downstream_cx_drain_close_.inc();
     stream_log_debug("drain closing connection", *this);
   }
@@ -523,15 +543,15 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
   if (!state_.remote_complete_) {
-    if (!(connection_manager_.codec_->features() & Http::CodecFeatures::Multiplexing)) {
-      connection_manager_.close_when_drained_ = true;
+    if (!(connection_manager_.codec_->features() & CodecFeatures::Multiplexing)) {
+      connection_manager_.drain_state_ = DrainState::Closing;
     }
 
     connection_manager_.config_.stats().named_.downstream_rq_response_before_rq_complete_.inc();
   }
 
-  if (connection_manager_.close_when_drained_ &&
-      !(connection_manager_.codec_->features() & Http::CodecFeatures::Multiplexing)) {
+  if (connection_manager_.drain_state_ == DrainState::Closing &&
+      !(connection_manager_.codec_->features() & CodecFeatures::Multiplexing)) {
     headers.addViaCopy(Headers::get().Connection, Headers::get().ConnectionValues.Close);
   }
 
@@ -552,7 +572,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
                                                      Buffer::Instance& data, bool end_stream) {
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   for (; entry != encoder_filters_.end(); entry++) {
-    Http::FilterDataStatus status = (*entry)->handle_->encodeData(data, end_stream);
+    FilterDataStatus status = (*entry)->handle_->encodeData(data, end_stream);
     stream_log_trace("encode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterDataCallback(status, data)) {
@@ -572,7 +592,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
                                                          HeaderMap& trailers) {
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, true);
   for (; entry != encoder_filters_.end(); entry++) {
-    Http::FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
+    FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
     stream_log_trace("encode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
@@ -643,16 +663,16 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCallback(
-    Http::FilterHeadersStatus status) {
+    FilterHeadersStatus status) {
 
   ASSERT(!headers_continued_);
   ASSERT(!stopped_);
 
-  if (status == Http::FilterHeadersStatus::StopIteration) {
+  if (status == FilterHeadersStatus::StopIteration) {
     stopped_ = true;
     return false;
   } else {
-    ASSERT(status == Http::FilterHeadersStatus::Continue);
+    ASSERT(status == FilterHeadersStatus::Continue);
     headers_continued_ = true;
     return true;
   }
@@ -676,9 +696,9 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleBufferData(
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallback(
-    Http::FilterDataStatus status, Buffer::Instance& provided_data) {
+    FilterDataStatus status, Buffer::Instance& provided_data) {
 
-  if (status == Http::FilterDataStatus::Continue) {
+  if (status == FilterDataStatus::Continue) {
     if (stopped_) {
       commonHandleBufferData(provided_data);
       commonContinue();
@@ -688,7 +708,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
     }
   } else {
     stopped_ = true;
-    if (status == Http::FilterDataStatus::StopIterationAndBuffer) {
+    if (status == FilterDataStatus::StopIterationAndBuffer) {
       commonHandleBufferData(provided_data);
     }
 
@@ -699,9 +719,9 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCallback(
-    Http::FilterTrailersStatus status) {
+    FilterTrailersStatus status) {
 
-  if (status == Http::FilterTrailersStatus::Continue) {
+  if (status == FilterTrailersStatus::Continue) {
     if (stopped_) {
       commonContinue();
       return false;
@@ -723,13 +743,13 @@ Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
   return parent_.connection_manager_.read_callbacks_->connection().dispatcher();
 }
 
-Http::AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestInfo() {
+AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestInfo() {
   return parent_.request_info_;
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
 
-void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeHeaders(Http::HeaderMapPtr&& headers,
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeHeaders(HeaderMapPtr&& headers,
                                                                      bool end_stream) {
   parent_.response_headers_ = std::move(headers);
   parent_.encodeHeaders(nullptr, *parent_.response_headers_, end_stream);

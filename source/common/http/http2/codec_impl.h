@@ -66,6 +66,7 @@ public:
   uint64_t features() override { return CodecFeatures::Multiplexing; }
   void goAway() override;
   const std::string& protocolString() override { return PROTOCOL_STRING; }
+  void shutdownNotice() override;
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
 
   static const uint64_t MAX_CONCURRENT_STREAMS = 1024;
@@ -190,6 +191,7 @@ private:
 
   Network::Connection& connection_;
   bool dispatching_{};
+  bool raised_goaway_{};
 };
 
 /**
