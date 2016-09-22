@@ -45,10 +45,11 @@ Format rules
 ------------
 
 The access log format string contains either command operators or other characters interpreted as a
-plain string. Access log formatter does not do assumptions on a new line separator, so you
-have to specify it explicitly as part of format string,
-see :ref:`default format <config_http_con_manager_access_log_default_format>`, for example.
-Note, access log line contains '-' character for every not set/empty value.
+plain string. The access log formatter does not make any assumptions about a new line separator, so one
+has to specified as part of the format string.
+See the :ref:`default format <config_http_con_manager_access_log_default_format>` for an example.
+Note that the access log line will contain a '-' character for every not set/empty value.
+
 The following command operators are supported:
 
 %START_TIME%
