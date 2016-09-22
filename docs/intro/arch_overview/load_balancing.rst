@@ -51,6 +51,8 @@ panic threshold is 50%. This is :ref:`configurable <config_cluster_manager_clust
 runtime. The panic threshold is used to avoid a situation in which host failures cascade throughout
 the cluster as load increases.
 
+.. _arch_overview_load_balancing_zone_panic_threshold:
+
 Zone panic threshold
 --------------------
 

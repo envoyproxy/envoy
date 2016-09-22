@@ -40,5 +40,5 @@ upstream.zone_routing.percent_diff
   the percent_diff of expected. Expected is calculated as 100 / number_of_zones.
 
 upstream.zone_routing.healthy_panic_threshold
-  Defines the :ref:`zone healthy panic threshold <arch_overview_load_balancing_zone_panic_threshold`
+  Defines the :ref:`zone healthy panic threshold <arch_overview_load_balancing_zone_panic_threshold>`
   percentage. Defaults to 80%.
