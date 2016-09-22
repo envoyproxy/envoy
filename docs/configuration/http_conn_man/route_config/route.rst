@@ -164,7 +164,7 @@ global
 
 route_key
   *(optional, string)* Specifies a descriptor value to be used when rate limiting for a route.
-  This information is used by :ref:`rate limit filter
+  This information is used by the :ref:`rate limit filter
   <config_http_filters_rate_limit>` if it is installed.
 
 .. _config_http_conn_man_route_table_route_shadow:
