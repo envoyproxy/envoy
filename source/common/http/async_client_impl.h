@@ -61,6 +61,7 @@ private:
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {
     // Router::RateLimitPolicy
     bool doGlobalLimiting() const override { return false; }
+    const std::string& rateLimitKey() const override { return EMPTY_STRING; }
   };
 
   struct NullRetryPolicy : public Router::RetryPolicy {
