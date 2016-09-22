@@ -114,7 +114,6 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
 
-  // There is only one host in the given zone for zone aware routing.
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_.chooseHost());
   EXPECT_EQ(0UL, stats_.upstream_zone_within_threshold_.value());
   EXPECT_EQ(0UL, stats_.upstream_zone_above_threshold_.value());
