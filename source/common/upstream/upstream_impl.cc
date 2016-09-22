@@ -1,4 +1,3 @@
-#include <bits/unordered_set.h>
 #include "upstream_impl.h"
 
 #include "envoy/event/dispatcher.h"

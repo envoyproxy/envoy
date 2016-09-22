@@ -50,3 +50,11 @@ health status and balance amongst all hosts. This is known as the *panic thresho
 panic threshold is 50%. This is :ref:`configurable <config_cluster_manager_cluster_runtime>` via
 runtime. The panic threshold is used to avoid a situation in which host failures cascade throughout
 the cluster as load increases.
+
+Zone panic threshold
+--------------------
+
+When Envoy performs zone aware routing it will send traffic to the same upstream zone
+only if percent of healthy hosts in the given upstream zone is bigger than this threshold.
+Default panic threshold is 80%. This is :ref:`configurable <config_cluster_manager_cluster_runtime>`
+via runtime.

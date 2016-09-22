@@ -23,8 +23,6 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
   if (healthy_percent < global_panic_threshold) {
     stats_.upstream_rq_lb_healthy_panic_.inc();
     return host_set_.hosts();
-  } else {
-    return host_set_.healthyHosts();
   }
 
   // Check if we need to perform zone aware routing, by default disabled.

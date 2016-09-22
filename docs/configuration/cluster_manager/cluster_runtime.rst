@@ -31,3 +31,14 @@ upstream.use_http2
 upstream.weight_enabled
   Binary switch to turn on or off weighted load balancing. If set to non 0, weighted load balancing
   is enabled. Defaults to enabled.
+
+upstream.zone_routing.enabled
+  What % of requests will be attempted to be routed to the same upstream zone. Defaults to 0%.
+
+upstream.zone_routing.percent_diff
+  Perform zone aware routing only if percent of upstream hosts in the same zone within
+  the percent_diff of expected. Expected is calculated as 100 / number_of_zones.
+
+upstream.zone_routing.healthy_panic_threshold
+  Defines the :ref:`zone healthy panic threshold <arch_overview_load_balancing_zone_panic_threshold`
+  percentage. Defaults to 80%.
