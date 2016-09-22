@@ -7,6 +7,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
+#include "lightstep/tracer.h"
+
 namespace Tracing {
 
 #define LIGHTSTEP_STATS(COUNTER)                                                                   \
@@ -88,78 +90,33 @@ private:
   std::vector<HttpSinkPtr> sinks_;
 };
 
-class LightStepUtility {
-public:
-  /**
-   * Sample json body format.
-   *
-   * {"runtime": { "guid": "039e9da7-2a07-4a54-9440-eaee8f3887ea", "group_name": "Envoy-Test",
-   * "start_micros": 1466704630010000 }, "span_records": [ { "span_guid":
-   * "745bfab3-4ba4-4a36-9133-ecf76108feb5", "span_name": "front-envoy",
-   * "oldest_micros":1466704630010000, "youngest_micros": 1466704630500000, "join_ids": [ {
-   * "TraceKey": "x-request-id", "Value": "5463a0cc-e469-454c-a8ac-950dd1a87c66" }, {
-   * "TraceKey": "x-client-request-id", "Value": "fcd405fd-657e-40e7-adf3-27c306df60a3" }]}]}
-   **/
-  static std::string
-  buildJsonBody(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-                const Http::AccessLog::RequestInfo& request_info, Runtime::RandomGenerator& random,
-                const std::string& local_service_cluster, const std::string& service_node);
-
-  /**
-   * Create LightStep specific headers.
-   *
-   * Note: We temporary keep access token to LightStep here hardcoded.
-   * This needs to be retrieved from Confidant, but we only can do so when we move LightStep
-   * collectors to our internal service.
-   *
-   * @param access token for light step access.
-   */
-  static Http::MessagePtr buildHeaders(const std::string& access_token);
-
-private:
-  /**
-   * Build request line: Method Request-URI Protocol.
-   * Note: Request-URI will be truncated if it's longer than 256 chars.
-   */
-  static std::string buildRequestLine(const Http::HeaderMap& request_headers,
-                                      const Http::AccessLog::RequestInfo& request_info);
-  static std::string buildJoiningIds(const Http::HeaderMap& request_headers);
-  static std::string buildSpanAttributes(const Http::HeaderMap& request_headers,
-                                         const Http::AccessLog::RequestInfo& request_info,
-                                         const std::string& service_node);
-};
-
 /**
  * LightStep (http://lightstep.com/) provides tracing capabilities, aggregation, visualization of
  * application trace data.
  *
  * LightStepSink is for flushing data to LightStep collectors.
  */
-class LightStepSink : public HttpSink, public Http::AsyncClient::Callbacks {
+class LightStepSink : public HttpSink {
 public:
   LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                 const std::string& stat_prefix, Stats::Store& stats,
-                Runtime::RandomGenerator& random, const std::string& local_service_cluster,
-                const std::string& service_node, const std::string& access_token);
+                const std::string& service_node, const lightstep::TracerOptions& options);
 
   // Tracer::HttpSink
   void flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
                   const Http::AccessLog::RequestInfo& request_info) override;
 
-  // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason reason) override;
-
 private:
-  void executeRequest(Http::MessagePtr&& msg);
+
+  std::string buildRequestLine(const Http::HeaderMap& request_headers,
+			       const Http::AccessLog::RequestInfo& info);
+  std::string buildResponseCode(const Http::AccessLog::RequestInfo& info);
 
   const std::string collector_cluster_;
   Upstream::ClusterManager& cm_;
   LightStepStats stats_;
-  Runtime::RandomGenerator& random_;
-  const std::string local_service_cluster_;
   const std::string service_node_;
-  const std::string access_token_;
+  lightstep::Tracer tracer_;
 };
 
 } // Tracing
