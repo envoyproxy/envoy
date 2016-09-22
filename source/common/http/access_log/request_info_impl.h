@@ -40,7 +40,7 @@ struct RequestInfoImpl : public RequestInfo {
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
   const std::string& protocol_;
-  SystemTime start_time_;
+  const SystemTime start_time_;
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};
