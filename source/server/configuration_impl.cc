@@ -1,6 +1,7 @@
 #include "configuration_impl.h"
 
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
 
@@ -77,7 +78,7 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
         log().notice(fmt::format("    loading {}", type));
 
         if (type == "lightstep") {
-          auto& rand = server_.random();
+          ::Runtime::RandomGenerator& rand = server_.random();
           lightstep::TracerOptions opts;
           opts.access_token = server_.api().fileReadToEnd(sink.getString("access_token_file"));
           StringUtil::rtrim(opts.access_token);
@@ -87,8 +88,6 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
               server_.options().serviceClusterName();
           opts.guid_generator = [&rand]() { return rand.random(); };
 
-          // REVIEWER: Either LightStepSink or its tracer_ field
-          // should be thread-local for this to work.
           http_tracer_->addSink(Tracing::HttpSinkPtr{new Tracing::LightStepSink(
               sink.getObject("config"), *cluster_manager_, "", server_.stats(),
               server_.options().serviceNodeName(), opts)});

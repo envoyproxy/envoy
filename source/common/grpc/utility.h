@@ -3,7 +3,6 @@
 #include "common/http/message_impl.h"
 
 #include "google/protobuf/message.h"
-#include "google/protobuf/service.h"
 
 namespace Grpc {
 

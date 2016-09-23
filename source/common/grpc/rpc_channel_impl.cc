@@ -1,5 +1,3 @@
-#include <bits/stringfwd.h>
-#include <chrono>
 #include "common.h"
 #include "rpc_channel_impl.h"
 #include "utility.h"
@@ -135,6 +133,9 @@ void RpcAsyncClientImpl::send(const std::string& upstream_cluster,
                               Http::AsyncClient::Callbacks& callbacks) {
   // For proto3 messages this should always return true.
   ASSERT(grpc_request->IsInitialized());
+  // This should be caught in configuration, and a request will fail normally anyway, but assert
+  // here for clarity.
+  ASSERT(cm_.get(cluster_)->features() & Upstream::Cluster::Features::HTTP2);
 
   Http::MessagePtr message = Utility::prepareHeaders(*method, upstream_cluster);
   message->body(Utility::serializeBody(*grpc_request));
