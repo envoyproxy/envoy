@@ -3,13 +3,15 @@
 #include "common/http/message_impl.h"
 
 #include "google/protobuf/message.h"
+#include "google/protobuf/service.h"
 
 namespace Grpc {
 
 class Utility {
 public:
-  static Buffer::InstancePtr serializeBody(const proto::Message& message);
-  static Http::MessagePtr prepareHeaders(const proto::MethodDescriptor* method);
+  static Buffer::InstancePtr serializeBody(const google::protobuf::Message& message);
+  static Http::MessagePtr prepareHeaders(const google::protobuf::MethodDescriptor* method,
+                                         const std::string& upstream_cluster);
 };
 
 } // Grpc

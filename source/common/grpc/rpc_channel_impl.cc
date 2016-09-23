@@ -31,7 +31,7 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
   // here for clarity.
   ASSERT(cm_.get(cluster_)->features() & Upstream::Cluster::Features::HTTP2);
 
-  Http::MessagePtr message = Utility::prepareHeaders(method);
+  Http::MessagePtr message = Utility::prepareHeaders(method, cluster_);
   message->body(Utility::serializeBody(*grpc_request));
 
   callbacks_.onPreRequestCustomizeHeaders(message->headers());
