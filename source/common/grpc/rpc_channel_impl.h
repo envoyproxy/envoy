@@ -70,4 +70,15 @@ private:
   Optional<std::chrono::milliseconds> timeout_;
 };
 
+class RpcAsyncClientImpl : public RpcAsyncClient {
+public:
+  RpcAsyncClientImpl(Upstream::ClusterManager& cm) : cm_(cm) {}
+
+  void send(const std::string& upstream_cluster, const proto::MethodDescriptor* method,
+            const proto::Message* grpc_request, Http::AsyncClient::Callbacks& callbacks) override;
+
+private:
+  Upstream::ClusterManager& cm_;
+};
+
 } // Grpc

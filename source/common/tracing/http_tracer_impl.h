@@ -106,6 +106,9 @@ public:
   void flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
                   const Http::AccessLog::RequestInfo& request_info) override;
 
+  Upstream::ClusterManager& clusterManager() { return cm_; }
+  const std::string& collectorCluster() { return collector_cluster_; }
+
 private:
   lightstep::Tracer& thread_local_tracer();
   std::string buildRequestLine(const Http::HeaderMap& request_headers,

@@ -125,8 +125,11 @@ void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
     lightstep::collector::ReportRequest request;
     std::swap(request, builder_.pending());
 
-    // REVIEWER: Here, call gRPC to collector-grpc.lightstep.com:443
-    // with std::move(request).
+    /*
+     Here get grpc message, introduce callback and wire things up.
+    Grpc::RpcAsyncClientImpl client(sink_->clusterManager());
+    client.send(sink_->collectorCluster(),
+    */
   }
 }
 
@@ -184,7 +187,7 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
                                const Http::HeaderMap& /*response_headers*/,
                                const Http::AccessLog::RequestInfo& request_info) {
   lightstep::Span span = thread_local_tracer().StartSpan(
-      "TODO:operation_name_goes_here",
+      "full request",
       {
        lightstep::StartTimestamp(request_info.startTime()),
        lightstep::SetTag("join:x-request-id", request_headers.get(Http::Headers::get().RequestId)),

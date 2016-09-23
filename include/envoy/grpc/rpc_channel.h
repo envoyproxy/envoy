@@ -3,6 +3,7 @@
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/async_client.h"
 
 #include "google/protobuf/service.h"
 
@@ -67,6 +68,21 @@ public:
    */
   virtual RpcChannelPtr create(RpcChannelCallbacks& callbacks,
                                const Optional<std::chrono::milliseconds>& timeout) PURE;
+};
+
+/**
+ * fixfixfix
+ */
+class RpcAsyncClient {
+public:
+  virtual ~RpcAsyncClient() {}
+
+  /**
+   * Async send gRPC request to upstream cluster using method and callbacks.
+   */
+  virtual void send(const std::string& upstream_cluster, const proto::MethodDescriptor* method,
+                    const proto::Message* grpc_request,
+                    Http::AsyncClient::Callbacks& callbacks) PURE;
 };
 
 } // Grpc

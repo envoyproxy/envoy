@@ -17,14 +17,14 @@ Buffer::InstancePtr Utility::serializeBody(const google::protobuf::Message& mess
   return body;
 }
 
-Http::MessagePtr Utility::prepareHeaders(const google::protobuf::MethodDescriptor* method,
+Http::MessagePtr Utility::prepareHeaders(const google::protobuf::MethodDescriptor& method,
                                          const std::string& upstream_cluster) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().addViaMoveValue(Http::Headers::get().Scheme, "http");
   message->headers().addViaMoveValue(Http::Headers::get().Method, "POST");
   message->headers().addViaMoveValue(
       Http::Headers::get().Path,
-      fmt::format("/{}/{}", method->service()->full_name(), method->name()));
+      fmt::format("/{}/{}", method.service()->full_name(), method.name()));
   message->headers().addViaCopy(Http::Headers::get().Host, upstream_cluster);
   message->headers().addViaCopy(Http::Headers::get().ContentType, Common::GRPC_CONTENT_TYPE);
 
