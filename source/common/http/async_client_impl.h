@@ -37,7 +37,7 @@ private:
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncRequestImpl>> active_requests_;
-  std::string local_address_;
+  const std::string local_address_;
 
   friend class AsyncRequestImpl;
 };
