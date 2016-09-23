@@ -1,4 +1,5 @@
 #include "async_client_impl.h"
+#include "headers.h"
 
 namespace Http {
 
@@ -10,10 +11,11 @@ AsyncClientImpl::AsyncClientImpl(const Upstream::Cluster& cluster, Stats::Store&
                                  Event::Dispatcher& dispatcher, const std::string& local_zone_name,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random,
-                                 Router::ShadowWriterPtr&& shadow_writer)
+                                 Router::ShadowWriterPtr&& shadow_writer,
+                                 const std::string& local_address)
     : cluster_(cluster), config_("http.async-client.", local_zone_name, stats_store, cm, runtime,
                                  random, std::move(shadow_writer)),
-      dispatcher_(dispatcher) {}
+      dispatcher_(dispatcher), local_address_(local_address) {}
 
 AsyncClientImpl::~AsyncClientImpl() { ASSERT(active_requests_.empty()); }
 
@@ -39,6 +41,8 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
       request_info_(EMPTY_STRING), route_(parent_.cluster_.name(), timeout) {
 
   router_.setDecoderFilterCallbacks(*this);
+  request_->headers().addViaMoveValue(Headers::get().EnvoyInternalRequest, "true");
+  request_->headers().addViaCopy(Headers::get().ForwardedFor, parent_.local_address_);
   router_.decodeHeaders(request_->headers(), !request_->body());
   if (!complete_ && request_->body()) {
     router_.decodeData(*request_->body(), true);

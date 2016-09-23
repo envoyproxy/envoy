@@ -21,7 +21,7 @@ public:
   ClusterManagerImpl(const Json::Object& config, Stats::Store& stats, ThreadLocal::Instance& tls,
                      Network::DnsResolver& dns_resolver, Ssl::ContextManager& ssl_context_manager,
                      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                     const std::string& local_zone_name);
+                     const std::string& local_zone_name, const std::string& local_address);
 
   // Upstream::ClusterManager
   void setInitializedCb(std::function<void()> callback) override {
@@ -74,7 +74,7 @@ private:
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, const Cluster& cluster,
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                    Stats::Store& stats_store, Event::Dispatcher& dispatcher,
-                   const std::string& local_zone_name);
+                   const std::string& local_zone_name, const std::string& local_address);
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority);
 
@@ -89,7 +89,8 @@ private:
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                  const std::string& local_zone_name);
+                                  const std::string& local_zone_name,
+                                  const std::string& local_address);
     void drainConnPools(HostPtr old_host, ConnPoolsContainer& container);
     static void updateClusterMembership(const std::string& name, ConstHostVectorPtr hosts,
                                         ConstHostVectorPtr healthy_hosts,
