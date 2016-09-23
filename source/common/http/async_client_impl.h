@@ -24,7 +24,8 @@ public:
   AsyncClientImpl(const Upstream::Cluster& cluster, Stats::Store& stats_store,
                   Event::Dispatcher& dispatcher, const std::string& local_zone_name,
                   Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                  Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer);
+                  Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer,
+                  const std::string& local_address);
   ~AsyncClientImpl();
 
   // Http::AsyncClient
@@ -36,6 +37,7 @@ private:
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncRequestImpl>> active_requests_;
+  std::string local_address_;
 
   friend class AsyncRequestImpl;
 };
