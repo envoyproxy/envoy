@@ -39,6 +39,7 @@ set(ENVOY_JANSSON_INCLUDE_DIR "" CACHE FILEPATH "location of jansson includes")
 set(ENVOY_OPENSSL_INCLUDE_DIR "" CACHE FILEPATH "location of openssl includes")
 
 # http://lightstep.com/
+# Last tested with lightstep-tracer-cpp-0.14
 set(ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR "" CACHE FILEPATH "location of lighstep tracer includes")
 
 # https://github.com/google/protobuf
