@@ -122,13 +122,19 @@ private:
  */
 class RateLimitPolicyImpl : public RateLimitPolicy {
 public:
-  RateLimitPolicyImpl(const Json::Object& config);
+  RateLimitPolicyImpl(const Json::Object& config)
+      : do_global_limiting_(config.getObject("rate_limit", true).getBoolean("global", false)),
+        route_key_(config.getObject("rate_limit", true).getString("route_key", "")) {}
 
   // Router::RateLimitPolicy
   bool doGlobalLimiting() const override { return do_global_limiting_; }
 
+  // Router::RateLimitPolicy
+  const std::string& routeKey() const override { return route_key_; }
+
 private:
-  bool do_global_limiting_{};
+  const bool do_global_limiting_;
+  const std::string route_key_;
 };
 
 /**

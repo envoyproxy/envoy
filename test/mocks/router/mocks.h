@@ -44,7 +44,11 @@ public:
   // Router::RateLimitPolicy
   bool doGlobalLimiting() const override { return do_global_limiting_; }
 
+  // Router::RateLimitPolicy
+  const std::string& routeKey() const override { return route_key_; }
+
   bool do_global_limiting_{};
+  std::string route_key_;
 };
 
 class TestShadowPolicy : public ShadowPolicy {

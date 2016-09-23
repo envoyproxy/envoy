@@ -153,13 +153,19 @@ Global rate limit :ref:`architecture overview <arch_overview_rate_limit>`.
 .. code-block:: json
 
   {
-    "global": "..."
+    "global": "...",
+    "route_key": "..."
   }
 
 global
   *(optional, boolean)* Specifies whether the global rate limit service should be called for a
   request that matches this route. This information is used by the :ref:`rate limit filter
   <config_http_filters_rate_limit>` if it is installed. Defaults to false if not specified.
+
+route_key
+  *(optional, string)* Specifies a descriptor value to be used when rate limiting for a route.
+  This information is used by the :ref:`rate limit filter
+  <config_http_filters_rate_limit>` if it is installed.
 
 .. _config_http_conn_man_route_table_route_shadow:
 
