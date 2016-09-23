@@ -1,5 +1,6 @@
 #include "common.h"
 #include "rpc_channel_impl.h"
+#include "utility.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
@@ -30,15 +31,8 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
   // here for clarity.
   ASSERT(cm_.get(cluster_)->features() & Upstream::Cluster::Features::HTTP2);
 
-  Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().addViaMoveValue(Http::Headers::get().Scheme, "http");
-  message->headers().addViaMoveValue(Http::Headers::get().Method, "POST");
-  message->headers().addViaMoveValue(
-      Http::Headers::get().Path,
-      fmt::format("/{}/{}", method->service()->full_name(), method->name()));
-  message->headers().addViaCopy(Http::Headers::get().Host, cluster_);
-  message->headers().addViaCopy(Http::Headers::get().ContentType, Common::GRPC_CONTENT_TYPE);
-  message->body(serializeBody(*grpc_request));
+  Http::MessagePtr message = Utility::prepareHeaders(method);
+  message->body(Utility::serializeBody(*grpc_request));
 
   callbacks_.onPreRequestCustomizeHeaders(message->headers());
   http_request_ = cm_.httpAsyncClientForCluster(cluster_).send(std::move(message), *this, timeout_);
@@ -134,17 +128,6 @@ void RpcChannelImpl::onComplete() {
   http_request_ = nullptr;
   grpc_method_ = nullptr;
   grpc_response_ = nullptr;
-}
-
-Buffer::InstancePtr RpcChannelImpl::serializeBody(const proto::Message& message) {
-  // http://www.grpc.io/docs/guides/wire.html
-  Buffer::InstancePtr body(new Buffer::OwnedImpl());
-  uint8_t compressed = 0;
-  body->add(&compressed, sizeof(compressed));
-  uint32_t size = htonl(message.ByteSize());
-  body->add(&size, sizeof(size));
-  body->add(message.SerializeAsString());
-  return body;
 }
 
 } // Grpc
