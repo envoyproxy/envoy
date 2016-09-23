@@ -3,7 +3,14 @@
 Sandboxes
 =========
 
-To get a flavor of what Envoy has to offer, we are releasing a
+The docker-compose sandboxes give you different environments to test out Envoy's
+features. As we gauge people's interests we will add more sandboxes demonstrating
+different features.
+
+Front Proxy
+-----------
+
+To get a flavor of what Envoy has to offer as a front proxy, we are releasing a
 `docker compose <https://docs.docker.com/compose/>`_ sandbox that deploys a front
 envoy and a couple of services (simple flask apps) colocated with a running
 service envoy. The three containers will be deployed inside a virtual network
@@ -16,16 +23,16 @@ Below you can see a graphic showing the docker compose deployment:
 
 All incoming requests are routed via the front envoy, which is acting as a reverse proxy sitting on
 the edge of the ``envoymesh`` network. Port ``80`` is mapped to  port ``8000`` by docker compose
-(see :repo:`/example/docker-compose.yml>`). Moreover, notice
+(see :repo:`/examples/front-proxy/docker-compose.yml`). Moreover, notice
 that all  traffic routed by the front envoy to the service containers is actually routed to the
-service envoys (routes setup in :repo:`/example/front-envoy.json>`). In turn the service
+service envoys (routes setup in :repo:`/examples/front-proxy/front-envoy.json`). In turn the service
 envoys route the  request to the flask app via the loopback address (routes setup in
-:repo:`/example/service-envoy.json>`). This setup
+:repo:`/examples/front-proxy/service-envoy.json`). This setup
 illustrates the advantage of running service envoys  collocated with your services: all requests are
 handled by the service envoy, and efficiently routed to your services.
 
 Running the Sandbox
--------------------
+~~~~~~~~~~~~~~~~~~~
 
 The following documentation runs through the setup of an envoy cluster organized
 as is described in the image above.
@@ -226,3 +233,80 @@ statistics. For example inside ``frontenvoy`` we can get::
 Notice that we can get the number of members of upstream clusters, number of requests
 fulfilled by them, information about http ingress, and a plethora of other useful
 stats.
+
+gRPC bridge
+-----------
+
+Envoy gRPC
+~~~~~~~~~~
+
+The gRPC bridge sandbox is an example usage of Envoy's 
+:ref:`gRPC bridge filter <config_http_filters_grpc_bridge>`.
+Included in the sandbox is a gRPC in memory Key/Value store with a Python HTTP
+client. The Python client makes HTTP/1 requests through the Envoy sidecar
+process which are upgraded into HTTP/2 gRPC requests. Response trailers are then
+buffered and sent back to the client as a HTTP/1 header payload.
+
+Another Envoy feature demonstrated in this example is Envoy's ability to do authority
+base routing via its route configuration.
+
+Docker compose
+~~~~~~~~~~~~~~
+
+To run the docker compose file, and set up both the Python and the gRPC containers
+run::
+
+  docker-compose up --build
+
+Sending requests to the Key/Value store
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To use the python service and sent gRPC requests::
+
+  # set a key
+  docker-compose exec python /client/client.py set foo bar
+  => setf foo to bar
+
+  # get a key
+  docker-compose exec python /client/client.py get foo
+  => bar
+  
+Building the Go service
+~~~~~~~~~~~~~~~~~~~~~~~
+
+To build the Go gRPC service run::
+
+  script/bootstrap
+  script/build
+
+Locally building a docker image with an envoy binary
+----------------------------------------------------
+
+The following steps guide you through building your own envoy binary, and
+putting that in a clean ubuntu container.
+
+**Step 1: Build Envoy**
+
+Using ``lyft/envoy-build`` you will compile envoy.
+This image has all software needed to build envoy. From your envoy directory::
+
+  $ pwd
+  src/envoy
+  $ docker run -t -i -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh normal"
+
+That command will take some time to run because it is compiling an envoy binary.
+
+**Step 2: Build image with only envoy binary**
+
+In this step we'll build an image that only has the envoy binary, and none
+of the software used to build it.::
+
+  $ pwd
+  src/envoy/
+  $ docker build -f example/Dockerfile-envoy-image -t envoy .
+
+Now you can use this ``envoy`` image to build the any of the sandboxes if you change
+the ``FROM`` line in any dockerfile.
+
+This will be particularly useful if you are interested in modifying envoy, and testing
+your changes.

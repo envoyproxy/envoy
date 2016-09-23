@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 
 # Core
-gem 'middleman', '4.0.0.alpha.5'
+gem 'middleman'
 gem 'middleman-autoprefixer'
 gem 'middleman-livereload'
 
@@ -20,7 +20,7 @@ gem 'rails-assets-anchor-js', '~> 1.1.1', source: 'http://rails-assets.org'
 gem 'wdm' if Gem.win_platform?
 
 # Deployment Gems
-gem 'middleman-deploy', '~> 2.0.0.pre.alpha'
+gem 'middleman-deploy'
 
 # Debug
 # gem 'pry'

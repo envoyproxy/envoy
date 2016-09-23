@@ -66,7 +66,8 @@ protected:
                 send_(_, _, Optional<std::chrono::milliseconds>(std::chrono::milliseconds(1000))))
         .WillOnce(Invoke([](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                             Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
-          callbacks.onFailure(Http::AsyncClient::FailureReason::Reset);
+          callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
+              Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}})});
           return nullptr;
         }));
   }

@@ -23,7 +23,22 @@ TEST_F(IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::
 
 void BaseIntegrationTest::testRouterNotFound(Http::CodecClient::Type type) {
   BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(HTTP_PORT, "GET", "/notfound", type);
+      IntegrationUtil::makeSingleRequest(HTTP_PORT, "GET", "/notfound", "", type);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().get(":status"));
+}
+
+TEST_F(IntegrationTest, RouterNotFoundBodyNoBuffer) {
+  testRouterNotFoundWithBody(HTTP_PORT, Http::CodecClient::Type::HTTP1);
+}
+
+TEST_F(IntegrationTest, RouterNotFoundBodyBuffer) {
+  testRouterNotFoundWithBody(HTTP_BUFFER_PORT, Http::CodecClient::Type::HTTP1);
+}
+
+void BaseIntegrationTest::testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type) {
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(port, "POST", "/notfound", "foo", type);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().get(":status"));
 }
@@ -32,7 +47,7 @@ TEST_F(IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::
 
 void BaseIntegrationTest::testRouterRedirect(Http::CodecClient::Type type) {
   BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(HTTP_PORT, "GET", "/foo", type, "www.redirect.com");
+      IntegrationUtil::makeSingleRequest(HTTP_PORT, "GET", "/foo", "", type, "www.redirect.com");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("301", response->headers().get(":status"));
   EXPECT_EQ("https://www.redirect.com/foo", response->headers().get("location"));

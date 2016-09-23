@@ -14,8 +14,6 @@ public:
    * Async Client failure reasons.
    */
   enum class FailureReason {
-    // Request timeout has been reached.
-    RequestTimeout,
     // The stream has been reset.
     Reset
   };

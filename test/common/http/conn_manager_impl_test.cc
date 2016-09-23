@@ -4,8 +4,8 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/thread.h"
-#include "common/http/access_log_impl.h"
-#include "common/http/access_log_formatter.h"
+#include "common/http/access_log/access_log_impl.h"
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
@@ -304,8 +304,8 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
       }));
   filter->callbacks_->encodeHeaders(std::move(response_headers), false);
 
-  // Finish the request. Since we already started, we expect the data to get eaten.
-  EXPECT_CALL(*filter, decodeData(_, _)).Times(0);
+  // Finish the request.
+  EXPECT_CALL(*filter, decodeData(_, true));
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> void { decoder->decodeData(data, true); }));
 
@@ -461,6 +461,7 @@ TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
         return Http::FilterHeadersStatus::StopIteration;
       }));
 
+  // Response is already complete so we drop buffered body data when we continue.
   EXPECT_CALL(*decoder_filter2, decodeData(_, _)).Times(0);
   decoder_filter1->callbacks_->continueDecoding();
 }

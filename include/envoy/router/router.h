@@ -90,6 +90,11 @@ public:
    * @return whether the global rate limiting service should be called for the owning route.
    */
   virtual bool doGlobalLimiting() const PURE;
+
+  /**
+   * @return the route key, if it exists.
+   */
+  virtual const std::string& routeKey() const PURE;
 };
 
 /**

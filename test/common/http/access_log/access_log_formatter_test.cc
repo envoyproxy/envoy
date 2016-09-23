@@ -1,4 +1,4 @@
-#include "common/http/access_log_formatter.h"
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/header_map_impl.h"
 
 #include "test/mocks/http/mocks.h"

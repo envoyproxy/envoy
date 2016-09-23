@@ -40,8 +40,8 @@ Actions
   }
 
 type
-  *(required, string) The type of rate limit action to perform. The currently supported action
-  type is *service_to_service*.
+  *(required, string)* The type of rate limit action to perform. The currently supported action
+  types are *service_to_service* and *request_headers*.
 
 Service to service
 ^^^^^^^^^^^^^^^^^^
@@ -59,6 +59,33 @@ The following descriptors are sent:
     ("from_cluster", "<local service cluster>")
 
 <local service cluster> is derived from the :option:`--service-cluster` option.
+
+Request Headers
+^^^^^^^^^^^^^^^
+
+.. code-block:: json
+
+  {
+    "type": "request_headers",
+    "header_name": "...",
+    "descriptor_key" : "..."
+  }
+
+header_name
+  *(required, string)* The header name to be queried from the request headers and used to
+  populate the descriptor value for the *descriptor_key*.
+
+descriptor_key
+  *(required, string)* The key to use in the descriptor.
+
+The following descriptor is sent when a header contains a key that matches the *header_name*:
+
+  * ("<descriptor_key>", "<header_value_queried_from_header>")
+
+If *route_key* is set in the :ref:`route <config_http_conn_man_route_table_route_rate_limit>`, the following
+descriptor is sent as well:
+
+  * ("route_key", "<route_key>"), ("<descriptor_key>", "<header_value_queried_from_header>")
 
 Statistics
 ----------

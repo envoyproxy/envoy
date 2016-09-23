@@ -76,6 +76,7 @@ TEST_F(MongoCodecImplTest, Query) {
                   ->addString("string", "string_value")
                   ->addDocument("document", Bson::DocumentImpl::create())
                   ->addArray("array", Bson::DocumentImpl::create())
+                  ->addBinary("binary", "binary_value")
                   ->addObjectId("object_id", Bson::Field::ObjectId())
                   ->addBoolean("true", true)
                   ->addBoolean("false", false)

@@ -88,6 +88,16 @@ std::string BufferHelper::removeString(Buffer::Instance& data) {
   return ret;
 }
 
+std::string BufferHelper::removeBinary(Buffer::Instance& data) {
+  // Read out the subtype but do not store it for now.
+  int32_t length = removeInt32(data);
+  removeByte(data);
+  char* start = reinterpret_cast<char*>(data.linearize(length));
+  std::string ret(start, length);
+  data.drain(length);
+  return ret;
+}
+
 void BufferHelper::writeCString(Buffer::Instance& data, const std::string& value) {
   data.add(value.c_str(), value.size() + 1);
 }
@@ -113,6 +123,14 @@ void BufferHelper::writeString(Buffer::Instance& data, const std::string& value)
   data.add(value.c_str(), value.size() + 1);
 }
 
+void BufferHelper::writeBinary(Buffer::Instance& data, const std::string& value) {
+  // Right now we do not actually store the binary subtype and always use zero.
+  writeInt32(data, value.size());
+  uint8_t subtype = 0;
+  data.add(&subtype, sizeof(subtype));
+  data.add(value.c_str(), value.size());
+}
+
 int32_t FieldImpl::byteSize() const {
   // 1 byte type, cstring key, field.
   int32_t total = 1 + key_.size() + 1;
@@ -132,6 +150,10 @@ int32_t FieldImpl::byteSize() const {
   case Type::DOCUMENT:
   case Type::ARRAY: {
     return total + value_.document_value_->byteSize();
+  }
+
+  case Type::BINARY: {
+    return total + 5 + value_.string_value_.size();
   }
 
   case Type::OBJECT_ID: {
@@ -174,6 +196,10 @@ void FieldImpl::encode(Buffer::Instance& output) const {
   case Type::DOCUMENT:
   case Type::ARRAY: {
     return value_.document_value_->encode(output);
+  }
+
+  case Type::BINARY: {
+    return BufferHelper::writeBinary(output, value_.string_value_);
   }
 
   case Type::OBJECT_ID: {
@@ -229,6 +255,10 @@ bool FieldImpl::operator==(const Field& rhs) const {
     return asArray() == rhs.asArray();
   }
 
+  case Type::BINARY: {
+    return asBinary() == rhs.asBinary();
+  }
+
   case Type::OBJECT_ID: {
     return asObjectId() == rhs.asObjectId();
   }
@@ -271,7 +301,8 @@ std::string FieldImpl::toString() const {
     return std::to_string(value_.double_value_);
   }
 
-  case Type::STRING: {
+  case Type::STRING:
+  case Type::BINARY: {
     return fmt::format("'{}'", value_.string_value_);
   }
 
@@ -358,6 +389,13 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
     case Field::Type::ARRAY: {
       log_trace("BSON array");
       addArray(key, DocumentImpl::create(data));
+      break;
+    }
+
+    case Field::Type::BINARY: {
+      std::string value = BufferHelper::removeBinary(data);
+      log_trace("BSON binary: {}", value);
+      addBinary(key, std::move(value));
       break;
     }
 

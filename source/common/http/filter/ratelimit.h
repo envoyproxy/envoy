@@ -27,7 +27,7 @@ public:
    */
   virtual void populateDescriptors(const Router::RouteEntry& route,
                                    std::vector<::RateLimit::Descriptor>& descriptors,
-                                   FilterConfig& config) PURE;
+                                   FilterConfig& config, const HeaderMap& headers) PURE;
 };
 
 typedef std::unique_ptr<Action> ActionPtr;
@@ -39,10 +39,27 @@ class ServiceToServiceAction : public Action {
 public:
   // Action
   void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors,
-                           FilterConfig& config) override;
+                           std::vector<::RateLimit::Descriptor>& descriptors, FilterConfig& config,
+                           const HeaderMap&) override;
 };
 
+/**
+ * Action for request headers rate limiting.
+ */
+class RequestHeadersAction : public Action {
+public:
+  RequestHeadersAction(const Json::Object& action)
+      : header_name_(action.getString("header_name")),
+        descriptor_key_(action.getString("descriptor_key")) {}
+  // Action
+  void populateDescriptors(const Router::RouteEntry& route,
+                           std::vector<::RateLimit::Descriptor>& descriptors, FilterConfig& config,
+                           const HeaderMap& headers) override;
+
+private:
+  const LowerCaseString header_name_;
+  const std::string descriptor_key_;
+};
 /**
  * Global configuration for the HTTP rate limit filter.
  */

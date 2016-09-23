@@ -45,8 +45,12 @@ Format rules
 ------------
 
 The access log format string contains either command operators or other characters interpreted as a
-plain string. Note, if one of the parameters are not available '-' will be present in the log
-entry. The following command operators are supported:
+plain string. The access log formatter does not make any assumptions about a new line separator, so one
+has to specified as part of the format string.
+See the :ref:`default format <config_http_con_manager_access_log_default_format>` for an example.
+Note that the access log line will contain a '-' character for every not set/empty value.
+
+The following command operators are supported:
 
 %START_TIME%
   Request start time including milliseconds.
@@ -104,7 +108,7 @@ If custom format is not specified, Envoy uses the following default format:
   [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
   %RESPONSE_CODE% %FAILURE_REASON% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
   %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
-  "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"
+  "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
 
 Example of the default Envoy access log format:
 

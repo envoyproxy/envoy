@@ -98,6 +98,14 @@ TEST_F(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   checkStats();
 }
 
+// This test must be here vs integration_admin_test so that it tests a server with loaded certs.
+TEST_F(SslIntegrationTest, AdminCertEndpoint) {
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      ADMIN_PORT, "GET", "/certs", "", Http::CodecClient::Type::HTTP1);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().get(":status"));
+}
+
 TEST_F(SslIntegrationTest, AltAlpn) {
   // Connect with ALPN, but we should end up using HTTP/1.
   MockRuntimeIntegrationTestServer* server =
@@ -107,13 +115,6 @@ TEST_F(SslIntegrationTest, AltAlpn) {
   testRouterRequestAndResponseWithBody(makeSslClientConnection(true),
                                        Http::CodecClient::Type::HTTP1, 1024, 512);
   checkStats();
-}
-
-TEST_F(SslIntegrationTest, AdminCertEndpoint) {
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      ADMIN_PORT, "GET", "/certs", Http::CodecClient::Type::HTTP1);
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().get(":status"));
 }
 
 } // Ssl

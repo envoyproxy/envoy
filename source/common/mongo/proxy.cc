@@ -83,43 +83,43 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
     stats_.op_query_exhaust_.inc();
   }
 
-  std::string command = MessageUtility::queryCommand(*message);
-  if (!command.empty()) {
+  ActiveQueryPtr active_query(new ActiveQuery(*this, *message));
+  if (!active_query->query_info_.command().empty()) {
     // First field key is the operation.
-    stat_store_.counter(fmt::format("{}cmd.{}.total", stat_prefix_, command)).inc();
+    stat_store_.counter(fmt::format("{}cmd.{}.total", stat_prefix_,
+                                    active_query->query_info_.command())).inc();
   } else {
     // Normal query, get stats on a per collection basis first.
-    std::string collection =
-        MessageUtility::collectionFromFullCollectionName(message->fullCollectionName());
-    std::string collection_stat_prefix = fmt::format("{}collection.{}", stat_prefix_, collection);
-    MessageUtility::QueryType query_type = MessageUtility::queryType(*message);
+    std::string collection_stat_prefix =
+        fmt::format("{}collection.{}", stat_prefix_, active_query->query_info_.collection());
+    QueryMessageInfo::QueryType query_type = active_query->query_info_.type();
     chargeQueryStats(collection_stat_prefix, query_type);
 
     // Callsite stats if we have it.
-    std::string callsite = MessageUtility::queryCallingFunction(*message);
-    if (!callsite.empty()) {
+    if (!active_query->query_info_.callsite().empty()) {
       std::string callsite_stat_prefix =
-          fmt::format("{}collection.{}.callsite.{}", stat_prefix_, collection, callsite);
+          fmt::format("{}collection.{}.callsite.{}", stat_prefix_,
+                      active_query->query_info_.collection(), active_query->query_info_.callsite());
       chargeQueryStats(callsite_stat_prefix, query_type);
     }
 
     // Global stats.
-    if (query_type == MessageUtility::QueryType::ScatterGet) {
+    if (query_type == QueryMessageInfo::QueryType::ScatterGet) {
       stats_.op_query_scatter_get_.inc();
-    } else if (query_type == MessageUtility::QueryType::MultiGet) {
+    } else if (query_type == QueryMessageInfo::QueryType::MultiGet) {
       stats_.op_query_multi_get_.inc();
     }
   }
 
-  active_query_list_.emplace_back(new ActiveQuery(*this, std::move(message)));
+  active_query_list_.emplace_back(std::move(active_query));
 }
 
 void ProxyFilter::chargeQueryStats(const std::string& prefix,
-                                   MessageUtility::QueryType query_type) {
+                                   QueryMessageInfo::QueryType query_type) {
   stat_store_.counter(fmt::format("{}.query.total", prefix)).inc();
-  if (query_type == MessageUtility::QueryType::ScatterGet) {
+  if (query_type == QueryMessageInfo::QueryType::ScatterGet) {
     stat_store_.counter(fmt::format("{}.query.scatter_get", prefix)).inc();
-  } else if (query_type == MessageUtility::QueryType::MultiGet) {
+  } else if (query_type == QueryMessageInfo::QueryType::MultiGet) {
     stat_store_.counter(fmt::format("{}.query.multi_get", prefix)).inc();
   }
 }
@@ -141,26 +141,25 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
 
   for (auto i = active_query_list_.begin(); i != active_query_list_.end(); i++) {
     ActiveQuery& active_query = **i;
-    if (active_query.query_->requestId() != message->responseTo()) {
+    if (active_query.query_info_.requestId() != message->responseTo()) {
       continue;
     }
 
-    std::string command = MessageUtility::queryCommand(*active_query.query_);
-    if (!command.empty()) {
-      std::string stat_prefix = fmt::format("{}cmd.{}", stat_prefix_, command);
+    if (!active_query.query_info_.command().empty()) {
+      std::string stat_prefix =
+          fmt::format("{}cmd.{}", stat_prefix_, active_query.query_info_.command());
       chargeReplyStats(active_query, stat_prefix, *message);
     } else {
       // Collection stats first.
-      std::string collection = MessageUtility::collectionFromFullCollectionName(
-          active_query.query_->fullCollectionName());
-      std::string stat_prefix = fmt::format("{}collection.{}.query", stat_prefix_, collection);
+      std::string stat_prefix =
+          fmt::format("{}collection.{}.query", stat_prefix_, active_query.query_info_.collection());
       chargeReplyStats(active_query, stat_prefix, *message);
 
       // Callsite stats if we have it.
-      std::string callsite = MessageUtility::queryCallingFunction(*active_query.query_);
-      if (!callsite.empty()) {
+      if (!active_query.query_info_.callsite().empty()) {
         std::string callsite_stat_prefix =
-            fmt::format("{}collection.{}.callsite.{}.query", stat_prefix_, collection, callsite);
+            fmt::format("{}collection.{}.callsite.{}.query", stat_prefix_,
+                        active_query.query_info_.collection(), active_query.query_info_.callsite());
         chargeReplyStats(active_query, callsite_stat_prefix, *message);
       }
     }

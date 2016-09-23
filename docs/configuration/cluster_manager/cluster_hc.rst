@@ -74,8 +74,6 @@ interval_jitter_ms
 .. _config_cluster_manager_cluster_hc_service_name:
 
 service_name
-  *(optional, string)* An optional service name parameter which is used to validate the health
-  checked cluster against this value. The upstream health checked cluster is taken from the
-  *x-envoy-upstream-healthchecked-cluster* response header, :ref:`see details here
-  <arch_overview_health_checking_filter>`. It is compared against the :option:`--service-cluster`
-  command line option. If the upstream health checked cluster differs from expected, HC will fail.
+  *(optional, string)* An optional service name parameter which is used to validate the identity of
+  the health checked cluster. See the :ref:`architecture overview
+  <arch_overview_health_checking_identity>` for more information.

@@ -2,13 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://lyft.github.io/envoy/</loc>
-    <lastmod>2016-09-10T00:00:00-07:00</lastmod>
+    <lastmod>2016-09-20T00:00:00-07:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://lyft.github.io/envoy/footer/</loc>
-    <lastmod>2016-09-10T00:00:00-07:00</lastmod>
+    <lastmod>2016-09-20T00:00:00-07:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

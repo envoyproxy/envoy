@@ -60,9 +60,9 @@ requests based on path, authority, content type, :ref:`runtime <arch_overview_ru
 This functionality is most useful when using Envoy as a front/edge proxy but is also leveraged when
 building a service to service mesh.
 
-**GRPC support:** `GRPC <http://www.grpc.io/>`_ is a new RPC framework from Google that uses HTTP/2
+**gRPC support:** `gRPC <http://www.grpc.io/>`_ is a new RPC framework from Google that uses HTTP/2
 as the underlying multiplexed transport. Envoy :ref:`supports <arch_overview_grpc>` all of the
-HTTP/2 features required to be used as the routing and load balancing substrate for GRPC requests
+HTTP/2 features required to be used as the routing and load balancing substrate for gRPC requests
 and responses. The two systems are very complementary.
 
 **MongoDB L7 support:** `MongoDB <https://www.mongodb.com/>`_ is a popular database used in modern

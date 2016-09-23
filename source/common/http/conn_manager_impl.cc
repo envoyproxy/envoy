@@ -92,6 +92,9 @@ void ConnectionManagerImpl::destroyStream(ActiveStream& stream) {
   // deleted first.
   bool reset_stream = false;
   if (!stream.state_.remote_complete_ || !stream.state_.local_complete_) {
+    // Indicate local is complete at this point so that if we reset during a continuation, we don't
+    // raise further data or trailers.
+    stream.state_.local_complete_ = true;
     stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
     reset_stream = true;
   }
@@ -244,9 +247,8 @@ DateFormatter ConnectionManagerImpl::ActiveStream::date_formatter_("%a, %d %b %Y
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
       stream_id_(connection_manager.random_generator_.random()),
-      start_time_(std::chrono::system_clock::now()),
-      request_timer_(
-          connection_manager_.config_.stats().named_.downstream_rq_time_.allocateSpan()) {
+      request_timer_(connection_manager_.config_.stats().named_.downstream_rq_time_.allocateSpan()),
+      request_info_(connection_manager_.codec_->protocolString()) {
   connection_manager_.config_.stats().named_.downstream_rq_total_.inc();
   connection_manager_.config_.stats().named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocolString() == Http::Http1::PROTOCOL_STRING) {
@@ -260,11 +262,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   connection_manager_.config_.stats().named_.downstream_rq_active_.dec();
   for (Http::AccessLog::InstancePtr access_log : connection_manager_.config_.accessLogs()) {
-    access_log->log(request_headers_.get(), response_headers_.get(), *this);
+    access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
   if (connection_manager_.config_.isTracing()) {
-    connection_manager_.tracer_.trace(request_headers_.get(), response_headers_.get(), *this);
+    connection_manager_.tracer_.trace(request_headers_.get(), response_headers_.get(),
+                                      request_info_);
   }
 }
 
@@ -289,9 +292,9 @@ void ConnectionManagerImpl::ActiveStream::addStreamFilter(Http::StreamFilterPtr 
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(Http::HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
-  response_code_.value(response_code);
+  request_info_.response_code_.value(response_code);
 
-  if (hc_request_) {
+  if (request_info_.hc_request_) {
     return;
   }
 
@@ -401,7 +404,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 
 void ConnectionManagerImpl::ActiveStream::decodeData(const Buffer::Instance& data,
                                                      bool end_stream) {
-  bytes_received_ += data.length();
+  request_info_.bytes_received_ += data.length();
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;
   if (state_.remote_complete_) {
@@ -416,8 +419,9 @@ void ConnectionManagerImpl::ActiveStream::decodeData(const Buffer::Instance& dat
 
 void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
-  // If a response has been started, filters do not care about further body data. Just drop it.
-  if (state_.local_started_) {
+  // If a response is complete or a reset has been sent, filters do not care about further body
+  // data. Just drop it.
+  if (state_.local_complete_) {
     return;
   }
 
@@ -447,8 +451,8 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilter* filter,
                                                          HeaderMap& trailers) {
-  // If a response has been started, filters do not care about trailers. Just drop it.
-  if (state_.local_started_) {
+  // See decodeData() above for why we check local_complete_ here.
+  if (state_.local_complete_) {
     return;
   }
 
@@ -488,11 +492,6 @@ ConnectionManagerImpl::ActiveStream::commonEncodePrefix(ActiveStreamEncoderFilte
 
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         Http::HeaderMap& headers, bool end_stream) {
-  if (filter == nullptr) {
-    ASSERT(!state_.local_started_);
-    state_.local_started_ = true;
-  }
-
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   for (; entry != encoder_filters_.end(); entry++) {
     Http::FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, end_stream);
@@ -564,7 +563,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   stream_log_trace("encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
 
-  bytes_sent_ += data.length();
+  request_info_.bytes_sent_ += data.length();
   response_encoder_->encodeData(data, end_stream);
   maybeEndEncode(end_stream);
 }
@@ -725,7 +724,7 @@ Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
 }
 
 Http::AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestInfo() {
-  return parent_;
+  return parent_.request_info_;
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }

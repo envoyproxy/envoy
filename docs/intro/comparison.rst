@@ -97,10 +97,10 @@ versus a library that must be built into something by each project individually.
 `gRPC <http://www.grpc.io/>`_
 -----------------------------
 
-GRPC is a new multi-platform message passing system out of Google. It uses an IDL to describe an RPC
+gRPC is a new multi-platform message passing system out of Google. It uses an IDL to describe an RPC
 library and then implements application specific runtimes for a variety of different languages. The
-underlying transport is HTTP/2.  Although GRPC likely has the goal of implementing many Envoy like
+underlying transport is HTTP/2.  Although gRPC likely has the goal of implementing many Envoy like
 features in the future (load balancing, etc.), as of this writing the various runtimes are somewhat
-immature and are primarily focused on serialization/de-serialization. We consider GRPC to be a
-companion to Envoy versus a competitor. How Envoy integrates with GRPC is described :ref:`here
+immature and are primarily focused on serialization/de-serialization. We consider gRPC to be a
+companion to Envoy versus a competitor. How Envoy integrates with gRPC is described :ref:`here
 <arch_overview_grpc>`.

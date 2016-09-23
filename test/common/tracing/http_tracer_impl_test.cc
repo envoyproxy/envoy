@@ -398,8 +398,8 @@ TEST_F(LightStepSinkTest, CallbacksCalled) {
   EXPECT_EQ(1UL, stats_.collector_failed_.value());
   EXPECT_EQ(0UL, stats_.collector_success_.value());
 
-  Http::MessagePtr msg{new Http::RequestMessageImpl()};
-  callback_1->onSuccess(std::move(msg));
+  callback_1->onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}})});
   EXPECT_EQ(1UL, stats_.collector_failed_.value());
   EXPECT_EQ(1UL, stats_.collector_success_.value());
 }
@@ -415,7 +415,8 @@ TEST_F(LightStepSinkTest, ClientNotAvailable) {
       .WillOnce(
           Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-            callbacks.onFailure(Http::AsyncClient::FailureReason::Reset);
+            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
+                Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
   SystemTime start_time_1;

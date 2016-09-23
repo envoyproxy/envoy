@@ -118,9 +118,6 @@ void RpcChannelImpl::onFailure(Http::AsyncClient::FailureReason reason) {
   case Http::AsyncClient::FailureReason::Reset:
     onFailureWorker(Optional<uint64_t>(), "stream reset");
     break;
-  case Http::AsyncClient::FailureReason::RequestTimeout:
-    onFailureWorker(Optional<uint64_t>(), "request timeout");
-    break;
   }
 }
 
