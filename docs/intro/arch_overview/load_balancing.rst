@@ -53,10 +53,10 @@ the cluster as load increases.
 
 .. _arch_overview_load_balancing_zone_panic_threshold:
 
-Zone panic threshold
---------------------
+Zone aware routing and local zone panic threshold
+-------------------------------------------------
 
-When Envoy performs zone aware routing it will send traffic to the same upstream zone
-only if percent of healthy hosts in the given upstream zone is bigger than this threshold.
-Default panic threshold is 80%. This is :ref:`configurable <config_cluster_manager_cluster_runtime>`
-via runtime.
+By default Envoy performs zone aware routing where it will send traffic to the same upstream zone.
+This is only done if the zones are well balanced (defaults to 3% allowed deviation) and if there 
+are enough healthy hosts in the local zone (the *panic threshold* which defaults to 80%). These are
+:ref:`configurable <config_cluster_manager_cluster_runtime>` via runtime.
