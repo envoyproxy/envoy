@@ -33,13 +33,14 @@ upstream.weight_enabled
   is enabled. Defaults to enabled.
 
 upstream.zone_routing.enabled
-  What % of requests will be attempted to be routed to the same upstream zone. By default enabled
-  to 100% of requests.
+  % of requests that will be routed to the same upstream zone. Defaults to 100% of requests.
 
 upstream.zone_routing.percent_diff
-  Perform zone aware routing only if percent of upstream hosts in the same zone within
-  the percent_diff of expected. Expected is calculated as 100 / number_of_zones.
+  Zone aware routing will be used only if the percent of upstream hosts in the same zone is within
+  percent_diff of expected. Expected is calculated as 100 / number_of_zones. This prevents Envoy
+  from using same zone routing if the zones are not balanced well. Defaults to 3% allowed deviation.
 
 upstream.zone_routing.healthy_panic_threshold
   Defines the :ref:`zone healthy panic threshold <arch_overview_load_balancing_zone_panic_threshold>`
-  percentage. Defaults to 80%.
+  percentage. Defaults to 80%. If the % of healthy hosts in the current zone falls below this %
+  all healthy hosts will be used for routing.
