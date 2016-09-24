@@ -2,6 +2,7 @@
 
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/grpc/rpc_channel_impl.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
@@ -119,17 +120,13 @@ LightStepRecorder::LightStepRecorder(LightStepSink* sink, const lightstep::Trace
 void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   builder_.addSpan(std::move(span));
 
-  // When the buffer has accumulated N spans, send to LightStep.
-  const int N = 5;
-  if (builder_.pendingSpans() == N) {
+  const int min_span_number_to_send = 5;
+  if (builder_.pendingSpans() == min_span_number_to_send) {
     lightstep::collector::ReportRequest request;
     std::swap(request, builder_.pending());
 
-    /*
-     Here get grpc message, introduce callback and wire things up.
     Grpc::RpcAsyncClientImpl client(sink_->clusterManager());
-    client.send(sink_->collectorCluster(),
-    */
+    client.send(sink_->collectorCluster(), /*method*/ nullptr, std::move(request), *this);
   }
 }
 

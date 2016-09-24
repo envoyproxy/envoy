@@ -81,8 +81,7 @@ public:
    * Send gRPC request to upstream cluster using method and callbacks.
    */
   virtual void send(const std::string& upstream_cluster, const proto::MethodDescriptor* method,
-                    const proto::Message* grpc_request,
-                    Http::AsyncClient::Callbacks& callbacks) PURE;
+                    proto::Message&& grpc_request, Http::AsyncClient::Callbacks& callbacks) PURE;
 };
 
 } // Grpc

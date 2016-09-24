@@ -122,13 +122,17 @@ private:
   lightstep::TracerOptions options_;
 };
 
-class LightStepRecorder : public lightstep::Recorder {
+class LightStepRecorder : public lightstep::Recorder, Http::AsyncClient::Callbacks {
 public:
   LightStepRecorder(LightStepSink* sink, const lightstep::TracerImpl& tracer);
 
   // lightstep::Recorder
   void RecordSpan(lightstep::collector::Span&& span) override;
   bool FlushWithTimeout(lightstep::Duration) override;
+
+  // Http::AsyncClient::Callbacks
+  void onSuccess(Http::MessagePtr&&) override{/*Do nothing*/};
+  void onFailure(Http::AsyncClient::FailureReason) override{/*Do nothing*/};
 
   static std::unique_ptr<lightstep::Recorder> NewInstance(LightStepSink* sink,
                                                           const lightstep::TracerImpl& tracer);
