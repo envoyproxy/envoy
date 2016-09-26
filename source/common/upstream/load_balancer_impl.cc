@@ -16,8 +16,7 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
 
   uint64_t global_panic_threshold =
       std::min(100UL, runtime_.snapshot().getInteger("upstream.healthy_panic_threshold", 50));
-  double healthy_percent =
-      (host_set_.healthyHosts().size() / static_cast<double>(host_set_.hosts().size())) * 100;
+  double healthy_percent = 100.0 * host_set_.healthyHosts().size() / host_set_.hosts().size();
 
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
   if (healthy_percent < global_panic_threshold) {

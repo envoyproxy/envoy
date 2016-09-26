@@ -186,11 +186,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
   for (HostPtr host : new_hosts) {
     bool found = false;
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
-      zones.insert((*i)->zone());
-
       // If we find a host matched based on URL, we keep it. However we do change weight inline so
       // do that here.
       if ((*i)->url() == host->url()) {
+        zones.insert((*i)->zone());
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
         }
