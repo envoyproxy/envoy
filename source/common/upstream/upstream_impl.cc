@@ -177,6 +177,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
                                                    std::vector<HostPtr>& hosts_removed,
                                                    bool depend_on_hc) {
   uint64_t max_host_weight = 1;
+  std::unordered_set<std::string> zones;
 
   // Go through and see if the list we have is different from what we just got. If it is, we
   // make a new host list and raise a change notification. This uses an N^2 search given that
@@ -188,6 +189,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
       // If we find a host matched based on URL, we keep it. However we do change weight inline so
       // do that here.
       if ((*i)->url() == host->url()) {
+        zones.insert((*i)->zone());
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
         }
@@ -205,6 +207,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }
+      zones.insert(host->zone());
 
       final_hosts.push_back(host);
       hosts_added.push_back(host);
@@ -221,6 +224,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
         if ((*i)->weight() > max_host_weight) {
           max_host_weight = (*i)->weight();
         }
+        zones.insert((*i)->zone());
 
         final_hosts.push_back(*i);
         i = current_hosts.erase(i);
@@ -231,6 +235,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
   }
 
   stats_.max_host_weight_.set(max_host_weight);
+  stats_.upstream_zone_count_.set(zones.size());
 
   if (!hosts_added.empty() || !current_hosts.empty()) {
     hosts_removed = std::move(current_hosts);
