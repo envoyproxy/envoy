@@ -9,8 +9,8 @@ namespace Grpc {
 class Utility {
 public:
   static Buffer::InstancePtr serializeBody(const google::protobuf::Message& message);
-  static Http::MessagePtr prepareHeaders(const google::protobuf::MethodDescriptor& method,
-                                         const std::string& upstream_cluster);
+  static Http::MessagePtr prepareHeaders(
+    const std::string& upstream_cluster, const std::string& service_full_name, const std::string& method_name);
 };
 
 } // Grpc

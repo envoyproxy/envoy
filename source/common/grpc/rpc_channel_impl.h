@@ -74,7 +74,7 @@ class RpcAsyncClientImpl : public RpcAsyncClient {
 public:
   RpcAsyncClientImpl(Upstream::ClusterManager& cm) : cm_(cm) {}
 
-  void send(const std::string& upstream_cluster, const proto::MethodDescriptor* method,
+  void send(const std::string& upstream_cluster, const std::string& service_full_name, const std::string& method_name,
             proto::Message&& grpc_request, Http::AsyncClient::Callbacks& callbacks) override;
 
 private:

@@ -126,7 +126,7 @@ void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
     std::swap(request, builder_.pending());
 
     Grpc::RpcAsyncClientImpl client(sink_->clusterManager());
-    client.send(sink_->collectorCluster(), /*method*/ nullptr, std::move(request), *this);
+    client.send(sink_->collectorCluster(), "lightstep.collector.CollectorService", "Report", std::move(request), *this);
   }
 }
 
