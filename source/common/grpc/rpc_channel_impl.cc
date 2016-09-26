@@ -31,7 +31,8 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
   // here for clarity.
   ASSERT(cm_.get(cluster_)->features() & Upstream::Cluster::Features::HTTP2);
 
-  Http::MessagePtr message = Utility::prepareHeaders(cluster_, method->service()->full_name(), method->name());
+  Http::MessagePtr message =
+      Utility::prepareHeaders(cluster_, method->service()->full_name(), method->name());
   message->body(Utility::serializeBody(*grpc_request));
 
   callbacks_.onPreRequestCustomizeHeaders(message->headers());
@@ -128,8 +129,7 @@ void RpcChannelImpl::onComplete() {
 }
 
 void RpcAsyncClientImpl::send(const std::string& upstream_cluster,
-                              const std::string& service_full_name,
-                              const std::string& method_name,
+                              const std::string& service_full_name, const std::string& method_name,
                               proto::Message&& grpc_request,
                               Http::AsyncClient::Callbacks& callbacks) {
   // For proto3 messages this should always return true.
@@ -138,7 +138,8 @@ void RpcAsyncClientImpl::send(const std::string& upstream_cluster,
   // here for clarity.
   ASSERT(cm_.get(cluster_)->features() & Upstream::Cluster::Features::HTTP2);
 
-  Http::MessagePtr message = Utility::prepareHeaders(upstream_cluster, service_full_name, method_name);
+  Http::MessagePtr message =
+      Utility::prepareHeaders(upstream_cluster, service_full_name, method_name);
   message->body(Utility::serializeBody(grpc_request));
 
   // TODO: pass timeout to send method.
