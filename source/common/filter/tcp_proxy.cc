@@ -55,12 +55,11 @@ void TcpProxy::initializeUpstreamConnection() {
 
     upstream_connection_ = std::move(conn_info.connection_);
     read_callbacks_->upstreamHost(conn_info.host_description_);
-    cluster_resource_manager.connections().inc();
     if (!upstream_connection_) {
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-      cluster_resource_manager.connections().dec();
       return;
     }
+    cluster_resource_manager.connections().inc();
   } else {
     return;
   }
