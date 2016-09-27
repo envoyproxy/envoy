@@ -101,6 +101,11 @@ public:
    * put into the access log.
    */
   virtual AccessLog::RequestInfo& requestInfo() PURE;
+
+  /**
+   * @return the trusted address for the connection.
+   */
+  virtual const std::string& address() PURE;
 };
 
 /**

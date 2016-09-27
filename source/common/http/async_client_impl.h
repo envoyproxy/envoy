@@ -125,6 +125,7 @@ private:
   const Router::StableRouteTable& routeTable() { return *this; }
   uint64_t streamId() override { return stream_id_; }
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
+  const std::string& address() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
   const Buffer::Instance* decodingBuffer() override { return request_->body(); }
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;

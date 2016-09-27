@@ -41,7 +41,7 @@ Actions
 
 type
   *(required, string)* The type of rate limit action to perform. The currently supported action
-  types are *service_to_service* and *request_headers*.
+  types are *service_to_service* , *request_headers* and *remote_address*.
 
 Service to service
 ^^^^^^^^^^^^^^^^^^
@@ -86,6 +86,20 @@ If *route_key* is set in the :ref:`route <config_http_conn_man_route_table_route
 descriptor is sent as well:
 
   * ("route_key", "<route_key>"), ("<descriptor_key>", "<header_value_queried_from_header>")
+
+Remote Address
+^^^^^^^^^^^^^^
+
+.. code-block:: json
+
+  {
+    "type": "remote_address"
+  }
+
+The following descriptor is sent using the trusted address from `x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
+
+    * ("remote_address", "<:ref:`trusted address from x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`>")
+
 
 Statistics
 ----------
