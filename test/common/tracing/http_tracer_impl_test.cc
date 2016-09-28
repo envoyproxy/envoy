@@ -280,7 +280,8 @@ public:
     opts_.tracer_attributes["lightstep.guid"] = "random_guid";
     opts_.tracer_attributes["lightstep.component_name"] = "component";
 
-    sink_.reset(new LightStepSink(config, cm_, "prefix.", fake_stats_, "service_node", opts_));
+    sink_.reset(
+        new LightStepSink(config, cm_, "prefix.", fake_stats_, "service_node", tls_, opts_));
   }
 
   void setupValidSink() {
@@ -302,6 +303,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::unique_ptr<LightStepSink> sink_;
   lightstep::TracerOptions opts_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
 };
 
 TEST_F(LightStepSinkTest, InitializeSink) {

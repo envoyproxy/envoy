@@ -1,5 +1,6 @@
 #pragma once
 
+#include <envoy/thread_local/thread_local.h>
 #include "envoy/runtime/runtime.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -100,7 +101,8 @@ class LightStepSink : public HttpSink {
 public:
   LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                 const std::string& stat_prefix, Stats::Store& stats,
-                const std::string& service_node, const lightstep::TracerOptions& options);
+                const std::string& service_node, ThreadLocal::Instance& tls,
+                const lightstep::TracerOptions& options);
 
   // Tracer::HttpSink
   void flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
@@ -108,9 +110,19 @@ public:
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& collectorCluster() { return collector_cluster_; }
+  LightStepStats& stats() { return stats_; }
 
 private:
-  lightstep::Tracer& thread_local_tracer();
+  struct TlsLightStepTracer : ThreadLocal::ThreadLocalObject {
+    TlsLightStepTracer(lightstep::Tracer tracer, LightStepSink& sink)
+        : tracer_(tracer), sink_(sink) {}
+
+    void shutdown() override {}
+
+    lightstep::Tracer tracer_;
+    LightStepSink& sink_;
+  };
+
   std::string buildRequestLine(const Http::HeaderMap& request_headers,
                                const Http::AccessLog::RequestInfo& info);
   std::string buildResponseCode(const Http::AccessLog::RequestInfo& info);
@@ -119,27 +131,29 @@ private:
   Upstream::ClusterManager& cm_;
   LightStepStats stats_;
   const std::string service_node_;
+  ThreadLocal::Instance& tls_;
   lightstep::TracerOptions options_;
+  uint32_t tls_slot_;
 };
 
 class LightStepRecorder : public lightstep::Recorder, Http::AsyncClient::Callbacks {
 public:
-  LightStepRecorder(LightStepSink* sink, const lightstep::TracerImpl& tracer);
+  LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink* sink);
 
   // lightstep::Recorder
   void RecordSpan(lightstep::collector::Span&& span) override;
   bool FlushWithTimeout(lightstep::Duration) override;
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&&) override{/*Do nothing*/};
-  void onFailure(Http::AsyncClient::FailureReason) override{/*Do nothing*/};
+  void onSuccess(Http::MessagePtr&&) override;
+  void onFailure(Http::AsyncClient::FailureReason) override;
 
   static std::unique_ptr<lightstep::Recorder> NewInstance(LightStepSink* sink,
                                                           const lightstep::TracerImpl& tracer);
 
 private:
-  LightStepSink* sink_;
   lightstep::ReportBuilder builder_;
+  LightStepSink* sink_;
 };
 
 } // Tracing

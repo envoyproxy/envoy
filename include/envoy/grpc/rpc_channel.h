@@ -70,19 +70,4 @@ public:
                                const Optional<std::chrono::milliseconds>& timeout) PURE;
 };
 
-/**
- * Interface for sending async gRPC requests.
- */
-class RpcAsyncClient {
-public:
-  virtual ~RpcAsyncClient() {}
-
-  /**
-   * Send gRPC request to upstream cluster using method and callbacks.
-   */
-  virtual void send(const std::string& upstream_cluster, const std::string& service_full_name,
-                    const std::string& method_name, proto::Message&& grpc_request,
-                    Http::AsyncClient::Callbacks& callbacks) PURE;
-};
-
 } // Grpc

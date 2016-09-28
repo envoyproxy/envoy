@@ -90,7 +90,7 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
 
           http_tracer_->addSink(Tracing::HttpSinkPtr{new Tracing::LightStepSink(
               sink.getObject("config"), *cluster_manager_, "", server_.stats(),
-              server_.options().serviceNodeName(), opts)});
+              server_.options().serviceNodeName(), server_.threadLocal(), opts)});
         } else {
           throw EnvoyException(fmt::format("Unsupported sink type: '{}'", type));
         }

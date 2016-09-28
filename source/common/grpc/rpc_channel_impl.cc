@@ -128,23 +128,4 @@ void RpcChannelImpl::onComplete() {
   grpc_response_ = nullptr;
 }
 
-void RpcAsyncClientImpl::send(const std::string& upstream_cluster,
-                              const std::string& service_full_name, const std::string& method_name,
-                              proto::Message&& grpc_request,
-                              Http::AsyncClient::Callbacks& callbacks) {
-  // For proto3 messages this should always return true.
-  ASSERT(grpc_request->IsInitialized());
-  // This should be caught in configuration, and a request will fail normally anyway, but assert
-  // here for clarity.
-  ASSERT(cm_.get(cluster_)->features() & Upstream::Cluster::Features::HTTP2);
-
-  Http::MessagePtr message =
-      Utility::prepareHeaders(upstream_cluster, service_full_name, method_name);
-  message->body(Utility::serializeBody(grpc_request));
-
-  // TODO: pass timeout to send method.
-  cm_.httpAsyncClientForCluster(upstream_cluster)
-      .send(std::move(message), callbacks, std::chrono::milliseconds(5000));
-}
-
 } // Grpc

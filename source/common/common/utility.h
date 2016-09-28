@@ -97,5 +97,5 @@ public:
    * @return original @param input string if it's not empty or @param default_value otherwise.
    */
   static const std::string& valueOrDefault(const std::string& input,
-                                           const std::string& default_value = "-");
+                                           const std::string& default_value);
 };
