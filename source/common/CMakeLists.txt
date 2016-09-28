@@ -47,7 +47,6 @@ add_library(
   grpc/common.cc
   grpc/http1_bridge_filter.cc
   grpc/rpc_channel_impl.cc
-  grpc/utility.cc
   http/access_log/access_log_formatter.cc
   http/access_log/access_log_impl.cc
   http/async_client_impl.cc

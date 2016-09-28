@@ -1,5 +1,5 @@
 #include "common/grpc/rpc_channel_impl.h"
-#include "common/grpc/utility.h"
+#include "common/grpc/common.h"
 
 #include "test/generated/helloworld.pb.h"
 #include "test/mocks/grpc/mocks.h"
@@ -62,7 +62,7 @@ TEST_F(GrpcRequestImplTest, NoError) {
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
   helloworld::HelloReply inner_response;
   inner_response.set_message("hello a name");
-  response_http_message->body(Utility::serializeBody(inner_response));
+  response_http_message->body(Common::serializeBody(inner_response));
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{"grpc-status", "0"}}});
 
@@ -279,7 +279,7 @@ TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
   helloworld::HelloReply inner_response;
   inner_response.set_message("hello a name");
 
-  response_http_message->body(Utility::serializeBody(inner_response));
+  response_http_message->body(Common::serializeBody(inner_response));
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{"grpc-status", "0"}}});
 

@@ -1,6 +1,5 @@
 #include "common.h"
 #include "rpc_channel_impl.h"
-#include "utility.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
@@ -32,8 +31,8 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
   ASSERT(cm_.get(cluster_)->features() & Upstream::Cluster::Features::HTTP2);
 
   Http::MessagePtr message =
-      Utility::prepareHeaders(cluster_, method->service()->full_name(), method->name());
-  message->body(Utility::serializeBody(*grpc_request));
+      Common::prepareHeaders(cluster_, method->service()->full_name(), method->name());
+  message->body(Common::serializeBody(*grpc_request));
 
   callbacks_.onPreRequestCustomizeHeaders(message->headers());
   http_request_ = cm_.httpAsyncClientForCluster(cluster_).send(std::move(message), *this, timeout_);

@@ -3,7 +3,7 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/grpc/rpc_channel_impl.h"
-#include "common/grpc/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
@@ -126,10 +126,10 @@ void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
     lightstep::collector::ReportRequest request;
     std::swap(request, builder_.pending());
 
-    Http::MessagePtr message = Grpc::Utility::prepareHeaders(
+    Http::MessagePtr message = Grpc::Common::prepareHeaders(
         sink_->collectorCluster(), "lightstep.collector.CollectorService", "Report");
 
-    message->body(Grpc::Utility::serializeBody(std::move(request)));
+    message->body(Grpc::Common::serializeBody(std::move(request)));
 
     sink_->clusterManager()
         .httpAsyncClientForCluster(sink_->collectorCluster())
