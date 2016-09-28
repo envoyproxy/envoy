@@ -35,6 +35,8 @@ Per priority settings
     "max_retries": "...",
   }
 
+.. _config_cluster_manager_cluster_circuit_breakers_max_connections:
+
 max_connections
   *(optional, integer)* The maximum number of connections that Envoy will make to the upstream
   cluster. If not specified, the default is 1024. See the :ref:`circuit breaking overview
