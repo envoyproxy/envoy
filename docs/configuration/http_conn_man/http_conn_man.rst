@@ -102,9 +102,9 @@ idle_timeout_s
   manager. The idle timeout is defined as the period in which there are no active requests. If not
   set, there is no idle timeout. When the idle timeout is reached the connection will be closed. If
   the connection is an HTTP/2 connection a drain sequence will occur prior to closing the
-  connection. See :ref:`drain_timeout_s <config_http_conn_man_drain_timeout_s>`.
+  connection. See :ref:`drain_timeout_s <config_http_conn_man_drain_timeout_ms>`.
 
-.. _config_http_conn_man_drain_timeout_s:
+.. _config_http_conn_man_drain_timeout_ms:
 
 drain_timeout_ms
   *(optional, integer)* The time in milliseconds that Envoy will wait between sending an HTTP/2
