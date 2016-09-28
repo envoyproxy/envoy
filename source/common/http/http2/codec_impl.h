@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/optional.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -100,6 +101,7 @@ protected:
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(size_t length, uint32_t* data_flags);
     int onDataSourceSend(const uint8_t* framehd, size_t length);
+    void resetStreamWorker(StreamResetReason reason);
     void runResetCallbacks(StreamResetReason reason);
     void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -130,12 +132,14 @@ protected:
     StreamDecoder* decoder_{};
     int32_t stream_id_{-1};
     bool local_end_stream_{};
+    bool local_end_stream_sent_{};
     bool remote_end_stream_{};
     Buffer::OwnedImpl pending_recv_data_;
     Buffer::OwnedImpl pending_send_data_;
     bool data_deferred_{};
     bool reset_callbacks_run_{};
     HeaderMapPtr pending_trailers_;
+    Optional<StreamResetReason> deferred_reset_;
   };
 
   typedef std::unique_ptr<StreamImpl> StreamImplPtr;
