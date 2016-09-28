@@ -79,7 +79,6 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose() {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
-    codec_->goAway();
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -249,7 +248,8 @@ void ConnectionManagerImpl::onIdleTimeout() {
 }
 
 void ConnectionManagerImpl::onDrainTimeout() {
-  ASSERT(drain_state_ != DrainState::NotDraining)
+  ASSERT(drain_state_ != DrainState::NotDraining);
+  codec_->goAway();
   drain_state_ = DrainState::Closing;
   checkForDeferredClose();
 }
