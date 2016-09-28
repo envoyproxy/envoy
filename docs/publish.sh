@@ -7,7 +7,7 @@ PUBLISH_DIR=$2
 BUILD_SHA=`git rev-parse HEAD`
 
 if [[ ! -d $PUBLISH_DIR ]]; then
-    echo "$PUBLISH_DIR does not exist. Clone envoy fresh repo."
+    echo "$PUBLISH_DIR does not exist. Clone a fresh envoy repo."
 fi
 
 git -C $PUBLISH_DIR fetch
