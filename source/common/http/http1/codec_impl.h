@@ -127,6 +127,7 @@ public:
   uint64_t features() override { return 0; }
   void goAway() override {} // Called during connection manager drain flow
   const std::string& protocolString() override { return Http1::PROTOCOL_STRING; }
+  void shutdownNotice() override {} // Called during connection manager drain flow
   bool wantsToWrite() override { return false; }
 
 protected:

@@ -62,6 +62,7 @@ public:
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks) override;
+  std::chrono::milliseconds drainTimeout() override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
   const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   const Router::Config& routeConfig() override { return *route_config_; }
@@ -101,6 +102,7 @@ private:
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   Router::ConfigPtr route_config_;
+  std::chrono::milliseconds drain_timeout_;
 };
 
 /**

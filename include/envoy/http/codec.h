@@ -189,6 +189,12 @@ public:
   virtual const std::string& protocolString() PURE;
 
   /**
+   * Indicate a "shutdown notice" to the remote. This is a hint that the remote should not send
+   * any new streams, but if streams do arrive that will not be reset.
+   */
+  virtual void shutdownNotice() PURE;
+
+  /**
    * @return bool whether the codec has data that it wants to write but cannot due to protocol
    *              reasons (e.g, needing window updates).
    */

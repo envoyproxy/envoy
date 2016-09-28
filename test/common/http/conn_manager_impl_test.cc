@@ -67,6 +67,7 @@ public:
                                   ServerConnectionCallbacks&) override {
     return ServerConnectionPtr{codec_};
   }
+  std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   const Router::Config& routeConfig() override { return route_config_; }
@@ -219,10 +220,16 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   conn_manager_->onData(fake_input);
 
   Http::HeaderMapPtr response_headers{new HeaderMapImpl{{":status", "300"}}};
+  Event::MockTimer* drain_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*drain_timer, enableTimer(_));
   EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(*codec_, shutdownNotice());
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
-  filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->callback_();
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_3xx_.value());
@@ -372,6 +379,22 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
   conn_manager_->onData(fake_input);
 }
 
+TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
+  // Not used in the test.
+  delete codec_;
+
+  idle_timeout_.value(std::chrono::milliseconds(10));
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_));
+  setup(false, "");
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*idle_timer, disableTimer());
+  idle_timer->callback_();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_idle_timeout_.value());
+}
+
 TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   idle_timeout_.value(std::chrono::milliseconds(10));
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
@@ -411,10 +434,15 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   Http::HeaderMapPtr response_headers{new HeaderMapImpl{{":status", "200"}}};
   filter->callbacks_->encodeHeaders(std::move(response_headers), true);
 
+  Event::MockTimer* drain_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*drain_timer, enableTimer(_));
+  idle_timer->callback_();
+
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*idle_timer, disableTimer());
-  idle_timer->callback_();
+  EXPECT_CALL(*drain_timer, disableTimer());
+  drain_timer->callback_();
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_idle_timeout_.value());
 }

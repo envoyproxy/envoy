@@ -102,6 +102,12 @@ public:
                                           ServerConnectionCallbacks& callbacks) PURE;
 
   /**
+   * @return the time in milliseconds the connection manager will wait betwen issuing a "shutdown
+   *         notice" to the time it will issue a full GOAWAY and not accept any new streams.
+   */
+  virtual std::chrono::milliseconds drainTimeout() PURE;
+
+  /**
    * @return FilterChainFactory& the HTTP level filter factory to build the connection's filter
    *         chain.
    */
@@ -375,19 +381,21 @@ private:
    */
   void destroyStream(ActiveStream& stream);
 
-  /**
-   * Connection idle timer event.
-   */
   void onIdleTimeout();
+  void onDrainTimeout();
+  void startDrainSequence();
+
+  enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfig& config_;
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;
   Network::DrainDecision& drain_close_;
-  bool close_when_drained_{};
+  DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
   Event::TimerPtr idle_timer_;
+  Event::TimerPtr drain_timer_;
   Runtime::RandomGenerator& random_generator_;
   Tracing::HttpTracer& tracer_;
   Runtime::Loader& runtime_;
