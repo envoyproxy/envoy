@@ -49,20 +49,20 @@ void TcpProxy::initializeUpstreamConnection() {
   Upstream::ResourceManager& cluster_resource_manager =
       cluster_manager_.get(config_->clusterName())
           ->resourceManager(Upstream::ResourcePriority::Default);
-  if (cluster_resource_manager.connections().canCreate()) {
-    Upstream::Host::CreateConnectionData conn_info =
-        cluster_manager_.tcpConnForCluster(config_->clusterName());
 
-    upstream_connection_ = std::move(conn_info.connection_);
-    read_callbacks_->upstreamHost(conn_info.host_description_);
-    if (!upstream_connection_) {
-      read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-      return;
-    }
-    cluster_resource_manager.connections().inc();
-  } else {
+  if (!cluster_resource_manager.connections().canCreate()) {
     return;
   }
+  Upstream::Host::CreateConnectionData conn_info =
+      cluster_manager_.tcpConnForCluster(config_->clusterName());
+
+  upstream_connection_ = std::move(conn_info.connection_);
+  read_callbacks_->upstreamHost(conn_info.host_description_);
+  if (!upstream_connection_) {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    return;
+  }
+  cluster_resource_manager.connections().inc();
 
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
