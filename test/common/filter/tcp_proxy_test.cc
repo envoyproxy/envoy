@@ -164,6 +164,8 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   cluster_manager_.cluster_.resource_manager_.reset(new Upstream::ResourceManagerImpl(0, 0, 0, 0));
 
   Buffer::OwnedImpl buffer("hello");
+  // The downstream connection closes if the proxy can't make an upstream connection.
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   ASSERT_EQ(Network::FilterStatus::StopIteration, filter_->onData(buffer));
 }
 

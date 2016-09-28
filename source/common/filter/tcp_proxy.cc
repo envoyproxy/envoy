@@ -46,11 +46,12 @@ TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Stor
 }
 
 void TcpProxy::initializeUpstreamConnection() {
-  Upstream::ResourceManager& cluster_resource_manager =
+  Upstream::ResourceManager& upstream_cluster_resource_manager =
       cluster_manager_.get(config_->clusterName())
           ->resourceManager(Upstream::ResourcePriority::Default);
 
-  if (!cluster_resource_manager.connections().canCreate()) {
+  if (!upstream_cluster_resource_manager.connections().canCreate()) {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;
   }
   Upstream::Host::CreateConnectionData conn_info =
@@ -62,7 +63,7 @@ void TcpProxy::initializeUpstreamConnection() {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;
   }
-  cluster_resource_manager.connections().inc();
+  upstream_cluster_resource_manager.connections().inc();
 
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
