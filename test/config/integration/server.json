@@ -21,6 +21,7 @@
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
+        "drain_timeout_ms": 10,
         "access_log": [
         {
           "path": "/dev/null",
@@ -101,6 +102,7 @@
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http1",
+        "drain_timeout_ms": 10,
         "access_log": [
         {
           "path": "/dev/null",

@@ -260,10 +260,22 @@ void ConnectionImpl::goAway() {
   sendPendingFrames();
 }
 
+void ConnectionImpl::shutdownNotice() {
+  int rc = nghttp2_submit_shutdown_notice(session_);
+  ASSERT(rc == 0);
+  UNREFERENCED_PARAMETER(rc);
+
+  sendPendingFrames();
+}
+
 int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   conn_log_trace("recv frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
-  if (frame->hd.type == NGHTTP2_GOAWAY) {
+
+  // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
+  // notifications are the same as a normal GOAWAY.
+  if (frame->hd.type == NGHTTP2_GOAWAY && !raised_goaway_) {
     ASSERT(frame->hd.stream_id == 0);
+    raised_goaway_ = true;
     callbacks().onGoAway();
     return 0;
   }

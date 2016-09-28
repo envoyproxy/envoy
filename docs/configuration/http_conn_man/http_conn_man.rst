@@ -21,6 +21,7 @@ HTTP connection manager
       "http_codec_options": "...",
       "server_name": "...",
       "idle_timeout_s": "...",
+      "drain_timeout_ms": "...",
       "access_log": [],
       "use_remote_address": "..."
     }
@@ -100,8 +101,19 @@ idle_timeout_s
   *(optional, integer)* The idle timeout in seconds for connections managed by the connection
   manager. The idle timeout is defined as the period in which there are no active requests. If not
   set, there is no idle timeout. When the idle timeout is reached the connection will be closed. If
-  the connection is an HTTP/2 connection a GOAWAY frame will be sent prior to closing
-  the connection.
+  the connection is an HTTP/2 connection a drain sequence will occur prior to closing the
+  connection. See :ref:`drain_timeout_s <config_http_conn_man_drain_timeout_ms>`.
+
+.. _config_http_conn_man_drain_timeout_ms:
+
+drain_timeout_ms
+  *(optional, integer)* The time in milliseconds that Envoy will wait between sending an HTTP/2
+  "shutdown notification" (GOAWAY frame with max stream ID) and a final GOAWAY frame. This is used
+  so that Envoy provides a grace period for new streams that race with the final GOAWAY frame.
+  During this grace period, Envoy will continue to accept new streams. After the grace period, a
+  final GOAWAY frame is sent and Envoy will start refusing new streams. Draining occurs both
+  when a connection hits the idle timeout or during general server draining. The default grace
+  period is 5000 milliseconds (5 seconds) if this option is not specified.
 
 :ref:`access_log <config_http_conn_man_access_log>`
   *(optional, array)* Configuration for :ref:`HTTP access logs <arch_overview_http_access_logs>`
@@ -111,7 +123,7 @@ idle_timeout_s
 
 use_remote_address
   *(optional, boolean)* If set to true, the connection manager will use the real remote address
-  of the client connection when determining internal versus external origin and manipulating 
+  of the client connection when determining internal versus external origin and manipulating
   various headers. If set to false or absent, the connection manager will use the
   :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header. See the documentation for
   :ref:`config_http_conn_man_headers_x-forwarded-for`,

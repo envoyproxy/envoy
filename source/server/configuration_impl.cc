@@ -22,7 +22,7 @@ void MainImpl::initialize(const std::string& file_path) {
   cluster_manager_.reset(new Upstream::ProdClusterManagerImpl(
       loader.getObject("cluster_manager"), server_.stats(), server_.threadLocal(),
       server_.dnsResolver(), server_.sslContextManager(), server_.runtime(), server_.random(),
-      server_.options().serviceZone()));
+      server_.options().serviceZone(), server_.getLocalAddress()));
 
   std::vector<Json::Object> listeners = loader.getObjectArray("listeners");
   log().notice("loading {} listener(s)", listeners.size());

@@ -30,6 +30,11 @@ TcpProxy::~TcpProxy() {
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_.inc();
     read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_active_.dec();
     read_callbacks_->upstreamHost()->stats().cx_active_.dec();
+    read_callbacks_->upstreamHost()
+        ->cluster()
+        .resourceManager(Upstream::ResourcePriority::Default)
+        .connections()
+        .dec();
     connected_timespan_->complete();
   }
 }
@@ -41,6 +46,14 @@ TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Stor
 }
 
 void TcpProxy::initializeUpstreamConnection() {
+  Upstream::ResourceManager& upstream_cluster_resource_manager =
+      cluster_manager_.get(config_->clusterName())
+          ->resourceManager(Upstream::ResourcePriority::Default);
+
+  if (!upstream_cluster_resource_manager.connections().canCreate()) {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    return;
+  }
   Upstream::Host::CreateConnectionData conn_info =
       cluster_manager_.tcpConnForCluster(config_->clusterName());
 
@@ -50,6 +63,7 @@ void TcpProxy::initializeUpstreamConnection() {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;
   }
+  upstream_cluster_resource_manager.connections().inc();
 
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);

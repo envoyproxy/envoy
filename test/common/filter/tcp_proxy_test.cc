@@ -157,4 +157,16 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
                     .value());
 }
 
+TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
+  // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
+  filter_.reset(new TcpProxy(config_, cluster_manager_));
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  cluster_manager_.cluster_.resource_manager_.reset(new Upstream::ResourceManagerImpl(0, 0, 0, 0));
+
+  Buffer::OwnedImpl buffer("hello");
+  // The downstream connection closes if the proxy can't make an upstream connection.
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  ASSERT_EQ(Network::FilterStatus::StopIteration, filter_->onData(buffer));
+}
+
 } // Filter

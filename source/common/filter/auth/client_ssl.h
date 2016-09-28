@@ -66,8 +66,7 @@ typedef std::shared_ptr<AllowedPrincipals> AllowedPrincipalsPtr;
 class Config : public Http::AsyncClient::Callbacks {
 public:
   Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
-         Event::Dispatcher& dispatcher, Stats::Store& stats_store, Runtime::Loader& runtime,
-         const std::string& local_address);
+         Event::Dispatcher& dispatcher, Stats::Store& stats_store, Runtime::Loader& runtime);
 
   const AllowedPrincipals& allowedPrincipals();
   const Network::IpWhiteList& ipWhiteList() { return ip_white_list_; }
@@ -91,7 +90,6 @@ private:
   Network::IpWhiteList ip_white_list_;
   GlobalStats stats_;
   Runtime::Loader& runtime_;
-  const std::string local_address_;
 };
 
 typedef std::shared_ptr<Config> ConfigPtr;

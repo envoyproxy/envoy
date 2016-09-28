@@ -63,7 +63,7 @@ public:
   MOCK_METHOD0(accessLogs, const std::list<AccessLog::InstancePtr>&());
   MOCK_METHOD3(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
                                                ServerConnectionCallbacks&));
-
+  MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(idleTimeout, const Optional<std::chrono::milliseconds>&());
   MOCK_METHOD0(routeConfig, Router::Config&());
@@ -158,6 +158,7 @@ public:
   MOCK_METHOD0(features, uint64_t());
   MOCK_METHOD0(goAway, void());
   MOCK_METHOD0(protocolString, const std::string&());
+  MOCK_METHOD0(shutdownNotice, void());
   MOCK_METHOD0(wantsToWrite, bool());
 
   const std::string protocol_{"HTTP/1.1"};
@@ -173,6 +174,7 @@ public:
   MOCK_METHOD0(features, uint64_t());
   MOCK_METHOD0(goAway, void());
   MOCK_METHOD0(protocolString, const std::string&());
+  MOCK_METHOD0(shutdownNotice, void());
   MOCK_METHOD0(wantsToWrite, bool());
 
   // Http::ClientConnection

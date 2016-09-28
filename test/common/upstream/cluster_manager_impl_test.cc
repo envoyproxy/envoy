@@ -34,7 +34,7 @@ public:
   void create(const Json::Object& config) {
     cluster_manager_.reset(new ClusterManagerImplForTest(config, stats_, tls_, dns_resolver_,
                                                          ssl_context_manager_, runtime_, random_,
-                                                         "us-east-1d"));
+                                                         "us-east-1d", "local_address"));
   }
 
   Stats::IsolatedStoreImpl stats_;

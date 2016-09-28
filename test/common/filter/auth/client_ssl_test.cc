@@ -42,7 +42,7 @@ public:
     Json::StringLoader loader(json);
     EXPECT_CALL(cm_, get("vpn"));
     setupRequest();
-    config_.reset(new Config(loader, tls_, cm_, dispatcher_, stats_store_, runtime_, "127.0.0.1"));
+    config_.reset(new Config(loader, tls_, cm_, dispatcher_, stats_store_, runtime_));
 
     createAuthFilter();
   }
@@ -56,9 +56,8 @@ public:
     EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(
-            Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
+            Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                           Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
-              EXPECT_EQ("127.0.0.1", request->headers().get("x-forwarded-for"));
               callbacks_ = &callbacks;
               return &request_;
             }));
@@ -88,8 +87,7 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
 
   Json::StringLoader loader(json);
   EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(new Config(loader, tls_, cm_, dispatcher_, stats_store_, runtime_, "127.0.0.1"),
-               EnvoyException);
+  EXPECT_THROW(new Config(loader, tls_, cm_, dispatcher_, stats_store_, runtime_), EnvoyException);
 }
 
 TEST_F(ClientSslAuthFilterTest, Basic) {

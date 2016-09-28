@@ -13,13 +13,12 @@ namespace Auth {
 namespace ClientSsl {
 
 Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
-               Event::Dispatcher& dispatcher, Stats::Store& stats_store, Runtime::Loader& runtime,
-               const std::string& local_address)
+               Event::Dispatcher& dispatcher, Stats::Store& stats_store, Runtime::Loader& runtime)
     : tls_(tls), tls_slot_(tls.allocateSlot()), cm_(cm),
       auth_api_cluster_(config.getString("auth_api_cluster")),
       interval_timer_(dispatcher.createTimer([this]() -> void { refreshPrincipals(); })),
       ip_white_list_(config), stats_(generateStats(stats_store, config.getString("stat_prefix"))),
-      runtime_(runtime), local_address_(local_address) {
+      runtime_(runtime) {
 
   if (!cm_.get(auth_api_cluster_)) {
     throw EnvoyException(
@@ -88,7 +87,6 @@ void Config::refreshPrincipals() {
   message->headers().addViaMoveValue(Http::Headers::get().Method, "GET");
   message->headers().addViaMoveValue(Http::Headers::get().Path, "/v1/certs/list/approved");
   message->headers().addViaCopy(Http::Headers::get().Host, auth_api_cluster_);
-  message->headers().addViaCopy(Http::Headers::get().ForwardedFor, local_address_);
   cm_.httpAsyncClientForCluster(auth_api_cluster_)
       .send(std::move(message), *this, Optional<std::chrono::milliseconds>());
 }

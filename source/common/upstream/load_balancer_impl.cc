@@ -14,18 +14,49 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.hosts();
   }
 
-  uint64_t threshold =
+  uint64_t global_panic_threshold =
       std::min(100UL, runtime_.snapshot().getInteger("upstream.healthy_panic_threshold", 50));
-  double healthy_percent =
-      (host_set_.healthyHosts().size() / static_cast<double>(host_set_.hosts().size())) * 100;
+  double healthy_percent = 100.0 * host_set_.healthyHosts().size() / host_set_.hosts().size();
 
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
-  if (healthy_percent < threshold) {
+  if (healthy_percent < global_panic_threshold) {
     stats_.upstream_rq_lb_healthy_panic_.inc();
     return host_set_.hosts();
-  } else {
+  }
+
+  // Early exit if we cannot perform zone aware routing.
+  if (stats_.upstream_zone_count_.value() < 2 || host_set_.localZoneHealthyHosts().empty() ||
+      !runtime_.snapshot().featureEnabled("upstream.zone_routing.enabled", 100)) {
     return host_set_.healthyHosts();
   }
+
+  double zone_to_all_percent =
+      100.0 * host_set_.localZoneHealthyHosts().size() / host_set_.healthyHosts().size();
+  double expected_percent = 100.0 / stats_.upstream_zone_count_.value();
+
+  uint64_t zone_percent_diff =
+      runtime_.snapshot().getInteger("upstream.zone_routing.percent_diff", 3);
+
+  // Hosts should be roughly equally distributed between zones.
+  if (std::abs(zone_to_all_percent - expected_percent) > zone_percent_diff) {
+    stats_.upstream_zone_above_threshold_.inc();
+
+    return host_set_.healthyHosts();
+  }
+
+  stats_.upstream_zone_within_threshold_.inc();
+
+  uint64_t zone_panic_threshold =
+      runtime_.snapshot().getInteger("upstream.zone_routing.healthy_panic_threshold", 80);
+  double zone_healthy_percent =
+      100.0 * host_set_.localZoneHealthyHosts().size() / host_set_.localZoneHosts().size();
+  if (zone_healthy_percent < zone_panic_threshold) {
+    stats_.upstream_zone_healthy_panic_.inc();
+
+    return host_set_.healthyHosts();
+  }
+
+  return host_set_.localZoneHealthyHosts();
 }
 
 ConstHostPtr RoundRobinLoadBalancer::chooseHost() {

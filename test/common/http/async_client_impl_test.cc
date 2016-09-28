@@ -24,7 +24,10 @@ namespace Http {
 
 class AsyncClientImplTest : public testing::Test {
 public:
-  AsyncClientImplTest() {
+  AsyncClientImplTest()
+      : client_(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
+                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()},
+                "local_address") {
     HttpTestUtility::addDefaultHeaders(message_->headers());
     ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
     ON_CALL(cm_.cluster_, altStatName()).WillByDefault(ReturnRef(EMPTY_STRING));
@@ -48,6 +51,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
+  AsyncClientImpl client_;
 };
 
 TEST_F(AsyncClientImplTest, Basic) {
@@ -62,19 +66,22 @@ TEST_F(AsyncClientImplTest, Basic) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
+  HeaderMapImpl copy(message_->headers());
+  copy.addViaCopy("x-envoy-internal", "true");
+  copy.addViaCopy("x-forwarded-for", "local_address");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(copy)), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
   expectSuccess(200);
 
-  AsyncClientImpl client(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                         Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()});
-  client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+  client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
   HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
 
   EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_200").value());
+  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.internal.upstream_rq_200").value());
 }
 
 TEST_F(AsyncClientImplTest, Retry) {
@@ -96,11 +103,9 @@ TEST_F(AsyncClientImplTest, Retry) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
 
-  AsyncClientImpl client(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                         Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()});
   message_->headers().addViaCopy(Headers::get().EnvoyRetryOn,
                                  Headers::get().EnvoyRetryOnValues._5xx);
-  client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+  client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
   // Expect retry and retry timer create.
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
@@ -143,9 +148,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
 
-  AsyncClientImpl client(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                         Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()});
-  client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+  client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
   // Send request 2.
   MessagePtr message2{new RequestMessageImpl()};
@@ -161,7 +164,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
                              return nullptr;
                            }));
   EXPECT_CALL(stream_encoder2, encodeHeaders(HeaderMapEqualRef(ByRef(message2->headers())), true));
-  client.send(std::move(message2), callbacks2, Optional<std::chrono::milliseconds>());
+  client_.send(std::move(message2), callbacks2, Optional<std::chrono::milliseconds>());
 
   // Finish request 2.
   HeaderMapPtr response_headers2(new HeaderMapImpl{{":status", "503"}});
@@ -191,9 +194,7 @@ TEST_F(AsyncClientImplTest, Trailers) {
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
   expectSuccess(200);
 
-  AsyncClientImpl client(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                         Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()});
-  client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+  client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, false);
@@ -211,9 +212,7 @@ TEST_F(AsyncClientImplTest, ImmediateReset) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
   expectSuccess(503);
 
-  AsyncClientImpl client(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                         Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()});
-  client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+  client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 
   EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_503").value());
@@ -231,9 +230,7 @@ TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
   EXPECT_CALL(callbacks_, onFailure(_));
 
-  AsyncClientImpl client(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                         Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()});
-  client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+  client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
@@ -250,10 +247,8 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
-  AsyncClientImpl client(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                         Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()});
   AsyncClient::Request* request =
-      client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+      client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   request->cancel();
 }
 
@@ -267,10 +262,8 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
       }));
 
   expectSuccess(503);
-  AsyncClientImpl client(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                         Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()});
   EXPECT_EQ(nullptr,
-            client.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>()));
+            client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>()));
 
   EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_503").value());
 }
@@ -288,9 +281,7 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40)));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
-  AsyncClientImpl client(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                         Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()});
-  client.send(std::move(message_), callbacks_, std::chrono::milliseconds(40));
+  client_.send(std::move(message_), callbacks_, std::chrono::milliseconds(40));
   timer_->callback_();
 
   EXPECT_EQ(1UL,
@@ -311,10 +302,8 @@ TEST_F(AsyncClientImplTest, DisableTimer) {
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(200)));
   EXPECT_CALL(*timer_, disableTimer());
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
-  AsyncClientImpl client(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                         Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()});
   AsyncClient::Request* request =
-      client.send(std::move(message_), callbacks_, std::chrono::milliseconds(200));
+      client_.send(std::move(message_), callbacks_, std::chrono::milliseconds(200));
   request->cancel();
 }
 
