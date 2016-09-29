@@ -52,14 +52,15 @@ void HostSetImpl::runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
 
 const ConstHostVectorPtr ClusterImplBase::empty_host_list_{new std::vector<HostPtr>{}};
 
-ClusterImplBase::ClusterImplBase(const Json::Object& config, Stats::Store& stats,
-                                 Ssl::ContextManager& ssl_context_manager)
+ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime,
+                                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
     : name_(config.getString("name")),
       max_requests_per_connection_(config.getInteger("max_requests_per_connection", 0)),
       connect_timeout_(std::chrono::milliseconds(config.getInteger("connect_timeout_ms"))),
       stats_(generateStats(name_, stats)), alt_stat_name_(config.getString("alt_stat_name", "")),
       features_(parseFeatures(config)),
-      http_codec_options_(Http::Utility::parseCodecOptions(config)), resource_managers_(config) {
+      http_codec_options_(Http::Utility::parseCodecOptions(config)),
+      resource_managers_(config, runtime) {
 
   std::string string_lb_type = config.getString("lb_type");
   if (string_lb_type == "round_robin") {
@@ -133,31 +134,43 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
   });
 }
 
-ClusterImplBase::ResourceManagers::ResourceManagers(const Json::Object& config) {
-  managers_[enumToInt(ResourcePriority::Default)] = load(config, "default");
-  managers_[enumToInt(ResourcePriority::High)] = load(config, "high");
+ClusterImplBase::ResourceManagers::ResourceManagers(const Json::Object& config,
+                                                    Runtime::Loader& runtime) {
+  managers_[enumToInt(ResourcePriority::Default)] = load(config, runtime, "default");
+  managers_[enumToInt(ResourcePriority::High)] = load(config, runtime, "high");
 }
 
 ResourceManagerImplPtr ClusterImplBase::ResourceManagers::load(const Json::Object& config,
+                                                               Runtime::Loader& runtime,
                                                                const std::string& priority) {
   uint64_t max_connections = 1024;
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
+  std::string runtime_prefix = "circuit_breakers." + priority + ".";
 
+  // check against config
   Json::Object settings = config.getObject("circuit_breakers", true).getObject(priority, true);
   max_connections = settings.getInteger("max_connections", max_connections);
   max_pending_requests = settings.getInteger("max_pending_requests", max_pending_requests);
   max_requests = settings.getInteger("max_requests", max_requests);
   max_retries = settings.getInteger("max_retries", max_retries);
 
+  // now check against runtime which is higher priority
+  max_connections =
+      runtime.snapshot().getInteger(runtime_prefix + "max_connections", max_connections);
+  max_pending_requests =
+      runtime.snapshot().getInteger(runtime_prefix + "max_pending_requests", max_pending_requests);
+  max_requests = runtime.snapshot().getInteger(runtime_prefix + "max_requests", max_requests);
+  max_retries = runtime.snapshot().getInteger(runtime_prefix + "max_retries", max_retries);
+
   return ResourceManagerImplPtr{
       new ResourceManagerImpl(max_connections, max_pending_requests, max_requests, max_retries)};
 }
 
-StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Stats::Store& stats,
-                                     Ssl::ContextManager& ssl_context_manager)
-    : ClusterImplBase(config, stats, ssl_context_manager) {
+StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
+                                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
+    : ClusterImplBase(config, runtime, stats, ssl_context_manager) {
   std::vector<Json::Object> hosts_json = config.getObjectArray("hosts");
   HostVectorPtr new_hosts(new std::vector<HostPtr>());
   for (Json::Object& host : hosts_json) {
@@ -249,10 +262,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
   }
 }
 
-StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Stats::Store& stats,
+StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
+                                           Stats::Store& stats,
                                            Ssl::ContextManager& ssl_context_manager,
                                            Network::DnsResolver& dns_resolver)
-    : BaseDynamicClusterImpl(config, stats, ssl_context_manager), dns_resolver_(dns_resolver) {
+    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
+      dns_resolver_(dns_resolver) {
   for (Json::Object& host : config.getObjectArray("hosts")) {
     resolve_targets_.emplace_back(new ResolveTarget(*this, host.getString("url")));
   }

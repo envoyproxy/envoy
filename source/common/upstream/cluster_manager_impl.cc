@@ -69,18 +69,19 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, Stats::Store& 
   std::string string_type = cluster.getString("type");
   ClusterImplBasePtr new_cluster;
   if (string_type == "static") {
-    new_cluster.reset(new StaticClusterImpl(cluster, stats, ssl_context_manager));
+    new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager));
   } else if (string_type == "strict_dns") {
-    new_cluster.reset(new StrictDnsClusterImpl(cluster, stats, ssl_context_manager, dns_resolver));
+    new_cluster.reset(
+        new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager, dns_resolver));
   } else if (string_type == "logical_dns") {
     new_cluster.reset(
-        new LogicalDnsCluster(cluster, stats, ssl_context_manager, dns_resolver, tls_));
+        new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager, dns_resolver, tls_));
   } else if (string_type == "sds") {
     if (!sds_config_.valid()) {
       throw EnvoyException("cannot create an sds cluster without an sds config");
     }
 
-    sds_clusters_.push_back(new SdsClusterImpl(cluster, stats, ssl_context_manager,
+    sds_clusters_.push_back(new SdsClusterImpl(cluster, runtime, stats, ssl_context_manager,
                                                sds_config_.value(), *this,
                                                dns_resolver.dispatcher(), random));
     new_cluster.reset(sds_clusters_.back());

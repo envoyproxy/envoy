@@ -8,6 +8,7 @@
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
@@ -159,7 +160,7 @@ public:
   ClusterStats& stats() const override { return stats_; }
 
 protected:
-  ClusterImplBase(const Json::Object& config, Stats::Store& stats,
+  ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                   Ssl::ContextManager& ssl_context_manager);
 
   static ConstHostVectorPtr createHealthyHostList(const std::vector<HostPtr>& hosts);
@@ -180,8 +181,9 @@ protected:
 
 private:
   struct ResourceManagers {
-    ResourceManagers(const Json::Object& config);
-    ResourceManagerImplPtr load(const Json::Object& config, const std::string& priority);
+    ResourceManagers(const Json::Object& config, Runtime::Loader& runtime);
+    ResourceManagerImplPtr load(const Json::Object& config, Runtime::Loader& runtime,
+                                const std::string& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
 
@@ -202,7 +204,7 @@ typedef std::shared_ptr<ClusterImplBase> ClusterImplBasePtr;
  */
 class StaticClusterImpl : public ClusterImplBase {
 public:
-  StaticClusterImpl(const Json::Object& config, Stats::Store& stats,
+  StaticClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                     Ssl::ContextManager& ssl_context_manager);
 
   // Upstream::Cluster
@@ -236,7 +238,7 @@ protected:
  */
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
-  StrictDnsClusterImpl(const Json::Object& config, Stats::Store& stats,
+  StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                        Ssl::ContextManager& ssl_context_manager,
                        Network::DnsResolver& dns_resolver);
   ~StrictDnsClusterImpl();
