@@ -136,14 +136,14 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
 
 ClusterImplBase::ResourceManagers::ResourceManagers(const Json::Object& config,
                                                     Runtime::Loader& runtime,
-                                                    std::string cluster_name) {
+                                                    const std::string& cluster_name) {
   managers_[enumToInt(ResourcePriority::Default)] = load(config, runtime, cluster_name, "default");
   managers_[enumToInt(ResourcePriority::High)] = load(config, runtime, cluster_name, "high");
 }
 
 ResourceManagerImplPtr ClusterImplBase::ResourceManagers::load(const Json::Object& config,
                                                                Runtime::Loader& runtime,
-                                                               std::string cluster_name,
+                                                               const std::string& cluster_name,
                                                                const std::string& priority) {
   uint64_t max_connections = 1024;
   uint64_t max_pending_requests = 1024;
@@ -151,7 +151,6 @@ ResourceManagerImplPtr ClusterImplBase::ResourceManagers::load(const Json::Objec
   uint64_t max_retries = 3;
   std::string runtime_prefix = "circuit_breakers." + cluster_name + "." + priority + ".";
 
-  // check against config
   Json::Object settings = config.getObject("circuit_breakers", true).getObject(priority, true);
   max_connections = settings.getInteger("max_connections", max_connections);
   max_pending_requests = settings.getInteger("max_pending_requests", max_pending_requests);

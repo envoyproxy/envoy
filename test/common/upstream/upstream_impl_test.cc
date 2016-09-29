@@ -139,44 +139,6 @@ TEST(StrictDnsClusterImplTest, Basic) {
   }
 }
 
-TEST(StrictDnsClusterImplTest, RuntimeResourceManager) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  NiceMock<Network::MockDnsResolver> dns_resolver;
-  NiceMock<Runtime::MockLoader> runtime;
-
-  // gmock matches in LIFO order which is why these are swapped.
-  ResolverData resolver2(dns_resolver);
-  ResolverData resolver1(dns_resolver);
-
-  std::string json = R"EOF(
-  {
-    "name": "runtime_test_cluster",
-    "connect_timeout_ms": 250,
-    "type": "strict_dns",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://localhost:11001"},
-              {"url": "tcp://localhost2:11002"}]
-  }
-  )EOF";
-
-  Json::StringLoader loader(json);
-  StrictDnsClusterImpl cluster(loader, runtime, stats, ssl_context_manager, dns_resolver);
-  EXPECT_CALL(runtime.snapshot_,
-              getInteger("circuit_breakers.runtime_test_cluster.default.max_connections", 1024U));
-  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).connections().max());
-  EXPECT_CALL(
-      runtime.snapshot_,
-      getInteger("circuit_breakers.runtime_test_cluster.default.max_pending_requests", 1024U));
-  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).pendingRequests().max());
-  EXPECT_CALL(runtime.snapshot_,
-              getInteger("circuit_breakers.runtime_test_cluster.default.max_requests", 1024U));
-  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).requests().max());
-  EXPECT_CALL(runtime.snapshot_,
-              getInteger("circuit_breakers.runtime_test_cluster.default.max_retries", 3U));
-  EXPECT_EQ(3U, cluster.resourceManager(ResourcePriority::Default).retries().max());
-}
-
 TEST(HostImplTest, HostCluster) {
   MockCluster cluster;
   HostImpl host(cluster, "tcp://10.0.0.1:1234", false, 1, "");
@@ -295,6 +257,32 @@ TEST(StaticClusterImplTest, UnsupportedFeature) {
 
   Json::StringLoader config(json);
   EXPECT_THROW(StaticClusterImpl(config, runtime, stats, ssl_context_manager), EnvoyException);
+}
+
+TEST(ResourceManagerImplTest, RuntimeResourceManager) {
+  NiceMock<Runtime::MockLoader> runtime;
+  ResourceManagerImpl resource_manager(
+      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 0);
+
+  EXPECT_CALL(
+      runtime.snapshot_,
+      getInteger("circuit_breakers.runtime_resource_manager_test.default.max_connections", 0U));
+  EXPECT_EQ(0U, resource_manager.connections().max());
+
+  EXPECT_CALL(
+      runtime.snapshot_,
+      getInteger("circuit_breakers.runtime_resource_manager_test.default.max_pending_requests",
+                 0U));
+  EXPECT_EQ(0U, resource_manager.pendingRequests().max());
+
+  EXPECT_CALL(
+      runtime.snapshot_,
+      getInteger("circuit_breakers.runtime_resource_manager_test.default.max_requests", 0U));
+  EXPECT_EQ(0U, resource_manager.requests().max());
+
+  EXPECT_CALL(runtime.snapshot_,
+              getInteger("circuit_breakers.runtime_resource_manager_test.default.max_retries", 0U));
+  EXPECT_EQ(0U, resource_manager.retries().max());
 }
 
 } // Upstream

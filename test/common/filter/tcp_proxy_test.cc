@@ -5,9 +5,9 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 
 using testing::_;
 using testing::NiceMock;

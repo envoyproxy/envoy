@@ -4,11 +4,11 @@
 
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
-#include "envoy/runtime/runtime.h"
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
@@ -182,9 +182,9 @@ protected:
 private:
   struct ResourceManagers {
     ResourceManagers(const Json::Object& config, Runtime::Loader& runtime,
-                     std::string cluster_name);
+                     const std::string& cluster_name);
     ResourceManagerImplPtr load(const Json::Object& config, Runtime::Loader& runtime,
-                                std::string cluster_name, const std::string& priority);
+                                const std::string& cluster_name, const std::string& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
 

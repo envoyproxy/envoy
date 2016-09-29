@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/upstream/resource_manager.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/upstream/resource_manager.h"
 
 #include "common/common/assert.h"
 
@@ -18,8 +18,9 @@ namespace Upstream {
  */
 class ResourceManagerImpl : public ResourceManager {
 public:
-  ResourceManagerImpl(Runtime::Loader& runtime, std::string runtime_key, uint64_t max_connections,
-                      uint64_t max_pending_requests, uint64_t max_requests, uint64_t max_retries)
+  ResourceManagerImpl(Runtime::Loader& runtime, const std::string& runtime_key,
+                      uint64_t max_connections, uint64_t max_pending_requests,
+                      uint64_t max_requests, uint64_t max_retries)
       : connections_(max_connections, runtime, runtime_key + "max_connections"),
         pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests"),
         requests_(max_requests, runtime, runtime_key + "max_requests"),
@@ -33,7 +34,7 @@ public:
 
 private:
   struct ResourceImpl : public Resource {
-    ResourceImpl(uint64_t max, Runtime::Loader& runtime, std::string runtime_key)
+    ResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key)
         : max_(max), runtime_(runtime), runtime_key_(runtime_key) {}
     ~ResourceImpl() { ASSERT(current_ == 0); }
 
