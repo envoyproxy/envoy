@@ -103,9 +103,9 @@ public:
   virtual AccessLog::RequestInfo& requestInfo() PURE;
 
   /**
-   * @return the trusted address for the connection.
+   * @return the trusted downstream address for the connection.
    */
-  virtual const std::string& address() PURE;
+  virtual const std::string& downstreamAddress() PURE;
 };
 
 /**

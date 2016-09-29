@@ -354,7 +354,7 @@ TEST_F(ConnectionManagerUtilityTest, EmptyXFF) {
   EXPECT_EQ("", ConnectionManagerUtility::getLastAddressFromXFF(request_headers));
 }
 
-TEST_F(ConnectionManagerUtilityTest, OneAddressInXff) {
+TEST_F(ConnectionManagerUtilityTest, OneAddressInXFF) {
   const std::string first_address = "34.0.0.1";
   HeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
   EXPECT_EQ(first_address, ConnectionManagerUtility::getLastAddressFromXFF(request_headers));

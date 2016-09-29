@@ -388,7 +388,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.runtime_);
 
   // Set the trusted address for the connection by taking the last address in XFF.
-  address_ = ConnectionManagerUtility::getLastAddressFromXFF(*request_headers_);
+  downstream_address_ = ConnectionManagerUtility::getLastAddressFromXFF(*request_headers_);
   decodeHeaders(nullptr, *request_headers_, end_stream);
 }
 
@@ -776,8 +776,8 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::resetStream() {
 
 uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::streamId() { return parent_.stream_id_; }
 
-const std::string& ConnectionManagerImpl::ActiveStreamFilterBase::address() {
-  return parent_.address_;
+const std::string& ConnectionManagerImpl::ActiveStreamFilterBase::downstreamAddress() {
+  return parent_.downstream_address_;
 }
 
 } // Http

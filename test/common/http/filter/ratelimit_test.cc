@@ -335,7 +335,7 @@ TEST_F(HttpRateLimitFilterTest, AddressRateLimiting) {
   filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.do_global_limiting_ = true;
 
   std::string address = "10.0.0.1";
-  EXPECT_CALL(filter_callbacks_, address()).WillOnce(ReturnRef(address));
+  EXPECT_CALL(filter_callbacks_, downstreamAddress()).WillOnce(ReturnRef(address));
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                             {{{"remote_address", address}}}})))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
@@ -357,7 +357,7 @@ TEST_F(HttpRateLimitFilterTest, RouteAddressRateLimiting) {
   filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.route_key_ = "test_key";
 
   std::string address = "10.0.0.1";
-  EXPECT_CALL(filter_callbacks_, address()).WillOnce(ReturnRef(address));
+  EXPECT_CALL(filter_callbacks_, downstreamAddress()).WillOnce(ReturnRef(address));
   EXPECT_CALL(*client_,
               limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                   {{{"remote_address", address}}},
@@ -379,7 +379,7 @@ TEST_F(HttpRateLimitFilterTest, NoAddressRateLimiting) {
   SetUpTest(address_json);
   filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.do_global_limiting_ = true;
 
-  EXPECT_CALL(filter_callbacks_, address()).WillOnce(ReturnRef(EMPTY_STRING));
+  EXPECT_CALL(filter_callbacks_, downstreamAddress()).WillOnce(ReturnRef(EMPTY_STRING));
 
   EXPECT_CALL(*client_, limit(_, _, _)).Times(0);
 

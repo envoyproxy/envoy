@@ -221,7 +221,7 @@ private:
     const Router::StableRouteTable& routeTable() override { return *this; }
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
-    const std::string& address() override;
+    const std::string& downstreamAddress() override;
 
     // Router::StableRouteTable
     const Router::RedirectEntry* redirectRequest(const HeaderMap& headers) const {
@@ -329,7 +329,6 @@ private:
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
-    const std::string& address() { return address_; }
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason) override;
@@ -368,7 +367,7 @@ private:
     std::list<std::function<void()>> reset_callbacks_;
     State state_;
     AccessLog::RequestInfoImpl request_info_;
-    std::string address_;
+    std::string downstream_address_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

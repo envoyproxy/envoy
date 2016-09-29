@@ -31,7 +31,7 @@ void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
                                                std::vector<::RateLimit::Descriptor>& descriptors,
                                                FilterConfig&, const HeaderMap& headers,
                                                StreamDecoderFilterCallbacks&) {
-  std::string header_value = headers.get(header_name_);
+  const std::string& header_value = headers.get(header_name_);
   if (header_value.empty()) {
     return;
   }
@@ -50,7 +50,7 @@ void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
                                               std::vector<::RateLimit::Descriptor>& descriptors,
                                               FilterConfig&, const HeaderMap&,
                                               StreamDecoderFilterCallbacks& callbacks) {
-  const std::string& remote_address = callbacks.address();
+  const std::string& remote_address = callbacks.downstreamAddress();
   if (remote_address.empty()) {
     return;
   }
