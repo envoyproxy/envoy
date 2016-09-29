@@ -35,8 +35,8 @@ protected:
     Json::StringLoader config(raw_config);
 
     timer_ = new Event::MockTimer(&dispatcher_);
-    cluster_.reset(new SdsClusterImpl(config, stats_, ssl_context_manager_, sds_config_, cm_,
-                                      dispatcher_, random_));
+    cluster_.reset(new SdsClusterImpl(config, runtime_, stats_, ssl_context_manager_, sds_config_,
+                                      cm_, dispatcher_, random_));
   }
 
   HostPtr findHost(const std::string& address) {
@@ -90,6 +90,7 @@ protected:
   ReadyWatcher membership_updated_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::MockAsyncClientRequest request_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 TEST_F(SdsTest, Shutdown) {

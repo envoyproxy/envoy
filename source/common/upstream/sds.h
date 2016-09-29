@@ -22,7 +22,7 @@ struct SdsConfig {
  */
 class SdsClusterImpl : public BaseDynamicClusterImpl, public Http::AsyncClient::Callbacks {
 public:
-  SdsClusterImpl(const Json::Object& config, Stats::Store& stats,
+  SdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                  Ssl::ContextManager& ssl_context_manager, const SdsConfig& sds_config,
                  ClusterManager& cm, Event::Dispatcher& dispatcher,
                  Runtime::RandomGenerator& random);

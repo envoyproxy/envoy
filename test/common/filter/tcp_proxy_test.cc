@@ -5,6 +5,7 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -74,6 +75,7 @@ public:
   Network::ReadFilterPtr upstream_read_filter_;
   NiceMock<Event::MockTimer>* connect_timer_{};
   std::unique_ptr<TcpProxy> filter_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 TEST_F(TcpProxyTest, UpstreamDisconnect) {
@@ -161,7 +163,8 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
   filter_.reset(new TcpProxy(config_, cluster_manager_));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
-  cluster_manager_.cluster_.resource_manager_.reset(new Upstream::ResourceManagerImpl(0, 0, 0, 0));
+  cluster_manager_.cluster_.resource_manager_.reset(
+      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 0, 0, 0, 0));
 
   Buffer::OwnedImpl buffer("hello");
   // The downstream connection closes if the proxy can't make an upstream connection.

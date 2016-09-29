@@ -6,6 +6,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -46,6 +47,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Network::MockDnsResolver> dns_resolver;
+  NiceMock<Runtime::MockLoader> runtime;
 
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver2(dns_resolver);
@@ -79,7 +81,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   )EOF";
 
   Json::StringLoader loader(json);
-  StrictDnsClusterImpl cluster(loader, stats, ssl_context_manager, dns_resolver);
+  StrictDnsClusterImpl cluster(loader, runtime, stats, ssl_context_manager, dns_resolver);
   EXPECT_EQ(43U, cluster.resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(57U, cluster.resourceManager(ResourcePriority::Default).pendingRequests().max());
   EXPECT_EQ(50U, cluster.resourceManager(ResourcePriority::Default).requests().max());
@@ -186,6 +188,7 @@ TEST(HostImplTest, MalformedUrl) {
 TEST(StaticClusterImplTest, UrlConfig) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
   std::string json = R"EOF(
   {
     "name": "addressportconfig",
@@ -198,7 +201,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
   )EOF";
 
   Json::StringLoader config(json);
-  StaticClusterImpl cluster(config, stats, ssl_context_manager);
+  StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager);
   EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).pendingRequests().max());
   EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).requests().max());
@@ -220,6 +223,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
 TEST(StaticClusterImplTest, UnsupportedLBType) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
   std::string json = R"EOF(
   {
     "name": "addressportconfig",
@@ -232,12 +236,13 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   )EOF";
 
   Json::StringLoader config(json);
-  EXPECT_THROW(StaticClusterImpl(config, stats, ssl_context_manager), EnvoyException);
+  EXPECT_THROW(StaticClusterImpl(config, runtime, stats, ssl_context_manager), EnvoyException);
 }
 
 TEST(StaticClusterImplTest, UnsupportedFeature) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
   std::string json = R"EOF(
   {
     "name": "addressportconfig",
@@ -251,7 +256,7 @@ TEST(StaticClusterImplTest, UnsupportedFeature) {
   )EOF";
 
   Json::StringLoader config(json);
-  EXPECT_THROW(StaticClusterImpl(config, stats, ssl_context_manager), EnvoyException);
+  EXPECT_THROW(StaticClusterImpl(config, runtime, stats, ssl_context_manager), EnvoyException);
 }
 
 } // Upstream

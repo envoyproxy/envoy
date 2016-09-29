@@ -21,7 +21,7 @@ MockHost::~MockHost() {}
 
 MockCluster::MockCluster()
     : stats_(ClusterImplBase::generateStats(name_, stats_store_)),
-      resource_manager_(new Upstream::ResourceManagerImpl(1, 1024, 1024, 1)) {
+      resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1)) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
