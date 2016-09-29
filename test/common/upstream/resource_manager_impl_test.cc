@@ -33,4 +33,5 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
       .WillOnce(Return(4U));
   EXPECT_EQ(4U, resource_manager.retries().max());
 }
-}
+
+} // Upstream
