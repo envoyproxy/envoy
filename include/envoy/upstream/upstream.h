@@ -22,6 +22,11 @@ public:
     HostDescriptionPtr host_description_;
   };
 
+  struct HealthFailures {
+    // The host is currently failing active health checks.
+    static const uint64_t ACTIVE_HC = 0x1;
+  };
+
   /**
    * @return host specific counters.
    */
@@ -44,14 +49,21 @@ public:
   virtual std::list<std::reference_wrapper<Stats::Gauge>> gauges() const PURE;
 
   /**
-   * @return bool whether the host is currently healthy and routable.
+   * @return all health failure states for the host. This is a logical OR of HealthFailures.
    */
-  virtual bool healthy() const PURE;
+  virtual uint64_t healthFailures() const PURE;
 
   /**
-   * Set whether the host is currently healthy and routable.
+   * Atomically clear a health failure state for a host. Failure states are specified in
+   * HealthFailures.
    */
-  virtual void healthy(bool is_healthy) PURE;
+  virtual void healthFailureClear(uint64_t failure) PURE;
+
+  /**
+   * Atomically set a health failure state for a host. Failure states are specified in
+   * HealthFailures.
+   */
+  virtual void healthFailureSet(uint64_t failure) PURE;
 
   /**
    * @return the current load balancing weight of the host, in the range 1-100.
