@@ -149,7 +149,7 @@ ResourceManagerImplPtr ClusterImplBase::ResourceManagers::load(const Json::Objec
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
-  std::string runtime_prefix = "circuit_breakers." + cluster_name + "." + priority + ".";
+  std::string runtime_prefix = fmt::format("circuit_breakers.{}.{}.", cluster_name, priority);
 
   Json::Object settings = config.getObject("circuit_breakers", true).getObject(priority, true);
   max_connections = settings.getInteger("max_connections", max_connections);

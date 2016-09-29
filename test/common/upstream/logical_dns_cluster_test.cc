@@ -2,9 +2,9 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 
 using testing::_;
 using testing::Invoke;

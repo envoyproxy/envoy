@@ -8,8 +8,8 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 
 using testing::_;
 using testing::DoAll;
