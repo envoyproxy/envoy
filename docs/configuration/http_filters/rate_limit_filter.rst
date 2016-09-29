@@ -96,10 +96,15 @@ Remote Address
     "type": "remote_address"
   }
 
-The following descriptor is sent using the trusted address from `x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
+The following descriptor is sent using the trusted address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
 
     * ("remote_address", "<:ref:`trusted address from x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`>")
 
+If *route_key* is set in the :ref:`route <config_http_conn_man_route_table_route_rate_limit>`, the following
+descriptor is sent as well:
+
+      * ("route_key", "<route_key>"),
+        ("remote_address", "<:ref:`trusted address from x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`>")
 
 Statistics
 ----------

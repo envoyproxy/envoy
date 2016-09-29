@@ -351,6 +351,30 @@ TEST_F(HttpRateLimitFilterTest, AddressRateLimiting) {
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.ratelimit.ok").value());
 }
 
+TEST_F(HttpRateLimitFilterTest, RouteAddressRateLimiting) {
+  SetUpTest(address_json);
+  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.do_global_limiting_ = true;
+  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.route_key_ = "test_key";
+
+  std::string address = "10.0.0.1";
+  EXPECT_CALL(filter_callbacks_, address()).WillOnce(ReturnRef(address));
+  EXPECT_CALL(*client_,
+              limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
+                                  {{{"remote_address", address}}},
+                                  {{{"route_key", "test_key"}, {"remote_address", address}}}})))
+      .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
+                                       -> void { request_callbacks_ = &callbacks; })));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  request_callbacks_->complete(::RateLimit::LimitStatus::OK);
+
+  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.ratelimit.ok").value());
+}
+
 TEST_F(HttpRateLimitFilterTest, NoAddressRateLimiting) {
   SetUpTest(address_json);
   filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.do_global_limiting_ = true;

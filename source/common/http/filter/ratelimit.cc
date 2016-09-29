@@ -46,7 +46,7 @@ void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
   descriptors.push_back({{{"route_key", route_key}, {descriptor_key_, header_value}}});
 }
 
-void RemoteAddressAction::populateDescriptors(const Router::RouteEntry&,
+void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
                                               std::vector<::RateLimit::Descriptor>& descriptors,
                                               FilterConfig&, const HeaderMap&,
                                               StreamDecoderFilterCallbacks& callbacks) {
@@ -54,7 +54,15 @@ void RemoteAddressAction::populateDescriptors(const Router::RouteEntry&,
   if (remote_address.empty()) {
     return;
   }
+
   descriptors.push_back({{{"remote_address", remote_address}}});
+
+  const std::string& route_key = route.rateLimitPolicy().routeKey();
+  if (route_key.empty()) {
+    return;
+  }
+
+  descriptors.push_back({{{"route_key", route_key}, {"remote_address", remote_address}}});
 }
 
 FilterConfig::FilterConfig(const Json::Object& config, const std::string& local_service_cluster,

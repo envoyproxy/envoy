@@ -69,9 +69,8 @@ class RemoteAddressAction : public Action {
 public:
   // Action
   void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors, FilterConfig& config,
-                           const HeaderMap& headers,
-                           StreamDecoderFilterCallbacks& callbacks) override;
+                           std::vector<::RateLimit::Descriptor>& descriptors, FilterConfig&,
+                           const HeaderMap&, StreamDecoderFilterCallbacks& callbacks) override;
 };
 
 /**
