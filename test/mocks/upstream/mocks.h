@@ -8,6 +8,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 
 using testing::NiceMock;
 
@@ -56,6 +57,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 class MockClusterManager : public ClusterManager {

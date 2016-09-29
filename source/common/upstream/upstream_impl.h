@@ -181,9 +181,10 @@ protected:
 
 private:
   struct ResourceManagers {
-    ResourceManagers(const Json::Object& config, Runtime::Loader& runtime);
+    ResourceManagers(const Json::Object& config, Runtime::Loader& runtime,
+                     std::string cluster_name);
     ResourceManagerImplPtr load(const Json::Object& config, Runtime::Loader& runtime,
-                                const std::string& priority);
+                                std::string cluster_name, const std::string& priority);
 
     typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
 

@@ -60,7 +60,7 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& ru
       stats_(generateStats(name_, stats)), alt_stat_name_(config.getString("alt_stat_name", "")),
       features_(parseFeatures(config)),
       http_codec_options_(Http::Utility::parseCodecOptions(config)),
-      resource_managers_(config, runtime) {
+      resource_managers_(config, runtime, name_) {
 
   std::string string_lb_type = config.getString("lb_type");
   if (string_lb_type == "round_robin") {
@@ -135,19 +135,21 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
 }
 
 ClusterImplBase::ResourceManagers::ResourceManagers(const Json::Object& config,
-                                                    Runtime::Loader& runtime) {
-  managers_[enumToInt(ResourcePriority::Default)] = load(config, runtime, "default");
-  managers_[enumToInt(ResourcePriority::High)] = load(config, runtime, "high");
+                                                    Runtime::Loader& runtime,
+                                                    std::string cluster_name) {
+  managers_[enumToInt(ResourcePriority::Default)] = load(config, runtime, cluster_name, "default");
+  managers_[enumToInt(ResourcePriority::High)] = load(config, runtime, cluster_name, "high");
 }
 
 ResourceManagerImplPtr ClusterImplBase::ResourceManagers::load(const Json::Object& config,
                                                                Runtime::Loader& runtime,
+                                                               std::string cluster_name,
                                                                const std::string& priority) {
   uint64_t max_connections = 1024;
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
-  std::string runtime_prefix = "circuit_breakers." + priority + ".";
+  std::string runtime_prefix = "circuit_breakers." + cluster_name + "." + priority + ".";
 
   // check against config
   Json::Object settings = config.getObject("circuit_breakers", true).getObject(priority, true);
@@ -156,16 +158,8 @@ ResourceManagerImplPtr ClusterImplBase::ResourceManagers::load(const Json::Objec
   max_requests = settings.getInteger("max_requests", max_requests);
   max_retries = settings.getInteger("max_retries", max_retries);
 
-  // now check against runtime which is higher priority
-  max_connections =
-      runtime.snapshot().getInteger(runtime_prefix + "max_connections", max_connections);
-  max_pending_requests =
-      runtime.snapshot().getInteger(runtime_prefix + "max_pending_requests", max_pending_requests);
-  max_requests = runtime.snapshot().getInteger(runtime_prefix + "max_requests", max_requests);
-  max_retries = runtime.snapshot().getInteger(runtime_prefix + "max_retries", max_retries);
-
-  return ResourceManagerImplPtr{
-      new ResourceManagerImpl(max_connections, max_pending_requests, max_requests, max_retries)};
+  return ResourceManagerImplPtr{new ResourceManagerImpl(
+      runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};
 }
 
 StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader& runtime,

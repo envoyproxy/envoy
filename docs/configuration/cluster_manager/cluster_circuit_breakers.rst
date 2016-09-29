@@ -66,6 +66,8 @@ max_retries
 Runtime
 -------
 
-All four circuit breaking settings are runtime configurable for all defined priorities. They
-follow the following naming scheme ``circuit_breakers.<priority>.<setting>``. Available runtime
-settings will override settings set in the envoy config file.
+All four circuit breaking settings are runtime configurable for all defined priorities based on cluster
+name. They follow the following naming scheme ``circuit_breakers.<cluster_name>.<priority>.<setting>``.
+``cluster_name`` is the name field in each cluster's configuration, which is set in the envoy
+:ref:`config file <config_cluster_manager_cluster_name>`. Available runtime settings will override
+settings set in the envoy config file.

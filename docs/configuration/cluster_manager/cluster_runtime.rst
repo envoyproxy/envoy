@@ -45,14 +45,14 @@ upstream.zone_routing.healthy_panic_threshold
   percentage. Defaults to 80%. If the % of healthy hosts in the current zone falls below this %
   all healthy hosts will be used for routing.
 
-circuit_breakers.<priority>.max_connections
+circuit_breakers.<cluster_name>.<priority>.max_connections
   :ref:`Max connections circuit breaker setting <config_cluster_manager_cluster_circuit_breakers_max_connections>`
 
-circuit_breakers.<priority>.max_pending_requests
+circuit_breakers.<cluster_name>.<priority>.max_pending_requests
   :ref:`Max pending requests circuit breaker setting <config_cluster_manager_cluster_circuit_breakers_max_pending_requests>`
 
-circuit_breakers.<priority>.max_requests
+circuit_breakers.<cluster_name>.<priority>.max_requests
   :ref:`Max requests circuit breaker setting <config_cluster_manager_cluster_circuit_breakers_max_requests>`
 
-circuit_breakers.<priority>.max_retries
+circuit_breakers.<cluster_name>.<priority>.max_retries
   :ref:`Max retries circuit breaker setting <config_cluster_manager_cluster_circuit_breakers_max_retries>`

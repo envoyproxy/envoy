@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/upstream/resource_manager.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
 
@@ -17,10 +18,12 @@ namespace Upstream {
  */
 class ResourceManagerImpl : public ResourceManager {
 public:
-  ResourceManagerImpl(uint64_t max_connections, uint64_t max_pending_requests,
-                      uint64_t max_requests, uint64_t max_retries)
-      : connections_(max_connections), pending_requests_(max_pending_requests),
-        requests_(max_requests), retries_(max_retries) {}
+  ResourceManagerImpl(Runtime::Loader& runtime, std::string runtime_key, uint64_t max_connections,
+                      uint64_t max_pending_requests, uint64_t max_requests, uint64_t max_retries)
+      : connections_(max_connections, runtime, runtime_key + "max_connections"),
+        pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests"),
+        requests_(max_requests, runtime, runtime_key + "max_requests"),
+        retries_(max_retries, runtime, runtime_key + "max_retries") {}
 
   // Upstream::ResourceManager
   Resource& connections() override { return connections_; }
@@ -30,20 +33,23 @@ public:
 
 private:
   struct ResourceImpl : public Resource {
-    ResourceImpl(uint64_t max) : max_(max) {}
+    ResourceImpl(uint64_t max, Runtime::Loader& runtime, std::string runtime_key)
+        : max_(max), runtime_(runtime), runtime_key_(runtime_key) {}
     ~ResourceImpl() { ASSERT(current_ == 0); }
 
     // Upstream::Resource
-    bool canCreate() override { return current_ < max_; }
+    bool canCreate() override { return current_ < max(); }
     void inc() override { current_++; }
     void dec() override {
       ASSERT(current_ > 0);
       current_--;
     }
-    uint64_t max() override { return max_; }
+    uint64_t max() override { return runtime_.snapshot().getInteger(runtime_key_, max_); }
 
     const uint64_t max_;
     std::atomic<uint64_t> current_{};
+    Runtime::Loader& runtime_;
+    std::string runtime_key_;
   };
 
   ResourceImpl connections_;

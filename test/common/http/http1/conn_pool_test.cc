@@ -9,6 +9,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 
 using testing::_;
 using testing::DoAll;
@@ -103,6 +104,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockCluster> cluster_;
   ConnPoolImplForTest conn_pool_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 /**
@@ -195,7 +197,8 @@ TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
  * Test when we overflow max pending requests.
  */
 TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
-  cluster_.resource_manager_.reset(new Upstream::ResourceManagerImpl(1, 1, 1024, 1));
+  cluster_.resource_manager_.reset(
+      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1, 1024, 1));
 
   NiceMock<Http::MockStreamDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
@@ -448,7 +451,8 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
 TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
   InSequence s;
 
-  cluster_.resource_manager_.reset(new Upstream::ResourceManagerImpl(2, 1024, 1024, 1));
+  cluster_.resource_manager_.reset(
+      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 2, 1024, 1024, 1));
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();
 

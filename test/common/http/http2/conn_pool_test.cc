@@ -7,6 +7,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 
 using testing::_;
 using testing::DoAll;
@@ -91,6 +92,7 @@ public:
   Upstream::HostPtr host_{new Upstream::HostImpl(cluster_, "tcp://127.0.0.1:80", false, 1, "")};
   TestConnPoolImpl pool_;
   std::vector<TestCodecClient> test_clients_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 class ActiveTestRequest {
@@ -331,7 +333,8 @@ TEST_F(Http2ConnPoolImplTest, MaxRequests) {
 
 TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
   InSequence s;
-  cluster_.resource_manager_.reset(new Upstream::ResourceManagerImpl(1024, 1024, 1, 1));
+  cluster_.resource_manager_.reset(
+      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1024, 1024, 1, 1));
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0);

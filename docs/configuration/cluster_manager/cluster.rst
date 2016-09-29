@@ -21,6 +21,8 @@ Cluster
     "alt_stat_name": "..."
   }
 
+.. _config_cluster_manager_cluster_name:
+
 name
   *(required, string)* Supplies the name of the cluster which must be unique across all clusters.
   The cluster name is used when emitting :ref:`statistics <config_cluster_manager_cluster_stats>`.

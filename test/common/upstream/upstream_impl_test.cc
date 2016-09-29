@@ -139,6 +139,34 @@ TEST(StrictDnsClusterImplTest, Basic) {
   }
 }
 
+TEST(StrictDnsClusterImplTest, RuntimeResourceManager) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Network::MockDnsResolver> dns_resolver;
+  NiceMock<Runtime::MockLoader> runtime;
+
+  // gmock matches in LIFO order which is why these are swapped.
+  ResolverData resolver2(dns_resolver);
+  ResolverData resolver1(dns_resolver);
+
+  std::string json = R"EOF(
+  {
+    "name": "runtime_test_cluster",
+    "connect_timeout_ms": 250,
+    "type": "strict_dns",
+    "lb_type": "round_robin",
+    "hosts": [{"url": "tcp://localhost:11001"},
+              {"url": "tcp://localhost2:11002"}]
+  }
+  )EOF";
+
+  Json::StringLoader loader(json);
+  StrictDnsClusterImpl cluster(loader, runtime, stats, ssl_context_manager, dns_resolver);
+  EXPECT_CALL(runtime.snapshot_,
+              getInteger("circuit_breakers.runtime_test_cluster.default.max_retries", 3U));
+  EXPECT_EQ(3U, cluster.resourceManager(ResourcePriority::Default).retries().max());
+}
+
 TEST(HostImplTest, HostCluster) {
   MockCluster cluster;
   HostImpl host(cluster, "tcp://10.0.0.1:1234", false, 1, "");
