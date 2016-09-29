@@ -163,6 +163,16 @@ TEST(StrictDnsClusterImplTest, RuntimeResourceManager) {
   Json::StringLoader loader(json);
   StrictDnsClusterImpl cluster(loader, runtime, stats, ssl_context_manager, dns_resolver);
   EXPECT_CALL(runtime.snapshot_,
+              getInteger("circuit_breakers.runtime_test_cluster.default.max_connections", 1024U));
+  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_CALL(
+      runtime.snapshot_,
+      getInteger("circuit_breakers.runtime_test_cluster.default.max_pending_requests", 1024U));
+  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).pendingRequests().max());
+  EXPECT_CALL(runtime.snapshot_,
+              getInteger("circuit_breakers.runtime_test_cluster.default.max_requests", 1024U));
+  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_CALL(runtime.snapshot_,
               getInteger("circuit_breakers.runtime_test_cluster.default.max_retries", 3U));
   EXPECT_EQ(3U, cluster.resourceManager(ResourcePriority::Default).retries().max());
 }
