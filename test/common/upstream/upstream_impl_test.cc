@@ -259,30 +259,4 @@ TEST(StaticClusterImplTest, UnsupportedFeature) {
   EXPECT_THROW(StaticClusterImpl(config, runtime, stats, ssl_context_manager), EnvoyException);
 }
 
-TEST(ResourceManagerImplTest, RuntimeResourceManager) {
-  NiceMock<Runtime::MockLoader> runtime;
-  ResourceManagerImpl resource_manager(
-      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 0);
-
-  EXPECT_CALL(
-      runtime.snapshot_,
-      getInteger("circuit_breakers.runtime_resource_manager_test.default.max_connections", 0U));
-  EXPECT_EQ(0U, resource_manager.connections().max());
-
-  EXPECT_CALL(
-      runtime.snapshot_,
-      getInteger("circuit_breakers.runtime_resource_manager_test.default.max_pending_requests",
-                 0U));
-  EXPECT_EQ(0U, resource_manager.pendingRequests().max());
-
-  EXPECT_CALL(
-      runtime.snapshot_,
-      getInteger("circuit_breakers.runtime_resource_manager_test.default.max_requests", 0U));
-  EXPECT_EQ(0U, resource_manager.requests().max());
-
-  EXPECT_CALL(runtime.snapshot_,
-              getInteger("circuit_breakers.runtime_resource_manager_test.default.max_retries", 0U));
-  EXPECT_EQ(0U, resource_manager.retries().max());
-}
-
 } // Upstream
