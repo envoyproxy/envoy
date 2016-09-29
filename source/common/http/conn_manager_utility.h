@@ -19,8 +19,6 @@ public:
   static void mutateResponseHeaders(Http::HeaderMap& response_headers,
                                     const Http::HeaderMap& request_headers,
                                     ConnectionManagerConfig& config);
-
-  static std::string getLastAddressFromXFF(const Http::HeaderMap& request_headers);
 };
 
 } // Http

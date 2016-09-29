@@ -341,22 +341,4 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   EXPECT_EQ("request-id", response_headers.get("x-request-id"));
 }
 
-TEST_F(ConnectionManagerUtilityTest, TwoAddressesInXFF) {
-  const std::string first_address = "34.0.0.1";
-  const std::string second_address = "10.0.0.1";
-  HeaderMapImpl request_headers{
-      {"x-forwarded-for", fmt::format("{0},{1}", first_address, second_address)}};
-  EXPECT_EQ(second_address, ConnectionManagerUtility::getLastAddressFromXFF(request_headers));
-}
-
-TEST_F(ConnectionManagerUtilityTest, EmptyXFF) {
-  HeaderMapImpl request_headers;
-  EXPECT_EQ("", ConnectionManagerUtility::getLastAddressFromXFF(request_headers));
-}
-
-TEST_F(ConnectionManagerUtilityTest, OneAddressInXFF) {
-  const std::string first_address = "34.0.0.1";
-  HeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
-  EXPECT_EQ(first_address, ConnectionManagerUtility::getLastAddressFromXFF(request_headers));
-}
 } // Http

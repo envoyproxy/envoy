@@ -1,6 +1,5 @@
 #include "conn_manager_utility.h"
 
-#include "common/common/empty_string.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -127,17 +126,6 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
     response_headers.replaceViaCopy(Headers::get().RequestId,
                                     request_headers.get(Headers::get().RequestId));
   }
-}
-
-std::string
-ConnectionManagerUtility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
-  std::vector<std::string> xff_address_list =
-      StringUtil::split(request_headers.get(Headers::get().ForwardedFor), ',');
-
-  if (xff_address_list.empty()) {
-    return EMPTY_STRING;
-  }
-  return xff_address_list.back();
 }
 
 } // Http
