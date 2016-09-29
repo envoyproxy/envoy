@@ -203,7 +203,7 @@ TEST_F(SdsTest, HealthChecker) {
 
   // Now run through and make all the hosts healthy except for the first one.
   for (size_t i = 1; i < cluster_->hosts().size(); i++) {
-    cluster_->hosts()[i]->healthy(true);
+    cluster_->hosts()[i]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     health_checker->runCallbacks(cluster_->hosts()[i], true);
   }
 
@@ -213,7 +213,7 @@ TEST_F(SdsTest, HealthChecker) {
 
   // Do the last one now which should fire the initialized event.
   EXPECT_CALL(membership_updated_, ready());
-  cluster_->hosts()[0]->healthy(true);
+  cluster_->hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster_->hosts()[0], true);
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
   EXPECT_EQ(4UL, cluster_->localZoneHosts().size());
@@ -237,7 +237,7 @@ TEST_F(SdsTest, HealthChecker) {
 
   // Now set one of the removed hosts to unhealthy, and return the same query again, this should
   // remove it.
-  findHost("10.0.5.0")->healthy(false);
+  findHost("10.0.5.0")->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   setupRequest();
   timer_->callback_();
   EXPECT_CALL(*timer_, enableTimer(_));

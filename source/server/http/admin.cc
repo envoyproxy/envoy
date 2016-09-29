@@ -22,6 +22,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
+#include "common/upstream/host_utility.h"
 
 namespace Server {
 
@@ -117,8 +118,8 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
                                  stat.first, stat.second));
       }
 
-      response.add(fmt::format("{}::{}::healthy::{}\n", cluster.second->name(), host->url(),
-                               host->healthy()));
+      response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second->name(), host->url(),
+                               Upstream::HostUtility::healthFlagsToString(*host)));
       response.add(
           fmt::format("{}::{}::weight::{}\n", cluster.second->name(), host->url(), host->weight()));
       response.add(

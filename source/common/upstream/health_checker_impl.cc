@@ -15,6 +15,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/json/json_loader.h"
+#include "common/upstream/host_utility.h"
 
 namespace Upstream {
 
@@ -101,13 +102,13 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
       interval_timer_(parent.dispatcher_.createTimer([this]() -> void { onInterval(); })),
       timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeout(); })) {
 
-  if (host->healthy()) {
+  if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent.incHealthy();
   }
 }
 
 HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
-  if (host_->healthy()) {
+  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent_.decHealthy();
   }
 }
@@ -117,12 +118,12 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
   num_unhealthy_ = 0;
 
   bool changed_state = false;
-  if (!host_->healthy()) {
+  if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     // If this is the first time we ever got a check result on this host, we immediately move
     // it to healthy. This makes startup faster with a small reduction in overall reliability
     // depending on the HC settings.
     if (first_check_ || ++num_healthy_ == parent_.healthy_threshold_) {
-      host_->healthy(true);
+      host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
       changed_state = true;
     }
@@ -138,9 +139,9 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(bool timeout
   num_healthy_ = 0;
 
   bool changed_state = false;
-  if (host_->healthy()) {
+  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     if (!timeout || ++num_unhealthy_ == parent_.unhealthy_threshold_) {
-      host_->healthy(false);
+      host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.decHealthy();
       changed_state = true;
     }
@@ -249,7 +250,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
   }
 
   timeout_timer_->disableTimer();
-  conn_log_debug("connection/stream error host_healthy={}", *client_, host_->healthy());
+  conn_log_debug("connection/stream error health_flags={}", *client_,
+                 HostUtility::healthFlagsToString(*host_));
   handleFailure(true);
   interval_timer_->enableTimer(parent_.interval());
 }
@@ -261,7 +263,8 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::isHealthCheckSucceeded
   // the host is healthy, we need to see if we have reached the unhealthy count. If a host returns
   // a response code other than 200 we ignore the number of unhealthy and immediately set it to
   // unhealthy.
-  conn_log_debug("hc response={} host_healthy={}", *client_, response_code, host_->healthy());
+  conn_log_debug("hc response={} health_flags={}", *client_, response_code,
+                 HostUtility::healthFlagsToString(*host_));
 
   if (response_code != enumToInt(Http::Code::OK)) {
     return false;
@@ -298,7 +301,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
-  conn_log_debug("connection/stream timeout host_healthy={}", *client_, host_->healthy());
+  conn_log_debug("connection/stream timeout health_flags={}", *client_,
+                 HostUtility::healthFlagsToString(*host_));
   handleFailure(true);
 
   // If there is an active request it will get reset, so make sure we ignore the reset.
