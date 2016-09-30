@@ -211,6 +211,7 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
+  std::vector<Json::Object> config_headers_;
 };
 
 /**

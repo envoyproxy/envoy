@@ -65,6 +65,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Obj
   if (!(isRedirect() ^ !cluster_name_.empty())) {
     throw EnvoyException("routes must be either redirects or cluster targets");
   }
+
+  if (route.hasObject("headers")) {
+    config_headers_ = route.getObjectArray("headers");
+  }
 }
 
 bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -77,6 +81,15 @@ bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random
 
   if (!content_type_.empty()) {
     matches &= (headers.get(Http::Headers::get().ContentType) == content_type_);
+  }
+
+  if (!config_headers_.empty()) {
+    for (const Json::Object& header_map : config_headers_) {
+      matches &= headers.get(Http::LowerCaseString(header_map.getString("header_name"))) == header_map.getString("header_value");
+      if (!matches) {
+        break;
+      }
+    }
   }
 
   return matches;
