@@ -1,9 +1,8 @@
 #pragma once
 
 #include "envoy/http/header_map.h"
+#include "envoy/http/message.h"
 #include "envoy/stats/stats.h"
-
-#include "common/http/message_impl.h"
 
 #include "google/protobuf/message.h"
 

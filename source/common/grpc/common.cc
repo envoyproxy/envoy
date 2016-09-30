@@ -1,6 +1,8 @@
 #include "common.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/http/headers.h"
+#include "common/http/message_impl.h"
 
 namespace Grpc {
 

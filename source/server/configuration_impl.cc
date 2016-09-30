@@ -88,9 +88,10 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
               server_.options().serviceClusterName();
           opts.guid_generator = [&rand]() { return rand.random(); };
 
-          http_tracer_->addSink(Tracing::HttpSinkPtr{new Tracing::LightStepSink(
-              sink.getObject("config"), *cluster_manager_, "", server_.stats(),
-              server_.options().serviceNodeName(), server_.threadLocal(), opts)});
+          http_tracer_->addSink(Tracing::HttpSinkPtr{
+              new Tracing::LightStepSink(sink.getObject("config"), *cluster_manager_, "",
+                                         server_.stats(), server_.options().serviceNodeName(),
+                                         server_.threadLocal(), server_.runtime(), opts)});
         } else {
           throw EnvoyException(fmt::format("Unsupported sink type: '{}'", type));
         }

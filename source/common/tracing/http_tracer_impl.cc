@@ -73,8 +73,6 @@ void HttpTracerImpl::addSink(HttpSinkPtr&& sink) { sinks_.push_back(std::move(si
 void HttpTracerImpl::trace(const Http::HeaderMap* request_headers,
                            const Http::HeaderMap* response_headers,
                            const Http::AccessLog::RequestInfo& request_info) {
-  std::cout << "entering tracing" << std::endl;
-
   static const Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;
@@ -89,7 +87,6 @@ void HttpTracerImpl::trace(const Http::HeaderMap* request_headers,
   populateStats(decision);
 
   if (decision.is_tracing) {
-    std::cout << "tracing will be executed" << std::endl;
     stats_.doing_tracing_.inc();
 
     for (HttpSinkPtr& sink : sinks_) {
@@ -124,8 +121,8 @@ LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightS
 void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   builder_.addSpan(std::move(span));
 
-  const int min_span_number_to_send = 5;
-  if (builder_.pendingSpans() == min_span_number_to_send) {
+  uint64_t min_flush_spans = sink_->runtime().snapshot().getInteger("tracing.min_flush_spans", 5U);
+  if (builder_.pendingSpans() == min_flush_spans) {
     lightstep::collector::ReportRequest request;
     std::swap(request, builder_.pending());
 
@@ -154,10 +151,11 @@ LightStepRecorder::NewInstance(LightStepSink* sink, const lightstep::TracerImpl&
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                              const std::string& stat_prefix, Stats::Store& stats,
                              const std::string& service_node, ThreadLocal::Instance& tls,
-                             const lightstep::TracerOptions& options)
+                             Runtime::Loader& runtime, const lightstep::TracerOptions& options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
       stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix + "tracing.lightstep."))},
-      service_node_(service_node), tls_(tls), options_(options), tls_slot_(tls.allocateSlot()) {
+      service_node_(service_node), tls_(tls), runtime_(runtime), options_(options),
+      tls_slot_(tls.allocateSlot()) {
   if (!cm_.get(collector_cluster_)) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
                                      collector_cluster_));
@@ -195,8 +193,7 @@ std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo&
   return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
 }
 
-void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
-                               const Http::HeaderMap& /*response_headers*/,
+void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
                                const Http::AccessLog::RequestInfo& request_info) {
   lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
       "full request",
@@ -226,19 +223,6 @@ void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
   sink_->stats().collector_failed_.inc();
 }
 
-void LightStepRecorder::onSuccess(Http::MessagePtr&& messagePtr) {
-  Buffer::Instance* buffered = messagePtr->body();
-
-  std::string body;
-  uint64_t num_slices = buffered->getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  buffered->getRawSlices(slices, num_slices);
-  for (Buffer::RawSlice& slice : slices) {
-    body.append(static_cast<const char*>(slice.mem_), slice.len_);
-  }
-
-  std::cout << "body: " << body << std::endl;
-  sink_->stats().collector_success_.inc();
-}
+void LightStepRecorder::onSuccess(Http::MessagePtr&&) { sink_->stats().collector_success_.inc(); }
 
 } // Tracing

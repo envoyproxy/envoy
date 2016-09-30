@@ -1,6 +1,8 @@
 #include "common/grpc/common.h"
+#include "common/http/headers.h"
 #include "common/stats/stats_impl.h"
 
+#include "test/generated/helloworld.pb.h"
 #include "test/mocks/stats/mocks.h"
 
 namespace Grpc {
@@ -19,8 +21,14 @@ TEST(CommonTest, chargeStats) {
   EXPECT_EQ(2U, stats.counter("cluster.cluster.grpc.service.method.total").value());
 }
 
-TEST(CommonTest, serializeBody) {}
+TEST(CommonTest, prepareHeaders) {
+  Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name");
 
-TEST(CommonTest, prepareHeaders) {}
+  EXPECT_EQ("http", message->headers().get(Http::Headers::get().Scheme));
+  EXPECT_EQ("POST", message->headers().get(Http::Headers::get().Method));
+  EXPECT_EQ("/service_name/method_name", message->headers().get(Http::Headers::get().Path));
+  EXPECT_EQ("cluster", message->headers().get(Http::Headers::get().Host));
+  EXPECT_EQ("application/grpc", message->headers().get(Http::Headers::get().ContentType));
+}
 
 } // Grpc
