@@ -27,7 +27,8 @@ public:
    */
   virtual void populateDescriptors(const Router::RouteEntry& route,
                                    std::vector<::RateLimit::Descriptor>& descriptors,
-                                   FilterConfig& config, const HeaderMap& headers) PURE;
+                                   FilterConfig& config, const HeaderMap& headers,
+                                   StreamDecoderFilterCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<Action> ActionPtr;
@@ -40,7 +41,7 @@ public:
   // Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors, FilterConfig& config,
-                           const HeaderMap&) override;
+                           const HeaderMap&, StreamDecoderFilterCallbacks&) override;
 };
 
 /**
@@ -54,12 +55,24 @@ public:
   // Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors, FilterConfig& config,
-                           const HeaderMap& headers) override;
+                           const HeaderMap& headers, StreamDecoderFilterCallbacks&) override;
 
 private:
   const LowerCaseString header_name_;
   const std::string descriptor_key_;
 };
+
+/**
+ * Action for remote address rate limiting.
+ */
+class RemoteAddressAction : public Action {
+public:
+  // Action
+  void populateDescriptors(const Router::RouteEntry& route,
+                           std::vector<::RateLimit::Descriptor>& descriptors, FilterConfig&,
+                           const HeaderMap&, StreamDecoderFilterCallbacks& callbacks) override;
+};
+
 /**
  * Global configuration for the HTTP rate limit filter.
  */

@@ -212,6 +212,7 @@ public:
   MOCK_METHOD0(routeTable, Router::StableRouteTable&());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
+  MOCK_METHOD0(downstreamAddress, const std::string&());
 
   // Http::StreamDecoderFilterCallbacks
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
@@ -240,6 +241,7 @@ public:
   MOCK_METHOD0(routeTable, Router::StableRouteTable&());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
+  MOCK_METHOD0(downstreamAddress, const std::string&());
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD0(continueEncoding, void());

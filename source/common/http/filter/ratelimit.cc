@@ -16,7 +16,8 @@ const Http::HeaderMapImpl Filter::TOO_MANY_REQUESTS_HEADER{
 
 void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route,
                                                  std::vector<::RateLimit::Descriptor>& descriptors,
-                                                 FilterConfig& config, const HeaderMap&) {
+                                                 FilterConfig& config, const HeaderMap&,
+                                                 StreamDecoderFilterCallbacks&) {
   // We limit on 2 dimensions.
   // 1) All calls to the given cluster.
   // 2) Calls to the given cluster and from this cluster.
@@ -28,8 +29,9 @@ void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route
 
 void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
                                                std::vector<::RateLimit::Descriptor>& descriptors,
-                                               FilterConfig&, const HeaderMap& headers) {
-  std::string header_value = headers.get(header_name_);
+                                               FilterConfig&, const HeaderMap& headers,
+                                               StreamDecoderFilterCallbacks&) {
+  const std::string& header_value = headers.get(header_name_);
   if (header_value.empty()) {
     return;
   }
@@ -44,6 +46,25 @@ void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
   descriptors.push_back({{{"route_key", route_key}, {descriptor_key_, header_value}}});
 }
 
+void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
+                                              std::vector<::RateLimit::Descriptor>& descriptors,
+                                              FilterConfig&, const HeaderMap&,
+                                              StreamDecoderFilterCallbacks& callbacks) {
+  const std::string& remote_address = callbacks.downstreamAddress();
+  if (remote_address.empty()) {
+    return;
+  }
+
+  descriptors.push_back({{{"remote_address", remote_address}}});
+
+  const std::string& route_key = route.rateLimitPolicy().routeKey();
+  if (route_key.empty()) {
+    return;
+  }
+
+  descriptors.push_back({{{"route_key", route_key}, {"remote_address", remote_address}}});
+}
+
 FilterConfig::FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
                            Stats::Store& stats_store, Runtime::Loader& runtime)
     : domain_(config.getString("domain")), local_service_cluster_(local_service_cluster),
@@ -54,6 +75,8 @@ FilterConfig::FilterConfig(const Json::Object& config, const std::string& local_
       actions_.emplace_back(new ServiceToServiceAction());
     } else if (type == "request_headers") {
       actions_.emplace_back(new RequestHeadersAction(action));
+    } else if (type == "remote_address") {
+      actions_.emplace_back(new RemoteAddressAction());
     } else {
       throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
     }
@@ -69,7 +92,7 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   if (route && route->rateLimitPolicy().doGlobalLimiting()) {
     std::vector<::RateLimit::Descriptor> descriptors;
     for (const ActionPtr& action : config_->actions()) {
-      action->populateDescriptors(*route, descriptors, *config_, headers);
+      action->populateDescriptors(*route, descriptors, *config_, headers, *callbacks_);
     }
 
     if (!descriptors.empty()) {

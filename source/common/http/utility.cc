@@ -4,6 +4,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
@@ -126,6 +127,16 @@ void Utility::sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::s
                         {Headers::get().Location, new_path}}};
 
   callbacks.encodeHeaders(std::move(response_headers), true);
+}
+
+std::string Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers) {
+  std::vector<std::string> xff_address_list =
+      StringUtil::split(request_headers.get(Headers::get().ForwardedFor), ',');
+
+  if (xff_address_list.empty()) {
+    return EMPTY_STRING;
+  }
+  return xff_address_list.back();
 }
 
 } // Http
