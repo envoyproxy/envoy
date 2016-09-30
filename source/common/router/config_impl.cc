@@ -89,11 +89,12 @@ bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random
   }
 
   if (!config_headers_.empty()) {
-    std::cout << "Investigating config headers" << std::endl;
     for (const HeaderData& header_data : config_headers_) {
-      std::cout << header_data.header_name_.get() << std::endl;
-      std::cout << header_data.header_value_ << std::endl;
-      matches &= headers.get(header_data.header_name_) == header_data.header_value_;
+      if (header_data.header_value_ == EMPTY_STRING) {
+        matches &= headers.has(header_data.header_name_);
+      } else {
+        matches &= headers.get(header_data.header_name_) == header_data.header_value_;
+      }
       if (!matches) {
         break;
       }
