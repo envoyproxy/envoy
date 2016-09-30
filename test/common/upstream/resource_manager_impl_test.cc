@@ -10,7 +10,7 @@ namespace Upstream {
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
   ResourceManagerImpl resource_manager(
-      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 0);
+      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1);
 
   EXPECT_CALL(
       runtime.snapshot_,
@@ -36,11 +36,11 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   EXPECT_TRUE(resource_manager.requests().canCreate());
 
   EXPECT_CALL(runtime.snapshot_,
-              getInteger("circuit_breakers.runtime_resource_manager_test.default.max_retries", 0U))
+              getInteger("circuit_breakers.runtime_resource_manager_test.default.max_retries", 1U))
       .Times(2)
-      .WillRepeatedly(Return(4U));
-  EXPECT_EQ(4U, resource_manager.retries().max());
-  EXPECT_TRUE(resource_manager.retries().canCreate());
+      .WillRepeatedly(Return(0U));
+  EXPECT_EQ(0U, resource_manager.retries().max());
+  EXPECT_FALSE(resource_manager.retries().canCreate());
 }
 
 } // Upstream
