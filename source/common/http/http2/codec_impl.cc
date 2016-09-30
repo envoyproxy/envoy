@@ -194,14 +194,25 @@ void ConnectionImpl::StreamImpl::encodeData(const Buffer::Instance& data, bool e
 void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // Higher layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(reason);
+
+  // If we submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
+  // We want these frames to go out so we defer the reset until we send all of the frames that
+  // end the local stream.
+  if (local_end_stream_ && !local_end_stream_sent_) {
+    deferred_reset_.value(reason);
+  } else {
+    resetStreamWorker(reason);
+    parent_.sendPendingFrames();
+  }
+}
+
+void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   int rc = nghttp2_submit_rst_stream(parent_.session_, NGHTTP2_FLAG_NONE, stream_id_,
                                      reason == StreamResetReason::LocalRefusedStreamReset
                                          ? NGHTTP2_REFUSED_STREAM
                                          : NGHTTP2_NO_ERROR);
   ASSERT(rc == 0);
   UNREFERENCED_PARAMETER(rc);
-
-  parent_.sendPendingFrames();
 }
 
 void ConnectionImpl::StreamImpl::runResetCallbacks(StreamResetReason reason) {
@@ -295,7 +306,12 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     } else {
       ASSERT(frame->headers.cat == NGHTTP2_HCAT_HEADERS);
       ASSERT(stream->remote_end_stream_);
-      stream->decoder_->decodeTrailers(std::move(stream->headers_));
+
+      // It's possible that we are waiting to send a deferred reset, so only raise trailers if local
+      // is not complete.
+      if (!stream->deferred_reset_.valid()) {
+        stream->decoder_->decodeTrailers(std::move(stream->headers_));
+      }
     }
 
     stream->headers_.reset();
@@ -303,7 +319,13 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
   case NGHTTP2_DATA: {
     stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
-    stream->decoder_->decodeData(stream->pending_recv_data_, stream->remote_end_stream_);
+
+    // It's possible that we are waiting to send a deferred reset, so only raise data if local
+    // is not complete.
+    if (!stream->deferred_reset_.valid()) {
+      stream->decoder_->decodeData(stream->pending_recv_data_, stream->remote_end_stream_);
+    }
+
     stream->pending_recv_data_.drain(stream->pending_recv_data_.length());
     break;
   }
@@ -323,13 +345,29 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   // In all cases however it will attempt to send a GOAWAY frame with an error status. If we see
   // an outgoing frame of this type, we will return an error code so that we can abort execution.
   conn_log_trace("sent frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
-  if (frame->hd.type == NGHTTP2_GOAWAY && frame->goaway.error_code != NGHTTP2_NO_ERROR) {
-    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  switch (frame->hd.type) {
+  case NGHTTP2_GOAWAY: {
+    if (frame->goaway.error_code != NGHTTP2_NO_ERROR) {
+      return NGHTTP2_ERR_CALLBACK_FAILURE;
+    }
+    break;
   }
 
-  if (frame->hd.type == NGHTTP2_RST_STREAM) {
+  case NGHTTP2_RST_STREAM: {
     conn_log_debug("sent reset code={}", connection_, frame->rst_stream.error_code);
     stats_.tx_reset_.inc();
+    break;
+  }
+
+  case NGHTTP2_HEADERS:
+  case NGHTTP2_DATA: {
+    StreamImpl* stream = getStream(frame->hd.stream_id);
+    stream->local_end_stream_sent_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
+    if (stream->local_end_stream_sent_ && stream->deferred_reset_.valid()) {
+      stream->resetStreamWorker(stream->deferred_reset_.value());
+    }
+    break;
+  }
   }
 
   return 0;

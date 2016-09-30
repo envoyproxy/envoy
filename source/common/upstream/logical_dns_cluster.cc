@@ -4,11 +4,11 @@
 
 namespace Upstream {
 
-LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Stats::Store& stats,
-                                     Ssl::ContextManager& ssl_context_manager,
+LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime,
+                                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                                      Network::DnsResolver& dns_resolver, ThreadLocal::Instance& tls)
-    : ClusterImplBase(config, stats, ssl_context_manager), dns_resolver_(dns_resolver), tls_(tls),
-      tls_slot_(tls.allocateSlot()),
+    : ClusterImplBase(config, runtime, stats, ssl_context_manager), dns_resolver_(dns_resolver),
+      tls_(tls), tls_slot_(tls.allocateSlot()),
       resolve_timer_(dns_resolver.dispatcher().createTimer([this]() -> void { startResolve(); })) {
 
   std::vector<Json::Object> hosts_json = config.getObjectArray("hosts");

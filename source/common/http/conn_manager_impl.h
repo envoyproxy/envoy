@@ -221,6 +221,7 @@ private:
     const Router::StableRouteTable& routeTable() override { return *this; }
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
+    const std::string& downstreamAddress() override;
 
     // Router::StableRouteTable
     const Router::RedirectEntry* redirectRequest(const HeaderMap& headers) const {
@@ -366,6 +367,7 @@ private:
     std::list<std::function<void()>> reset_callbacks_;
     State state_;
     AccessLog::RequestInfoImpl request_info_;
+    std::string downstream_address_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

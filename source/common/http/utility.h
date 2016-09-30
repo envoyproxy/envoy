@@ -73,6 +73,13 @@ public:
    * @param new_path supplies the redirect target.
    */
   static void sendRedirect(StreamDecoderFilterCallbacks& callbacks, const std::string& new_path);
+
+  /**
+   * Retrieves the last address in x-forwarded-for header. If it isn't set, returns empty string.
+   * @param request_headers
+   * @return last_address_in_xff
+   */
+  static std::string getLastAddressFromXFF(const Http::HeaderMap& request_headers);
 };
 
 } // Http

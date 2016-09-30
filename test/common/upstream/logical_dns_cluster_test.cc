@@ -2,6 +2,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
@@ -16,8 +17,8 @@ public:
   void setup(const std::string& json) {
     Json::StringLoader config(json);
     resolve_timer_ = new Event::MockTimer(&dns_resolver_.dispatcher_);
-    cluster_.reset(
-        new LogicalDnsCluster(config, stats_store_, ssl_context_manager_, dns_resolver_, tls_));
+    cluster_.reset(new LogicalDnsCluster(config, runtime_, stats_store_, ssl_context_manager_,
+                                         dns_resolver_, tls_));
     cluster_->addMemberUpdateCb([&](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
                                     -> void { membership_updated_.ready(); });
     cluster_->setInitializedCb([&]() -> void { initialized_.ready(); });
@@ -38,6 +39,7 @@ public:
   std::unique_ptr<LogicalDnsCluster> cluster_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 TEST_F(LogicalDnsClusterTest, BadConfig) {

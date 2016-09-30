@@ -15,12 +15,12 @@
 
 namespace Upstream {
 
-SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Stats::Store& stats,
-                               Ssl::ContextManager& ssl_context_manager,
+SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
+                               Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                                const SdsConfig& sds_config, ClusterManager& cm,
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random)
-    : BaseDynamicClusterImpl(config, stats, ssl_context_manager), cm_(cm), sds_config_(sds_config),
-      service_name_(config.getString("service_name")), random_(random),
+    : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager), cm_(cm),
+      sds_config_(sds_config), service_name_(config.getString("service_name")), random_(random),
       refresh_timer_(dispatcher.createTimer([this]() -> void { refreshHosts(); })) {}
 
 SdsClusterImpl::~SdsClusterImpl() {}

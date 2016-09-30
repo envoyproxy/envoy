@@ -87,4 +87,23 @@ TEST(HttpUtility, parseCodecOptions) {
   }
 }
 
+TEST(HttpUtility, TwoAddressesInXFF) {
+  const std::string first_address = "34.0.0.1";
+  const std::string second_address = "10.0.0.1";
+  HeaderMapImpl request_headers{
+      {"x-forwarded-for", fmt::format("{0},{1}", first_address, second_address)}};
+  EXPECT_EQ(second_address, Utility::getLastAddressFromXFF(request_headers));
+}
+
+TEST(HttpUtility, EmptyXFF) {
+  HeaderMapImpl request_headers;
+  EXPECT_EQ("", Utility::getLastAddressFromXFF(request_headers));
+}
+
+TEST(HttpUtility, OneAddressInXFF) {
+  const std::string first_address = "34.0.0.1";
+  HeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
+  EXPECT_EQ(first_address, Utility::getLastAddressFromXFF(request_headers));
+}
+
 } // Http

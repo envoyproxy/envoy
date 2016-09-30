@@ -23,7 +23,7 @@ namespace Upstream {
  */
 class LogicalDnsCluster : public ClusterImplBase {
 public:
-  LogicalDnsCluster(const Json::Object& config, Stats::Store& stats,
+  LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                     Ssl::ContextManager& ssl_context_manager, Network::DnsResolver& dns_resolver,
                     ThreadLocal::Instance& tls);
 
