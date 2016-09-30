@@ -69,17 +69,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Obj
   if (route.hasObject("headers")) {
     std::vector<Json::Object> config_headers = route.getObjectArray("headers");
     for (const Json::Object& header_map : config_headers) {
-      HeaderData header_data;
-
-      if (!header_map.hasObject("header_name")) {
-        throw EnvoyException("headers in the route config must have a header name");
-      } else {
-        header_data.header_name_ = header_map.getString("header_name");
-      }
-
       // allow header value to be empty, allows matching to be only based on header presence.
-      header_data.header_value_ = header_map.getString("header_value");
-
+      HeaderData header_data(header_map.getString("header_name"),
+                             header_map.getString("header_value", ""));
       config_headers_.push_back(header_data);
     }
   }
@@ -98,8 +90,8 @@ bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random
   }
 
   if (!config_headers_.empty()) {
-    for (const HeaderData header_data : config_headers_) {
-      matches &= headers.get(Http::LowerCaseString(header_data.header_name_)) == header_data.header_value_;
+    for (const HeaderData& header_data : config_headers_) {
+      matches &= headers.get(header_data.header_name_) == header_data.header_value_;
       if (!matches) {
         break;
       }
@@ -168,6 +160,10 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   return fmt::format("{}://{}{}", headers.get(Http::Headers::get().ForwardedProto), *final_host,
                      *final_path);
 }
+
+RouteEntryImplBase::HeaderData::HeaderData(const std::string& header_name,
+                                           const std::string& header_value)
+    : header_name_(header_name), header_value_(header_value) {}
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHost& vhost, const Json::Object& route,
                                            Runtime::Loader& loader)
