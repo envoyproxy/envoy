@@ -194,6 +194,11 @@ private:
     uint64_t default_;
   };
 
+  struct HeaderData {
+    std::string header_name_;
+    std::string header_value_;
+  };
+
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
 
   // Default timeout is 15s if nothing is specified in the route config.
@@ -211,7 +216,7 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
-  std::vector<Json::Object> config_headers_;
+  std::vector<HeaderData> config_headers_;
 };
 
 /**
