@@ -84,7 +84,7 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& ru
 ConstHostVectorPtr ClusterImplBase::createHealthyHostList(const std::vector<HostPtr>& hosts) {
   HostVectorPtr healthy_list(new std::vector<HostPtr>());
   for (auto host : hosts) {
-    if (host->healthy()) {
+    if (!host->healthFailures()) {
       healthy_list->emplace_back(host);
     }
   }
@@ -219,14 +219,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
       hosts_added.push_back(host);
 
       // If we are depending on a health checker, we initialize to unhealthy.
-      hosts_added.back()->healthy(!depend_on_hc);
+      if (depend_on_hc) {
+        hosts_added.back()->healthFailureSet(Host::HealthFailures::ACTIVE_HC);
+      }
     }
   }
 
   // If there are removed hosts, check to see if we should only delete if unhealthy.
   if (!current_hosts.empty() && depend_on_hc) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
-      if ((*i)->healthy()) {
+      if (!((*i)->healthFailures() & Host::HealthFailures::ACTIVE_HC)) {
         if ((*i)->weight() > max_host_weight) {
           max_host_weight = (*i)->weight();
         }

@@ -68,8 +68,9 @@ public:
   std::list<std::reference_wrapper<Stats::Gauge>> gauges() const override {
     return stats_store_.gauges();
   }
-  bool healthy() const override { return healthy_; }
-  void healthy(bool is_healthy) override { healthy_ = is_healthy; }
+  uint64_t healthFailures() const override { return health_failures_; }
+  void healthFailureClear(uint64_t failure) override { health_failures_ &= ~failure; }
+  void healthFailureSet(uint64_t failure) override { health_failures_ |= failure; }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight);
 
@@ -78,7 +79,7 @@ protected:
   createConnection(Event::Dispatcher& dispatcher, const Cluster& cluster, const std::string& url);
 
 private:
-  std::atomic<bool> healthy_{true};
+  std::atomic<uint64_t> health_failures_{};
   std::atomic<uint32_t> weight_;
 };
 
