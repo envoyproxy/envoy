@@ -2,7 +2,6 @@
 
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
-#include "envoy/http/async_client.h"
 #include "envoy/http/header_map.h"
 
 #include "google/protobuf/service.h"
