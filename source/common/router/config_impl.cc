@@ -70,7 +70,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Obj
     std::vector<Json::Object> config_headers = route.getObjectArray("headers");
     for (const Json::Object& header_map : config_headers) {
       // allow header value to be empty, allows matching to be only based on header presence.
-      config_headers_.push_back({Http::LowerCaseString(header_map.getString("header_name")),
+      config_headers_.push_back({Http::LowerCaseString(header_map.getString("header_name"), true),
                                  header_map.getString("header_value", "")});
     }
   }
@@ -89,7 +89,10 @@ bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random
   }
 
   if (!config_headers_.empty()) {
+    std::cout << "Investigating config headers" << std::endl;
     for (const HeaderData& header_data : config_headers_) {
+      std::cout << header_data.header_name_.get() << std::endl;
+      std::cout << header_data.header_value_ << std::endl;
       matches &= headers.get(header_data.header_name_) == header_data.header_value_;
       if (!matches) {
         break;

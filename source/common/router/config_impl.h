@@ -195,7 +195,8 @@ private:
   };
 
   struct HeaderData {
-    const Http::LowerCaseString& header_name_;
+    //HeaderData(const std::string& header_name, const std::string& header_value): header_name_(header_name), header_value_(header_value) {};
+    const Http::LowerCaseString header_name_;
     const std::string header_value_;
   };
 
