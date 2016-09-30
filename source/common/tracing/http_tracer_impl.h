@@ -102,7 +102,7 @@ public:
   LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                 const std::string& stat_prefix, Stats::Store& stats,
                 const std::string& service_node, ThreadLocal::Instance& tls,
-                Runtime::Loader& runtime, const lightstep::TracerOptions& options);
+                Runtime::Loader& runtime, std::unique_ptr<lightstep::TracerOptions> options);
 
   // Tracer::HttpSink
   void flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
@@ -134,7 +134,7 @@ private:
   const std::string service_node_;
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;
-  lightstep::TracerOptions options_;
+  std::unique_ptr<lightstep::TracerOptions> options_;
   uint32_t tls_slot_;
 };
 

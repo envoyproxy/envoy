@@ -2,16 +2,12 @@
 
 #include "common/common/macros.h"
 #include "common/common/utility.h"
-#include "common/grpc/rpc_channel_impl.h"
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/runtime/uuid_util.h"
-
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/upstream/cluster_manager.h"
 
 namespace Tracing {
 
@@ -151,10 +147,11 @@ LightStepRecorder::NewInstance(LightStepSink* sink, const lightstep::TracerImpl&
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                              const std::string& stat_prefix, Stats::Store& stats,
                              const std::string& service_node, ThreadLocal::Instance& tls,
-                             Runtime::Loader& runtime, const lightstep::TracerOptions& options)
+                             Runtime::Loader& runtime,
+                             std::unique_ptr<lightstep::TracerOptions> options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
       stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix + "tracing.lightstep."))},
-      service_node_(service_node), tls_(tls), runtime_(runtime), options_(options),
+      service_node_(service_node), tls_(tls), runtime_(runtime), options_(std::move(options)),
       tls_slot_(tls.allocateSlot()) {
   if (!cm_.get(collector_cluster_)) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
@@ -168,7 +165,7 @@ LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManage
 
   tls_.set(tls_slot_, [this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr {
     lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
-        options_, std::bind(&LightStepRecorder::NewInstance, this, std::placeholders::_1)));
+        *options_, std::bind(&LightStepRecorder::NewInstance, this, std::placeholders::_1)));
 
     return ThreadLocal::ThreadLocalObjectPtr{new TlsLightStepTracer(std::move(tracer), *this)};
   });

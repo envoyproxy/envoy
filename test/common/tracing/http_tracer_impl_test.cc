@@ -276,12 +276,13 @@ public:
       : stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(fake_stats_, "prefix.tracing.lightstep."))} {}
 
   void setup(Json::Object& config) {
-    opts_.access_token = "sample_token";
-    opts_.tracer_attributes["lightstep.guid"] = "random_guid";
-    opts_.tracer_attributes["lightstep.component_name"] = "component";
+    std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
+    opts->access_token = "sample_token";
+    opts->tracer_attributes["lightstep.guid"] = "random_guid";
+    opts->tracer_attributes["lightstep.component_name"] = "component";
 
     sink_.reset(new LightStepSink(config, cm_, "prefix.", fake_stats_, "service_node", tls_,
-                                  runtime_, opts_));
+                                  runtime_, std::move(opts)));
   }
 
   void setupValidSink() {
@@ -305,7 +306,6 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<LightStepSink> sink_;
-  lightstep::TracerOptions opts_;
   NiceMock<ThreadLocal::MockInstance> tls_;
 };
 
