@@ -7,30 +7,38 @@ using testing::Return;
 
 namespace Upstream {
 
-  TEST(ResourceManagerImplTest, RuntimeResourceManager) {
+TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 0);
 
-  EXPECT_CALL(runtime.snapshot_,
-  getInteger("circuit_breakers.runtime_resource_manager_test.default.max_connections",
-  0U)).Times(2).WillRepeatedly(Return(1U));
+  EXPECT_CALL(
+      runtime.snapshot_,
+      getInteger("circuit_breakers.runtime_resource_manager_test.default.max_connections", 0U))
+      .Times(2)
+      .WillRepeatedly(Return(1U));
   EXPECT_EQ(1U, resource_manager.connections().max());
   EXPECT_TRUE(resource_manager.connections().canCreate());
 
   EXPECT_CALL(
       runtime.snapshot_,
-  getInteger("circuit_breakers.runtime_resource_manager_test.default.max_pending_requests", 0U)).Times(2).WillRepeatedly(Return(2U));
+      getInteger("circuit_breakers.runtime_resource_manager_test.default.max_pending_requests", 0U))
+      .Times(2)
+      .WillRepeatedly(Return(2U));
   EXPECT_EQ(2U, resource_manager.pendingRequests().max());
   EXPECT_TRUE(resource_manager.pendingRequests().canCreate());
 
   EXPECT_CALL(runtime.snapshot_,
-  getInteger("circuit_breakers.runtime_resource_manager_test.default.max_requests", 0U)).Times(2).WillRepeatedly(Return(3U));
+              getInteger("circuit_breakers.runtime_resource_manager_test.default.max_requests", 0U))
+      .Times(2)
+      .WillRepeatedly(Return(3U));
   EXPECT_EQ(3U, resource_manager.requests().max());
   EXPECT_TRUE(resource_manager.requests().canCreate());
 
   EXPECT_CALL(runtime.snapshot_,
-  getInteger("circuit_breakers.runtime_resource_manager_test.default.max_retries", 0U)).Times(2).WillRepeatedly(Return(4U));
+              getInteger("circuit_breakers.runtime_resource_manager_test.default.max_retries", 0U))
+      .Times(2)
+      .WillRepeatedly(Return(4U));
   EXPECT_EQ(4U, resource_manager.retries().max());
   EXPECT_TRUE(resource_manager.retries().canCreate());
 }
