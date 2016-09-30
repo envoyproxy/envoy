@@ -73,6 +73,8 @@ void HttpTracerImpl::addSink(HttpSinkPtr&& sink) { sinks_.push_back(std::move(si
 void HttpTracerImpl::trace(const Http::HeaderMap* request_headers,
                            const Http::HeaderMap* response_headers,
                            const Http::AccessLog::RequestInfo& request_info) {
+  std::cout << "entering tracing" << std::endl;
+
   static const Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;
@@ -87,6 +89,7 @@ void HttpTracerImpl::trace(const Http::HeaderMap* request_headers,
   populateStats(decision);
 
   if (decision.is_tracing) {
+    std::cout << "tracing will be executed" << std::endl;
     stats_.doing_tracing_.inc();
 
     for (HttpSinkPtr& sink : sinks_) {
@@ -160,6 +163,11 @@ LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManage
                                      collector_cluster_));
   }
 
+  if (!(cm_.get(collector_cluster_)->features() & Upstream::Cluster::Features::HTTP2)) {
+    throw EnvoyException(
+        fmt::format("{} collector cluster must support http2 for gRPC calls", collector_cluster_));
+  }
+
   tls_.set(tls_slot_, [this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr {
     lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
         options_, std::bind(&LightStepRecorder::NewInstance, this, std::placeholders::_1)));
@@ -218,6 +226,19 @@ void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
   sink_->stats().collector_failed_.inc();
 }
 
-void LightStepRecorder::onSuccess(Http::MessagePtr&&) { sink_->stats().collector_success_.inc(); }
+void LightStepRecorder::onSuccess(Http::MessagePtr&& messagePtr) {
+  Buffer::Instance* buffered = messagePtr->body();
+
+  std::string body;
+  uint64_t num_slices = buffered->getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  buffered->getRawSlices(slices, num_slices);
+  for (Buffer::RawSlice& slice : slices) {
+    body.append(static_cast<const char*>(slice.mem_), slice.len_);
+  }
+
+  std::cout << "body: " << body << std::endl;
+  sink_->stats().collector_success_.inc();
+}
 
 } // Tracing

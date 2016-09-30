@@ -285,7 +285,8 @@ public:
   }
 
   void setupValidSink() {
-    EXPECT_CALL(cm_, get("lightstep_saas"));
+    EXPECT_CALL(cm_, get("lightstep_saas")).WillRepeatedly(Return(&cluster_));
+    ON_CALL(cluster_, features()).WillByDefault(Return(Upstream::Cluster::Features::HTTP2));
 
     std::string valid_config = R"EOF(
       {"collector_cluster": "lightstep_saas"}
@@ -300,6 +301,7 @@ public:
   Stats::IsolatedStoreImpl fake_stats_;
   LightStepStats stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Upstream::MockCluster> cluster_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::unique_ptr<LightStepSink> sink_;
   lightstep::TracerOptions opts_;
@@ -324,7 +326,7 @@ TEST_F(LightStepSinkTest, InitializeSink) {
   }
 
   {
-    // Valid config but not valid cluster
+    // Valid config but not valid cluster.
     EXPECT_CALL(cm_, get("lightstep_saas")).WillOnce(Return(nullptr));
 
     std::string valid_config = R"EOF(
@@ -336,7 +338,21 @@ TEST_F(LightStepSinkTest, InitializeSink) {
   }
 
   {
-    EXPECT_CALL(cm_, get("lightstep_saas"));
+    // Valid config, but upstream cluster does not support http2.
+    EXPECT_CALL(cm_, get("lightstep_saas")).WillRepeatedly(Return(&cluster_));
+    ON_CALL(cluster_, features()).WillByDefault(Return(0));
+
+    std::string valid_config = R"EOF(
+      {"collector_cluster": "lightstep_saas"}
+    )EOF";
+    Json::StringLoader loader(valid_config);
+
+    EXPECT_THROW(setup(loader), EnvoyException);
+  }
+
+  {
+    EXPECT_CALL(cm_, get("lightstep_saas")).WillRepeatedly(Return(&cluster_));
+    ON_CALL(cluster_, features()).WillByDefault(Return(Upstream::Cluster::Features::HTTP2));
 
     std::string valid_config = R"EOF(
       {"collector_cluster": "lightstep_saas"}
