@@ -410,22 +410,22 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
           "prefix": "/",
           "cluster": "local_service_with_headers",
           "headers" : [
-            {"header_name": "test_header", "header_value": "test"}
+            {"name": "test_header", "value": "test"}
           ]
         },
         {
           "prefix": "/",
           "cluster": "local_service_with_multiple_headers",
           "headers" : [
-            {"header_name": "test_header_multiple1", "header_value": "test1"},
-            {"header_name": "test_header_multiple2", "header_value": "test2"}
+            {"name": "test_header_multiple1", "value": "test1"},
+            {"name": "test_header_multiple2", "value": "test2"}
           ]
         },
         {
           "prefix": "/",
           "cluster": "local_service_with_empty_headers",
           "headers" : [
-            {"header_name": "test_header_presence"}
+            {"name": "test_header_presence"}
           ]
         },
         {

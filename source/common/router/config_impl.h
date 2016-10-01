@@ -195,11 +195,11 @@ private:
   };
 
   struct HeaderData {
-    HeaderData(const Http::LowerCaseString& header_name, const std::string& header_value)
-        : header_name_(header_name), header_value_(header_value){};
+    HeaderData(const Http::LowerCaseString& name, const std::string& value)
+        : name_(name), value_(value){};
 
-    const Http::LowerCaseString header_name_;
-    const std::string header_value_;
+    const Http::LowerCaseString name_;
+    const std::string value_;
   };
 
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
