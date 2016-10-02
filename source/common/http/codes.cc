@@ -59,33 +59,30 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
 }
 
 void CodeUtility::chargeResponseTiming(const ResponseTimingInfo& info) {
-  if (DateUtil::timePointValid(info.request_send_time_)) {
-    std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now() - info.request_send_time_);
+  info.store_.deliverTimingToSinks(info.prefix_ + "upstream_rq_time", info.response_time_);
+  if (info.upstream_canary_) {
+    info.store_.deliverTimingToSinks(info.prefix_ + "canary.upstream_rq_time", info.response_time_);
+  }
 
-    info.store_.deliverTimingToSinks(info.prefix_ + "upstream_rq_time", ms);
-    if (info.upstream_canary_) {
-      info.store_.deliverTimingToSinks(info.prefix_ + "canary.upstream_rq_time", ms);
-    }
+  if (info.internal_request_) {
+    info.store_.deliverTimingToSinks(info.prefix_ + "internal.upstream_rq_time",
+                                     info.response_time_);
+  } else {
+    info.store_.deliverTimingToSinks(info.prefix_ + "external.upstream_rq_time",
+                                     info.response_time_);
+  }
 
-    if (info.internal_request_) {
-      info.store_.deliverTimingToSinks(info.prefix_ + "internal.upstream_rq_time", ms);
-    } else {
-      info.store_.deliverTimingToSinks(info.prefix_ + "external.upstream_rq_time", ms);
-    }
+  if (!info.request_vcluster_name_.empty()) {
+    info.store_.deliverTimingToSinks("vhost." + info.request_vhost_name_ + ".vcluster." +
+                                         info.request_vcluster_name_ + ".upstream_rq_time",
+                                     info.response_time_);
+  }
 
-    if (!info.request_vcluster_name_.empty()) {
-      info.store_.deliverTimingToSinks("vhost." + info.request_vhost_name_ + ".vcluster." +
-                                           info.request_vcluster_name_ + ".upstream_rq_time",
-                                       ms);
-    }
-
-    // Handle per zone stats.
-    if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-      info.store_.deliverTimingToSinks(fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_,
-                                                   info.from_zone_, info.to_zone_),
-                                       ms);
-    }
+  // Handle per zone stats.
+  if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
+    info.store_.deliverTimingToSinks(
+        fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_, info.from_zone_, info.to_zone_),
+        info.response_time_);
   }
 }
 

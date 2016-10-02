@@ -186,6 +186,44 @@ TEST(HostImplTest, MalformedUrl) {
   EXPECT_THROW(HostImpl(cluster, "fake\\10.0.0.1:1234", false, 1, ""), EnvoyException);
 }
 
+TEST(StaticClusterImplTest, OutlierDetector) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
+  std::string json = R"EOF(
+  {
+    "name": "addressportconfig",
+    "connect_timeout_ms": 250,
+    "type": "static",
+    "lb_type": "random",
+    "hosts": [{"url": "tcp://10.0.0.1:11001"},
+              {"url": "tcp://10.0.0.2:11002"}]
+  }
+  )EOF";
+
+  Json::StringLoader config(json);
+  StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager);
+
+  MockOutlierDetector* detector = new MockOutlierDetector();
+  EXPECT_CALL(*detector, addChangedStateCb(_));
+  cluster.setOutlierDetector(OutlierDetectorPtr{detector});
+
+  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+
+  // Set a single host as having failed and fire outlier detector callbacks. This should result
+  // in only a single healthy host.
+  cluster.hosts()[0]->outlierDetector().putHttpResponseCode(503);
+  cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  detector->runCallbacks(cluster.hosts()[0]);
+  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  EXPECT_NE(cluster.healthyHosts()[0], cluster.hosts()[0]);
+
+  // Bring the host back online.
+  cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  detector->runCallbacks(cluster.hosts()[0]);
+  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+}
+
 TEST(StaticClusterImplTest, UrlConfig) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;

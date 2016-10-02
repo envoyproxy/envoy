@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/outlier_detection.h"
 
 namespace Upstream {
 
@@ -41,6 +42,11 @@ public:
    * @return the cluster the host is a member of.
    */
   virtual const Cluster& cluster() const PURE;
+
+  /**
+   * @return the host's outlier detection sink.
+   */
+  virtual OutlierDetectorHostSink& outlierDetector() const PURE;
 
   /**
    * @return the URL used to connect to the host.

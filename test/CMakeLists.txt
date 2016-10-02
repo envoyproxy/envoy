@@ -86,6 +86,7 @@ add_executable(envoy-test
   common/upstream/load_balancer_impl_test.cc
   common/upstream/load_balancer_simulation_test.cc
   common/upstream/logical_dns_cluster_test.cc
+  common/upstream/outlier_detection_impl_test.cc
   common/upstream/resource_manager_impl_test.cc
   common/upstream/sds_test.cc
   common/upstream/upstream_impl_test.cc

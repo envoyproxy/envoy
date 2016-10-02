@@ -98,6 +98,11 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers) {
     bool is_canary = (response_headers.get(Http::Headers::get().EnvoyUpstreamCanary) == "true") ||
                      (upstream_host_ ? upstream_host_->canary() : false);
 
+    if (upstream_host_) {
+      upstream_host_->outlierDetector().putHttpResponseCode(
+          Http::Utility::getResponseStatus(response_headers));
+    }
+
     Http::CodeUtility::ResponseStatInfo info{
         config_.stats_store_, stat_prefix_, response_headers,
         downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true",
@@ -430,11 +435,16 @@ void Filter::onUpstreamComplete() {
     upstream_request_->upstream_encoder_->resetStream();
   }
 
-  if (config_.emit_dynamic_stats_ && !callbacks_->requestInfo().healthCheck()) {
+  if (config_.emit_dynamic_stats_ && !callbacks_->requestInfo().healthCheck() &&
+      DateUtil::timePointValid(upstream_request_->upstream_encoder_->requestCompleteTime())) {
+    std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now() -
+        upstream_request_->upstream_encoder_->requestCompleteTime());
+
+    upstream_host_->outlierDetector().putResponseTime(response_time);
+
     Http::CodeUtility::ResponseTimingInfo info{
-        config_.stats_store_, stat_prefix_,
-        upstream_request_->upstream_encoder_->requestCompleteTime(),
-        upstream_request_->upstream_canary_,
+        config_.stats_store_, stat_prefix_, response_time, upstream_request_->upstream_canary_,
         downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true",
         route_->virtualHostName(), request_vcluster_ ? request_vcluster_->name() : "",
         config_.service_zone_, upstreamZone()};
@@ -443,9 +453,7 @@ void Filter::onUpstreamComplete() {
 
     for (const std::string& alt_prefix : alt_stat_prefixes_) {
       Http::CodeUtility::ResponseTimingInfo info{
-          config_.stats_store_, alt_prefix,
-          upstream_request_->upstream_encoder_->requestCompleteTime(),
-          upstream_request_->upstream_canary_,
+          config_.stats_store_, alt_prefix, response_time, upstream_request_->upstream_canary_,
           downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true", "", "",
           config_.service_zone_, upstreamZone()};
 

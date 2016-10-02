@@ -85,6 +85,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   EXPECT_CALL(dns_resolver_.dispatcher_, createClientConnection_("tcp://127.0.0.1:443"));
   logical_host->createConnection(dns_resolver_.dispatcher_);
+  logical_host->outlierDetector().putHttpResponseCode(200);
 
   expectResolve();
   resolve_timer_->callback_();
@@ -101,6 +102,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ(&cluster_->hosts()[0]->stats(), &data.host_description_->stats());
   EXPECT_EQ("tcp://127.0.0.1:443", data.host_description_->url());
   EXPECT_EQ("", data.host_description_->zone());
+  data.host_description_->outlierDetector().putHttpResponseCode(200);
 
   expectResolve();
   resolve_timer_->callback_();

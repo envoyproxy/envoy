@@ -472,6 +472,8 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
   // Fire timeout.
   EXPECT_CALL(callbacks_.request_info_,
               onFailedResponse(Http::AccessLog::FailureReason::UpstreamRequestTimeout));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putResponseTime(_)).Times(0);
   Http::HeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(response_headers), false));
@@ -525,6 +527,8 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(false));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putResponseTime(_));
   Http::HeaderMapPtr response_headers2(new Http::HeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers2), true);
 
@@ -596,6 +600,9 @@ TEST_F(RouterTest, AltStatName) {
                               {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
+
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putResponseTime(_));
 
   Http::HeaderMapPtr response_headers(
       new Http::HeaderMapImpl{{":status", "200"},

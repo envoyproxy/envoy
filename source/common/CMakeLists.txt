@@ -100,6 +100,7 @@ add_library(
   upstream/host_utility.cc
   upstream/load_balancer_impl.cc
   upstream/logical_dns_cluster.cc
+  upstream/outlier_detection_impl.cc
   upstream/sds.cc
   upstream/upstream_impl.cc
   ${gen_git_sha_target})
