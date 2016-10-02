@@ -12,14 +12,6 @@
 
 namespace Tracing {
 
-#define LIGHTSTEP_STATS(COUNTER)                                                                   \
-  COUNTER(collector_failed)                                                                        \
-  COUNTER(collector_success)
-
-struct LightStepStats {
-  LIGHTSTEP_STATS(GENERATE_COUNTER_STRUCT)
-};
-
 #define HTTP_TRACER_STATS(COUNTER)                                                                 \
   COUNTER(global_switch_off)                                                                       \
   COUNTER(invalid_request_id)                                                                      \
@@ -110,8 +102,11 @@ public:
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& collectorCluster() { return collector_cluster_; }
-  LightStepStats& stats() { return stats_; }
   Runtime::Loader& runtime() { return runtime_; }
+  Stats::Store& statsStore() { return stats_store_; }
+
+  static const std::string LIGHTSTEP_SERVICE;
+  static const std::string LIGHTSTEP_METHOD;
 
 private:
   struct TlsLightStepTracer : ThreadLocal::ThreadLocalObject {
@@ -130,7 +125,7 @@ private:
 
   const std::string collector_cluster_;
   Upstream::ClusterManager& cm_;
-  LightStepStats stats_;
+  Stats::Store& stats_store_;
   const std::string service_node_;
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;

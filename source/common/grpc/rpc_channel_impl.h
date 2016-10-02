@@ -42,15 +42,6 @@ public:
                   proto::Closure* done_callback) override;
 
 private:
-  class Exception : public EnvoyException {
-  public:
-    Exception(const Optional<uint64_t>& grpc_status, const std::string& message)
-        : EnvoyException(message), grpc_status_(grpc_status) {}
-
-    const Optional<uint64_t> grpc_status_;
-  };
-
-  void checkForHeaderOnlyError(Http::Message& http_response);
   void incStat(bool success);
   void onComplete();
   void onFailureWorker(const Optional<uint64_t>& grpc_status, const std::string& message);

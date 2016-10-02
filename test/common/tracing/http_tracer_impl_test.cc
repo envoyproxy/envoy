@@ -272,16 +272,13 @@ TEST(HttpNullTracerTest, NoFailures) {
 
 class LightStepSinkTest : public Test {
 public:
-  LightStepSinkTest()
-      : stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(fake_stats_, "prefix.tracing.lightstep."))} {}
-
   void setup(Json::Object& config) {
     std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
     opts->access_token = "sample_token";
     opts->tracer_attributes["lightstep.guid"] = "random_guid";
     opts->tracer_attributes["lightstep.component_name"] = "component";
 
-    sink_.reset(new LightStepSink(config, cm_, "prefix.", fake_stats_, "service_node", tls_,
+    sink_.reset(new LightStepSink(config, cm_, "not_used_now", stats_, "service_node", tls_,
                                   runtime_, std::move(opts)));
   }
 
@@ -299,8 +296,7 @@ public:
 
   const Http::HeaderMapImpl empty_header_{};
 
-  Stats::IsolatedStoreImpl fake_stats_;
-  LightStepStats stats_;
+  Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Upstream::MockCluster> cluster_;
   NiceMock<Runtime::MockRandomGenerator> random_;
@@ -395,18 +391,16 @@ TEST_F(LightStepSinkTest, FlushOneSpan) {
   EXPECT_CALL(request_info, responseCode()).Times(2).WillRepeatedly(ReturnRef(code));
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.min_flush_spans", 5)).WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
+      .WillOnce(Return(1));
 
   sink_->flushTrace(empty_header_, empty_header_, request_info);
   callback->onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}})});
 
-  EXPECT_EQ(0U, stats_.collector_failed_.value());
-  EXPECT_EQ(1U, stats_.collector_success_.value());
-
+  /* grpc stats 1*/
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
-  EXPECT_EQ(1U, stats_.collector_failed_.value());
-  EXPECT_EQ(1U, stats_.collector_success_.value());
+  /* stats 2 */
 }
 
 TEST_F(LightStepSinkTest, FlushSeveralSpans) {
@@ -446,7 +440,7 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
 
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).Times(2).WillRepeatedly(ReturnRef(protocol));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.min_flush_spans", 5))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .Times(2)
       .WillRepeatedly(Return(2));
 
@@ -456,12 +450,15 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
   callback->onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}})});
 
-  EXPECT_EQ(0U, stats_.collector_failed_.value());
-  EXPECT_EQ(1U, stats_.collector_success_.value());
+  /* TODO: grpc stats */
 
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
-  EXPECT_EQ(1U, stats_.collector_failed_.value());
-  EXPECT_EQ(1U, stats_.collector_success_.value());
+
+  EXPECT_EQ(
+      1,
+      stats_.counter(
+                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.failure")
+          .value());
 }
 
 } // Tracing

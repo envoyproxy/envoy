@@ -11,6 +11,9 @@
 
 namespace Tracing {
 
+const std::string LightStepSink::LIGHTSTEP_SERVICE = "lightstep.collector.CollectorService";
+const std::string LightStepSink::LIGHTSTEP_METHOD = "Report";
+
 void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
   std::string x_request_id = request_headers.get(Http::Headers::get().RequestId);
 
@@ -117,13 +120,15 @@ LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightS
 void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   builder_.addSpan(std::move(span));
 
-  uint64_t min_flush_spans = sink_.runtime().snapshot().getInteger("tracing.min_flush_spans", 5U);
+  uint64_t min_flush_spans =
+      sink_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U);
   if (builder_.pendingSpans() == min_flush_spans) {
     lightstep::collector::ReportRequest request;
     std::swap(request, builder_.pending());
 
-    Http::MessagePtr message = Grpc::Common::prepareHeaders(
-        sink_.collectorCluster(), "lightstep.collector.CollectorService", "Report");
+    Http::MessagePtr message =
+        Grpc::Common::prepareHeaders(sink_.collectorCluster(), LightStepSink::LIGHTSTEP_SERVICE,
+                                     LightStepSink::LIGHTSTEP_METHOD);
 
     message->body(Grpc::Common::serializeBody(std::move(request)));
 
@@ -145,14 +150,13 @@ LightStepRecorder::NewInstance(LightStepSink& sink, const lightstep::TracerImpl&
 }
 
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                             const std::string& stat_prefix, Stats::Store& stats,
+                             const std::string&, Stats::Store& stats,
                              const std::string& service_node, ThreadLocal::Instance& tls,
                              Runtime::Loader& runtime,
                              std::unique_ptr<lightstep::TracerOptions> options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
-      stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix + "tracing.lightstep."))},
-      service_node_(service_node), tls_(tls), runtime_(runtime), options_(std::move(options)),
-      tls_slot_(tls.allocateSlot()) {
+      stats_store_(stats), service_node_(service_node), tls_(tls), runtime_(runtime),
+      options_(std::move(options)), tls_slot_(tls.allocateSlot()) {
   if (!cm_.get(collector_cluster_)) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
                                      collector_cluster_));
@@ -218,9 +222,22 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
 }
 
 void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
-  sink_.stats().collector_failed_.inc();
+  Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
+                           LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
+                           false);
 }
 
-void LightStepRecorder::onSuccess(Http::MessagePtr&&) { sink_.stats().collector_success_.inc(); }
+void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
+  try {
+    Grpc::Common::validateResponse(*msg);
+
+    Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
+                             LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
+                             true);
+  } catch (const Grpc::Exception& ex) {
+    Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
+                             "lightstep.collector.CollectorService", "Report", false);
+  }
+}
 
 } // Tracing
