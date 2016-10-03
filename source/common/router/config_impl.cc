@@ -93,7 +93,7 @@ bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random
       if (header_data.value_ == EMPTY_STRING) {
         matches &= headers.has(header_data.name_);
       } else {
-        matches &= headers.get(header_data.name_) == header_data.value_;
+        matches &= (headers.get(header_data.name_) == header_data.value_);
       }
       if (!matches) {
         break;

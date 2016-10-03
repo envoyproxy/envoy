@@ -24,7 +24,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "rate_limit": "{...}",
     "shadow": "{...}",
     "priority": "...",
-    "headers": "[...]"
+    "headers": "[]"
   }
 
 prefix
@@ -96,7 +96,7 @@ priority
   <arch_overview_http_routing_priority>`.
 
 :ref:`headers <config_http_conn_man_route_table_route_headers>`
-  *(optional, array)* Allows to do header matched routing with arbitrary headers.
+  *(optional, array)* Specifies a set of headers that the route should match on.
 
 .. _config_http_conn_man_route_table_route_runtime:
 
