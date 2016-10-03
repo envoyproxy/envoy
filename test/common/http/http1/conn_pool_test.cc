@@ -349,6 +349,7 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   NiceMock<Http::MockStreamDecoder> outer_decoder2;
   ConnPoolCallbacks callbacks2;
   handle = conn_pool_.newStream(outer_decoder2, callbacks2);
+  EXPECT_EQ(1U, cluster_.stats_.upstream_cx_overflow_.value());
 
   EXPECT_NE(nullptr, handle);
 

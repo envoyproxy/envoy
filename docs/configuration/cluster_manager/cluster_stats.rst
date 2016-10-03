@@ -15,6 +15,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_http2_total, Counter, Total HTTP/2 connections
   upstream_cx_connect_fail, Counter, Total connection failures
   upstream_cx_connect_timeout, Counter, Total connection timeouts
+  upstream_cx_overflow, Counter, Total times that the cluster's connection circuit breaker overflowed
   upstream_cx_connect_ms, Timer, Connection establishment milliseconds
   upstream_cx_length_ms, Timer, Connection length milliseconds
   upstream_cx_destroy, Counter, Total destroyed connections

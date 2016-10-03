@@ -170,6 +170,10 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   ASSERT_EQ(Network::FilterStatus::StopIteration, filter_->onData(buffer));
+  EXPECT_EQ(
+      1U,
+      cluster_manager_.cluster_.stats_store_.counter("cluster.fake_cluster.upstream_cx_overflow")
+          .value());
 }
 
 } // Filter
