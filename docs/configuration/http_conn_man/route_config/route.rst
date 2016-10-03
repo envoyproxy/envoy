@@ -24,7 +24,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "rate_limit": "{...}",
     "shadow": "{...}",
     "priority": "...",
-    "headers": "[]"
+    "headers": []
   }
 
 prefix
@@ -219,8 +219,8 @@ name
   *(required, string)* Specifies the name of the header in the request.
 
 value
-  *(optional, string)* Specifies the value of the header. If the value is absent a request that has the
-   ``name`` header will match, regardless of the header's value.
+  *(optional, string)* Specifies the value of the header. If the value is absent a request that has
+  the *name* header will match, regardless of the header's value.
 
 The router will check the request's headers against all the specified
 headers in the route config. A match will happen if all the headers in the route are present in
