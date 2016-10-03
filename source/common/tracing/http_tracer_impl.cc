@@ -121,7 +121,7 @@ void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   builder_.addSpan(std::move(span));
 
   uint64_t min_flush_spans =
-      sink_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 1U);
+      sink_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U);
   if (builder_.pendingSpans() == min_flush_spans) {
     lightstep::collector::ReportRequest request;
     std::swap(request, builder_.pending());
