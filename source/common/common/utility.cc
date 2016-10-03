@@ -97,7 +97,7 @@ bool StringUtil::endsWith(const std::string& source, const std::string& end) {
 bool StringUtil::startsWith(const std::string& source, const std::string& start,
                             bool case_sensitive) {
   if (case_sensitive) {
-    return source.find(start) == 0;
+    return strncmp(source.c_str(), start.c_str(), start.size()) == 0;
   } else {
     return strncasecmp(source.c_str(), start.c_str(), start.size()) == 0;
   }
