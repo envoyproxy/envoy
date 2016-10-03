@@ -45,7 +45,6 @@ public:
 
   /**
    * Basic validation of gRPC response, @throws Grpc::Exception in case of non successful response.
-   *
    */
   static void validateResponse(Http::Message& http_response);
 

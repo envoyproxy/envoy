@@ -92,8 +92,7 @@ private:
 class LightStepSink : public HttpSink {
 public:
   LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                const std::string& stat_prefix, Stats::Store& stats,
-                const std::string& service_node, ThreadLocal::Instance& tls,
+                Stats::Store& stats, const std::string& service_node, ThreadLocal::Instance& tls,
                 Runtime::Loader& runtime, std::unique_ptr<lightstep::TracerOptions> options);
 
   // Tracer::HttpSink

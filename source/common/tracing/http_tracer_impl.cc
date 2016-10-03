@@ -150,9 +150,8 @@ LightStepRecorder::NewInstance(LightStepSink& sink, const lightstep::TracerImpl&
 }
 
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                             const std::string&, Stats::Store& stats,
-                             const std::string& service_node, ThreadLocal::Instance& tls,
-                             Runtime::Loader& runtime,
+                             Stats::Store& stats, const std::string& service_node,
+                             ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                              std::unique_ptr<lightstep::TracerOptions> options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
       stats_store_(stats), service_node_(service_node), tls_(tls), runtime_(runtime),
@@ -235,9 +234,9 @@ void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
                              LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
                              true);
   } catch (const Grpc::Exception& ex) {
-    std::cout << "ex: " << ex.what() << std::endl;
     Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                             "lightstep.collector.CollectorService", "Report", false);
+                             LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
+                             false);
   }
 }
 

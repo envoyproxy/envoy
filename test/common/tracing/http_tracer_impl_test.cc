@@ -278,8 +278,8 @@ public:
     opts->tracer_attributes["lightstep.guid"] = "random_guid";
     opts->tracer_attributes["lightstep.component_name"] = "component";
 
-    sink_.reset(new LightStepSink(config, cm_, "not_used_now", stats_, "service_node", tls_,
-                                  runtime_, std::move(opts)));
+    sink_.reset(
+        new LightStepSink(config, cm_, stats_, "service_node", tls_, runtime_, std::move(opts)));
   }
 
   void setupValidSink() {
