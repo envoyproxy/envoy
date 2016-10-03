@@ -121,7 +121,7 @@ void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   builder_.addSpan(std::move(span));
 
   uint64_t min_flush_spans =
-      sink_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U);
+      sink_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 1U);
   if (builder_.pendingSpans() == min_flush_spans) {
     lightstep::collector::ReportRequest request;
     std::swap(request, builder_.pending());
@@ -235,6 +235,7 @@ void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
                              LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
                              true);
   } catch (const Grpc::Exception& ex) {
+    std::cout << "ex: " << ex.what() << std::endl;
     Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
                              "lightstep.collector.CollectorService", "Report", false);
   }
