@@ -102,3 +102,8 @@ bool StringUtil::startsWith(const std::string& source, const std::string& start,
     return strncasecmp(source.c_str(), start.c_str(), start.size()) == 0;
   }
 }
+
+const std::string& StringUtil::valueOrDefault(const std::string& input,
+                                              const std::string& default_value) {
+  return input.empty() ? default_value : input;
+}

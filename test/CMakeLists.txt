@@ -19,6 +19,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_BINARY_DIR})
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 include_directories(${ENVOY_NGHTTP2_INCLUDE_DIR})
+include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
 
 add_executable(envoy-test
   $<TARGET_OBJECTS:envoy-server>
@@ -32,6 +33,7 @@ add_executable(envoy-test
   common/event/file_event_impl_test.cc
   common/filesystem/filesystem_impl_test.cc
   common/filesystem/watcher_impl_test.cc
+  common/grpc/common_test.cc
   common/grpc/http1_bridge_filter_test.cc
   common/grpc/rpc_channel_impl_test.cc
   common/http/access_log/access_log_formatter_test.cc
@@ -137,6 +139,7 @@ target_link_libraries(envoy-test jansson)
 target_link_libraries(envoy-test ssl)
 target_link_libraries(envoy-test crypto)
 target_link_libraries(envoy-test nghttp2)
+target_link_libraries(envoy-test lightstep_core_cxx11)
 target_link_libraries(envoy-test protobuf)
 target_link_libraries(envoy-test gmock)
 target_link_libraries(envoy-test pthread)

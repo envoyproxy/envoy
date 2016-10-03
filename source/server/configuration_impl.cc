@@ -1,6 +1,7 @@
 #include "configuration_impl.h"
 
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
 
@@ -77,14 +78,20 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
         log().notice(fmt::format("    loading {}", type));
 
         if (type == "lightstep") {
-          std::string access_token =
-              server_.api().fileReadToEnd(sink.getString("access_token_file"));
-          StringUtil::rtrim(access_token);
+          ::Runtime::RandomGenerator& rand = server_.random();
+          std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
+          opts->access_token = server_.api().fileReadToEnd(sink.getString("access_token_file"));
+          StringUtil::rtrim(opts->access_token);
+
+          opts->tracer_attributes["lightstep.guid"] = rand.uuid();
+          opts->tracer_attributes["lightstep.component_name"] =
+              server_.options().serviceClusterName();
+          opts->guid_generator = [&rand]() { return rand.random(); };
 
           http_tracer_->addSink(Tracing::HttpSinkPtr{new Tracing::LightStepSink(
-              sink.getObject("config"), *cluster_manager_, "", server_.stats(), server_.random(),
-              server_.options().serviceClusterName(), server_.options().serviceNodeName(),
-              access_token)});
+              sink.getObject("config"), *cluster_manager_, server_.stats(),
+              server_.options().serviceNodeName(), server_.threadLocal(), server_.runtime(),
+              std::move(opts))});
         } else {
           throw EnvoyException(fmt::format("Unsupported sink type: '{}'", type));
         }

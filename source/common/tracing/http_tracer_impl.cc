@@ -1,17 +1,18 @@
 #include "http_tracer_impl.h"
 
 #include "common/common/macros.h"
-#include "common/http/codes.h"
+#include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/runtime/uuid_util.h"
 
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/upstream/cluster_manager.h"
-
 namespace Tracing {
+
+const std::string LightStepSink::LIGHTSTEP_SERVICE = "lightstep.collector.CollectorService";
+const std::string LightStepSink::LIGHTSTEP_METHOD = "Report";
 
 void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
   std::string x_request_id = request_headers.get(Http::Headers::get().RequestId);
@@ -113,46 +114,69 @@ void HttpTracerImpl::populateStats(const Decision& decision) {
   }
 }
 
-Http::MessagePtr LightStepUtility::buildHeaders(const std::string& access_token) {
-  Http::MessagePtr msg{new Http::RequestMessageImpl()};
+LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink)
+    : builder_(tracer), sink_(sink) {}
 
-  msg->headers().addViaCopy(Http::Headers::get().Scheme, "http");
-  msg->headers().addViaCopy(Http::Headers::get().Method, "POST");
-  msg->headers().addViaCopy(Http::Headers::get().Path, "/api/v0/reports");
-  msg->headers().addViaCopy(Http::Headers::get().ContentType, "application/json");
-  msg->headers().addViaCopy(Http::Headers::get().Host, "collector.lightstep.com");
-  msg->headers().addViaCopy("LightStep-Access-Token", access_token);
+void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
+  builder_.addSpan(std::move(span));
 
-  return msg;
+  uint64_t min_flush_spans =
+      sink_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U);
+  if (builder_.pendingSpans() == min_flush_spans) {
+    lightstep::collector::ReportRequest request;
+    std::swap(request, builder_.pending());
+
+    Http::MessagePtr message =
+        Grpc::Common::prepareHeaders(sink_.collectorCluster(), LightStepSink::LIGHTSTEP_SERVICE,
+                                     LightStepSink::LIGHTSTEP_METHOD);
+
+    message->body(Grpc::Common::serializeBody(std::move(request)));
+
+    sink_.clusterManager()
+        .httpAsyncClientForCluster(sink_.collectorCluster())
+        .send(std::move(message), *this, std::chrono::milliseconds(5000));
+  }
 }
 
-std::string LightStepUtility::buildJoiningIds(const Http::HeaderMap& request_headers) {
-  std::string join_ids;
+bool LightStepRecorder::FlushWithTimeout(lightstep::Duration) {
+  // Note: We don't expect this to be called, since the Tracer
+  // reference is private to its LightStepSink.
+  return true;
+}
 
-  // Always populate x-request-id as joining id.
-  static const std::string x_request_id_format = R"EOF(
-      {{
-        "TraceKey": "x-request-id",
-        "Value": "{}"
-      }})EOF";
-  join_ids += fmt::format(x_request_id_format, request_headers.get(Http::Headers::get().RequestId));
+std::unique_ptr<lightstep::Recorder>
+LightStepRecorder::NewInstance(LightStepSink& sink, const lightstep::TracerImpl& tracer) {
+  return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(tracer, sink));
+}
 
-  // Optionally populate x-client-trace-id if present.
-  if (request_headers.has(Http::Headers::get().ClientTraceId)) {
-    static const std::string x_client_trace_id_format = R"EOF(
-      ,{{
-        "TraceKey": "x-client-trace-id",
-        "Value": "{}"
-      }})EOF";
-    join_ids += fmt::format(x_client_trace_id_format,
-                            request_headers.get(Http::Headers::get().ClientTraceId));
+LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
+                             Stats::Store& stats, const std::string& service_node,
+                             ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                             std::unique_ptr<lightstep::TracerOptions> options)
+    : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
+      stats_store_(stats), service_node_(service_node), tls_(tls), runtime_(runtime),
+      options_(std::move(options)), tls_slot_(tls.allocateSlot()) {
+  if (!cm_.get(collector_cluster_)) {
+    throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
+                                     collector_cluster_));
   }
 
-  return join_ids;
+  if (!(cm_.get(collector_cluster_)->features() & Upstream::Cluster::Features::HTTP2)) {
+    throw EnvoyException(
+        fmt::format("{} collector cluster must support http2 for gRPC calls", collector_cluster_));
+  }
+
+  tls_.set(tls_slot_, [this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr {
+    lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
+        *options_,
+        std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::placeholders::_1)));
+
+    return ThreadLocal::ThreadLocalObjectPtr{new TlsLightStepTracer(std::move(tracer), *this)};
+  });
 }
 
-std::string LightStepUtility::buildRequestLine(const Http::HeaderMap& request_headers,
-                                               const Http::AccessLog::RequestInfo& info) {
+std::string LightStepSink::buildRequestLine(const Http::HeaderMap& request_headers,
+                                            const Http::AccessLog::RequestInfo& info) {
   std::string method = request_headers.get(Http::Headers::get().Method);
   std::string path = request_headers.has(Http::Headers::get().EnvoyOriginalPath)
                          ? request_headers.get(Http::Headers::get().EnvoyOriginalPath)
@@ -166,135 +190,53 @@ std::string LightStepUtility::buildRequestLine(const Http::HeaderMap& request_he
   return fmt::format("{} {} {}", method, path, info.protocol());
 }
 
-std::string LightStepUtility::buildSpanAttributes(const Http::HeaderMap& request_headers,
-                                                  const Http::AccessLog::RequestInfo& request_info,
-                                                  const std::string& service_node) {
-  const std::string request_line = buildRequestLine(request_headers, request_info);
-  std::string downstream_cluster =
-      request_headers.get(Http::Headers::get().EnvoyDownstreamServiceCluster);
-  if (downstream_cluster.empty()) {
-    downstream_cluster = "-";
-  }
-
-  const std::string response_code = request_info.responseCode().valid()
-                                        ? std::to_string(request_info.responseCode().value())
-                                        : "0";
-  std::string user_agent = request_headers.get(Http::Headers::get().UserAgent);
-  if (user_agent.empty()) {
-    user_agent = "-";
-  }
-
-  static const std::string attributes_format = R"EOF(
-      {{
-        "Key": "request line",
-        "Value": "{}"
-      }},
-      {{
-        "Key": "response code",
-        "Value": "{}"
-      }},
-      {{
-        "Key": "downstream cluster",
-        "Value": "{}"
-      }},
-      {{
-        "Key": "user agent",
-        "Value": "{}"
-      }},
-      {{
-        "Key": "node id",
-        "Value": "{}"
-      }})EOF";
-
-  return fmt::format(attributes_format, request_line, response_code, downstream_cluster, user_agent,
-                     service_node);
+std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo& info) {
+  return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
 }
 
-std::string LightStepUtility::buildJsonBody(const Http::HeaderMap& request_headers,
-                                            const Http::HeaderMap&,
-                                            const Http::AccessLog::RequestInfo& request_info,
-                                            Runtime::RandomGenerator& random,
-                                            const std::string& local_service_cluster,
-                                            const std::string& service_node) {
-  static const std::string json_format = R"EOF(
-{{
-  "runtime": {{
-    "guid": "{}",
-    "group_name": "{}",
-    "start_micros": {}
-  }},
-  "span_records": [
-    {{
-      "span_guid": "{}",
-      "span_name": "{}",
-      "oldest_micros": {},
-      "youngest_micros": {},
-      "join_ids": [{}],
-      "attributes": [{}]
-    }}
-  ]
-}}
-  )EOF";
-
-  const std::string tracing_guid = random.uuid();
-  static const std::string group_name = "Envoy-Tracing";
-  uint64_t start_time = std::chrono::duration_cast<std::chrono::microseconds>(
-                            request_info.startTime().time_since_epoch()).count();
-  const std::string start_micros = std::to_string(start_time);
-  const std::string span_guid = random.uuid();
-  const std::string& span_name = local_service_cluster;
-  const std::string oldest_micros = start_micros;
-  uint64_t end_time =
-      start_time +
-      std::chrono::duration_cast<std::chrono::microseconds>(request_info.duration()).count();
-  const std::string youngest_micros = std::to_string(end_time);
-  const std::string joining_ids = buildJoiningIds(request_headers);
-  const std::string annotations = buildSpanAttributes(request_headers, request_info, service_node);
-
-  return fmt::format(json_format, tracing_guid, group_name, start_micros, span_guid, span_name,
-                     oldest_micros, youngest_micros, joining_ids, annotations);
-}
-
-LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                             const std::string& stat_prefix, Stats::Store& stats,
-                             Runtime::RandomGenerator& random,
-                             const std::string& local_service_cluster,
-                             const std::string& service_node, const std::string& access_token)
-    : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
-      stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix + "tracing.lightstep."))},
-      random_(random), local_service_cluster_(local_service_cluster), service_node_(service_node),
-      access_token_(access_token) {
-  if (!cm_.get(collector_cluster_)) {
-    throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
-                                     collector_cluster_));
-  }
-}
-
-void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
-                               const Http::HeaderMap& response_headers,
+void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
                                const Http::AccessLog::RequestInfo& request_info) {
-  Http::MessagePtr msg = LightStepUtility::buildHeaders(access_token_);
-  Buffer::InstancePtr buffer(new Buffer::OwnedImpl(
-      LightStepUtility::buildJsonBody(request_headers, response_headers, request_info, random_,
-                                      local_service_cluster_, service_node_)));
+  lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
+      "full request",
+      {
+       lightstep::StartTimestamp(request_info.startTime()),
+       lightstep::SetTag("join:x-request-id", request_headers.get(Http::Headers::get().RequestId)),
+       lightstep::SetTag("request line", buildRequestLine(request_headers, request_info)),
+       lightstep::SetTag("response code", buildResponseCode(request_info)),
+       lightstep::SetTag(
+           "downstream cluster",
+           StringUtil::valueOrDefault(
+               request_headers.get(Http::Headers::get().EnvoyDownstreamServiceCluster), "-")),
+       lightstep::SetTag(
+           "user agent",
+           StringUtil::valueOrDefault(request_headers.get(Http::Headers::get().UserAgent), "-")),
+       lightstep::SetTag("node id", service_node_),
+      });
 
-  msg->body(std::move(buffer));
-  executeRequest(std::move(msg));
+  if (request_headers.has(Http::Headers::get().ClientTraceId)) {
+    span.SetTag("join:x-client-trace-id", request_headers.get(Http::Headers::get().ClientTraceId));
+  }
+
+  span.Finish();
 }
 
-void LightStepSink::executeRequest(Http::MessagePtr&& msg) {
-  cm_.httpAsyncClientForCluster(collector_cluster_)
-      .send(std::move(msg), *this, std::chrono::milliseconds(5000));
+void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
+  Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
+                           LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
+                           false);
 }
 
-void LightStepSink::onFailure(Http::AsyncClient::FailureReason) { stats_.collector_failed_.inc(); }
+void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
+  try {
+    Grpc::Common::validateResponse(*msg);
 
-void LightStepSink::onSuccess(Http::MessagePtr&& response) {
-  uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
-  if (Http::CodeUtility::is2xx(response_code)) {
-    stats_.collector_success_.inc();
-  } else {
-    stats_.collector_failed_.inc();
+    Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
+                             LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
+                             true);
+  } catch (const Grpc::Exception& ex) {
+    Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
+                             LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
+                             false);
   }
 }
 

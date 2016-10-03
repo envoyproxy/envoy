@@ -272,16 +272,19 @@ TEST(HttpNullTracerTest, NoFailures) {
 
 class LightStepSinkTest : public Test {
 public:
-  LightStepSinkTest()
-      : stats_{LIGHTSTEP_STATS(POOL_COUNTER_PREFIX(fake_stats_, "prefix.tracing.lightstep."))} {}
-
   void setup(Json::Object& config) {
-    sink_.reset(new LightStepSink(config, cm_, "prefix.", fake_stats_, random_, "service_cluster",
-                                  "service_node", "token"));
+    std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
+    opts->access_token = "sample_token";
+    opts->tracer_attributes["lightstep.guid"] = "random_guid";
+    opts->tracer_attributes["lightstep.component_name"] = "component";
+
+    sink_.reset(
+        new LightStepSink(config, cm_, stats_, "service_node", tls_, runtime_, std::move(opts)));
   }
 
   void setupValidSink() {
-    EXPECT_CALL(cm_, get("lightstep_saas"));
+    EXPECT_CALL(cm_, get("lightstep_saas")).WillRepeatedly(Return(&cluster_));
+    ON_CALL(cluster_, features()).WillByDefault(Return(Upstream::Cluster::Features::HTTP2));
 
     std::string valid_config = R"EOF(
       {"collector_cluster": "lightstep_saas"}
@@ -293,11 +296,13 @@ public:
 
   const Http::HeaderMapImpl empty_header_{};
 
-  Stats::IsolatedStoreImpl fake_stats_;
-  LightStepStats stats_;
+  Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Upstream::MockCluster> cluster_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<LightStepSink> sink_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
 };
 
 TEST_F(LightStepSinkTest, InitializeSink) {
@@ -318,7 +323,7 @@ TEST_F(LightStepSinkTest, InitializeSink) {
   }
 
   {
-    // Valid config but not valid cluster
+    // Valid config but not valid cluster.
     EXPECT_CALL(cm_, get("lightstep_saas")).WillOnce(Return(nullptr));
 
     std::string valid_config = R"EOF(
@@ -330,7 +335,21 @@ TEST_F(LightStepSinkTest, InitializeSink) {
   }
 
   {
-    EXPECT_CALL(cm_, get("lightstep_saas"));
+    // Valid config, but upstream cluster does not support http2.
+    EXPECT_CALL(cm_, get("lightstep_saas")).WillRepeatedly(Return(&cluster_));
+    ON_CALL(cluster_, features()).WillByDefault(Return(0));
+
+    std::string valid_config = R"EOF(
+      {"collector_cluster": "lightstep_saas"}
+    )EOF";
+    Json::StringLoader loader(valid_config);
+
+    EXPECT_THROW(setup(loader), EnvoyException);
+  }
+
+  {
+    EXPECT_CALL(cm_, get("lightstep_saas")).WillRepeatedly(Return(&cluster_));
+    ON_CALL(cluster_, features()).WillByDefault(Return(Upstream::Cluster::Features::HTTP2));
 
     std::string valid_config = R"EOF(
       {"collector_cluster": "lightstep_saas"}
@@ -341,249 +360,132 @@ TEST_F(LightStepSinkTest, InitializeSink) {
   }
 }
 
-TEST_F(LightStepSinkTest, CallbacksCalled) {
+TEST_F(LightStepSinkTest, FlushSeveralSpans) {
   setupValidSink();
 
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("lightstep_saas"))
-      .WillOnce(ReturnRef(cm_.async_client_));
-
-  Http::MockAsyncClientRequest request_1(&cm_.async_client_);
-  Http::AsyncClient::Callbacks* callback_1;
-  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
-
-  EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-            callback_1 = &callbacks;
-            return &request_1;
-          }));
-  EXPECT_CALL(random_, uuid()).WillOnce(Return("1")).WillOnce(Return("2"));
-  SystemTime start_time_1;
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time_1));
-  std::chrono::seconds duration_1(1);
-  EXPECT_CALL(request_info, duration()).WillOnce(Return(duration_1));
-  Optional<uint32_t> code_1(200);
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code_1));
-  const std::string protocol = "http/1";
-  EXPECT_CALL(request_info, protocol()).WillRepeatedly(ReturnRef(protocol));
-
-  sink_->flushTrace(empty_header_, empty_header_, request_info);
-
-  Http::MockAsyncClientRequest request_2(&cm_.async_client_);
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("lightstep_saas"))
-      .WillOnce(ReturnRef(cm_.async_client_));
-  Http::AsyncClient::Callbacks* callback_2;
-
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                           Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
-        callback_2 = &callbacks;
-        return &request_2;
-      }));
-  EXPECT_CALL(random_, uuid()).WillOnce(Return("3")).WillOnce(Return("4"));
-  SystemTime start_time_2;
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time_2));
-  std::chrono::seconds duration_2(2);
-  EXPECT_CALL(request_info, duration()).WillOnce(Return(duration_2));
-  Optional<uint32_t> code_2(200);
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code_2));
-
-  sink_->flushTrace(empty_header_, empty_header_, request_info);
-
-  callback_2->onFailure(Http::AsyncClient::FailureReason::Reset);
-  EXPECT_EQ(1UL, stats_.collector_failed_.value());
-  EXPECT_EQ(0UL, stats_.collector_success_.value());
-
-  callback_1->onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}})});
-  EXPECT_EQ(1UL, stats_.collector_failed_.value());
-  EXPECT_EQ(1UL, stats_.collector_success_.value());
-}
-
-TEST_F(LightStepSinkTest, ClientNotAvailable) {
-  setupValidSink();
-
-  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("lightstep_saas"))
-      .WillOnce(ReturnRef(cm_.async_client_));
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}})});
-            return nullptr;
-          }));
-  SystemTime start_time_1;
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time_1));
-  std::chrono::seconds duration_1(1);
-  EXPECT_CALL(request_info, duration()).WillOnce(Return(duration_1));
-  const std::string protocol = "http/1";
-  EXPECT_CALL(request_info, protocol()).WillRepeatedly(ReturnRef(protocol));
-  Optional<uint32_t> code_1(200);
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code_1));
-  sink_->flushTrace(empty_header_, empty_header_, request_info);
-
-  EXPECT_EQ(1UL, stats_.collector_failed_.value());
-  EXPECT_EQ(0UL, stats_.collector_success_.value());
-}
-
-TEST_F(LightStepSinkTest, ShutdownWhenActiveRequests) {
-  setupValidSink();
-
   EXPECT_CALL(cm_, httpAsyncClientForCluster("lightstep_saas"))
       .WillOnce(ReturnRef(cm_.async_client_));
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
-
-  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  const std::string protocol = "http/1";
-  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
-  EXPECT_CALL(random_, uuid()).WillOnce(Return("1")).WillOnce(Return("2"));
-  SystemTime start_time(std::chrono::duration<int>(1));
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
-  std::chrono::seconds duration(1);
-  EXPECT_CALL(request_info, duration()).WillOnce(Return(duration));
-  Optional<uint32_t> code(200);
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
-  Http::HeaderMapImpl request_header{{"x-request-id", "id"},
-                                     {":method", "GET"},
-                                     {":path", "sample_path"},
-                                     {"x-envoy-downstream-service-cluster", "downstream"},
-                                     {"x-client-trace-id", "client-trace-id"},
-                                     {"user-agent", "agent"}};
-
-  std::string expected_json = R"EOF(
-{
-  "runtime": {
-    "guid": "1",
-    "group_name": "Envoy-Tracing",
-    "start_micros": 1000000
-  },
-  "span_records": [
-    {
-      "span_guid": "2",
-      "span_name": "service_cluster",
-      "oldest_micros": 1000000,
-      "youngest_micros": 2000000,
-      "join_ids": [
-      {
-        "TraceKey": "x-request-id",
-        "Value": "id"
-      }
-      ,{
-        "TraceKey": "x-client-trace-id",
-        "Value": "client-trace-id"
-      }],
-      "attributes": [
-      {
-        "Key": "request line",
-        "Value": "GET sample_path http/1"
-      },
-      {
-        "Key": "response code",
-        "Value": "200"
-      },
-      {
-        "Key": "downstream cluster",
-        "Value": "downstream"
-      },
-      {
-        "Key": "user agent",
-        "Value": "agent"
-      },
-      {
-        "Key": "node id",
-        "Value": "service_node"
-      }]
-    }
-  ]
-}
-  )EOF";
-
   Http::AsyncClient::Callbacks* callback;
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([&](Http::MessagePtr& msg, Http::AsyncClient::Callbacks& callbacks,
-                           Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
-        callback = &callbacks;
-        EXPECT_EQ(expected_json, msg->bodyAsString());
-        EXPECT_EQ("token", msg->headers().get("LightStep-Access-Token"));
-        return &request;
-      }));
+  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  sink_->flushTrace(request_header, empty_header_, request_info);
+  EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
+      .WillOnce(
+          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            EXPECT_EQ("/lightstep.collector.CollectorService/Report",
+                      message->headers().get(Http::Headers::get().Path));
+            EXPECT_EQ("lightstep_saas", message->headers().get(Http::Headers::get().Host));
+            EXPECT_EQ("application/grpc", message->headers().get(Http::Headers::get().ContentType));
+
+            return &request;
+          }));
+
+  SystemTime start_time;
+  EXPECT_CALL(request_info, startTime()).Times(2).WillRepeatedly(Return(start_time));
+  Optional<uint32_t> code_1(200);
+  Optional<uint32_t> code_2(503);
+  EXPECT_CALL(request_info, responseCode())
+      .WillOnce(ReturnRef(code_1))
+      .WillOnce(ReturnRef(code_1))
+      .WillOnce(ReturnRef(code_2))
+      .WillOnce(ReturnRef(code_2));
+
+  const std::string protocol = "http/1";
+  EXPECT_CALL(request_info, protocol()).Times(2).WillRepeatedly(ReturnRef(protocol));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
+      .Times(2)
+      .WillRepeatedly(Return(2));
+
+  sink_->flushTrace(empty_header_, empty_header_, request_info);
+  sink_->flushTrace(empty_header_, empty_header_, request_info);
+
+  Http::MessagePtr msg(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+
+  msg->trailers(std::move(Http::HeaderMapPtr{new Http::HeaderMapImpl{{"grpc-status", "0"}}}));
+
+  callback->onSuccess(std::move(msg));
+
+  EXPECT_EQ(
+      1U,
+      stats_.counter(
+                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.success")
+          .value());
+
+  callback->onFailure(Http::AsyncClient::FailureReason::Reset);
+
+  EXPECT_EQ(
+      1U,
+      stats_.counter(
+                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.failure")
+          .value());
+
+  EXPECT_EQ(
+      2U,
+      stats_.counter(
+                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.total")
+          .value());
 }
 
-TEST(LightStepUtilityTest, HeadersNotSet) {
-  std::string expected_json = R"EOF(
-{
-  "runtime": {
-    "guid": "1",
-    "group_name": "Envoy-Tracing",
-    "start_micros": 1000000
-  },
-  "span_records": [
-    {
-      "span_guid": "2",
-      "span_name": "cluster",
-      "oldest_micros": 1000000,
-      "youngest_micros": 2000000,
-      "join_ids": [
-      {
-        "TraceKey": "x-request-id",
-        "Value": "id"
-      }],
-      "attributes": [
-      {
-        "Key": "request line",
-        "Value": "POST /locations http/1"
-      },
-      {
-        "Key": "response code",
-        "Value": "300"
-      },
-      {
-        "Key": "downstream cluster",
-        "Value": "-"
-      },
-      {
-        "Key": "user agent",
-        "Value": "-"
-      },
-      {
-        "Key": "node id",
-        "Value": "i485"
-      }]
-    }
-  ]
-}
-  )EOF";
+TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
+  setupValidSink();
 
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("lightstep_saas"))
+      .WillOnce(ReturnRef(cm_.async_client_));
+
+  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+  EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
+      .WillOnce(
+          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            EXPECT_EQ("/lightstep.collector.CollectorService/Report",
+                      message->headers().get(Http::Headers::get().Path));
+            EXPECT_EQ("lightstep_saas", message->headers().get(Http::Headers::get().Host));
+            EXPECT_EQ("application/grpc", message->headers().get(Http::Headers::get().ContentType));
+
+            return &request;
+          }));
+
+  SystemTime start_time;
+  EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
+  Optional<uint32_t> code(200);
+  EXPECT_CALL(request_info, responseCode()).WillOnce(ReturnRef(code)).WillOnce(ReturnRef(code));
+
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
-  SystemTime start_time(std::chrono::duration<int>(1));
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
-  std::chrono::seconds duration(1);
-  EXPECT_CALL(request_info, duration()).WillOnce(Return(duration));
-  Optional<uint32_t> code(300);
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
+      .WillOnce(Return(1));
 
-  Runtime::MockRandomGenerator random;
-  EXPECT_CALL(random, uuid()).WillOnce(Return("1")).WillOnce(Return("2"));
+  sink_->flushTrace(empty_header_, empty_header_, request_info);
 
-  Http::HeaderMapImpl request_header{
-      {"x-request-id", "id"}, {":method", "POST"}, {":path", "/locations"}};
-  Http::HeaderMapImpl empty_header;
+  Http::MessagePtr msg(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
 
-  const std::string actual_json = LightStepUtility::buildJsonBody(
-      request_header, empty_header, request_info, random, "cluster", "i485");
+  // No trailers, gRPC is considered failed.
+  callback->onSuccess(std::move(msg));
 
-  EXPECT_EQ(actual_json, expected_json);
+  EXPECT_EQ(
+      1U,
+      stats_.counter(
+                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.failure")
+          .value());
+
+  EXPECT_EQ(
+      1U,
+      stats_.counter(
+                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.total")
+          .value());
 }
 
 } // Tracing
