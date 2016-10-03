@@ -23,7 +23,8 @@ next (e.g., redirect, forward, rewrite, etc.).
     "retry_policy": "{...}",
     "rate_limit": "{...}",
     "shadow": "{...}",
-    "priority": "..."
+    "priority": "...",
+    "headers": "[]"
   }
 
 prefix
@@ -93,6 +94,9 @@ content_type
 priority
   *(optional, string)* Optionally specifies the :ref:`routing priority
   <arch_overview_http_routing_priority>`.
+
+:ref:`headers <config_http_conn_man_route_table_route_headers>`
+  *(optional, array)* Specifies a set of headers that the route should match on.
 
 .. _config_http_conn_man_route_table_route_runtime:
 
@@ -197,3 +201,27 @@ runtime_key
   from 0 to 10000, allowing for increments of 0.01% of requests to be shadowed. If the runtime key
   is specified in the configuration but not present in runtime, 0 is the default and thus 0% of
   requests will be shadowed.
+
+.. _config_http_conn_man_route_table_route_headers:
+
+Headers
+-------
+
+The router can match a request to a route based on headers specified in the route config.
+
+.. code-block:: json
+
+  [
+    {"name": "...", "value": "..."}
+  ]
+
+name
+  *(required, string)* Specifies the name of the header in the request.
+
+value
+  *(optional, string)* Specifies the value of the header. If the value is absent a request that has the
+   ``name`` header will match, regardless of the header's value.
+
+The router will check the request's headers against all the specified
+headers in the route config. A match will happen if all the headers in the route are present in
+the request with the same values (or based on presence if the ``value`` field is not in the config).

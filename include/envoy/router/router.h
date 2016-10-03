@@ -154,7 +154,7 @@ public:
    * Do potentially destructive header transforms on request headers prior to forwarding. For
    * example URL prefix rewriting, adding headers, etc. This should only be called ONCE
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
-   * @param headers supplise the request headers, which may be modified during this call.
+   * @param headers supplies the request headers, which may be modified during this call.
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers) const PURE;
 

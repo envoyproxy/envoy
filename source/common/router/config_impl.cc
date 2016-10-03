@@ -65,6 +65,15 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Obj
   if (!(isRedirect() ^ !cluster_name_.empty())) {
     throw EnvoyException("routes must be either redirects or cluster targets");
   }
+
+  if (route.hasObject("headers")) {
+    std::vector<Json::Object> config_headers = route.getObjectArray("headers");
+    for (const Json::Object& header_map : config_headers) {
+      // allow header value to be empty, allows matching to be only based on header presence.
+      config_headers_.emplace_back(Http::LowerCaseString(header_map.getString("name")),
+                                   header_map.getString("value", EMPTY_STRING));
+    }
+  }
 }
 
 bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -77,6 +86,19 @@ bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random
 
   if (!content_type_.empty()) {
     matches &= (headers.get(Http::Headers::get().ContentType) == content_type_);
+  }
+
+  if (!config_headers_.empty()) {
+    for (const HeaderData& header_data : config_headers_) {
+      if (header_data.value_ == EMPTY_STRING) {
+        matches &= headers.has(header_data.name_);
+      } else {
+        matches &= (headers.get(header_data.name_) == header_data.value_);
+      }
+      if (!matches) {
+        break;
+      }
+    }
   }
 
   return matches;

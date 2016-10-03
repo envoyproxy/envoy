@@ -194,6 +194,14 @@ private:
     uint64_t default_;
   };
 
+  struct HeaderData {
+    HeaderData(const Http::LowerCaseString& name, const std::string& value)
+        : name_(name), value_(value) {}
+
+    const Http::LowerCaseString name_;
+    const std::string value_;
+  };
+
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
 
   // Default timeout is 15s if nothing is specified in the route config.
@@ -211,6 +219,7 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
+  std::vector<HeaderData> config_headers_;
 };
 
 /**

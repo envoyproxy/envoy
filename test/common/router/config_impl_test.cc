@@ -398,6 +398,84 @@ TEST(RouteMatcherTest, Priority) {
   }
 }
 
+TEST(RouteMatcherTest, HeaderMatchedRouting) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "local_service",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_headers",
+          "headers" : [
+            {"name": "test_header", "value": "test"}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_multiple_headers",
+          "headers" : [
+            {"name": "test_header_multiple1", "value": "test1"},
+            {"name": "test_header_multiple2", "value": "test2"}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_empty_headers",
+          "headers" : [
+            {"name": "test_header_presence"}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_without_headers"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::StringLoader loader(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(loader, runtime, cm);
+
+  {
+    EXPECT_EQ("local_service_without_headers",
+              config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 0)->clusterName());
+  }
+
+  {
+    Http::HeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addViaCopy("test_header", "test");
+    EXPECT_EQ("local_service_with_headers", config.routeForRequest(headers, 0)->clusterName());
+  }
+
+  {
+    Http::HeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addViaCopy("test_header_multiple1", "test1");
+    headers.addViaCopy("test_header_multiple2", "test2");
+    EXPECT_EQ("local_service_with_multiple_headers",
+              config.routeForRequest(headers, 0)->clusterName());
+  }
+
+  {
+    Http::HeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addViaCopy("non_existent_header", "foo");
+    EXPECT_EQ("local_service_without_headers", config.routeForRequest(headers, 0)->clusterName());
+  }
+
+  {
+    Http::HeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addViaCopy("test_header_presence", "test");
+    EXPECT_EQ("local_service_with_empty_headers",
+              config.routeForRequest(headers, 0)->clusterName());
+  }
+}
+
 TEST(RouteMatcherTest, ContentType) {
   std::string json = R"EOF(
 {
