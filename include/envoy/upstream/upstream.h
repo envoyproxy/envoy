@@ -22,6 +22,11 @@ public:
     HostDescriptionPtr host_description_;
   };
 
+  enum class HealthFlag {
+    // The host is currently failing active health checks.
+    FAILED_ACTIVE_HC = 0x1
+  };
+
   /**
    * @return host specific counters.
    */
@@ -44,14 +49,25 @@ public:
   virtual std::list<std::reference_wrapper<Stats::Gauge>> gauges() const PURE;
 
   /**
-   * @return bool whether the host is currently healthy and routable.
+   * Atomically clear a health flag for a host. Flags are specified in HealthFlags.
    */
-  virtual bool healthy() const PURE;
+  virtual void healthFlagClear(HealthFlag flag) PURE;
 
   /**
-   * Set whether the host is currently healthy and routable.
+   * Atomically get whether a health flag is set for a host. Flags are specified in HealthFlags.
    */
-  virtual void healthy(bool is_healthy) PURE;
+  virtual bool healthFlagGet(HealthFlag flag) const PURE;
+
+  /**
+   * Atomically set a health flag for a host. Flags are specified in HealthFlags.
+   */
+  virtual void healthFlagSet(HealthFlag flag) PURE;
+
+  /**
+   * @return whether in aggregate a host is healthy and routable. Multiple health flags and other
+   *         information may be considered.
+   */
+  virtual bool healthy() const PURE;
 
   /**
    * @return the current load balancing weight of the host, in the range 1-100.

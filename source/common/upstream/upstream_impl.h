@@ -10,6 +10,7 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
 #include "common/stats/stats_impl.h"
@@ -68,8 +69,10 @@ public:
   std::list<std::reference_wrapper<Stats::Gauge>> gauges() const override {
     return stats_store_.gauges();
   }
-  bool healthy() const override { return healthy_; }
-  void healthy(bool is_healthy) override { healthy_ = is_healthy; }
+  void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
+  bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
+  void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
+  bool healthy() const override { return !health_flags_; }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight);
 
@@ -78,7 +81,7 @@ protected:
   createConnection(Event::Dispatcher& dispatcher, const Cluster& cluster, const std::string& url);
 
 private:
-  std::atomic<bool> healthy_{true};
+  std::atomic<uint64_t> health_flags_{};
   std::atomic<uint32_t> weight_;
 };
 

@@ -219,14 +219,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
       hosts_added.push_back(host);
 
       // If we are depending on a health checker, we initialize to unhealthy.
-      hosts_added.back()->healthy(!depend_on_hc);
+      if (depend_on_hc) {
+        hosts_added.back()->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+      }
     }
   }
 
   // If there are removed hosts, check to see if we should only delete if unhealthy.
   if (!current_hosts.empty() && depend_on_hc) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
-      if ((*i)->healthy()) {
+      if (!(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
         if ((*i)->weight() > max_host_weight) {
           max_host_weight = (*i)->weight();
         }

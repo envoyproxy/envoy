@@ -97,6 +97,7 @@ add_library(
   tracing/http_tracer_impl.cc
   upstream/cluster_manager_impl.cc
   upstream/health_checker_impl.cc
+  upstream/host_utility.cc
   upstream/load_balancer_impl.cc
   upstream/logical_dns_cluster.cc
   upstream/sds.cc
