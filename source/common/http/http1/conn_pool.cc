@@ -72,14 +72,14 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
   }
 
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
-    bool connections_canCreate =
+    bool connections_can_create =
         host_->cluster().resourceManager(priority_).connections().canCreate();
-    if (!connections_canCreate) {
+    if (!connections_can_create) {
       host_->cluster().stats().upstream_cx_overflow_.inc();
     }
 
     // If we have no connections at all, make one no matter what so we don't starve.
-    if ((ready_clients_.size() == 0 && busy_clients_.size() == 0) || connections_canCreate) {
+    if ((ready_clients_.size() == 0 && busy_clients_.size() == 0) || connections_can_create) {
       createNewConnection();
     }
 

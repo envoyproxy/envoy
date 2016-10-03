@@ -140,7 +140,7 @@ public:
   COUNTER(upstream_cx_http2_total)                                                                 \
   COUNTER(upstream_cx_connect_fail)                                                                \
   COUNTER(upstream_cx_connect_timeout)                                                             \
-  COUNTER(upstream_cx_overflow)                                                        \
+  COUNTER(upstream_cx_overflow)                                                                    \
   TIMER  (upstream_cx_connect_ms)                                                                  \
   TIMER  (upstream_cx_length_ms)                                                                   \
   COUNTER(upstream_cx_destroy)                                                                     \
