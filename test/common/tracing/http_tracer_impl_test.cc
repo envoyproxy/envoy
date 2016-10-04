@@ -430,6 +430,8 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
       stats_.counter(
                  "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.total")
           .value());
+
+  EXPECT_EQ(2U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
 TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
@@ -486,6 +488,7 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
       stats_.counter(
                  "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.total")
           .value());
+  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
 } // Tracing

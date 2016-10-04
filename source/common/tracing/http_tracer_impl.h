@@ -28,6 +28,12 @@ struct HttpTracerStats {
   HTTP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+#define LIGHTSTEP_TRACER_STATS(COUNTER) COUNTER(spans_sent)
+
+struct LightstepTracerStats {
+  LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
@@ -103,6 +109,7 @@ public:
   const std::string& collectorCluster() { return collector_cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Store& statsStore() { return stats_store_; }
+  LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
   static const std::string LIGHTSTEP_SERVICE;
   static const std::string LIGHTSTEP_METHOD;
@@ -125,6 +132,7 @@ private:
   const std::string collector_cluster_;
   Upstream::ClusterManager& cm_;
   Stats::Store& stats_store_;
+  LightstepTracerStats tracer_stats_;
   const std::string service_node_;
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;

@@ -123,6 +123,7 @@ void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   uint64_t min_flush_spans =
       sink_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U);
   if (builder_.pendingSpans() == min_flush_spans) {
+    sink_.tracerStats().spans_sent_.add(min_flush_spans);
     lightstep::collector::ReportRequest request;
     std::swap(request, builder_.pending());
 
@@ -154,8 +155,10 @@ LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManage
                              ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                              std::unique_ptr<lightstep::TracerOptions> options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
-      stats_store_(stats), service_node_(service_node), tls_(tls), runtime_(runtime),
-      options_(std::move(options)), tls_slot_(tls.allocateSlot()) {
+      stats_store_(stats),
+      tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
+      service_node_(service_node), tls_(tls), runtime_(runtime), options_(std::move(options)),
+      tls_slot_(tls.allocateSlot()) {
   if (!cm_.get(collector_cluster_)) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
                                      collector_cluster_));
