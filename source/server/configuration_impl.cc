@@ -83,7 +83,6 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
           opts->access_token = server_.api().fileReadToEnd(sink.getString("access_token_file"));
           StringUtil::rtrim(opts->access_token);
 
-          opts->tracer_attributes["lightstep.guid"] = rand.uuid();
           opts->tracer_attributes["lightstep.component_name"] =
               server_.options().serviceClusterName();
           opts->guid_generator = [&rand]() { return rand.random(); };
