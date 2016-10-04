@@ -30,33 +30,36 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  double zone_to_all_percent =
+  // Do not perform zone routing for small clusters
+  if (host_set_.healthyHosts().size() <
+      runtime_.snapshot().getInteger("upstream.zone_routing.min_cluster_size", 6)) {
+    stats_.zone_cluster_too_small_.inc();
+    return host_set_.healthyHosts();
+  }
+
+  double zone_host_percent =
       100.0 * host_set_.localZoneHealthyHosts().size() / host_set_.healthyHosts().size();
-  double expected_percent = 100.0 / stats_.upstream_zone_count_.value();
+  double zone_expected_percent = 100.0 / stats_.upstream_zone_count_.value();
 
-  uint64_t zone_percent_diff =
-      runtime_.snapshot().getInteger("upstream.zone_routing.percent_diff", 3);
-
-  // Hosts should be roughly equally distributed between zones.
-  if (std::abs(zone_to_all_percent - expected_percent) > zone_percent_diff) {
-    stats_.upstream_zone_above_threshold_.inc();
-
-    return host_set_.healthyHosts();
+  // If local zone percent is higher than expected, we can route whole current zone traffic and
+  // will also get some cross zone traffic from other zones.
+  if (zone_host_percent >= zone_expected_percent) {
+    stats_.zone_over_percentage_.inc();
+    return host_set_.localZoneHealthyHosts();
   }
 
-  stats_.upstream_zone_within_threshold_.inc();
-
-  uint64_t zone_panic_threshold =
-      runtime_.snapshot().getInteger("upstream.zone_routing.healthy_panic_threshold", 80);
-  double zone_healthy_percent =
-      100.0 * host_set_.localZoneHealthyHosts().size() / host_set_.localZoneHosts().size();
-  if (zone_healthy_percent < zone_panic_threshold) {
-    stats_.upstream_zone_healthy_panic_.inc();
-
+  // If current zone percent is lower than expected we should partially route requests from the same
+  // zone. Scale by 100 for better precision.
+  const uint64_t scale_factor = 100;
+  uint64_t req_percent_to_route =
+      static_cast<uint64_t>(scale_factor * 100 * zone_host_percent / zone_expected_percent);
+  if (random_.random() % 10000 < req_percent_to_route) {
+    stats_.zone_routing_sampled_.inc();
+    return host_set_.localZoneHealthyHosts();
+  } else {
+    stats_.zone_routing_no_sampled_.inc();
     return host_set_.healthyHosts();
   }
-
-  return host_set_.localZoneHealthyHosts();
 }
 
 ConstHostPtr RoundRobinLoadBalancer::chooseHost() {
@@ -71,7 +74,7 @@ ConstHostPtr RoundRobinLoadBalancer::chooseHost() {
 LeastRequestLoadBalancer::LeastRequestLoadBalancer(const HostSet& host_set, ClusterStats& stats,
                                                    Runtime::Loader& runtime,
                                                    Runtime::RandomGenerator& random)
-    : LoadBalancerBase(host_set, stats, runtime), random_(random) {
+    : LoadBalancerBase(host_set, stats, runtime, random) {
   host_set.addMemberUpdateCb(
       [this](const std::vector<HostPtr>&, const std::vector<HostPtr>& hosts_removed) -> void {
         if (last_host_) {
