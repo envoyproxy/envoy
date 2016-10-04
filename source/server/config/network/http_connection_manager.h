@@ -64,6 +64,7 @@ public:
                                         Http::ServerConnectionCallbacks& callbacks) override;
   std::chrono::milliseconds drainTimeout() override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
+  bool generateRequestId() override { return generate_request_id_; }
   const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   const Router::Config& routeConfig() override { return *route_config_; }
   const std::string& serverName() override { return server_name_; }
@@ -103,6 +104,7 @@ private:
   Optional<std::chrono::milliseconds> idle_timeout_;
   Router::ConfigPtr route_config_;
   std::chrono::milliseconds drain_timeout_;
+  bool generate_request_id_;
 };
 
 /**

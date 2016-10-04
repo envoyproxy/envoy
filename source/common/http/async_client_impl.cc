@@ -14,7 +14,7 @@ AsyncClientImpl::AsyncClientImpl(const Upstream::Cluster& cluster, Stats::Store&
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  const std::string& local_address)
     : cluster_(cluster), config_("http.async-client.", local_zone_name, stats_store, cm, runtime,
-                                 random, std::move(shadow_writer)),
+                                 random, std::move(shadow_writer), true),
       dispatcher_(dispatcher), local_address_(local_address) {}
 
 AsyncClientImpl::~AsyncClientImpl() { ASSERT(active_requests_.empty()); }

@@ -38,7 +38,7 @@ public:
   RouterTest()
       : shadow_writer_(new MockShadowWriter()),
         config_("test.", "from_az", stats_store_, cm_, runtime_, random_,
-                ShadowWriterPtr{shadow_writer_}),
+                ShadowWriterPtr{shadow_writer_}, true),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     ON_CALL(*cm_.conn_pool_.host_, url()).WillByDefault(ReturnRef(host_url_));

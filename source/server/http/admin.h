@@ -44,6 +44,7 @@ public:
                                         Http::ServerConnectionCallbacks& callbacks) override;
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
+  bool generateRequestId() override { return false; }
   const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   const Router::Config& routeConfig() override { return *route_config_; }
   const std::string& serverName() override {

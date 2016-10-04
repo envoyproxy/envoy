@@ -18,7 +18,10 @@ const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
 
 void StreamEncoderImpl::encodeHeader(const std::string& key, const std::string& value) {
-  output_buffer_.add(fmt::format("{}: {}\r\n", key, value));
+  output_buffer_.add(key);
+  output_buffer_.add(": ");
+  output_buffer_.add(value);
+  output_buffer_.add(CRLF);
 }
 
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
@@ -125,8 +128,11 @@ void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end
   started_response_ = true;
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
-  output_buffer_.add(fmt::format("HTTP/1.1 {} {}\r\n", numeric_status,
-                                 CodeUtility::toString(static_cast<Code>(numeric_status))));
+  output_buffer_.add("HTTP/1.1 ");
+  output_buffer_.add(std::to_string(numeric_status));
+  output_buffer_.add(" ");
+  output_buffer_.add(CodeUtility::toString(static_cast<Code>(numeric_status)));
+  output_buffer_.add(CRLF);
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
 }
 
@@ -141,7 +147,10 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
     head_request_ = true;
   }
 
-  output_buffer_.add(fmt::format("{} {} HTTP/1.1\r\n", method, path));
+  output_buffer_.add(method);
+  output_buffer_.add(" ");
+  output_buffer_.add(path);
+  output_buffer_.add(" HTTP/1.1\r\n");
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
 }
 
@@ -265,8 +274,14 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 int ConnectionImpl::onHeadersCompleteBase() {
   conn_log_trace("headers complete", connection_);
   completeLastHeader();
-  current_header_map_->addViaMoveValue(
-      Headers::get().Version, fmt::format("HTTP/{}.{}", parser_.http_major, parser_.http_minor));
+  if (parser_.http_major == 1 && parser_.http_minor == 1) {
+    current_header_map_->addViaMoveValue(Headers::get().Version, "HTTP/1.1");
+  } else {
+    // This is not necessarily true, but it's good enough since higher layers only care if this is
+    // HTTP/1.1 or not.
+    current_header_map_->addViaMoveValue(Headers::get().Version, "HTTP/1.0");
+  }
+
   int rc = onHeadersComplete(std::move(current_header_map_));
   current_header_map_.reset();
   header_parsing_state_ = HeaderParsingState::Done;
