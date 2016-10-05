@@ -3,6 +3,7 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
+#include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
@@ -10,9 +11,6 @@
 #include "common/runtime/uuid_util.h"
 
 namespace Tracing {
-
-const std::string LightStepSink::LIGHTSTEP_SERVICE = "lightstep.collector.CollectorService";
-const std::string LightStepSink::LIGHTSTEP_METHOD = "Report";
 
 void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
   std::string x_request_id = request_headers.get(Http::Headers::get().RequestId);
@@ -160,9 +158,9 @@ void LightStepRecorder::flushSpans() {
     lightstep::collector::ReportRequest request;
     std::swap(request, builder_.pending());
 
-    Http::MessagePtr message =
-        Grpc::Common::prepareHeaders(sink_.collectorCluster(), LightStepSink::LIGHTSTEP_SERVICE,
-                                     LightStepSink::LIGHTSTEP_METHOD);
+    Http::MessagePtr message = Grpc::Common::prepareHeaders(sink_.collectorCluster(),
+                                                            lightstep::CollectorServiceFullName(),
+                                                            lightstep::CollectorMethodName());
 
     message->body(Grpc::Common::serializeBody(std::move(request)));
 
@@ -224,7 +222,8 @@ std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo&
   return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
 }
 
-void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
+void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
+                               const Http::HeaderMap& response_headers,
                                const Http::AccessLog::RequestInfo& request_info) {
   lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
       "full request",
@@ -243,6 +242,11 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag("node id", service_node_),
       });
 
+  uint64_t response_code = Http::Utility::getResponseStatus(response_headers);
+  if (Http::CodeUtility::is5xx(response_code)) {
+    span.SetTag("error", "true");
+  }
+
   if (request_headers.has(Http::Headers::get().ClientTraceId)) {
     span.SetTag("join:x-client-trace-id", request_headers.get(Http::Headers::get().ClientTraceId));
   }
@@ -252,7 +256,7 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
 
 void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
   Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                           LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
+                           lightstep::CollectorServiceFullName(), lightstep::CollectorMethodName(),
                            false);
 }
 
@@ -261,12 +265,12 @@ void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
     Grpc::Common::validateResponse(*msg);
 
     Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                             LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
-                             true);
+                             lightstep::CollectorServiceFullName(),
+                             lightstep::CollectorMethodName(), true);
   } catch (const Grpc::Exception& ex) {
     Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                             LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
-                             false);
+                             lightstep::CollectorServiceFullName(),
+                             lightstep::CollectorMethodName(), false);
   }
 }
 
