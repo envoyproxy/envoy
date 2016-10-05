@@ -464,7 +464,7 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
 
   timer_->callback_();
 
-  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_flushed").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 

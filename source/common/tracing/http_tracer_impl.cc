@@ -117,7 +117,7 @@ void HttpTracerImpl::populateStats(const Decision& decision) {
 LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink)
     : builder_(tracer), sink_(sink) {
   flush_timer_ = sink_.dispatcher().createTimer([this]() -> void {
-    sink_.tracerStats().spans_flushed_.inc();
+    sink_.tracerStats().timer_flushed_.inc();
     flushSpans();
     flush_timer_->enableTimer(std::chrono::milliseconds(1000));
   });

@@ -30,7 +30,7 @@ struct HttpTracerStats {
 
 #define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
   COUNTER(spans_sent)                                                                              \
-  COUNTER(spans_flushed)
+  COUNTER(timer_flushed)
 
 struct LightstepTracerStats {
   LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
