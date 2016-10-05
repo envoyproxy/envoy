@@ -114,14 +114,20 @@ void HttpTracerImpl::populateStats(const Decision& decision) {
   }
 }
 
-LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink)
+LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink,
+                                     Event::Dispatcher& dispatcher)
     : builder_(tracer), sink_(sink) {
-  flush_timer_ = sink_.dispatcher().createTimer([this]() -> void {
+  flush_timer_ = dispatcher.createTimer([this]() -> void {
     sink_.tracerStats().timer_flushed_.inc();
     flushSpans();
-    flush_timer_->enableTimer(std::chrono::milliseconds(1000));
+    uint64_t flush_interval =
+        sink_.runtime().snapshot().getInteger("tracing.lightstep.flush_interval_ms", 1000U);
+    flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
   });
-  flush_timer_->enableTimer(std::chrono::milliseconds(1000));
+
+  uint64_t flush_interval =
+      sink_.runtime().snapshot().getInteger("tracing.lightstep.flush_interval_ms", 1000U);
+  flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
 
 void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
@@ -141,23 +147,29 @@ bool LightStepRecorder::FlushWithTimeout(lightstep::Duration) {
 }
 
 std::unique_ptr<lightstep::Recorder>
-LightStepRecorder::NewInstance(LightStepSink& sink, const lightstep::TracerImpl& tracer) {
-  return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(tracer, sink));
+LightStepRecorder::NewInstance(LightStepSink& sink, Event::Dispatcher& dispatcher,
+                               const lightstep::TracerImpl& tracer) {
+  return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(tracer, sink, dispatcher));
 }
 
 void LightStepRecorder::flushSpans() {
-  sink_.tracerStats().spans_sent_.add(builder_.pendingSpans());
-  lightstep::collector::ReportRequest request;
-  std::swap(request, builder_.pending());
+  if (builder_.pendingSpans() != 0) {
+    sink_.tracerStats().spans_sent_.add(builder_.pendingSpans());
+    lightstep::collector::ReportRequest request;
+    std::swap(request, builder_.pending());
 
-  Http::MessagePtr message = Grpc::Common::prepareHeaders(
-      sink_.collectorCluster(), LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD);
+    Http::MessagePtr message =
+        Grpc::Common::prepareHeaders(sink_.collectorCluster(), LightStepSink::LIGHTSTEP_SERVICE,
+                                     LightStepSink::LIGHTSTEP_METHOD);
 
-  message->body(Grpc::Common::serializeBody(std::move(request)));
+    message->body(Grpc::Common::serializeBody(std::move(request)));
 
-  sink_.clusterManager()
-      .httpAsyncClientForCluster(sink_.collectorCluster())
-      .send(std::move(message), *this, std::chrono::milliseconds(5000));
+    uint64_t timeout =
+        sink_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
+    sink_.clusterManager()
+        .httpAsyncClientForCluster(sink_.collectorCluster())
+        .send(std::move(message), *this, std::chrono::milliseconds(timeout));
+  }
 }
 
 LightStepSink::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer, LightStepSink& sink)
@@ -183,10 +195,10 @@ LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManage
         fmt::format("{} collector cluster must support http2 for gRPC calls", collector_cluster_));
   }
 
-  tls_.set(tls_slot_, [this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr {
+  tls_.set(tls_slot_, [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
     lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
-        *options_,
-        std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::placeholders::_1)));
+        *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::ref(dispatcher),
+                             std::placeholders::_1)));
 
     return ThreadLocal::ThreadLocalObjectPtr{new TlsLightStepTracer(std::move(tracer), *this)};
   });

@@ -146,7 +146,8 @@ private:
 
 class LightStepRecorder : public lightstep::Recorder, Http::AsyncClient::Callbacks {
 public:
-  LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink);
+  LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink,
+                    Event::Dispatcher& dispatcher);
 
   // lightstep::Recorder
   void RecordSpan(lightstep::collector::Span&& span) override;
@@ -158,6 +159,7 @@ public:
 
   void flushSpans();
   static std::unique_ptr<lightstep::Recorder> NewInstance(LightStepSink& sink,
+                                                          Event::Dispatcher& dispatcher,
                                                           const lightstep::TracerImpl& tracer);
 
 private:
