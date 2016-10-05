@@ -281,12 +281,12 @@ public:
         .WillByDefault(ReturnRef(cm_.async_client_));
 
     if (init_timer) {
-      timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+      timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
     }
 
-    sink_.reset(new LightStepSink(config, cm_, dispatcher_, stats_, "service_node", tls_, runtime_,
-                                  std::move(opts)));
+    sink_.reset(new LightStepSink(config, cm_, tls_.dispatcher_, stats_, "service_node", tls_,
+                                  runtime_, std::move(opts)));
   }
 
   void setupValidSink() {
@@ -307,7 +307,6 @@ public:
   NiceMock<Event::MockTimer>* timer_;
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockCluster> cluster_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -406,6 +405,8 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .Times(2)
       .WillRepeatedly(Return(2));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
 
   sink_->flushTrace(empty_header_, empty_header_, request_info);
   sink_->flushTrace(empty_header_, empty_header_, request_info);
@@ -461,6 +462,10 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   sink_->flushTrace(empty_header_, empty_header_, request_info);
   // Timer should be re-enabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", 1000U))
+      .WillOnce(Return(1000U));
 
   timer_->callback_();
 
@@ -499,6 +504,8 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
   EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
 
   sink_->flushTrace(empty_header_, empty_header_, request_info);
 
