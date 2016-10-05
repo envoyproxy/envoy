@@ -120,14 +120,10 @@ LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightS
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     sink_.tracerStats().timer_flushed_.inc();
     flushSpans();
-    uint64_t flush_interval =
-        sink_.runtime().snapshot().getInteger("tracing.lightstep.flush_interval_ms", 1000U);
-    flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
+    enableTimer();
   });
 
-  uint64_t flush_interval =
-      sink_.runtime().snapshot().getInteger("tracing.lightstep.flush_interval_ms", 1000U);
-  flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
+  enableTimer();
 }
 
 void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
@@ -150,6 +146,12 @@ std::unique_ptr<lightstep::Recorder>
 LightStepRecorder::NewInstance(LightStepSink& sink, Event::Dispatcher& dispatcher,
                                const lightstep::TracerImpl& tracer) {
   return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(tracer, sink, dispatcher));
+}
+
+void LightStepRecorder::enableTimer() {
+  uint64_t flush_interval =
+      sink_.runtime().snapshot().getInteger("tracing.lightstep.flush_interval_ms", 1000U);
+  flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
 
 void LightStepRecorder::flushSpans() {
@@ -176,12 +178,11 @@ LightStepSink::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer, 
     : tracer_(tracer), sink_(sink) {}
 
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                             Event::Dispatcher& dispatcher, Stats::Store& stats,
-                             const std::string& service_node, ThreadLocal::Instance& tls,
-                             Runtime::Loader& runtime,
+                             Stats::Store& stats, const std::string& service_node,
+                             ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                              std::unique_ptr<lightstep::TracerOptions> options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
-      dispatcher_(dispatcher), stats_store_(stats),
+      stats_store_(stats),
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       service_node_(service_node), tls_(tls), runtime_(runtime), options_(std::move(options)),
       tls_slot_(tls.allocateSlot()) {

@@ -285,8 +285,8 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
     }
 
-    sink_.reset(new LightStepSink(config, cm_, tls_.dispatcher_, stats_, "service_node", tls_,
-                                  runtime_, std::move(opts)));
+    sink_.reset(
+        new LightStepSink(config, cm_, stats_, "service_node", tls_, runtime_, std::move(opts)));
   }
 
   void setupValidSink() {

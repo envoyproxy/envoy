@@ -100,9 +100,8 @@ private:
 class LightStepSink : public HttpSink {
 public:
   LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                Event::Dispatcher& dispatcher, Stats::Store& stats, const std::string& service_node,
-                ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                std::unique_ptr<lightstep::TracerOptions> options);
+                Stats::Store& stats, const std::string& service_node, ThreadLocal::Instance& tls,
+                Runtime::Loader& runtime, std::unique_ptr<lightstep::TracerOptions> options);
 
   // Tracer::HttpSink
   void flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
@@ -113,7 +112,6 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Store& statsStore() { return stats_store_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
-  Event::Dispatcher& dispatcher() { return dispatcher_; }
 
   static const std::string LIGHTSTEP_SERVICE;
   static const std::string LIGHTSTEP_METHOD;
@@ -134,7 +132,6 @@ private:
 
   const std::string collector_cluster_;
   Upstream::ClusterManager& cm_;
-  Event::Dispatcher& dispatcher_;
   Stats::Store& stats_store_;
   LightstepTracerStats tracer_stats_;
   const std::string service_node_;
@@ -157,12 +154,14 @@ public:
   void onSuccess(Http::MessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
-  void flushSpans();
   static std::unique_ptr<lightstep::Recorder> NewInstance(LightStepSink& sink,
                                                           Event::Dispatcher& dispatcher,
                                                           const lightstep::TracerImpl& tracer);
 
 private:
+  void enableTimer();
+  void flushSpans();
+
   lightstep::ReportBuilder builder_;
   LightStepSink& sink_;
   Event::TimerPtr flush_timer_;

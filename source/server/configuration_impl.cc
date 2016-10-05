@@ -88,7 +88,7 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
           opts->guid_generator = [&rand]() { return rand.random(); };
 
           http_tracer_->addSink(Tracing::HttpSinkPtr{new Tracing::LightStepSink(
-              sink.getObject("config"), *cluster_manager_, server_.dispatcher(), server_.stats(),
+              sink.getObject("config"), *cluster_manager_, server_.stats(),
               server_.options().serviceNodeName(), server_.threadLocal(), server_.runtime(),
               std::move(opts))});
         } else {
