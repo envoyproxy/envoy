@@ -91,6 +91,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
   const std::string uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  ON_CALL(config_, isTracing()).WillByDefault(Return(true));
 
   {
     // Internal request, make traceable
@@ -127,6 +128,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_remote_address));
   ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillByDefault(Return(true));
+  ON_CALL(config_, isTracing()).WillByDefault(Return(true));
 
   {
     HeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},

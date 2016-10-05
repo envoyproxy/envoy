@@ -25,7 +25,7 @@ else
   TEST_TARGET="envoy.check"
 fi
 
-mkdir build
+mkdir -p build
 cd build
 
 cmake \

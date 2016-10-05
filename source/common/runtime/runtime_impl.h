@@ -159,7 +159,13 @@ private:
     }
 
     bool featureEnabled(const std::string& key, uint64_t default_value) const override {
-      return featureEnabled(key, default_value, generator_.random());
+      if (default_value == 0) {
+        return false;
+      } else if (default_value == 100) {
+        return true;
+      } else {
+        return featureEnabled(key, default_value, generator_.random());
+      }
     }
 
     bool featureEnabled(const std::string& key, uint64_t default_value,

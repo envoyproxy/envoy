@@ -23,7 +23,8 @@ HTTP connection manager
       "idle_timeout_s": "...",
       "drain_timeout_ms": "...",
       "access_log": [],
-      "use_remote_address": "..."
+      "use_remote_address": "...",
+      "generate_request_id": "..."
     }
   }
 
@@ -129,6 +130,12 @@ use_remote_address
   :ref:`config_http_conn_man_headers_x-forwarded-for`,
   :ref:`config_http_conn_man_headers_x-envoy-internal`, and
   :ref:`config_http_conn_man_headers_x-envoy-external-address` for more information.
+
+generate_request_id
+  *(optional, boolean)* Whether the connection manager will generate the
+  :ref:`config_http_conn_man_headers_x-request-id` header if it does not exist. This defaults to
+  *true*. Generating a random UUID4 is expensive so in high throughput scenarios where this
+  feature is not desired it can be disabled.
 
 .. toctree::
   :hidden:

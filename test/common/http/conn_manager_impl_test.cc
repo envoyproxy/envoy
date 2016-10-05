@@ -69,6 +69,7 @@ public:
   }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
+  bool generateRequestId() override { return true; }
   const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   const Router::Config& routeConfig() override { return route_config_; }
   const std::string& serverName() override { return server_name_; }

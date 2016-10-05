@@ -114,6 +114,12 @@ public:
   virtual FilterChainFactory& filterFactory() PURE;
 
   /**
+   * @return whether the connection manager will generate a fresh x-request-id if the request does
+   *         not have one.
+   */
+  virtual bool generateRequestId() PURE;
+
+  /**
    * @return optional idle timeout for incoming connection manager connections.
    */
   virtual const Optional<std::chrono::milliseconds>& idleTimeout() PURE;

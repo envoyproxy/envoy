@@ -11,7 +11,8 @@ namespace Configuration {
 class FilterConfig : public HttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                             const Json::Object&, const std::string& stat_prefix,
+                                             const Json::Object& json_config,
+                                             const std::string& stat_prefix,
                                              Instance& server) override {
     if (type != HttpFilterType::Decoder || name != "router") {
       return nullptr;
@@ -20,7 +21,8 @@ public:
     Router::FilterConfigPtr config(new Router::FilterConfig(
         stat_prefix, server.options().serviceZone(), server.stats(), server.clusterManager(),
         server.runtime(), server.random(),
-        Router::ShadowWriterPtr{new Router::ShadowWriterImpl(server.clusterManager())}));
+        Router::ShadowWriterPtr{new Router::ShadowWriterImpl(server.clusterManager())},
+        json_config.getBoolean("dynamic_stats", true)));
 
     return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(
