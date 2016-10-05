@@ -97,7 +97,7 @@ public:
 
   // Event::Timer
   MOCK_METHOD0(disableTimer, void());
-  MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds& d));
+  MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds&));
 
   TimerCb callback_;
 };

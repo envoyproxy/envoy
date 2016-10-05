@@ -119,6 +119,7 @@ LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightS
   flush_timer_ = sink_.dispatcher().createTimer([this]() -> void {
     sink_.tracerStats().spans_flushed_.inc();
     flushSpans();
+    flush_timer_->enableTimer(std::chrono::milliseconds(1000));
   });
   flush_timer_->enableTimer(std::chrono::milliseconds(1000));
 }
