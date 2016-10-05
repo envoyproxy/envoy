@@ -20,7 +20,7 @@ redirection, the filter also handles retry, statistics, etc.
 
 dynamic_stats
   *(optional, boolean)* Whether the router generates :ref:`dynamic cluster statistics
-  <config_cluster_manager_cluster_stats_dynamic_http>`. Defaults to true. Can be disabled in high
+  <config_cluster_manager_cluster_stats_dynamic_http>`. Defaults to *true*. Can be disabled in high
   performance scenarios.
 
 .. _config_http_filters_router_headers:
