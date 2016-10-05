@@ -30,9 +30,11 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  // Do not perform zone routing for small clusters
-  if (host_set_.healthyHosts().size() <
-      runtime_.snapshot().getInteger("upstream.zone_routing.min_cluster_size", 6)) {
+  // Do not perform zone routing for small clusters.
+  uint64_t min_cluster_size =
+      runtime_.snapshot().getInteger("upstream.zone_routing.min_cluster_size", 6U);
+
+  if (host_set_.healthyHosts().size() < min_cluster_size) {
     stats_.zone_cluster_too_small_.inc();
     return host_set_.healthyHosts();
   }
