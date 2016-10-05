@@ -115,7 +115,13 @@ void HttpTracerImpl::populateStats(const Decision& decision) {
 }
 
 LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink)
-    : builder_(tracer), sink_(sink) {}
+    : builder_(tracer), sink_(sink) {
+  flush_timer_ = sink_.dispatcher().createTimer([this]() -> void {
+    sink_.tracerStats().spans_flushed_.inc();
+    flushSpans();
+  });
+  flush_timer_->enableTimer(std::chrono::milliseconds(1000));
+}
 
 void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   builder_.addSpan(std::move(span));
@@ -123,19 +129,7 @@ void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   uint64_t min_flush_spans =
       sink_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U);
   if (builder_.pendingSpans() == min_flush_spans) {
-    sink_.tracerStats().spans_sent_.add(min_flush_spans);
-    lightstep::collector::ReportRequest request;
-    std::swap(request, builder_.pending());
-
-    Http::MessagePtr message =
-        Grpc::Common::prepareHeaders(sink_.collectorCluster(), LightStepSink::LIGHTSTEP_SERVICE,
-                                     LightStepSink::LIGHTSTEP_METHOD);
-
-    message->body(Grpc::Common::serializeBody(std::move(request)));
-
-    sink_.clusterManager()
-        .httpAsyncClientForCluster(sink_.collectorCluster())
-        .send(std::move(message), *this, std::chrono::milliseconds(5000));
+    flushSpans();
   }
 }
 
@@ -150,12 +144,31 @@ LightStepRecorder::NewInstance(LightStepSink& sink, const lightstep::TracerImpl&
   return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(tracer, sink));
 }
 
+void LightStepRecorder::flushSpans() {
+  sink_.tracerStats().spans_sent_.add(builder_.pendingSpans());
+  lightstep::collector::ReportRequest request;
+  std::swap(request, builder_.pending());
+
+  Http::MessagePtr message = Grpc::Common::prepareHeaders(
+      sink_.collectorCluster(), LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD);
+
+  message->body(Grpc::Common::serializeBody(std::move(request)));
+
+  sink_.clusterManager()
+      .httpAsyncClientForCluster(sink_.collectorCluster())
+      .send(std::move(message), *this, std::chrono::milliseconds(5000));
+}
+
+LightStepSink::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer, LightStepSink& sink)
+    : tracer_(tracer), sink_(sink) {}
+
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                             Stats::Store& stats, const std::string& service_node,
-                             ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                             Event::Dispatcher& dispatcher, Stats::Store& stats,
+                             const std::string& service_node, ThreadLocal::Instance& tls,
+                             Runtime::Loader& runtime,
                              std::unique_ptr<lightstep::TracerOptions> options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
-      stats_store_(stats),
+      dispatcher_(dispatcher), stats_store_(stats),
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       service_node_(service_node), tls_(tls), runtime_(runtime), options_(std::move(options)),
       tls_slot_(tls.allocateSlot()) {
