@@ -37,9 +37,9 @@ public:
     stats_.upstream_zone_count_.set(all_destination_cluster.size());
 
     std::unordered_map<std::string, std::vector<HostPtr>> healthy_map =
-      generateHostsPerZone(healthy_destination_cluster);
+        generateHostsPerZone(healthy_destination_cluster);
     std::unordered_map<std::string, std::vector<HostPtr>> all_map =
-      generateHostsPerZone(all_destination_cluster);
+        generateHostsPerZone(all_destination_cluster);
 
     std::vector<HostPtr> originating_hosts = generateHostList(originating_cluster);
     cluster_.healthy_hosts_ = generateHostList(healthy_destination_cluster);
@@ -71,7 +71,7 @@ public:
    * Generate list of hosts based on number of hosts in the given zone.
    * @param hosts number of hosts per zone.
    */
-  std::vector<HostPtr> generateHostList(const std::vector <uint32_t> &hosts) {
+  std::vector<HostPtr> generateHostList(const std::vector<uint32_t>& hosts) {
     std::vector<HostPtr> ret;
     for (size_t i = 0; i < hosts.size(); ++i) {
       const std::string zone = std::to_string(i);
@@ -89,7 +89,7 @@ public:
    * @param hosts number of hosts per zone.
    */
   std::unordered_map<std::string, std::vector<HostPtr>>
-  generateHostsPerZone(const std::vector <uint32_t> &hosts) {
+  generateHostsPerZone(const std::vector<uint32_t>& hosts) {
     std::unordered_map<std::string, std::vector<HostPtr>> ret;
     for (size_t i = 0; i < hosts.size(); ++i) {
       const std::string zone = std::to_string(i);
