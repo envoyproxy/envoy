@@ -85,7 +85,6 @@ public:
       std::vector<HostPtr> zone_hosts;
 
       for (uint32_t j = 0; j < hosts[i]; ++j) {
-        // url:zone:host_number
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
         zone_hosts.push_back(newTestHost(cluster_, url, 1, zone));
       }
