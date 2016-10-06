@@ -24,7 +24,7 @@ public:
 
   /**
    * @param originating_cluster total number of hosts in each zone in originating cluster.
-   * @param all_destination_cluster total number of all hosts in each zone in upstream cluster.
+   * @param all_destination_cluster total number of hosts in each zone in upstream cluster.
    * @param healthy_destination_cluster total number of healthy hosts in each zone in upstream
    * cluster.
    */
@@ -33,7 +33,6 @@ public:
     setupRuntime();
     stats_.upstream_zone_count_.set(all_destination_cluster.size());
 
-    // zone to list of healthy hosts
     std::unordered_map<std::string, std::vector<HostPtr>> healthy_map =
         generateMap(healthy_destination_cluster);
     std::unordered_map<std::string, std::vector<HostPtr>> all_map =
@@ -54,7 +53,7 @@ public:
       hits[selected->url()]++;
     }
 
-    for (auto& host_hit_num_pair : hits) {
+    for (const auto& host_hit_num_pair : hits) {
       std::cout << fmt::format("url:{}, hits:{}", host_hit_num_pair.first, host_hit_num_pair.second)
                 << std::endl;
     }
@@ -70,7 +69,6 @@ public:
     for (size_t i = 0; i < hosts.size(); ++i) {
       const std::string zone = std::to_string(i);
       for (uint32_t j = 0; j < hosts[i]; ++j) {
-        // url:zone:host_number
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
         ret.push_back(newTestHost(cluster_, url, 1, zone));
       }
