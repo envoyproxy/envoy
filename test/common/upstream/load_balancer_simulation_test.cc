@@ -25,6 +25,8 @@ public:
   }
 
   /**
+   * Run simulation with given parameters. Generate statistics on per host requests.
+   *
    * @param originating_cluster total number of hosts in each zone in originating cluster.
    * @param all_destination_cluster total number of hosts in each zone in upstream cluster.
    * @param healthy_destination_cluster total number of healthy hosts in each zone in upstream
