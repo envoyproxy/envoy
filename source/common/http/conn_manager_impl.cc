@@ -155,9 +155,16 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
     try {
       codec_->dispatch(data);
     } catch (const CodecProtocolException& e) {
-      // HTTP/1.1 codec has already sent a 400 response if possible.
+      // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
+      // GOAWAY.
       conn_log_debug("dispatch error: {}", read_callbacks_->connection(), e.what());
       config_.stats().named_.downstream_cx_protocol_error_.inc();
+
+      // In the protocol error case, we need to reset all streams now. Since we do a flush write,
+      // the connection might stick around long enough for a pending stream to come back and try
+      // to encode.
+      resetAllStreams();
+
       read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       return Network::FilterStatus::StopIteration;
     }
@@ -192,6 +199,13 @@ void ConnectionManagerImpl::onBufferChange(Network::ConnectionBufferType type, u
                                       config_.stats().named_.downstream_cx_tx_bytes_buffered_);
 }
 
+void ConnectionManagerImpl::resetAllStreams() {
+  while (!streams_.empty()) {
+    // Mimic a downstream reset in this case.
+    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination);
+  }
+}
+
 void ConnectionManagerImpl::onEvent(uint32_t events) {
   if (events & Network::ConnectionEvent::LocalClose) {
     config_.stats().named_.downstream_cx_destroy_local_.inc();
@@ -224,11 +238,7 @@ void ConnectionManagerImpl::onEvent(uint32_t events) {
 
     config_.stats().named_.downstream_cx_destroy_active_rq_.inc();
     user_agent_.onConnectionDestroy(events, true);
-
-    while (!streams_.empty()) {
-      // Mimic a downstream reset in this case.
-      streams_.front()->onResetStream(StreamResetReason::ConnectionTermination);
-    }
+    resetAllStreams();
   }
 }
 

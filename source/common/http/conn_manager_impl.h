@@ -389,6 +389,7 @@ private:
    */
   void destroyStream(ActiveStream& stream);
 
+  void resetAllStreams();
   void onIdleTimeout();
   void onDrainTimeout();
   void startDrainSequence();
