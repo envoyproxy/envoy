@@ -24,6 +24,8 @@ We welcome contributions from the community. Here are some guidelines.
   includes both const and non-const references.
 * Function names using camel case starting with a lower case letter (e.g., "doFoo()").
 * Struct/Class member variables have a '\_' postfix (e.g., "int foo\_;").
+* There are probably a few other things missing from this list. We will add them as they
+  are brought to our attention.
 
 # Submitting a PR
 
