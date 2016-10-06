@@ -23,7 +23,7 @@ We welcome contributions from the community. Here are some guidelines.
 * References are always preferred over pointers when the reference cannot be null. This
   includes both const and non-const references.
 * Function names using camel case starting with a lower case letter (e.g., "doFoo()").
-* Struct/Class member variables have a '_' postfix (e.g., "int foo_;").
+* Struct/Class member variables have a '\_' postfix (e.g., "int foo\_;").
 
 # Submitting a PR
 
