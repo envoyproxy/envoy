@@ -222,8 +222,7 @@ std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo&
   return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
 }
 
-void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
-                               const Http::HeaderMap& response_headers,
+void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
                                const Http::AccessLog::RequestInfo& request_info) {
   lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
       "full request",
@@ -242,9 +241,10 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers,
        lightstep::SetTag("node id", service_node_),
       });
 
-  uint64_t response_code = Http::Utility::getResponseStatus(response_headers);
-  if (Http::CodeUtility::is5xx(response_code)) {
-    span.SetTag("error", "true");
+  if (request_info.responseCode().valid()) {
+    if (Http::CodeUtility::is5xx(request_info.responseCode().value())) {
+      span.SetTag("error", "true");
+    }
   }
 
   if (request_headers.has(Http::Headers::get().ClientTraceId)) {

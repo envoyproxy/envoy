@@ -393,13 +393,8 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
 
   SystemTime start_time;
   EXPECT_CALL(request_info, startTime()).Times(2).WillRepeatedly(Return(start_time));
-  Optional<uint32_t> code_1(200);
-  Optional<uint32_t> code_2(503);
-  EXPECT_CALL(request_info, responseCode())
-      .WillOnce(ReturnRef(code_1))
-      .WillOnce(ReturnRef(code_1))
-      .WillOnce(ReturnRef(code_2))
-      .WillOnce(ReturnRef(code_2));
+  Optional<uint32_t> code(200);
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
 
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).Times(2).WillRepeatedly(ReturnRef(protocol));
@@ -453,7 +448,7 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   SystemTime start_time;
   EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
   Optional<uint32_t> code(200);
-  EXPECT_CALL(request_info, responseCode()).Times(2).WillRepeatedly(ReturnRef(code));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
 
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
@@ -499,7 +494,7 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
   SystemTime start_time;
   EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
   Optional<uint32_t> code(200);
-  EXPECT_CALL(request_info, responseCode()).WillOnce(ReturnRef(code)).WillOnce(ReturnRef(code));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
 
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
