@@ -113,9 +113,6 @@ public:
   Stats::Store& statsStore() { return stats_store_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
-  static const std::string LIGHTSTEP_SERVICE;
-  static const std::string LIGHTSTEP_METHOD;
-
 private:
   struct TlsLightStepTracer : ThreadLocal::ThreadLocalObject {
     TlsLightStepTracer(lightstep::Tracer tracer, LightStepSink& sink);

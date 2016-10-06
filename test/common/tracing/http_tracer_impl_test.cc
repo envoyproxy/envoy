@@ -302,6 +302,7 @@ public:
   }
 
   const Http::HeaderMapImpl empty_header_{};
+  const Http::HeaderMapImpl response_headers_{{":status", "500"}};
 
   std::unique_ptr<LightStepSink> sink_;
   NiceMock<Event::MockTimer>* timer_;
@@ -392,13 +393,8 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
 
   SystemTime start_time;
   EXPECT_CALL(request_info, startTime()).Times(2).WillRepeatedly(Return(start_time));
-  Optional<uint32_t> code_1(200);
-  Optional<uint32_t> code_2(503);
-  EXPECT_CALL(request_info, responseCode())
-      .WillOnce(ReturnRef(code_1))
-      .WillOnce(ReturnRef(code_1))
-      .WillOnce(ReturnRef(code_2))
-      .WillOnce(ReturnRef(code_2));
+  Optional<uint32_t> code(200);
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
 
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).Times(2).WillRepeatedly(ReturnRef(protocol));
@@ -408,8 +404,8 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  sink_->flushTrace(empty_header_, empty_header_, request_info);
-  sink_->flushTrace(empty_header_, empty_header_, request_info);
+  sink_->flushTrace(empty_header_, response_headers_, request_info);
+  sink_->flushTrace(empty_header_, response_headers_, request_info);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
@@ -452,14 +448,14 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   SystemTime start_time;
   EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
   Optional<uint32_t> code(200);
-  EXPECT_CALL(request_info, responseCode()).Times(2).WillRepeatedly(ReturnRef(code));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
 
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(5));
 
-  sink_->flushTrace(empty_header_, empty_header_, request_info);
+  sink_->flushTrace(empty_header_, response_headers_, request_info);
   // Timer should be re-enabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
@@ -498,7 +494,7 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
   SystemTime start_time;
   EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
   Optional<uint32_t> code(200);
-  EXPECT_CALL(request_info, responseCode()).WillOnce(ReturnRef(code)).WillOnce(ReturnRef(code));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
 
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
@@ -507,7 +503,7 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  sink_->flushTrace(empty_header_, empty_header_, request_info);
+  sink_->flushTrace(empty_header_, response_headers_, request_info);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
