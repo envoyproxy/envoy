@@ -241,10 +241,9 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag("node id", service_node_),
       });
 
-  if (request_info.responseCode().valid()) {
-    if (Http::CodeUtility::is5xx(request_info.responseCode().value())) {
-      span.SetTag("error", "true");
-    }
+  if (request_info.responseCode().valid() &&
+      Http::CodeUtility::is5xx(request_info.responseCode().value())) {
+    span.SetTag("error", "true");
   }
 
   if (request_headers.has(Http::Headers::get().ClientTraceId)) {
