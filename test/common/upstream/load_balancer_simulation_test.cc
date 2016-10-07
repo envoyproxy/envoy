@@ -113,9 +113,11 @@ public:
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 3))
         .WillByDefault(Return(3));
+    ON_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+        .WillByDefault(Return(6));
   }
 
-  const uint32_t total_number_of_requests = 100000;
+  const uint32_t total_number_of_requests = 30000000;
 
   NiceMock<MockCluster> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -127,11 +129,11 @@ public:
 };
 
 TEST_F(DISABLED_SimulationTest, strictlyEqualDistribution) {
-  run({1U, 1U, 1U}, {3U, 3U, 3U}, {3U, 3U, 3U});
+  run({1U, 1U, 1U}, {5U, 5U, 5U}, {5U, 5U, 5U});
 }
 
 TEST_F(DISABLED_SimulationTest, unequalZoneDistribution) {
-  run({1U, 1U, 1U}, {5U, 5U, 6U}, {5U, 5U, 6U});
+  run({1U, 1U, 1U}, {5U, 4U, 2U}, {5U, 4U, 2U});
 }
 
 } // Upstream
