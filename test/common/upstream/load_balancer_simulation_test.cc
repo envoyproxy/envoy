@@ -111,7 +111,7 @@ public:
     return ret;
   };
 
-  const uint32_t total_number_of_requests = 30000000;
+  const uint32_t total_number_of_requests = 3000000;
 
   NiceMock<MockCluster> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -132,6 +132,10 @@ TEST_F(DISABLED_SimulationTest, unequalZoneDistribution) {
 
 TEST_F(DISABLED_SimulationTest, unequalZoneDistribution2) {
   run({1U, 1U, 1U}, {5U, 5U, 6U}, {5U, 5U, 6U});
+}
+
+TEST_F(DISABLED_SimulationTest, unequalZoneDistribution3) {
+  run({1U, 1U, 1U}, {10U, 10U, 10U}, {10U, 8U, 8U});
 }
 
 } // Upstream
