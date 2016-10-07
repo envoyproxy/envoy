@@ -55,7 +55,7 @@ FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
 }
 
 FormatterImpl::FormatterImpl(const std::string& format) {
-  formatters_ = std::move(AccessLogFormatParser::parse(format));
+  formatters_ = AccessLogFormatParser::parse(format);
 }
 
 std::string FormatterImpl::format(const Http::HeaderMap& request_headers,

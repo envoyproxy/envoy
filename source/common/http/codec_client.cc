@@ -28,7 +28,7 @@ CodecClient::~CodecClient() {}
 void CodecClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
 void CodecClient::deleteRequest(ActiveRequest& request) {
-  connection_->dispatcher().deferredDelete(std::move(request.removeFromList(active_requests_)));
+  connection_->dispatcher().deferredDelete(request.removeFromList(active_requests_));
   if (codec_client_callbacks_) {
     codec_client_callbacks_->onStreamDestroy();
   }

@@ -182,7 +182,7 @@ InstancePtr InstanceImpl::fromJson(Json::Object& json, Api::Api& api, Event::Dis
   if (json.hasObject("format")) {
     formatter.reset(new FormatterImpl(json.getString("format")));
   } else {
-    formatter = std::move(AccessLogFormatUtils::defaultAccessLogFormatter());
+    formatter = AccessLogFormatUtils::defaultAccessLogFormatter();
   }
 
   return InstancePtr{new InstanceImpl(access_log_path, api, std::move(filter), std::move(formatter),
