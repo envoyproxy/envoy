@@ -21,7 +21,12 @@ static HostPtr newTestHost(const Upstream::Cluster& cluster, const std::string& 
 class DISABLED_SimulationTest : public testing::Test {
 public:
   DISABLED_SimulationTest() : stats_(ClusterImplBase::generateStats("", stats_store_)) {
-    setupRuntime();
+    ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
+        .WillByDefault(Return(50U));
+    ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+        .WillByDefault(Return(true));
+    ON_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 3))
+        .WillByDefault(Return(3));
   }
 
   /**
@@ -105,15 +110,6 @@ public:
 
     return ret;
   };
-
-  void setupRuntime() {
-    ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
-        .WillByDefault(Return(50U));
-    ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
-        .WillByDefault(Return(true));
-    ON_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 3))
-        .WillByDefault(Return(3));
-  }
 
   const uint32_t total_number_of_requests = 100000;
 
