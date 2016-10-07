@@ -24,8 +24,9 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.hosts();
   }
 
+  uint32_t number_of_zones = stats_.upstream_zone_count_.value();
   // Early exit if we cannot perform zone aware routing.
-  if (stats_.upstream_zone_count_.value() < 2 || host_set_.localZoneHealthyHosts().empty() ||
+  if (number_of_zones < 2 || host_set_.localZoneHealthyHosts().empty() ||
       !runtime_.snapshot().featureEnabled("upstream.zone_routing.enabled", 100)) {
     return host_set_.healthyHosts();
   }
@@ -39,23 +40,29 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  double zone_host_percent =
-      100.0 * host_set_.localZoneHealthyHosts().size() / host_set_.healthyHosts().size();
-  double zone_expected_percent = 100.0 / stats_.upstream_zone_count_.value();
+  double zone_host_ratio =
+      host_set_.localZoneHealthyHosts().size() / host_set_.healthyHosts().size();
+  double zone_expected_ratio = 1.0 / number_of_zones;
 
   // If local zone percent is higher than expected, we can route whole current zone traffic and
   // will also get some cross zone traffic from other zones.
-  if (zone_host_percent >= zone_expected_percent) {
+  if (zone_host_ratio >= zone_expected_ratio) {
     stats_.zone_over_percentage_.inc();
     return host_set_.localZoneHealthyHosts();
   }
 
   // If current zone percent is lower than expected we should partially route requests from the same
-  // zone. Scale by 100 for better precision.
-  const uint64_t scale_factor = 100;
-  uint64_t req_percent_to_route =
-      static_cast<uint64_t>(scale_factor * 100 * zone_host_percent / zone_expected_percent);
-  if (random_.random() % 10000 < req_percent_to_route) {
+  double ratio_to_route = zone_host_ratio / zone_expected_ratio;
+
+  // Due to that not directly routed requests to the local zone will be equally distributed between
+  // all zones including local, we need to route directly fraction of req_percent_to_route.
+  double actual_routing_ratio = (ratio_to_route - zone_host_ratio) / (1 - zone_host_ratio);
+
+  // Scale percentage to improve precision.
+  const uint64_t scale_factor = 10000;
+  uint64_t zone_routing_threshold = scale_factor * actual_routing_ratio;
+
+  if (random_.random() % 10000 < zone_routing_threshold) {
     stats_.zone_routing_sampled_.inc();
     return host_set_.localZoneHealthyHosts();
   } else {
