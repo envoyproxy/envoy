@@ -25,9 +25,9 @@ void MainImpl::initialize(const std::string& file_path) {
       server_.options().serviceZone(), server_.getLocalAddress()));
 
   std::vector<Json::Object> listeners = loader.getObjectArray("listeners");
-  log().notice("loading {} listener(s)", listeners.size());
+  log().info("loading {} listener(s)", listeners.size());
   for (size_t i = 0; i < listeners.size(); i++) {
-    log().notice("listener #{}:", i);
+    log().info("listener #{}:", i);
     listeners_.emplace_back(
         Server::Configuration::ListenerPtr{new ListenerConfig(*this, listeners[i])});
   }
@@ -61,7 +61,7 @@ void MainImpl::initialize(const std::string& file_path) {
 }
 
 void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
-  log().notice("loading tracing configuration");
+  log().info("loading tracing configuration");
 
   // Initialize http sinks
   if (tracing_configuration_.hasObject("http")) {
@@ -71,11 +71,11 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
 
     if (http_tracer_config.hasObject("sinks")) {
       std::vector<Json::Object> sinks = http_tracer_config.getObjectArray("sinks");
-      log().notice(fmt::format("  loading {} http sink(s):", sinks.size()));
+      log().info(fmt::format("  loading {} http sink(s):", sinks.size()));
 
       for (const Json::Object& sink : sinks) {
         std::string type = sink.getString("type");
-        log().notice(fmt::format("    loading {}", type));
+        log().info(fmt::format("    loading {}", type));
 
         if (type == "lightstep") {
           ::Runtime::RandomGenerator& rand = server_.random();
@@ -105,7 +105,7 @@ const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { ret
 
 MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
     : parent_(parent), port_(json.getInteger("port")) {
-  log().notice("  port={}", port_);
+  log().info("  port={}", port_);
 
   if (json.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(json.getObject("ssl_context"));
@@ -122,9 +122,9 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
     std::string string_type = filters[i].getString("type");
     std::string string_name = filters[i].getString("name");
     Json::Object config = filters[i].getObject("config");
-    log().notice("  filter #{}:", i);
-    log().notice("    type: {}", string_type);
-    log().notice("    name: {}", string_name);
+    log().info("  filter #{}:", i);
+    log().info("    type: {}", string_type);
+    log().info("    name: {}", string_name);
 
     // Map filter type string to enum.
     NetworkFilterType type;
