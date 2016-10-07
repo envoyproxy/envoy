@@ -51,14 +51,14 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.localZoneHealthyHosts();
   }
 
-  // If current zone percent is lower than expected we should partially route requests from the same
+  // If local zone ratio is lower than expected we should only partially route requests from the same zone.
   double ratio_to_route = zone_host_ratio / zone_expected_ratio;
 
   // Due to that not directly routed requests to the local zone will be equally distributed between
   // all zones including local, we need to route directly fraction of req_percent_to_route.
   double actual_routing_ratio = (ratio_to_route - zone_host_ratio) / (1 - zone_host_ratio);
 
-  // Scale percentage to improve precision.
+  // Scale actual_routing_ratio to improve precision.
   const uint64_t scale_factor = 10000;
   uint64_t zone_routing_threshold = scale_factor * actual_routing_ratio;
 
