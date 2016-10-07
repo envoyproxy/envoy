@@ -11,7 +11,7 @@
   {                                                                                                \
     if (!(X)) {                                                                                    \
       Logger::Registry::getLog(Logger::Id::assert)                                                 \
-          .emerg("assert failure: {}: {}:{}", #X, __FILE__, __LINE__);                             \
+          .critical("assert failure: {}: {}:{}", #X, __FILE__, __LINE__);                          \
       abort();                                                                                     \
     }                                                                                              \
   }
@@ -29,7 +29,8 @@
  * Indicate a panic situation and exit.
  */
 #define PANIC(X)                                                                                   \
-  Logger::Registry::getLog(Logger::Id::assert).emerg("panic: {}: {}:{}", X, __FILE__, __LINE__);   \
+  Logger::Registry::getLog(Logger::Id::assert)                                                     \
+      .critical("panic: {}: {}:{}", X, __FILE__, __LINE__);                                        \
   abort();
 
 #define NOT_IMPLEMENTED PANIC("not implemented")

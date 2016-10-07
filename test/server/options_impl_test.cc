@@ -10,7 +10,7 @@ TEST(OptionsImplTest, All) {
   argv.push_back("--restart-epoch");
   argv.push_back("1");
   argv.push_back("-l");
-  argv.push_back("3");
+  argv.push_back("info");
   argv.push_back("--service-cluster");
   argv.push_back("cluster");
   argv.push_back("--service-node");
@@ -19,11 +19,11 @@ TEST(OptionsImplTest, All) {
   argv.push_back("zone");
   argv.push_back("--file-flush-interval-msec");
   argv.push_back("9000");
-  OptionsImpl options(argv.size(), const_cast<char**>(&argv[0]), "1", spdlog::level::notice);
+  OptionsImpl options(argv.size(), const_cast<char**>(&argv[0]), "1", spdlog::level::warn);
   EXPECT_EQ(2U, options.concurrency());
   EXPECT_EQ("hello", options.configPath());
   EXPECT_EQ(1U, options.restartEpoch());
-  EXPECT_EQ(3U, options.logLevel());
+  EXPECT_EQ(spdlog::level::info, options.logLevel());
   EXPECT_EQ("cluster", options.serviceClusterName());
   EXPECT_EQ("node", options.serviceNodeName());
   EXPECT_EQ("zone", options.serviceZone());

@@ -32,7 +32,7 @@ public:
   MOCK_METHOD0(baseId, uint64_t());
   MOCK_METHOD0(concurrency, uint32_t());
   MOCK_METHOD0(configPath, const std::string&());
-  MOCK_METHOD0(logLevel, uint64_t());
+  MOCK_METHOD0(logLevel, spdlog::level::level_enum());
   MOCK_METHOD0(restartEpoch, uint64_t());
   MOCK_METHOD0(serviceClusterName, const std::string&());
   MOCK_METHOD0(serviceNodeName, const std::string&());
