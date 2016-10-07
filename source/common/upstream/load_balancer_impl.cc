@@ -53,8 +53,8 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
       1.0 * host_set_.localZoneHealthyHosts().size() / host_set_.healthyHosts().size();
   double ratio_to_route = zone_host_ratio * number_of_zones;
 
-  // Due to that not directly routed requests to the local zone will be equally distributed between
-  // all zones including local, we need to route directly fraction of req_percent_to_route.
+  // Not zone routed requests will be distributed between all hosts and hence
+  // we need to route only fraction of req_percent_to_route to the local zone.
   double actual_routing_ratio = (ratio_to_route - zone_host_ratio) / (1 - zone_host_ratio);
 
   // Scale actual_routing_ratio to improve precision.
