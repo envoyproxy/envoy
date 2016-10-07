@@ -144,7 +144,7 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
       .WillRepeatedly(Return(5));
 
   // There is only one host in the given zone for zone aware routing.
-  EXPECT_CALL(random_, random()).WillOnce(Return(5500));
+  EXPECT_CALL(random_, random()).WillOnce(Return(1000));
   EXPECT_EQ(cluster_.local_zone_healthy_hosts_[0], lb_.chooseHost());
   EXPECT_EQ(1U, stats_.zone_routing_sampled_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(6500));

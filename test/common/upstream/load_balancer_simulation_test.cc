@@ -25,8 +25,8 @@ public:
         .WillByDefault(Return(50U));
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
         .WillByDefault(Return(true));
-    ON_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.percent_diff", 3))
-        .WillByDefault(Return(3));
+    ON_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+        .WillByDefault(Return(6));
   }
 
   /**
@@ -127,7 +127,7 @@ TEST_F(DISABLED_SimulationTest, strictlyEqualDistribution) {
 }
 
 TEST_F(DISABLED_SimulationTest, unequalZoneDistribution) {
-  run({1U, 1U, 1U}, {5U, 5U, 5U}, {5U, 5U, 5U});
+  run({1U, 1U, 1U}, {2U, 5U, 5U}, {2U, 5U, 5U});
 }
 
 } // Upstream
