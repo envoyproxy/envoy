@@ -57,6 +57,5 @@ Zone aware routing and local zone panic threshold
 -------------------------------------------------
 
 By default Envoy performs zone aware routing where it will send traffic to the same upstream zone.
-This is only done if the zones are well balanced (defaults to 3% allowed deviation) and if there 
-are enough healthy hosts in the local zone (the *panic threshold* which defaults to 80%). These are
-:ref:`configurable <config_cluster_manager_cluster_runtime>` via runtime.
+This feature is in active development.
+You can enable/disable it :ref:`via runtime <config_cluster_manager_cluster_runtime>`.
