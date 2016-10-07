@@ -44,7 +44,7 @@ set(ENVOY_PROTOBUF_INCLUDE_DIR "" CACHE FILEPATH "location of protobuf includes"
 set(ENVOY_PROTOBUF_PROTOC "" CACHE FILEPATH "location of protoc")
 
 # http://lightstep.com/
-# Last tested with lightstep-tracer-cpp-0.14
+# Last tested with lightstep-tracer-cpp-0.16
 set(ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR "" CACHE FILEPATH "location of lighstep tracer includes")
 
 # Extra linker flags required to properly link envoy with all of the above libraries.

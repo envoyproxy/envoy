@@ -94,9 +94,10 @@ const std::string& Filter::upstreamZone() {
 }
 
 void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers) {
-  bool is_canary = (response_headers.get(Http::Headers::get().EnvoyUpstreamCanary) == "true") ||
-                   (upstream_host_ ? upstream_host_->canary() : false);
-  if (!callbacks_->requestInfo().healthCheck()) {
+  if (config_.emit_dynamic_stats_ && !callbacks_->requestInfo().healthCheck()) {
+    bool is_canary = (response_headers.get(Http::Headers::get().EnvoyUpstreamCanary) == "true") ||
+                     (upstream_host_ ? upstream_host_->canary() : false);
+
     Http::CodeUtility::ResponseStatInfo info{
         config_.stats_store_, stat_prefix_, response_headers,
         downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true",
@@ -429,7 +430,7 @@ void Filter::onUpstreamComplete() {
     upstream_request_->upstream_encoder_->resetStream();
   }
 
-  if (!callbacks_->requestInfo().healthCheck()) {
+  if (config_.emit_dynamic_stats_ && !callbacks_->requestInfo().healthCheck()) {
     Http::CodeUtility::ResponseTimingInfo info{
         config_.stats_store_, stat_prefix_,
         upstream_request_->upstream_encoder_->requestCompleteTime(),

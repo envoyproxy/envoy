@@ -88,7 +88,8 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   }
 
   // Generate x-request-id for all edge requests, or if there is none.
-  if (edge_request || request_headers.get(Headers::get().RequestId).empty()) {
+  if (config.generateRequestId() &&
+      (edge_request || request_headers.get(Headers::get().RequestId).empty())) {
     std::string uuid = "";
 
     try {
@@ -103,7 +104,9 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     }
   }
 
-  Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
+  if (config.isTracing()) {
+    Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
+  }
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,

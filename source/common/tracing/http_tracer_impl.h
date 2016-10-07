@@ -28,6 +28,14 @@ struct HttpTracerStats {
   HTTP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+#define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
+  COUNTER(spans_sent)                                                                              \
+  COUNTER(timer_flushed)
+
+struct LightstepTracerStats {
+  LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
@@ -103,14 +111,11 @@ public:
   const std::string& collectorCluster() { return collector_cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Store& statsStore() { return stats_store_; }
-
-  static const std::string LIGHTSTEP_SERVICE;
-  static const std::string LIGHTSTEP_METHOD;
+  LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
 private:
   struct TlsLightStepTracer : ThreadLocal::ThreadLocalObject {
-    TlsLightStepTracer(lightstep::Tracer tracer, LightStepSink& sink)
-        : tracer_(tracer), sink_(sink) {}
+    TlsLightStepTracer(lightstep::Tracer tracer, LightStepSink& sink);
 
     void shutdown() override {}
 
@@ -125,6 +130,7 @@ private:
   const std::string collector_cluster_;
   Upstream::ClusterManager& cm_;
   Stats::Store& stats_store_;
+  LightstepTracerStats tracer_stats_;
   const std::string service_node_;
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;
@@ -134,7 +140,8 @@ private:
 
 class LightStepRecorder : public lightstep::Recorder, Http::AsyncClient::Callbacks {
 public:
-  LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink);
+  LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink,
+                    Event::Dispatcher& dispatcher);
 
   // lightstep::Recorder
   void RecordSpan(lightstep::collector::Span&& span) override;
@@ -145,11 +152,16 @@ public:
   void onFailure(Http::AsyncClient::FailureReason) override;
 
   static std::unique_ptr<lightstep::Recorder> NewInstance(LightStepSink& sink,
+                                                          Event::Dispatcher& dispatcher,
                                                           const lightstep::TracerImpl& tracer);
 
 private:
+  void enableTimer();
+  void flushSpans();
+
   lightstep::ReportBuilder builder_;
   LightStepSink& sink_;
+  Event::TimerPtr flush_timer_;
 };
 
 } // Tracing

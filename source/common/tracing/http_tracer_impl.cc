@@ -3,6 +3,7 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
+#include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
@@ -10,9 +11,6 @@
 #include "common/runtime/uuid_util.h"
 
 namespace Tracing {
-
-const std::string LightStepSink::LIGHTSTEP_SERVICE = "lightstep.collector.CollectorService";
-const std::string LightStepSink::LIGHTSTEP_METHOD = "Report";
 
 void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
   std::string x_request_id = request_headers.get(Http::Headers::get().RequestId);
@@ -114,8 +112,17 @@ void HttpTracerImpl::populateStats(const Decision& decision) {
   }
 }
 
-LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink)
-    : builder_(tracer), sink_(sink) {}
+LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink,
+                                     Event::Dispatcher& dispatcher)
+    : builder_(tracer), sink_(sink) {
+  flush_timer_ = dispatcher.createTimer([this]() -> void {
+    sink_.tracerStats().timer_flushed_.inc();
+    flushSpans();
+    enableTimer();
+  });
+
+  enableTimer();
+}
 
 void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   builder_.addSpan(std::move(span));
@@ -123,18 +130,7 @@ void LightStepRecorder::RecordSpan(lightstep::collector::Span&& span) {
   uint64_t min_flush_spans =
       sink_.runtime().snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U);
   if (builder_.pendingSpans() == min_flush_spans) {
-    lightstep::collector::ReportRequest request;
-    std::swap(request, builder_.pending());
-
-    Http::MessagePtr message =
-        Grpc::Common::prepareHeaders(sink_.collectorCluster(), LightStepSink::LIGHTSTEP_SERVICE,
-                                     LightStepSink::LIGHTSTEP_METHOD);
-
-    message->body(Grpc::Common::serializeBody(std::move(request)));
-
-    sink_.clusterManager()
-        .httpAsyncClientForCluster(sink_.collectorCluster())
-        .send(std::move(message), *this, std::chrono::milliseconds(5000));
+    flushSpans();
   }
 }
 
@@ -145,17 +141,49 @@ bool LightStepRecorder::FlushWithTimeout(lightstep::Duration) {
 }
 
 std::unique_ptr<lightstep::Recorder>
-LightStepRecorder::NewInstance(LightStepSink& sink, const lightstep::TracerImpl& tracer) {
-  return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(tracer, sink));
+LightStepRecorder::NewInstance(LightStepSink& sink, Event::Dispatcher& dispatcher,
+                               const lightstep::TracerImpl& tracer) {
+  return std::unique_ptr<lightstep::Recorder>(new LightStepRecorder(tracer, sink, dispatcher));
 }
+
+void LightStepRecorder::enableTimer() {
+  uint64_t flush_interval =
+      sink_.runtime().snapshot().getInteger("tracing.lightstep.flush_interval_ms", 1000U);
+  flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
+}
+
+void LightStepRecorder::flushSpans() {
+  if (builder_.pendingSpans() != 0) {
+    sink_.tracerStats().spans_sent_.add(builder_.pendingSpans());
+    lightstep::collector::ReportRequest request;
+    std::swap(request, builder_.pending());
+
+    Http::MessagePtr message = Grpc::Common::prepareHeaders(sink_.collectorCluster(),
+                                                            lightstep::CollectorServiceFullName(),
+                                                            lightstep::CollectorMethodName());
+
+    message->body(Grpc::Common::serializeBody(std::move(request)));
+
+    uint64_t timeout =
+        sink_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
+    sink_.clusterManager()
+        .httpAsyncClientForCluster(sink_.collectorCluster())
+        .send(std::move(message), *this, std::chrono::milliseconds(timeout));
+  }
+}
+
+LightStepSink::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer, LightStepSink& sink)
+    : tracer_(tracer), sink_(sink) {}
 
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                              Stats::Store& stats, const std::string& service_node,
                              ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                              std::unique_ptr<lightstep::TracerOptions> options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
-      stats_store_(stats), service_node_(service_node), tls_(tls), runtime_(runtime),
-      options_(std::move(options)), tls_slot_(tls.allocateSlot()) {
+      stats_store_(stats),
+      tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
+      service_node_(service_node), tls_(tls), runtime_(runtime), options_(std::move(options)),
+      tls_slot_(tls.allocateSlot()) {
   if (!cm_.get(collector_cluster_)) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
                                      collector_cluster_));
@@ -166,10 +194,10 @@ LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManage
         fmt::format("{} collector cluster must support http2 for gRPC calls", collector_cluster_));
   }
 
-  tls_.set(tls_slot_, [this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr {
+  tls_.set(tls_slot_, [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
     lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
-        *options_,
-        std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::placeholders::_1)));
+        *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::ref(dispatcher),
+                             std::placeholders::_1)));
 
     return ThreadLocal::ThreadLocalObjectPtr{new TlsLightStepTracer(std::move(tracer), *this)};
   });
@@ -213,6 +241,11 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag("node id", service_node_),
       });
 
+  if (request_info.responseCode().valid() &&
+      Http::CodeUtility::is5xx(request_info.responseCode().value())) {
+    span.SetTag("error", "true");
+  }
+
   if (request_headers.has(Http::Headers::get().ClientTraceId)) {
     span.SetTag("join:x-client-trace-id", request_headers.get(Http::Headers::get().ClientTraceId));
   }
@@ -222,7 +255,7 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
 
 void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
   Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                           LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
+                           lightstep::CollectorServiceFullName(), lightstep::CollectorMethodName(),
                            false);
 }
 
@@ -231,12 +264,12 @@ void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
     Grpc::Common::validateResponse(*msg);
 
     Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                             LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
-                             true);
+                             lightstep::CollectorServiceFullName(),
+                             lightstep::CollectorMethodName(), true);
   } catch (const Grpc::Exception& ex) {
     Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                             LightStepSink::LIGHTSTEP_SERVICE, LightStepSink::LIGHTSTEP_METHOD,
-                             false);
+                             lightstep::CollectorServiceFullName(),
+                             lightstep::CollectorMethodName(), false);
   }
 }
 

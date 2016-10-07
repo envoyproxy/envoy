@@ -67,10 +67,11 @@ class FilterConfig {
 public:
   FilterConfig(const std::string& stat_prefix, const std::string& service_zone, Stats::Store& stats,
                Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-               Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer)
+               Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
+               bool emit_dynamic_stats)
       : stats_store_(stats), service_zone_(service_zone), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))},
-        shadow_writer_(std::move(shadow_writer)) {}
+        emit_dynamic_stats_(emit_dynamic_stats), shadow_writer_(std::move(shadow_writer)) {}
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
 
@@ -80,6 +81,7 @@ public:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   FilterStats stats_;
+  const bool emit_dynamic_stats_;
 
 private:
   ShadowWriterPtr shadow_writer_;

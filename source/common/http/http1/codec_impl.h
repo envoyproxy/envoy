@@ -40,6 +40,9 @@ public:
 protected:
   StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}
 
+  static const std::string CRLF;
+  static const std::string LAST_CHUNK;
+
   ConnectionImpl& connection_;
   Buffer::OwnedImpl output_buffer_;
 
@@ -60,9 +63,6 @@ private:
    * Flush all pending output from encoding.
    */
   void flushOutput();
-
-  static const std::string CRLF;
-  static const std::string LAST_CHUNK;
 
   std::list<StreamCallbacks*> callbacks_{};
   bool chunk_encoding_{true};

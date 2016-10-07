@@ -69,6 +69,7 @@ public:
   }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
+  bool generateRequestId() override { return true; }
   const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   const Router::Config& routeConfig() override { return route_config_; }
   const std::string& serverName() override { return server_name_; }
@@ -361,11 +362,11 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
         callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{filter});
       }));
 
-  // A protocol exception should result in a local close followed by reset of the streams.
+  // A protocol exception should result in reset of the streams followed by a local close.
   Sequence s;
+  EXPECT_CALL(filter->reset_stream_called_, ready()).InSequence(s);
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
       .InSequence(s);
-  EXPECT_CALL(filter->reset_stream_called_, ready()).InSequence(s);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))

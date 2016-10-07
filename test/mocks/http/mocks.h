@@ -65,6 +65,7 @@ public:
                                                ServerConnectionCallbacks&));
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
+  MOCK_METHOD0(generateRequestId, bool());
   MOCK_METHOD0(idleTimeout, const Optional<std::chrono::milliseconds>&());
   MOCK_METHOD0(routeConfig, Router::Config&());
   MOCK_METHOD0(serverName, const std::string&());
