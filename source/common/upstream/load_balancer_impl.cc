@@ -64,7 +64,7 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
   if (random_.random() % 10000 < zone_routing_threshold) {
     stats_.zone_routing_sampled_.inc();
     return host_set_.localZoneHealthyHosts();
-3  } else {
+  } else {
     stats_.zone_routing_no_sampled_.inc();
     return host_set_.healthyHosts();
   }
