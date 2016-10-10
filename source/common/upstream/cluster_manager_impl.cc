@@ -295,7 +295,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     break;
   }
   case LoadBalancerType::RoundRobin: {
-    lb_.reset(new RoundRobinLoadBalancer(host_set_, cluster.stats(), runtime));
+    lb_.reset(new RoundRobinLoadBalancer(host_set_, cluster.stats(), runtime, random));
     break;
   }
   }

@@ -11,8 +11,9 @@ namespace Upstream {
  */
 class LoadBalancerBase {
 protected:
-  LoadBalancerBase(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime)
-      : stats_(stats), runtime_(runtime), host_set_(host_set) {}
+  LoadBalancerBase(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
+                   Runtime::RandomGenerator& random)
+      : stats_(stats), runtime_(runtime), random_(random), host_set_(host_set) {}
 
   /**
    * Pick the host list to use (healthy or all depending on how many in the set are not healthy).
@@ -21,6 +22,7 @@ protected:
 
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
+  Runtime::RandomGenerator& random_;
 
 private:
   const HostSet& host_set_;
@@ -31,8 +33,9 @@ private:
  */
 class RoundRobinLoadBalancer : public LoadBalancer, LoadBalancerBase {
 public:
-  RoundRobinLoadBalancer(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime)
-      : LoadBalancerBase(host_set, stats, runtime) {}
+  RoundRobinLoadBalancer(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
+                         Runtime::RandomGenerator& random)
+      : LoadBalancerBase(host_set, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
   ConstHostPtr chooseHost() override;
@@ -63,7 +66,6 @@ public:
   ConstHostPtr chooseHost() override;
 
 private:
-  Runtime::RandomGenerator& random_;
   HostPtr last_host_;
   uint32_t hits_left_{};
 };
@@ -75,13 +77,10 @@ class RandomLoadBalancer : public LoadBalancer, LoadBalancerBase {
 public:
   RandomLoadBalancer(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random)
-      : LoadBalancerBase(host_set, stats, runtime), random_(random) {}
+      : LoadBalancerBase(host_set, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
   ConstHostPtr chooseHost() override;
-
-private:
-  Runtime::RandomGenerator& random_;
 };
 
 } // Upstream

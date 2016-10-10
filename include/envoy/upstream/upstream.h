@@ -177,11 +177,12 @@ public:
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_success)                                                                          \
   COUNTER(update_failure)                                                                          \
+  COUNTER(zone_cluster_too_small)                                                                  \
+  COUNTER(zone_over_percentage)                                                                    \
+  COUNTER(zone_routing_sampled)                                                                    \
+  COUNTER(zone_routing_no_sampled)                                                                 \
   GAUGE  (max_host_weight)                                                                         \
-  GAUGE  (upstream_zone_count)                                                                     \
-  COUNTER(upstream_zone_above_threshold)                                                           \
-  COUNTER(upstream_zone_healthy_panic)                                                             \
-  COUNTER(upstream_zone_within_threshold)
+  GAUGE  (upstream_zone_count)
 // clang-format on
 
 /**
