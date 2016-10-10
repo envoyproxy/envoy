@@ -138,4 +138,8 @@ TEST_F(DISABLED_SimulationTest, unequalZoneDistribution3) {
   run({1U, 1U, 1U}, {10U, 10U, 10U}, {10U, 8U, 8U});
 }
 
+TEST_F(DISABLED_SimulationTest, unequalZoneDistribution4) {
+  run({20U, 20U, 21U}, {4U, 4U, 5U}, {4U, 5U, 5U});
+}
+
 } // Upstream
