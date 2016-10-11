@@ -36,6 +36,20 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
               UuidUtils::isTraceableUuid(request_headers.get("x-request-id")));
   }
 
+  // Sampling must not be done on client traced.
+  {
+    NiceMock<Runtime::MockLoader> runtime;
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.random_sampling", 0, _, 10000)).Times(0);
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+        .WillOnce(Return(true));
+
+    Http::HeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
+    HttpTracerUtility::mutateHeaders(request_headers, runtime);
+
+    EXPECT_EQ(UuidTraceStatus::Forced,
+              UuidUtils::isTraceableUuid(request_headers.get("x-request-id")));
+  }
+
   // Sampling, global off.
   {
     NiceMock<Runtime::MockLoader> runtime;

@@ -21,13 +21,16 @@ void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime:
     return;
   }
 
-  if (request_headers.has(Http::Headers::get().ClientTraceId) &&
-      runtime.snapshot().featureEnabled("tracing.client_enabled", 100)) {
-    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
-  } else if (request_headers.has(Http::Headers::get().EnvoyForceTrace)) {
-    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
-  } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", 0, result, 10000)) {
-    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
+  // Do not apply tracing transformations if we are currently tracing.
+  if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
+    if (request_headers.has(Http::Headers::get().ClientTraceId) &&
+        runtime.snapshot().featureEnabled("tracing.client_enabled", 100)) {
+      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
+    } else if (request_headers.has(Http::Headers::get().EnvoyForceTrace)) {
+      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
+    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", 0, result, 10000)) {
+      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
+    }
   }
 
   if (!runtime.snapshot().featureEnabled("tracing.global_enabled", 100, result)) {
