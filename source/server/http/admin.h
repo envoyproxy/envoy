@@ -99,7 +99,7 @@ private:
 };
 
 /**
- * A terminal HTTP filter that implements server admin functioanlity.
+ * A terminal HTTP filter that implements server admin functionality.
  */
 class AdminFilter : public Http::StreamDecoderFilter, Logger::Loggable<Logger::Id::admin> {
 public:

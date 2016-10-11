@@ -6,6 +6,7 @@
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -103,6 +104,34 @@ bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
 Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& response) {
   for (auto& cluster : server_.clusterManager().clusters()) {
     response.add(fmt::format("=== {} ===\n", cluster.second->name()));
+
+    response.add(fmt::format("Circuit Breaker Settings\n"));
+    response.add(fmt::format(
+        "{}::default_priority::max_connections::{}\n", cluster.second->name(),
+        cluster.second->resourceManager(Upstream::ResourcePriority::Default).connections().max()));
+    response.add(fmt::format(
+        "{}::default_priority::max_pending_requests::{}\n", cluster.second->name(),
+        cluster.second->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().max()));
+    response.add(fmt::format(
+        "{}::default_priority::max_requests::{}\n", cluster.second->name(),
+        cluster.second->resourceManager(Upstream::ResourcePriority::Default).requests().max()));
+    response.add(fmt::format(
+        "{}::default_priority::max_retries::{}\n", cluster.second->name(),
+        cluster.second->resourceManager(Upstream::ResourcePriority::Default).retries().max()));
+    response.add(fmt::format(
+        "{}::high_priority::max_connections::{}\n", cluster.second->name(),
+        cluster.second->resourceManager(Upstream::ResourcePriority::High).connections().max()));
+    response.add(fmt::format(
+        "{}::high_priority::max_pending_requests::{}\n", cluster.second->name(),
+        cluster.second->resourceManager(Upstream::ResourcePriority::High).pendingRequests().max()));
+    response.add(fmt::format(
+        "{}::high_priority::max_requests::{}\n", cluster.second->name(),
+        cluster.second->resourceManager(Upstream::ResourcePriority::High).requests().max()));
+    response.add(fmt::format(
+        "{}::high_priority::max_retries::{}\n", cluster.second->name(),
+        cluster.second->resourceManager(Upstream::ResourcePriority::High).retries().max()));
+    response.add("\n");
+
     for (auto& host : cluster.second->hosts()) {
       std::map<std::string, uint64_t> all_stats;
       for (Stats::Counter& counter : host->counters()) {
