@@ -147,6 +147,7 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
           fmt::format("{}::{}::canary::{}\n", cluster.second->name(), host->url(), host->canary()));
       response.add("\n");
     }
+    response.add("\n");
   }
 
   return Http::Code::OK;
