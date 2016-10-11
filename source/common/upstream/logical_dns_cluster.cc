@@ -8,6 +8,8 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
                                      Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                                      Network::DnsResolver& dns_resolver, ThreadLocal::Instance& tls)
     : ClusterImplBase(config, runtime, stats, ssl_context_manager), dns_resolver_(dns_resolver),
+      dns_refresh_rate_ms_(
+          std::chrono::milliseconds(config.getInteger("dns_refresh_rate_ms", 5000))),
       tls_(tls), tls_slot_(tls.allocateSlot()),
       resolve_timer_(dns_resolver.dispatcher().createTimer([this]() -> void { startResolve(); })) {
 
@@ -61,7 +63,7 @@ void LogicalDnsCluster::startResolve() {
           initialize_callback_ = nullptr;
         }
 
-        resolve_timer_->enableTimer(std::chrono::milliseconds(5000));
+        resolve_timer_->enableTimer(dns_refresh_rate_ms_);
       });
 }
 
