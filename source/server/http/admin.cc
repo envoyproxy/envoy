@@ -116,13 +116,11 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
   for (auto& cluster : server_.clusterManager().clusters()) {
     response.add(fmt::format("=== {} ===\n", cluster.second->name()));
 
-    response.add(fmt::format("Circuit Breaker Settings\n"));
     addCircuitSettings(cluster.second->name(), "default",
                        cluster.second->resourceManager(Upstream::ResourcePriority::Default),
                        response);
     addCircuitSettings(cluster.second->name(), "high",
                        cluster.second->resourceManager(Upstream::ResourcePriority::High), response);
-    response.add("\n");
 
     for (auto& host : cluster.second->hosts()) {
       std::map<std::string, uint64_t> all_stats;
