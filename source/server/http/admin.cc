@@ -112,6 +112,7 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
   response.add(fmt::format("{}::{}_priority::max_retries::{}\n", cluster_name, priority_str,
                            resource_manager.retries().max()));
 }
+
 Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& response) {
   for (auto& cluster : server_.clusterManager().clusters()) {
     response.add(fmt::format("=== {} ===\n", cluster.second->name()));
