@@ -18,7 +18,8 @@ Cluster
     "ssl_context": "{...}",
     "features": "...",
     "http_codec_options": "...",
-    "alt_stat_name": "..."
+    "alt_stat_name": "...",
+    "dns_refresh_rate_ms": "..."
   }
 
 .. _config_cluster_manager_cluster_name:
@@ -128,6 +129,12 @@ alt_stat_name
   *(optional, string)* If an alternate stat name is specified, some :ref:`statistics
   <config_cluster_manager_cluster_stats>` will be duplicated between the standard statistics and a
   tree specified by this parameter (e.g., *cluster.<alt_stat_name>.*).
+
+dns_refresh_rate_ms
+  *(optional, integer)* If the dns refresh rate is specified and the cluster type is either *strict_dns*,
+  or *logical_dns*, this value is used as the cluster's dns refresh rate. If this setting is not specified,
+  the value defaults to 5000. For cluster types other than *strict_dns* and *logical_dns* this setting is
+  ignored.
 
 .. toctree::
   :hidden:

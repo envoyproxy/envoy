@@ -269,6 +269,7 @@ private:
 
   Network::DnsResolver& dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;
+  const std::chrono::milliseconds dns_refresh_rate_ms_;
 };
 
 } // Upstream

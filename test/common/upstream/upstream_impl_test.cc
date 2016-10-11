@@ -58,6 +58,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
     "name": "name",
     "connect_timeout_ms": 250,
     "type": "strict_dns",
+    "dns_refresh_rate_ms": 4000,
     "lb_type": "round_robin",
     "circuit_breakers": {
       "default": {
@@ -97,7 +98,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
                                 -> void { membership_updated.ready(); });
 
   resolver1.expectResolve(dns_resolver);
-  EXPECT_CALL(*resolver1.timer_, enableTimer(_));
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver1.dns_callback_({"127.0.0.1", "127.0.0.2"});
   EXPECT_THAT(std::list<std::string>({"tcp://127.0.0.1:11001", "tcp://127.0.0.2:11001"}),
@@ -105,26 +106,26 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   resolver1.expectResolve(dns_resolver);
   resolver1.timer_->callback_();
-  EXPECT_CALL(*resolver1.timer_, enableTimer(_));
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_({"127.0.0.2", "127.0.0.1"});
   EXPECT_THAT(std::list<std::string>({"tcp://127.0.0.1:11001", "tcp://127.0.0.2:11001"}),
               ContainerEq(hostListToURLs(cluster.hosts())));
 
   resolver1.expectResolve(dns_resolver);
   resolver1.timer_->callback_();
-  EXPECT_CALL(*resolver1.timer_, enableTimer(_));
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_({"127.0.0.2", "127.0.0.1"});
   EXPECT_THAT(std::list<std::string>({"tcp://127.0.0.1:11001", "tcp://127.0.0.2:11001"}),
               ContainerEq(hostListToURLs(cluster.hosts())));
 
   resolver1.timer_->callback_();
-  EXPECT_CALL(*resolver1.timer_, enableTimer(_));
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver1.dns_callback_({"127.0.0.3"});
   EXPECT_THAT(std::list<std::string>({"tcp://127.0.0.3:11001"}),
               ContainerEq(hostListToURLs(cluster.hosts())));
 
-  EXPECT_CALL(*resolver2.timer_, enableTimer(_));
+  EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver2.dns_callback_({"10.0.0.1"});
   EXPECT_THAT(std::list<std::string>({"tcp://127.0.0.3:11001", "tcp://10.0.0.1:11002"}),
