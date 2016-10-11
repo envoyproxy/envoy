@@ -73,7 +73,8 @@ private:
    * @return TRUE if level change succeeded, FALSE otherwise.
    */
   bool changeLogLevel(const Http::Utility::QueryParams& params);
-  void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str, Upstream::ResourceManager& resource_manager, Buffer::Instance& response);
+  void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
+                          Upstream::ResourceManager& resource_manager, Buffer::Instance& response);
 
   /**
    * URL handlers.
