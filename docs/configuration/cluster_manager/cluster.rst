@@ -133,7 +133,8 @@ alt_stat_name
 dns_refresh_rate_ms
   *(optional, integer)* If the dns refresh rate is specified and the cluster type is either *strict_dns*,
   or *logical_dns*, this value is used as the cluster's dns refresh rate. If this setting is not specified,
-  the value defaults to 5000.
+  the value defaults to 5000. For cluster types other than *strict_dns* and *logical_dns* this setting is
+  ignored.
 
 .. toctree::
   :hidden:
