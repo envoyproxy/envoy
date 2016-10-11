@@ -18,7 +18,6 @@ next (e.g., redirect, forward, rewrite, etc.).
     "host_rewrite": "...",
     "case_sensitive": "...",
     "timeout_ms": "...",
-    "content_type": "...",
     "runtime": "{...}",
     "retry_policy": "{...}",
     "rate_limit": "{...}",
@@ -74,10 +73,6 @@ timeout_ms
   :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
   :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
   :ref:`retry overview <arch_overview_http_routing_retry>`.
-
-content_type
-  *(optional, string)* Indicates that the route should additionally match on the *content-type*
-  HTTP header.
 
 :ref:`runtime <config_http_conn_man_route_table_route_runtime>`
   *(optional, object)* Indicates that the route should additionally match on a runtime key.

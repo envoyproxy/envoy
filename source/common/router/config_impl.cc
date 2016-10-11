@@ -58,8 +58,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Obj
       runtime_(loadRuntimeData(route)), loader_(loader),
       host_redirect_(route.getString("host_redirect", "")),
       path_redirect_(route.getString("path_redirect", "")), retry_policy_(route),
-      content_type_(route.getString("content_type", "")), rate_limit_policy_(route),
-      shadow_policy_(route), priority_(ConfigUtility::parsePriority(route)) {
+      rate_limit_policy_(route), shadow_policy_(route),
+      priority_(ConfigUtility::parsePriority(route)) {
 
   // Check to make sure that we are either a redirect route or we have a cluster.
   if (!(isRedirect() ^ !cluster_name_.empty())) {
@@ -82,10 +82,6 @@ bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random
   if (runtime_.valid()) {
     matches &= loader_.snapshot().featureEnabled(runtime_.value().key_, runtime_.value().default_,
                                                  random_value);
-  }
-
-  if (!content_type_.empty()) {
-    matches &= (headers.get(Http::Headers::get().ContentType) == content_type_);
   }
 
   if (!config_headers_.empty()) {
