@@ -129,4 +129,21 @@ TEST(JsonLoaderTest, Integer) {
   }
 }
 
+TEST(JsonLoaderTest, Double) {
+  {
+    StringLoader json("{\"value1\": 10.5, \"value2\": -12.3}");
+    EXPECT_EQ(10.5, json.getDouble("value1"));
+    EXPECT_EQ(-12.3, json.getDouble("value2"));
+  }
+  {
+    StringLoader json("{\"foo\": 13.22}");
+    EXPECT_EQ(13.22, json.getDouble("foo", 0));
+    EXPECT_EQ(0, json.getDouble("bar", 0));
+  }
+  {
+    StringLoader json("{\"foo\": \"bar\"}");
+    EXPECT_THROW(json.getDouble("foo"), Exception);
+  }
+}
+
 } // Json

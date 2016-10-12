@@ -57,6 +57,8 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
 
     chargeBasicStats(status);
 
+    chargeTablePartitionIdStats(data);
+
     if (Http::CodeUtility::is4xx(status)) {
       chargeFailureSpecificStats(data);
     }
@@ -173,6 +175,7 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Buffer::Instance& data) {
       // complete apart of the batch operation. Only the table names will be logged for errors.
       std::vector<std::string> unprocessed_tables =
           Dynamo::RequestParser::parseBatchUnProcessedKeys(body);
+
       for (const std::string& unprocessed_table : unprocessed_tables) {
         stats_.counter(fmt::format("{}error.{}.BatchFailureUnprocessedKeys", stat_prefix_,
                                    unprocessed_table)).inc();
@@ -205,6 +208,31 @@ void DynamoFilter::chargeFailureSpecificStats(const Buffer::Instance& data) {
     }
   } else {
     stats_.counter(fmt::format("{}empty_response_body", stat_prefix_)).inc();
+  }
+}
+
+void DynamoFilter::chargeTablePartitionIdStats(const Buffer::Instance& data) {
+
+  if (table_descriptor_.table_name.empty()) {
+    return;
+  }
+  std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
+  if (!body.empty()) {
+    try {
+      // Check if there is a partition id in the response
+      std::vector<Dynamo::RequestParser::PartitionDescriptor> partitions =
+          Dynamo::RequestParser::parsePartitionIds(body);
+      for (const Dynamo::RequestParser::PartitionDescriptor& partition : partitions) {
+        // increment table partition stat stats_.counter
+        stats_.counter(fmt::format("{}table.{}.__partition_id={}", stat_prefix_,
+                                   table_descriptor_.table_name, partition.partition_id_))
+            .add(partition.capacity_);
+      }
+
+    } catch (const Json::Exception& jsonEx) {
+      // Body parsing failed. This should not happen, just put a stat for that.
+      stats_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
+    }
   }
 }
 

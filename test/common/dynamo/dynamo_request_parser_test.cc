@@ -221,4 +221,61 @@ TEST(DynamoRequestParser, parseBatchUnProcessedKeys) {
     EXPECT_EQ(2u, unprocessed_tables.size());
   }
 }
+
+TEST(DynamoRequestParser, parsePartitionIds) {
+  {
+    std::vector<RequestParser::PartitionDescriptor> partitions =
+        RequestParser::parsePartitionIds("{}");
+    EXPECT_EQ(0u, partitions.size());
+  }
+  {
+    std::vector<RequestParser::PartitionDescriptor> partitions =
+        RequestParser::parsePartitionIds("{\"ConsumedCapacity\":{}}");
+    EXPECT_EQ(0u, partitions.size());
+  }
+  {
+    std::vector<RequestParser::PartitionDescriptor> partitions =
+        RequestParser::parsePartitionIds("{\"ConsumedCapacity\":{ \"Partitions\":{}}}");
+    EXPECT_EQ(0u, partitions.size());
+  }
+  {
+    std::string json = R"EOF(
+    {
+      "ConsumedCapacity": {
+        "Partitions": {
+          "partition_1" : 2.0,
+          "partition_2" : 3.0
+        }
+      }
+    }
+    )EOF";
+    std::vector<RequestParser::PartitionDescriptor> partitions =
+        RequestParser::parsePartitionIds(json);
+    // EXPECT_TRUE(find(partitions.begin(), partitions.end(), "partition_1") != partitions.end());
+    // EXPECT_TRUE(find(partitions.begin(), partitions.end(), "partition_2") != partitions.end());
+    EXPECT_EQ(2u, partitions.size());
+  }
+  {
+    std::string json = R"EOF(
+    {
+      "ConsumedCapacity": {
+        "Partitions": {
+          "partition_1" : 0.5,
+          "partition_2" : 3.0
+        }
+      }
+    }
+    )EOF";
+    std::vector<RequestParser::PartitionDescriptor> partitions =
+        RequestParser::parsePartitionIds(json);
+    for (const RequestParser::PartitionDescriptor& partition : partitions) {
+      if (partition.partition_id_ == "partition_1") {
+        EXPECT_EQ(1u, partition.capacity_);
+      } else {
+        EXPECT_EQ(3u, partition.capacity_);
+      }
+    }
+  }
+}
+
 } // Dynamo

@@ -46,6 +46,7 @@ private:
                             uint64_t status);
   void chargeFailureSpecificStats(const Buffer::Instance& data);
   void chargeUnProcessedKeysStats(const Buffer::Instance& data);
+  void chargeTablePartitionIdStats(const Buffer::Instance& data);
 
   Runtime::Loader& runtime_;
   std::string stat_prefix_;

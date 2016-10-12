@@ -18,6 +18,13 @@ public:
     bool is_single_table;
   };
 
+  struct PartitionDescriptor {
+    PartitionDescriptor(std::string partition, uint64_t capacity): partition_id_(partition), capacity_(capacity){}
+    std::string partition_id_;
+    // The capacity returned with a partition id is a real number. We round up the capacity.
+    uint64_t capacity_;
+  };
+
   /**
    * Parse operation out of x-amz-target header.
    * @return empty string if operation cannot be parsed.
@@ -65,6 +72,11 @@ public:
    * @return true if the operation is in the set of supported BATCH_OPERATIONS
    */
   static bool isBatchOperation(const std::string& operation);
+
+  /**
+   * @return empty set if there are no partition ids or a set or partition ids
+   */
+  static std::vector<PartitionDescriptor> parsePartitionIds(const std::string& data);
 
 private:
   static const Http::LowerCaseString X_AMZ_TARGET;
