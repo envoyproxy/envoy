@@ -10,12 +10,7 @@ using testing::NiceMock;
 namespace Upstream {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
-  std::string json = R"EOF(
-  {
-  }
-  )EOF";
-
-  Json::StringLoader loader(json);
+  Json::StringLoader loader("{}");
   MockCluster cluster;
   Event::MockDispatcher dispatcher;
   EXPECT_EQ(nullptr, OutlierDetectorImplFactory::createForCluster(cluster, loader, dispatcher));
