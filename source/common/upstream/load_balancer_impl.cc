@@ -79,10 +79,11 @@ ConstHostPtr RoundRobinLoadBalancer::chooseHost() {
   return hosts_to_use[rr_index_++ % hosts_to_use.size()];
 }
 
-LeastRequestLoadBalancer::LeastRequestLoadBalancer(const HostSet& host_set, ClusterStats& stats,
-                                                   Runtime::Loader& runtime,
+LeastRequestLoadBalancer::LeastRequestLoadBalancer(const HostSet& host_set,
+                                                   const HostSet* local_host_set,
+                                                   ClusterStats& stats, Runtime::Loader& runtime,
                                                    Runtime::RandomGenerator& random)
-    : LoadBalancerBase(host_set, stats, runtime, random) {
+    : LoadBalancerBase(host_set, local_host_set, stats, runtime, random) {
   host_set.addMemberUpdateCb(
       [this](const std::vector<HostPtr>&, const std::vector<HostPtr>& hosts_removed) -> void {
         if (last_host_) {

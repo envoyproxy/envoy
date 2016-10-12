@@ -119,7 +119,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   // TODO: make per originating host load balancer.
-  RandomLoadBalancer lb_{cluster_, stats_, runtime_, random_};
+  RandomLoadBalancer lb_{cluster_, nullptr, stats_, runtime_, random_};
 };
 
 TEST_F(DISABLED_SimulationTest, strictlyEqualDistribution) {

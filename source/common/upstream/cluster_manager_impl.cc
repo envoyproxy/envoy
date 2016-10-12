@@ -43,11 +43,22 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, Stats::Store&
     loadCluster(cluster, stats, dns_resolver, ssl_context_manager, runtime, random);
   }
 
+  Optional<std::string> local_cluster_name;
+  if (config.hasObject("local_cluster")) {
+    Json::Object local_cluster = config.getObject("local_cluster");
+    std::string name = local_cluster.getString("name");
+    if (get(name) == nullptr) {
+      throw EnvoyException(fmt::format("Local cluster '{}' must be defined", name));
+    }
+    local_cluster_name.value(name);
+  }
+
   tls.set(thread_local_slot_,
-          [this, &stats, &runtime, &random, local_zone_name, local_address](
+          [this, &stats, &runtime, &random, local_zone_name, local_address, local_cluster_name](
               Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
             return ThreadLocal::ThreadLocalObjectPtr{new ThreadLocalClusterManagerImpl(
-                *this, dispatcher, runtime, random, local_zone_name, local_address)};
+                *this, dispatcher, runtime, random, local_zone_name, local_address,
+                local_cluster_name)};
           });
 
   // To avoid threading issues, for those clusters that start with hosts already in them (like
@@ -209,12 +220,25 @@ Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::stri
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const std::string& local_zone_name,
-    const std::string& local_address)
+    const std::string& local_address, const Optional<std::string>& local_cluster_name)
     : parent_(parent), dispatcher_(dispatcher) {
+  // If local cluster is set, initialize that first.
+  if (local_cluster_name.valid()) {
+    auto& local_cluster = parent.primary_clusters_[local_cluster_name.value()];
+    thread_local_clusters_[local_cluster_name.value()].reset(
+        new ClusterEntry(*this, *local_cluster, runtime, random, parent.stats_, dispatcher,
+                         local_zone_name, local_address, local_cluster_name));
+  }
+
   for (auto& cluster : parent.primary_clusters_) {
-    thread_local_clusters_[cluster.first].reset(new ClusterEntry(*this, *cluster.second, runtime,
-                                                                 random, parent.stats_, dispatcher,
-                                                                 local_zone_name, local_address));
+    // If local cluster name is set then we already initialized this cluster.
+    if (local_cluster_name.valid() && local_cluster_name == cluster.first) {
+      continue;
+    }
+
+    thread_local_clusters_[cluster.first].reset(
+        new ClusterEntry(*this, *cluster.second, runtime, random, parent.stats_, dispatcher,
+                         local_zone_name, local_address, local_cluster_name));
   }
 
   for (auto& cluster : thread_local_clusters_) {
@@ -281,23 +305,31 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::shutdown() {
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, const Cluster& cluster, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Stats::Store& stats_store, Event::Dispatcher& dispatcher,
-    const std::string& local_zone_name, const std::string& local_address)
+    const std::string& local_zone_name, const std::string& local_address,
+    const Optional<std::string>& local_cluster_name)
     : parent_(parent), primary_cluster_(cluster),
       http_async_client_(
           cluster, stats_store, dispatcher, local_zone_name, parent.parent_, runtime, random,
           Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}, local_address) {
 
+  const HostSet* local_host_set = nullptr;
+  if (local_cluster_name.valid()) {
+    local_host_set = &parent.thread_local_clusters_[local_cluster_name.value()]->host_set_;
+  }
+
   switch (cluster.lbType()) {
   case LoadBalancerType::LeastRequest: {
-    lb_.reset(new LeastRequestLoadBalancer(host_set_, cluster.stats(), runtime, random));
+    lb_.reset(
+        new LeastRequestLoadBalancer(host_set_, local_host_set, cluster.stats(), runtime, random));
     break;
   }
   case LoadBalancerType::Random: {
-    lb_.reset(new RandomLoadBalancer(host_set_, cluster.stats(), runtime, random));
+    lb_.reset(new RandomLoadBalancer(host_set_, local_host_set, cluster.stats(), runtime, random));
     break;
   }
   case LoadBalancerType::RoundRobin: {
-    lb_.reset(new RoundRobinLoadBalancer(host_set_, cluster.stats(), runtime, random));
+    lb_.reset(
+        new RoundRobinLoadBalancer(host_set_, local_host_set, cluster.stats(), runtime, random));
     break;
   }
   }

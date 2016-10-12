@@ -11,9 +11,10 @@ namespace Upstream {
  */
 class LoadBalancerBase {
 protected:
-  LoadBalancerBase(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
-                   Runtime::RandomGenerator& random)
-      : stats_(stats), runtime_(runtime), random_(random), host_set_(host_set) {}
+  LoadBalancerBase(const HostSet& host_set, const HostSet* local_host_set, ClusterStats& stats,
+                   Runtime::Loader& runtime, Runtime::RandomGenerator& random)
+      : stats_(stats), runtime_(runtime), random_(random), host_set_(host_set),
+        local_host_set_(local_host_set) {}
 
   /**
    * Pick the host list to use (healthy or all depending on how many in the set are not healthy).
@@ -26,6 +27,7 @@ protected:
 
 private:
   const HostSet& host_set_;
+  const HostSet* local_host_set_;
 };
 
 /**
@@ -33,9 +35,10 @@ private:
  */
 class RoundRobinLoadBalancer : public LoadBalancer, LoadBalancerBase {
 public:
-  RoundRobinLoadBalancer(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
+  RoundRobinLoadBalancer(const HostSet& host_set, const HostSet* local_host_set_,
+                         ClusterStats& stats, Runtime::Loader& runtime,
                          Runtime::RandomGenerator& random)
-      : LoadBalancerBase(host_set, stats, runtime, random) {}
+      : LoadBalancerBase(host_set, local_host_set_, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
   ConstHostPtr chooseHost() override;
@@ -59,7 +62,8 @@ private:
  */
 class LeastRequestLoadBalancer : public LoadBalancer, LoadBalancerBase {
 public:
-  LeastRequestLoadBalancer(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
+  LeastRequestLoadBalancer(const HostSet& host_set, const HostSet* local_host_set_,
+                           ClusterStats& stats, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random);
 
   // Upstream::LoadBalancer
@@ -75,9 +79,9 @@ private:
  */
 class RandomLoadBalancer : public LoadBalancer, LoadBalancerBase {
 public:
-  RandomLoadBalancer(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime,
-                     Runtime::RandomGenerator& random)
-      : LoadBalancerBase(host_set, stats, runtime, random) {}
+  RandomLoadBalancer(const HostSet& host_set, const HostSet* local_host_set, ClusterStats& stats,
+                     Runtime::Loader& runtime, Runtime::RandomGenerator& random)
+      : LoadBalancerBase(host_set, local_host_set, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
   ConstHostPtr chooseHost() override;

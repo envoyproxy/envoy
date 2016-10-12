@@ -23,7 +23,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
-  RoundRobinLoadBalancer lb_{cluster_, stats_, runtime_, random_};
+  RoundRobinLoadBalancer lb_{cluster_, nullptr, stats_, runtime_, random_};
 };
 
 TEST_F(RoundRobinLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost()); }
@@ -196,7 +196,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
-  LeastRequestLoadBalancer lb_{cluster_, stats_, runtime_, random_};
+  LeastRequestLoadBalancer lb_{cluster_, nullptr, stats_, runtime_, random_};
 };
 
 TEST_F(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost()); }
@@ -354,7 +354,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
-  RandomLoadBalancer lb_{cluster_, stats_, runtime_, random_};
+  RandomLoadBalancer lb_{cluster_, nullptr, stats_, runtime_, random_};
 };
 
 TEST_F(RandomLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost()); }
