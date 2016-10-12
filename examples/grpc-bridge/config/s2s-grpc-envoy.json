@@ -20,7 +20,9 @@
                     {
                       "timeout_ms": 0,
                       "prefix": "/",
-                      "content_type": "application/grpc",
+                      "headers": [
+                        {"name": "content-type", "value": "application/grpc"}
+                      ],
                       "cluster": "local_service_grpc"
                     }
                   ]

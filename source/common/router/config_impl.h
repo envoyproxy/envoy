@@ -215,7 +215,6 @@ private:
   const std::string host_redirect_;
   const std::string path_redirect_;
   const RetryPolicyImpl retry_policy_;
-  const std::string content_type_;
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
