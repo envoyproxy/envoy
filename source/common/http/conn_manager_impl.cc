@@ -100,8 +100,7 @@ void ConnectionManagerImpl::destroyStream(ActiveStream& stream) {
   }
 
   if (!reset_stream) {
-    read_callbacks_->connection().dispatcher().deferredDelete(
-        std::move(stream.removeFromList(streams_)));
+    read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
   }
 
   if (reset_stream && !(codec_->features() & CodecFeatures::Multiplexing)) {
@@ -642,7 +641,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
   }
 
   connection_manager_.read_callbacks_->connection().dispatcher().deferredDelete(
-      std::move(removeFromList(connection_manager_.streams_)));
+      removeFromList(connection_manager_.streams_));
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::addResetStreamCallback(

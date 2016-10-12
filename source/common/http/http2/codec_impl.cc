@@ -401,7 +401,7 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
                                     : StreamResetReason::RemoteReset);
     }
 
-    connection_.dispatcher().deferredDelete(std::move(stream->removeFromList(active_streams_)));
+    connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
     nghttp2_session_set_stream_user_data(session_, stream->stream_id_, nullptr);
   }
 
