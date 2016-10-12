@@ -8,10 +8,6 @@
 
 namespace Upstream {
 
-class Host;
-typedef std::shared_ptr<Host> HostPtr;
-typedef std::shared_ptr<const Host> ConstHostPtr;
-
 /**
  * An upstream host.
  */
@@ -24,7 +20,9 @@ public:
 
   enum class HealthFlag {
     // The host is currently failing active health checks.
-    FAILED_ACTIVE_HC = 0x1
+    FAILED_ACTIVE_HC = 0x1,
+    // The host is currently considered an outlier and has been ejected.
+    FAILED_OUTLIER_CHECK = 0x02
   };
 
   /**
@@ -70,6 +68,13 @@ public:
   virtual bool healthy() const PURE;
 
   /**
+   * Set the host's outlier detector. Outlier detectors are assumed to be thread safe, however
+   * a new outlier detector must be installed before the host is used across threads. Thus,
+   * this routine should only be called on the main thread before the host is used across threads.
+   */
+  virtual void setOutlierDetector(OutlierDetectorHostSinkPtr&& outlier_detector) PURE;
+
+  /**
    * @return the current load balancing weight of the host, in the range 1-100.
    */
   virtual uint32_t weight() const PURE;
@@ -79,6 +84,8 @@ public:
    */
   virtual void weight(uint32_t new_weight) PURE;
 };
+
+typedef std::shared_ptr<const Host> ConstHostPtr;
 
 /**
  * Base host set interface. This is used both for clusters, as well as per thread/worker host sets

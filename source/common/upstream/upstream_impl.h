@@ -1,5 +1,6 @@
 #pragma once
 
+#include "outlier_detection_impl.h"
 #include "resource_manager_impl.h"
 
 #include "envoy/event/timer.h"
@@ -32,6 +33,13 @@ public:
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
   const Cluster& cluster() const override { return cluster_; }
+  OutlierDetectorHostSink& outlierDetector() const override {
+    if (outlier_detector_) {
+      return *outlier_detector_;
+    } else {
+      return null_outlier_detector_;
+    }
+  }
   const HostStats& stats() const override { return stats_; }
   const std::string& url() const override { return url_; }
   const std::string& zone() const override { return zone_; }
@@ -43,9 +51,12 @@ protected:
   const std::string zone_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
+  OutlierDetectorHostSinkPtr outlier_detector_;
 
 private:
   void checkUrl();
+
+  static OutlierDetectorHostSinkNullImpl null_outlier_detector_;
 };
 
 /**
@@ -72,6 +83,9 @@ public:
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
+  void setOutlierDetector(OutlierDetectorHostSinkPtr&& outlier_detector) override {
+    outlier_detector_ = std::move(outlier_detector);
+  }
   bool healthy() const override { return !health_flags_; }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight);
@@ -150,6 +164,12 @@ public:
    */
   void setHealthChecker(HealthCheckerPtr&& health_checker);
 
+  /**
+   * Optionally set the outlier detector for the primary cluster. Done for the same reason as
+   * documented in setHealthChecker().
+   */
+  void setOutlierDetector(OutlierDetectorPtr&& outlier_detector);
+
   // Upstream::Cluster
   const std::string& altStatName() const override { return alt_stat_name_; }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
@@ -181,6 +201,7 @@ protected:
   HealthCheckerPtr health_checker_;
   std::string alt_stat_name_;
   uint64_t features_;
+  OutlierDetectorPtr outlier_detector_;
 
 private:
   struct ResourceManagers {

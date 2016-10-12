@@ -16,6 +16,8 @@
 
 namespace Upstream {
 
+OutlierDetectorHostSinkNullImpl HostDescriptionImpl::null_outlier_detector_;
+
 Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatcher) const {
   return {createConnection(dispatcher, cluster_, url_), shared_from_this()};
 }
@@ -131,6 +133,18 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
       updateHosts(rawHosts(), createHealthyHostList(*rawHosts()), rawLocalZoneHosts(),
                   createHealthyHostList(*rawLocalZoneHosts()), {}, {});
     }
+  });
+}
+
+void ClusterImplBase::setOutlierDetector(OutlierDetectorPtr&& outlier_detector) {
+  if (!outlier_detector) {
+    return;
+  }
+
+  outlier_detector_ = std::move(outlier_detector);
+  outlier_detector_->addChangedStateCb([this](HostPtr) -> void {
+    updateHosts(rawHosts(), createHealthyHostList(*rawHosts()), rawLocalZoneHosts(),
+                createHealthyHostList(*rawLocalZoneHosts()), {}, {});
   });
 }
 

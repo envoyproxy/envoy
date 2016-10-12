@@ -157,15 +157,19 @@ TEST_F(CodeUtilityTest, PerZoneStats) {
 TEST(CodeUtilityResponseTimingTest, All) {
   Stats::MockStore store;
 
-  CodeUtility::ResponseTimingInfo info{store, "prefix.", std::chrono::system_clock::now(), true,
-                                       true, "vhost_name", "req_vcluster_name", "from_az", "to_az"};
+  CodeUtility::ResponseTimingInfo info{store, "prefix.", std::chrono::milliseconds(5), true, true,
+                                       "vhost_name", "req_vcluster_name", "from_az", "to_az"};
 
-  EXPECT_CALL(store, deliverTimingToSinks("prefix.upstream_rq_time", _));
-  EXPECT_CALL(store, deliverTimingToSinks("prefix.canary.upstream_rq_time", _));
-  EXPECT_CALL(store, deliverTimingToSinks("prefix.internal.upstream_rq_time", _));
-  EXPECT_CALL(store, deliverTimingToSinks(
-                         "vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time", _));
-  EXPECT_CALL(store, deliverTimingToSinks("prefix.zone.from_az.to_az.upstream_rq_time", _));
+  EXPECT_CALL(store, deliverTimingToSinks("prefix.upstream_rq_time", std::chrono::milliseconds(5)));
+  EXPECT_CALL(store,
+              deliverTimingToSinks("prefix.canary.upstream_rq_time", std::chrono::milliseconds(5)));
+  EXPECT_CALL(store, deliverTimingToSinks("prefix.internal.upstream_rq_time",
+                                          std::chrono::milliseconds(5)));
+  EXPECT_CALL(store,
+              deliverTimingToSinks("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time",
+                                   std::chrono::milliseconds(5)));
+  EXPECT_CALL(store, deliverTimingToSinks("prefix.zone.from_az.to_az.upstream_rq_time",
+                                          std::chrono::milliseconds(5)));
   CodeUtility::chargeResponseTiming(info);
 }
 

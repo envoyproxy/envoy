@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/common/time.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats.h"
@@ -40,7 +39,7 @@ public:
   struct ResponseTimingInfo {
     Stats::Store& store_;
     const std::string& prefix_;
-    SystemTime request_send_time_;
+    std::chrono::milliseconds response_time_;
     bool upstream_canary_;
     bool internal_request_;
     const std::string& request_vhost_name_;

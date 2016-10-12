@@ -4,6 +4,31 @@
 
 namespace Upstream {
 
+class MockOutlierDetectorHostSink : public OutlierDetectorHostSink {
+public:
+  MockOutlierDetectorHostSink();
+  ~MockOutlierDetectorHostSink();
+
+  MOCK_METHOD1(putHttpResponseCode, void(uint64_t code));
+  MOCK_METHOD1(putResponseTime, void(std::chrono::milliseconds time));
+};
+
+class MockOutlierDetector : public OutlierDetector {
+public:
+  MockOutlierDetector();
+  ~MockOutlierDetector();
+
+  void runCallbacks(HostPtr host) {
+    for (ChangeStateCb cb : callbacks_) {
+      cb(host);
+    }
+  }
+
+  MOCK_METHOD1(addChangedStateCb, void(ChangeStateCb cb));
+
+  std::list<ChangeStateCb> callbacks_;
+};
+
 class MockHostDescription : public HostDescription {
 public:
   MockHostDescription();
@@ -11,11 +36,13 @@ public:
 
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_CONST_METHOD0(cluster, const Cluster&());
+  MOCK_CONST_METHOD0(outlierDetector, OutlierDetectorHostSink&());
   MOCK_CONST_METHOD0(url, const std::string&());
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(zone, const std::string&());
 
   std::string url_{"tcp://10.0.0.1:443"};
+  testing::NiceMock<MockOutlierDetectorHostSink> outlier_detector_;
 };
 
 class MockHost : public Host {

@@ -12,7 +12,20 @@ using testing::ReturnRef;
 
 namespace Upstream {
 
-MockHostDescription::MockHostDescription() { ON_CALL(*this, url()).WillByDefault(ReturnRef(url_)); }
+MockOutlierDetectorHostSink::MockOutlierDetectorHostSink() {}
+MockOutlierDetectorHostSink::~MockOutlierDetectorHostSink() {}
+
+MockOutlierDetector::MockOutlierDetector() {
+  ON_CALL(*this, addChangedStateCb(_))
+      .WillByDefault(Invoke([this](ChangeStateCb cb) -> void { callbacks_.push_back(cb); }));
+}
+
+MockOutlierDetector::~MockOutlierDetector() {}
+
+MockHostDescription::MockHostDescription() {
+  ON_CALL(*this, url()).WillByDefault(ReturnRef(url_));
+  ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
+}
 
 MockHostDescription::~MockHostDescription() {}
 

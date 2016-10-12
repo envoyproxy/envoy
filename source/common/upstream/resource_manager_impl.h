@@ -50,7 +50,7 @@ private:
     const uint64_t max_;
     std::atomic<uint64_t> current_{};
     Runtime::Loader& runtime_;
-    std::string runtime_key_;
+    const std::string runtime_key_;
   };
 
   ResourceImpl connections_;
