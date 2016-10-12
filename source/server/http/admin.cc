@@ -100,9 +100,27 @@ bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
   return true;
 }
 
+void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
+                                   Upstream::ResourceManager& resource_manager,
+                                   Buffer::Instance& response) {
+  response.add(fmt::format("{}::{}_priority::max_connections::{}\n", cluster_name, priority_str,
+                           resource_manager.connections().max()));
+  response.add(fmt::format("{}::{}_priority::max_pending_requests::{}\n", cluster_name,
+                           priority_str, resource_manager.pendingRequests().max()));
+  response.add(fmt::format("{}::{}_priority::max_requests::{}\n", cluster_name, priority_str,
+                           resource_manager.requests().max()));
+  response.add(fmt::format("{}::{}_priority::max_retries::{}\n", cluster_name, priority_str,
+                           resource_manager.retries().max()));
+}
+
 Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& response) {
   for (auto& cluster : server_.clusterManager().clusters()) {
-    response.add(fmt::format("=== {} ===\n", cluster.second->name()));
+    addCircuitSettings(cluster.second->name(), "default",
+                       cluster.second->resourceManager(Upstream::ResourcePriority::Default),
+                       response);
+    addCircuitSettings(cluster.second->name(), "high",
+                       cluster.second->resourceManager(Upstream::ResourcePriority::High), response);
+
     for (auto& host : cluster.second->hosts()) {
       std::map<std::string, uint64_t> all_stats;
       for (Stats::Counter& counter : host->counters()) {
@@ -126,7 +144,6 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
           fmt::format("{}::{}::zone::{}\n", cluster.second->name(), host->url(), host->zone()));
       response.add(
           fmt::format("{}::{}::canary::{}\n", cluster.second->name(), host->url(), host->canary()));
-      response.add("\n");
     }
   }
 

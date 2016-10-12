@@ -7,6 +7,9 @@ architectures. Below we compare Envoy to other related systems. Though in any pa
 rich as some of the solutions below, in aggregate no other solution supplies the same set of
 overall features into a single self contained and high performance package.
 
+**NOTE:** Most of the projects below are under active development. Thus some of the information may
+become out of date. If that is the case please let us know and we will fix it.
+
 `nginx <https://nginx.org/en/>`_
 --------------------------------
 
@@ -18,7 +21,7 @@ proxy:
 
 * Full HTTP/2 transparent proxy. Envoy supports HTTP/2 for both downstream and upstream
   communication. nginx only supports HTTP/2 for downstream connections.
-* Freely available advanced load balancing. Only nginx plus (the paid server) supports similar 
+* Freely available advanced load balancing. Only nginx plus (the paid server) supports similar
   advanced load balancing capabilities as Envoy.
 * Ability to run the same software at the edge as well as on each service node. Many infrastructures
   run a mix of nginx and haproxy. A single proxy solution at every hop is substantially simpler from
@@ -104,3 +107,18 @@ features in the future (load balancing, etc.), as of this writing the various ru
 immature and are primarily focused on serialization/de-serialization. We consider gRPC to be a
 companion to Envoy versus a competitor. How Envoy integrates with gRPC is described :ref:`here
 <arch_overview_grpc>`.
+
+`linkerd <https://github.com/BuoyantIO/linkerd>`_
+-------------------------------------------------
+
+linkerd is a standalone, open source RPC routing proxy built on Netty and Finagle (Scala/JVM).
+linkerd offers many of Finagle’s features, including latency-aware load balancing, connection
+pooling, circuit-breaking, retry budgets, deadlines, tracing, fine-grained instrumentation, and a
+traffic routing layer for request-level routing. linkerd provides a pluggable service discovery
+interface (with standard support for Consul and ZooKeeper, as well as the Marathon and Kubernetes
+APIs).
+
+linkerd’s memory and CPU requirements are significantly higher than Envoy’s. In contrast to Envoy,
+linkerd provides a minimalist configuration language, and explicitly does not support hot reloads,
+relying instead on dynamic provisioning and service abstractions. linkerd supports HTTP/1.1, Thrift,
+ThriftMux, HTTP/2 (experimental) and gRPC (experimental).

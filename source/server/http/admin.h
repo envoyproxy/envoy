@@ -3,6 +3,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/admin.h"
+#include "envoy/upstream/resource_manager.h"
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
@@ -72,6 +73,8 @@ private:
    * @return TRUE if level change succeeded, FALSE otherwise.
    */
   bool changeLogLevel(const Http::Utility::QueryParams& params);
+  void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
+                          Upstream::ResourceManager& resource_manager, Buffer::Instance& response);
 
   /**
    * URL handlers.
@@ -99,7 +102,7 @@ private:
 };
 
 /**
- * A terminal HTTP filter that implements server admin functioanlity.
+ * A terminal HTTP filter that implements server admin functionality.
  */
 class AdminFilter : public Http::StreamDecoderFilter, Logger::Loggable<Logger::Id::admin> {
 public:
