@@ -487,7 +487,9 @@ TEST(RouteMatcherTest, ContentType) {
         {
           "prefix": "/",
           "cluster": "local_service_grpc",
-          "content_type": "application/grpc"
+          "headers" : [
+            {"name": "content-type", "value": "application/grpc"}
+          ]
         },
         {
           "prefix": "/",
