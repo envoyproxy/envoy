@@ -10,7 +10,6 @@ namespace Ssl {
 std::unique_ptr<std::mutex[]> OpenSsl::locks_;
 
 void OpenSsl::initialize() {
-  ERR_load_CRYPTO_strings();
   SSL_load_error_strings();
 
   if (!SSL_library_init()) {
