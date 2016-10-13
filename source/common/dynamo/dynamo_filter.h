@@ -44,9 +44,9 @@ private:
   void chargeBasicStats(uint64_t status);
   void chargeStatsPerEntity(const std::string& entity, const std::string& entity_type,
                             uint64_t status);
-  void chargeFailureSpecificStats(const Buffer::Instance& data);
-  void chargeUnProcessedKeysStats(const Buffer::Instance& data);
-  void chargeTablePartitionIdStats(const Buffer::Instance& data);
+  void chargeFailureSpecificStats(const std::string& body);
+  void chargeUnProcessedKeysStats(const std::string& body);
+  void chargeTablePartitionIdStats(const std::string& body);
 
   Runtime::Loader& runtime_;
   std::string stat_prefix_;

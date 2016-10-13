@@ -243,23 +243,6 @@ TEST(DynamoRequestParser, parsePartitionIds) {
     {
       "ConsumedCapacity": {
         "Partitions": {
-          "partition_1" : 2.0,
-          "partition_2" : 3.0
-        }
-      }
-    }
-    )EOF";
-    std::vector<RequestParser::PartitionDescriptor> partitions =
-        RequestParser::parsePartitions(json);
-    // EXPECT_TRUE(find(partitions.begin(), partitions.end(), "partition_1") != partitions.end());
-    // EXPECT_TRUE(find(partitions.begin(), partitions.end(), "partition_2") != partitions.end());
-    EXPECT_EQ(2u, partitions.size());
-  }
-  {
-    std::string json = R"EOF(
-    {
-      "ConsumedCapacity": {
-        "Partitions": {
           "partition_1" : 0.5,
           "partition_2" : 3.0
         }
@@ -275,6 +258,7 @@ TEST(DynamoRequestParser, parsePartitionIds) {
         EXPECT_EQ(3u, partition.capacity_);
       }
     }
+    EXPECT_EQ(2u, partitions.size());
   }
 }
 

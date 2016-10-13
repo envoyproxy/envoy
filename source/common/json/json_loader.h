@@ -114,7 +114,7 @@ public:
    * @param default_value supplies the value to return if name does not exist.
    * @return double the value.
    */
-  double getDouble(const std::string& name, const double& default_value) const;
+  double getDouble(const std::string& name, double default_value) const;
 
   /**
    * Iterate Object and call callback on key-value pairs

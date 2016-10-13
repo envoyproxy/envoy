@@ -130,22 +130,20 @@ RequestParser::parsePartitions(const std::string& data) {
   Json::StringLoader json(data);
   std::vector<RequestParser::PartitionDescriptor> partition_descriptors;
 
-  if (json.hasObject("ConsumedCapacity")) {
-    Json::Object consumed_capacity = json.getObject("ConsumedCapacity");
-    if (consumed_capacity.hasObject("Partitions")) {
-      Json::Object partitions = consumed_capacity.getObject("Partitions");
+  Json::Object consumed_capacity = json.getObject("ConsumedCapacity", true);
+  Json::Object partitions = consumed_capacity.getObject("Partitions", true);
 
-      partitions.iterate(
-          [&partition_descriptors, &partitions](const std::string& key, const Json::Object&) {
-            // Capacity is a double and it is rounded up to the nearest integer.
-            // The partition stat will be incremented by the capacity value.
-            uint64_t capacity_integer =
-                static_cast<uint64_t>(std::ceil(partitions.getDouble(key, 0.0)));
-            partition_descriptors.emplace_back(key, capacity_integer);
-            return true;
-          });
-    }
-  }
+  partitions.iterate([&partition_descriptors, &partitions](const std::string& key,
+                                                           const Json::Object&) {
+    // For a given partition id, the amount of capacity used is returned in the body as a double.
+    // A stat will be created to track the capacity consumed for the operation, table and partition.
+    // Stats counter only increments by whole numbers, capacity is round up to the nearest integer
+    // to account for this.
+    uint64_t capacity_integer = static_cast<uint64_t>(std::ceil(partitions.getDouble(key, 0.0)));
+    partition_descriptors.emplace_back(key, capacity_integer);
+    return true;
+  });
+
   return partition_descriptors;
 }
 

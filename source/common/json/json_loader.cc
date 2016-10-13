@@ -139,13 +139,13 @@ std::vector<std::string> Object::getStringArray(const std::string& name) const {
 double Object::getDouble(const std::string& name) const {
   json_t* real = json_object_get(json_, name.c_str());
   if (!real || !json_is_real(real)) {
-    throw Exception(fmt::format("key '{}' missing or not an double in '{}'", name, name_));
+    throw Exception(fmt::format("key '{}' missing or not a double in '{}'", name, name_));
   }
 
   return json_real_value(real);
 }
 
-double Object::getDouble(const std::string& name, const double& default_value) const {
+double Object::getDouble(const std::string& name, double default_value) const {
   if (!json_object_get(json_, name.c_str())) {
     return default_value;
   } else {

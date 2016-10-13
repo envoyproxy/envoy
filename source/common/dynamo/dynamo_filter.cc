@@ -13,7 +13,7 @@ namespace Dynamo {
 Http::FilterHeadersStatus DynamoFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (enabled_) {
     start_decode_ = std::chrono::system_clock::now();
-    operation_ = Dynamo::RequestParser::parseOperation(headers);
+    operation_ = RequestParser::parseOperation(headers);
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -44,7 +44,7 @@ void DynamoFilter::onDecodeComplete(const Buffer::Instance& data) {
   std::string body = buildBody(decoder_callbacks_->decodingBuffer(), data);
   if (!body.empty()) {
     try {
-      table_descriptor_ = Dynamo::RequestParser::parseTable(operation_, body);
+      table_descriptor_ = RequestParser::parseTable(operation_, body);
     } catch (const Json::Exception& jsonEx) {
       // Body parsing failed. This should not happen, just put a stat for that.
       stats_.counter(fmt::format("{}invalid_req_body", stat_prefix_)).inc();
@@ -57,17 +57,17 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
     uint64_t status = Http::Utility::getResponseStatus(*response_headers_);
 
     chargeBasicStats(status);
-
-    chargeTablePartitionIdStats(data);
+    std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
+    chargeTablePartitionIdStats(body);
 
     if (Http::CodeUtility::is4xx(status)) {
-      chargeFailureSpecificStats(data);
+      chargeFailureSpecificStats(body);
     }
     // Batch Operations will always return status 200 for a partial or full success. Check
     // unprocessed keys to determine partial success.
     // http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Programming.Errors.html#Programming.Errors.BatchOperations
-    if (Dynamo::RequestParser::isBatchOperation(operation_)) {
-      chargeUnProcessedKeysStats(data);
+    if (RequestParser::isBatchOperation(operation_)) {
+      chargeUnProcessedKeysStats(body);
     }
   }
 }
@@ -168,8 +168,7 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
                               latency);
 }
 
-void DynamoFilter::chargeUnProcessedKeysStats(const Buffer::Instance& data) {
-  std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
+void DynamoFilter::chargeUnProcessedKeysStats(const std::string& body) {
   if (!body.empty()) {
     try {
       // The unprocessed keys block contains a list of tables and keys for that table that did not
@@ -180,19 +179,17 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Buffer::Instance& data) {
         stats_.counter(fmt::format("{}error.{}.BatchFailureUnprocessedKeys", stat_prefix_,
                                    unprocessed_table)).inc();
       }
-    } catch (const Json::Exception& jsonEx) {
+    } catch (const Json::Exception&) {
       // Body parsing failed. This should not happen, just put a stat for that.
       stats_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
     }
   }
 }
 
-void DynamoFilter::chargeFailureSpecificStats(const Buffer::Instance& data) {
-  std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
-
+void DynamoFilter::chargeFailureSpecificStats(const std::string& body) {
   if (!body.empty()) {
     try {
-      std::string error_type = Dynamo::RequestParser::parseErrorType(body);
+      std::string error_type = RequestParser::parseErrorType(body);
 
       if (!error_type.empty()) {
         if (table_descriptor_.table_name.empty()) {
@@ -211,22 +208,20 @@ void DynamoFilter::chargeFailureSpecificStats(const Buffer::Instance& data) {
   }
 }
 
-void DynamoFilter::chargeTablePartitionIdStats(const Buffer::Instance& data) {
-  // Only log partition stats for single table operations.
+void DynamoFilter::chargeTablePartitionIdStats(const std::string& body) {
   if (table_descriptor_.table_name.empty() || operation_.empty()) {
     return;
   }
-  std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
   if (!body.empty()) {
     try {
-      std::vector<Dynamo::RequestParser::PartitionDescriptor> partitions =
-          Dynamo::RequestParser::parsePartitions(body);
-      for (const Dynamo::RequestParser::PartitionDescriptor& partition : partitions) {
+      std::vector<RequestParser::PartitionDescriptor> partitions =
+          RequestParser::parsePartitions(body);
+      for (const RequestParser::PartitionDescriptor& partition : partitions) {
         std::string stats_string = Utility::buildPartitionStatString(
             stat_prefix_, table_descriptor_.table_name, operation_, partition.partition_id_);
         stats_.counter(stats_string).add(partition.capacity_);
       }
-    } catch (const Json::Exception& jsonEx) {
+    } catch (const Json::Exception&) {
       // Body parsing failed. This should not happen, just put a stat for that.
       stats_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
     }

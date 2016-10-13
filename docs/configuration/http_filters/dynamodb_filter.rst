@@ -56,15 +56,14 @@ in all operations from the batch.
 
 *Disclaimer: Please note that this is a pre-release Amazon DynamoDB feature that is not yet widely available.*
 Per partition and operation stats can be found in the *http.<stat_prefix>.dynamodb.table.<table_name>.*
-namespace. For Batch operations, Envoy tracks per partition and operation stats in the case only if it is the same
-table used in all operations from the batch.
+namespace. For batch operations, Envoy tracks per partition and operation stats only if it is the same
+table used in all operations.
 
   .. csv-table::
     :header: Name, Type, Description
     :widths: 1, 1, 2
 
-    capacity.<operation_name>.__partition_id=<last_seven_characters_from_partition_id>, Counter, Total number of
-    capacity for <operation_name> on <table_name> table for a given <partition_id>
+    capacity.<operation_name>.__partition_id=<last_seven_characters_from_partition_id>, Counter, Total number of capacity for <operation_name> on <table_name> table for a given <partition_id>
 
 Additional detailed stats:
 

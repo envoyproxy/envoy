@@ -74,8 +74,11 @@ public:
   static bool isBatchOperation(const std::string& operation);
 
   /**
-   * Parse the Partition ids and the capacity from the response body.
-   * @return empty set if there are no partition ids or a set of partition ids
+   * Parse the Partition ids and the consumed capacity from the body.
+   * @return empty set if there is no partition data or a set of partition data containing
+   * the partition id as a string and the capacity consumed as an integer.
+   *
+   * @throw Json::Exception if data is not in valid Json format.
    */
   static std::vector<PartitionDescriptor> parsePartitions(const std::string& data);
 

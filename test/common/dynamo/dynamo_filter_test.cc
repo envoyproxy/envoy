@@ -608,7 +608,7 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
 
   response_data.add(response_content);
 
-  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(2).WillRepeatedly(Return(&response_data));
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(1).WillRepeatedly(Return(&response_data));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
 }
 
