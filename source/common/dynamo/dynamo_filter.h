@@ -51,6 +51,7 @@ private:
   Runtime::Loader& runtime_;
   std::string stat_prefix_;
   Stats::Store& stats_;
+
   bool enabled_{};
   std::string operation_{};
   RequestParser::TableDescriptor table_descriptor_{"", true};
