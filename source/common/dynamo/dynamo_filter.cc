@@ -243,7 +243,7 @@ std::string DynamoFilter::buildPartitionStatString(const std::string& stat_prefi
                   partition_id.substr(partition_id.size() - 7, partition_id.size()));
   // Calculate how many characters are available for the table prefix.
   size_t remaining_size = MAX_NAME_SIZE - stats_partition_postfix.size() - 1;
-  // Truncate the table prefix if the curent string is too large to fit.
+  // Truncate the table prefix if the curent string is too large.
   if (stats_table_prefix.size() > remaining_size) {
     stats_table_prefix = stats_table_prefix.substr(0, remaining_size);
   }

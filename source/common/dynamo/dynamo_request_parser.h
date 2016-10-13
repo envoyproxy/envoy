@@ -22,7 +22,6 @@ public:
     PartitionDescriptor(std::string partition, uint64_t capacity)
         : partition_id_(partition), capacity_(capacity) {}
     std::string partition_id_;
-    // The capacity returned with a partition id is a real number. We round up the capacity.
     uint64_t capacity_;
   };
 
@@ -75,6 +74,7 @@ public:
   static bool isBatchOperation(const std::string& operation);
 
   /**
+   * Parse the Partition ids and the capacity from the response body.
    * @return empty set if there are no partition ids or a set of partition ids
    */
   static std::vector<PartitionDescriptor> parsePartitions(const std::string& data);
