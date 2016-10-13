@@ -19,7 +19,8 @@ public:
   };
 
   struct PartitionDescriptor {
-    PartitionDescriptor(std::string partition, uint64_t capacity): partition_id_(partition), capacity_(capacity){}
+    PartitionDescriptor(std::string partition, uint64_t capacity)
+        : partition_id_(partition), capacity_(capacity) {}
     std::string partition_id_;
     // The capacity returned with a partition id is a real number. We round up the capacity.
     uint64_t capacity_;
@@ -74,9 +75,9 @@ public:
   static bool isBatchOperation(const std::string& operation);
 
   /**
-   * @return empty set if there are no partition ids or a set or partition ids
+   * @return empty set if there are no partition ids or a set of partition ids
    */
-  static std::vector<PartitionDescriptor> parsePartitionIds(const std::string& data);
+  static std::vector<PartitionDescriptor> parsePartitions(const std::string& data);
 
 private:
   static const Http::LowerCaseString X_AMZ_TARGET;

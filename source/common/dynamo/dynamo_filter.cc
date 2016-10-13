@@ -175,7 +175,6 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Buffer::Instance& data) {
       // complete apart of the batch operation. Only the table names will be logged for errors.
       std::vector<std::string> unprocessed_tables =
           Dynamo::RequestParser::parseBatchUnProcessedKeys(body);
-
       for (const std::string& unprocessed_table : unprocessed_tables) {
         stats_.counter(fmt::format("{}error.{}.BatchFailureUnprocessedKeys", stat_prefix_,
                                    unprocessed_table)).inc();
@@ -212,28 +211,43 @@ void DynamoFilter::chargeFailureSpecificStats(const Buffer::Instance& data) {
 }
 
 void DynamoFilter::chargeTablePartitionIdStats(const Buffer::Instance& data) {
-
-  if (table_descriptor_.table_name.empty()) {
+  // Only log partition stats for single table operations.
+  if (table_descriptor_.table_name.empty() || operation_.empty()) {
     return;
   }
   std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
   if (!body.empty()) {
     try {
-      // Check if there is a partition id in the response
       std::vector<Dynamo::RequestParser::PartitionDescriptor> partitions =
-          Dynamo::RequestParser::parsePartitionIds(body);
+          Dynamo::RequestParser::parsePartitions(body);
       for (const Dynamo::RequestParser::PartitionDescriptor& partition : partitions) {
-        // increment table partition stat stats_.counter
-        stats_.counter(fmt::format("{}table.{}.__partition_id={}", stat_prefix_,
-                                   table_descriptor_.table_name, partition.partition_id_))
-            .add(partition.capacity_);
+        std::string stats_string = DynamoFilter::buildPartitionStatString(
+            stat_prefix_, table_descriptor_.table_name, operation_, partition.partition_id_);
+        stats_.counter(stats_string).add(partition.capacity_);
       }
-
     } catch (const Json::Exception& jsonEx) {
       // Body parsing failed. This should not happen, just put a stat for that.
       stats_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
     }
   }
+}
+
+std::string DynamoFilter::buildPartitionStatString(const std::string& stat_prefix,
+                                                   const std::string& table_name,
+                                                   const std::string& operation,
+                                                   const std::string& partition_id) {
+  std::string stats_table_prefix = fmt::format("{}table.{}", stat_prefix, table_name);
+  // Use only the last 7 characters from the partition id.
+  std::string stats_partition_postfix =
+      fmt::format(".Capacity.{}.__partition_id={}", operation,
+                  partition_id.substr(partition_id.size() - 7, partition_id.size()));
+  // Calculate how many characters are available for the table prefix.
+  size_t remaining_size = MAX_NAME_SIZE - stats_partition_postfix.size() - 1;
+  // Truncate the table prefix if the curent string is too large to fit.
+  if (stats_table_prefix.size() > remaining_size) {
+    stats_table_prefix = stats_table_prefix.substr(0, remaining_size);
+  }
+  return fmt::format("{}{}", stats_table_prefix, stats_partition_postfix);
 }
 
 } // Dynamo

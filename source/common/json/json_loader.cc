@@ -152,6 +152,7 @@ double Object::getDouble(const std::string& name, const double& default_value) c
     return getDouble(name);
   }
 }
+
 void Object::iterate(const ObjectCallback& callback) {
   const char* key;
   json_t* value;

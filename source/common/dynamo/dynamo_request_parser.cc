@@ -126,7 +126,7 @@ bool RequestParser::isBatchOperation(const std::string& operation) {
 }
 
 std::vector<RequestParser::PartitionDescriptor>
-RequestParser::parsePartitionIds(const std::string& data) {
+RequestParser::parsePartitions(const std::string& data) {
   Json::StringLoader json(data);
   std::vector<RequestParser::PartitionDescriptor> partition_descriptors;
 
@@ -138,11 +138,9 @@ RequestParser::parsePartitionIds(const std::string& data) {
       partitions.iterate(
           [&partition_descriptors, &partitions](const std::string& key, const Json::Object&) {
             // Capacity is a double and it is rounded up to the nearest integer.
-            // The stats for partition is incremented based on the capacity. 
-            // Ex if Capacity == 2, the stats for key will be incremented by 2.
+            // The partition stat will be incremented by the capacity value.
             uint64_t capacity_integer =
                 static_cast<uint64_t>(std::ceil(partitions.getDouble(key, 0.0)));
-            // Dynamo::RequestParser::PartitionDescriptor partition = {key, capacity_integer};
             partition_descriptors.emplace_back(key, capacity_integer);
             return true;
           });

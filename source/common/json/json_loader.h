@@ -104,7 +104,7 @@ public:
   /**
    * Get a double value by name.
    * @param name supplies the key name.
-   * @return double the value
+   * @return double the value.
    */
   double getDouble(const std::string& name) const;
 
@@ -112,7 +112,7 @@ public:
    * Get a double value by name.
    * @param name supplies the key name.
    * @param default_value supplies the value to return if name does not exist.
-   * @return double the value
+   * @return double the value.
    */
   double getDouble(const std::string& name, const double& default_value) const;
 
