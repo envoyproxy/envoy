@@ -447,10 +447,10 @@ TEST_F(DynamoFilterTest, PartitionIdStats) {
   EXPECT_CALL(stats_, deliverTimingToSinks("prefix.dynamodb.table.locations.upstream_rq_time", _));
 
   EXPECT_CALL(stats_,
-              counter("prefix.dynamodb.table.locations.Capacity.GetItem.__partition_id=ition_1"))
+              counter("prefix.dynamodb.table.locations.capacity.GetItem.__partition_id=ition_1"))
       .Times(1);
   EXPECT_CALL(stats_,
-              counter("prefix.dynamodb.table.locations.Capacity.GetItem.__partition_id=ition_2"))
+              counter("prefix.dynamodb.table.locations.capacity.GetItem.__partition_id=ition_2"))
       .Times(1);
 
   Http::HeaderMapImpl response_headers{{":status", "200"}};
@@ -510,11 +510,11 @@ TEST_F(DynamoFilterTest, NoPartitionIdStatsForMultipleTables) {
 
   EXPECT_CALL(
       stats_,
-      counter("prefix.dynamodb.table.locations.Capacity.BatchGetItem.__partition_id=ition_1"))
+      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_1"))
       .Times(0);
   EXPECT_CALL(
       stats_,
-      counter("prefix.dynamodb.table.locations.Capacity.BatchGetItem.__partition_id=ition_2"))
+      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_2"))
       .Times(0);
 
   Http::HeaderMapImpl response_headers{{":status", "200"}};
@@ -583,11 +583,11 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
 
   EXPECT_CALL(
       stats_,
-      counter("prefix.dynamodb.table.locations.Capacity.BatchGetItem.__partition_id=ition_1"))
+      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_1"))
       .Times(1);
   EXPECT_CALL(
       stats_,
-      counter("prefix.dynamodb.table.locations.Capacity.BatchGetItem.__partition_id=ition_2"))
+      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_2"))
       .Times(1);
 
   Http::HeaderMapImpl response_headers{{":status", "200"}};
@@ -610,52 +610,6 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
 
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(2).WillRepeatedly(Return(&response_data));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
-}
-
-TEST_F(DynamoFilterTest, PartitionIdStatString) {
-  const size_t MAX_NAME_SIZE = 127;
-  {
-    std::string stat_prefix = "stat.prefix.";
-    std::string table_name = "locations";
-    std::string operation = "GetItem";
-    std::string partition_id = "6235c781-1d0d-47a3-a4ea-eec04c5883ca";
-    std::string partition_stat_string =
-        DynamoFilter::buildPartitionStatString(stat_prefix, table_name, operation, partition_id);
-    std::string expected_stat_string =
-        "stat.prefix.table.locations.Capacity.GetItem.__partition_id=c5883ca";
-    EXPECT_EQ(expected_stat_string, partition_stat_string);
-    EXPECT_TRUE(partition_stat_string.size() < MAX_NAME_SIZE);
-  }
-
-  {
-    std::string stat_prefix = "http.egress_dynamodb_iad.dynamodb.";
-    std::string table_name = "locations-sandbox-partition-test-iad-mytest-really-long-name";
-    std::string operation = "GetItem";
-    std::string partition_id = "6235c781-1d0d-47a3-a4ea-eec04c5883ca";
-
-    std::string partition_stat_string =
-        DynamoFilter::buildPartitionStatString(stat_prefix, table_name, operation, partition_id);
-    std::string expected_stat_string = "http.egress_dynamodb_iad.dynamodb.table.locations-sandbox-"
-                                       "partition-test-iad-mytest-re.Capacity.GetItem.__partition_"
-                                       "id=c5883ca";
-    EXPECT_EQ(expected_stat_string, partition_stat_string);
-    EXPECT_TRUE(partition_stat_string.size() < MAX_NAME_SIZE);
-  }
-  {
-    std::string stat_prefix = "http.egress_dynamodb_iad.dynamodb.";
-    std::string table_name = "locations-sandbox-partition-test-iad-mytest-re";
-    std::string operation = "GetItem";
-    std::string partition_id = "6235c781-1d0d-47a3-a4ea-eec04c5883ca";
-
-    std::string partition_stat_string =
-        DynamoFilter::buildPartitionStatString(stat_prefix, table_name, operation, partition_id);
-    std::string expected_stat_string = "http.egress_dynamodb_iad.dynamodb.table.locations-sandbox-"
-                                       "partition-test-iad-mytest-re.Capacity.GetItem.__partition_"
-                                       "id=c5883ca";
-
-    EXPECT_EQ(expected_stat_string, partition_stat_string);
-    EXPECT_TRUE(partition_stat_string.size() < MAX_NAME_SIZE);
-  }
 }
 
 } // Dynamo

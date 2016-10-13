@@ -19,7 +19,7 @@ public:
   };
 
   struct PartitionDescriptor {
-    PartitionDescriptor(std::string partition, uint64_t capacity)
+    PartitionDescriptor(const std::string& partition, uint64_t capacity)
         : partition_id_(partition), capacity_(capacity) {}
     std::string partition_id_;
     uint64_t capacity_;

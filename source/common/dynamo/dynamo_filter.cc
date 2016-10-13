@@ -1,4 +1,5 @@
 #include "dynamo_filter.h"
+#include "dynamo_utility.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/dynamo/dynamo_request_parser.h"
@@ -201,7 +202,7 @@ void DynamoFilter::chargeFailureSpecificStats(const Buffer::Instance& data) {
                                      error_type)).inc();
         }
       }
-    } catch (const Json::Exception& jsonEx) {
+    } catch (const Json::Exception&) {
       // Body parsing failed. This should not happen, just put a stat for that.
       stats_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
     }
@@ -221,7 +222,7 @@ void DynamoFilter::chargeTablePartitionIdStats(const Buffer::Instance& data) {
       std::vector<Dynamo::RequestParser::PartitionDescriptor> partitions =
           Dynamo::RequestParser::parsePartitions(body);
       for (const Dynamo::RequestParser::PartitionDescriptor& partition : partitions) {
-        std::string stats_string = DynamoFilter::buildPartitionStatString(
+        std::string stats_string = Utility::buildPartitionStatString(
             stat_prefix_, table_descriptor_.table_name, operation_, partition.partition_id_);
         stats_.counter(stats_string).add(partition.capacity_);
       }
@@ -230,24 +231,6 @@ void DynamoFilter::chargeTablePartitionIdStats(const Buffer::Instance& data) {
       stats_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
     }
   }
-}
-
-std::string DynamoFilter::buildPartitionStatString(const std::string& stat_prefix,
-                                                   const std::string& table_name,
-                                                   const std::string& operation,
-                                                   const std::string& partition_id) {
-  std::string stats_table_prefix = fmt::format("{}table.{}", stat_prefix, table_name);
-  // Use only the last 7 characters from the partition id.
-  std::string stats_partition_postfix =
-      fmt::format(".Capacity.{}.__partition_id={}", operation,
-                  partition_id.substr(partition_id.size() - 7, partition_id.size()));
-  // Calculate how many characters are available for the table prefix.
-  size_t remaining_size = MAX_NAME_SIZE - stats_partition_postfix.size() - 1;
-  // Truncate the table prefix if the curent string is too large.
-  if (stats_table_prefix.size() > remaining_size) {
-    stats_table_prefix = stats_table_prefix.substr(0, remaining_size);
-  }
-  return fmt::format("{}{}", stats_table_prefix, stats_partition_postfix);
 }
 
 } // Dynamo

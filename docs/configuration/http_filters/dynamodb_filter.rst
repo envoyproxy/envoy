@@ -54,6 +54,18 @@ in all operations from the batch.
     upstream_rq_total_xxx, Counter, Total number of requests on <table_name> table per response code (503/2xx/etc)
     upstream_rq_time_xxx, Timer, Time spent on <table_name> table per response code (400/3xx/etc)
 
+*Disclaimer: Please note that this is a pre-release Amazon DynamoDB feature that is not yet widely available.*
+Per partition and operation stats can be found in the *http.<stat_prefix>.dynamodb.table.<table_name>.*
+namespace. For Batch operations, Envoy tracks per partition and operation stats in the case only if it is the same
+table used in all operations from the batch.
+
+  .. csv-table::
+    :header: Name, Type, Description
+    :widths: 1, 1, 2
+
+    capacity.<operation_name>.__partition_id=<last_seven_characters_from_partition_id>, Counter, Total number of
+    capacity for <operation_name> on <table_name> table for a given <partition_id>
+
 Additional detailed stats:
 
 * For 4xx responses and partial batch operation failures, the total number of failures for a given

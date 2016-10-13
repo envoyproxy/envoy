@@ -37,11 +37,6 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-  static std::string buildPartitionStatString(const std::string& stat_prefix,
-                                              const std::string& table_name,
-                                              const std::string& operation,
-                                              const std::string& partition_id);
-
 private:
   void onDecodeComplete(const Buffer::Instance& data);
   void onEncodeComplete(const Buffer::Instance& data);
@@ -52,8 +47,6 @@ private:
   void chargeFailureSpecificStats(const Buffer::Instance& data);
   void chargeUnProcessedKeysStats(const Buffer::Instance& data);
   void chargeTablePartitionIdStats(const Buffer::Instance& data);
-
-  static const size_t MAX_NAME_SIZE = 127;
 
   Runtime::Loader& runtime_;
   std::string stat_prefix_;
