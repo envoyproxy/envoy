@@ -80,6 +80,65 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
   EXPECT_THROW(create(loader), EnvoyException);
 }
 
+TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
+  std::string json = R"EOF(
+  {
+    "local_cluster_name": "new_cluster",
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    },
+    {
+      "name": "cluster_2",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11002"}]
+    }]
+  }
+  )EOF";
+
+  Json::StringLoader loader(json);
+  EXPECT_THROW(create(loader), EnvoyException);
+}
+
+TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
+  std::string json = R"EOF(
+  {
+    "local_cluster_name": "new_cluster",
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    },
+    {
+      "name": "cluster_2",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11002"}]
+    },
+    {
+      "name": "new_cluster",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11002"}]
+    }]
+  }
+  )EOF";
+
+  Json::StringLoader loader(json);
+  create(loader);
+}
+
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
   std::string json = R"EOF(
   {
