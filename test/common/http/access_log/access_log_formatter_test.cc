@@ -114,7 +114,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
 TEST(AccessLogFormatterTest, requestHeaderFormatter) {
   MockRequestInfo requestInfo;
-  HeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+  HeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}, {"x-test", "hello\nworld"}};
   HeaderMapImpl response_header{{":method", "PUT"}};
 
   {
@@ -135,6 +135,11 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
   {
     RequestHeaderFormatter formatter("does_not_exist", "", Optional<size_t>());
     EXPECT_EQ("-", formatter.format(request_header, response_header, requestInfo));
+  }
+
+  {
+    RequestHeaderFormatter formatter("x-test", "", Optional<size_t>());
+    EXPECT_EQ("hello\\nworld", formatter.format(request_header, response_header, requestInfo));
   }
 }
 
