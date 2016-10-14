@@ -75,7 +75,7 @@ private:
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                    Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                    const std::string& local_zone_name, const std::string& local_address,
-                   const ClusterEntry* local_cluster);
+                   const HostSet* local_host_set);
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority);
 

@@ -229,19 +229,19 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
                          local_zone_name, local_address, nullptr));
   }
 
-  const ClusterEntry* local_cluster = local_cluster_name.valid()
-                                          ? thread_local_clusters_[local_cluster_name.value()].get()
-                                          : nullptr;
+  const HostSet* local_host_set =
+      local_cluster_name.valid() ? &thread_local_clusters_[local_cluster_name.value()]->host_set_
+                                 : nullptr;
 
   for (auto& cluster : parent.primary_clusters_) {
     // If local cluster name is set then we already initialized this cluster.
-    if (local_cluster_name.valid() && local_cluster_name == cluster.first) {
+    if (local_cluster_name.valid() && local_cluster_name.value() == cluster.first) {
       continue;
     }
 
     thread_local_clusters_[cluster.first].reset(
         new ClusterEntry(*this, *cluster.second, runtime, random, parent.stats_, dispatcher,
-                         local_zone_name, local_address, local_cluster));
+                         local_zone_name, local_address, local_host_set));
   }
 
   for (auto& cluster : thread_local_clusters_) {
@@ -309,16 +309,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, const Cluster& cluster, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Stats::Store& stats_store, Event::Dispatcher& dispatcher,
     const std::string& local_zone_name, const std::string& local_address,
-    const ClusterEntry* local_cluster)
+    const HostSet* local_host_set)
     : parent_(parent), primary_cluster_(cluster),
       http_async_client_(
           cluster, stats_store, dispatcher, local_zone_name, parent.parent_, runtime, random,
           Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}, local_address) {
-
-  const HostSet* local_host_set = nullptr;
-  if (local_cluster) {
-    local_host_set = &local_cluster->host_set_;
-  }
 
   switch (cluster.lbType()) {
   case LoadBalancerType::LeastRequest: {
