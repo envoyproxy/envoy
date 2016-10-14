@@ -83,9 +83,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   std::string json = R"EOF(
   {
-    "local_cluster": {
-      "name": "new_cluster"
-    },
+    "local_cluster_name": "new_cluster",
     "clusters": [
     {
       "name": "cluster_1",
@@ -111,9 +109,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
   std::string json = R"EOF(
   {
-    "local_cluster": {
-      "name": "new_cluster"
-    },
+    "local_cluster_name": "new_cluster",
     "clusters": [
     {
       "name": "cluster_1",
