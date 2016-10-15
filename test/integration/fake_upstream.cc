@@ -37,9 +37,12 @@ void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   decoder_event_.notify_one();
 }
 
-void FakeStream::encodeHeaders(Http::HeaderMapImpl headers, bool end_stream) {
-  parent_.connection().dispatcher().post(
-      [this, headers, end_stream]() -> void { encoder_.encodeHeaders(headers, end_stream); });
+void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream) {
+  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
+      new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
+  parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
+    encoder_.encodeHeaders(*headers_copy, end_stream);
+  });
 }
 
 void FakeStream::encodeData(uint64_t size, bool end_stream) {
@@ -54,9 +57,11 @@ void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
                                              -> void { encoder_.encodeData(data, end_stream); });
 }
 
-void FakeStream::encodeTrailers(Http::HeaderMapImpl trailers) {
-  parent_.connection().dispatcher().post([this, trailers]()
-                                             -> void { encoder_.encodeTrailers(trailers); });
+void FakeStream::encodeTrailers(const Http::HeaderMapImpl& trailers) {
+  std::shared_ptr<Http::HeaderMapImpl> trailers_copy(
+      new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(trailers)));
+  parent_.connection().dispatcher().post([this, trailers_copy]()
+                                             -> void { encoder_.encodeTrailers(*trailers_copy); });
 }
 
 void FakeStream::encodeResetStream() {

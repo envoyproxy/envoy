@@ -14,7 +14,7 @@ TEST(ShadowWriterImplTest, All) {
 
   // Success case
   Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().addViaCopy(Http::Headers::get().Host, "cluster1");
+  message->headers().insertHost().value(std::string("cluster1"));
   EXPECT_CALL(cm, httpAsyncClientForCluster("foo")).WillOnce(ReturnRef(cm.async_client_));
   Http::MockAsyncClientRequest request(&cm.async_client_);
   Http::AsyncClient::Callbacks* callback;
@@ -24,7 +24,7 @@ TEST(ShadowWriterImplTest, All) {
           Invoke([&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             EXPECT_EQ(message, inner_message);
-            EXPECT_EQ("cluster1-shadow", message->headers().get(Http::Headers::get().Host));
+            EXPECT_STREQ("cluster1-shadow", message->headers().Host()->value().c_str());
             callback = &callbacks;
             return &request;
           }));
@@ -35,7 +35,7 @@ TEST(ShadowWriterImplTest, All) {
 
   // Failure case
   message.reset(new Http::RequestMessageImpl());
-  message->headers().addViaCopy(Http::Headers::get().Host, "cluster2");
+  message->headers().insertHost().value(std::string("cluster2"));
   EXPECT_CALL(cm, httpAsyncClientForCluster("bar")).WillOnce(ReturnRef(cm.async_client_));
   EXPECT_CALL(cm.async_client_,
               send_(_, _, Optional<std::chrono::milliseconds>(std::chrono::milliseconds(10))))
@@ -43,7 +43,7 @@ TEST(ShadowWriterImplTest, All) {
           Invoke([&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             EXPECT_EQ(message, inner_message);
-            EXPECT_EQ("cluster2-shadow", message->headers().get(Http::Headers::get().Host));
+            EXPECT_STREQ("cluster2-shadow", message->headers().Host()->value().c_str());
             callback = &callbacks;
             return &request;
           }));

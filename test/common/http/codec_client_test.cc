@@ -8,6 +8,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::Invoke;
@@ -60,7 +61,7 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
   Http::MockStreamDecoder outer_decoder;
   client_->newStream(outer_decoder);
 
-  Http::HeaderMapPtr response_headers{new HeaderMapImpl{{":status", "200"}}};
+  Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 }
@@ -77,7 +78,7 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
   Http::MockStreamDecoder outer_decoder;
   client_->newStream(outer_decoder);
 
-  Http::HeaderMapPtr response_headers{new HeaderMapImpl{{":status", "200"}}};
+  Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
   inner_decoder->decodeHeaders(std::move(response_headers), false);
 
@@ -121,7 +122,7 @@ TEST_F(CodecClientTest, ProtocolError) {
 TEST_F(CodecClientTest, 408Response) {
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Invoke([](Buffer::Instance&) -> void {
-        Http::HeaderMapPtr response_headers{new HeaderMapImpl{{":status", "408"}}};
+        Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "408"}}};
         throw PrematureResponseException(std::move(response_headers));
       }));
 
@@ -136,7 +137,7 @@ TEST_F(CodecClientTest, 408Response) {
 TEST_F(CodecClientTest, PrematureResponse) {
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Invoke([](Buffer::Instance&) -> void {
-        Http::HeaderMapPtr response_headers{new HeaderMapImpl{{":status", "200"}}};
+        Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
         throw PrematureResponseException(std::move(response_headers));
       }));
 

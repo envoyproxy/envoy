@@ -7,6 +7,7 @@
 #include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
@@ -273,8 +274,10 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::isHealthCheckSucceeded
   if (parent_.service_name_.valid() &&
       parent_.runtime_.snapshot().featureEnabled("health_check.verify_cluster", 100UL)) {
     parent_.stats_.verify_cluster_.inc();
-    const std::string& service_cluster_healthchecked =
-        response_headers_->get(Http::Headers::get().EnvoyUpstreamHealthCheckedCluster);
+    std::string service_cluster_healthchecked =
+        response_headers_->EnvoyUpstreamHealthCheckedCluster()
+            ? response_headers_->EnvoyUpstreamHealthCheckedCluster()->value().c_str()
+            : EMPTY_STRING;
 
     return service_cluster_healthchecked.find(parent_.service_name_.value()) == 0;
   }
@@ -290,9 +293,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     handleFailure(false);
   }
 
-  if (0 ==
-      StringUtil::caseInsensitiveCompare(response_headers_->get(Http::Headers::get().Connection),
-                                         Http::Headers::get().ConnectionValues.Close)) {
+  if (response_headers_->Connection() &&
+      0 ==
+          StringUtil::caseInsensitiveCompare(response_headers_->Connection()->value().c_str(),
+                                             Http::Headers::get().ConnectionValues.Close.c_str())) {
     client_->close();
   }
 

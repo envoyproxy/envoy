@@ -61,7 +61,9 @@ public:
    * @param rhs supplies string 2.
    * @return < 0, 0, > 0 depending on the comparison result.
    */
-  static int caseInsensitiveCompare(const std::string& lhs, const std::string& rhs);
+  static int caseInsensitiveCompare(const char* lhs, const char* rhs) {
+    return strcasecmp(lhs, rhs);
+  }
 
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
@@ -99,12 +101,5 @@ public:
    * @param case_sensitive determines if the compare is case sensitive
    * @return true if @param source starts with @param start and ignores cases.
    */
-  static bool startsWith(const std::string& source, const std::string& start,
-                         bool case_sensitive = true);
-
-  /**
-   * @return original @param input string if it's not empty or @param default_value otherwise.
-   */
-  static const std::string& valueOrDefault(const std::string& input,
-                                           const std::string& default_value);
+  static bool startsWith(const char* source, const std::string& start, bool case_sensitive = true);
 };

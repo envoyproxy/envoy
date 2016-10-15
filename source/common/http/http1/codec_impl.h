@@ -5,6 +5,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/http/header_map_impl.h"
 
 #include "http_parser.h"
 
@@ -196,7 +197,7 @@ private:
    * @return 0 if no error, 1 if there should be no body.
    */
   int onHeadersCompleteBase();
-  virtual int onHeadersComplete(HeaderMapPtr&& headers) PURE;
+  virtual int onHeadersComplete(HeaderMapImplPtr&& headers) PURE;
 
   /**
    * Called when body data is received.
@@ -222,10 +223,10 @@ private:
 
   static http_parser_settings settings_;
 
-  HeaderMapPtr current_header_map_;
+  HeaderMapImplPtr current_header_map_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
-  std::string current_header_field_;
-  std::string current_header_value_;
+  HeaderString current_header_field_;
+  HeaderString current_header_value_;
   bool reset_stream_called_{};
   Buffer::OwnedImpl output_buffer_;
   Buffer::RawSlice reserved_iovec_;
@@ -246,7 +247,7 @@ private:
   struct ActiveRequest {
     ActiveRequest(ConnectionImpl& connection) : response_encoder_(connection) {}
 
-    std::string request_url_;
+    HeaderString request_url_;
     StreamDecoder* request_decoder_{};
     ResponseStreamEncoderImpl response_encoder_;
     bool remote_complete_{};
@@ -256,7 +257,7 @@ private:
   void onEncodeComplete() override;
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
-  int onHeadersComplete(HeaderMapPtr&& headers) override;
+  int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
@@ -290,7 +291,7 @@ private:
   void onEncodeComplete() override;
   void onMessageBegin() {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED; }
-  int onHeadersComplete(HeaderMapPtr&& headers) override;
+  int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;

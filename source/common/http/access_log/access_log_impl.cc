@@ -97,9 +97,9 @@ RuntimeFilter::RuntimeFilter(Json::Object& json, Runtime::Loader& runtime)
     : runtime_(runtime), runtime_key_(json.getString("key")) {}
 
 bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header) {
-  std::string uuid = request_header.get(Http::Headers::get().RequestId);
+  const HeaderEntry* uuid = request_header.RequestId();
   uint16_t sampled_value;
-  if (UuidUtils::uuidModBy(uuid, sampled_value, 100)) {
+  if (uuid && UuidUtils::uuidModBy(uuid->value().c_str(), sampled_value, 100)) {
     uint64_t runtime_value = std::min(runtime_.snapshot().getInteger(runtime_key_, 0), 100UL);
 
     return sampled_value < static_cast<uint16_t>(runtime_value);

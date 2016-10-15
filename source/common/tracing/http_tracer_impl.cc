@@ -14,7 +14,12 @@
 namespace Tracing {
 
 void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
-  std::string x_request_id = request_headers.get(Http::Headers::get().RequestId);
+  if (!request_headers.RequestId()) {
+    return;
+  }
+
+  // TODO PERF: Avoid copy.
+  std::string x_request_id = request_headers.RequestId()->value().c_str();
 
   uint16_t result;
   // Skip if x-request-id is corrupted.
@@ -24,10 +29,10 @@ void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime:
 
   // Do not apply tracing transformations if we are currently tracing.
   if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
-    if (request_headers.has(Http::Headers::get().ClientTraceId) &&
+    if (request_headers.ClientTraceId() &&
         runtime.snapshot().featureEnabled("tracing.client_enabled", 100)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
-    } else if (request_headers.has(Http::Headers::get().EnvoyForceTrace)) {
+    } else if (request_headers.EnvoyForceTrace()) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
     } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", 0, result, 10000)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
@@ -38,7 +43,7 @@ void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime:
     UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
   }
 
-  request_headers.replaceViaCopy(Http::Headers::get().RequestId, x_request_id);
+  request_headers.RequestId()->value(x_request_id);
 }
 
 Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& request_info,
@@ -48,8 +53,9 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
     return {Reason::HealthCheck, false};
   }
 
+  // TODO PERF: Avoid copy.
   UuidTraceStatus trace_status =
-      UuidUtils::isTraceableUuid(request_headers.get(Http::Headers::get().RequestId));
+      UuidUtils::isTraceableUuid(request_headers.RequestId()->value().c_str());
 
   switch (trace_status) {
   case UuidTraceStatus::Client:
@@ -210,21 +216,24 @@ LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManage
 
 std::string LightStepSink::buildRequestLine(const Http::HeaderMap& request_headers,
                                             const Http::AccessLog::RequestInfo& info) {
-  std::string method = request_headers.get(Http::Headers::get().Method);
-  std::string path = request_headers.has(Http::Headers::get().EnvoyOriginalPath)
-                         ? request_headers.get(Http::Headers::get().EnvoyOriginalPath)
-                         : request_headers.get(Http::Headers::get().Path);
+  std::string path = request_headers.EnvoyOriginalPath()
+                         ? request_headers.EnvoyOriginalPath()->value().c_str()
+                         : request_headers.Path()->value().c_str();
   static const size_t max_path_length = 256;
 
   if (path.length() > max_path_length) {
     path = path.substr(0, max_path_length);
   }
 
-  return fmt::format("{} {} {}", method, path, info.protocol());
+  return fmt::format("{} {} {}", request_headers.Method()->value().c_str(), path, info.protocol());
 }
 
 std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo& info) {
   return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
+}
+
+static const char* valueOrDefault(const Http::HeaderEntry* header, const char* default_value) {
+  return header ? header->value().c_str() : default_value;
 }
 
 void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
@@ -239,15 +248,11 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag("request size", request_info.bytesReceived()),
        lightstep::SetTag("response size", request_info.bytesSent()),
        lightstep::SetTag("host header", request_headers.get(Http::Headers::get().Host)),
-       lightstep::SetTag(
-           "downstream cluster",
-           StringUtil::valueOrDefault(
-               request_headers.get(Http::Headers::get().EnvoyDownstreamServiceCluster), "-")),
-       lightstep::SetTag(
-           "user agent",
-           StringUtil::valueOrDefault(request_headers.get(Http::Headers::get().UserAgent), "-")),
+       lightstep::SetTag("downstream cluster",
+                         valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-")),
+       lightstep::SetTag("user agent", valueOrDefault(request_headers.UserAgent(), "-")),
        lightstep::SetTag("node id", service_node_),
-       lightstep::SetTag("x-request-id", request_headers.get(Http::Headers::get().RequestId))});
+       lightstep::SetTag("x-request-id", request_headers.RequestId()->value().c_str())});
 
   if (request_info.responseCode().valid() &&
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {
@@ -259,8 +264,8 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
                 Http::AccessLog::FilterReasonUtils::toShortString(request_info.failureReason()));
   }
 
-  if (request_headers.has(Http::Headers::get().ClientTraceId)) {
-    span.SetTag("join:x-client-trace-id", request_headers.get(Http::Headers::get().ClientTraceId));
+  if (request_headers.ClientTraceId()) {
+    span.SetTag("join:x-client-trace-id", request_headers.ClientTraceId()->value().c_str());
   }
 
   span.Finish();

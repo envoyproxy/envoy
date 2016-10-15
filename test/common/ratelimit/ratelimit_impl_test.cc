@@ -51,7 +51,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, "");
 
     client_.onPreRequestCustomizeHeaders(headers);
-    ASSERT_FALSE(headers.has(Http::Headers::get().RequestId));
+    EXPECT_EQ(nullptr, headers.RequestId());
 
     response->Clear();
     response->set_overall_code(pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT);
@@ -71,7 +71,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}}, "requestid");
 
     client_.onPreRequestCustomizeHeaders(headers);
-    ASSERT_EQ(headers.get(Http::Headers::get().RequestId), "requestid");
+    EXPECT_EQ(headers.RequestId()->value(), "requestid");
 
     response->Clear();
     response->set_overall_code(pb::lyft::ratelimit::RateLimitResponse_Code_OK);

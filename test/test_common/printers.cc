@@ -5,8 +5,10 @@
 
 namespace Http {
 void PrintTo(const HeaderMapImpl& headers, std::ostream* os) {
-  headers.iterate([os](const LowerCaseString& key, const std::string& value)
-                      -> void { *os << "{'" << key.get() << "','" << value << "'}"; });
+  headers.iterate([](const HeaderEntry& header, void* context) -> void {
+    std::ostream* os = static_cast<std::ostream*>(context);
+    *os << "{'" << header.key().c_str() << "','" << header.value().c_str() << "'}";
+  }, os);
 }
 
 void PrintTo(const HeaderMapPtr& headers, std::ostream* os) {

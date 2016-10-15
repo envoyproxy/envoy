@@ -10,6 +10,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/http/header_map_impl.h"
 
 #include "nghttp2/nghttp2.h"
 
@@ -46,9 +47,13 @@ class Utility {
 public:
   /**
    * Deal with https://tools.ietf.org/html/rfc7540#section-8.1.2.5
-   * @param headers supplies the headers to merge cookies on.
+   * @param key supplies the incoming header key.
+   * @param value supplies the incoming header value.
+   * @param cookies supplies the header string to fill if this is a cookie header that needs to be
+   *                rebuilt.
    */
-  static void reconstituteCrumbledCookies(HeaderMap& headers);
+  static bool reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
+                                          HeaderString& cookies);
 };
 
 /**
@@ -104,6 +109,7 @@ protected:
     void resetStreamWorker(StreamResetReason reason);
     void runResetCallbacks(StreamResetReason reason);
     void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
+    void saveHeader(HeaderString&& name, HeaderString&& value);
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                nghttp2_data_provider* provider) PURE;
     void submitTrailers(const HeaderMap& trailers);
@@ -128,7 +134,7 @@ protected:
 
     ConnectionImpl& parent_;
     std::list<StreamCallbacks*> callbacks_{};
-    HeaderMapPtr headers_;
+    HeaderMapImplPtr headers_;
     StreamDecoder* decoder_{};
     int32_t stream_id_{-1};
     bool local_end_stream_{};
@@ -140,6 +146,7 @@ protected:
     bool reset_callbacks_run_{};
     HeaderMapPtr pending_trailers_;
     Optional<StreamResetReason> deferred_reset_;
+    HeaderString cookies_;
   };
 
   typedef std::unique_ptr<StreamImpl> StreamImplPtr;
@@ -168,7 +175,7 @@ protected:
 
   ConnectionImpl* base() { return this; }
   StreamImpl* getStream(int32_t stream_id);
-  int saveHeader(const nghttp2_frame* frame, std::string&& name, std::string&& value);
+  int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
   void sendPendingFrames();
   void sendSettings(uint64_t codec_options);
 
@@ -184,7 +191,7 @@ private:
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   int onFrameReceived(const nghttp2_frame* frame);
   int onFrameSend(const nghttp2_frame* frame);
-  virtual int onHeader(const nghttp2_frame* frame, std::string&& name, std::string&& value) PURE;
+  virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int error_code);
   ssize_t onSend(const uint8_t* data, size_t length);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
@@ -213,7 +220,7 @@ private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   int onBeginHeaders(const nghttp2_frame* frame) override;
-  int onHeader(const nghttp2_frame* frame, std::string&& name, std::string&& value) override;
+  int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
   ConnectionCallbacks& callbacks_;
 };
@@ -230,7 +237,7 @@ private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   int onBeginHeaders(const nghttp2_frame* frame) override;
-  int onHeader(const nghttp2_frame* frame, std::string&& name, std::string&& value) override;
+  int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
   ServerConnectionCallbacks& callbacks_;
 };

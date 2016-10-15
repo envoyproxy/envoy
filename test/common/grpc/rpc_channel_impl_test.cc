@@ -4,6 +4,7 @@
 #include "test/generated/helloworld.pb.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::Invoke;
@@ -45,25 +46,28 @@ TEST_F(GrpcRequestImplTest, NoError) {
   helloworld::HelloRequest request;
   request.set_name("a name");
   helloworld::HelloReply response;
+  Http::LowerCaseString header_key("foo");
+  std::string header_value("bar");
   EXPECT_CALL(grpc_callbacks_, onPreRequestCustomizeHeaders(_))
-      .WillOnce(Invoke([](Http::HeaderMap& headers) -> void { headers.addViaCopy("foo", "bar"); }));
+      .WillOnce(Invoke([&](Http::HeaderMap& headers)
+                           -> void { headers.addStatic(header_key, header_value); }));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
-  Http::HeaderMapImpl expected_request_headers{{":method", "POST"},
-                                               {":path", "/helloworld.Greeter/SayHello"},
-                                               {":authority", "cluster"},
-                                               {"content-type", "application/grpc"},
-                                               {"foo", "bar"}};
+  Http::TestHeaderMapImpl expected_request_headers{{":method", "POST"},
+                                                   {":path", "/helloworld.Greeter/SayHello"},
+                                                   {":authority", "cluster"},
+                                                   {"content-type", "application/grpc"},
+                                                   {"foo", "bar"}};
 
-  EXPECT_THAT(http_request_->headers(), HeaderMapEqualRef(expected_request_headers));
+  EXPECT_THAT(http_request_->headers(), HeaderMapEqualRef(&expected_request_headers));
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   helloworld::HelloReply inner_response;
   inner_response.set_message("hello a name");
   response_http_message->body(Common::serializeBody(inner_response));
   response_http_message->trailers(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{"grpc-status", "0"}}});
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
   EXPECT_CALL(grpc_callbacks_, onSuccess());
   http_callbacks_->onSuccess(std::move(response_http_message));
@@ -84,7 +88,7 @@ TEST_F(GrpcRequestImplTest, Non200Response) {
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}}));
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "non-200 response code"));
   http_callbacks_->onSuccess(std::move(response_http_message));
@@ -104,7 +108,7 @@ TEST_F(GrpcRequestImplTest, NoResponseTrailers) {
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "no response trailers"));
   http_callbacks_->onSuccess(std::move(response_http_message));
@@ -120,7 +124,7 @@ TEST_F(GrpcRequestImplTest, BadGrpcStatusInHeaderOnlyResponse) {
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}, {"grpc-status", "foo"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "foo"}}}));
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "bad grpc-status header"));
   http_callbacks_->onSuccess(std::move(response_http_message));
@@ -136,7 +140,7 @@ TEST_F(GrpcRequestImplTest, HeaderOnlyFailure) {
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(
-      new Http::ResponseMessageImpl(Http::HeaderMapPtr{new Http::HeaderMapImpl{
+      new Http::ResponseMessageImpl(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{
           {":status", "200"}, {"grpc-status", "3"}, {"grpc-message", "hello"}}}));
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(3), "hello"));
@@ -153,8 +157,9 @@ TEST_F(GrpcRequestImplTest, BadGrpcStatusInResponse) {
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
-  response_http_message->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl{{"grpc-status", ""}}});
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  response_http_message->trailers(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", ""}}});
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "bad grpc-status trailer"));
   http_callbacks_->onSuccess(std::move(response_http_message));
@@ -170,9 +175,9 @@ TEST_F(GrpcRequestImplTest, GrpcStatusNonZeroInResponse) {
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
-  response_http_message->trailers(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{"grpc-status", "1"}, {"grpc-message", "hello"}}});
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  response_http_message->trailers(Http::HeaderMapPtr{
+      new Http::TestHeaderMapImpl{{"grpc-status", "1"}, {"grpc-message", "hello"}}});
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(1), "hello"));
   http_callbacks_->onSuccess(std::move(response_http_message));
@@ -188,10 +193,10 @@ TEST_F(GrpcRequestImplTest, ShortBodyInResponse) {
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   response_http_message->body(Buffer::InstancePtr{new Buffer::OwnedImpl("aaa")});
   response_http_message->trailers(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{"grpc-status", "0"}}});
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "bad serialized body"));
   http_callbacks_->onSuccess(std::move(response_http_message));
@@ -207,10 +212,10 @@ TEST_F(GrpcRequestImplTest, BadMessageInResponse) {
   service_.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   response_http_message->body(Buffer::InstancePtr{new Buffer::OwnedImpl("aaaaaaaa")});
   response_http_message->trailers(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{"grpc-status", "0"}}});
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "bad serialized body"));
   http_callbacks_->onSuccess(std::move(response_http_message));
@@ -236,7 +241,7 @@ TEST_F(GrpcRequestImplTest, NoHttpAsyncRequest) {
           Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}})});
+                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "non-200 response code"));
@@ -274,13 +279,13 @@ TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
   service_timeout.SayHello(nullptr, &request, &response, nullptr);
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   helloworld::HelloReply inner_response;
   inner_response.set_message("hello a name");
 
   response_http_message->body(Common::serializeBody(inner_response));
   response_http_message->trailers(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{"grpc-status", "0"}}});
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
   EXPECT_CALL(grpc_callbacks_, onSuccess());
   http_callbacks_->onSuccess(std::move(response_http_message));

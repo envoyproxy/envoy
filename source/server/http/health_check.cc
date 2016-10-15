@@ -71,7 +71,7 @@ void HealthCheckCacheManager::onTimer() {
 
 Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::HeaderMap& headers,
                                                            bool end_stream) {
-  if (headers.get(Http::Headers::get().Path) == endpoint_) {
+  if (headers.Path()->value() == endpoint_.c_str()) {
     health_check_request_ = true;
     callbacks_->requestInfo().healthCheck(true);
 
@@ -115,8 +115,7 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
           static_cast<Http::Code>(Http::Utility::getResponseStatus(headers)));
     }
 
-    headers.replaceViaCopy(Http::Headers::get().EnvoyUpstreamHealthCheckedCluster,
-                           server_.options().serviceClusterName());
+    headers.insertEnvoyUpstreamHealthCheckedCluster().value(server_.options().serviceClusterName());
   }
 
   return Http::FilterHeadersStatus::Continue;

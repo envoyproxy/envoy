@@ -2,30 +2,32 @@
 #include "common/json/json_loader.h"
 #include "common/http/header_map_impl.h"
 
+#include "test/test_common/utility.h"
+
 namespace Dynamo {
 
 TEST(DynamoRequestParser, parseOperation) {
   // Well formed x-amz-target header, in a format, Version.Operation
   {
-    Http::HeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "X.Operation"}};
+    Http::TestHeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "X.Operation"}};
     EXPECT_EQ("Operation", RequestParser::parseOperation(headers));
   }
 
   // Not well formed x-amz-target header.
   {
-    Http::HeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "X,Operation"}};
+    Http::TestHeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "X,Operation"}};
     EXPECT_EQ("", RequestParser::parseOperation(headers));
   }
 
   // Too many entries in the Version.Operation.
   {
-    Http::HeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "NOT_VALID.NOT_VALID.NOT_VALID"}};
+    Http::TestHeaderMapImpl headers{{"X", "X"}, {"x-amz-target", "NOT_VALID.NOT_VALID.NOT_VALID"}};
     EXPECT_EQ("", RequestParser::parseOperation(headers));
   }
 
   // Required header is not present in the headers
   {
-    Http::HeaderMapImpl headers{{"Z", "Z"}};
+    Http::TestHeaderMapImpl headers{{"Z", "Z"}};
     EXPECT_EQ("", RequestParser::parseOperation(headers));
   }
 }

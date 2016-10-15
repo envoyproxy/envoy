@@ -49,8 +49,6 @@ public:
   static void validateResponse(Http::Message& http_response);
 
   static const std::string GRPC_CONTENT_TYPE;
-  static const Http::LowerCaseString GRPC_MESSAGE_HEADER;
-  static const Http::LowerCaseString GRPC_STATUS_HEADER;
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);

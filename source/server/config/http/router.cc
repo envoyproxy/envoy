@@ -25,8 +25,7 @@ public:
         json_config.getBoolean("dynamic_stats", true)));
 
     return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(
-          Http::StreamDecoderFilterPtr{new Router::ProdFilter(*config)});
+      callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*config));
     };
   }
 };

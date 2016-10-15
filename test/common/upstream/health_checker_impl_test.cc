@@ -8,6 +8,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -123,7 +124,8 @@ public:
   void respond(size_t index, const std::string& code, bool conn_close, bool body = false,
                bool trailers = false,
                const Optional<std::string>& service_cluster = Optional<std::string>()) {
-    Http::HeaderMapPtr response_headers(new Http::HeaderMapImpl{{":status", code}});
+    std::unique_ptr<Http::TestHeaderMapImpl> response_headers(
+        new Http::TestHeaderMapImpl{{":status", code}});
     if (service_cluster.valid()) {
       response_headers->addViaCopy(Http::Headers::get().EnvoyUpstreamHealthCheckedCluster,
                                    service_cluster.value());
@@ -141,7 +143,7 @@ public:
 
     if (trailers) {
       test_sessions_[index]->stream_response_callbacks_->decodeTrailers(
-          Http::HeaderMapPtr{new Http::HeaderMapImpl{{"some", "trailer"}}});
+          Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"some", "trailer"}}});
     }
   }
 

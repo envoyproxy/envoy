@@ -22,10 +22,10 @@ public:
 
   uint64_t bodyLength() { return body_length_; }
   bool complete() { return end_stream_; }
-  void encodeHeaders(Http::HeaderMapImpl headers, bool end_stream);
+  void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
-  void encodeTrailers(Http::HeaderMapImpl trailers);
+  void encodeTrailers(const Http::HeaderMapImpl& trailers);
   void encodeResetStream();
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }

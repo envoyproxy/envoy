@@ -349,11 +349,10 @@ public:
 
 MATCHER_P(HeaderMapEqual, rhs, "") {
   Http::HeaderMapImpl& lhs = *dynamic_cast<Http::HeaderMapImpl*>(arg.get());
-  return lhs == rhs;
+  return lhs == *rhs;
 }
 
 MATCHER_P(HeaderMapEqualRef, rhs, "") {
   const Http::HeaderMapImpl& lhs = *dynamic_cast<const Http::HeaderMapImpl*>(&arg);
-  const Http::HeaderMap& rhs_temp = rhs;
-  return lhs == *dynamic_cast<const Http::HeaderMapImpl*>(&rhs_temp);
+  return lhs == *dynamic_cast<const Http::HeaderMapImpl*>(rhs);
 }

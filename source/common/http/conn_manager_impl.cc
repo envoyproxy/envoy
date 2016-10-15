@@ -340,16 +340,17 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   request_headers_ = std::move(headers);
   stream_log_debug("request headers complete (end_stream={}):", *this, end_stream);
 #ifndef NDEBUG
-  request_headers_->iterate([this](const LowerCaseString& key, const std::string& value) -> void {
-    stream_log_debug("  '{}':'{}'", *this, key.get(), value);
-  });
+  request_headers_->iterate([](const HeaderEntry& header, void* context) -> void {
+    stream_log_debug("  '{}':'{}'", *static_cast<ActiveStream*>(context), header.key().c_str(),
+                     header.value().c_str());
+  }, this);
 #endif
 
   connection_manager_.user_agent_.initializeFromHeaders(
       *request_headers_, connection_manager_.stats_.prefix_, connection_manager_.stats_.store_);
 
   // Make sure we are getting a codec version we support.
-  const std::string& codec_version = request_headers_->get(Headers::get().Version);
+  const HeaderString& codec_version = request_headers_->Version()->value();
   if (!(codec_version == "HTTP/1.1" || codec_version == "HTTP/2")) {
     HeaderMapImpl headers{
         {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
@@ -357,8 +358,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     return;
   }
 
-  // Require host header. For HTTP/1.1 Host has already been translated to :host.
-  if (request_headers_->get(Headers::get().Host).empty()) {
+  // Require host header. For HTTP/1.1 Host has already been translated to :authority.
+  if (!request_headers_->Host()) {
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
     encodeHeaders(nullptr, headers, true);
     return;
@@ -384,7 +385,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec does not do this
   // so we only support relative paths in all cases.
   // https://tools.ietf.org/html/rfc7230#section-5.3
-  if (request_headers_->get(Headers::get().Path).find('/') != 0) {
+  if (request_headers_->Path()->value().c_str()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::NotFound))}};
     encodeHeaders(nullptr, headers, true);
@@ -526,10 +527,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 
   // Base headers.
-  headers.replaceViaCopy(Headers::get().Server, connection_manager_.config_.serverName());
-  headers.replaceViaMoveValue(Headers::get().Date, date_formatter_.now());
-  headers.replaceViaCopy(Headers::get().EnvoyProtocolVersion,
-                         connection_manager_.codec_->protocolString());
+  headers.insertServer().value(connection_manager_.config_.serverName());
+  headers.insertDate().value(date_formatter_.now());
+  headers.insertEnvoyProtocolVersion().value(connection_manager_.codec_->protocolString());
   ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
                                                   connection_manager_.config_);
 
@@ -559,15 +559,17 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   if (connection_manager_.drain_state_ == DrainState::Closing &&
       !(connection_manager_.codec_->features() & CodecFeatures::Multiplexing)) {
-    headers.addViaCopy(Headers::get().Connection, Headers::get().ConnectionValues.Close);
+    headers.insertConnection().value(Headers::get().ConnectionValues.Close);
   }
 
   chargeStats(headers);
 
   stream_log_debug("encoding headers via codec (end_stream={}):", *this, end_stream);
 #ifndef NDEBUG
-  headers.iterate([this](const LowerCaseString& key, const std::string& value)
-                      -> void { stream_log_debug("  '{}':'{}'", *this, key.get(), value); });
+  headers.iterate([](const HeaderEntry& header, void* context) -> void {
+    stream_log_debug("  '{}':'{}'", *static_cast<ActiveStream*>(context), header.key().c_str(),
+                     header.value().c_str());
+  }, this);
 #endif
 
   // Now actually encode via the codec.
@@ -609,8 +611,10 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
   stream_log_debug("encoding trailers via codec", *this);
 #ifndef NDEBUG
-  trailers.iterate([this](const LowerCaseString& key, const std::string& value)
-                       -> void { stream_log_debug("  '{}':'{}'", *this, key.get(), value); });
+  trailers.iterate([](const HeaderEntry& header, void* context) -> void {
+    stream_log_debug("  '{}':'{}'", *static_cast<ActiveStream*>(context), header.key().c_str(),
+                     header.value().c_str());
+  }, this);
 #endif
 
   response_encoder_->encodeTrailers(trailers);

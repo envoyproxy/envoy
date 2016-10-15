@@ -81,11 +81,13 @@ void Config::onFailure(Http::AsyncClient::FailureReason) {
   requestComplete();
 }
 
+static const std::string Path = "/v1/certs/list/approved";
+
 void Config::refreshPrincipals() {
   Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().addViaMoveValue(Http::Headers::get().Method, "GET");
-  message->headers().addViaMoveValue(Http::Headers::get().Path, "/v1/certs/list/approved");
-  message->headers().addViaCopy(Http::Headers::get().Host, auth_api_cluster_);
+  message->headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
+  message->headers().insertPath().value(Path);
+  message->headers().insertHost().value(auth_api_cluster_);
   cm_.httpAsyncClientForCluster(auth_api_cluster_)
       .send(std::move(message), *this, Optional<std::chrono::milliseconds>());
 }

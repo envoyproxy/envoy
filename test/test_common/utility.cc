@@ -2,6 +2,8 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "common/common/empty_string.h"
+
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {
     return false;
@@ -41,3 +43,46 @@ std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
 
   return output;
 }
+
+namespace Http {
+
+TestHeaderMapImpl::TestHeaderMapImpl() : HeaderMapImpl() {}
+
+TestHeaderMapImpl::TestHeaderMapImpl(
+    const std::initializer_list<std::pair<std::string, std::string>>& values)
+    : HeaderMapImpl() {
+  for (auto& value : values) {
+    addViaCopy(value.first, value.second);
+  }
+}
+
+TestHeaderMapImpl::TestHeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl(rhs) {}
+
+void TestHeaderMapImpl::addViaCopy(const std::string& key, const std::string& value) {
+  addViaCopy(LowerCaseString(key), value);
+}
+
+void TestHeaderMapImpl::addViaCopy(const LowerCaseString& key, const std::string& value) {
+  HeaderString key_string;
+  key_string.setCopy(key.get().c_str(), key.get().size());
+  HeaderString value_string;
+  value_string.setCopy(value.c_str(), value.size());
+  addViaMove(std::move(key_string), std::move(value_string));
+}
+
+std::string TestHeaderMapImpl::get_(const std::string& key) { return get_(LowerCaseString(key)); }
+
+std::string TestHeaderMapImpl::get_(const LowerCaseString& key) {
+  const HeaderEntry* header = get(key);
+  if (!header) {
+    return EMPTY_STRING;
+  } else {
+    return header->value().c_str();
+  }
+}
+
+bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString(key)) != nullptr; }
+
+bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
+
+} // Http

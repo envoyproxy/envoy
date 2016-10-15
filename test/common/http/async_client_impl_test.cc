@@ -13,7 +13,6 @@
 #include "test/mocks/upstream/mocks.h"
 
 using testing::_;
-using testing::ByRef;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
@@ -28,9 +27,9 @@ public:
       : client_(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
                 Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()},
                 "local_address") {
-    message_->headers().addViaCopy(":method", "GET");
-    message_->headers().addViaCopy(":authority", "host");
-    message_->headers().addViaCopy(":path", "/");
+    message_->headers().insertMethod().value(std::string("GET"));
+    message_->headers().insertHost().value(std::string("host"));
+    message_->headers().insertPath().value(std::string("/"));
     ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
     ON_CALL(cm_.cluster_, altStatName()).WillByDefault(ReturnRef(EMPTY_STRING));
   }
@@ -68,18 +67,18 @@ TEST_F(AsyncClientImplTest, Basic) {
                              return nullptr;
                            }));
 
-  HeaderMapImpl copy(message_->headers());
+  TestHeaderMapImpl copy(message_->headers());
   copy.addViaCopy("x-envoy-internal", "true");
   copy.addViaCopy("x-forwarded-for", "local_address");
   copy.addViaCopy(":scheme", "http");
 
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(copy)), false));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
   expectSuccess(200);
 
   client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
-  HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
+  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
 
@@ -103,16 +102,15 @@ TEST_F(AsyncClientImplTest, Retry) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
 
-  message_->headers().addViaCopy(Headers::get().EnvoyRetryOn,
-                                 Headers::get().EnvoyRetryOnValues._5xx);
+  message_->headers().insertEnvoyRetryOn().value(Headers::get().EnvoyRetryOnValues._5xx);
   client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
 
   // Expect retry and retry timer create.
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "503"}});
+  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "503"}});
   response_decoder_->decodeHeaders(std::move(response_headers), true);
 
   // Retry request.
@@ -124,14 +122,13 @@ TEST_F(AsyncClientImplTest, Retry) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(stream_encoder_,
-              encodeHeaders(HeaderMapEqualRef(ByRef(message_copy->headers())), false));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_copy->headers()), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
   timer_->callback_();
 
   // Normal response.
   expectSuccess(200);
-  HeaderMapPtr response_headers2(new HeaderMapImpl{{":status", "200"}});
+  HeaderMapPtr response_headers2(new TestHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers2), true);
 }
 
@@ -148,7 +145,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
 
   client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
@@ -166,16 +163,16 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
                              response_decoder2 = &decoder;
                              return nullptr;
                            }));
-  EXPECT_CALL(stream_encoder2, encodeHeaders(HeaderMapEqualRef(ByRef(message2->headers())), true));
+  EXPECT_CALL(stream_encoder2, encodeHeaders(HeaderMapEqualRef(&message2->headers()), true));
   client_.send(std::move(message2), callbacks2, Optional<std::chrono::milliseconds>());
 
   // Finish request 2.
-  HeaderMapPtr response_headers2(new HeaderMapImpl{{":status", "503"}});
+  HeaderMapPtr response_headers2(new TestHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(callbacks2, onSuccess_(_));
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
 
   // Finish request 1.
-  HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
+  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   expectSuccess(200);
   response_decoder_->decodeData(data, true);
@@ -193,15 +190,15 @@ TEST_F(AsyncClientImplTest, Trailers) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), false));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
   expectSuccess(200);
 
   client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
-  HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
+  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, false);
-  response_decoder_->decodeTrailers(HeaderMapPtr{new HeaderMapImpl{{"some", "trailer"}}});
+  response_decoder_->decodeTrailers(HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
 }
 
 TEST_F(AsyncClientImplTest, ImmediateReset) {
@@ -212,7 +209,7 @@ TEST_F(AsyncClientImplTest, ImmediateReset) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   expectSuccess(503);
 
   client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
@@ -230,11 +227,11 @@ TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   EXPECT_CALL(callbacks_, onFailure(_));
 
   client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
-  HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
+  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
@@ -247,7 +244,7 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
   AsyncClient::Request* request =
@@ -279,7 +276,7 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   expectSuccess(504);
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40)));
@@ -300,7 +297,7 @@ TEST_F(AsyncClientImplTest, DisableTimer) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(message_->headers())), true));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(200)));
   EXPECT_CALL(*timer_, disableTimer());

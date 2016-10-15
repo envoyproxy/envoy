@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/http/header_map_impl.h"
+
 class TestUtility {
 public:
   /**
@@ -17,3 +19,25 @@ public:
    */
   static std::string bufferToString(const Buffer::Instance& buffer);
 };
+
+namespace Http {
+
+/**
+ * A test version of HeaderMapImpl that adds some niceties since the prod one makes it very
+ * difficult to do any string copies without really meaning to.
+ */
+class TestHeaderMapImpl : public HeaderMapImpl {
+public:
+  TestHeaderMapImpl();
+  TestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values);
+  TestHeaderMapImpl(const HeaderMap& rhs);
+
+  void addViaCopy(const std::string& key, const std::string& value);
+  void addViaCopy(const LowerCaseString& key, const std::string& value);
+  std::string get_(const std::string& key);
+  std::string get_(const LowerCaseString& key);
+  bool has(const std::string& key);
+  bool has(const LowerCaseString& key);
+};
+
+} // Http

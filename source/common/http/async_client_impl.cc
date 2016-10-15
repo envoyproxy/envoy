@@ -41,8 +41,9 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
       request_info_(EMPTY_STRING), route_(parent_.cluster_.name(), timeout) {
 
   router_.setDecoderFilterCallbacks(*this);
-  request_->headers().addViaMoveValue(Headers::get().EnvoyInternalRequest, "true");
-  request_->headers().addViaCopy(Headers::get().ForwardedFor, parent_.local_address_);
+  request_->headers().insertEnvoyInternalRequest().value(
+      Headers::get().EnvoyInternalRequestValues.True);
+  request_->headers().insertForwardedFor().value(parent_.local_address_);
   router_.decodeHeaders(request_->headers(), !request_->body());
   if (!complete_ && request_->body()) {
     router_.decodeData(*request_->body(), true);
@@ -57,8 +58,9 @@ void AsyncRequestImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   response_.reset(new ResponseMessageImpl(std::move(headers)));
 #ifndef NDEBUG
   log_debug("async http request response headers (end_stream={}):", end_stream);
-  response_->headers().iterate([](const LowerCaseString& key, const std::string& value)
-                                   -> void { log_debug("  '{}':'{}'", key.get(), value); });
+  response_->headers().iterate([](const HeaderEntry& header, void*) -> void {
+    log_debug("  '{}':'{}'", header.key().c_str(), header.value().c_str());
+  }, nullptr);
 #endif
 
   if (end_stream) {
@@ -83,8 +85,9 @@ void AsyncRequestImpl::encodeTrailers(HeaderMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
 #ifndef NDEBUG
   log_debug("async http request response trailers:");
-  response_->trailers()->iterate([](const LowerCaseString& key, const std::string& value)
-                                     -> void { log_debug("  '{}':'{}'", key.get(), value); });
+  response_->trailers()->iterate([](const HeaderEntry& header, void*) -> void {
+    log_debug("  '{}':'{}'", header.key().c_str(), header.value().c_str());
+  }, nullptr);
 #endif
 
   onComplete();

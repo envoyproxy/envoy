@@ -38,13 +38,8 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   }
 }
 
-int StringUtil::caseInsensitiveCompare(const std::string& lhs, const std::string& rhs) {
-  return strcasecmp(lhs.c_str(), rhs.c_str());
-}
-
 uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
-  // The maximum size required for an unsigned 64-bit integer is 21 chars (including null).
-  if (buffer_size < 21) {
+  if (buffer_size < 32) {
     throw std::invalid_argument("itoa buffer too small");
   }
 
@@ -116,16 +111,10 @@ bool StringUtil::endsWith(const std::string& source, const std::string& end) {
   return std::equal(source.begin() + start_position, source.end(), end.begin());
 }
 
-bool StringUtil::startsWith(const std::string& source, const std::string& start,
-                            bool case_sensitive) {
+bool StringUtil::startsWith(const char* source, const std::string& start, bool case_sensitive) {
   if (case_sensitive) {
-    return strncmp(source.c_str(), start.c_str(), start.size()) == 0;
+    return strncmp(source, start.c_str(), start.size()) == 0;
   } else {
-    return strncasecmp(source.c_str(), start.c_str(), start.size()) == 0;
+    return strncasecmp(source, start.c_str(), start.size()) == 0;
   }
-}
-
-const std::string& StringUtil::valueOrDefault(const std::string& input,
-                                              const std::string& default_value) {
-  return input.empty() ? default_value : input;
 }

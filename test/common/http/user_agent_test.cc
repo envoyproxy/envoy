@@ -2,6 +2,7 @@
 #include "common/http/user_agent.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/utility.h"
 
 namespace Http {
 
@@ -17,8 +18,9 @@ TEST(UserAgentTest, All) {
 
   {
     UserAgent ua;
-    ua.initializeFromHeaders(HeaderMapImpl{{"user-agent", "aaa iOS bbb"}}, "test.", stat_store);
-    ua.initializeFromHeaders(HeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.", stat_store);
+    ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa iOS bbb"}}, "test.", stat_store);
+    ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
+                             stat_store);
     ua.completeConnectionLength(span);
   }
 
@@ -30,20 +32,22 @@ TEST(UserAgentTest, All) {
 
   {
     UserAgent ua;
-    ua.initializeFromHeaders(HeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.", stat_store);
+    ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
+                             stat_store);
     ua.completeConnectionLength(span);
   }
 
   {
     UserAgent ua;
-    ua.initializeFromHeaders(HeaderMapImpl{{"user-agent", "aaa bbb"}}, "test.", stat_store);
-    ua.initializeFromHeaders(HeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.", stat_store);
+    ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa bbb"}}, "test.", stat_store);
+    ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
+                             stat_store);
     ua.completeConnectionLength(span);
   }
 
   {
     UserAgent ua;
-    ua.initializeFromHeaders(HeaderMapImpl{}, "test.", stat_store);
+    ua.initializeFromHeaders(TestHeaderMapImpl{}, "test.", stat_store);
     ua.completeConnectionLength(span);
   }
 }

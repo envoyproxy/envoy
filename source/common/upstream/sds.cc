@@ -116,10 +116,9 @@ void SdsClusterImpl::refreshHosts() {
   stats_.update_attempt_.inc();
 
   Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().addViaMoveValue(Http::Headers::get().Method, "GET");
-  message->headers().addViaMoveValue(Http::Headers::get().Path,
-                                     "/v1/registration/" + service_name_);
-  message->headers().addViaMoveValue(Http::Headers::get().Host, "sds");
+  message->headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
+  message->headers().insertPath().value("/v1/registration/" + service_name_);
+  message->headers().insertHost().value(sds_config_.sds_cluster_name_);
   active_request_ = cm_.httpAsyncClientForCluster(sds_config_.sds_cluster_name_)
                         .send(std::move(message), *this,
                               Optional<std::chrono::milliseconds>(std::chrono::milliseconds(1000)));

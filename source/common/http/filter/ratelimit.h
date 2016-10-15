@@ -118,7 +118,7 @@ public:
 private:
   enum class State { NotStarted, Calling, Complete, Responded };
 
-  static const Http::HeaderMapImpl TOO_MANY_REQUESTS_HEADER;
+  static const Http::HeaderMapPtr TOO_MANY_REQUESTS_HEADER;
 
   FilterConfigPtr config_;
   ::RateLimit::ClientPtr client_;

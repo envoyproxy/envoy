@@ -7,7 +7,6 @@
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
@@ -33,42 +32,35 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
 
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   bool saw_content_length = false;
-  bool saw_chunk_encoding = false;
-  headers.iterate([this, &saw_content_length, &saw_chunk_encoding](
-                      const LowerCaseString& key, const std::string& value) -> void {
-    const LowerCaseString* key_to_use = &key;
-    // Translate :host -> host so that upper layers do not need to deal with this.
-    if (Headers::get().Host == *key_to_use) {
-      key_to_use = &Headers::get().HostLegacy;
+  headers.iterate([](const HeaderEntry& header, void* context) -> void {
+    const char* key_to_use = header.key().c_str();
+    uint32_t key_size_to_use = header.key().size();
+    // Translate :authority -> host so that upper layers do not need to deal with this.
+    if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
+      key_to_use = Headers::get().HostLegacy.get().c_str();
+      key_size_to_use = Headers::get().HostLegacy.get().size();
     }
 
     // Skip all headers starting with ':' that make it here.
-    if (key_to_use->get()[0] == ':') {
+    if (key_to_use[0] == ':') {
       return;
     }
 
-    if (Headers::get().ContentLength == *key_to_use) {
-      saw_content_length = true;
-    }
+    static_cast<StreamEncoderImpl*>(context)
+        ->encodeHeader(key_to_use, key_size_to_use, header.value().c_str(), header.value().size());
+  }, this);
 
-    if (Headers::get().TransferEncoding == *key_to_use &&
-        0 == StringUtil::caseInsensitiveCompare(Headers::get().TransferEncodingValues.Chunked,
-                                                value)) {
-      saw_chunk_encoding = true;
-    }
+  if (headers.ContentLength()) {
+    saw_content_length = true;
+  }
 
-    encodeHeader(key_to_use->get().c_str(), key_to_use->get().size(), value.c_str(), value.size());
-  });
+  ASSERT(!headers.TransferEncoding());
 
   // Assume we are chunk encoding unless we are passed a content length or this is a header only
   // response. Upper layers generally should strip transfer-encoding since it only applies to
   // HTTP/1.1. The codec will infer it based on the type of response.
   if (saw_content_length) {
-    ASSERT(!saw_chunk_encoding);
     chunk_encoding_ = false;
-  } else if (saw_chunk_encoding) {
-    // HEAD request responses can supply transfer-encoding but we still do a header only response.
-    chunk_encoding_ = !end_stream;
   } else {
     if (end_stream) {
       encodeHeader(Headers::get().ContentLength.get().c_str(),
@@ -199,20 +191,20 @@ void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
 void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
-  const std::string& method = headers.get(Headers::get().Method);
-  const std::string& path = headers.get(Headers::get().Path);
-  if (method.empty() || path.empty()) {
+  const HeaderEntry* method = headers.Method();
+  const HeaderEntry* path = headers.Path();
+  if (!method || !path) {
     throw CodecClientException(":method and :path must be specified");
   }
 
-  if (method == Headers::get().MethodValues.Head) {
+  if (method->value() == Headers::get().MethodValues.Head.c_str()) {
     head_request_ = true;
   }
 
   connection_.reserveBuffer(4096);
-  connection_.copyToBuffer(method.c_str(), method.size());
+  connection_.copyToBuffer(method->value().c_str(), method->value().size());
   connection_.addCharToBuffer(' ');
-  connection_.copyToBuffer(path.c_str(), path.size());
+  connection_.copyToBuffer(path->value().c_str(), path->value().size());
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
@@ -256,17 +248,23 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type
   parser_.data = this;
 }
 
-void ConnectionImpl::completeLastHeader() {
-  conn_log_trace("completed header: key={} value={}", connection_, current_header_field_,
-                 current_header_value_);
-  if (!current_header_field_.empty()) {
-    // Handle translation from 'host' to ':host' here so upper layers don't need to deal with it.
-    if (0 == StringUtil::caseInsensitiveCompare(current_header_field_,
-                                                Headers::get().HostLegacy.get())) {
-      current_header_field_ = Headers::get().Host.get();
+static void toLowerCase(HeaderString& text) {
+  char* buffer = text.buffer();
+  uint32_t size = text.size();
+  for (size_t i = 0; i < size; i++) {
+    char c = buffer[i];
+    if ((c >= 'A') && (c <= 'Z')) {
+      buffer[i] |= 0x20;
     }
+  }
+}
 
-    current_header_map_->addViaMove(LowerCaseString(std::move(current_header_field_)),
+void ConnectionImpl::completeLastHeader() {
+  conn_log_trace("completed header: key={} value={}", connection_, current_header_field_.c_str(),
+                 current_header_value_.c_str());
+  if (!current_header_field_.empty()) {
+    toLowerCase(current_header_field_);
+    current_header_map_->addViaMove(std::move(current_header_field_),
                                     std::move(current_header_value_));
   }
 
@@ -331,15 +329,18 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   current_header_value_.append(data, length);
 }
 
+static const std::string HTTP_1_1 = "HTTP/1.1";
+static const std::string HTTP_1_0 = "HTTP/1.0";
+
 int ConnectionImpl::onHeadersCompleteBase() {
   conn_log_trace("headers complete", connection_);
   completeLastHeader();
   if (parser_.http_major == 1 && parser_.http_minor == 1) {
-    current_header_map_->addViaMoveValue(Headers::get().Version, "HTTP/1.1");
+    current_header_map_->insertVersion().value(HTTP_1_1);
   } else {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
     // HTTP/1.1 or not.
-    current_header_map_->addViaMoveValue(Headers::get().Version, "HTTP/1.0");
+    current_header_map_->insertVersion().value(HTTP_1_0);
   }
 
   int rc = onHeadersComplete(std::move(current_header_map_));
@@ -375,25 +376,27 @@ void ServerConnectionImpl::onEncodeComplete() {
   }
 }
 
-int ServerConnectionImpl::onHeadersComplete(HeaderMapPtr&& headers) {
+int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
   if (active_request_) {
-    headers->addViaMoveValue(Headers::get().Path, std::move(active_request_->request_url_));
+    HeaderString path(Headers::get().Path);
+    headers->addViaMove(std::move(path), std::move(active_request_->request_url_));
     ASSERT(active_request_->request_url_.empty());
 
-    headers->addViaMoveValue(Headers::get().Method,
-                             http_method_str(static_cast<http_method>(parser_.method)));
+    const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
+    headers->insertMethod().value(method_string, strlen(method_string));
 
     // Deal with expect: 100-continue here since a) only HTTP/1.1 has this, b) higher layers are
     // never going to do anything other than say to continue since we can response before request
     // complete if necessary.
-    if (0 == StringUtil::caseInsensitiveCompare(headers->get(Headers::get().Expect),
-                                                Headers::get().ExpectValues._100Continue)) {
+    if (headers->Expect() &&
+        0 == StringUtil::caseInsensitiveCompare(headers->Expect()->value().c_str(),
+                                                Headers::get().ExpectValues._100Continue.c_str())) {
       Buffer::OwnedImpl continue_response("HTTP/1.1 100 Continue\r\n\r\n");
       connection_.write(continue_response);
-      headers->remove(Headers::get().Expect);
+      headers->removeExpect();
     }
 
     // Determine here whether we have a body or not. This uses the new RFC semantics where the
@@ -511,8 +514,8 @@ void ClientConnectionImpl::onEncodeComplete() {
   pending_responses_.back().head_request_ = request_encoder_->headRequest();
 }
 
-int ClientConnectionImpl::onHeadersComplete(HeaderMapPtr&& headers) {
-  headers->addViaMoveValue(Headers::get().Status, std::to_string(parser_.status_code));
+int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
+  headers->insertStatus().value(parser_.status_code);
 
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed

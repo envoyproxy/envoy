@@ -6,6 +6,7 @@
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -72,7 +73,7 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
         return request_decoder;
       }));
 
-  HeaderMapImpl request_headers;
+  TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder, decodeHeaders_(_, true));
   request_encoder.encodeHeaders(request_headers, true);
@@ -81,7 +82,7 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   server_.shutdownNotice();
   server_.goAway();
 
-  HeaderMapImpl response_headers{{":status", "200"}};
+  TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   response_encoder->encodeHeaders(response_headers, true);
 }
@@ -98,7 +99,7 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
         return request_decoder;
       }));
 
-  HeaderMapImpl request_headers;
+  TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder, decodeHeaders_(_, false));
   request_encoder.encodeHeaders(request_headers, false);
@@ -124,7 +125,7 @@ TEST_P(Http2CodecImplTest, InvalidFrame) {
   ON_CALL(client_connection_, write(_))
       .WillByDefault(
           Invoke([&](Buffer::Instance& data) -> void { server_wrapper_.buffer_.add(data); }));
-  request_encoder.encodeHeaders(HeaderMapImpl{}, true);
+  request_encoder.encodeHeaders(TestHeaderMapImpl{}, true);
   EXPECT_THROW(server_wrapper_.dispatch(Buffer::OwnedImpl(), server_), CodecProtocolException);
 }
 
@@ -140,7 +141,7 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
         return request_decoder;
       }));
 
-  HeaderMapImpl request_headers;
+  TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder, decodeHeaders_(_, false));
   request_encoder.encodeHeaders(request_headers, false);
@@ -148,16 +149,16 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
   Buffer::OwnedImpl hello("hello");
   request_encoder.encodeData(hello, false);
   EXPECT_CALL(request_decoder, decodeTrailers_(_));
-  request_encoder.encodeTrailers(HeaderMapImpl{{"trailing", "header"}});
+  request_encoder.encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 
-  HeaderMapImpl response_headers{{":status", "200"}};
+  TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   response_encoder->encodeHeaders(response_headers, false);
   EXPECT_CALL(response_decoder, decodeData(_, false));
   Buffer::OwnedImpl world("world");
   response_encoder->encodeData(world, false);
   EXPECT_CALL(response_decoder, decodeTrailers_(_));
-  response_encoder->encodeTrailers(HeaderMapImpl{{"trailing", "header"}});
+  response_encoder->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
@@ -177,7 +178,7 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
         return request_decoder;
       }));
 
-  HeaderMapImpl request_headers;
+  TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder, decodeHeaders_(_, false));
   request_encoder.encodeHeaders(request_headers, false);
@@ -185,20 +186,20 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   request_encoder.encodeData(body, false);
   EXPECT_CALL(request_decoder, decodeTrailers_(_));
-  request_encoder.encodeTrailers(HeaderMapImpl{{"trailing", "header"}});
+  request_encoder.encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 
   // Flush pending data.
   setupDefaultConnectionMocks();
   server_wrapper_.dispatch(Buffer::OwnedImpl(), server_);
 
-  HeaderMapImpl response_headers{{":status", "200"}};
+  TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   response_encoder->encodeHeaders(response_headers, false);
   EXPECT_CALL(response_decoder, decodeData(_, false));
   Buffer::OwnedImpl world("world");
   response_encoder->encodeData(world, false);
   EXPECT_CALL(response_decoder, decodeTrailers_(_));
-  response_encoder->encodeTrailers(HeaderMapImpl{{"trailing", "header"}});
+  response_encoder->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
 }
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTest, Http2CodecImplTest,
@@ -206,35 +207,35 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplTest, Http2CodecImplTest,
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {
-    HeaderMapImpl headers;
-    Utility::reconstituteCrumbledCookies(headers);
-    EXPECT_EQ(headers, HeaderMapImpl{});
+    HeaderString key;
+    HeaderString value;
+    HeaderString cookies;
+    EXPECT_FALSE(Utility::reconstituteCrumbledCookies(key, value, cookies));
+    EXPECT_TRUE(cookies.empty());
   }
 
   {
-    HeaderMapImpl headers{{"foo", "bar"}, {"cookie", "a=b"}};
-    Utility::reconstituteCrumbledCookies(headers);
-    EXPECT_EQ(headers, (HeaderMapImpl{{"foo", "bar"}, {"cookie", "a=b"}}));
+    HeaderString key(Headers::get().ContentLength);
+    HeaderString value;
+    value.setInteger(5);
+    HeaderString cookies;
+    EXPECT_FALSE(Utility::reconstituteCrumbledCookies(key, value, cookies));
+    EXPECT_TRUE(cookies.empty());
   }
 
   {
-    HeaderMapImpl headers{{"foo", "bar"}, {"cookie", "a=b"}, {"cookie", "c=d"}};
-    Utility::reconstituteCrumbledCookies(headers);
-    EXPECT_EQ(headers, (HeaderMapImpl{{"foo", "bar"}, {"cookie", "a=b; c=d"}}));
-  }
+    HeaderString key(Headers::get().Cookie);
+    HeaderString value;
+    value.setCopy("a=b", 3);
+    HeaderString cookies;
+    EXPECT_TRUE(Utility::reconstituteCrumbledCookies(key, value, cookies));
+    EXPECT_EQ(cookies, "a=b");
 
-  {
-    HeaderMapImpl headers{{"foo", "bar"},
-                          {"cookie", "a=b"},
-                          {"hello", "world"},
-                          {"cookie", "c=d"},
-                          {"more", "headers"},
-                          {"cookie", "blah=blah"}};
-    Utility::reconstituteCrumbledCookies(headers);
-    EXPECT_EQ(headers, (HeaderMapImpl{{"foo", "bar"},
-                                      {"hello", "world"},
-                                      {"more", "headers"},
-                                      {"cookie", "a=b; c=d; blah=blah"}}));
+    HeaderString key2(Headers::get().Cookie);
+    HeaderString value2;
+    value2.setCopy("c=d", 3);
+    EXPECT_TRUE(Utility::reconstituteCrumbledCookies(key2, value2, cookies));
+    EXPECT_EQ(cookies, "a=b; c=d");
   }
 }
 

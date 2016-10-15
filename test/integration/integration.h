@@ -175,7 +175,7 @@ protected:
   void testRouterNotFoundWithBody(uint32_t port, Http::CodecClient::Type type);
   void testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
                                             Http::CodecClient::Type type, uint64_t request_size,
-                                            uint64_t response_size);
+                                            uint64_t response_size, bool big_header);
   void testRouterHeaderOnlyRequestAndResponse(Network::ClientConnectionPtr&& conn,
                                               Http::CodecClient::Type type);
   void testRouterUpstreamDisconnectBeforeRequestComplete(Network::ClientConnectionPtr&& conn,
