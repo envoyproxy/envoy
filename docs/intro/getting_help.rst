@@ -10,6 +10,8 @@ Google Groups
 * `envoy-announce <https://groups.google.com/forum/#!forum/envoy-announce>`_: Low frequency mailing
   list where we will email announcements only.
 * `envoy-users <https://groups.google.com/forum/#!forum/envoy-users>`_: General user discussion.
+* `envoy-dev <https://groups.google.com/forum/#!forum/envoy-dev>`_: Envoy developer discussion
+  (APIs, feature design, etc.).
 
 IRC
 ---
