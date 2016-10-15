@@ -8,27 +8,16 @@
 
 namespace Upstream {
 
-const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
-  ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
-  if (host_set_.hosts().empty()) {
-    return host_set_.hosts();
-  }
-
-  uint64_t global_panic_threshold =
-      std::min(100UL, runtime_.snapshot().getInteger("upstream.healthy_panic_threshold", 50));
-  double healthy_percent = 100.0 * host_set_.healthyHosts().size() / host_set_.hosts().size();
-
-  // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
-  if (healthy_percent < global_panic_threshold) {
-    stats_.upstream_rq_lb_healthy_panic_.inc();
-    return host_set_.hosts();
-  }
-
-  uint32_t number_of_zones = stats_.upstream_zone_count_.value();
-  // Early exit if we cannot perform zone aware routing.
-  if (number_of_zones < 2 || host_set_.localZoneHealthyHosts().empty() ||
+bool LoadBalancerBase::earlyExitNonZoneRouting() {
+  uint32_t number_of_zones = host_set_.healthyHostsPerZone().size();
+  if (number_of_zones < 2 ||
       !runtime_.snapshot().featureEnabled("upstream.zone_routing.enabled", 100)) {
-    return host_set_.healthyHosts();
+    return true;
+  }
+
+  const std::vector<HostPtr>& local_zone_healthy_hosts = host_set_.healthyHostsPerZone()[0];
+  if (local_zone_healthy_hosts.empty()) {
+    return true;
   }
 
   // Do not perform zone routing for small clusters.
@@ -37,20 +26,51 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
 
   if (host_set_.healthyHosts().size() < min_cluster_size) {
     stats_.zone_cluster_too_small_.inc();
+    return true;
+  }
+
+  return false;
+}
+
+bool LoadBalancerBase::isGlobalPanic() {
+  uint64_t global_panic_threshold =
+      std::min(100UL, runtime_.snapshot().getInteger("upstream.healthy_panic_threshold", 50));
+  double healthy_percent = 100.0 * host_set_.healthyHosts().size() / host_set_.hosts().size();
+
+  // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
+  if (healthy_percent < global_panic_threshold) {
+    stats_.upstream_rq_lb_healthy_panic_.inc();
+    return true;
+  }
+
+  return false;
+}
+
+const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
+  ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
+
+  if (host_set_.hosts().empty() || isGlobalPanic()) {
+    return host_set_.hosts();
+  }
+
+  if (earlyExitNonZoneRouting()) {
     return host_set_.healthyHosts();
   }
 
-  // If number of hosts in a local zone big enough route all requests to the same zone.
-  if (host_set_.localZoneHealthyHosts().size() * number_of_zones >=
-      host_set_.healthyHosts().size()) {
+  // At this point it's guaranteed to be at least 2 zones.
+  uint32_t number_of_zones = host_set_.healthyHostsPerZone().size();
+  ASSERT(number_of_zones >= 2U);
+  const std::vector<HostPtr>& local_zone_healthy_hosts = host_set_.healthyHostsPerZone()[0];
+
+  // If number of hosts in a local zone big enough then route all requests to the same zone.
+  if (local_zone_healthy_hosts.size() * number_of_zones >= host_set_.healthyHosts().size()) {
     stats_.zone_over_percentage_.inc();
-    return host_set_.localZoneHealthyHosts();
+    return local_zone_healthy_hosts;
   }
 
   // If local zone ratio is lower than expected we should only partially route requests from the
   // same zone.
-  double zone_host_ratio =
-      1.0 * host_set_.localZoneHealthyHosts().size() / host_set_.healthyHosts().size();
+  double zone_host_ratio = 1.0 * local_zone_healthy_hosts.size() / host_set_.healthyHosts().size();
   double ratio_to_route = zone_host_ratio * number_of_zones;
 
   // Not zone routed requests will be distributed between all hosts and hence
@@ -63,7 +83,7 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
 
   if (random_.random() % 10000 < zone_routing_threshold) {
     stats_.zone_routing_sampled_.inc();
-    return host_set_.localZoneHealthyHosts();
+    return local_zone_healthy_hosts;
   } else {
     stats_.zone_routing_no_sampled_.inc();
     return host_set_.healthyHosts();

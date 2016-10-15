@@ -26,6 +26,9 @@ protected:
   Runtime::RandomGenerator& random_;
 
 private:
+  bool earlyExitNonZoneRouting();
+  bool isGlobalPanic();
+
   const HostSet& host_set_;
   const HostSet* local_host_set_;
 };

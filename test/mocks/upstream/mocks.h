@@ -29,8 +29,8 @@ public:
   MOCK_CONST_METHOD1(addMemberUpdateCb, void(MemberUpdateCb callback));
   MOCK_CONST_METHOD0(hosts, const std::vector<HostPtr>&());
   MOCK_CONST_METHOD0(healthyHosts, const std::vector<HostPtr>&());
-  MOCK_CONST_METHOD0(localZoneHosts, const std::vector<HostPtr>&());
-  MOCK_CONST_METHOD0(localZoneHealthyHosts, const std::vector<HostPtr>&());
+  MOCK_CONST_METHOD0(hostsPerZone, const std::vector<std::vector<HostPtr>>&());
+  MOCK_CONST_METHOD0(healthyHostsPerZone, const std::vector<std::vector<HostPtr>>&());
 
   // Upstream::Cluster
   MOCK_CONST_METHOD0(altStatName, const std::string&());
@@ -48,8 +48,8 @@ public:
 
   std::vector<HostPtr> hosts_;
   std::vector<HostPtr> healthy_hosts_;
-  std::vector<HostPtr> local_zone_hosts_;
-  std::vector<HostPtr> local_zone_healthy_hosts_;
+  std::vector<std::vector<HostPtr>> hosts_per_zone_;
+  std::vector<std::vector<HostPtr>> healthy_hosts_per_zone_;
   std::string name_{"fake_cluster"};
   std::string alt_stat_name_{"fake_alt_cluster"};
   std::list<MemberUpdateCb> callbacks_;

@@ -127,13 +127,20 @@ public:
    *         set on the command line and to use a cluster type that supports population such as
    *         the SDS cluster type.
    */
-  virtual const std::vector<HostPtr>& localZoneHosts() const PURE;
 
   /**
-   * @return all healthy hosts that are in the zone local to this node. See healthyHosts() and
-   *         localZoneHosts() for more information.
+   * @return hosts per zone, index 0 is dedicated to local zone hosts.
+   * If there is no hosts in local zone for upstream cluster hostPerZone() will @return
+   * empty vector.
+   *
+   * Note, that we sort zones in alphabetical order starting from index 1.
    */
-  virtual const std::vector<HostPtr>& localZoneHealthyHosts() const PURE;
+  virtual const std::vector<std::vector<HostPtr>>& hostsPerZone() const PURE;
+
+  /**
+   * @return same as hostsPerZone but only contains healthy hosts.
+   */
+  virtual const std::vector<std::vector<HostPtr>>& healthyHostsPerZone() const PURE;
 };
 
 /**
@@ -188,8 +195,7 @@ public:
   COUNTER(zone_over_percentage)                                                                    \
   COUNTER(zone_routing_sampled)                                                                    \
   COUNTER(zone_routing_no_sampled)                                                                 \
-  GAUGE  (max_host_weight)                                                                         \
-  GAUGE  (upstream_zone_count)
+  GAUGE  (max_host_weight)
 // clang-format on
 
 /**
