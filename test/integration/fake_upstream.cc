@@ -22,7 +22,7 @@ void FakeStream::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   decoder_event_.notify_one();
 }
 
-void FakeStream::decodeData(const Buffer::Instance& data, bool end_stream) {
+void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
   std::unique_lock<std::mutex> lock(lock_);
   end_stream_ = end_stream;
   body_length_ += data.length();

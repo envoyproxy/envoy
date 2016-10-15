@@ -145,7 +145,8 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
   EXPECT_CALL(request_decoder, decodeHeaders_(_, false));
   request_encoder.encodeHeaders(request_headers, false);
   EXPECT_CALL(request_decoder, decodeData(_, false));
-  request_encoder.encodeData(Buffer::OwnedImpl("hello"), false);
+  Buffer::OwnedImpl hello("hello");
+  request_encoder.encodeData(hello, false);
   EXPECT_CALL(request_decoder, decodeTrailers_(_));
   request_encoder.encodeTrailers(HeaderMapImpl{{"trailing", "header"}});
 
@@ -153,7 +154,8 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   response_encoder->encodeHeaders(response_headers, false);
   EXPECT_CALL(response_decoder, decodeData(_, false));
-  response_encoder->encodeData(Buffer::OwnedImpl("world"), false);
+  Buffer::OwnedImpl world("world");
+  response_encoder->encodeData(world, false);
   EXPECT_CALL(response_decoder, decodeTrailers_(_));
   response_encoder->encodeTrailers(HeaderMapImpl{{"trailing", "header"}});
 }
@@ -180,7 +182,8 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   EXPECT_CALL(request_decoder, decodeHeaders_(_, false));
   request_encoder.encodeHeaders(request_headers, false);
   EXPECT_CALL(request_decoder, decodeData(_, false)).Times(AtLeast(1));
-  request_encoder.encodeData(Buffer::OwnedImpl(std::string(1024 * 1024, 'a')), false);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  request_encoder.encodeData(body, false);
   EXPECT_CALL(request_decoder, decodeTrailers_(_));
   request_encoder.encodeTrailers(HeaderMapImpl{{"trailing", "header"}});
 
@@ -192,7 +195,8 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   response_encoder->encodeHeaders(response_headers, false);
   EXPECT_CALL(response_decoder, decodeData(_, false));
-  response_encoder->encodeData(Buffer::OwnedImpl("world"), false);
+  Buffer::OwnedImpl world("world");
+  response_encoder->encodeData(world, false);
   EXPECT_CALL(response_decoder, decodeTrailers_(_));
   response_encoder->encodeTrailers(HeaderMapImpl{{"trailing", "header"}});
 }

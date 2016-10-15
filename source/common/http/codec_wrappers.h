@@ -22,7 +22,7 @@ public:
     }
   }
 
-  void decodeData(const Buffer::Instance& data, bool end_stream) override {
+  void decodeData(Buffer::Instance& data, bool end_stream) override {
     if (end_stream) {
       onPreDecodeComplete();
     }
@@ -66,7 +66,7 @@ public:
     }
   }
 
-  void encodeData(const Buffer::Instance& data, bool end_stream) override {
+  void encodeData(Buffer::Instance& data, bool end_stream) override {
     inner_.encodeData(data, end_stream);
     if (end_stream) {
       onEncodeComplete();

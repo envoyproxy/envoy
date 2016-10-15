@@ -21,7 +21,7 @@ void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool en
   }
 }
 
-void BufferingStreamDecoder::decodeData(const Buffer::Instance& data, bool end_stream) {
+void BufferingStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
   body_.append(TestUtility::bufferToString(data));
@@ -61,7 +61,8 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   headers.addViaMoveValue(Http::Headers::get().Scheme, "http");
   encoder.encodeHeaders(headers, body.empty());
   if (!body.empty()) {
-    encoder.encodeData(Buffer::OwnedImpl(body), true);
+    Buffer::OwnedImpl body_buffer(body);
+    encoder.encodeData(body_buffer, true);
   }
 
   dispatcher->run(Event::Dispatcher::RunType::Block);

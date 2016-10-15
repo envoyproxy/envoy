@@ -221,15 +221,24 @@ void Filter::sendNoHealthyUpstreamResponse() {
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  upstream_request_->upstream_encoder_->encodeData(data, end_stream);
+  bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
+
+  // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
+  // since it's all moves from here on.
+  if (buffering) {
+    Buffer::OwnedImpl copy(data);
+    upstream_request_->upstream_encoder_->encodeData(copy, end_stream);
+  } else {
+    upstream_request_->upstream_encoder_->encodeData(data, end_stream);
+  }
+
   if (end_stream) {
     onRequestComplete();
   }
 
   // If we are potentially going to retry or shadow this request we need to buffer.
-  return (retry_state_ && retry_state_->enabled()) || do_shadowing_
-             ? Http::FilterDataStatus::StopIterationAndBuffer
-             : Http::FilterDataStatus::StopIterationNoBuffer;
+  return buffering ? Http::FilterDataStatus::StopIterationAndBuffer
+                   : Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
@@ -416,13 +425,12 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   callbacks_->encodeHeaders(std::move(headers), end_stream);
 }
 
-void Filter::onUpstreamData(const Buffer::Instance& data, bool end_stream) {
+void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
     onUpstreamComplete();
   }
 
-  Buffer::OwnedImpl copy(data);
-  callbacks_->encodeData(copy, end_stream);
+  callbacks_->encodeData(data, end_stream);
 }
 
 void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
@@ -500,8 +508,9 @@ void Filter::doRetry() {
   // It's possible we got immediately reset.
   if (upstream_request_) {
     if (callbacks_->decodingBuffer()) {
-      upstream_request_->upstream_encoder_->encodeData(*callbacks_->decodingBuffer(),
-                                                       !downstream_trailers_);
+      // If we are doing a retry we need to make a copy.
+      Buffer::OwnedImpl copy(*callbacks_->decodingBuffer());
+      upstream_request_->upstream_encoder_->encodeData(copy, !downstream_trailers_);
     }
 
     if (downstream_trailers_) {
@@ -529,7 +538,7 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
   parent_.onUpstreamHeaders(std::move(headers), end_stream);
 }
 
-void Filter::UpstreamRequest::decodeData(const Buffer::Instance& data, bool end_stream) {
+void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
   parent_.onUpstreamData(data, end_stream);
 }
 

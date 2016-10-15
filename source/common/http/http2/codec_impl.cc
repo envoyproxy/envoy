@@ -139,23 +139,9 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
   static const uint64_t FRAME_HEADER_SIZE = 9;
 
   // TODO: Back pressure.
-  uint64_t length_remaining = length;
   Buffer::OwnedImpl output(framehd, FRAME_HEADER_SIZE);
-  uint64_t num_slices = pending_send_data_.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  pending_send_data_.getRawSlices(slices, num_slices);
-  for (Buffer::RawSlice& slice : slices) {
-    if (length_remaining == 0) {
-      break;
-    }
-
-    uint64_t data_to_write = std::min(length_remaining, slice.len_);
-    output.add(slice.mem_, data_to_write);
-    length_remaining -= data_to_write;
-  }
-
+  output.move(pending_send_data_, length);
   parent_.connection_.write(output);
-  pending_send_data_.drain(length);
   return 0;
 }
 
@@ -176,10 +162,10 @@ void ConnectionImpl::ServerStreamImpl::submitHeaders(const std::vector<nghttp2_n
   UNREFERENCED_PARAMETER(rc);
 }
 
-void ConnectionImpl::StreamImpl::encodeData(const Buffer::Instance& data, bool end_stream) {
+void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
-  pending_send_data_.add(data);
+  pending_send_data_.move(data);
   if (data_deferred_) {
     int rc = nghttp2_session_resume_data(parent_.session_, stream_id_);
     ASSERT(rc == 0);

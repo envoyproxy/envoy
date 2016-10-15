@@ -44,6 +44,11 @@ template <class T> static void initializeMockConnection(T& connection) {
   ON_CALL(connection, remoteAddress()).WillByDefault(ReturnRef(connection.remote_address_));
   ON_CALL(connection, id()).WillByDefault(Return(connection.next_id_));
   ON_CALL(connection, state()).WillByDefault(ReturnPointee(&connection.state_));
+
+  // The real implementation will move the buffer data into the socket.
+  ON_CALL(connection, write(_))
+      .WillByDefault(
+          Invoke([](Buffer::Instance& buffer) -> void { buffer.drain(buffer.length()); }));
 }
 
 MockConnection::MockConnection() { initializeMockConnection(*this); }

@@ -420,8 +420,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::decodeData(const Buffer::Instance& data,
-                                                     bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
   request_info_.bytes_received_ += data.length();
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;
@@ -429,10 +428,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(const Buffer::Instance& dat
     stream_log_debug("request end stream", *this);
   }
 
-  // We are fed data directly from codec buffers. Perform a single copy here so that filters can
-  // modify the data and potentially take ownership of it.
-  Buffer::OwnedImpl data_copy(data);
-  decodeData(nullptr, data_copy, end_stream);
+  decodeData(nullptr, data, end_stream);
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
@@ -702,7 +698,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleBufferData(
     if (!bufferedData()) {
       bufferedData().reset(new Buffer::OwnedImpl());
     }
-    bufferedData()->add(provided_data);
+    bufferedData()->move(provided_data);
   }
 }
 

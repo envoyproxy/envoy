@@ -108,6 +108,7 @@ private:
   void fakeBufferDrain(ConnectionBufferType type, evbuffer* buffer);
 
   Buffer::WrappedImpl read_buffer_;
+  Buffer::WrappedImpl write_buffer_;
   Buffer::Instance* current_write_buffer_{};
 };
 

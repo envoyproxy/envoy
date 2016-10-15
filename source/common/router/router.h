@@ -118,7 +118,7 @@ private:
 
     // Http::StreamDecoder
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
-    void decodeData(const Buffer::Instance& data, bool end_stream) override;
+    void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
 
     // Http::StreamCallbacks
@@ -159,7 +159,7 @@ private:
   void onResetStream();
   void onResponseTimeout();
   void onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream);
-  void onUpstreamData(const Buffer::Instance& data, bool end_stream);
+  void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
   void onUpstreamComplete();
   void onUpstreamReset(UpstreamResetType type,
