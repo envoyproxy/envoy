@@ -286,7 +286,7 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
-  if (connection_manager_.config_.isTracing(request_info_)) {
+  if (connection_manager_.config_.shouldTraceRequest(request_info_)) {
     connection_manager_.tracer_.trace(request_headers_.get(), response_headers_.get(),
                                       request_info_, *this);
   }
@@ -645,7 +645,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
 }
 
 const std::string& ConnectionManagerImpl::ActiveStream::operationName() const {
-  return connection_manager_.config_.tracingInfo().value().operation_name_;
+  return connection_manager_.config_.tracingConfig().value().operation_name_;
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::addResetStreamCallback(

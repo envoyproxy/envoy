@@ -202,7 +202,8 @@ HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type
 
 const std::string& HttpConnectionManagerConfig::localAddress() { return server_.getLocalAddress(); }
 
-bool HttpConnectionManagerConfig::isTracing(const Http::AccessLog::RequestInfo& request_info) {
+bool HttpConnectionManagerConfig::shouldTraceRequest(
+    const Http::AccessLog::RequestInfo& request_info) {
   if (!tracing_info_.valid()) {
     return false;
   }

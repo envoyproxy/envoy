@@ -55,8 +55,8 @@ public:
   bool useRemoteAddress() override { return true; }
   const std::string& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
-  bool isTracing(const Http::AccessLog::RequestInfo&) override { return false; }
-  const Optional<Tracing::TracingConnectionManagerConfig>& tracingInfo() override {
+  bool shouldTraceRequest(const Http::AccessLog::RequestInfo&) override { return false; }
+  const Optional<Tracing::TracingConnectionManagerConfig>& tracingConfig() override {
     return tracing_info_;
   }
 

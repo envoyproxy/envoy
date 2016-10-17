@@ -17,6 +17,7 @@
 #include "common/common/linked_object.h"
 #include "common/common/utility.h"
 #include "common/http/access_log/request_info_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
 
@@ -159,14 +160,14 @@ public:
   virtual const Optional<std::string>& userAgent() PURE;
 
   /**
-   * @return true if tracing is enabled otherwise it returns false;
+   * @return true if tracing is enabled otherwise it returns false.
    */
-  virtual bool isTracing(const Http::AccessLog::RequestInfo& request_info) PURE;
+  virtual bool shouldTraceRequest(const Http::AccessLog::RequestInfo& request_info) PURE;
 
   /**
-   * TODO: comment.
+   * @return tracing config.
    */
-  virtual const Optional<Tracing::TracingConnectionManagerConfig>& tracingInfo() PURE;
+  virtual const Optional<Tracing::TracingConnectionManagerConfig>& tracingConfig() PURE;
 };
 
 /**

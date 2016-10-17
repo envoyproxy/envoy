@@ -70,8 +70,8 @@ public:
   const std::string& serverName() override { return server_name_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
-  bool isTracing(const Http::AccessLog::RequestInfo& request_info) override;
-  const Optional<Tracing::TracingConnectionManagerConfig>& tracingInfo() override {
+  bool shouldTraceRequest(const Http::AccessLog::RequestInfo& request_info) override;
+  const Optional<Tracing::TracingConnectionManagerConfig>& tracingConfig() override {
     return tracing_info_;
   }
   const std::string& localAddress() override;

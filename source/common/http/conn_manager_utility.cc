@@ -104,7 +104,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     }
   }
 
-  if (config.tracingInfo().valid()) {
+  if (config.tracingConfig().valid()) {
     Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
   }
 }

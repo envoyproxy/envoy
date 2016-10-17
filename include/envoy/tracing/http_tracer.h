@@ -6,23 +6,6 @@
 
 namespace Tracing {
 
-enum class TracingType {
-  // Trace all traceable requests.
-  All,
-  // Trace only when there is an upstream failure reason.
-  UpstreamFailureReason
-};
-
-/**
- * Configuration for tracing which is set on the connection manager level.
- * Http Tracing can be enabled/disabled on a per connection manager basis.
- * Here we specify some specific for connection manager settings.
- */
-struct TracingConnectionManagerConfig {
-  std::string operation_name_;
-  TracingType tracing_type_;
-};
-
 class TracingContext {
 public:
   virtual ~TracingContext() {}
