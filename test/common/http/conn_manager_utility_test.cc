@@ -19,7 +19,7 @@ class ConnectionManagerUtilityTest : public testing::Test {
 public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
-    ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(not_set_tracing_));
+    ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(tracing_not_set_));
 
     set_tracing_all_.value({"test", Http::TracingType::All});
   }
@@ -29,14 +29,14 @@ public:
   NiceMock<MockConnectionManagerConfig> config_;
   Optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Optional<Http::TracingConnectionManagerConfig> not_set_tracing_;
+  Optional<Http::TracingConnectionManagerConfig> tracing_not_set_;
   Optional<Http::TracingConnectionManagerConfig> set_tracing_all_;
 };
 
 TEST_F(ConnectionManagerUtilityTest, ShouldTraceRequest) {
   {
     NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-    EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, not_set_tracing_));
+    EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_not_set_));
   }
 
   {
