@@ -4,6 +4,11 @@
 
 namespace Tracing {
 
+class MockTracingContext : public TracingContext {
+public:
+  MOCK_CONST_METHOD0(operationName, const std::string&());
+};
+
 class MockHttpTracer : public HttpTracer {
 public:
   MockHttpTracer();

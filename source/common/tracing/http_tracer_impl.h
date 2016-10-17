@@ -36,17 +36,6 @@ struct LightstepTracerStats {
   LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class TracingContextImpl : public TracingContext {
-public:
-  TracingContextImpl(const std::string& operation_name) : operation_name_(operation_name) {}
-
-  // Tracing::TracingContext
-  const std::string& operationName() const override;
-
-private:
-  const std::string operation_name_;
-};
-
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer

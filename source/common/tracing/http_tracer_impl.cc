@@ -12,8 +12,6 @@
 
 namespace Tracing {
 
-const std::string& TracingContextImpl::operationName() const { return operation_name_; }
-
 void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
   std::string x_request_id = request_headers.get(Http::Headers::get().RequestId);
 
