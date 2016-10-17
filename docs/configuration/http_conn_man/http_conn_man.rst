@@ -17,7 +17,7 @@ HTTP connection manager
       "route_config": "{...}",
       "filters": [],
       "add_user_agent": "...",
-      "tracing_enabled": "...",
+      "tracing": "{...}",
       "http_codec_options": "...",
       "server_name": "...",
       "idle_timeout_s": "...",
@@ -71,11 +71,34 @@ add_user_agent
   :ref:`config_http_conn_man_headers_downstream-service-cluster` headers. See the linked
   documentation for more information. Defaults to false.
 
-.. _config_http_conn_man_tracing_enabled:
+.. _config_http_conn_man_tracing:
 
-tracing_enabled
-  *(optional, boolean)* Whether the connection manager emits :ref:`tracing <arch_overview_tracing>`
-  data to the :ref:`configured tracing provider <config_tracing>`. Defaults to false.
+tracing
+  *(optional, object)* Presence of the object defines whether the connection manager
+  emits :ref:`tracing <arch_overview_tracing>` data to the :ref:`configured tracing provider <config_tracing>`.
+  Tracing object is in the following format:
+  
+  .. code-block:: json
+  
+    {
+      "tracing": {
+        "operation_name": "...",
+        "type": "..."
+      }
+    }
+ 
+  operation_name
+    *(required, string)* Span name that will be emitted on completed request.
+  
+  type
+    *(optional, string)* Allows to filter requests so that only some of them are traced. Default value is *all*.
+    Possible values are:
+    
+    all
+      Trace all requests.
+
+    upstream_failure
+      Trace only requests for which upstream failure reason is defined. 
 
 .. _config_http_conn_man_http_codec_options:
 
