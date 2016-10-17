@@ -16,7 +16,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
 
 void RawStatData::initialize(const std::string& name) {
   ASSERT(!initialized());
-  ASSERT(name.size() < MAX_NAME_SIZE);
+  ASSERT(name.size() <= MAX_NAME_SIZE);
   strncpy(name_, name.substr(0, MAX_NAME_SIZE).c_str(), MAX_NAME_SIZE + 1);
 }
 

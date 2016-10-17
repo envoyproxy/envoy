@@ -6,7 +6,7 @@ DynamoDB
 Envoy supports an HTTP level DynamoDB sniffing filter with the following features:
 
 * DynamoDB API request/response parser.
-* DynamoDB per operation/per table statistics.
+* DynamoDB per operation/per table/per partition and operation statistics.
 * Failure type statistics for 4xx responses, parsed from response JSON,
   e.g., ProvisionedThroughputExceededException.
 * Batch operation partial failure statistics.

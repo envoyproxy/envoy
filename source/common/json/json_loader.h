@@ -81,14 +81,14 @@ public:
 
   /**
    * Get a string value by name.
-   * @param name suppies the key name.
+   * @param name supplies the key name.
    * @return std::string the value.
    */
   std::string getString(const std::string& name) const;
 
   /**
    * Get a string value by name or return a default if name does not exist.
-   * @param name suppies the key name.
+   * @param name supplies the key name.
    * @param default_value supplies the value to return if name does not exist.
    * @return std::string the value.
    */
@@ -100,6 +100,21 @@ public:
    * @return std::vector<std::string> the array of strings.
    */
   std::vector<std::string> getStringArray(const std::string& name) const;
+
+  /**
+   * Get a double value by name.
+   * @param name supplies the key name.
+   * @return double the value.
+   */
+  double getDouble(const std::string& name) const;
+
+  /**
+   * Get a double value by name.
+   * @param name supplies the key name.
+   * @param default_value supplies the value to return if name does not exist.
+   * @return double the value.
+   */
+  double getDouble(const std::string& name, double default_value) const;
 
   /**
    * Iterate Object and call callback on key-value pairs

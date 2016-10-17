@@ -58,6 +58,7 @@ add_executable(envoy-test
   common/filter/tcp_proxy_test.cc
   common/dynamo/dynamo_filter_test.cc
   common/dynamo/dynamo_request_parser_test.cc
+  common/dynamo/dynamo_utility_test.cc
   common/json/json_loader_test.cc
   common/mongo/bson_impl_test.cc
   common/mongo/codec_impl_test.cc

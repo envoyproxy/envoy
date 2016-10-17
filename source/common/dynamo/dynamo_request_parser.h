@@ -2,6 +2,8 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/json/json_loader.h"
+
 namespace Dynamo {
 
 /*
@@ -16,6 +18,13 @@ public:
   public:
     std::string table_name;
     bool is_single_table;
+  };
+
+  struct PartitionDescriptor {
+    PartitionDescriptor(const std::string& partition, uint64_t capacity)
+        : partition_id_(partition), capacity_(capacity) {}
+    std::string partition_id_;
+    uint64_t capacity_;
   };
 
   /**
@@ -40,7 +49,7 @@ public:
    *
    * @throw Json::Exception if data is not in valid Json format.
    */
-  static TableDescriptor parseTable(const std::string& operation, const std::string& data);
+  static TableDescriptor parseTable(const std::string& operation, const Json::Object& json_data);
 
   /**
    * Parse error details which might be provided for a given response code.
@@ -52,19 +61,28 @@ public:
    *
    * @throw Json::Exception if data is not in valid Json format.
    */
-  static std::string parseErrorType(const std::string& data);
+  static std::string parseErrorType(const Json::Object& json_data);
 
   /**
    * Parse unprocessed keys for batch operation results.
    * @return empty set if there are no unprocessed keys or a set of table names that did not get
    * processed in the batch operation.
    */
-  static std::vector<std::string> parseBatchUnProcessedKeys(const std::string& data);
+  static std::vector<std::string> parseBatchUnProcessedKeys(const Json::Object& json_data);
 
   /**
    * @return true if the operation is in the set of supported BATCH_OPERATIONS
    */
   static bool isBatchOperation(const std::string& operation);
+
+  /**
+   * Parse the Partition ids and the consumed capacity from the body.
+   * @return empty set if there is no partition data or a set of partition data containing
+   * the partition id as a string and the capacity consumed as an integer.
+   *
+   * @throw Json::Exception if data is not in valid Json format.
+   */
+  static std::vector<PartitionDescriptor> parsePartitions(const Json::Object& json_data);
 
 private:
   static const Http::LowerCaseString X_AMZ_TARGET;
