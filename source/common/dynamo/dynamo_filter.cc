@@ -60,6 +60,7 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
 
   uint64_t status = Http::Utility::getResponseStatus(*response_headers_);
   chargeBasicStats(status);
+
   std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
   if (!body.empty()) {
     try {
