@@ -423,6 +423,8 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
       .WillRepeatedly(Return(2));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
+  const std::string operation = "operation";
+  EXPECT_CALL(context_, operationName()).Times(2).WillRepeatedly(ReturnRef(operation));
 
   sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
   sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
@@ -474,6 +476,8 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(5));
+  const std::string operation = "operation";
+  EXPECT_CALL(context_, operationName()).WillOnce(ReturnRef(operation));
 
   sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
   // Timer should be re-enabled.
@@ -522,6 +526,8 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
       .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
+  const std::string operation = "operation";
+  EXPECT_CALL(context_, operationName()).WillOnce(ReturnRef(operation));
 
   sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
 
