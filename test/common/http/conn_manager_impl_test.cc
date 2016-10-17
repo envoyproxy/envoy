@@ -242,6 +242,8 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
   setup(false, "envoy-server-test");
+  // Make tracing off.
+  tracing_config_ = Optional<Http::TracingConnectionManagerConfig>();
   EXPECT_CALL(tracer_, trace(_, _, _, _)).Times(0);
 
   Http::MockStreamDecoderFilter* filter = new NiceMock<Http::MockStreamDecoderFilter>();

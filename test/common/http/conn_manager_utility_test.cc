@@ -21,7 +21,7 @@ public:
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
     ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(not_set_tracing_));
 
-    set_tracing_.value({"test", Http::TracingType::All});
+    set_tracing_all_.value({"test", Http::TracingType::All});
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -30,8 +30,33 @@ public:
   Optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
   Optional<Http::TracingConnectionManagerConfig> not_set_tracing_;
-  Optional<Http::TracingConnectionManagerConfig> set_tracing_;
+  Optional<Http::TracingConnectionManagerConfig> set_tracing_all_;
 };
+
+TEST_F(ConnectionManagerUtilityTest, ShouldTraceRequest) {
+  {
+    NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+    EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, not_set_tracing_));
+  }
+
+  {
+    NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+    EXPECT_TRUE(ConnectionManagerUtility::shouldTraceRequest(request_info, set_tracing_all_));
+  }
+
+  {
+    NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+    Optional<Http::TracingConnectionManagerConfig> tracing_failure(
+        {"operation", Http::TracingType::UpstreamFailureReason});
+    EXPECT_CALL(request_info, failureReason())
+        .WillOnce(Return(Http::AccessLog::FailureReason::UpstreamConnectionFailure));
+    EXPECT_TRUE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
+
+    EXPECT_CALL(request_info, failureReason())
+        .WillOnce(Return(Http::AccessLog::FailureReason::None));
+    EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
+  }
+}
 
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
   const std::string not_local_host_remote_address = "12.12.12.12";
@@ -96,7 +121,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
   const std::string uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
-  ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(set_tracing_));
+  ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(set_tracing_all_));
 
   {
     // Internal request, make traceable
@@ -133,7 +158,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_remote_address));
   ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillByDefault(Return(true));
-  ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(set_tracing_));
+  ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(set_tracing_all_));
 
   {
     HeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
