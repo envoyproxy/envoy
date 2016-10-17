@@ -141,12 +141,13 @@ bool ConnectionManagerUtility::shouldTraceRequest(
   switch (config.value().tracing_type_) {
   case Http::TracingType::All:
     return true;
-  case Http::TracingType::UpstreamFailureReason:
+  case Http::TracingType::UpstreamFailure:
     return request_info.failureReason() != Http::AccessLog::FailureReason::None;
   }
 
-  // This should not happen as switch above covers all cases, this is just to make compiler happy.
-  throw EnvoyException("unknown tracing type");
+  // Compiler enforces switch above to cover all the cases and it's impossible to be here,
+  // but compiler complains on missing return statement, this is to make compiler happy.
+  NOT_IMPLEMENTED;
 }
 
 } // Http

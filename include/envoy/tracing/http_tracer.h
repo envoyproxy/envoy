@@ -6,6 +6,9 @@
 
 namespace Tracing {
 
+/*
+ * Context used by tracers, it carries additional data needed to populate the trace.
+ */
 class TracingContext {
 public:
   virtual ~TracingContext() {}

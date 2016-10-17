@@ -73,33 +73,10 @@ add_user_agent
 
 .. _config_http_conn_man_tracing:
 
-tracing
+:ref:`tracing <config_http_conn_man_tracing_format>`
   *(optional, object)* Presence of the object defines whether the connection manager
   emits :ref:`tracing <arch_overview_tracing>` data to the :ref:`configured tracing provider <config_tracing>`.
-  Tracing object is in the following format:
   
-  .. code-block:: json
-  
-    {
-      "tracing": {
-        "operation_name": "...",
-        "type": "..."
-      }
-    }
- 
-  operation_name
-    *(required, string)* Span name that will be emitted on completed request.
-  
-  type
-    *(optional, string)* Allows to filter requests so that only some of them are traced. Default value is *all*.
-    Possible values are:
-    
-    all
-      Trace all requests.
-
-    upstream_failure
-      Trace only requests for which upstream failure reason is defined. 
-
 .. _config_http_conn_man_http_codec_options:
 
 http_codec_options
@@ -159,6 +136,32 @@ generate_request_id
   :ref:`config_http_conn_man_headers_x-request-id` header if it does not exist. This defaults to
   *true*. Generating a random UUID4 is expensive so in high throughput scenarios where this
   feature is not desired it can be disabled.
+
+.. _config_http_conn_man_tracing_format:
+
+Tracing configuration
+^^^^^^^^^^^^^^^^^^^^^
+.. code-block:: json
+  
+  {
+    "tracing": {
+      "operation_name": "...",
+      "type": "..."
+    }
+  }
+ 
+operation_name
+  *(required, string)* Span name that will be emitted on completed request.
+  
+type
+  *(optional, string)* Allows to filter requests so that only some of them are traced. Default value is *all*.
+  Possible values are:
+    
+  all
+    Trace all requests.
+
+  upstream_failure
+    Trace only requests for which upstream failure reason is defined.
 
 .. toctree::
   :hidden:

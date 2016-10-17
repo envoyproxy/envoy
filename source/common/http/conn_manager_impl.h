@@ -80,7 +80,7 @@ enum class TracingType {
   // Trace all traceable requests.
   All,
   // Trace only when there is an upstream failure reason.
-  UpstreamFailureReason
+  UpstreamFailure
 };
 
 /**
