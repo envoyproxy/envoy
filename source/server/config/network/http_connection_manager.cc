@@ -202,21 +202,5 @@ HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type
 
 const std::string& HttpConnectionManagerConfig::localAddress() { return server_.getLocalAddress(); }
 
-bool HttpConnectionManagerConfig::shouldTraceRequest(
-    const Http::AccessLog::RequestInfo& request_info) {
-  if (!tracing_config_.valid()) {
-    return false;
-  }
-
-  switch (tracing_config_.value().tracing_type_) {
-  case Http::TracingType::All:
-    return true;
-  case Http::TracingType::UpstreamFailureReason:
-    return request_info.failureReason() != Http::AccessLog::FailureReason::None;
-  }
-
-  throw EnvoyException("unknown tracing type");
-}
-
 } // Configuration
 } // Server

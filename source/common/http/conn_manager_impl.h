@@ -176,11 +176,6 @@ public:
   virtual const Optional<std::string>& userAgent() PURE;
 
   /**
-   * @return true if tracing is enabled otherwise it returns false.
-   */
-  virtual bool shouldTraceRequest(const Http::AccessLog::RequestInfo& request_info) PURE;
-
-  /**
    * @return tracing config.
    */
   virtual const Optional<TracingConnectionManagerConfig>& tracingConfig() PURE;

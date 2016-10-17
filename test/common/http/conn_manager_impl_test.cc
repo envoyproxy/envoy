@@ -45,7 +45,7 @@ public:
                                         POOL_TIMER(fake_stats_))},
                "",
                fake_stats_} {
-    tracing_info_.value({"operation", Http::TracingType::All});
+    tracing_config_.value({"operation", Http::TracingType::All});
   }
 
   ~HttpConnectionManagerImplTest() {
@@ -79,9 +79,8 @@ public:
   bool useRemoteAddress() override { return use_remote_address_; }
   const std::string& localAddress() override { return local_address_; }
   const Optional<std::string>& userAgent() override { return user_agent_; }
-  bool shouldTraceRequest(const Http::AccessLog::RequestInfo&) override { return is_tracing_; }
   const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
-    return tracing_info_;
+    return tracing_config_;
   }
 
   NiceMock<Tracing::MockHttpTracer> tracer_;
@@ -106,8 +105,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
   NiceMock<Router::MockConfig> route_config_;
-  bool is_tracing_{true};
-  Optional<Http::TracingConnectionManagerConfig> tracing_info_;
+  Optional<Http::TracingConnectionManagerConfig> tracing_config_;
 };
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
@@ -244,7 +242,6 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
   setup(false, "envoy-server-test");
-  is_tracing_ = false;
   EXPECT_CALL(tracer_, trace(_, _, _, _)).Times(0);
 
   Http::MockStreamDecoderFilter* filter = new NiceMock<Http::MockStreamDecoderFilter>();

@@ -131,4 +131,22 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
   }
 }
 
+bool ConnectionManagerUtility::shouldTraceRequest(
+    const Http::AccessLog::RequestInfo& request_info,
+    const Optional<TracingConnectionManagerConfig>& config) {
+  if (!config.valid()) {
+    return false;
+  }
+
+  switch (config.value().tracing_type_) {
+  case Http::TracingType::All:
+    return true;
+  case Http::TracingType::UpstreamFailureReason:
+    return request_info.failureReason() != Http::AccessLog::FailureReason::None;
+  }
+
+  // This should not happen as switch above covers all cases, this is just to make compiler happy.
+  throw EnvoyException("unknown tracing type");
+}
+
 } // Http
