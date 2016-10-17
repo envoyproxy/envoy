@@ -90,16 +90,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     const std::string operation_name = config.getObject("tracing").getString("operation_name");
 
     std::string tracing_type = config.getObject("tracing").getString("type", "all");
-    Tracing::TracingType type;
+    Http::TracingType type;
     if (tracing_type == "all") {
-      type = Tracing::TracingType::All;
+      type = Http::TracingType::All;
     } else if (tracing_type == "upstream_failure") {
-      type = Tracing::TracingType::UpstreamFailureReason;
+      type = Http::TracingType::UpstreamFailureReason;
     } else {
       throw EnvoyException(fmt::format("unsupported tracing type '{}'", tracing_type));
     }
 
-    tracing_info_.value({operation_name, type});
+    tracing_config_.value({operation_name, type});
   }
 
   if (config.hasObject("idle_timeout_s")) {
@@ -204,14 +204,14 @@ const std::string& HttpConnectionManagerConfig::localAddress() { return server_.
 
 bool HttpConnectionManagerConfig::shouldTraceRequest(
     const Http::AccessLog::RequestInfo& request_info) {
-  if (!tracing_info_.valid()) {
+  if (!tracing_config_.valid()) {
     return false;
   }
 
-  switch (tracing_info_.value().tracing_type_) {
-  case Tracing::TracingType::All:
+  switch (tracing_config_.value().tracing_type_) {
+  case Http::TracingType::All:
     return true;
-  case Tracing::TracingType::UpstreamFailureReason:
+  case Http::TracingType::UpstreamFailureReason:
     return request_info.failureReason() != Http::AccessLog::FailureReason::None;
   }
 

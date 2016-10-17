@@ -56,7 +56,7 @@ public:
   const std::string& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
   bool shouldTraceRequest(const Http::AccessLog::RequestInfo&) override { return false; }
-  const Optional<Tracing::TracingConnectionManagerConfig>& tracingConfig() override {
+  const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
     return tracing_info_;
   }
 
@@ -102,7 +102,7 @@ private:
   std::list<UrlHandler> handlers_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   Optional<std::string> user_agent_;
-  Optional<Tracing::TracingConnectionManagerConfig> tracing_info_;
+  Optional<Http::TracingConnectionManagerConfig> tracing_info_;
 };
 
 /**

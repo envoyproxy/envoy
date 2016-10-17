@@ -17,7 +17,6 @@
 #include "common/common/linked_object.h"
 #include "common/common/utility.h"
 #include "common/http/access_log/request_info_impl.h"
-#include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
 
@@ -75,6 +74,23 @@ struct ConnectionManagerStats {
   ConnectionManagerNamedStats named_;
   std::string prefix_;
   Stats::Store& store_;
+};
+
+enum class TracingType {
+  // Trace all traceable requests.
+  All,
+  // Trace only when there is an upstream failure reason.
+  UpstreamFailureReason
+};
+
+/**
+ * Configuration for tracing which is set on the connection manager level.
+ * Http Tracing can be enabled/disabled on a per connection manager basis.
+ * Here we specify some specific for connection manager settings.
+ */
+struct TracingConnectionManagerConfig {
+  std::string operation_name_;
+  TracingType tracing_type_;
 };
 
 /**
@@ -167,7 +183,7 @@ public:
   /**
    * @return tracing config.
    */
-  virtual const Optional<Tracing::TracingConnectionManagerConfig>& tracingConfig() PURE;
+  virtual const Optional<TracingConnectionManagerConfig>& tracingConfig() PURE;
 };
 
 /**

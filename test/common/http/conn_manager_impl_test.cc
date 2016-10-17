@@ -45,7 +45,7 @@ public:
                                         POOL_TIMER(fake_stats_))},
                "",
                fake_stats_} {
-    tracing_info_.value({"operation", Tracing::TracingType::All});
+    tracing_info_.value({"operation", Http::TracingType::All});
   }
 
   ~HttpConnectionManagerImplTest() {
@@ -80,7 +80,7 @@ public:
   const std::string& localAddress() override { return local_address_; }
   const Optional<std::string>& userAgent() override { return user_agent_; }
   bool shouldTraceRequest(const Http::AccessLog::RequestInfo&) override { return is_tracing_; }
-  const Optional<Tracing::TracingConnectionManagerConfig>& tracingConfig() override {
+  const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
     return tracing_info_;
   }
 
@@ -107,7 +107,7 @@ public:
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
   NiceMock<Router::MockConfig> route_config_;
   bool is_tracing_{true};
-  Optional<Tracing::TracingConnectionManagerConfig> tracing_info_;
+  Optional<Http::TracingConnectionManagerConfig> tracing_info_;
 };
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {

@@ -19,18 +19,18 @@ class ConnectionManagerUtilityTest : public testing::Test {
 public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
-    ON_CALL(config_, tracingInfo()).WillByDefault(ReturnRef(not_set_tracing_));
+    ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(not_set_tracing_));
 
-    set_tracing_.value({"test", Tracing::TracingType::All});
+    set_tracing_.value({"test", Http::TracingType::All});
   }
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  NiceMock<Http::MockConnectionManagerConfig> config_;
+  NiceMock<MockConnectionManagerConfig> config_;
   Optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Optional<Tracing::TracingConnectionManagerConfig> not_set_tracing_;
-  Optional<Tracing::TracingConnectionManagerConfig> set_tracing_;
+  Optional<Http::TracingConnectionManagerConfig> not_set_tracing_;
+  Optional<Http::TracingConnectionManagerConfig> set_tracing_;
 };
 
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
@@ -96,7 +96,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
   const std::string uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
-  ON_CALL(config_, tracingInfo()).WillByDefault(ReturnRef(set_tracing_));
+  ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(set_tracing_));
 
   {
     // Internal request, make traceable
@@ -133,7 +133,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_remote_address));
   ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillByDefault(Return(true));
-  ON_CALL(config_, tracingInfo()).WillByDefault(ReturnRef(set_tracing_));
+  ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(set_tracing_));
 
   {
     HeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
