@@ -515,7 +515,10 @@ TEST_F(HttpConnectionManagerImplTest, DoubleBuffering) {
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* decoder = nullptr;
+
+  // The data will get moved so we need to have a copy to compare against.
   Buffer::OwnedImpl fake_data("hello");
+  Buffer::OwnedImpl fake_data_copy("hello");
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Invoke([&](Buffer::Instance&) -> void {
         decoder = &conn_manager_->newStream(encoder);
@@ -540,7 +543,7 @@ TEST_F(HttpConnectionManagerImplTest, DoubleBuffering) {
   // data to have been kept inline as it moves through.
   EXPECT_CALL(*decoder_filter3, decodeHeaders(_, false))
       .WillOnce(Return(Http::FilterHeadersStatus::StopIteration));
-  EXPECT_CALL(*decoder_filter3, decodeData(BufferEqual(&fake_data), true))
+  EXPECT_CALL(*decoder_filter3, decodeData(BufferEqual(&fake_data_copy), true))
       .WillOnce(Return(Http::FilterDataStatus::StopIterationNoBuffer));
   decoder_filter2->callbacks_->continueDecoding();
 }

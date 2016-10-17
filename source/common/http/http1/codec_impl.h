@@ -28,7 +28,7 @@ public:
 
   // Http::StreamEncoder
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
-  void encodeData(const Buffer::Instance& data, bool end_stream) override;
+  void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const HeaderMap& trailers) override;
   Stream& getStream() override { return *this; }
 

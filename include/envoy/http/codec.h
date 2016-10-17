@@ -25,10 +25,10 @@ public:
 
   /**
    * Encode a data frame.
-   * @param data supplies the data to encode.
+   * @param data supplies the data to encode. The data may be moved by the encoder.
    * @param end_stream supplies whether this is the last data frame.
    */
-  virtual void encodeData(const Buffer::Instance& data, bool end_stream) PURE;
+  virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
    * Encode trailers. This implicitly ends the stream.
@@ -62,7 +62,7 @@ public:
    * @param data supplies the decoded data.
    * @param end_stream supplies whether this is the last data frame.
    */
-  virtual void decodeData(const Buffer::Instance& data, bool end_stream) PURE;
+  virtual void decodeData(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
    * Called with a decoded trailers frame. This implicitly ends the stream.

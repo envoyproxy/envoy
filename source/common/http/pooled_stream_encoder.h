@@ -38,7 +38,7 @@ public:
                       PooledStreamEncoderCallbacks& callbacks);
 
   void encodeHeaders(const HeaderMap& headers, bool end_stream);
-  void encodeData(const Buffer::Instance& data, bool end_stream);
+  void encodeData(Buffer::Instance& data, bool end_stream);
   void encodeTrailers(const HeaderMap& trailers);
   void resetStream();
   uint64_t connectionId() { return connection_id_; }

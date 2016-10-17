@@ -42,11 +42,11 @@ void PooledStreamEncoder::encodeHeaders(const HeaderMap& headers, bool end_strea
   }
 }
 
-void PooledStreamEncoder::encodeData(const Buffer::Instance& data, bool end_stream) {
+void PooledStreamEncoder::encodeData(Buffer::Instance& data, bool end_stream) {
   commonEncodePrefix(end_stream);
   if (!request_encoder_) {
     stream_log_trace("buffering {} bytes", *this, data.length());
-    buffered_request_body_.add(data);
+    buffered_request_body_.move(data);
   } else {
     stream_log_trace("proxying {} bytes", *this, data.length());
     request_encoder_->encodeData(data, end_stream);

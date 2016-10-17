@@ -65,6 +65,19 @@ public:
   virtual void* linearize(uint32_t size) PURE;
 
   /**
+   * Move a buffer into this buffer. As little copying is done as possible.
+   * @param rhs supplies the buffer to move.
+   */
+  virtual void move(Instance& rhs) PURE;
+
+  /**
+   * Move a portion of a buffer into this buffer. As little copying is done as possible.
+   * @param rhs supplies the buffer to move.
+   * @param length supplies the amount of data to move.
+   */
+  virtual void move(Instance& rhs, uint64_t length) PURE;
+
+  /**
    * Search for an occurence of a buffer within the larger buffer.
    * @param data supplies the data to search for.
    * @param size supplies the length of the data to search for.

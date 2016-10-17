@@ -24,7 +24,7 @@ public:
 
   // Http::StreamDecoder
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
-  void decodeData(const Buffer::Instance& data, bool end_stream) override;
+  void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
 
   // Http::StreamCallbacks

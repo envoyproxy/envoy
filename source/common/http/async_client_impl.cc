@@ -70,10 +70,9 @@ void AsyncRequestImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   log_trace("async http request response data (length={} end_stream={})", data.length(),
             end_stream);
   if (!response_->body()) {
-    response_->body(Buffer::InstancePtr{new Buffer::OwnedImpl(data)});
-  } else {
-    response_->body()->add(data);
+    response_->body(Buffer::InstancePtr{new Buffer::OwnedImpl()});
   }
+  response_->body()->move(data);
 
   if (end_stream) {
     onComplete();

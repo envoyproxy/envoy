@@ -107,7 +107,7 @@ Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
 
   conn_log_trace("received {} bytes", read_callbacks_->connection(), data.length());
   upstream_connection_->write(data);
-  data.drain(data.length());
+  ASSERT(0 == data.length());
   return Network::FilterStatus::StopIteration;
 }
 
@@ -147,7 +147,7 @@ void TcpProxy::onUpstreamBufferChange(Network::ConnectionBufferType type, uint64
 
 void TcpProxy::onUpstreamData(Buffer::Instance& data) {
   read_callbacks_->connection().write(data);
-  data.drain(data.length());
+  ASSERT(0 == data.length());
 }
 
 void TcpProxy::onUpstreamEvent(uint32_t event) {

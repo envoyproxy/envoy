@@ -43,6 +43,23 @@ void* ImplBase::linearize(uint32_t size) {
   return evbuffer_pullup(&buffer(), size);
 }
 
+void ImplBase::move(Instance& rhs) {
+  // We do the static cast here because in practice we only have one buffer implementation right
+  // now and this is safe. Using the evbuffer move routines require having access to both evbuffers.
+  // This is a reasonable compromise in a high performance path where we want to maintain an
+  // abstraction in case we get rid of evbuffer later.
+  int rc = evbuffer_add_buffer(&buffer(), &static_cast<ImplBase&>(rhs).buffer());
+  ASSERT(rc == 0);
+  UNREFERENCED_PARAMETER(rc);
+}
+
+void ImplBase::move(Instance& rhs, uint64_t length) {
+  // See move() above for why we do the static cast.
+  int rc = evbuffer_remove_buffer(&static_cast<ImplBase&>(rhs).buffer(), &buffer(), length);
+  ASSERT(static_cast<uint64_t>(rc) == length);
+  UNREFERENCED_PARAMETER(rc);
+}
+
 ssize_t ImplBase::search(const void* data, uint64_t size, size_t start) const {
   evbuffer_ptr start_ptr;
   if (-1 == evbuffer_ptr_set(&buffer(), &start_ptr, start, EVBUFFER_PTR_SET)) {
