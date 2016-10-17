@@ -44,7 +44,8 @@ void DynamoFilter::onDecodeComplete(const Buffer::Instance& data) {
   std::string body = buildBody(decoder_callbacks_->decodingBuffer(), data);
   if (!body.empty()) {
     try {
-      table_descriptor_ = RequestParser::parseTable(operation_, body);
+      Json::StringLoader json_body(body);
+      table_descriptor_ = RequestParser::parseTable(operation_, json_body);
     } catch (const Json::Exception& jsonEx) {
       // Body parsing failed. This should not happen, just put a stat for that.
       stats_.counter(fmt::format("{}invalid_req_body", stat_prefix_)).inc();
@@ -53,21 +54,30 @@ void DynamoFilter::onDecodeComplete(const Buffer::Instance& data) {
 }
 
 void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
-  if (response_headers_) {
-    uint64_t status = Http::Utility::getResponseStatus(*response_headers_);
+  if (!response_headers_) {
+    return;
+  }
 
-    chargeBasicStats(status);
-    std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
-    chargeTablePartitionIdStats(body);
+  uint64_t status = Http::Utility::getResponseStatus(*response_headers_);
+  chargeBasicStats(status);
+  std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
+  if (!body.empty()) {
+    try {
+      Json::StringLoader json_body(body);
+      chargeTablePartitionIdStats(json_body);
 
-    if (Http::CodeUtility::is4xx(status)) {
-      chargeFailureSpecificStats(body);
-    }
-    // Batch Operations will always return status 200 for a partial or full success. Check
-    // unprocessed keys to determine partial success.
-    // http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Programming.Errors.html#Programming.Errors.BatchOperations
-    if (RequestParser::isBatchOperation(operation_)) {
-      chargeUnProcessedKeysStats(body);
+      if (Http::CodeUtility::is4xx(status)) {
+        chargeFailureSpecificStats(json_body);
+      }
+      // Batch Operations will always return status 200 for a partial or full success. Check
+      // unprocessed keys to determine partial success.
+      // http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Programming.Errors.html#Programming.Errors.BatchOperations
+      if (RequestParser::isBatchOperation(operation_)) {
+        chargeUnProcessedKeysStats(json_body);
+      }
+    } catch (const Json::Exception&) {
+      // Body parsing failed. This should not happen, just put a stat for that.
+      stats_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
     }
   }
 }
@@ -168,63 +178,42 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
                               latency);
 }
 
-void DynamoFilter::chargeUnProcessedKeysStats(const std::string& body) {
-  if (!body.empty()) {
-    try {
-      // The unprocessed keys block contains a list of tables and keys for that table that did not
-      // complete apart of the batch operation. Only the table names will be logged for errors.
-      std::vector<std::string> unprocessed_tables =
-          Dynamo::RequestParser::parseBatchUnProcessedKeys(body);
-      for (const std::string& unprocessed_table : unprocessed_tables) {
-        stats_.counter(fmt::format("{}error.{}.BatchFailureUnprocessedKeys", stat_prefix_,
-                                   unprocessed_table)).inc();
-      }
-    } catch (const Json::Exception&) {
-      // Body parsing failed. This should not happen, just put a stat for that.
-      stats_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
-    }
+void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
+  // The unprocessed keys block contains a list of tables and keys for that table that did not
+  // complete apart of the batch operation. Only the table names will be logged for errors.
+  std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(json_body);
+  for (const std::string& unprocessed_table : unprocessed_tables) {
+    stats_.counter(fmt::format("{}error.{}.BatchFailureUnprocessedKeys", stat_prefix_,
+                               unprocessed_table)).inc();
   }
 }
 
-void DynamoFilter::chargeFailureSpecificStats(const std::string& body) {
-  if (!body.empty()) {
-    try {
-      std::string error_type = RequestParser::parseErrorType(body);
+void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
+  std::string error_type = RequestParser::parseErrorType(json_body);
 
-      if (!error_type.empty()) {
-        if (table_descriptor_.table_name.empty()) {
-          stats_.counter(fmt::format("{}error.no_table.{}", stat_prefix_, error_type)).inc();
-        } else {
-          stats_.counter(fmt::format("{}error.{}.{}", stat_prefix_, table_descriptor_.table_name,
-                                     error_type)).inc();
-        }
-      }
-    } catch (const Json::Exception&) {
-      // Body parsing failed. This should not happen, just put a stat for that.
-      stats_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
+  if (!error_type.empty()) {
+    if (table_descriptor_.table_name.empty()) {
+      stats_.counter(fmt::format("{}error.no_table.{}", stat_prefix_, error_type)).inc();
+    } else {
+      stats_.counter(fmt::format("{}error.{}.{}", stat_prefix_, table_descriptor_.table_name,
+                                 error_type)).inc();
     }
   } else {
     stats_.counter(fmt::format("{}empty_response_body", stat_prefix_)).inc();
   }
 }
 
-void DynamoFilter::chargeTablePartitionIdStats(const std::string& body) {
+void DynamoFilter::chargeTablePartitionIdStats(const Json::Object& json_body) {
   if (table_descriptor_.table_name.empty() || operation_.empty()) {
     return;
   }
-  if (!body.empty()) {
-    try {
-      std::vector<RequestParser::PartitionDescriptor> partitions =
-          RequestParser::parsePartitions(body);
-      for (const RequestParser::PartitionDescriptor& partition : partitions) {
-        std::string stats_string = Utility::buildPartitionStatString(
-            stat_prefix_, table_descriptor_.table_name, operation_, partition.partition_id_);
-        stats_.counter(stats_string).add(partition.capacity_);
-      }
-    } catch (const Json::Exception&) {
-      // Body parsing failed. This should not happen, just put a stat for that.
-      stats_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
-    }
+
+  std::vector<RequestParser::PartitionDescriptor> partitions =
+      RequestParser::parsePartitions(json_body);
+  for (const RequestParser::PartitionDescriptor& partition : partitions) {
+    std::string stats_string = Utility::buildPartitionStatString(
+        stat_prefix_, table_descriptor_.table_name, operation_, partition.partition_id_);
+    stats_.counter(stats_string).add(partition.capacity_);
   }
 }
 

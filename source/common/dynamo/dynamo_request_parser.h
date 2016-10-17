@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/json/json_loader.h"
 #include "envoy/http/header_map.h"
 
 namespace Dynamo {
@@ -47,7 +48,7 @@ public:
    *
    * @throw Json::Exception if data is not in valid Json format.
    */
-  static TableDescriptor parseTable(const std::string& operation, const std::string& data);
+  static TableDescriptor parseTable(const std::string& operation, const Json::Object& json_data);
 
   /**
    * Parse error details which might be provided for a given response code.
@@ -59,14 +60,14 @@ public:
    *
    * @throw Json::Exception if data is not in valid Json format.
    */
-  static std::string parseErrorType(const std::string& data);
+  static std::string parseErrorType(const Json::Object& json_data);
 
   /**
    * Parse unprocessed keys for batch operation results.
    * @return empty set if there are no unprocessed keys or a set of table names that did not get
    * processed in the batch operation.
    */
-  static std::vector<std::string> parseBatchUnProcessedKeys(const std::string& data);
+  static std::vector<std::string> parseBatchUnProcessedKeys(const Json::Object& json_data);
 
   /**
    * @return true if the operation is in the set of supported BATCH_OPERATIONS
@@ -80,7 +81,7 @@ public:
    *
    * @throw Json::Exception if data is not in valid Json format.
    */
-  static std::vector<PartitionDescriptor> parsePartitions(const std::string& data);
+  static std::vector<PartitionDescriptor> parsePartitions(const Json::Object& json_data);
 
 private:
   static const Http::LowerCaseString X_AMZ_TARGET;

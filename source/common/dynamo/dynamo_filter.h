@@ -2,6 +2,7 @@
 
 #include "dynamo_request_parser.h"
 
+#include "common/json/json_loader.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -44,9 +45,9 @@ private:
   void chargeBasicStats(uint64_t status);
   void chargeStatsPerEntity(const std::string& entity, const std::string& entity_type,
                             uint64_t status);
-  void chargeFailureSpecificStats(const std::string& body);
-  void chargeUnProcessedKeysStats(const std::string& body);
-  void chargeTablePartitionIdStats(const std::string& body);
+  void chargeFailureSpecificStats(const Json::Object& json_body);
+  void chargeUnProcessedKeysStats(const Json::Object& json_body);
+  void chargeTablePartitionIdStats(const Json::Object& json_body);
 
   Runtime::Loader& runtime_;
   std::string stat_prefix_;
