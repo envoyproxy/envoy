@@ -3,6 +3,7 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
@@ -231,11 +232,11 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
                                const TracingContext& tracing_context) {
   lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
       tracing_context.operationName(),
-      {
-       lightstep::StartTimestamp(request_info.startTime()),
+      {lightstep::StartTimestamp(request_info.startTime()),
        lightstep::SetTag("join:x-request-id", request_headers.get(Http::Headers::get().RequestId)),
        lightstep::SetTag("request line", buildRequestLine(request_headers, request_info)),
        lightstep::SetTag("response code", buildResponseCode(request_info)),
+       lightstep::SetTag("host header", request_headers.get(Http::Headers::get().Host)),
        lightstep::SetTag(
            "downstream cluster",
            StringUtil::valueOrDefault(
@@ -243,12 +244,16 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag(
            "user agent",
            StringUtil::valueOrDefault(request_headers.get(Http::Headers::get().UserAgent), "-")),
-       lightstep::SetTag("node id", service_node_),
-      });
+       lightstep::SetTag("node id", service_node_)});
 
   if (request_info.responseCode().valid() &&
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {
     span.SetTag("error", "true");
+  }
+
+  if (request_info.failureReason() != Http::AccessLog::FailureReason::None) {
+    span.SetTag("failure reason",
+                Http::AccessLog::FilterReasonUtils::toShortString(request_info.failureReason()));
   }
 
   if (request_headers.has(Http::Headers::get().ClientTraceId)) {
