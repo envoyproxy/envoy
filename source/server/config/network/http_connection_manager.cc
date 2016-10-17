@@ -86,7 +86,21 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     user_agent_.value(server.options().serviceClusterName());
   }
 
-  is_tracing_ = config.getBoolean("tracing_enabled", false);
+  if (config.hasObject("tracing")) {
+    const std::string operation_name = config.getObject("tracing").getString("operation_name");
+
+    std::string tracing_type = config.getObject("tracing").getString("type", "all");
+    Tracing::TracingType type;
+    if (tracing_type == "all") {
+      type = Tracing::TracingType::All;
+    } else if (tracing_type == "upstream_failure") {
+      type = Tracing::TracingType::UpstreamFailureReason;
+    } else {
+      throw EnvoyException(fmt::format("unsupported tracing type '{}'", tracing_type));
+    }
+
+    tracing_info_.value({operation_name, type});
+  }
 
   if (config.hasObject("idle_timeout_s")) {
     idle_timeout_.value(std::chrono::seconds(config.getInteger("idle_timeout_s")));
@@ -187,6 +201,21 @@ HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type
 }
 
 const std::string& HttpConnectionManagerConfig::localAddress() { return server_.getLocalAddress(); }
+
+bool HttpConnectionManagerConfig::isTracing(const Http::AccessLog::RequestInfo& request_info) {
+  if (!tracing_info_.valid()) {
+    return false;
+  }
+
+  switch (tracing_info_.value().tracing_type_) {
+  case Tracing::TracingType::All:
+    return true;
+  case Tracing::TracingType::UpstreamFailureReason:
+    return request_info.failureReason() != Http::AccessLog::FailureReason::None;
+  }
+
+  throw EnvoyException("unknown tracing type");
+}
 
 } // Configuration
 } // Server

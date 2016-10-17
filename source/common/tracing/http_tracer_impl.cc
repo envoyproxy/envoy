@@ -12,6 +12,8 @@
 
 namespace Tracing {
 
+const std::string& TracingContextImpl::operationName() const { return operation_name_; }
+
 void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
   std::string x_request_id = request_headers.get(Http::Headers::get().RequestId);
 
@@ -72,7 +74,8 @@ void HttpTracerImpl::addSink(HttpSinkPtr&& sink) { sinks_.push_back(std::move(si
 
 void HttpTracerImpl::trace(const Http::HeaderMap* request_headers,
                            const Http::HeaderMap* response_headers,
-                           const Http::AccessLog::RequestInfo& request_info) {
+                           const Http::AccessLog::RequestInfo& request_info,
+                           const TracingContext& tracing_context) {
   static const Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;
@@ -90,7 +93,7 @@ void HttpTracerImpl::trace(const Http::HeaderMap* request_headers,
     stats_.doing_tracing_.inc();
 
     for (HttpSinkPtr& sink : sinks_) {
-      sink->flushTrace(*request_headers, *response_headers, request_info);
+      sink->flushTrace(*request_headers, *response_headers, request_info, tracing_context);
     }
   }
 }
@@ -226,9 +229,10 @@ std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo&
 }
 
 void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
-                               const Http::AccessLog::RequestInfo& request_info) {
+                               const Http::AccessLog::RequestInfo& request_info,
+                               const TracingContext& tracing_context) {
   lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
-      "full request",
+      tracing_context.operationName(),
       {
        lightstep::StartTimestamp(request_info.startTime()),
        lightstep::SetTag("join:x-request-id", request_headers.get(Http::Headers::get().RequestId)),

@@ -215,6 +215,7 @@ TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
   Http::HeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
   Http::HeaderMapImpl empty_header{};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  Tracing::TracingContextImpl context("operation");
 
   MockHttpSink* sink1 = new MockHttpSink();
   MockHttpSink* sink2 = new MockHttpSink();
@@ -225,36 +226,36 @@ TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
 
   // Force traced request.
   {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _));
-    EXPECT_CALL(*sink2, flushTrace(_, _, _));
-    tracer.trace(&forced_header, &empty_header, request_info);
+    EXPECT_CALL(*sink1, flushTrace(_, _, _, _));
+    EXPECT_CALL(*sink2, flushTrace(_, _, _, _));
+    tracer.trace(&forced_header, &empty_header, request_info, context);
   }
 
   // x-request-id is sample traced.
   {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _));
-    EXPECT_CALL(*sink2, flushTrace(_, _, _));
+    EXPECT_CALL(*sink1, flushTrace(_, _, _, _));
+    EXPECT_CALL(*sink2, flushTrace(_, _, _, _));
 
-    tracer.trace(&sampled_header, &empty_header, request_info);
+    tracer.trace(&sampled_header, &empty_header, request_info, context);
   }
 
   // HC request.
   {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _)).Times(0);
-    EXPECT_CALL(*sink2, flushTrace(_, _, _)).Times(0);
+    EXPECT_CALL(*sink1, flushTrace(_, _, _, _)).Times(0);
+    EXPECT_CALL(*sink2, flushTrace(_, _, _, _)).Times(0);
 
     Http::HeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
     NiceMock<Http::AccessLog::MockRequestInfo> request_info;
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(true));
-    tracer.trace(&traceable_header_hc, &empty_header, request_info);
+    tracer.trace(&traceable_header_hc, &empty_header, request_info, context);
   }
 
   // x-request-id is not traceable.
   {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _)).Times(0);
-    EXPECT_CALL(*sink2, flushTrace(_, _, _)).Times(0);
+    EXPECT_CALL(*sink1, flushTrace(_, _, _, _)).Times(0);
+    EXPECT_CALL(*sink2, flushTrace(_, _, _, _)).Times(0);
 
-    tracer.trace(&not_traceable_header, &empty_header, request_info);
+    tracer.trace(&not_traceable_header, &empty_header, request_info, context);
   }
 }
 
@@ -268,7 +269,8 @@ TEST(HttpTracerImplTest, ZeroSinksRunsFine) {
   Http::HeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
 
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  tracer.trace(&not_traceable, &not_traceable, request_info);
+  Tracing::TracingContextImpl context("operation");
+  tracer.trace(&not_traceable, &not_traceable, request_info, context);
 }
 
 TEST(HttpNullTracerTest, NoFailures) {
@@ -280,8 +282,9 @@ TEST(HttpNullTracerTest, NoFailures) {
 
   Http::HeaderMapImpl empty_header{};
   Http::AccessLog::MockRequestInfo request_info;
+  Tracing::TracingContextImpl context("operation");
 
-  tracer.trace(&empty_header, &empty_header, request_info);
+  tracer.trace(&empty_header, &empty_header, request_info, context);
 }
 
 class LightStepSinkTest : public Test {
@@ -387,6 +390,7 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
   setupValidSink();
 
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  Tracing::TracingContextImpl context("operation");
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
   const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
@@ -418,8 +422,8 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  sink_->flushTrace(empty_header_, response_headers_, request_info);
-  sink_->flushTrace(empty_header_, response_headers_, request_info);
+  sink_->flushTrace(empty_header_, response_headers_, request_info, context);
+  sink_->flushTrace(empty_header_, response_headers_, request_info, context);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
@@ -455,6 +459,7 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   setupValidSink();
 
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  Tracing::TracingContextImpl context("operation");
 
   const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout));
@@ -469,7 +474,7 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(5));
 
-  sink_->flushTrace(empty_header_, response_headers_, request_info);
+  sink_->flushTrace(empty_header_, response_headers_, request_info, context);
   // Timer should be re-enabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
@@ -486,6 +491,7 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
 TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
   setupValidSink();
 
+  Tracing::TracingContextImpl context("operation");
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
@@ -517,7 +523,7 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  sink_->flushTrace(empty_header_, response_headers_, request_info);
+  sink_->flushTrace(empty_header_, response_headers_, request_info, context);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));

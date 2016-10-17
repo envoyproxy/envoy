@@ -36,12 +36,23 @@ struct LightstepTracerStats {
   LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+class TracingContextImpl : public TracingContext {
+public:
+  TracingContextImpl(const std::string& operation_name) : operation_name_(operation_name) {}
+
+  // Tracing::TracingContext
+  const std::string& operationName() const override;
+
+private:
+  const std::string operation_name_;
+};
+
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
   void addSink(HttpSinkPtr&&) override {}
-  void trace(const Http::HeaderMap*, const Http::HeaderMap*,
-             const Http::AccessLog::RequestInfo&) override {}
+  void trace(const Http::HeaderMap*, const Http::HeaderMap*, const Http::AccessLog::RequestInfo&,
+             const TracingContext&) override {}
 };
 
 enum class Reason {
@@ -81,7 +92,8 @@ public:
   // Tracing::HttpTracer
   void addSink(HttpSinkPtr&& sink) override;
   void trace(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-             const Http::AccessLog::RequestInfo& request_info) override;
+             const Http::AccessLog::RequestInfo& request_info,
+             const TracingContext& tracing_context) override;
 
 private:
   void populateStats(const Decision& decision);
@@ -105,7 +117,8 @@ public:
 
   // Tracer::HttpSink
   void flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-                  const Http::AccessLog::RequestInfo& request_info) override;
+                  const Http::AccessLog::RequestInfo& request_info,
+                  const TracingContext& tracing_context) override;
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& collectorCluster() { return collector_cluster_; }

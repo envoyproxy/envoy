@@ -161,7 +161,12 @@ public:
   /**
    * @return true if tracing is enabled otherwise it returns false;
    */
-  virtual bool isTracing() PURE;
+  virtual bool isTracing(const Http::AccessLog::RequestInfo& request_info) PURE;
+
+  /**
+   * TODO: comment.
+   */
+  virtual const Optional<Tracing::TracingConnectionManagerConfig>& tracingInfo() PURE;
 };
 
 /**
@@ -319,7 +324,8 @@ private:
                         public Event::DeferredDeletable,
                         public StreamCallbacks,
                         public StreamDecoder,
-                        public FilterChainFactoryCallbacks {
+                        public FilterChainFactoryCallbacks,
+                        public Tracing::TracingContext {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
 
@@ -348,6 +354,9 @@ private:
     void addStreamDecoderFilter(StreamDecoderFilterPtr filter) override;
     void addStreamEncoderFilter(StreamEncoderFilterPtr filter) override;
     void addStreamFilter(StreamFilterPtr filter) override;
+
+    // Tracing::TracingContext
+    virtual const std::string& operationName() const override;
 
     static DateFormatter date_formatter_;
 
