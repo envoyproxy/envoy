@@ -2,10 +2,11 @@
 
 #include "dynamo_request_parser.h"
 
-#include "common/json/json_loader.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
+
+#include "common/json/json_loader.h"
 
 namespace Dynamo {
 

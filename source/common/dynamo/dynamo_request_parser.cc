@@ -97,6 +97,10 @@ std::vector<std::string> RequestParser::parseBatchUnProcessedKeys(const Json::Ob
 }
 std::string RequestParser::parseErrorType(const Json::Object& json_data) {
   std::string error_type = json_data.getString("__type", "");
+  if (error_type.empty()) {
+    return "";
+  }
+
   for (const std::string& supported_error_type : SUPPORTED_ERROR_TYPES) {
     if (StringUtil::endsWith(error_type, supported_error_type)) {
       return supported_error_type;

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "common/json/json_loader.h"
 #include "envoy/http/header_map.h"
+
+#include "common/json/json_loader.h"
 
 namespace Dynamo {
 
