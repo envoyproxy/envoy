@@ -94,7 +94,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     if (tracing_type == "all") {
       type = Http::TracingType::All;
     } else if (tracing_type == "upstream_failure") {
-      type = Http::TracingType::UpstreamFailureReason;
+      type = Http::TracingType::UpstreamFailure;
     } else {
       throw EnvoyException(fmt::format("unsupported tracing type '{}'", tracing_type));
     }
