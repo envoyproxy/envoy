@@ -11,7 +11,9 @@
     "config": {
       "codec_type": "auto",
       "http_codec_options": "no_compression",
-      "tracing_enabled": true,
+      "tracing": {
+        "operation_name": "ingress"
+      },
       "idle_timeout_s": 840,
       "access_log": [
       {
@@ -97,6 +99,10 @@
       "name": "http_connection_manager",
       "config": {
         "codec_type": "auto",
+        "tracing": {
+          "operation_name": "egress",
+          "type": "upstream_error"
+        }
         "add_user_agent": true,
         "idle_timeout_s": 840,
         "access_log": [
