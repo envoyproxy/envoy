@@ -244,7 +244,8 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag(
            "user agent",
            StringUtil::valueOrDefault(request_headers.get(Http::Headers::get().UserAgent), "-")),
-       lightstep::SetTag("node id", service_node_)});
+       lightstep::SetTag("node id", service_node_),
+       lightstep::SetTag("x-request-id", request_headers.get(Http::Headers::get().RequestId))});
 
   if (request_info.responseCode().valid() &&
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {
