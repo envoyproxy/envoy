@@ -27,7 +27,7 @@ public:
 int main(int argc, char** argv) {
   Event::Libevent::Global::initialize();
   Ssl::OpenSsl::initialize();
-  OptionsImpl options(argc, argv, Server::SharedMemory::version(), spdlog::level::notice);
+  OptionsImpl options(argc, argv, Server::SharedMemory::version(), spdlog::level::err);
 
   std::unique_ptr<Server::HotRestartImpl> restarter;
   try {
