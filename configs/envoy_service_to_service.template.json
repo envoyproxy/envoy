@@ -102,7 +102,7 @@
         "tracing": {
           "operation_name": "egress",
           "type": "upstream_error"
-        }
+        },
         "add_user_agent": true,
         "idle_timeout_s": 840,
         "access_log": [
