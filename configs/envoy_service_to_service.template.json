@@ -101,7 +101,7 @@
         "codec_type": "auto",
         "tracing": {
           "operation_name": "egress",
-          "type": "upstream_error"
+          "type": "upstream_failure"
         },
         "add_user_agent": true,
         "idle_timeout_s": 840,
