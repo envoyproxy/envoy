@@ -18,7 +18,9 @@
       "name": "http_connection_manager",
       "config": {
         "codec_type": "auto",
-        "tracing_enabled": true,
+        "tracing": {
+          "operation_name": "ingress"
+        },
         "idle_timeout_s": 840,
         "access_log": [
         {
