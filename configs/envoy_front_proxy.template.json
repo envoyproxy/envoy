@@ -27,7 +27,9 @@
       "config": {
         "codec_type": "auto",
         "add_user_agent": true,
-        "tracing_enabled": true,
+        "tracing": {
+          "operation_name": "ingress"
+        },
         "idle_timeout_s": 840,
         "access_log": [
         {
