@@ -92,12 +92,12 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
               server_.options().serviceNodeName(), server_.threadLocal(), server_.runtime(),
               std::move(opts))});
         } else {
-          throw EnvoyException(fmt::format("Unsupported sink type: '{}'", type));
+          throw EnvoyException(fmt::format("unsupported sink type: '{}'", type));
         }
       }
     }
   } else {
-    throw EnvoyException("Incorrect tracing configuration");
+    throw EnvoyException("incorrect tracing configuration");
   }
 }
 

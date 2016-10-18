@@ -86,7 +86,21 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     user_agent_.value(server.options().serviceClusterName());
   }
 
-  is_tracing_ = config.getBoolean("tracing_enabled", false);
+  if (config.hasObject("tracing")) {
+    const std::string operation_name = config.getObject("tracing").getString("operation_name");
+
+    std::string tracing_type = config.getObject("tracing").getString("type", "all");
+    Http::TracingType type;
+    if (tracing_type == "all") {
+      type = Http::TracingType::All;
+    } else if (tracing_type == "upstream_failure") {
+      type = Http::TracingType::UpstreamFailure;
+    } else {
+      throw EnvoyException(fmt::format("unsupported tracing type '{}'", tracing_type));
+    }
+
+    tracing_config_.value({operation_name, type});
+  }
 
   if (config.hasObject("idle_timeout_s")) {
     idle_timeout_.value(std::chrono::seconds(config.getInteger("idle_timeout_s")));

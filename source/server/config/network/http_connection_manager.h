@@ -70,7 +70,9 @@ public:
   const std::string& serverName() override { return server_name_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
-  bool isTracing() override { return is_tracing_; }
+  const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
+    return tracing_config_;
+  }
   const std::string& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
 
@@ -99,7 +101,7 @@ private:
   CodecType codec_type_;
   const uint64_t codec_options_;
   std::string server_name_;
-  bool is_tracing_;
+  Optional<Http::TracingConnectionManagerConfig> tracing_config_;
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   Router::ConfigPtr route_config_;

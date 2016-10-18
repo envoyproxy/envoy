@@ -104,7 +104,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     }
   }
 
-  if (config.isTracing()) {
+  if (config.tracingConfig().valid()) {
     Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
   }
 }
@@ -129,6 +129,25 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
     response_headers.replaceViaCopy(Headers::get().RequestId,
                                     request_headers.get(Headers::get().RequestId));
   }
+}
+
+bool ConnectionManagerUtility::shouldTraceRequest(
+    const Http::AccessLog::RequestInfo& request_info,
+    const Optional<TracingConnectionManagerConfig>& config) {
+  if (!config.valid()) {
+    return false;
+  }
+
+  switch (config.value().tracing_type_) {
+  case Http::TracingType::All:
+    return true;
+  case Http::TracingType::UpstreamFailure:
+    return request_info.failureReason() != Http::AccessLog::FailureReason::None;
+  }
+
+  // Compiler enforces switch above to cover all the cases and it's impossible to be here,
+  // but compiler complains on missing return statement, this is to make compiler happy.
+  NOT_IMPLEMENTED;
 }
 
 } // Http

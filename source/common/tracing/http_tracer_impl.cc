@@ -3,6 +3,7 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
@@ -72,7 +73,8 @@ void HttpTracerImpl::addSink(HttpSinkPtr&& sink) { sinks_.push_back(std::move(si
 
 void HttpTracerImpl::trace(const Http::HeaderMap* request_headers,
                            const Http::HeaderMap* response_headers,
-                           const Http::AccessLog::RequestInfo& request_info) {
+                           const Http::AccessLog::RequestInfo& request_info,
+                           const TracingContext& tracing_context) {
   static const Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
     request_headers = &empty_headers;
@@ -90,7 +92,7 @@ void HttpTracerImpl::trace(const Http::HeaderMap* request_headers,
     stats_.doing_tracing_.inc();
 
     for (HttpSinkPtr& sink : sinks_) {
-      sink->flushTrace(*request_headers, *response_headers, request_info);
+      sink->flushTrace(*request_headers, *response_headers, request_info, tracing_context);
     }
   }
 }
@@ -226,14 +228,15 @@ std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo&
 }
 
 void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
-                               const Http::AccessLog::RequestInfo& request_info) {
+                               const Http::AccessLog::RequestInfo& request_info,
+                               const TracingContext& tracing_context) {
   lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
-      "full request",
-      {
-       lightstep::StartTimestamp(request_info.startTime()),
+      tracing_context.operationName(),
+      {lightstep::StartTimestamp(request_info.startTime()),
        lightstep::SetTag("join:x-request-id", request_headers.get(Http::Headers::get().RequestId)),
        lightstep::SetTag("request line", buildRequestLine(request_headers, request_info)),
        lightstep::SetTag("response code", buildResponseCode(request_info)),
+       lightstep::SetTag("host header", request_headers.get(Http::Headers::get().Host)),
        lightstep::SetTag(
            "downstream cluster",
            StringUtil::valueOrDefault(
@@ -241,12 +244,16 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag(
            "user agent",
            StringUtil::valueOrDefault(request_headers.get(Http::Headers::get().UserAgent), "-")),
-       lightstep::SetTag("node id", service_node_),
-      });
+       lightstep::SetTag("node id", service_node_)});
 
   if (request_info.responseCode().valid() &&
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {
     span.SetTag("error", "true");
+  }
+
+  if (request_info.failureReason() != Http::AccessLog::FailureReason::None) {
+    span.SetTag("failure reason",
+                Http::AccessLog::FilterReasonUtils::toShortString(request_info.failureReason()));
   }
 
   if (request_headers.has(Http::Headers::get().ClientTraceId)) {

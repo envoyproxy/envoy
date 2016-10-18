@@ -19,6 +19,9 @@ public:
   static void mutateResponseHeaders(Http::HeaderMap& response_headers,
                                     const Http::HeaderMap& request_headers,
                                     ConnectionManagerConfig& config);
+
+  static bool shouldTraceRequest(const Http::AccessLog::RequestInfo& request_info,
+                                 const Optional<TracingConnectionManagerConfig>& config);
 };
 
 } // Http

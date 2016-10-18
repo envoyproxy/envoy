@@ -73,7 +73,7 @@ public:
   MOCK_METHOD0(useRemoteAddress, bool());
   MOCK_METHOD0(localAddress, const std::string&());
   MOCK_METHOD0(userAgent, const Optional<std::string>&());
-  MOCK_METHOD0(isTracing, bool());
+  MOCK_METHOD0(tracingConfig, const Optional<Http::TracingConnectionManagerConfig>&());
 
   testing::NiceMock<Router::MockConfig> route_config_;
 };
