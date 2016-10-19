@@ -214,7 +214,7 @@ public:
   void onEvent(uint32_t events) override;
 
 private:
-  class ActiveStream;
+  struct ActiveStream;
 
   /**
    * Base class wrapper for both stream encoder and decoder filters.
