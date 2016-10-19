@@ -135,9 +135,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     std::string string_name = filters[i].getString("name");
     Json::Object config = filters[i].getObject("config");
 
-    log().notice("    filter #{}", i);
-    log().notice("      type: {}", string_type);
-    log().notice("      name: {}", string_name);
+    log().info("    filter #{}", i);
+    log().info("      type: {}", string_type);
+    log().info("      name: {}", string_name);
 
     HttpFilterType type = stringToType(string_type);
     bool found_filter = false;

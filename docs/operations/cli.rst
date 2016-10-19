@@ -20,9 +20,10 @@ following are the command line options that Envoy supports.
   *(optional)* The number of :ref:`worker threads <arch_overview_threading>` to run. If not
   specified defaults to the number of hardware threads on the machine.
 
-.. option:: -l <integer>, --log-level <integer>
+.. option:: -l <string>, --log-level <string>
 
-  *(optional)* The logging level. Defaults to *NOTICE*. Non developers should never set this option.
+  *(optional)* The logging level. Non developers should generally never set this option. See the
+  help text for the available log levels and the default.
 
 .. option:: --restart-epoch <integer>
 

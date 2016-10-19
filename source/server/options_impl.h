@@ -14,7 +14,7 @@ public:
   uint64_t baseId() { return base_id_; }
   uint32_t concurrency() override { return concurrency_; }
   const std::string& configPath() override { return config_path_; }
-  uint64_t logLevel() override { return log_level_; }
+  spdlog::level::level_enum logLevel() override { return log_level_; }
   uint64_t restartEpoch() override { return restart_epoch_; }
   const std::string& serviceClusterName() override { return service_cluster_; }
   const std::string& serviceNodeName() override { return service_node_; }
@@ -25,7 +25,7 @@ private:
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
-  uint64_t log_level_;
+  spdlog::level::level_enum log_level_;
   uint64_t restart_epoch_;
   std::string service_cluster_;
   std::string service_node_;

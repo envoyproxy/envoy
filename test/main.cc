@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
   Ssl::OpenSsl::initialize();
   Event::Libevent::Global::initialize();
 
-  OptionsImpl options(argc, argv, "1", spdlog::level::warn);
+  OptionsImpl options(argc, argv, "1", spdlog::level::err);
   Thread::MutexBasicLockable lock;
   Logger::Registry::initialize(options.logLevel(), lock);
   BaseIntegrationTest::default_log_level_ =

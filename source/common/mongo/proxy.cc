@@ -201,7 +201,7 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
   try {
     decoder_->onData(buffer);
   } catch (EnvoyException& e) {
-    log().notice("mongo decoding error: {}", e.what());
+    log().info("mongo decoding error: {}", e.what());
     stats_.decoding_error_.inc();
     sniffing_ = false;
   }

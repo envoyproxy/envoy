@@ -49,7 +49,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   try {
     initialize(options, hooks, component_factory);
   } catch (const EnvoyException& e) {
-    log().emerg("error initializing configuration '{}': {}", options.configPath(), e.what());
+    log().critical("error initializing configuration '{}': {}", options.configPath(), e.what());
     exit(1);
   }
 }
@@ -59,7 +59,7 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() { return config_->clust
 Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_->httpTracer(); }
 
 void InstanceImpl::drainListeners() {
-  log().notice("closing and draining listeners");
+  log().warn("closing and draining listeners");
   for (const auto& worker : workers_) {
     Worker& worker_ref = *worker;
     worker->dispatcher().post([&worker_ref]() -> void { worker_ref.handler()->closeListeners(); });
@@ -125,12 +125,12 @@ bool InstanceImpl::healthCheckFailed() { return server_stats_.live_.value() == 0
 
 void InstanceImpl::initialize(Options& options, TestHooks& hooks,
                               ComponentFactory& component_factory) {
-  log().notice("initializing epoch {} (hot restart version={})", options.restartEpoch(),
-               restarter_.version());
+  log().warn("initializing epoch {} (hot restart version={})", options.restartEpoch(),
+             restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
   Configuration::InitialImpl initial_config(options.configPath());
-  log().notice("admin port: {}", initial_config.admin().port());
+  log().info("admin port: {}", initial_config.admin().port());
 
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
@@ -182,25 +182,25 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
   // Setup signals.
   sigterm_ = handler_.dispatcher().listenForSignal(SIGTERM, [this]() -> void {
-    log().notice("caught SIGTERM");
+    log().warn("caught SIGTERM");
     restarter_.terminateParent();
     handler_.dispatcher().exit();
   });
 
   sig_usr_1_ = handler_.dispatcher().listenForSignal(SIGUSR1, [this]() -> void {
-    log().notice("caught SIGUSR1");
+    log().warn("caught SIGUSR1");
     access_log_manager_.reopen();
   });
 
   sig_hup_ = handler_.dispatcher().listenForSignal(SIGHUP, [this]() -> void {
-    log().notice("caught and eating SIGHUP. See documentation for how to hot restart.");
+    log().warn("caught and eating SIGHUP. See documentation for how to hot restart.");
   });
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
   // if there are only static clusters this will fire immediately.
   clusterManager().setInitializedCb([this, &hooks]() -> void {
-    log().notice("all clusters initialized. starting workers");
+    log().warn("all clusters initialized. starting workers");
     for (const WorkerPtr& worker : workers_) {
       try {
         worker->initializeConfiguration(*config_, socket_map_);
@@ -209,7 +209,8 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
         // bind to it above. This happens when there is a race between two applications to listen
         // on the same port. In general if we can't initialize the worker configuration just print
         // the error and exit cleanly without crashing.
-        log().emerg("shutting down due to error initializing worker configuration: {}", e.what());
+        log().critical("shutting down due to error initializing worker configuration: {}",
+                       e.what());
         shutdown();
       }
     }
@@ -231,12 +232,12 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
   if (config.runtime()) {
-    log().notice("runtime symlink: {}", config.runtime()->symlinkRoot());
-    log().notice("runtime subdirectory: {}", config.runtime()->subdirectory());
+    log().info("runtime symlink: {}", config.runtime()->symlinkRoot());
+    log().info("runtime subdirectory: {}", config.runtime()->subdirectory());
 
     std::string override_subdirectory =
         config.runtime()->overrideSubdirectory() + "/" + server.options().serviceClusterName();
-    log().notice("runtime override subdirectory: {}", override_subdirectory);
+    log().info("runtime override subdirectory: {}", override_subdirectory);
 
     return Runtime::LoaderPtr{new Runtime::LoaderImpl(
         server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
@@ -248,13 +249,13 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
 
 void InstanceImpl::initializeStatSinks() {
   if (config_->statsdUdpPort().valid()) {
-    log().notice("statsd UDP port: {}", config_->statsdUdpPort().value());
+    log().info("statsd UDP port: {}", config_->statsdUdpPort().value());
     stat_sinks_.emplace_back(new Stats::Statsd::UdpStatsdSink(config_->statsdUdpPort().value()));
     stats_store_.addSink(*stat_sinks_.back());
   }
 
   if (config_->statsdTcpClusterName().valid()) {
-    log().notice("statsd TCP cluster: {}", config_->statsdTcpClusterName().value());
+    log().info("statsd TCP cluster: {}", config_->statsdTcpClusterName().value());
     stat_sinks_.emplace_back(new Stats::Statsd::TcpStatsdSink(
         options_.serviceClusterName(), options_.serviceNodeName(),
         config_->statsdTcpClusterName().value(), thread_local_, config_->clusterManager()));
@@ -267,9 +268,9 @@ void InstanceImpl::loadServerFlags(const Optional<std::string>& flags_path) {
     return;
   }
 
-  log().notice("server flags path: {}", flags_path.value());
+  log().info("server flags path: {}", flags_path.value());
   if (handler_.api().fileExists(flags_path.value() + "/drain")) {
-    log().notice("starting server in drain mode");
+    log().warn("starting server in drain mode");
     failHealthcheck(true);
   }
 }
@@ -287,10 +288,10 @@ uint64_t InstanceImpl::numConnections() {
 
 void InstanceImpl::run() {
   // Run the main dispatch loop waiting to exit.
-  log().notice("starting main dispatch loop");
+  log().warn("starting main dispatch loop");
   handler_.startWatchdog();
   handler_.dispatcher().run(Event::Dispatcher::RunType::Block);
-  log().notice("main dispatch loop exited");
+  log().warn("main dispatch loop exited");
 
   // Shutdown all the listeners now that the main dispatch loop is done.
   for (const WorkerPtr& worker : workers_) {
@@ -305,7 +306,7 @@ void InstanceImpl::run() {
   config_->clusterManager().shutdown();
   handler_.closeConnections();
   thread_local_.shutdownThread();
-  log().notice("exiting");
+  log().warn("exiting");
   log().flush();
 }
 
@@ -314,17 +315,17 @@ Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
 InstanceImpl::~InstanceImpl() {}
 
 void InstanceImpl::shutdown() {
-  log().notice("shutdown invoked. sending SIGTERM to self");
+  log().warn("shutdown invoked. sending SIGTERM to self");
   kill(getpid(), SIGTERM);
 }
 
 void InstanceImpl::shutdownAdmin() {
-  log().notice("shutting down admin due to child startup");
+  log().warn("shutting down admin due to child startup");
   stat_flush_timer_.reset();
   handler_.closeListeners();
   admin_->socket().close();
 
-  log().notice("terminating parent process");
+  log().warn("terminating parent process");
   restarter_.terminateParent();
 }
 
