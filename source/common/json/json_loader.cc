@@ -1,7 +1,10 @@
 #include "json_loader.h"
 
 // Do not let jansson leak outside of this file.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include "jansson.h"
+#pragma GCC diagnostic pop
 
 namespace Json {
 
