@@ -90,7 +90,6 @@ rm cotire-1.7.8.tar.gz
 wget https://github.com/gabime/spdlog/archive/v0.11.0.tar.gz
 tar xf v0.11.0.tar.gz
 rm v0.11.0.tar.gz
-mv spdlog-0.11.0 spdlog
 
 # http-parser
 wget -O http-parser-v2.7.0.tar.gz https://github.com/nodejs/http-parser/archive/v2.7.0.tar.gz
