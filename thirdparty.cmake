@@ -7,7 +7,7 @@
 set(ENVOY_COTIRE_MODULE_DIR "" CACHE FILEPATH "location of cotire cmake module")
 
 # https://github.com/gabime/spdlog
-# Has no releases. Last tested with 319a62
+# Last tested with 0.11.0
 set(ENVOY_SPDLOG_INCLUDE_DIR "" CACHE FILEPATH "location of spdlog includes")
 
 # https://github.com/nodejs/http-parser
@@ -15,7 +15,7 @@ set(ENVOY_SPDLOG_INCLUDE_DIR "" CACHE FILEPATH "location of spdlog includes")
 set(ENVOY_HTTP_PARSER_INCLUDE_DIR "" CACHE FILEPATH "location of http-parser includes")
 
 # https://github.com/nghttp2/nghttp2
-# Last tested with 1.14.0
+# Last tested with 1.14.1
 set(ENVOY_NGHTTP2_INCLUDE_DIR "" CACHE FILEPATH "location of nghttp2 includes")
 
 # http://libevent.org/
@@ -35,7 +35,7 @@ set(ENVOY_GPERFTOOLS_INCLUDE_DIR "" CACHE FILEPATH "location of gperftools inclu
 set(ENVOY_JANSSON_INCLUDE_DIR "" CACHE FILEPATH "location of jansson includes")
 
 # https://www.openssl.org/
-# Last tested with 1.0.2h
+# Last tested with 1.0.2i
 set(ENVOY_OPENSSL_INCLUDE_DIR "" CACHE FILEPATH "location of openssl includes")
 
 # https://github.com/google/protobuf
