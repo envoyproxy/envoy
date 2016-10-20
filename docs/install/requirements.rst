@@ -17,11 +17,12 @@ Envoy has the following requirements:
 * `jansson <https://github.com/akheron/jansson>`_ (last tesed with 2.7)
 * `openssl <https://www.openssl.org/>`_ (last tesed with 1.0.2i)
 * `protobuf <https://github.com/google/protobuf>`_ (last tested with 3.0.0)
+* `lightstep-tracer-cpp <https://github.com/lightstep/lightstep-tracer-cpp/>`_ (last tested with 0.16)
 
 In order to compile and run the tests the following is required:
 
-* `googletest <https://github.com/google/googletest>`_
+* `googletest <https://github.com/google/googletest>`_ (last tested with 1.8.0)
 
 In order to run code coverage the following is required:
 
-* `gcovr <http://gcovr.com/>`_
+* `gcovr <http://gcovr.com/>`_ (last tested with 3.3)
