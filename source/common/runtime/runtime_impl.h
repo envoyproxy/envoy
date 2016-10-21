@@ -8,7 +8,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
-#include "common/common/utility.h"
+#include "common/common/thread.h"
 
 #include <dirent.h>
 
@@ -30,7 +30,7 @@ private:
   static std::ranlux48& threadLocalGenerator() {
     std::chrono::nanoseconds now = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::system_clock::now().time_since_epoch());
-    static thread_local std::ranlux48 generator(now.count() ^ ThreadUtil::currentThreadId());
+    static thread_local std::ranlux48 generator(now.count() ^ Thread::Thread::currentThreadId());
 
     return generator;
   }

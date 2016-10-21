@@ -1,6 +1,8 @@
 #include "assert.h"
 #include "thread.h"
 
+#include <sys/syscall.h>
+
 namespace Thread {
 
 Thread::Thread(std::function<void()> thread_routine) : thread_routine_(thread_routine) {
@@ -11,6 +13,8 @@ Thread::Thread(std::function<void()> thread_routine) : thread_routine_(thread_ro
   RELEASE_ASSERT(rc == 0);
   UNREFERENCED_PARAMETER(rc);
 }
+
+int32_t Thread::currentThreadId() { return syscall(SYS_gettid); }
 
 void Thread::join() {
   int rc = pthread_join(thread_id_, nullptr);
