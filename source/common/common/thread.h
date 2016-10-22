@@ -13,6 +13,11 @@ public:
   Thread(std::function<void()> thread_routine);
 
   /**
+   * Get current thread id.
+   */
+  static int32_t currentThreadId();
+
+  /**
    * Join on thread exit.
    */
   void join();
@@ -47,7 +52,7 @@ private:
 };
 
 /**
- * Impementation of BasicLockable
+ * Implementation of BasicLockable
  */
 class MutexBasicLockable : public BasicLockable {
 public:

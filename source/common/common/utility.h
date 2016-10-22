@@ -2,8 +2,6 @@
 
 #include "envoy/common/time.h"
 
-#include <sys/syscall.h>
-
 /**
  * Utility class for formatting dates given a strftime style format string.
  */
@@ -100,12 +98,4 @@ public:
    */
   static const std::string& valueOrDefault(const std::string& input,
                                            const std::string& default_value);
-};
-
-/**
- * Utility class for thread specific operations.
- */
-class ThreadUtil {
-public:
-  static int32_t currentThreadId() { return syscall(SYS_gettid); }
 };
