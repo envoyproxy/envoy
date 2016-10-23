@@ -6,49 +6,36 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/common/enum_to_int.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
-
-#include "event2/buffer.h"
-#include "event2/bufferevent.h"
-#include "event2/event.h"
 
 namespace Network {
 
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
-const evbuffer_cb_func ConnectionImpl::read_buffer_cb_ =
-    [](evbuffer*, const evbuffer_cb_info* info, void* arg) -> void {
-      static_cast<ConnectionImpl*>(arg)->onBufferChange(ConnectionBufferType::Read, info);
-    };
 
-const evbuffer_cb_func ConnectionImpl::write_buffer_cb_ =
-    [](evbuffer*, const evbuffer_cb_info* info, void* arg) -> void {
-      static_cast<ConnectionImpl*>(arg)->onBufferChange(ConnectionBufferType::Write, info);
-    };
-
-ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher)
-    : ConnectionImpl(dispatcher,
-                     bufferevent_socket_new(&dispatcher.base(), -1,
-                                            BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS),
-                     "") {}
-
-ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher,
-                               Event::Libevent::BufferEventPtr&& bev,
+ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                const std::string& remote_address)
-    : dispatcher_(dispatcher), bev_(std::move(bev)), remote_address_(remote_address),
-      id_(++next_global_id_), filter_manager_(*this, *this),
-      redispatch_read_event_(dispatcher.createTimer([this]() -> void { onRead(); })),
-      read_buffer_(bufferevent_get_input(bev_.get())),
-      write_buffer_(bufferevent_get_output(bev_.get())) {
+    : filter_manager_(*this, *this), remote_address_(remote_address), dispatcher_(dispatcher),
+      fd_(fd), id_(++next_global_id_) {
 
-  enableCallbacks(true, false, true);
-  bufferevent_enable(bev_.get(), EV_READ | EV_WRITE);
+  file_event_ =
+      dispatcher_.createFileEvent(fd, [this](uint32_t events) -> void { onFileEvent(events); });
+  if (fd_ == -1) {
+    // Can't obtain a socket.
+    state_ |= InternalState::ImmediateConnectionError;
+    file_event_->activate(Event::FileReadyType::Write);
+  }
 
-  evbuffer_add_cb(bufferevent_get_input(bev_.get()), read_buffer_cb_, this);
-  evbuffer_add_cb(bufferevent_get_output(bev_.get()), write_buffer_cb_, this);
+  read_buffer_.setCallback([this](uint64_t old_size, int64_t delta) -> void {
+    onBufferChange(ConnectionBufferType::Read, old_size, delta);
+  });
+  write_buffer_.setCallback([this](uint64_t old_size, int64_t delta) -> void {
+    onBufferChange(ConnectionBufferType::Write, old_size, delta);
+  });
 }
 
-ConnectionImpl::~ConnectionImpl() { ASSERT(!bev_); }
+ConnectionImpl::~ConnectionImpl() { ASSERT(fd_ == -1); }
 
 void ConnectionImpl::addWriteFilter(WriteFilterPtr filter) {
   filter_manager_.addWriteFilter(filter);
@@ -59,50 +46,64 @@ void ConnectionImpl::addFilter(FilterPtr filter) { filter_manager_.addFilter(fil
 void ConnectionImpl::addReadFilter(ReadFilterPtr filter) { filter_manager_.addReadFilter(filter); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (!bev_) {
+  if (fd_ == -1) {
     return;
   }
 
-  uint64_t data_to_write = evbuffer_get_length(bufferevent_get_output(bev_.get()));
-  conn_log_debug("closing data_to_write={}", *this, data_to_write);
+  uint64_t data_to_write = write_buffer_.length();
+  conn_log_debug("closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush) {
-    closeNow();
+    if (data_to_write > 0) {
+      // We aren't going to wait to flush, but try to write as much as we can if there is pending
+      // data.
+      doWriteToSocket();
+    }
+
+    doLocalClose();
   } else {
     ASSERT(type == ConnectionCloseType::FlushWrite);
-    closing_with_flush_ = true;
-    enableCallbacks(false, true, true);
+    state_ |= InternalState::CloseWithFlush;
+    state_ &= ~InternalState::ReadEnabled;
   }
 }
 
 Connection::State ConnectionImpl::state() {
-  if (!bev_) {
+  if (fd_ == -1) {
     return State::Closed;
-  } else if (closing_with_flush_) {
+  } else if (state_ & InternalState::CloseWithFlush) {
     return State::Closing;
   } else {
     return State::Open;
   }
 }
 
-void ConnectionImpl::closeBev() {
-  ASSERT(bev_);
-  conn_log_debug("destroying bev", *this);
+void ConnectionImpl::closeSocket() {
+  ASSERT(fd_ != -1 || (state_ & InternalState::ImmediateConnectionError));
+  conn_log_debug("closing socket", *this);
 
   // Drain input and output buffers so that callbacks get fired. This does not happen automatically
   // as part of destruction.
-  fakeBufferDrain(ConnectionBufferType::Read, bufferevent_get_input(bev_.get()));
-  evbuffer_remove_cb(bufferevent_get_input(bev_.get()), read_buffer_cb_, this);
+  uint64_t current_read_buffer_length = read_buffer_.length();
+  read_buffer_.setCallback(nullptr);
+  if (current_read_buffer_length > 0) {
+    onBufferChange(ConnectionBufferType::Read, current_read_buffer_length,
+                   -current_read_buffer_length);
+  }
+  uint64_t current_write_buffer_length = write_buffer_.length();
+  write_buffer_.setCallback(nullptr);
+  if (current_write_buffer_length > 0) {
+    onBufferChange(ConnectionBufferType::Write, current_write_buffer_length,
+                   -current_write_buffer_length);
+  }
 
-  fakeBufferDrain(ConnectionBufferType::Write, bufferevent_get_output(bev_.get()));
-  evbuffer_remove_cb(bufferevent_get_output(bev_.get()), write_buffer_cb_, this);
-
-  bev_.reset();
-  redispatch_read_event_->disableTimer();
+  file_event_.reset();
+  ::close(fd_);
+  fd_ = -1;
 }
 
-void ConnectionImpl::closeNow() {
-  conn_log_debug("closing now", *this);
-  closeBev();
+void ConnectionImpl::doLocalClose() {
+  conn_log_debug("doing local close", *this);
+  closeSocket();
 
   // We expect our owner to deal with freeing us in whatever way makes sense. We raise an event
   // to kick that off.
@@ -111,44 +112,7 @@ void ConnectionImpl::closeNow() {
 
 Event::Dispatcher& ConnectionImpl::dispatcher() { return dispatcher_; }
 
-void ConnectionImpl::enableCallbacks(bool read, bool write, bool event) {
-  read_enabled_ = false;
-  bufferevent_data_cb read_cb = nullptr;
-  bufferevent_data_cb write_cb = nullptr;
-  bufferevent_event_cb event_cb = nullptr;
-
-  if (read) {
-    read_enabled_ = true;
-    read_cb = [](bufferevent*, void* ctx) -> void { static_cast<ConnectionImpl*>(ctx)->onRead(); };
-  }
-
-  if (write) {
-    write_cb =
-        [](bufferevent*, void* ctx) -> void { static_cast<ConnectionImpl*>(ctx)->onWrite(); };
-  }
-
-  if (event) {
-    event_cb = [](bufferevent*, short events, void* ctx)
-                   -> void { static_cast<ConnectionImpl*>(ctx)->onEvent(events); };
-  }
-
-  bufferevent_setcb(bev_.get(), read_cb, write_cb, event_cb, this);
-}
-
-void ConnectionImpl::fakeBufferDrain(ConnectionBufferType type, evbuffer* buffer) {
-  if (evbuffer_get_length(buffer) > 0) {
-    evbuffer_cb_info info;
-    info.n_added = 0;
-    info.n_deleted = evbuffer_get_length(buffer);
-    info.orig_size = evbuffer_get_length(buffer);
-
-    onBufferChange(type, &info);
-  }
-}
-
 void ConnectionImpl::noDelay(bool enable) {
-  int fd = bufferevent_getfd(bev_.get());
-
   // There are cases where a connection to localhost can immediately fail (e.g., if the other end
   // does not have enough fds, reaches a backlog limit, etc.). Because we run with deferred error
   // events, the calling code may not yet know that the connection has failed. This is one call
@@ -156,14 +120,14 @@ void ConnectionImpl::noDelay(bool enable) {
   // invalid. For this call instead of plumbing through logic that will immediately indicate that a
   // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
   // going to be raised shortly anyway and it makes the calling code simpler.
-  if (fd == -1) {
+  if (fd_ == -1) {
     return;
   }
 
   // Don't set NODELAY for unix domain sockets
   sockaddr addr;
   socklen_t len = sizeof(addr);
-  int rc = getsockname(fd, &addr, &len);
+  int rc = getsockname(fd_, &addr, &len);
   RELEASE_ASSERT(rc == 0);
 
   if (addr.sa_family == AF_UNIX) {
@@ -172,50 +136,29 @@ void ConnectionImpl::noDelay(bool enable) {
 
   // Set NODELAY
   int new_value = enable;
-  rc = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
+  rc = setsockopt(fd_, IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
   RELEASE_ASSERT(0 == rc);
   UNREFERENCED_PARAMETER(rc);
 }
 
 uint64_t ConnectionImpl::id() { return id_; }
 
-void ConnectionImpl::onBufferChange(ConnectionBufferType type, const evbuffer_cb_info* info) {
-  // We don't run callbacks deferred so we should only get deleted or added.
-  ASSERT(info->n_deleted ^ info->n_added);
+void ConnectionImpl::onBufferChange(ConnectionBufferType type, uint64_t old_size, int64_t delta) {
   for (ConnectionCallbacks* callbacks : callbacks_) {
-    callbacks->onBufferChange(type, info->orig_size, info->n_added - info->n_deleted);
+    callbacks->onBufferChange(type, old_size, delta);
   }
-}
-
-void ConnectionImpl::onEvent(short events) {
-  uint32_t normalized_events = 0;
-  if ((events & BEV_EVENT_EOF) || (events & BEV_EVENT_ERROR)) {
-    normalized_events |= ConnectionEvent::RemoteClose;
-    closeBev();
-  }
-
-  if (events & BEV_EVENT_CONNECTED) {
-    normalized_events |= ConnectionEvent::Connected;
-  }
-
-  ASSERT(normalized_events != 0);
-  conn_log_debug("event: {}", *this, normalized_events);
-  raiseEvents(normalized_events);
 }
 
 void ConnectionImpl::onRead() {
-  // Cancel the redispatch event in case we raced with a network event.
-  redispatch_read_event_->disableTimer();
+  if (!(state_ & InternalState::ReadEnabled)) {
+    return;
+  }
+
   if (read_buffer_.length() == 0) {
     return;
   }
 
   filter_manager_.onRead();
-}
-
-void ConnectionImpl::onWrite() {
-  conn_log_debug("write flush complete", *this);
-  closeNow();
 }
 
 void ConnectionImpl::readDisable(bool disable) {
@@ -231,11 +174,13 @@ void ConnectionImpl::readDisable(bool disable) {
   //       applies back pressure to bad HTTP/1.1 clients.
   if (disable) {
     ASSERT(read_enabled);
-    enableCallbacks(false, false, true);
+    state_ &= ~InternalState::ReadEnabled;
   } else {
     ASSERT(!read_enabled);
-    enableCallbacks(true, false, true);
-    redispatch_read_event_->enableTimer(std::chrono::milliseconds::zero());
+    state_ |= InternalState::ReadEnabled;
+    if (read_buffer_.length() > 0) {
+      file_event_->activate(Event::FileReadyType::Read);
+    }
   }
 }
 
@@ -245,7 +190,7 @@ void ConnectionImpl::raiseEvents(uint32_t events) {
   }
 }
 
-bool ConnectionImpl::readEnabled() { return read_enabled_; }
+bool ConnectionImpl::readEnabled() { return state_ & InternalState::ReadEnabled; }
 
 void ConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) { callbacks_.push_back(&cb); }
 
@@ -264,47 +209,172 @@ void ConnectionImpl::write(Buffer::Instance& data) {
   if (data.length() > 0) {
     conn_log_trace("writing {} bytes", *this, data.length());
     write_buffer_.move(data);
+    if (!(state_ & InternalState::Connecting)) {
+      file_event_->activate(Event::FileReadyType::Write);
+    }
   }
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
-                                           Event::Libevent::BufferEventPtr&& bev,
+void ConnectionImpl::onFileEvent(uint32_t events) {
+  conn_log_trace("socket event: {}", *this, events);
+
+  if (state_ & InternalState::ImmediateConnectionError) {
+    conn_log_debug("raising immediate connect error", *this);
+    closeSocket();
+    raiseEvents(ConnectionEvent::RemoteClose);
+    return;
+  }
+
+  // Read may become ready if there is an error connecting. If still connecting, skip straight
+  // to write ready which is where the connection logic is.
+  if (!(state_ & InternalState::Connecting) && (events & Event::FileReadyType::Read)) {
+    onReadReady();
+  }
+
+  // Possible for a read event close the socket.
+  if (fd_ != -1 && (events & Event::FileReadyType::Write)) {
+    onWriteReady();
+  }
+}
+
+ConnectionImpl::PostIoAction ConnectionImpl::doReadFromSocket() {
+  do {
+    int rc = read_buffer_.read(fd_, 16384);
+    conn_log_trace("read returns: {}", *this, rc);
+
+    // Remote close. Might need to raise data before raising close.
+    if (rc == 0) {
+      return PostIoAction::Close;
+    }
+
+    // Remote error (might be no data).
+    if (rc == -1) {
+      conn_log_trace("read error: {}", *this, errno);
+      if (errno == EAGAIN) {
+        return PostIoAction::KeepOpen;
+      } else {
+        return PostIoAction::Close;
+      }
+    }
+  } while (true);
+}
+
+void ConnectionImpl::onReadReady() {
+  ASSERT(!(state_ & InternalState::Connecting));
+
+  PostIoAction action = doReadFromSocket();
+  onRead();
+
+  // The read callback may have already closed the connection.
+  if (fd_ != -1 && action == PostIoAction::Close) {
+    conn_log_debug("remote close", *this);
+    closeSocket();
+    raiseEvents(ConnectionEvent::RemoteClose);
+  }
+}
+
+ConnectionImpl::PostIoAction ConnectionImpl::doWriteToSocket() {
+  do {
+    if (write_buffer_.length() == 0) {
+      return PostIoAction::KeepOpen;
+    }
+
+    int rc = write_buffer_.write(fd_);
+    conn_log_trace("write returns: {}", *this, rc);
+    if (rc == -1) {
+      conn_log_trace("write error: {}", *this, errno);
+      if (errno == EAGAIN) {
+        return PostIoAction::KeepOpen;
+      } else {
+        return PostIoAction::Close;
+      }
+    }
+  } while (true);
+}
+
+void ConnectionImpl::onConnected() { raiseEvents(ConnectionEvent::Connected); }
+
+void ConnectionImpl::onWriteReady() {
+  conn_log_trace("write ready", *this);
+
+  if (state_ & InternalState::Connecting) {
+    int error;
+    socklen_t error_size = sizeof(error);
+    int rc = getsockopt(fd_, SOL_SOCKET, SO_ERROR, &error, &error_size);
+    ASSERT(0 == rc);
+    UNREFERENCED_PARAMETER(rc);
+
+    if (error == 0) {
+      conn_log_debug("connected", *this);
+      state_ &= ~InternalState::Connecting;
+      onConnected();
+    } else {
+      conn_log_debug("delayed connection error: {}", *this, error);
+      closeSocket();
+      raiseEvents(ConnectionEvent::RemoteClose);
+      return;
+    }
+  }
+
+  if (doWriteToSocket() == PostIoAction::Close) {
+    closeSocket();
+    raiseEvents(ConnectionEvent::RemoteClose);
+  } else if ((state_ & InternalState::CloseWithFlush) && write_buffer_.length() == 0) {
+    conn_log_debug("write flush complete", *this);
+    doLocalClose();
+  }
+}
+
+void ConnectionImpl::doConnect(const sockaddr* addr, socklen_t addrlen) {
+  int rc = ::connect(fd_, addr, addrlen);
+  if (rc == 0) {
+    // write will become ready.
+    state_ |= InternalState::Connecting;
+  } else {
+    ASSERT(rc == -1);
+    if (errno == EINPROGRESS) {
+      state_ |= InternalState::Connecting;
+      conn_log_debug("connection in progress", *this);
+    } else {
+      // read/write will become ready.
+      state_ |= InternalState::ImmediateConnectionError;
+      conn_log_debug("immediate connection error: {}", *this, errno);
+    }
+  }
+}
+
+ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                            const std::string& url)
-    : ConnectionImpl(dispatcher, std::move(bev), url) {}
+    : ConnectionImpl(dispatcher, fd, url) {}
 
 Network::ClientConnectionPtr ClientConnectionImpl::create(Event::DispatcherImpl& dispatcher,
-                                                          Event::Libevent::BufferEventPtr&& bev,
                                                           const std::string& url) {
   if (url.find(Network::Utility::TCP_SCHEME) == 0) {
-    return Network::ClientConnectionPtr{
-        new Network::TcpClientConnectionImpl(dispatcher, std::move(bev), url)};
+    return Network::ClientConnectionPtr{new Network::TcpClientConnectionImpl(dispatcher, url)};
   } else if (url.find(Network::Utility::UNIX_SCHEME) == 0) {
-    return Network::ClientConnectionPtr{
-        new Network::UdsClientConnectionImpl(dispatcher, std::move(bev), url)};
+    return Network::ClientConnectionPtr{new Network::UdsClientConnectionImpl(dispatcher, url)};
   } else {
     throw EnvoyException(fmt::format("malformed url: {}", url));
   }
 }
 
 TcpClientConnectionImpl::TcpClientConnectionImpl(Event::DispatcherImpl& dispatcher,
-                                                 Event::Libevent::BufferEventPtr&& bev,
                                                  const std::string& url)
-    : ClientConnectionImpl(dispatcher, std::move(bev), url) {}
+    : ClientConnectionImpl(dispatcher, socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), url) {}
 
 void TcpClientConnectionImpl::connect() {
   AddrInfoPtr addr_info = Utility::resolveTCP(Utility::hostFromUrl(remote_address_),
                                               Utility::portFromUrl(remote_address_));
-  bufferevent_socket_connect(bev_.get(), addr_info->ai_addr, addr_info->ai_addrlen);
+  doConnect(addr_info->ai_addr, addr_info->ai_addrlen);
 }
 
 UdsClientConnectionImpl::UdsClientConnectionImpl(Event::DispatcherImpl& dispatcher,
-                                                 Event::Libevent::BufferEventPtr&& bev,
                                                  const std::string& url)
-    : ClientConnectionImpl(dispatcher, std::move(bev), url) {}
+    : ClientConnectionImpl(dispatcher, socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0), url) {}
 
 void UdsClientConnectionImpl::connect() {
   sockaddr_un addr = Utility::resolveUnixDomainSocket(Utility::pathFromUrl(remote_address_));
-  bufferevent_socket_connect(bev_.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(sockaddr_un));
+  doConnect(reinterpret_cast<sockaddr*>(&addr), sizeof(sockaddr_un));
 }
 
 } // Network

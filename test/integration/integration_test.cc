@@ -133,6 +133,12 @@ TEST_F(IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
                                        Http::CodecClient::Type::HTTP1, 1024, 512);
 }
 
+TEST_F(IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
+  testRouterRequestAndResponseWithBody(makeClientConnection(IntegrationTest::HTTP_BUFFER_PORT),
+                                       Http::CodecClient::Type::HTTP1, 4 * 1024 * 1024,
+                                       4 * 1024 * 1024);
+}
+
 void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
     Network::ClientConnectionPtr&& conn, Http::CodecClient::Type type) {
 

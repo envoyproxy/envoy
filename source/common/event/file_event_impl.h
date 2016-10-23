@@ -12,11 +12,13 @@ namespace Event {
  */
 class FileEventImpl : public FileEvent, ImplBase {
 public:
-  FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb read_cb, FileReadyCb write_cb);
+  FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb);
+
+  // Event::FileEvent
+  void activate(uint32_t events) override;
 
 private:
-  FileReadyCb read_cb_;
-  FileReadyCb write_cb_;
+  FileReadyCb cb_;
 };
 
 } // Event

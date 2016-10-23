@@ -9,7 +9,6 @@
 #include "common/network/connection_impl.h"
 #include "common/ssl/connection_impl.h"
 
-#include "event2/bufferevent_ssl.h"
 #include "event2/listener.h"
 
 namespace Network {
@@ -30,6 +29,7 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& sock
 }
 
 void ListenerImpl::newConnection(int fd, sockaddr* addr) {
+  evutil_make_socket_nonblocking(fd);
   if (use_proxy_proto_) {
     proxy_protocol_.newConnection(dispatcher_, fd, *this);
   } else {
@@ -38,9 +38,7 @@ void ListenerImpl::newConnection(int fd, sockaddr* addr) {
 }
 
 void ListenerImpl::newConnection(int fd, const std::string& remote_address) {
-  Event::Libevent::BufferEventPtr bev{bufferevent_socket_new(
-      &dispatcher_.base(), fd, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS)};
-  ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, std::move(bev), remote_address));
+  ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, fd, remote_address));
   cb_.onNewConnection(std::move(new_connection));
 }
 
@@ -53,15 +51,8 @@ void SslListenerImpl::newConnection(int fd, sockaddr* addr) {
 }
 
 void SslListenerImpl::newConnection(int fd, const std::string& remote_address) {
-  // The dynamic_cast is necessary here in order to avoid exposing the SSL_CTX directly from
-  // Ssl::Context.
-  Ssl::ContextImpl* ctx = dynamic_cast<Ssl::ContextImpl*>(&ssl_ctx_);
-
-  Event::Libevent::BufferEventPtr bev{bufferevent_openssl_socket_new(
-      &dispatcher_.base(), fd, ctx->newSsl(), BUFFEREVENT_SSL_ACCEPTING,
-      BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS)};
-  ConnectionPtr new_connection(
-      new Ssl::ConnectionImpl(dispatcher_, std::move(bev), remote_address, *ctx));
+  ConnectionPtr new_connection(new Ssl::ConnectionImpl(dispatcher_, fd, remote_address, ssl_ctx_,
+                                                       Ssl::ConnectionImpl::InitialState::Server));
   cb_.onNewConnection(std::move(new_connection));
 }
 

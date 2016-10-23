@@ -186,6 +186,7 @@ void IntegrationTcpClient::write(const std::string& data) {
 
 Network::FilterStatus IntegrationTcpClient::ConnectionCallbacks::onData(Buffer::Instance& data) {
   parent_.data_.append(TestUtility::bufferToString(data));
+  data.drain(data.length());
   if (!parent_.data_to_wait_for_.empty() && parent_.data_.find(parent_.data_to_wait_for_) == 0) {
     parent_.data_to_wait_for_.clear();
     parent_.connection_->dispatcher().exit();

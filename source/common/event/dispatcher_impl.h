@@ -28,7 +28,7 @@ public:
   Network::ClientConnectionPtr createSslClientConnection(Ssl::ClientContext& ssl_ctx,
                                                          const std::string& url) override;
   Network::DnsResolverPtr createDnsResolver() override;
-  FileEventPtr createFileEvent(int fd, FileReadyCb read_cb, FileReadyCb write_cb) override;
+  FileEventPtr createFileEvent(int fd, FileReadyCb cb) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
                                       Stats::Store& stats_store, bool use_proxy_proto) override;

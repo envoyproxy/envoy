@@ -20,12 +20,16 @@ TEST(FileEventImplTest, All) {
   int data = 1;
   rc = write(fds[1], &data, sizeof(data));
   ASSERT_EQ(sizeof(data), static_cast<size_t>(rc));
-  Event::FileEventPtr file_event =
-      dispatcher.createFileEvent(fds[0], [&]() -> void { read_event.ready(); },
-                                 [&]() -> void {
-                                   write_event.ready();
-                                   dispatcher.exit();
-                                 });
+  Event::FileEventPtr file_event = dispatcher.createFileEvent(fds[0], [&](uint32_t events) -> void {
+    if (events & FileReadyType::Read) {
+      read_event.ready();
+    }
+
+    if (events & FileReadyType::Write) {
+      write_event.ready();
+      dispatcher.exit();
+    }
+  });
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
   close(fds[0]);

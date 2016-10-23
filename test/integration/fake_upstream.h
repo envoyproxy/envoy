@@ -62,6 +62,7 @@ typedef std::unique_ptr<FakeStream> FakeStreamPtr;
 class FakeConnectionBase : public Network::ConnectionCallbacks {
 public:
   void close();
+  void readDisable(bool disable);
   void waitForDisconnect();
 
   // Network::ConnectionCallbacks

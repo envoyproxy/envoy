@@ -57,6 +57,7 @@ private:
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data) override {
       data_callback_(*parent_.client_, data);
+      data.drain(data.length());
       return Network::FilterStatus::StopIteration;
     }
 

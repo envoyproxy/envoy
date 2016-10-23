@@ -62,6 +62,13 @@ void SslIntegrationTest::checkStats() {
   counter.reset();
 }
 
+TEST_F(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
+  testRouterRequestAndResponseWithBody(makeSslClientConnection(false),
+                                       Http::CodecClient::Type::HTTP1, 16 * 1024 * 1024,
+                                       16 * 1024 * 1024);
+  checkStats();
+}
+
 TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(makeSslClientConnection(false),
                                        Http::CodecClient::Type::HTTP1, 1024, 512);
