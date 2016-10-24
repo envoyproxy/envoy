@@ -130,7 +130,7 @@ public:
 
   /**
    * @return hosts per zone, index 0 is dedicated to local zone hosts.
-   * If there is no hosts in local zone for upstream cluster hostPerZone() will @return
+   * If there are no hosts in local zone for upstream cluster hostPerZone() will @return
    * empty vector.
    *
    * Note, that we sort zones in alphabetical order starting from index 1.
