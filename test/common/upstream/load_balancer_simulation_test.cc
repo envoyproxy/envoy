@@ -55,7 +55,6 @@ public:
       std::vector<std::vector<HostPtr>> per_zone_upstream;
       per_zone_upstream.push_back(per_zone_hosts[from_zone]);
       for (size_t pos = 0; pos < per_zone_hosts.size(); ++pos) {
-        // make compiler happy for now.
         if (pos == from_zone) {
           continue;
         }

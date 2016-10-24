@@ -132,7 +132,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
               ContainerEq(hostListToURLs(cluster.hosts())));
 
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  // check for local zone hosts also.
+  EXPECT_EQ(0UL, cluster.hostsPerZone().size());
   EXPECT_EQ(0UL, cluster.healthyHostsPerZone().size());
 
   for (const HostPtr& host : cluster.hosts()) {
@@ -255,7 +255,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
   EXPECT_THAT(std::list<std::string>({"tcp://10.0.0.1:11001", "tcp://10.0.0.2:11002"}),
               ContainerEq(hostListToURLs(cluster.hosts())));
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  // check for local zone hosts number.
+  EXPECT_EQ(0UL, cluster.hostsPerZone().size());
   EXPECT_EQ(0UL, cluster.healthyHostsPerZone().size());
 }
 
