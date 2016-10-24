@@ -39,12 +39,9 @@ public:
    */
   void run(std::vector<uint32_t> originating_cluster, std::vector<uint32_t> all_destination_cluster,
            std::vector<uint32_t> healthy_destination_cluster) {
-    stats_.upstream_zone_count_.set(all_destination_cluster.size());
 
-    std::unordered_map<std::string, std::vector<HostPtr>> healthy_map =
+    std::vector<std::vector<HostPtr>> per_zone_hosts =
         generateHostsPerZone(healthy_destination_cluster);
-    std::unordered_map<std::string, std::vector<HostPtr>> all_map =
-        generateHostsPerZone(all_destination_cluster);
 
     std::vector<HostPtr> originating_hosts = generateHostList(originating_cluster);
     cluster_.healthy_hosts_ = generateHostList(healthy_destination_cluster);
@@ -53,9 +50,19 @@ public:
     std::map<std::string, uint32_t> hits;
     for (uint32_t i = 0; i < total_number_of_requests; ++i) {
       HostPtr from_host = selectOriginatingHost(originating_hosts);
+      uint32_t from_zone = atoi(from_host->zone().c_str());
 
-      cluster_.local_zone_hosts_ = all_map[from_host->zone()];
-      cluster_.local_zone_healthy_hosts_ = healthy_map[from_host->zone()];
+      std::vector<std::vector<HostPtr>> per_zone_upstream;
+      per_zone_upstream.push_back(per_zone_hosts[from_zone]);
+      for (size_t pos = 0; pos < per_zone_hosts.size(); ++pos) {
+        if (pos == from_zone) {
+          continue;
+        }
+
+        per_zone_upstream.push_back(per_zone_hosts[pos]);
+      }
+
+      cluster_.healthy_hosts_per_zone_ = std::move(per_zone_upstream);
 
       ConstHostPtr selected = lb_.chooseHost();
       hits[selected->url()]++;
@@ -93,9 +100,8 @@ public:
    * Generate hosts by zone.
    * @param hosts number of hosts per zone.
    */
-  std::unordered_map<std::string, std::vector<HostPtr>>
-  generateHostsPerZone(const std::vector<uint32_t>& hosts) {
-    std::unordered_map<std::string, std::vector<HostPtr>> ret;
+  std::vector<std::vector<HostPtr>> generateHostsPerZone(const std::vector<uint32_t>& hosts) {
+    std::vector<std::vector<HostPtr>> ret;
     for (size_t i = 0; i < hosts.size(); ++i) {
       const std::string zone = std::to_string(i);
       std::vector<HostPtr> zone_hosts;
@@ -105,7 +111,7 @@ public:
         zone_hosts.push_back(newTestHost(cluster_, url, 1, zone));
       }
 
-      ret.insert({zone, std::move(zone_hosts)});
+      ret.push_back(std::move(zone_hosts));
     }
 
     return ret;

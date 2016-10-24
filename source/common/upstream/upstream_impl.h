@@ -101,6 +101,8 @@ private:
 
 typedef std::shared_ptr<std::vector<HostPtr>> HostVectorPtr;
 typedef std::shared_ptr<const std::vector<HostPtr>> ConstHostVectorPtr;
+typedef std::shared_ptr<std::vector<std::vector<HostPtr>>> HostListsPtr;
+typedef std::shared_ptr<const std::vector<std::vector<HostPtr>>> ConstHostListsPtr;
 
 /**
  * Base clase for all clusters as well as thread local host sets.
@@ -111,25 +113,27 @@ public:
 
   ConstHostVectorPtr rawHosts() const { return hosts_; }
   ConstHostVectorPtr rawHealthyHosts() const { return healthy_hosts_; }
-  ConstHostVectorPtr rawLocalZoneHosts() const { return local_zone_hosts_; }
-  ConstHostVectorPtr rawLocalZoneHealthyHosts() const { return local_zone_healthy_hosts_; }
+  ConstHostListsPtr rawHostsPerZone() const { return hosts_per_zone_; }
+  ConstHostListsPtr rawHealthyHostsPerZone() const { return healthy_hosts_per_zone_; }
   void updateHosts(ConstHostVectorPtr hosts, ConstHostVectorPtr healthy_hosts,
-                   ConstHostVectorPtr local_zone_hosts, ConstHostVectorPtr local_zone_healthy_hosts,
+                   ConstHostListsPtr hosts_per_zone, ConstHostListsPtr healthy_hosts_per_zone,
                    const std::vector<HostPtr>& hosts_added,
                    const std::vector<HostPtr>& hosts_removed) {
     hosts_ = hosts;
     healthy_hosts_ = healthy_hosts;
-    local_zone_hosts_ = local_zone_hosts;
-    local_zone_healthy_hosts_ = local_zone_healthy_hosts;
+    hosts_per_zone_ = hosts_per_zone;
+    healthy_hosts_per_zone_ = healthy_hosts_per_zone;
     runUpdateCallbacks(hosts_added, hosts_removed);
   }
 
   // Upstream::HostSet
   const std::vector<HostPtr>& hosts() const override { return *hosts_; }
   const std::vector<HostPtr>& healthyHosts() const override { return *healthy_hosts_; }
-  const std::vector<HostPtr>& localZoneHosts() const override { return *local_zone_hosts_; }
-  const std::vector<HostPtr>& localZoneHealthyHosts() const override {
-    return *local_zone_healthy_hosts_;
+  const std::vector<std::vector<HostPtr>>& hostsPerZone() const override {
+    return *hosts_per_zone_;
+  }
+  const std::vector<std::vector<HostPtr>>& healthyHostsPerZone() const override {
+    return *healthy_hosts_per_zone_;
   }
   void addMemberUpdateCb(MemberUpdateCb callback) const override;
 
@@ -140,8 +144,8 @@ protected:
 private:
   ConstHostVectorPtr hosts_;
   ConstHostVectorPtr healthy_hosts_;
-  ConstHostVectorPtr local_zone_hosts_;
-  ConstHostVectorPtr local_zone_healthy_hosts_;
+  ConstHostListsPtr hosts_per_zone_;
+  ConstHostListsPtr healthy_hosts_per_zone_;
   mutable std::list<MemberUpdateCb> callbacks_;
 };
 
@@ -187,10 +191,11 @@ protected:
                   Ssl::ContextManager& ssl_context_manager);
 
   static ConstHostVectorPtr createHealthyHostList(const std::vector<HostPtr>& hosts);
+  static ConstHostListsPtr createHealthyHostLists(const std::vector<std::vector<HostPtr>>& hosts);
   void runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
                           const std::vector<HostPtr>& hosts_removed) override;
 
-  static const ConstHostVectorPtr empty_host_list_;
+  static const ConstHostListsPtr empty_host_lists_;
 
   Ssl::ClientContext* ssl_ctx_;
   std::string name_;

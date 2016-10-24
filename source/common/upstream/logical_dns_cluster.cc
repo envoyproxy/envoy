@@ -53,8 +53,8 @@ void LogicalDnsCluster::startResolve() {
             logical_host_.reset(new LogicalHost(*this, dns_url_, *this));
             HostVectorPtr new_hosts(new std::vector<HostPtr>());
             new_hosts->emplace_back(logical_host_);
-            updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_list_,
-                        empty_host_list_, *new_hosts, {});
+            updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
+                        empty_host_lists_, *new_hosts, {});
           }
         }
 
