@@ -470,6 +470,8 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
   Optional<uint32_t> code(200);
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
+  EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10UL));
+  EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100UL));
 
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));

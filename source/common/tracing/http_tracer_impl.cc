@@ -233,9 +233,11 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
   lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
       tracing_context.operationName(),
       {lightstep::StartTimestamp(request_info.startTime()),
-       lightstep::SetTag("join:x-request-id", request_headers.get(Http::Headers::get().RequestId)),
+       lightstep::SetTag("guid:x-request-id", request_headers.get(Http::Headers::get().RequestId)),
        lightstep::SetTag("request line", buildRequestLine(request_headers, request_info)),
        lightstep::SetTag("response code", buildResponseCode(request_info)),
+       lightstep::SetTag("request size", request_info.bytesReceived()),
+       lightstep::SetTag("response size", request_info.bytesSent()),
        lightstep::SetTag("host header", request_headers.get(Http::Headers::get().Host)),
        lightstep::SetTag(
            "downstream cluster",
