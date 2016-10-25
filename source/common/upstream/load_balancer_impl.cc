@@ -29,13 +29,26 @@ bool LoadBalancerBase::earlyExitNonZoneRouting() {
     return true;
   }
 
+  // If local cluster is not set, or we are in panic mode for it.
+  if (local_host_set_ == nullptr || local_host_set_->hosts().empty() ||
+      isGlobalPanic(*local_host_set_)) {
+    stats_.local_cluster_not_ok_.inc();
+    return true;
+  }
+
+  // Same number of zones should be for local and upstream cluster.
+  if (host_set_.healthyHostsPerZone().size() != local_host_set_->healthyHostsPerZone().size()) {
+    stats_.zone_number_differs_.inc();
+    return true;
+  }
+
   return false;
 }
 
-bool LoadBalancerBase::isGlobalPanic() {
+bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
   uint64_t global_panic_threshold =
       std::min(100UL, runtime_.snapshot().getInteger("upstream.healthy_panic_threshold", 50));
-  double healthy_percent = 100.0 * host_set_.healthyHosts().size() / host_set_.hosts().size();
+  double healthy_percent = 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
 
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
   if (healthy_percent < global_panic_threshold) {
@@ -46,10 +59,84 @@ bool LoadBalancerBase::isGlobalPanic() {
   return false;
 }
 
+std::vector<uint64_t>
+LoadBalancerBase::calculateZonePercentage(const std::vector<std::vector<HostPtr>>& hosts_per_zone) {
+  std::vector<uint64_t> percentage(hosts_per_zone.size());
+
+  uint64_t total_hosts = 0;
+  for (const auto& zone_hosts : hosts_per_zone) {
+    total_hosts += zone_hosts.size();
+  }
+
+  if (total_hosts != 0) {
+    size_t pos = 0;
+    for (const auto& zone_hosts : hosts_per_zone) {
+      percentage[pos++] = 10000ULL * zone_hosts.size() / total_hosts;
+    }
+  }
+
+  return percentage;
+}
+
+const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
+  // At this point it's guaranteed to be at least 2 zones.
+  ASSERT(host_set_.healthyHostsPerZone().size() >= 2U);
+
+  std::vector<uint64_t> local_percentage =
+      calculateZonePercentage(local_host_set_->healthyHostsPerZone());
+  std::vector<uint64_t> upstream_percentage =
+      calculateZonePercentage(host_set_.healthyHostsPerZone());
+
+  // Try to push all of the requests to the same zone first.
+  // If we have lower percent of hosts in the local cluster in the same zone,
+  // we can push all of the requests directly to upstream cluster in the same zone.
+  if (upstream_percentage[0] >= local_percentage[0]) {
+    stats_.zone_over_percentage_.inc();
+    return host_set_.healthyHostsPerZone()[0];
+  }
+
+  // If we cannot route all requests to the same zone, calculate what percentage can be routed.
+  // For example, if local percentage is 20% and upstream is 10%
+  // we can route only 50% of requests directly.
+  uint64_t local_percent_route = upstream_percentage[0] * 10000 / local_percentage[0];
+  if (random_.random() % 10000 < local_percent_route) {
+    stats_.zone_routing_sampled_.inc();
+    return host_set_.healthyHostsPerZone()[0];
+  }
+
+  // At this point we should route cross zone as we cannot route to the local zone.
+  stats_.zone_routing_no_sampled_.inc();
+
+  std::vector<uint64_t> capacity_left;
+  // Local zone does not have additional capacity (we already routed what we could), but
+  // put it to the capacity_left so that index in the array matches to the zone index.
+  capacity_left.push_back(0);
+  for (size_t i = 1; i < local_percentage.size(); ++i) {
+    // Only route to the zones that have additional capacity.
+    if (upstream_percentage[i] > local_percentage[i]) {
+      capacity_left.push_back(capacity_left[i - 1] + upstream_percentage[i] - local_percentage[i]);
+    } else {
+      capacity_left.push_back(capacity_left[i - 1]);
+    }
+  }
+
+  // Select specific zone for cross zone traffic based on the additional capacity in zones.
+  uint64_t threshold = random_.random() % capacity_left.back();
+
+  // This potentially can be optimized to be O(log(N)) where N is the number of zones.
+  // Linear scan should be faster for smaller N, in most of the scenarios N will be small.
+  int pos = 0;
+  while (threshold > capacity_left[pos]) {
+    pos++;
+  }
+
+  return host_set_.healthyHostsPerZone()[pos];
+}
+
 const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
   ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
 
-  if (host_set_.hosts().empty() || isGlobalPanic()) {
+  if (host_set_.hosts().empty() || isGlobalPanic(host_set_)) {
     return host_set_.hosts();
   }
 
@@ -57,37 +144,7 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  // At this point it's guaranteed to be at least 2 zones.
-  uint32_t number_of_zones = host_set_.healthyHostsPerZone().size();
-  ASSERT(number_of_zones >= 2U);
-  const std::vector<HostPtr>& local_zone_healthy_hosts = host_set_.healthyHostsPerZone()[0];
-
-  // If number of hosts in a local zone big enough then route all requests to the same zone.
-  if (local_zone_healthy_hosts.size() * number_of_zones >= host_set_.healthyHosts().size()) {
-    stats_.zone_over_percentage_.inc();
-    return local_zone_healthy_hosts;
-  }
-
-  // If local zone ratio is lower than expected we should only partially route requests from the
-  // same zone.
-  double zone_host_ratio = 1.0 * local_zone_healthy_hosts.size() / host_set_.healthyHosts().size();
-  double ratio_to_route = zone_host_ratio * number_of_zones;
-
-  // Not zone routed requests will be distributed between all hosts and hence
-  // we need to route only fraction of req_percent_to_route to the local zone.
-  double actual_routing_ratio = (ratio_to_route - zone_host_ratio) / (1 - zone_host_ratio);
-
-  // Scale actual_routing_ratio to improve precision.
-  const uint64_t scale_factor = 10000;
-  uint64_t zone_routing_threshold = scale_factor * actual_routing_ratio;
-
-  if (random_.random() % 10000 < zone_routing_threshold) {
-    stats_.zone_routing_sampled_.inc();
-    return local_zone_healthy_hosts;
-  } else {
-    stats_.zone_routing_no_sampled_.inc();
-    return host_set_.healthyHosts();
-  }
+  return tryChooseLocalZoneHosts();
 }
 
 ConstHostPtr RoundRobinLoadBalancer::chooseHost() {

@@ -26,8 +26,25 @@ protected:
   Runtime::RandomGenerator& random_;
 
 private:
+  /*
+   * @return decision on quick exit from zone aware host selection.
+   */
   bool earlyExitNonZoneRouting();
-  bool isGlobalPanic();
+
+  /**
+   * For the given host_set it @return if we should be in a panic mode or not.
+   * For example, if majority of hosts are unhealthy we'll be likely in a panic mode.
+   * In this case we'll route requests to hosts no matter if they are healthy or not.
+   */
+  bool isGlobalPanic(const HostSet& host_set);
+  const std::vector<HostPtr>& tryChooseLocalZoneHosts();
+
+  /**
+   * @return ratio of hosts in a given zone to total number of hosts. The result is scaled by 10000
+   * multiplier.
+   */
+  std::vector<uint64_t>
+  calculateZonePercentage(const std::vector<std::vector<HostPtr>>& hosts_per_zone);
 
   const HostSet& host_set_;
   const HostSet* local_host_set_;
