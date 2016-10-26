@@ -7,7 +7,7 @@
 namespace Network {
 
 void FilterManagerImpl::addWriteFilter(WriteFilterPtr filter) {
-  ASSERT(connection_.state() != Connection::State::Closed);
+  ASSERT(connection_.state() == Connection::State::Open);
   downstream_filters_.emplace_back(filter);
 }
 
@@ -17,7 +17,7 @@ void FilterManagerImpl::addFilter(FilterPtr filter) {
 }
 
 void FilterManagerImpl::addReadFilter(ReadFilterPtr filter) {
-  ASSERT(connection_.state() != Connection::State::Closed);
+  ASSERT(connection_.state() == Connection::State::Open);
   ActiveReadFilterPtr new_filter(new ActiveReadFilter{*this, filter});
   filter->initializeReadFilterCallbacks(*new_filter);
   new_filter->moveIntoListBack(std::move(new_filter), upstream_filters_);
