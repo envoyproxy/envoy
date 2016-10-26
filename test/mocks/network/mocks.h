@@ -163,4 +163,28 @@ public:
   MOCK_METHOD0(drainClose, bool());
 };
 
+class MockFilterChainFactory : public FilterChainFactory {
+public:
+  MockFilterChainFactory();
+  ~MockFilterChainFactory();
+
+  MOCK_METHOD1(createFilterChain, void(Connection& connection));
+};
+
+class MockListenSocket : public ListenSocket {
+public:
+  MockListenSocket();
+  ~MockListenSocket();
+
+  MOCK_METHOD0(name, const std::string());
+  MOCK_METHOD0(fd, int());
+  MOCK_METHOD0(close, void());
+};
+
+class MockListener : public Listener {
+public:
+  MockListener();
+  ~MockListener();
+};
+
 } // Network

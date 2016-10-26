@@ -3,7 +3,6 @@
 #include "test_hooks.h"
 #include "worker.h"
 
-#include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -12,6 +11,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/access_log/access_log_manager.h"
+#include "common/api/api_impl.h"
 #include "common/common/version.h"
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
@@ -27,7 +27,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), access_log_lock_(access_log_lock),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
-      handler_(stats_store_, log(), options.fileFlushIntervalMsec()),
+      handler_(stats_store_, log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
       dns_resolver_(handler_.dispatcher().createDnsResolver()),
       local_address_(Network::Utility::getLocalAddress()) {
 

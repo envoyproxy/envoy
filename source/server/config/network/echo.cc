@@ -18,8 +18,8 @@ public:
       return nullptr;
     }
 
-    return [](Network::Connection& connection)
-        -> void { connection.addReadFilter(Network::ReadFilterPtr{new Filter::Echo()}); };
+    return [](Network::FilterManager& filter_manager)
+        -> void { filter_manager.addReadFilter(Network::ReadFilterPtr{new Filter::Echo()}); };
   }
 };
 

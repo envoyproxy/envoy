@@ -14,6 +14,19 @@
 namespace Server {
 namespace Configuration {
 
+void FilterChainUtility::buildFilterChain(Network::Connection& connection,
+                                          const std::list<NetworkFilterFactoryCb>& factories) {
+  for (const NetworkFilterFactoryCb& factory : factories) {
+    // It's possible for a connection to be closed immediately in the middle of chain creation.
+    // If this happened, do not instantiate any more filters.
+    if (connection.state() != Network::Connection::State::Open) {
+      break;
+    }
+
+    factory(connection);
+  }
+}
+
 MainImpl::MainImpl(Server::Instance& server) : server_(server) {}
 
 void MainImpl::initialize(const std::string& file_path) {
@@ -158,9 +171,7 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
 }
 
 void MainImpl::ListenerConfig::createFilterChain(Network::Connection& connection) {
-  for (const NetworkFilterFactoryCb& factory : filter_factories_) {
-    factory(connection);
-  }
+  FilterChainUtility::buildFilterChain(connection, filter_factories_);
 }
 
 InitialImpl::InitialImpl(const std::string& file_path) {

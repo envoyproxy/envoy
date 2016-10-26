@@ -27,9 +27,9 @@ public:
 /**
  * This is a filter manager for TCP (L4) filters. It is split out for ease of testing.
  */
-class FilterManager {
+class FilterManagerImpl {
 public:
-  FilterManager(Connection& connection, BufferSource& buffer_source)
+  FilterManagerImpl(Connection& connection, BufferSource& buffer_source)
       : connection_(connection), buffer_source_(buffer_source) {}
 
   void addWriteFilter(WriteFilterPtr filter);
@@ -41,7 +41,7 @@ public:
 
 private:
   struct ActiveReadFilter : public ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
-    ActiveReadFilter(FilterManager& parent, ReadFilterPtr filter)
+    ActiveReadFilter(FilterManagerImpl& parent, ReadFilterPtr filter)
         : parent_(parent), filter_(filter) {}
 
     Connection& connection() override { return parent_.connection_; }
@@ -51,7 +51,7 @@ private:
       parent_.host_description_ = host;
     }
 
-    FilterManager& parent_;
+    FilterManagerImpl& parent_;
     ReadFilterPtr filter_;
   };
 

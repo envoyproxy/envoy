@@ -1,5 +1,5 @@
 #include "common/buffer/buffer_impl.h"
-#include "common/network/filter_manager.h"
+#include "common/network/filter_manager_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -40,8 +40,8 @@ TEST_F(NetworkFilterManagerTest, All) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter(host_description));
 
-  MockConnection connection;
-  FilterManager manager(connection, *this);
+  NiceMock<MockConnection> connection;
+  FilterManagerImpl manager(connection, *this);
   manager.addReadFilter(ReadFilterPtr{read_filter});
   manager.addWriteFilter(WriteFilterPtr{write_filter});
   manager.addFilter(FilterPtr{filter});
