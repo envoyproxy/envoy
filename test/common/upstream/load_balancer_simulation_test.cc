@@ -87,9 +87,11 @@ public:
       hits[selected->url()]++;
     }
 
+    double mean = total_number_of_requests * 1.0 / hits.size();
     for (const auto& host_hit_num_pair : hits) {
-      std::cout << fmt::format("url:{}, hits:{}", host_hit_num_pair.first, host_hit_num_pair.second)
-                << std::endl;
+      double percent_diff = std::abs((mean - host_hit_num_pair.second) / mean) * 100;
+      std::cout << fmt::format("url:{}, hits:{}, {} % from mean", host_hit_num_pair.first,
+                               host_hit_num_pair.second, percent_diff) << std::endl;
     }
   }
 
@@ -136,7 +138,7 @@ public:
     return ret;
   };
 
-  const uint32_t total_number_of_requests = 300000;
+  const uint32_t total_number_of_requests = 1000000;
   std::vector<HostPtr> empty_vector_;
 
   HostSetImpl* local_host_set_;
@@ -164,11 +166,11 @@ TEST_F(DISABLED_SimulationTest, unequalZoneDistribution3) {
 }
 
 TEST_F(DISABLED_SimulationTest, unequalZoneDistribution4) {
-  run({20U, 20U, 21U}, {4U, 4U, 5U}, {4U, 5U, 5U});
+  run({20U, 20U, 21U}, {4U, 5U, 5U}, {4U, 5U, 5U});
 }
 
 TEST_F(DISABLED_SimulationTest, unequalZoneDistribution5) {
-  run({3U, 2U, 5U}, {4U, 4U, 5U}, {4U, 5U, 5U});
+  run({3U, 2U, 5U}, {4U, 5U, 5U}, {4U, 5U, 5U});
 }
 
 TEST_F(DISABLED_SimulationTest, unequalZoneDistribution6) {
