@@ -179,9 +179,9 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
 
   // There is only one host in the given zone for zone aware routing.
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
-  EXPECT_EQ(1U, stats_.zone_over_percentage_.value());
+  EXPECT_EQ(1U, stats_.zone_routing_all_directly_.value());
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
-  EXPECT_EQ(2U, stats_.zone_over_percentage_.value());
+  EXPECT_EQ(2U, stats_.zone_routing_all_directly_.value());
 
   // Disable runtime global zone routing.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
@@ -235,7 +235,7 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[1][1], lb_->chooseHost());
-  EXPECT_EQ(1U, stats_.zone_routing_no_sampled_.value());
+  EXPECT_EQ(1U, stats_.zone_routing_cross_zone_.value());
 }
 
 TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {

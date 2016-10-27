@@ -192,9 +192,9 @@ public:
   COUNTER(update_success)                                                                          \
   COUNTER(update_failure)                                                                          \
   COUNTER(zone_cluster_too_small)                                                                  \
-  COUNTER(zone_over_percentage)                                                                    \
+  COUNTER(zone_routing_all_directly)                                                               \
   COUNTER(zone_routing_sampled)                                                                    \
-  COUNTER(zone_routing_no_sampled)                                                                 \
+  COUNTER(zone_routing_cross_zone)                                                                 \
   GAUGE  (max_host_weight)                                                                         \
   COUNTER(local_cluster_not_ok)                                                                    \
   COUNTER(zone_number_differs)

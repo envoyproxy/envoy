@@ -59,39 +59,38 @@ bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
   return false;
 }
 
-std::vector<uint64_t>
-LoadBalancerBase::calculateZonePercentage(const std::vector<std::vector<HostPtr>>& hosts_per_zone) {
-  std::vector<uint64_t> percentage(hosts_per_zone.size());
-
+void LoadBalancerBase::calculateZonePercentage(
+    const std::vector<std::vector<HostPtr>>& hosts_per_zone, uint64_t* ret) {
   uint64_t total_hosts = 0;
   for (const auto& zone_hosts : hosts_per_zone) {
     total_hosts += zone_hosts.size();
   }
 
   if (total_hosts != 0) {
-    size_t pos = 0;
+    size_t i = 0;
     for (const auto& zone_hosts : hosts_per_zone) {
-      percentage[pos++] = 10000ULL * zone_hosts.size() / total_hosts;
+      ret[i++] = 10000ULL * zone_hosts.size() / total_hosts;
     }
   }
-
-  return percentage;
 }
 
 const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
   // At this point it's guaranteed to be at least 2 zones.
-  ASSERT(host_set_.healthyHostsPerZone().size() >= 2U);
+  size_t number_of_zones = host_set_.healthyHostsPerZone().size();
 
-  std::vector<uint64_t> local_percentage =
-      calculateZonePercentage(local_host_set_->healthyHostsPerZone());
-  std::vector<uint64_t> upstream_percentage =
-      calculateZonePercentage(host_set_.healthyHostsPerZone());
+  ASSERT(number_of_zones >= 2U);
+
+  uint64_t local_percentage[number_of_zones];
+  calculateZonePercentage(local_host_set_->healthyHostsPerZone(), local_percentage);
+
+  uint64_t upstream_percentage[number_of_zones];
+  calculateZonePercentage(host_set_.healthyHostsPerZone(), upstream_percentage);
 
   // Try to push all of the requests to the same zone first.
   // If we have lower percent of hosts in the local cluster in the same zone,
   // we can push all of the requests directly to upstream cluster in the same zone.
   if (upstream_percentage[0] >= local_percentage[0]) {
-    stats_.zone_over_percentage_.inc();
+    stats_.zone_routing_all_directly_.inc();
     return host_set_.healthyHostsPerZone()[0];
   }
 
@@ -104,33 +103,44 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
     return host_set_.healthyHostsPerZone()[0];
   }
 
-  // At this point we should route cross zone as we cannot route to the local zone.
-  stats_.zone_routing_no_sampled_.inc();
+  // At this point we must route cross zone as we cannot route to the local zone.
+  stats_.zone_routing_cross_zone_.inc();
 
-  std::vector<uint64_t> capacity_left;
-  // Local zone does not have additional capacity (we already routed what we could), but
-  // put it to the capacity_left so that index in the array matches to the zone index.
-  capacity_left.push_back(0);
-  for (size_t i = 1; i < local_percentage.size(); ++i) {
+  // Local zone does not have additional capacity (we have already routed what we could).
+  // Now we need to figure out how much traffic we can route cross zone and to which exact zone
+  // we should route. Percentage of requests routed cross zone to a specific zone should be
+  // proportional to the residual capacity upstream zone has.
+  //
+  // Residual_capacity contains capacity left in a given zone, we keep accumulating residual
+  // capacity to make search for sampled value easier.
+  uint64_t residual_capacity[number_of_zones];
+
+  // Local zone (index 0) does not have residual capacity as we have routed all we could.
+  residual_capacity[0] = 0;
+  for (size_t i = 1; i < number_of_zones; ++i) {
     // Only route to the zones that have additional capacity.
     if (upstream_percentage[i] > local_percentage[i]) {
-      capacity_left.push_back(capacity_left[i - 1] + upstream_percentage[i] - local_percentage[i]);
+      residual_capacity[i] =
+          residual_capacity[i - 1] + upstream_percentage[i] - local_percentage[i];
     } else {
-      capacity_left.push_back(capacity_left[i - 1]);
+      // Zone with index "i" does not have residual capacity, but we keep accumulating previous
+      // values to make search easier on the next step.
+      residual_capacity[i] = residual_capacity[i - 1];
     }
   }
 
-  // Select specific zone for cross zone traffic based on the additional capacity in zones.
-  uint64_t threshold = random_.random() % capacity_left.back();
+  // Random simulation to select specific zone for cross zone traffic based on the additional
+  // capacity in zones.
+  uint64_t threshold = random_.random() % residual_capacity[number_of_zones - 1];
 
   // This potentially can be optimized to be O(log(N)) where N is the number of zones.
   // Linear scan should be faster for smaller N, in most of the scenarios N will be small.
-  int pos = 0;
-  while (threshold > capacity_left[pos]) {
-    pos++;
+  int i = 0;
+  while (threshold > residual_capacity[i]) {
+    i++;
   }
 
-  return host_set_.healthyHostsPerZone()[pos];
+  return host_set_.healthyHostsPerZone()[i];
 }
 
 const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {

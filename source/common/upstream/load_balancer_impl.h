@@ -40,11 +40,12 @@ private:
   const std::vector<HostPtr>& tryChooseLocalZoneHosts();
 
   /**
-   * @return ratio of hosts in a given zone to total number of hosts. The result is scaled by 10000
-   * multiplier.
+   * @return ratio of hosts in a given zone to total number of hosts in ret param.
+   * The result is scaled by 10000 multiplier.
+   * Caller is responsible for allocation/de-allocation of ret.
    */
-  std::vector<uint64_t>
-  calculateZonePercentage(const std::vector<std::vector<HostPtr>>& hosts_per_zone);
+  void calculateZonePercentage(const std::vector<std::vector<HostPtr>>& hosts_per_zone,
+                               uint64_t* ret);
 
   const HostSet& host_set_;
   const HostSet* local_host_set_;
