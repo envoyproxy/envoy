@@ -23,8 +23,8 @@ public:
     Filter::Auth::ClientSsl::ConfigPtr config(new Filter::Auth::ClientSsl::Config(
         json_config, server.threadLocal(), server.clusterManager(), server.dispatcher(),
         server.stats(), server.runtime()));
-    return [config](Network::Connection& connection) -> void {
-      connection.addReadFilter(
+    return [config](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(
           Network::ReadFilterPtr{new Filter::Auth::ClientSsl::Instance(config)});
     };
   }

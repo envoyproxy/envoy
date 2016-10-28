@@ -22,8 +22,8 @@ public:
 
     Filter::TcpProxyConfigPtr filter_config(
         new Filter::TcpProxyConfig(config, server.clusterManager(), server.stats()));
-    return [filter_config, &server](Network::Connection& connection) -> void {
-      connection.addReadFilter(
+    return [filter_config, &server](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(
           Network::ReadFilterPtr{new Filter::TcpProxy(filter_config, server.clusterManager())});
     };
   }

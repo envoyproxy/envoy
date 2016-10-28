@@ -74,7 +74,7 @@ add_library(
   mongo/utility.cc
   network/connection_impl.cc
   network/dns_impl.cc
-  network/filter_manager.cc
+  network/filter_manager_impl.cc
   network/listener_impl.cc
   network/listen_socket_impl.cc
   network/proxy_protocol.cc

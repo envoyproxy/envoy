@@ -94,17 +94,6 @@ void TcpProxy::onConnectTimeout() {
 }
 
 Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
-  if (!upstream_connection_) {
-    // TODO: This is done here vs. the constructor because currently the filter manager is not built
-    //       to handle the downstream connection being closed during construction. The better long
-    //       term solution is to have an initialize() method that is passed the relevant data and
-    //       can also cause the filter manager to stop execution.
-    initializeUpstreamConnection();
-    if (!upstream_connection_) {
-      return Network::FilterStatus::StopIteration;
-    }
-  }
-
   conn_log_trace("received {} bytes", read_callbacks_->connection(), data.length());
   upstream_connection_->write(data);
   ASSERT(0 == data.length());

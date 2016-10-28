@@ -30,8 +30,8 @@ public:
       server.accessLogManager().registerAccessLog(access_log);
     }
 
-    return [stat_prefix, &server, access_log](Network::Connection& connection) -> void {
-      connection.addFilter(Network::FilterPtr{
+    return [stat_prefix, &server, access_log](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addFilter(Network::FilterPtr{
           new Mongo::ProdProxyFilter(stat_prefix, server.stats(), server.runtime(), access_log)});
     };
   }

@@ -101,4 +101,13 @@ MockListenerCallbacks::~MockListenerCallbacks() {}
 MockDrainDecision::MockDrainDecision() {}
 MockDrainDecision::~MockDrainDecision() {}
 
+MockFilterChainFactory::MockFilterChainFactory() {}
+MockFilterChainFactory::~MockFilterChainFactory() {}
+
+MockListenSocket::MockListenSocket() {}
+MockListenSocket::~MockListenSocket() {}
+
+MockListener::MockListener() {}
+MockListener::~MockListener() {}
+
 } // Network

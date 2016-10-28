@@ -1,30 +1,34 @@
-#include "filter_manager.h"
+#include "filter_manager_impl.h"
+
+#include "envoy/network/connection.h"
 
 #include "common/common/assert.h"
 
 namespace Network {
 
-void FilterManager::addWriteFilter(WriteFilterPtr filter) {
+void FilterManagerImpl::addWriteFilter(WriteFilterPtr filter) {
+  ASSERT(connection_.state() == Connection::State::Open);
   downstream_filters_.emplace_back(filter);
 }
 
-void FilterManager::addFilter(FilterPtr filter) {
+void FilterManagerImpl::addFilter(FilterPtr filter) {
   addReadFilter(filter);
   addWriteFilter(filter);
 }
 
-void FilterManager::addReadFilter(ReadFilterPtr filter) {
+void FilterManagerImpl::addReadFilter(ReadFilterPtr filter) {
+  ASSERT(connection_.state() == Connection::State::Open);
   ActiveReadFilterPtr new_filter(new ActiveReadFilter{*this, filter});
   filter->initializeReadFilterCallbacks(*new_filter);
   new_filter->moveIntoListBack(std::move(new_filter), upstream_filters_);
 }
 
-void FilterManager::destroyFilters() {
+void FilterManagerImpl::destroyFilters() {
   upstream_filters_.clear();
   downstream_filters_.clear();
 }
 
-void FilterManager::onContinueReading(ActiveReadFilter* filter) {
+void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter) {
   std::list<ActiveReadFilterPtr>::iterator entry;
   if (!filter) {
     entry = upstream_filters_.begin();
@@ -40,12 +44,12 @@ void FilterManager::onContinueReading(ActiveReadFilter* filter) {
   }
 }
 
-void FilterManager::onRead() {
+void FilterManagerImpl::onRead() {
   ASSERT(!upstream_filters_.empty());
   onContinueReading(nullptr);
 }
 
-FilterStatus FilterManager::onWrite() {
+FilterStatus FilterManagerImpl::onWrite() {
   for (const WriteFilterPtr& filter : downstream_filters_) {
     FilterStatus status = filter->onWrite(buffer_source_.getWriteBuffer());
     if (status == FilterStatus::StopIteration) {
