@@ -85,6 +85,8 @@ message RateLimitResponse {
     Code code = 1;
     // The current limit as configured by the server. Useful for debugging, etc.
     RateLimit current_limit = 2;
+    // The limit remaining in the current time unit.
+    uint32 limit_remaining = 3;
   }
 
   // The overall response code which takes into account all of the descriptors that were passed
