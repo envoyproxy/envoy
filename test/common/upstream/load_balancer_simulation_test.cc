@@ -90,7 +90,7 @@ public:
     double mean = total_number_of_requests * 1.0 / hits.size();
     for (const auto& host_hit_num_pair : hits) {
       double percent_diff = std::abs((mean - host_hit_num_pair.second) / mean) * 100;
-      EXPECT_TRUE(2.0 >= percent_diff);
+      EXPECT_TRUE(3.0 >= percent_diff);
       std::cout << fmt::format("url:{}, hits:{}, {} % from mean", host_hit_num_pair.first,
                                host_hit_num_pair.second, percent_diff) << std::endl;
     }
