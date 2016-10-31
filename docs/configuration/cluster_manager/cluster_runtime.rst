@@ -32,8 +32,14 @@ upstream.weight_enabled
   Binary switch to turn on or off weighted load balancing. If set to non 0, weighted load balancing
   is enabled. Defaults to enabled.
 
+.. _config_cluster_manager_cluster_runtime_zone_routing:
+
 upstream.zone_routing.enabled
   % of requests that will be routed to the same upstream zone. Defaults to 100% of requests.
+
+upstream.zone_routing.min_cluster_size
+  minimal size of upstream cluster for which zone aware routing can be attempted. Default value is 6.
+  If upstream cluster size is smaller than min_cluster_size zone aware routing will not be performed.
 
 circuit_breakers.<cluster_name>.<priority>.max_connections
   :ref:`Max connections circuit breaker setting <config_cluster_manager_cluster_circuit_breakers_max_connections>`

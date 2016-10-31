@@ -125,3 +125,20 @@ Envoy will track the following statistics in *cluster.<name>.zone.<from_zone>.<t
   upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
   upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
   upstream_rq_time, Timer, Request time milliseconds
+
+Zone aware routing statistics
+_____________________________
+
+Statistics for monitoring zone aware routing decisions. Stats
+are rooted at *cluster.<name>.* and contain the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  zone_cluster_too_small, Counter, No zone aware routing because of small upstream cluster size
+  zone_routing_all_directly, Counter, Sending all requests directly to the same zone
+  zone_routing_sampled, Counter, Sending some requests to the same zone
+  zone_routing_cross_zone, Counter, Zone aware routing mode but have to send cross zone
+  local_cluster_not_ok, Counter, Local host set is not set or it is panic mode for local cluster
+  zone_number_differs, Counter, Number of zones in local and upstream cluster different
