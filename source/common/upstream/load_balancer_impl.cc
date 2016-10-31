@@ -121,7 +121,8 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
   // bucket sizes (residual capacity). For simplicity of finding where specific
   // sampled value is, we accumulate values in residual capacity. This is what it will look like:
   // residual_capacity: 0 10000 15000
-  // Now to find zone to route (bucket) we could simply iterate over residual_capacity searching where
+  // Now to find zone to route (bucket) we could simply iterate over residual_capacity searching
+  // where
   // sampled value is placed.
   uint64_t residual_capacity[number_of_zones];
 
