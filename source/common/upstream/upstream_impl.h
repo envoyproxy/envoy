@@ -105,7 +105,7 @@ typedef std::shared_ptr<std::vector<std::vector<HostPtr>>> HostListsPtr;
 typedef std::shared_ptr<const std::vector<std::vector<HostPtr>>> ConstHostListsPtr;
 
 /**
- * Base clase for all clusters as well as thread local host sets.
+ * Base class for all clusters as well as thread local host sets.
  */
 class HostSetImpl : public virtual HostSet {
 public:

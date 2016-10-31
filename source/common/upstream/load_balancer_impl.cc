@@ -25,31 +25,138 @@ bool LoadBalancerBase::earlyExitNonZoneRouting() {
       runtime_.snapshot().getInteger("upstream.zone_routing.min_cluster_size", 6U);
 
   if (host_set_.healthyHosts().size() < min_cluster_size) {
-    stats_.zone_cluster_too_small_.inc();
+    stats_.lb_zone_cluster_too_small_.inc();
+    return true;
+  }
+
+  // If local cluster is not set, or we are in panic mode for it.
+  if (local_host_set_ == nullptr || local_host_set_->hosts().empty() ||
+      isGlobalPanic(*local_host_set_)) {
+    stats_.lb_local_cluster_not_ok_.inc();
+    return true;
+  }
+
+  // Same number of zones should be for local and upstream cluster.
+  if (host_set_.healthyHostsPerZone().size() != local_host_set_->healthyHostsPerZone().size()) {
+    stats_.lb_zone_number_differs_.inc();
     return true;
   }
 
   return false;
 }
 
-bool LoadBalancerBase::isGlobalPanic() {
+bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
   uint64_t global_panic_threshold =
       std::min(100UL, runtime_.snapshot().getInteger("upstream.healthy_panic_threshold", 50));
-  double healthy_percent = 100.0 * host_set_.healthyHosts().size() / host_set_.hosts().size();
+  double healthy_percent = 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
 
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
   if (healthy_percent < global_panic_threshold) {
-    stats_.upstream_rq_lb_healthy_panic_.inc();
+    stats_.lb_healthy_panic_.inc();
     return true;
   }
 
   return false;
+}
+
+void LoadBalancerBase::calculateZonePercentage(
+    const std::vector<std::vector<HostPtr>>& hosts_per_zone, uint64_t* ret) {
+  uint64_t total_hosts = 0;
+  for (const auto& zone_hosts : hosts_per_zone) {
+    total_hosts += zone_hosts.size();
+  }
+
+  if (total_hosts != 0) {
+    size_t i = 0;
+    for (const auto& zone_hosts : hosts_per_zone) {
+      ret[i++] = 10000ULL * zone_hosts.size() / total_hosts;
+    }
+  }
+}
+
+const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
+  // At this point it's guaranteed to be at least 2 zones.
+  size_t number_of_zones = host_set_.healthyHostsPerZone().size();
+
+  ASSERT(number_of_zones >= 2U);
+  ASSERT(local_host_set_->healthyHostsPerZone().size == host_set_.healthyHostsPerZone().size());
+
+  uint64_t local_percentage[number_of_zones];
+  calculateZonePercentage(local_host_set_->healthyHostsPerZone(), local_percentage);
+
+  uint64_t upstream_percentage[number_of_zones];
+  calculateZonePercentage(host_set_.healthyHostsPerZone(), upstream_percentage);
+
+  // Try to push all of the requests to the same zone first.
+  // If we have lower percent of hosts in the local cluster in the same zone,
+  // we can push all of the requests directly to upstream cluster in the same zone.
+  if (upstream_percentage[0] >= local_percentage[0]) {
+    stats_.lb_zone_routing_all_directly_.inc();
+    return host_set_.healthyHostsPerZone()[0];
+  }
+
+  // If we cannot route all requests to the same zone, calculate what percentage can be routed.
+  // For example, if local percentage is 20% and upstream is 10%
+  // we can route only 50% of requests directly.
+  uint64_t local_percent_route = upstream_percentage[0] * 10000 / local_percentage[0];
+  if (random_.random() % 10000 < local_percent_route) {
+    stats_.lb_zone_routing_sampled_.inc();
+    return host_set_.healthyHostsPerZone()[0];
+  }
+
+  // At this point we must route cross zone as we cannot route to the local zone.
+  stats_.lb_zone_routing_cross_zone_.inc();
+
+  // Local zone does not have additional capacity (we have already routed what we could).
+  // Now we need to figure out how much traffic we can route cross zone and to which exact zone
+  // we should route. Percentage of requests routed cross zone to a specific zone needed be
+  // proportional to the residual capacity upstream zone has.
+  //
+  // residual_capacity contains capacity left in a given zone, we keep accumulating residual
+  // capacity to make search for sampled value easier.
+  // For example, if we have the following upstream and local percentage:
+  // local_percentage: 40000 40000 20000
+  // upstream_percentage: 25000 50000 25000
+  // Residual capacity would look like: 0 10000 5000. Now we need to sample proportionally to
+  // bucket sizes (residual capacity). For simplicity of finding where specific
+  // sampled value is, we accumulate values in residual capacity. This is what it will look like:
+  // residual_capacity: 0 10000 15000
+  // Now to find a zone to route (bucket) we could simply iterate over residual_capacity searching
+  // where sampled value is placed.
+  uint64_t residual_capacity[number_of_zones];
+
+  // Local zone (index 0) does not have residual capacity as we have routed all we could.
+  residual_capacity[0] = 0;
+  for (size_t i = 1; i < number_of_zones; ++i) {
+    // Only route to the zones that have additional capacity.
+    if (upstream_percentage[i] > local_percentage[i]) {
+      residual_capacity[i] =
+          residual_capacity[i - 1] + upstream_percentage[i] - local_percentage[i];
+    } else {
+      // Zone with index "i" does not have residual capacity, but we keep accumulating previous
+      // values to make search easier on the next step.
+      residual_capacity[i] = residual_capacity[i - 1];
+    }
+  }
+
+  // Random sampling to select specific zone for cross zone traffic based on the additional
+  // capacity in zones.
+  uint64_t threshold = random_.random() % residual_capacity[number_of_zones - 1];
+
+  // This potentially can be optimized to be O(log(N)) where N is the number of zones.
+  // Linear scan should be faster for smaller N, in most of the scenarios N will be small.
+  int i = 0;
+  while (threshold > residual_capacity[i]) {
+    i++;
+  }
+
+  return host_set_.healthyHostsPerZone()[i];
 }
 
 const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
   ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
 
-  if (host_set_.hosts().empty() || isGlobalPanic()) {
+  if (host_set_.hosts().empty() || isGlobalPanic(host_set_)) {
     return host_set_.hosts();
   }
 
@@ -57,37 +164,7 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  // At this point it's guaranteed to be at least 2 zones.
-  uint32_t number_of_zones = host_set_.healthyHostsPerZone().size();
-  ASSERT(number_of_zones >= 2U);
-  const std::vector<HostPtr>& local_zone_healthy_hosts = host_set_.healthyHostsPerZone()[0];
-
-  // If number of hosts in a local zone big enough then route all requests to the same zone.
-  if (local_zone_healthy_hosts.size() * number_of_zones >= host_set_.healthyHosts().size()) {
-    stats_.zone_over_percentage_.inc();
-    return local_zone_healthy_hosts;
-  }
-
-  // If local zone ratio is lower than expected we should only partially route requests from the
-  // same zone.
-  double zone_host_ratio = 1.0 * local_zone_healthy_hosts.size() / host_set_.healthyHosts().size();
-  double ratio_to_route = zone_host_ratio * number_of_zones;
-
-  // Not zone routed requests will be distributed between all hosts and hence
-  // we need to route only fraction of req_percent_to_route to the local zone.
-  double actual_routing_ratio = (ratio_to_route - zone_host_ratio) / (1 - zone_host_ratio);
-
-  // Scale actual_routing_ratio to improve precision.
-  const uint64_t scale_factor = 10000;
-  uint64_t zone_routing_threshold = scale_factor * actual_routing_ratio;
-
-  if (random_.random() % 10000 < zone_routing_threshold) {
-    stats_.zone_routing_sampled_.inc();
-    return local_zone_healthy_hosts;
-  } else {
-    stats_.zone_routing_no_sampled_.inc();
-    return host_set_.healthyHosts();
-  }
+  return tryChooseLocalZoneHosts();
 }
 
 ConstHostPtr RoundRobinLoadBalancer::chooseHost() {

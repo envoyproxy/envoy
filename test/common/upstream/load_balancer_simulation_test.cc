@@ -39,38 +39,59 @@ public:
    */
   void run(std::vector<uint32_t> originating_cluster, std::vector<uint32_t> all_destination_cluster,
            std::vector<uint32_t> healthy_destination_cluster) {
+    local_host_set_ = new HostSetImpl();
+    // TODO: make load balancer per originating cluster host.
+    RandomLoadBalancer lb(cluster_, local_host_set_, stats_, runtime_, random_);
 
-    std::vector<std::vector<HostPtr>> per_zone_hosts =
-        generateHostsPerZone(healthy_destination_cluster);
+    HostListsPtr upstream_per_zone_hosts = generateHostsPerZone(healthy_destination_cluster);
+    HostListsPtr local_per_zone_hosts = generateHostsPerZone(originating_cluster);
 
-    std::vector<HostPtr> originating_hosts = generateHostList(originating_cluster);
-    cluster_.healthy_hosts_ = generateHostList(healthy_destination_cluster);
-    cluster_.hosts_ = generateHostList(all_destination_cluster);
+    HostVectorPtr originating_hosts = generateHostList(originating_cluster);
+    HostVectorPtr healthy_destination = generateHostList(healthy_destination_cluster);
+    cluster_.healthy_hosts_ = *healthy_destination;
+    HostVectorPtr all_destination = generateHostList(all_destination_cluster);
+    cluster_.hosts_ = *all_destination;
 
     std::map<std::string, uint32_t> hits;
     for (uint32_t i = 0; i < total_number_of_requests; ++i) {
-      HostPtr from_host = selectOriginatingHost(originating_hosts);
+      HostPtr from_host = selectOriginatingHost(*originating_hosts);
       uint32_t from_zone = atoi(from_host->zone().c_str());
 
-      std::vector<std::vector<HostPtr>> per_zone_upstream;
-      per_zone_upstream.push_back(per_zone_hosts[from_zone]);
-      for (size_t pos = 0; pos < per_zone_hosts.size(); ++pos) {
-        if (pos == from_zone) {
+      // Populate host set for upstream cluster.
+      HostListsPtr per_zone_upstream(new std::vector<std::vector<HostPtr>>());
+      per_zone_upstream->push_back((*upstream_per_zone_hosts)[from_zone]);
+      for (size_t zone = 0; zone < upstream_per_zone_hosts->size(); ++zone) {
+        if (zone == from_zone) {
           continue;
         }
 
-        per_zone_upstream.push_back(per_zone_hosts[pos]);
+        per_zone_upstream->push_back((*upstream_per_zone_hosts)[zone]);
       }
+      cluster_.hosts_per_zone_ = *per_zone_upstream;
+      cluster_.healthy_hosts_per_zone_ = *per_zone_upstream;
 
-      cluster_.healthy_hosts_per_zone_ = std::move(per_zone_upstream);
+      // Populate host set for originating cluster.
+      HostListsPtr per_zone_local(new std::vector<std::vector<HostPtr>>());
+      per_zone_local->push_back((*local_per_zone_hosts)[from_zone]);
+      for (size_t zone = 0; zone < local_per_zone_hosts->size(); ++zone) {
+        if (zone == from_zone) {
+          continue;
+        }
 
-      ConstHostPtr selected = lb_.chooseHost();
+        per_zone_local->push_back((*local_per_zone_hosts)[zone]);
+      }
+      local_host_set_->updateHosts(originating_hosts, originating_hosts, per_zone_local,
+                                   per_zone_local, empty_vector_, empty_vector_);
+
+      ConstHostPtr selected = lb.chooseHost();
       hits[selected->url()]++;
     }
 
+    double mean = total_number_of_requests * 1.0 / hits.size();
     for (const auto& host_hit_num_pair : hits) {
-      std::cout << fmt::format("url:{}, hits:{}", host_hit_num_pair.first, host_hit_num_pair.second)
-                << std::endl;
+      double percent_diff = std::abs((mean - host_hit_num_pair.second) / mean) * 100;
+      std::cout << fmt::format("url:{}, hits:{}, {} % from mean", host_hit_num_pair.first,
+                               host_hit_num_pair.second, percent_diff) << std::endl;
     }
   }
 
@@ -83,13 +104,13 @@ public:
    * Generate list of hosts based on number of hosts in the given zone.
    * @param hosts number of hosts per zone.
    */
-  std::vector<HostPtr> generateHostList(const std::vector<uint32_t>& hosts) {
-    std::vector<HostPtr> ret;
+  HostVectorPtr generateHostList(const std::vector<uint32_t>& hosts) {
+    HostVectorPtr ret(new std::vector<HostPtr>());
     for (size_t i = 0; i < hosts.size(); ++i) {
       const std::string zone = std::to_string(i);
       for (uint32_t j = 0; j < hosts[i]; ++j) {
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
-        ret.push_back(newTestHost(cluster_, url, 1, zone));
+        ret->push_back(newTestHost(cluster_, url, 1, zone));
       }
     }
 
@@ -100,8 +121,8 @@ public:
    * Generate hosts by zone.
    * @param hosts number of hosts per zone.
    */
-  std::vector<std::vector<HostPtr>> generateHostsPerZone(const std::vector<uint32_t>& hosts) {
-    std::vector<std::vector<HostPtr>> ret;
+  HostListsPtr generateHostsPerZone(const std::vector<uint32_t>& hosts) {
+    HostListsPtr ret(new std::vector<std::vector<HostPtr>>());
     for (size_t i = 0; i < hosts.size(); ++i) {
       const std::string zone = std::to_string(i);
       std::vector<HostPtr> zone_hosts;
@@ -111,21 +132,21 @@ public:
         zone_hosts.push_back(newTestHost(cluster_, url, 1, zone));
       }
 
-      ret.push_back(std::move(zone_hosts));
+      ret->push_back(std::move(zone_hosts));
     }
 
     return ret;
   };
 
-  const uint32_t total_number_of_requests = 3000000;
+  const uint32_t total_number_of_requests = 1000000;
+  std::vector<HostPtr> empty_vector_;
 
+  HostSetImpl* local_host_set_;
   NiceMock<MockCluster> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
   Runtime::RandomGeneratorImpl random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
-  // TODO: make per originating host load balancer.
-  RandomLoadBalancer lb_{cluster_, nullptr, stats_, runtime_, random_};
 };
 
 TEST_F(DISABLED_SimulationTest, strictlyEqualDistribution) {
@@ -145,7 +166,15 @@ TEST_F(DISABLED_SimulationTest, unequalZoneDistribution3) {
 }
 
 TEST_F(DISABLED_SimulationTest, unequalZoneDistribution4) {
-  run({20U, 20U, 21U}, {4U, 4U, 5U}, {4U, 5U, 5U});
+  run({20U, 20U, 21U}, {4U, 5U, 5U}, {4U, 5U, 5U});
+}
+
+TEST_F(DISABLED_SimulationTest, unequalZoneDistribution5) {
+  run({3U, 2U, 5U}, {4U, 5U, 5U}, {4U, 5U, 5U});
+}
+
+TEST_F(DISABLED_SimulationTest, unequalZoneDistribution6) {
+  run({3U, 2U, 5U}, {3U, 4U, 5U}, {3U, 4U, 5U});
 }
 
 } // Upstream
