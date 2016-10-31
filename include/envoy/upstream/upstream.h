@@ -185,19 +185,19 @@ public:
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_retry_overflow)                                                              \
-  COUNTER(upstream_rq_lb_healthy_panic)                                                            \
+  COUNTER(lb_healthy_panic)                                                                        \
+  COUNTER(lb_local_cluster_not_ok)                                                                 \
+  COUNTER(lb_zone_cluster_too_small)                                                               \
+  COUNTER(lb_zone_number_differs)                                                                  \
+  COUNTER(lb_zone_routing_all_directly)                                                            \
+  COUNTER(lb_zone_routing_sampled)                                                                 \
+  COUNTER(lb_zone_routing_cross_zone)                                                              \
+  GAUGE  (max_host_weight)                                                                         \
   COUNTER(membership_change)                                                                       \
   GAUGE  (membership_total)                                                                        \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_success)                                                                          \
-  COUNTER(update_failure)                                                                          \
-  COUNTER(zone_cluster_too_small)                                                                  \
-  COUNTER(zone_routing_all_directly)                                                               \
-  COUNTER(zone_routing_sampled)                                                                    \
-  COUNTER(zone_routing_cross_zone)                                                                 \
-  GAUGE  (max_host_weight)                                                                         \
-  COUNTER(local_cluster_not_ok)                                                                    \
-  COUNTER(zone_number_differs)
+  COUNTER(update_failure)
 // clang-format on
 
 /**

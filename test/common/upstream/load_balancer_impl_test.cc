@@ -82,7 +82,7 @@ TEST_F(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(cluster_.healthy_hosts_[3], lb_->chooseHost());
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost());
 
-  EXPECT_EQ(3UL, stats_.upstream_rq_lb_healthy_panic_.value());
+  EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
 }
 
 TEST_F(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
@@ -110,16 +110,16 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
       .WillRepeatedly(Return(6));
 
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost());
-  EXPECT_EQ(1U, stats_.zone_cluster_too_small_.value());
+  EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
   EXPECT_EQ(cluster_.healthy_hosts_[1], lb_->chooseHost());
-  EXPECT_EQ(2U, stats_.zone_cluster_too_small_.value());
+  EXPECT_EQ(2U, stats_.lb_zone_cluster_too_small_.value());
   EXPECT_EQ(cluster_.healthy_hosts_[2], lb_->chooseHost());
-  EXPECT_EQ(3U, stats_.zone_cluster_too_small_.value());
+  EXPECT_EQ(3U, stats_.lb_zone_cluster_too_small_.value());
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(1));
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
-  EXPECT_EQ(3U, stats_.zone_cluster_too_small_.value());
+  EXPECT_EQ(3U, stats_.lb_zone_cluster_too_small_.value());
 }
 
 TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
@@ -149,7 +149,7 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillOnce(Return(1));
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost());
-  EXPECT_EQ(1U, stats_.zone_number_differs_.value());
+  EXPECT_EQ(1U, stats_.lb_zone_number_differs_.value());
 }
 
 TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
@@ -179,9 +179,9 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
 
   // There is only one host in the given zone for zone aware routing.
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
-  EXPECT_EQ(1U, stats_.zone_routing_all_directly_.value());
+  EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
-  EXPECT_EQ(2U, stats_.zone_routing_all_directly_.value());
+  EXPECT_EQ(2U, stats_.lb_zone_routing_all_directly_.value());
 
   // Disable runtime global zone routing.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
@@ -231,11 +231,11 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
   // There is only one host in the given zone for zone aware routing.
   EXPECT_CALL(random_, random()).WillOnce(Return(100));
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
-  EXPECT_EQ(1U, stats_.zone_routing_sampled_.value());
+  EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[1][1], lb_->chooseHost());
-  EXPECT_EQ(1U, stats_.zone_routing_cross_zone_.value());
+  EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
 TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {

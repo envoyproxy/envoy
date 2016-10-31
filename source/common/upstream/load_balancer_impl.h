@@ -37,6 +37,10 @@ private:
    * In this case we'll route requests to hosts no matter if they are healthy or not.
    */
   bool isGlobalPanic(const HostSet& host_set);
+
+  /**
+   * Try to select upstream hosts from the same zone.
+   */
   const std::vector<HostPtr>& tryChooseLocalZoneHosts();
 
   /**
