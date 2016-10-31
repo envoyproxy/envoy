@@ -148,6 +148,13 @@ public:
  */
 // clang-format off
 #define ALL_CLUSTER_STATS(COUNTER, GAUGE, TIMER)                                                   \
+  COUNTER(lb_healthy_panic)                                                                        \
+  COUNTER(lb_local_cluster_not_ok)                                                                 \
+  COUNTER(lb_zone_cluster_too_small)                                                               \
+  COUNTER(lb_zone_number_differs)                                                                  \
+  COUNTER(lb_zone_routing_all_directly)                                                            \
+  COUNTER(lb_zone_routing_sampled)                                                                 \
+  COUNTER(lb_zone_routing_cross_zone)                                                              \
   COUNTER(upstream_cx_total)                                                                       \
   GAUGE  (upstream_cx_active)                                                                      \
   COUNTER(upstream_cx_http1_total)                                                                 \
@@ -185,17 +192,12 @@ public:
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_retry_overflow)                                                              \
-  COUNTER(upstream_rq_lb_healthy_panic)                                                            \
+  GAUGE  (max_host_weight)                                                                         \
   COUNTER(membership_change)                                                                       \
   GAUGE  (membership_total)                                                                        \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_success)                                                                          \
-  COUNTER(update_failure)                                                                          \
-  COUNTER(zone_cluster_too_small)                                                                  \
-  COUNTER(zone_over_percentage)                                                                    \
-  COUNTER(zone_routing_sampled)                                                                    \
-  COUNTER(zone_routing_no_sampled)                                                                 \
-  GAUGE  (max_host_weight)
+  COUNTER(update_failure)
 // clang-format on
 
 /**
