@@ -135,8 +135,8 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
 
         parseCommand(token, start, main_header, alternative_header, max_length);
 
-        formatters.emplace_back(
-            FormatterPtr(new RequestHeaderFormatter(main_header, alternative_header, max_length)));
+        formatters.emplace_back(FormatterPtr(
+            new RequestHeaderFormatter(main_header, alternative_header, max_length, true)));
       } else if (token.find("RESP(") == 0) {
         std::string main_header, alternative_header;
         Optional<size_t> max_length;
@@ -144,8 +144,8 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
 
         parseCommand(token, start, main_header, alternative_header, max_length);
 
-        formatters.emplace_back(
-            FormatterPtr(new ResponseHeaderFormatter(main_header, alternative_header, max_length)));
+        formatters.emplace_back(FormatterPtr(
+            new ResponseHeaderFormatter(main_header, alternative_header, max_length, false)));
       } else {
         formatters.emplace_back(FormatterPtr(new RequestInfoFormatter(token)));
       }
@@ -219,8 +219,9 @@ std::string PlainStringFormatter::format(const Http::HeaderMap&, const Http::Hea
 
 HeaderFormatter::HeaderFormatter(const std::string& main_header,
                                  const std::string& alternative_header,
-                                 const Optional<size_t>& max_length)
-    : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
+                                 const Optional<size_t>& max_length, bool escape_newlines)
+    : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length),
+      escape_newlines_(escape_newlines) {}
 
 std::string HeaderFormatter::format(const HeaderMap& headers) const {
   std::string header_value = headers.get(main_header_);
@@ -242,8 +243,8 @@ std::string HeaderFormatter::format(const HeaderMap& headers) const {
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
                                                  const std::string& alternative_header,
-                                                 const Optional<size_t>& max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+                                                 const Optional<size_t>& max_length, bool)
+    : HeaderFormatter(main_header, alternative_header, max_length, false) {}
 
 std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
                                             const Http::HeaderMap& response_headers,
@@ -253,8 +254,9 @@ std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
 
 RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
                                                const std::string& alternative_header,
-                                               const Optional<size_t>& max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+                                               const Optional<size_t>& max_length,
+                                               bool escape_newlines)
+    : HeaderFormatter(main_header, alternative_header, max_length, escape_newlines) {}
 
 std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_headers,
                                            const Http::HeaderMap&, const RequestInfo&) const {
