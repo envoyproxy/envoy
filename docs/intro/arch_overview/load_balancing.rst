@@ -59,9 +59,11 @@ Zone aware routing
 In deployments where hosts in a cluster belong to different zones Envoy tries to perform
 zone aware routing where it will send traffic to the same upstream zone if possible.
 There are several preconditions when zone aware routing can be performed:
+
 * Both local and upstream cluster are not in :ref:`panic mode <arch_overview_load_balancing_panic_threshold>`
 * Zone aware :ref:`routing is enabled <config_cluster_manager_cluster_runtime_zone_routing>`
 * Local cluster should have same number of zones as upstream one
 * Upstream cluster has enough hosts, see :ref:`here <config_cluster_manager_cluster_runtime_zone_routing>` for details.
+
 The purpose of zone aware routing is to send as much traffic to the same zone in upstream cluster as possible keeping
 invariant of the same requests per second across all upstream hosts.
