@@ -16,11 +16,11 @@ static HostPtr newTestHost(const Upstream::Cluster& cluster, const std::string& 
 }
 
 /**
- * Simulation test for zone aware routing.
+ * This test is for simulation only and should not be run as part of unit tests.
  */
-class SimulationTest : public testing::Test {
+class DISABLED_SimulationTest : public testing::Test {
 public:
-  SimulationTest() : stats_(ClusterImplBase::generateStats("", stats_store_)) {
+  DISABLED_SimulationTest() : stats_(ClusterImplBase::generateStats("", stats_store_)) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
         .WillByDefault(Return(50U));
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
@@ -90,7 +90,6 @@ public:
     double mean = total_number_of_requests * 1.0 / hits.size();
     for (const auto& host_hit_num_pair : hits) {
       double percent_diff = std::abs((mean - host_hit_num_pair.second) / mean) * 100;
-      EXPECT_TRUE(3.0 >= percent_diff);
       std::cout << fmt::format("url:{}, hits:{}, {} % from mean", host_hit_num_pair.first,
                                host_hit_num_pair.second, percent_diff) << std::endl;
     }
@@ -139,7 +138,7 @@ public:
     return ret;
   };
 
-  const uint32_t total_number_of_requests = 600000;
+  const uint32_t total_number_of_requests = 1000000;
   std::vector<HostPtr> empty_vector_;
 
   HostSetImpl* local_host_set_;
@@ -150,22 +149,32 @@ public:
   ClusterStats stats_;
 };
 
-TEST_F(SimulationTest, strictlyEqualDistribution) { run({1U, 1U, 1U}, {3U, 3U, 3U}, {3U, 3U, 3U}); }
+TEST_F(DISABLED_SimulationTest, strictlyEqualDistribution) {
+  run({1U, 1U, 1U}, {3U, 3U, 3U}, {3U, 3U, 3U});
+}
 
-TEST_F(SimulationTest, unequalZoneDistribution) { run({1U, 1U, 1U}, {2U, 5U, 5U}, {2U, 5U, 5U}); }
+TEST_F(DISABLED_SimulationTest, unequalZoneDistribution) {
+  run({1U, 1U, 1U}, {2U, 5U, 5U}, {2U, 5U, 5U});
+}
 
-TEST_F(SimulationTest, unequalZoneDistribution2) { run({1U, 1U, 1U}, {5U, 5U, 6U}, {5U, 5U, 6U}); }
+TEST_F(DISABLED_SimulationTest, unequalZoneDistribution2) {
+  run({1U, 1U, 1U}, {5U, 5U, 6U}, {5U, 5U, 6U});
+}
 
-TEST_F(SimulationTest, unequalZoneDistribution3) {
+TEST_F(DISABLED_SimulationTest, unequalZoneDistribution3) {
   run({1U, 1U, 1U}, {10U, 10U, 10U}, {10U, 8U, 8U});
 }
 
-TEST_F(SimulationTest, unequalZoneDistribution4) {
+TEST_F(DISABLED_SimulationTest, unequalZoneDistribution4) {
   run({20U, 20U, 21U}, {4U, 5U, 5U}, {4U, 5U, 5U});
 }
 
-TEST_F(SimulationTest, unequalZoneDistribution5) { run({3U, 2U, 5U}, {4U, 5U, 5U}, {4U, 5U, 5U}); }
+TEST_F(DISABLED_SimulationTest, unequalZoneDistribution5) {
+  run({3U, 2U, 5U}, {4U, 5U, 5U}, {4U, 5U, 5U});
+}
 
-TEST_F(SimulationTest, unequalZoneDistribution6) { run({3U, 2U, 5U}, {3U, 4U, 5U}, {3U, 4U, 5U}); }
+TEST_F(DISABLED_SimulationTest, unequalZoneDistribution6) {
+  run({3U, 2U, 5U}, {3U, 4U, 5U}, {3U, 4U, 5U});
+}
 
 } // Upstream
