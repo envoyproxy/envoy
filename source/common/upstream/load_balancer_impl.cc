@@ -108,10 +108,10 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
 
   // Local zone does not have additional capacity (we have already routed what we could).
   // Now we need to figure out how much traffic we can route cross zone and to which exact zone
-  // we should route. Percentage of requests routed cross zone to a specific zone should be
+  // we should route. Percentage of requests routed cross zone to a specific zone needed be
   // proportional to the residual capacity upstream zone has.
   //
-  // Residual_capacity contains capacity left in a given zone, we keep accumulating residual
+  // residual_capacity contains capacity left in a given zone, we keep accumulating residual
   // capacity to make search for sampled value easier.
   uint64_t residual_capacity[number_of_zones];
 
@@ -129,7 +129,7 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
     }
   }
 
-  // Random simulation to select specific zone for cross zone traffic based on the additional
+  // Random sampling to select specific zone for cross zone traffic based on the additional
   // capacity in zones.
   uint64_t threshold = random_.random() % residual_capacity[number_of_zones - 1];
 
