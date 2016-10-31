@@ -238,6 +238,17 @@ std::string HeaderFormatter::format(const HeaderMap& headers) const {
     return header_value.substr(0, max_length_.value());
   }
 
+  if (escape_newlines_ == true) {
+    // TODO: factor out into function? replace multiple characters
+    size_t pos = 0;
+    std::string search = "\n";
+    std::string replace = "\\n";
+    while ((pos = header_value.find(search, pos)) != std::string::npos) {
+         header_value.replace(pos, search.length(), replace);
+         pos += replace.length();
+    }
+  }
+
   return header_value;
 }
 
