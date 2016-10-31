@@ -79,7 +79,7 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
   size_t number_of_zones = host_set_.healthyHostsPerZone().size();
 
   ASSERT(number_of_zones >= 2U);
-  ASSERT(local_host_set_->healthyHostsPerZone().size == host_set_.healthyHostsPerZone().size());
+  ASSERT(local_host_set_->healthyHostsPerZone().size() == host_set_.healthyHostsPerZone().size());
 
   uint64_t local_percentage[number_of_zones];
   calculateZonePercentage(local_host_set_->healthyHostsPerZone(), local_percentage);
