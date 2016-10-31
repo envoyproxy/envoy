@@ -60,6 +60,8 @@ public:
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.http_filter_enforcing", 100))
         .WillByDefault(Return(true));
+    ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_key.http_filter_enabled", 100))
+        .WillByDefault(Return(true));
   }
 
   void SetUpTest(const std::string json) {
@@ -380,6 +382,21 @@ TEST_F(HttpRateLimitFilterTest, NoAddressRateLimiting) {
   filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.do_global_limiting_ = true;
 
   EXPECT_CALL(filter_callbacks_, downstreamAddress()).WillOnce(ReturnRef(EMPTY_STRING));
+
+  EXPECT_CALL(*client_, limit(_, _, _)).Times(0);
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+}
+
+TEST_F(HttpRateLimitFilterTest, RateLimitDisabledForRouteKey) {
+  SetUpTest(request_headers_json);
+
+  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.do_global_limiting_ = true;
+  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.route_key_ = "test_key";
+  ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_key.http_filter_enabled", 100))
+      .WillByDefault(Return(false));
 
   EXPECT_CALL(*client_, limit(_, _, _)).Times(0);
 

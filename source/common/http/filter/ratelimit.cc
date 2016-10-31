@@ -89,23 +89,33 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   }
 
   const Router::RouteEntry* route = callbacks_->routeTable().routeForRequest(headers);
-  if (route && route->rateLimitPolicy().doGlobalLimiting()) {
-    std::vector<::RateLimit::Descriptor> descriptors;
-    for (const ActionPtr& action : config_->actions()) {
-      action->populateDescriptors(*route, descriptors, *config_, headers, *callbacks_);
+  if (route) {
+
+    // Check if the route_key is enabled for rate limiting.
+    const std::string& route_key = route->rateLimitPolicy().routeKey();
+    std::string runtime_route_key = fmt::format("ratelimit.{}.http_filter_enabled", route_key);
+    if (!route_key.empty() &&
+        !config_->runtime().snapshot().featureEnabled(runtime_route_key, 100)) {
+      return FilterHeadersStatus::Continue;
     }
 
-    if (!descriptors.empty()) {
-      cluster_stat_prefix_ = fmt::format("cluster.{}.", route->clusterName());
-      cluster_ratelimit_stat_prefix_ = fmt::format("{}ratelimit.", cluster_stat_prefix_);
+    if (route->rateLimitPolicy().doGlobalLimiting()) {
+      std::vector<::RateLimit::Descriptor> descriptors;
+      for (const ActionPtr& action : config_->actions()) {
+        action->populateDescriptors(*route, descriptors, *config_, headers, *callbacks_);
+      }
 
-      state_ = State::Calling;
-      initiating_call_ = true;
-      client_->limit(*this, config_->domain(), descriptors);
-      initiating_call_ = false;
+      if (!descriptors.empty()) {
+        cluster_stat_prefix_ = fmt::format("cluster.{}.", route->clusterName());
+        cluster_ratelimit_stat_prefix_ = fmt::format("{}ratelimit.", cluster_stat_prefix_);
+
+        state_ = State::Calling;
+        initiating_call_ = true;
+        client_->limit(*this, config_->domain(), descriptors);
+        initiating_call_ = false;
+      }
     }
   }
-
   return (state_ == State::Calling || state_ == State::Responded)
              ? FilterHeadersStatus::StopIteration
              : FilterHeadersStatus::Continue;
