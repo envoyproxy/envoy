@@ -9,6 +9,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  lb_healthy_panic, Counter, Total requests load balanced with the load balancer in panic mode
   upstream_cx_total, Counter, Total connections
   upstream_cx_active, Gauge, Total active connections
   upstream_cx_http1_total, Counter, Total HTTP/1.1 connections
@@ -46,7 +47,6 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_retry, Counter, Total request retries
   upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking
-  upstream_rq_lb_healthy_panic, Counter, Total requests load balanced with the load balancer in panic mode
   membership_change, Counter, Total cluster membership changes
   membership_total, Gauge, Current cluster membership total
   update_attempt, Counter, Total cluster membership update attempts
@@ -136,9 +136,9 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  zone_cluster_too_small, Counter, No zone aware routing because of small upstream cluster size
-  zone_routing_all_directly, Counter, Sending all requests directly to the same zone
-  zone_routing_sampled, Counter, Sending some requests to the same zone
-  zone_routing_cross_zone, Counter, Zone aware routing mode but have to send cross zone
-  local_cluster_not_ok, Counter, Local host set is not set or it is panic mode for local cluster
-  zone_number_differs, Counter, Number of zones in local and upstream cluster different
+  lb_zone_cluster_too_small, Counter, No zone aware routing because of small upstream cluster size
+  lb_zone_routing_all_directly, Counter, Sending all requests directly to the same zone
+  lb_zone_routing_sampled, Counter, Sending some requests to the same zone
+  lb_zone_routing_cross_zone, Counter, Zone aware routing mode but have to send cross zone
+  lb_local_cluster_not_ok, Counter, Local host set is not set or it is panic mode for local cluster
+  lb_zone_number_differs, Counter, Number of zones in local and upstream cluster different
