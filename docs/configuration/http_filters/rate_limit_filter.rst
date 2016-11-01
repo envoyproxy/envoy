@@ -132,3 +132,7 @@ ratelimit.http_filter_enabled
 ratelimit.http_filter_enforcing
   % of requests that will call the rate limit service and enforce the decision. Defaults to 100.
   This can be used to test what would happen before fully enforcing the outcome.
+
+ratelimit.<route_key>.http_filter_enabled
+  % of requests that will call the rate limit service for a given *route_key* specified in the
+  :ref:`route <config_http_conn_man_route_table_route_rate_limit>`. Defaults to 100.
