@@ -92,9 +92,9 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   if (route) {
     // Check if the route_key is enabled for rate limiting.
     const std::string& route_key = route->rateLimitPolicy().routeKey();
-    std::string runtime_route_key = fmt::format("ratelimit.{}.http_filter_enabled", route_key);
     if (!route_key.empty() &&
-        !config_->runtime().snapshot().featureEnabled(runtime_route_key, 100)) {
+        !config_->runtime().snapshot().featureEnabled(
+            fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
       return FilterHeadersStatus::Continue;
     }
 
