@@ -89,7 +89,7 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   }
 
   const Router::RouteEntry* route = callbacks_->routeTable().routeForRequest(headers);
-  if (route) {
+  if (route && route->rateLimitPolicy().doGlobalLimiting()) {
     // Check if the route_key is enabled for rate limiting.
     const std::string& route_key = route->rateLimitPolicy().routeKey();
     if (!route_key.empty() &&
@@ -98,23 +98,22 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
       return FilterHeadersStatus::Continue;
     }
 
-    if (route->rateLimitPolicy().doGlobalLimiting()) {
-      std::vector<::RateLimit::Descriptor> descriptors;
-      for (const ActionPtr& action : config_->actions()) {
-        action->populateDescriptors(*route, descriptors, *config_, headers, *callbacks_);
-      }
+    std::vector<::RateLimit::Descriptor> descriptors;
+    for (const ActionPtr& action : config_->actions()) {
+      action->populateDescriptors(*route, descriptors, *config_, headers, *callbacks_);
+    }
 
-      if (!descriptors.empty()) {
-        cluster_stat_prefix_ = fmt::format("cluster.{}.", route->clusterName());
-        cluster_ratelimit_stat_prefix_ = fmt::format("{}ratelimit.", cluster_stat_prefix_);
+    if (!descriptors.empty()) {
+      cluster_stat_prefix_ = fmt::format("cluster.{}.", route->clusterName());
+      cluster_ratelimit_stat_prefix_ = fmt::format("{}ratelimit.", cluster_stat_prefix_);
 
-        state_ = State::Calling;
-        initiating_call_ = true;
-        client_->limit(*this, config_->domain(), descriptors);
-        initiating_call_ = false;
-      }
+      state_ = State::Calling;
+      initiating_call_ = true;
+      client_->limit(*this, config_->domain(), descriptors);
+      initiating_call_ = false;
     }
   }
+
   return (state_ == State::Calling || state_ == State::Responded)
              ? FilterHeadersStatus::StopIteration
              : FilterHeadersStatus::Continue;
