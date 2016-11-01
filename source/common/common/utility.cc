@@ -108,15 +108,15 @@ const std::string& StringUtil::valueOrDefault(const std::string& input,
   return input.empty() ? default_value : input;
 }
 
-std::string StringUtil::replaceAll(const std::string& input, const std::string& search, const std::string& replacement) {
+std::string StringUtil::replaceAll(const std::string& input, const std::string& search,
+                                   const std::string& replacement) {
   std::string input_ = input;
 
   size_t pos = 0;
   while ((pos = input_.find(search, pos)) != std::string::npos) {
-       input_.replace(pos, search.length(), replacement);
-       pos += replacement.length();
+    input_.replace(pos, search.length(), replacement);
+    pos += replacement.length();
   }
 
   return input_;
-
 }

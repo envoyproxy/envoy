@@ -99,5 +99,6 @@ public:
   static const std::string& valueOrDefault(const std::string& input,
                                            const std::string& default_value);
 
-  static std::string replaceAll(const std::string& input, const std::string& search, const std::string& replacement);
+  static std::string replaceAll(const std::string& input, const std::string& search,
+                                const std::string& replacement);
 };
