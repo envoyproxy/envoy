@@ -76,6 +76,23 @@ struct ConnectionManagerStats {
   Stats::Store& store_;
 };
 
+enum class TracingType {
+  // Trace all traceable requests.
+  All,
+  // Trace only when there is an upstream failure reason.
+  UpstreamFailure
+};
+
+/**
+ * Configuration for tracing which is set on the connection manager level.
+ * Http Tracing can be enabled/disabled on a per connection manager basis.
+ * Here we specify some specific for connection manager settings.
+ */
+struct TracingConnectionManagerConfig {
+  std::string operation_name_;
+  TracingType tracing_type_;
+};
+
 /**
  * Abstract configuration for the connection manager.
  */
@@ -159,9 +176,9 @@ public:
   virtual const Optional<std::string>& userAgent() PURE;
 
   /**
-   * @return true if tracing is enabled otherwise it returns false;
+   * @return tracing config.
    */
-  virtual bool isTracing() PURE;
+  virtual const Optional<TracingConnectionManagerConfig>& tracingConfig() PURE;
 };
 
 /**
@@ -197,7 +214,7 @@ public:
   void onEvent(uint32_t events) override;
 
 private:
-  class ActiveStream;
+  struct ActiveStream;
 
   /**
    * Base class wrapper for both stream encoder and decoder filters.
@@ -319,7 +336,8 @@ private:
                         public Event::DeferredDeletable,
                         public StreamCallbacks,
                         public StreamDecoder,
-                        public FilterChainFactoryCallbacks {
+                        public FilterChainFactoryCallbacks,
+                        public Tracing::TracingContext {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
 
@@ -341,13 +359,16 @@ private:
 
     // Http::StreamDecoder
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
-    void decodeData(const Buffer::Instance& data, bool end_stream) override;
+    void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(HeaderMapPtr&& trailers) override;
 
     // Http::FilterChainFactoryCallbacks
     void addStreamDecoderFilter(StreamDecoderFilterPtr filter) override;
     void addStreamEncoderFilter(StreamEncoderFilterPtr filter) override;
     void addStreamFilter(StreamFilterPtr filter) override;
+
+    // Tracing::TracingContext
+    virtual const std::string& operationName() const override;
 
     static DateFormatter date_formatter_;
 

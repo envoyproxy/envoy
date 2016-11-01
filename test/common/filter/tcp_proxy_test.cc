@@ -130,11 +130,8 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
 }
 
 TEST_F(TcpProxyTest, NoHost) {
-  setup(false);
-
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
-  Buffer::OwnedImpl buffer("hello");
-  filter_->onData(buffer);
+  setup(false);
 }
 
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
@@ -160,16 +157,15 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
-  // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
-  filter_.reset(new TcpProxy(config_, cluster_manager_));
-  filter_->initializeReadFilterCallbacks(filter_callbacks_);
   cluster_manager_.cluster_.resource_manager_.reset(
       new Upstream::ResourceManagerImpl(runtime_, "fake_key", 0, 0, 0, 0));
 
-  Buffer::OwnedImpl buffer("hello");
+  // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
+  filter_.reset(new TcpProxy(config_, cluster_manager_));
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
-  ASSERT_EQ(Network::FilterStatus::StopIteration, filter_->onData(buffer));
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+
   EXPECT_EQ(
       1U,
       cluster_manager_.cluster_.stats_store_.counter("cluster.fake_cluster.upstream_cx_overflow")

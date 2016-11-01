@@ -1,6 +1,6 @@
 #pragma once
 
-#include "filter_manager.h"
+#include "filter_manager_impl.h"
 
 #include "envoy/network/connection.h"
 
@@ -27,11 +27,13 @@ public:
                  const std::string& remote_address);
   ~ConnectionImpl();
 
-  // Network::Connection
-  void addConnectionCallbacks(ConnectionCallbacks& cb) override;
+  // Network::FilterManager
   void addWriteFilter(WriteFilterPtr filter) override;
   void addFilter(FilterPtr filter) override;
   void addReadFilter(ReadFilterPtr filter) override;
+
+  // Network::Connection
+  void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() override;
@@ -98,7 +100,7 @@ protected:
   Event::Libevent::BufferEventPtr bev_;
   const std::string remote_address_;
   const uint64_t id_;
-  FilterManager filter_manager_;
+  FilterManagerImpl filter_manager_;
   std::list<ConnectionCallbacks*> callbacks_;
   Event::TimerPtr redispatch_read_event_;
   bool read_enabled_;
@@ -108,6 +110,7 @@ private:
   void fakeBufferDrain(ConnectionBufferType type, evbuffer* buffer);
 
   Buffer::WrappedImpl read_buffer_;
+  Buffer::WrappedImpl write_buffer_;
   Buffer::Instance* current_write_buffer_{};
 };
 

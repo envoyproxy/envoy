@@ -127,13 +127,20 @@ public:
    *         set on the command line and to use a cluster type that supports population such as
    *         the SDS cluster type.
    */
-  virtual const std::vector<HostPtr>& localZoneHosts() const PURE;
 
   /**
-   * @return all healthy hosts that are in the zone local to this node. See healthyHosts() and
-   *         localZoneHosts() for more information.
+   * @return hosts per zone, index 0 is dedicated to local zone hosts.
+   * If there are no hosts in local zone for upstream cluster hostPerZone() will @return
+   * empty vector.
+   *
+   * Note, that we sort zones in alphabetical order starting from index 1.
    */
-  virtual const std::vector<HostPtr>& localZoneHealthyHosts() const PURE;
+  virtual const std::vector<std::vector<HostPtr>>& hostsPerZone() const PURE;
+
+  /**
+   * @return same as hostsPerZone but only contains healthy hosts.
+   */
+  virtual const std::vector<std::vector<HostPtr>>& healthyHostsPerZone() const PURE;
 };
 
 /**
@@ -141,6 +148,13 @@ public:
  */
 // clang-format off
 #define ALL_CLUSTER_STATS(COUNTER, GAUGE, TIMER)                                                   \
+  COUNTER(lb_healthy_panic)                                                                        \
+  COUNTER(lb_local_cluster_not_ok)                                                                 \
+  COUNTER(lb_zone_cluster_too_small)                                                               \
+  COUNTER(lb_zone_number_differs)                                                                  \
+  COUNTER(lb_zone_routing_all_directly)                                                            \
+  COUNTER(lb_zone_routing_sampled)                                                                 \
+  COUNTER(lb_zone_routing_cross_zone)                                                              \
   COUNTER(upstream_cx_total)                                                                       \
   GAUGE  (upstream_cx_active)                                                                      \
   COUNTER(upstream_cx_http1_total)                                                                 \
@@ -178,18 +192,12 @@ public:
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_retry_overflow)                                                              \
-  COUNTER(upstream_rq_lb_healthy_panic)                                                            \
+  GAUGE  (max_host_weight)                                                                         \
   COUNTER(membership_change)                                                                       \
   GAUGE  (membership_total)                                                                        \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_success)                                                                          \
-  COUNTER(update_failure)                                                                          \
-  COUNTER(zone_cluster_too_small)                                                                  \
-  COUNTER(zone_over_percentage)                                                                    \
-  COUNTER(zone_routing_sampled)                                                                    \
-  COUNTER(zone_routing_no_sampled)                                                                 \
-  GAUGE  (max_host_weight)                                                                         \
-  GAUGE  (upstream_zone_count)
+  COUNTER(update_failure)
 // clang-format on
 
 /**

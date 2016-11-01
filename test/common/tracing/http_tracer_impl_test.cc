@@ -215,6 +215,7 @@ TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
   Http::HeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
   Http::HeaderMapImpl empty_header{};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  NiceMock<MockTracingContext> context;
 
   MockHttpSink* sink1 = new MockHttpSink();
   MockHttpSink* sink2 = new MockHttpSink();
@@ -225,36 +226,36 @@ TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
 
   // Force traced request.
   {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _));
-    EXPECT_CALL(*sink2, flushTrace(_, _, _));
-    tracer.trace(&forced_header, &empty_header, request_info);
+    EXPECT_CALL(*sink1, flushTrace(_, _, _, _));
+    EXPECT_CALL(*sink2, flushTrace(_, _, _, _));
+    tracer.trace(&forced_header, &empty_header, request_info, context);
   }
 
   // x-request-id is sample traced.
   {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _));
-    EXPECT_CALL(*sink2, flushTrace(_, _, _));
+    EXPECT_CALL(*sink1, flushTrace(_, _, _, _));
+    EXPECT_CALL(*sink2, flushTrace(_, _, _, _));
 
-    tracer.trace(&sampled_header, &empty_header, request_info);
+    tracer.trace(&sampled_header, &empty_header, request_info, context);
   }
 
   // HC request.
   {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _)).Times(0);
-    EXPECT_CALL(*sink2, flushTrace(_, _, _)).Times(0);
+    EXPECT_CALL(*sink1, flushTrace(_, _, _, _)).Times(0);
+    EXPECT_CALL(*sink2, flushTrace(_, _, _, _)).Times(0);
 
     Http::HeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
     NiceMock<Http::AccessLog::MockRequestInfo> request_info;
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(true));
-    tracer.trace(&traceable_header_hc, &empty_header, request_info);
+    tracer.trace(&traceable_header_hc, &empty_header, request_info, context);
   }
 
   // x-request-id is not traceable.
   {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _)).Times(0);
-    EXPECT_CALL(*sink2, flushTrace(_, _, _)).Times(0);
+    EXPECT_CALL(*sink1, flushTrace(_, _, _, _)).Times(0);
+    EXPECT_CALL(*sink2, flushTrace(_, _, _, _)).Times(0);
 
-    tracer.trace(&not_traceable_header, &empty_header, request_info);
+    tracer.trace(&not_traceable_header, &empty_header, request_info, context);
   }
 }
 
@@ -268,7 +269,8 @@ TEST(HttpTracerImplTest, ZeroSinksRunsFine) {
   Http::HeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
 
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  tracer.trace(&not_traceable, &not_traceable, request_info);
+  NiceMock<MockTracingContext> context;
+  tracer.trace(&not_traceable, &not_traceable, request_info, context);
 }
 
 TEST(HttpNullTracerTest, NoFailures) {
@@ -280,8 +282,9 @@ TEST(HttpNullTracerTest, NoFailures) {
 
   Http::HeaderMapImpl empty_header{};
   Http::AccessLog::MockRequestInfo request_info;
+  NiceMock<MockTracingContext> context;
 
-  tracer.trace(&empty_header, &empty_header, request_info);
+  tracer.trace(&empty_header, &empty_header, request_info, context);
 }
 
 class LightStepSinkTest : public Test {
@@ -293,6 +296,7 @@ public:
 
     ON_CALL(cm_, httpAsyncClientForCluster("lightstep_saas"))
         .WillByDefault(ReturnRef(cm_.async_client_));
+    ON_CALL(context_, operationName()).WillByDefault(ReturnRef(operation_name_));
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
@@ -315,6 +319,7 @@ public:
     setup(loader, true);
   }
 
+  const std::string operation_name_{"test"};
   const Http::HeaderMapImpl empty_header_{};
   const Http::HeaderMapImpl response_headers_{{":status", "500"}};
 
@@ -326,6 +331,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<MockTracingContext> context_;
 };
 
 TEST_F(LightStepSinkTest, InitializeSink) {
@@ -417,9 +423,10 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
       .WillRepeatedly(Return(2));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
+  EXPECT_CALL(context_, operationName()).Times(2).WillRepeatedly(ReturnRef(operation_name_));
 
-  sink_->flushTrace(empty_header_, response_headers_, request_info);
-  sink_->flushTrace(empty_header_, response_headers_, request_info);
+  sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
+  sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
@@ -463,13 +470,16 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
   Optional<uint32_t> code(200);
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
+  EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10UL));
+  EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100UL));
 
   const std::string protocol = "http/1";
   EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(5));
+  EXPECT_CALL(context_, operationName()).WillOnce(ReturnRef(operation_name_));
 
-  sink_->flushTrace(empty_header_, response_headers_, request_info);
+  sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
   // Timer should be re-enabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
@@ -516,8 +526,9 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
       .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
+  EXPECT_CALL(context_, operationName()).WillOnce(ReturnRef(operation_name_));
 
-  sink_->flushTrace(empty_header_, response_headers_, request_info);
+  sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));

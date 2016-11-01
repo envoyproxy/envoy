@@ -125,7 +125,7 @@ private:
 
     // Http::StreamDecoder
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
-    void decodeData(const Buffer::Instance&, bool end_stream) override {
+    void decodeData(Buffer::Instance&, bool end_stream) override {
       if (end_stream) {
         onResponseComplete();
       }

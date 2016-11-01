@@ -4,11 +4,9 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
-#include "common/api/api_impl.h"
-
 ConnectionHandler::ConnectionHandler(Stats::Store& stats_store, spdlog::logger& logger,
-                                     std::chrono::milliseconds file_flush_interval_msec)
-    : stats_store_(stats_store), logger_(logger), api_(new Api::Impl(file_flush_interval_msec)),
+                                     Api::ApiPtr&& api)
+    : stats_store_(stats_store), logger_(logger), api_(std::move(api)),
       dispatcher_(api_->allocateDispatcher()),
       watchdog_miss_counter_(stats_store.counter("server.watchdog_miss")),
       watchdog_mega_miss_counter_(stats_store.counter("server.watchdog_mega_miss")) {}
@@ -75,10 +73,14 @@ ConnectionHandler::SslActiveListener::SslActiveListener(ConnectionHandler& paren
 void ConnectionHandler::ActiveListener::onNewConnection(Network::ConnectionPtr&& new_connection) {
   conn_log(parent_.logger_, info, "new connection", *new_connection);
   factory_.createFilterChain(*new_connection);
-  ActiveConnectionPtr active_connection(
-      new ActiveConnection(parent_, std::move(new_connection), stats_));
-  active_connection->moveIntoList(std::move(active_connection), parent_.connections_);
-  parent_.num_connections_++;
+
+  // If the connection is already closed, we can just let this connection immediately die.
+  if (new_connection->state() != Network::Connection::State::Closed) {
+    ActiveConnectionPtr active_connection(
+        new ActiveConnection(parent_, std::move(new_connection), stats_));
+    active_connection->moveIntoList(std::move(active_connection), parent_.connections_);
+    parent_.num_connections_++;
+  }
 }
 
 ConnectionHandler::ActiveConnection::ActiveConnection(ConnectionHandler& parent,

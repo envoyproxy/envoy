@@ -26,9 +26,9 @@ export CC=gcc-4.9
 export CXX=g++-4.9
 
 # openssl
-wget https://www.openssl.org/source/openssl-1.0.2h.tar.gz
-tar xf openssl-1.0.2h.tar.gz
-cd openssl-1.0.2h
+wget https://www.openssl.org/source/openssl-1.0.2i.tar.gz
+tar xf openssl-1.0.2i.tar.gz
+cd openssl-1.0.2i
 ./config --prefix=$THIRDPARTY_BUILD -DPURIFY no-shared
 make install
 cd ..
@@ -64,9 +64,9 @@ cd ..
 rm -fr jansson*
 
 # nghttp2
-wget https://github.com/nghttp2/nghttp2/releases/download/v1.14.0/nghttp2-1.14.0.tar.gz
-tar xf nghttp2-1.14.0.tar.gz
-cd nghttp2-1.14.0
+wget https://github.com/nghttp2/nghttp2/releases/download/v1.14.1/nghttp2-1.14.1.tar.gz
+tar xf nghttp2-1.14.1.tar.gz
+cd nghttp2-1.14.1
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-lib-only
 make install
 cd ..
@@ -86,11 +86,10 @@ wget https://github.com/sakra/cotire/archive/cotire-1.7.8.tar.gz
 tar xf cotire-1.7.8.tar.gz
 rm cotire-1.7.8.tar.gz
 
-# spdlog (not tag based)
-git clone https://github.com/gabime/spdlog.git
-cd spdlog
-git reset --hard 319a62
-cd ..
+# spdlog
+wget https://github.com/gabime/spdlog/archive/v0.11.0.tar.gz
+tar xf v0.11.0.tar.gz
+rm v0.11.0.tar.gz
 
 # http-parser
 wget -O http-parser-v2.7.0.tar.gz https://github.com/nodejs/http-parser/archive/v2.7.0.tar.gz

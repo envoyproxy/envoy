@@ -286,9 +286,10 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
-  if (connection_manager_.config_.isTracing()) {
+  if (ConnectionManagerUtility::shouldTraceRequest(request_info_,
+                                                   connection_manager_.config_.tracingConfig())) {
     connection_manager_.tracer_.trace(request_headers_.get(), response_headers_.get(),
-                                      request_info_);
+                                      request_info_, *this);
   }
 }
 
@@ -420,8 +421,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::decodeData(const Buffer::Instance& data,
-                                                     bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
   request_info_.bytes_received_ += data.length();
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;
@@ -429,10 +429,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(const Buffer::Instance& dat
     stream_log_debug("request end stream", *this);
   }
 
-  // We are fed data directly from codec buffers. Perform a single copy here so that filters can
-  // modify the data and potentially take ownership of it.
-  Buffer::OwnedImpl data_copy(data);
-  decodeData(nullptr, data_copy, end_stream);
+  decodeData(nullptr, data, end_stream);
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
@@ -644,6 +641,10 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
       removeFromList(connection_manager_.streams_));
 }
 
+const std::string& ConnectionManagerImpl::ActiveStream::operationName() const {
+  return connection_manager_.config_.tracingConfig().value().operation_name_;
+}
+
 void ConnectionManagerImpl::ActiveStreamFilterBase::addResetStreamCallback(
     std::function<void()> callback) {
   parent_.reset_callbacks_.push_back(callback);
@@ -702,7 +703,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleBufferData(
     if (!bufferedData()) {
       bufferedData().reset(new Buffer::OwnedImpl());
     }
-    bufferedData()->add(provided_data);
+    bufferedData()->move(provided_data);
   }
 }
 

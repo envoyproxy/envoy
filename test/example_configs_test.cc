@@ -68,7 +68,7 @@ void runConfigTest(const std::string& dir_path) {
     }
 
     std::string file_name = fmt::format("{}/{}", dir_path, std::string(entry->d_name));
-    Logger::Registry::getLog(Logger::Id::testing).notice("testing config: {}", file_name);
+    Logger::Registry::getLog(Logger::Id::testing).info("testing config: {}", file_name);
     ConfigTest config(file_name);
   }
 

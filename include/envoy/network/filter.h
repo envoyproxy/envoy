@@ -100,6 +100,32 @@ class Filter : public WriteFilter, public ReadFilter {};
 typedef std::shared_ptr<Filter> FilterPtr;
 
 /**
+ * Interface for adding individual network filters to a manager.
+ */
+class FilterManager {
+public:
+  virtual ~FilterManager() {}
+
+  /**
+   * Add a write filter to the connection. Filters are invoked in LIFO order (the last added
+   * filter is called first).
+   */
+  virtual void addWriteFilter(WriteFilterPtr filter) PURE;
+
+  /**
+   * Add a combination filter to the connection. Equivalent to calling both addWriteFilter()
+   * and addReadFilter() with the same filter instance.
+   */
+  virtual void addFilter(FilterPtr filter) PURE;
+
+  /**
+   * Add a read filter to the connection. Filters are invoked in FIFO order (the filter added
+   * first is called first).
+   */
+  virtual void addReadFilter(ReadFilterPtr filter) PURE;
+};
+
+/**
  * Creates a chain of network filters for a new connection.
  */
 class FilterChainFactory {

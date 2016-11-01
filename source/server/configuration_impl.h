@@ -18,7 +18,7 @@ enum class NetworkFilterType { Read, Write, Both };
  * come in. Filter factories create the lambda at configuration initialization time, and then they
  * are used at runtime. This maps JSON -> runtime configuration.
  */
-typedef std::function<void(Network::Connection&)> NetworkFilterFactoryCb;
+typedef std::function<void(Network::FilterManager& filter_manager)> NetworkFilterFactoryCb;
 
 /**
  * Implemented by each network filter and registered via registerNetworkFilterConfigFactory() or
@@ -32,6 +32,19 @@ public:
                                                         const std::string& name,
                                                         const Json::Object& config,
                                                         Server::Instance& server) PURE;
+};
+
+/**
+ * Utilities for creating a filter chain for a network connection.
+ */
+class FilterChainUtility {
+public:
+  /**
+   * Given a connection and a list of factories, create a new filter chain. Chain creation will
+   * exit early if any filters immediately close the connection.
+   */
+  static void buildFilterChain(Network::Connection& connection,
+                               const std::list<NetworkFilterFactoryCb>& factories);
 };
 
 /**

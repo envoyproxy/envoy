@@ -22,8 +22,8 @@ sources of latency. Envoy supports three features related to system wide tracing
 
 How to initiate a trace
 -----------------------
-The HTTP connection manager that handles the request must have the :ref:`tracing_enabled
-<config_http_conn_man_tracing_enabled>` option set. There are several ways tracing can be 
+The HTTP connection manager that handles the request must have the :ref:`tracing
+<config_http_conn_man_tracing>` object set. There are several ways tracing can be 
 initiated:
 
 * By an external client via the :ref:`config_http_conn_man_headers_x-client-trace-id`

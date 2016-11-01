@@ -30,9 +30,9 @@ public:
   virtual const std::string& configPath() PURE;
 
   /**
-   * @return uint64_t the default log level for the server.
+   * @return spdlog::level::level_enum the default log level for the server.
    */
-  virtual uint64_t logLevel() PURE;
+  virtual spdlog::level::level_enum logLevel() PURE;
 
   /**
    * @return the restart epoch. 0 indicates the first server start, 1 the second, and so on.

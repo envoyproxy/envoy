@@ -64,6 +64,7 @@ public:
     read_callbacks_ = &callbacks;
     conn_log_info("new tcp proxy session", read_callbacks_->connection());
     read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
+    initializeUpstreamConnection();
   }
 
 private:

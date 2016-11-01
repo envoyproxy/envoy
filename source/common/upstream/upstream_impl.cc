@@ -52,7 +52,7 @@ void HostSetImpl::runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
   }
 }
 
-const ConstHostVectorPtr ClusterImplBase::empty_host_list_{new std::vector<HostPtr>{}};
+const ConstHostListsPtr ClusterImplBase::empty_host_lists_{new std::vector<std::vector<HostPtr>>()};
 
 ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime,
                                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
@@ -85,10 +85,27 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& ru
 
 ConstHostVectorPtr ClusterImplBase::createHealthyHostList(const std::vector<HostPtr>& hosts) {
   HostVectorPtr healthy_list(new std::vector<HostPtr>());
-  for (auto host : hosts) {
+  for (const auto& host : hosts) {
     if (host->healthy()) {
       healthy_list->emplace_back(host);
     }
+  }
+
+  return healthy_list;
+}
+
+ConstHostListsPtr
+ClusterImplBase::createHealthyHostLists(const std::vector<std::vector<HostPtr>>& hosts) {
+  HostListsPtr healthy_list(new std::vector<std::vector<HostPtr>>());
+
+  for (const auto& hosts_zone : hosts) {
+    std::vector<HostPtr> current_zone_hosts;
+    for (const auto& host : hosts_zone) {
+      if (host->healthy()) {
+        current_zone_hosts.emplace_back(host);
+      }
+    }
+    healthy_list->push_back(std::move(current_zone_hosts));
   }
 
   return healthy_list;
@@ -130,8 +147,8 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
     // If we get a health check completion that resulted in a state change, signal to
     // update the host sets on all threads.
     if (changed_state) {
-      updateHosts(rawHosts(), createHealthyHostList(*rawHosts()), rawLocalZoneHosts(),
-                  createHealthyHostList(*rawLocalZoneHosts()), {}, {});
+      updateHosts(rawHosts(), createHealthyHostList(*rawHosts()), rawHostsPerZone(),
+                  createHealthyHostLists(*rawHostsPerZone()), {}, {});
     }
   });
 }
@@ -143,8 +160,8 @@ void ClusterImplBase::setOutlierDetector(OutlierDetectorPtr&& outlier_detector) 
 
   outlier_detector_ = std::move(outlier_detector);
   outlier_detector_->addChangedStateCb([this](HostPtr) -> void {
-    updateHosts(rawHosts(), createHealthyHostList(*rawHosts()), rawLocalZoneHosts(),
-                createHealthyHostList(*rawLocalZoneHosts()), {}, {});
+    updateHosts(rawHosts(), createHealthyHostList(*rawHosts()), rawHostsPerZone(),
+                createHealthyHostLists(*rawHostsPerZone()), {}, {});
   });
 }
 
@@ -187,8 +204,8 @@ StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader
     new_hosts->emplace_back(HostPtr{new HostImpl(*this, url, false, 1, "")});
   }
 
-  updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_list_, empty_host_list_, {},
-              {});
+  updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
+              {}, {});
 }
 
 bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& new_hosts,
@@ -197,7 +214,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
                                                    std::vector<HostPtr>& hosts_removed,
                                                    bool depend_on_hc) {
   uint64_t max_host_weight = 1;
-  std::unordered_set<std::string> zones;
 
   // Go through and see if the list we have is different from what we just got. If it is, we
   // make a new host list and raise a change notification. This uses an N^2 search given that
@@ -209,7 +225,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
       // If we find a host matched based on URL, we keep it. However we do change weight inline so
       // do that here.
       if ((*i)->url() == host->url()) {
-        zones.insert((*i)->zone());
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
         }
@@ -227,7 +242,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }
-      zones.insert(host->zone());
 
       final_hosts.push_back(host);
       hosts_added.push_back(host);
@@ -246,7 +260,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
         if ((*i)->weight() > max_host_weight) {
           max_host_weight = (*i)->weight();
         }
-        zones.insert((*i)->zone());
 
         final_hosts.push_back(*i);
         i = current_hosts.erase(i);
@@ -257,7 +270,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
   }
 
   stats_.max_host_weight_.set(max_host_weight);
-  stats_.upstream_zone_count_.set(zones.size());
 
   if (!hosts_added.empty() || !current_hosts.empty()) {
     hosts_removed = std::move(current_hosts);
@@ -295,7 +307,7 @@ void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostPtr>& hosts_adde
     }
   }
 
-  updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_list_, empty_host_list_,
+  updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
               hosts_added, hosts_removed);
 }
 

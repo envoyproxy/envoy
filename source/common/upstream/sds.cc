@@ -73,17 +73,30 @@ void SdsClusterImpl::parseSdsResponse(Http::Message& response) {
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
     log_debug("sds hosts changed for cluster: {} ({})", name_, hosts().size());
-    HostVectorPtr local_zone_hosts(new std::vector<HostPtr>());
+    HostListsPtr per_zone(new std::vector<std::vector<HostPtr>>());
+
+    // If local zone name is not defined then skip populating per zone hosts.
     if (!sds_config_.local_zone_name_.empty()) {
+      std::map<std::string, std::vector<HostPtr>> hosts_per_zone;
+
       for (HostPtr host : *current_hosts_copy) {
-        if (host->zone() == sds_config_.local_zone_name_) {
-          local_zone_hosts->push_back(host);
+        hosts_per_zone[host->zone()].push_back(host);
+      }
+
+      // Populate per_zone hosts only if upstream cluster has hosts in the same zone.
+      if (hosts_per_zone.find(sds_config_.local_zone_name_) != hosts_per_zone.end()) {
+        per_zone->push_back(hosts_per_zone[sds_config_.local_zone_name_]);
+
+        for (auto& entry : hosts_per_zone) {
+          if (sds_config_.local_zone_name_ != entry.first) {
+            per_zone->push_back(entry.second);
+          }
         }
       }
     }
 
-    updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy), local_zone_hosts,
-                createHealthyHostList(*local_zone_hosts), hosts_added, hosts_removed);
+    updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy), per_zone,
+                createHealthyHostLists(*per_zone), hosts_added, hosts_removed);
 
     if (initialize_callback_ && health_checker_ && pending_health_checks_ == 0) {
       pending_health_checks_ = hosts().size();

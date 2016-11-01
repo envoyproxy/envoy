@@ -38,7 +38,8 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher,
     : dispatcher_(dispatcher), bev_(std::move(bev)), remote_address_(remote_address),
       id_(++next_global_id_), filter_manager_(*this, *this),
       redispatch_read_event_(dispatcher.createTimer([this]() -> void { onRead(); })),
-      read_buffer_(bufferevent_get_input(bev_.get())) {
+      read_buffer_(bufferevent_get_input(bev_.get())),
+      write_buffer_(bufferevent_get_output(bev_.get())) {
 
   enableCallbacks(true, false, true);
   bufferevent_enable(bev_.get(), EV_READ | EV_WRITE);
@@ -262,14 +263,7 @@ void ConnectionImpl::write(Buffer::Instance& data) {
 
   if (data.length() > 0) {
     conn_log_trace("writing {} bytes", *this, data.length());
-    uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    Buffer::RawSlice slices[num_slices];
-    data.getRawSlices(slices, num_slices);
-    for (Buffer::RawSlice& slice : slices) {
-      int rc = bufferevent_write(bev_.get(), slice.mem_, slice.len_);
-      ASSERT(rc == 0);
-      UNREFERENCED_PARAMETER(rc);
-    }
+    write_buffer_.move(data);
   }
 }
 

@@ -144,7 +144,7 @@ private:
     CodecClient& parent_;
   };
 
-  class ActiveRequest;
+  struct ActiveRequest;
 
   /**
    * Wrapper for the client response decoder. We use this only for managing end of stream.

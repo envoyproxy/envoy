@@ -82,7 +82,7 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
   }
 }
 
-void StreamEncoderImpl::encodeData(const Buffer::Instance& data, bool end_stream) {
+void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // end_stream may be indicated with a zero length data buffer. If that is the case, so not
   // atually write the zero length buffer out.
   if (data.length() > 0) {
@@ -90,7 +90,7 @@ void StreamEncoderImpl::encodeData(const Buffer::Instance& data, bool end_stream
       output_buffer_.add(fmt::format("{:x}\r\n", data.length()));
     }
 
-    output_buffer_.add(data);
+    output_buffer_.move(data);
 
     if (chunk_encoding_) {
       output_buffer_.add(CRLF);
@@ -378,8 +378,7 @@ void ServerConnectionImpl::onBody(const char* data, size_t length) {
   ASSERT(!deferred_end_stream_headers_);
   if (active_request_) {
     conn_log_trace("body size={}", connection_, length);
-    Buffer::OwnedImpl buffer;
-    buffer.add(data, length);
+    Buffer::OwnedImpl buffer(data, length);
     active_request_->request_decoder_->decodeData(buffer, false);
   }
 }

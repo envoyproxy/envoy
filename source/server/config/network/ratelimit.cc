@@ -21,8 +21,8 @@ public:
 
     RateLimit::TcpFilter::ConfigPtr config(
         new RateLimit::TcpFilter::Config(json_config, server.stats(), server.runtime()));
-    return [config, &server](Network::Connection& connection) -> void {
-      connection.addReadFilter(Network::ReadFilterPtr{new RateLimit::TcpFilter::Instance(
+    return [config, &server](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(Network::ReadFilterPtr{new RateLimit::TcpFilter::Instance(
           config, server.rateLimitClient(Optional<std::chrono::milliseconds>()))});
     };
   }

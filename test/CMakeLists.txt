@@ -58,6 +58,7 @@ add_executable(envoy-test
   common/filter/tcp_proxy_test.cc
   common/dynamo/dynamo_filter_test.cc
   common/dynamo/dynamo_request_parser_test.cc
+  common/dynamo/dynamo_utility_test.cc
   common/json/json_loader_test.cc
   common/mongo/bson_impl_test.cc
   common/mongo/codec_impl_test.cc
@@ -65,7 +66,7 @@ add_executable(envoy-test
   common/mongo/utility_test.cc
   common/network/connection_impl_test.cc
   common/network/dns_impl_test.cc
-  common/network/filter_manager_test.cc
+  common/network/filter_manager_impl_test.cc
   common/network/listen_socket_impl_test.cc
   common/network/proxy_protocol_test.cc
   common/network/utility_test.cc
@@ -122,6 +123,8 @@ add_executable(envoy-test
   mocks/tracing/mocks.cc
   mocks/upstream/mocks.cc
   server/config/network/http_connection_manager_test.cc
+  server/configuration_impl_test.cc
+  server/connection_handler_test.cc
   server/drain_manager_impl_test.cc
   server/http/admin_test.cc
   server/http/health_check_test.cc

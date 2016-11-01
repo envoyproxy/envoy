@@ -78,8 +78,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   EXPECT_EQ(1UL, cluster_->hosts().size());
   EXPECT_EQ(1UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->localZoneHosts().size());
-  EXPECT_EQ(0UL, cluster_->localZoneHealthyHosts().size());
+  EXPECT_EQ(0UL, cluster_->hostsPerZone().size());
+  EXPECT_EQ(0UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(cluster_->hosts()[0], cluster_->healthyHosts()[0]);
   HostPtr logical_host = cluster_->hosts()[0];
 

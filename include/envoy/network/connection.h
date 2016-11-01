@@ -60,7 +60,7 @@ enum class ConnectionCloseType {
 /**
  * An abstract raw connection. Free the connection or call close() to disconnect.
  */
-class Connection : public Event::DeferredDeletable {
+class Connection : public Event::DeferredDeletable, public FilterManager {
 public:
   enum class State { Open, Closing, Closed };
 
@@ -70,24 +70,6 @@ public:
    * Register callbacks that fire when connection events occur.
    */
   virtual void addConnectionCallbacks(ConnectionCallbacks& cb) PURE;
-
-  /**
-   * Add a write filter to the connection. Filters are invoked in LIFO order (the last added
-   * filter is called first).
-   */
-  virtual void addWriteFilter(WriteFilterPtr filter) PURE;
-
-  /**
-   * Add a combination filter to the connection. Equivalent to calling both addWriteFilter()
-   * and addReadFilter() with the same filter instance.
-   */
-  virtual void addFilter(FilterPtr filter) PURE;
-
-  /**
-   * Add a read filter to the connection. Filters are invoked in FIFO order (the filter added
-   * first is called first).
-   */
-  virtual void addReadFilter(ReadFilterPtr filter) PURE;
 
   /**
    * Close the connection.

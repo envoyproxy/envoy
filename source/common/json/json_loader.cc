@@ -1,7 +1,10 @@
 #include "json_loader.h"
 
 // Do not let jansson leak outside of this file.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include "jansson.h"
+#pragma GCC diagnostic pop
 
 namespace Json {
 
@@ -134,6 +137,23 @@ std::vector<std::string> Object::getStringArray(const std::string& name) const {
   }
 
   return string_array;
+}
+
+double Object::getDouble(const std::string& name) const {
+  json_t* real = json_object_get(json_, name.c_str());
+  if (!real || !json_is_real(real)) {
+    throw Exception(fmt::format("key '{}' missing or not a double in '{}'", name, name_));
+  }
+
+  return json_real_value(real);
+}
+
+double Object::getDouble(const std::string& name, double default_value) const {
+  if (!json_object_get(json_, name.c_str())) {
+    return default_value;
+  } else {
+    return getDouble(name);
+  }
 }
 
 void Object::iterate(const ObjectCallback& callback) {

@@ -35,8 +35,8 @@ public:
 
     std::shared_ptr<HttpConnectionManagerConfig> http_config(
         new HttpConnectionManagerConfig(config, server));
-    return [http_config, &server](Network::Connection& connection) mutable -> void {
-      connection.addReadFilter(Network::ReadFilterPtr{
+    return [http_config, &server](Network::FilterManager& filter_manager) mutable -> void {
+      filter_manager.addReadFilter(Network::ReadFilterPtr{
           new Http::ConnectionManagerImpl(*http_config, server.drainManager(), server.random(),
                                           server.httpTracer(), server.runtime())});
     };
@@ -86,7 +86,21 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     user_agent_.value(server.options().serviceClusterName());
   }
 
-  is_tracing_ = config.getBoolean("tracing_enabled", false);
+  if (config.hasObject("tracing")) {
+    const std::string operation_name = config.getObject("tracing").getString("operation_name");
+
+    std::string tracing_type = config.getObject("tracing").getString("type", "all");
+    Http::TracingType type;
+    if (tracing_type == "all") {
+      type = Http::TracingType::All;
+    } else if (tracing_type == "upstream_failure") {
+      type = Http::TracingType::UpstreamFailure;
+    } else {
+      throw EnvoyException(fmt::format("unsupported tracing type '{}'", tracing_type));
+    }
+
+    tracing_config_.value({operation_name, type});
+  }
 
   if (config.hasObject("idle_timeout_s")) {
     idle_timeout_.value(std::chrono::seconds(config.getInteger("idle_timeout_s")));
@@ -121,9 +135,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     std::string string_name = filters[i].getString("name");
     Json::Object config = filters[i].getObject("config");
 
-    log().notice("    filter #{}", i);
-    log().notice("      type: {}", string_type);
-    log().notice("      name: {}", string_name);
+    log().info("    filter #{}", i);
+    log().info("      type: {}", string_type);
+    log().info("      name: {}", string_name);
 
     HttpFilterType type = stringToType(string_type);
     bool found_filter = false;

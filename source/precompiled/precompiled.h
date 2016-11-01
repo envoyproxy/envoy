@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <fstream>
 #include <iostream>
@@ -17,4 +18,7 @@
 #include <unistd.h>
 #include <unordered_set>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include <spdlog/spdlog.h>
+#pragma GCC diagnostic pop

@@ -73,7 +73,7 @@ public:
   MOCK_METHOD0(useRemoteAddress, bool());
   MOCK_METHOD0(localAddress, const std::string&());
   MOCK_METHOD0(userAgent, const Optional<std::string>&());
-  MOCK_METHOD0(isTracing, bool());
+  MOCK_METHOD0(tracingConfig, const Optional<Http::TracingConnectionManagerConfig>&());
 
   testing::NiceMock<Router::MockConfig> route_config_;
 };
@@ -109,7 +109,7 @@ public:
 
   // Http::StreamDecoder
   MOCK_METHOD2(decodeHeaders_, void(HeaderMapPtr& headers, bool end_stream));
-  MOCK_METHOD2(decodeData, void(const Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD2(decodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(decodeTrailers_, void(HeaderMapPtr& trailers));
 };
 
@@ -142,7 +142,7 @@ public:
 
   // Http::StreamEncoder
   MOCK_METHOD2(encodeHeaders, void(const HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(encodeData, void(const Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers, void(const HeaderMap& trailers));
   MOCK_METHOD0(getStream, Stream&());
 

@@ -43,11 +43,21 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, Stats::Store&
     loadCluster(cluster, stats, dns_resolver, ssl_context_manager, runtime, random);
   }
 
+  Optional<std::string> local_cluster_name;
+  if (config.hasObject("local_cluster_name")) {
+    local_cluster_name.value(config.getString("local_cluster_name"));
+    if (get(local_cluster_name.value()) == nullptr) {
+      throw EnvoyException(
+          fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
+    }
+  }
+
   tls.set(thread_local_slot_,
-          [this, &stats, &runtime, &random, local_zone_name, local_address](
+          [this, &stats, &runtime, &random, local_zone_name, local_address, local_cluster_name](
               Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
             return ThreadLocal::ThreadLocalObjectPtr{new ThreadLocalClusterManagerImpl(
-                *this, dispatcher, runtime, random, local_zone_name, local_address)};
+                *this, dispatcher, runtime, random, local_zone_name, local_address,
+                local_cluster_name)};
           });
 
   // To avoid threading issues, for those clusters that start with hosts already in them (like
@@ -164,16 +174,17 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const ClusterImplBase& pri
   const std::string& name = primary_cluster.name();
   ConstHostVectorPtr hosts_copy = primary_cluster.rawHosts();
   ConstHostVectorPtr healthy_hosts_copy = primary_cluster.rawHealthyHosts();
-  ConstHostVectorPtr local_zone_hosts_copy = primary_cluster.rawLocalZoneHosts();
-  ConstHostVectorPtr local_zone_healthy_hosts_copy = primary_cluster.rawLocalZoneHealthyHosts();
+  ConstHostListsPtr hosts_per_zone_copy = primary_cluster.rawHostsPerZone();
+  ConstHostListsPtr healthy_hosts_per_zone_copy = primary_cluster.rawHealthyHostsPerZone();
   ThreadLocal::Instance& tls = tls_;
   uint32_t thead_local_slot = thread_local_slot_;
+
   tls_.runOnAllThreads(
-      [name, hosts_copy, healthy_hosts_copy, local_zone_hosts_copy, local_zone_healthy_hosts_copy,
+      [name, hosts_copy, healthy_hosts_copy, hosts_per_zone_copy, healthy_hosts_per_zone_copy,
        hosts_added, hosts_removed, &tls, thead_local_slot]() mutable -> void {
         ThreadLocalClusterManagerImpl::updateClusterMembership(
-            name, hosts_copy, healthy_hosts_copy, local_zone_hosts_copy,
-            local_zone_healthy_hosts_copy, hosts_added, hosts_removed, tls, thead_local_slot);
+            name, hosts_copy, healthy_hosts_copy, hosts_per_zone_copy, healthy_hosts_per_zone_copy,
+            hosts_added, hosts_removed, tls, thead_local_slot);
       });
 }
 
@@ -209,12 +220,29 @@ Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::stri
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const std::string& local_zone_name,
-    const std::string& local_address)
+    const std::string& local_address, const Optional<std::string>& local_cluster_name)
     : parent_(parent), dispatcher_(dispatcher) {
+  // If local cluster is defined then we need to initialize it first.
+  if (local_cluster_name.valid()) {
+    auto& local_cluster = parent.primary_clusters_[local_cluster_name.value()];
+    thread_local_clusters_[local_cluster_name.value()].reset(
+        new ClusterEntry(*this, *local_cluster, runtime, random, parent.stats_, dispatcher,
+                         local_zone_name, local_address, nullptr));
+  }
+
+  const HostSet* local_host_set =
+      local_cluster_name.valid() ? &thread_local_clusters_[local_cluster_name.value()]->host_set_
+                                 : nullptr;
+
   for (auto& cluster : parent.primary_clusters_) {
-    thread_local_clusters_[cluster.first].reset(new ClusterEntry(*this, *cluster.second, runtime,
-                                                                 random, parent.stats_, dispatcher,
-                                                                 local_zone_name, local_address));
+    // If local cluster name is set then we already initialized this cluster.
+    if (local_cluster_name.valid() && local_cluster_name.value() == cluster.first) {
+      continue;
+    }
+
+    thread_local_clusters_[cluster.first].reset(
+        new ClusterEntry(*this, *cluster.second, runtime, random, parent.stats_, dispatcher,
+                         local_zone_name, local_address, local_host_set));
   }
 
   for (auto& cluster : thread_local_clusters_) {
@@ -262,7 +290,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, ConstHostVectorPtr hosts, ConstHostVectorPtr healthy_hosts,
-    ConstHostVectorPtr local_zone_hosts, ConstHostVectorPtr local_zone_healthy_hosts,
+    ConstHostListsPtr hosts_per_zone, ConstHostListsPtr healthy_hosts_per_zone,
     const std::vector<HostPtr>& hosts_added, const std::vector<HostPtr>& hosts_removed,
     ThreadLocal::Instance& tls, uint32_t thead_local_slot) {
 
@@ -271,7 +299,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
   config.thread_local_clusters_[name]->host_set_.updateHosts(
-      hosts, healthy_hosts, local_zone_hosts, local_zone_healthy_hosts, hosts_added, hosts_removed);
+      hosts, healthy_hosts, hosts_per_zone, healthy_hosts_per_zone, hosts_added, hosts_removed);
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::shutdown() {
@@ -281,7 +309,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::shutdown() {
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, const Cluster& cluster, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Stats::Store& stats_store, Event::Dispatcher& dispatcher,
-    const std::string& local_zone_name, const std::string& local_address)
+    const std::string& local_zone_name, const std::string& local_address,
+    const HostSet* local_host_set)
     : parent_(parent), primary_cluster_(cluster),
       http_async_client_(
           cluster, stats_store, dispatcher, local_zone_name, parent.parent_, runtime, random,
@@ -289,15 +318,17 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
 
   switch (cluster.lbType()) {
   case LoadBalancerType::LeastRequest: {
-    lb_.reset(new LeastRequestLoadBalancer(host_set_, cluster.stats(), runtime, random));
+    lb_.reset(
+        new LeastRequestLoadBalancer(host_set_, local_host_set, cluster.stats(), runtime, random));
     break;
   }
   case LoadBalancerType::Random: {
-    lb_.reset(new RandomLoadBalancer(host_set_, cluster.stats(), runtime, random));
+    lb_.reset(new RandomLoadBalancer(host_set_, local_host_set, cluster.stats(), runtime, random));
     break;
   }
   case LoadBalancerType::RoundRobin: {
-    lb_.reset(new RoundRobinLoadBalancer(host_set_, cluster.stats(), runtime, random));
+    lb_.reset(
+        new RoundRobinLoadBalancer(host_set_, local_host_set, cluster.stats(), runtime, random));
     break;
   }
   }

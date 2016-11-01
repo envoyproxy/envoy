@@ -8,20 +8,21 @@ Envoy has the following requirements:
 
 * GCC 4.9+ (for C++11 regex support)
 * `cotire <https://github.com/sakra/cotire>`_ (last tested with 1.7.8)
-* `spdlog <https://github.com/gabime/spdlog>`_ (last tested with 319a62)
+* `spdlog <https://github.com/gabime/spdlog>`_ (last tested with 0.11.0)
 * `http-parser <https://github.com/nodejs/http-parser>`_ (last tested with 2.7.0)
-* `nghttp2 <https://github.com/nghttp2/nghttp2>`_ (last tested with 1.9.2)
+* `nghttp2 <https://github.com/nghttp2/nghttp2>`_ (last tested with 1.14.1)
 * `libevent <http://libevent.org/>`_ (last tested with 2.0.22)
 * `tclap <http://tclap.sourceforge.net/>`_ (last tested with 1.2.1)
 * `gperftools <https://github.com/gperftools/gperftools>`_ (last tested with 2.5.0)
 * `jansson <https://github.com/akheron/jansson>`_ (last tesed with 2.7)
-* `openssl <https://www.openssl.org/>`_ (last tesed with 1.0.2h)
+* `openssl <https://www.openssl.org/>`_ (last tesed with 1.0.2i)
 * `protobuf <https://github.com/google/protobuf>`_ (last tested with 3.0.0)
+* `lightstep-tracer-cpp <https://github.com/lightstep/lightstep-tracer-cpp/>`_ (last tested with 0.16)
 
 In order to compile and run the tests the following is required:
 
-* `googletest <https://github.com/google/googletest>`_
+* `googletest <https://github.com/google/googletest>`_ (last tested with 1.8.0)
 
 In order to run code coverage the following is required:
 
-* `gcovr <http://gcovr.com/>`_
+* `gcovr <http://gcovr.com/>`_ (last tested with 3.3)
