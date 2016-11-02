@@ -43,6 +43,8 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doReadFromSocket() {
   bool keep_reading = true;
   PostIoAction action = PostIoAction::KeepOpen;
   while (keep_reading) {
+    // We use 2 slices here so that we can use the remainder of an existing buffer chain element
+    // if there is extra space. 16K read is arbitrary and can be tuned later.
     Buffer::RawSlice slices[2];
     uint64_t slices_to_commit = 0;
     uint64_t num_slices = read_buffer_.reserve(16384, slices, 2);

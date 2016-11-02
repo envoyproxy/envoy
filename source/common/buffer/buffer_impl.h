@@ -4,7 +4,7 @@
 
 #include "common/event/libevent.h"
 
-// Forward decls to avoid leaking libevent headers to reset of program.
+// Forward decls to avoid leaking libevent headers to rest of program.
 struct evbuffer_cb_info;
 typedef void (*evbuffer_cb_func)(evbuffer* buffer, const evbuffer_cb_info* info, void* arg);
 
@@ -40,10 +40,11 @@ public:
 private:
   void onBufferChange(const evbuffer_cb_info& info);
 
-  static const evbuffer_cb_func buffer_cb_;
+  static const evbuffer_cb_func buffer_cb_; // Static callback used for all evbuffer callbacks.
+                                            // This allows us to add/remove by value.
 
   Event::Libevent::BufferPtr buffer_;
-  Callback cb_;
+  Callback cb_; // The per buffer callback. Invoked via the buffer_cb_ static thunk.
 };
 
 } // Buffer

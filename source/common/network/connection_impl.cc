@@ -20,7 +20,7 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
       fd_(fd), id_(++next_global_id_) {
 
   file_event_ =
-      dispatcher_.createFileEvent(fd, [this](uint32_t events) -> void { onFileEvent(events); });
+      dispatcher_.createFileEvent(fd_, [this](uint32_t events) -> void { onFileEvent(events); });
   if (fd_ == -1) {
     // Can't obtain a socket.
     state_ |= InternalState::ImmediateConnectionError;
@@ -239,6 +239,10 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 
 ConnectionImpl::PostIoAction ConnectionImpl::doReadFromSocket() {
   do {
+    // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
+    // use an ioctl() before every read to figure out how much data there is to read.
+    // TODO PERF: Tune the read size and figure out a way of getting rid of the ioctl(). The extra
+    //            syscall is not worth it.
     int rc = read_buffer_.read(fd_, 16384);
     conn_log_trace("read returns: {}", *this, rc);
 

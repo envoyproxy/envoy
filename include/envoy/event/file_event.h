@@ -22,7 +22,7 @@ public:
   virtual ~FileEvent() {}
 
   /**
-   * Active the file event explicitly for a set of events. Should be a logical OR of FileReadyType
+   * Activate the file event explicitly for a set of events. Should be a logical OR of FileReadyType
    * events.
    */
   virtual void activate(uint32_t events) PURE;
