@@ -47,12 +47,12 @@ set(ENVOY_PROTOBUF_PROTOC "" CACHE FILEPATH "location of protoc")
 # Last tested with lightstep-tracer-cpp-0.16
 set(ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR "" CACHE FILEPATH "location of lighstep tracer includes")
 
-# Extra linker flags required to properly link envoy with all of the above libraries.
-set(ENVOY_EXE_EXTRA_LINKER_FLAGS "" CACHE STRING "envoy extra linker flags")
-
 # https://github.com/miloyip/rapidjson
 # Last tested with 1.1.0
 set(ENVOY_RAPIDJSON_INCLUDE_DIR "" CACHE FILEPATH "location of rapidjson includes")
+
+# Extra linker flags required to properly link envoy with all of the above libraries.
+set(ENVOY_EXE_EXTRA_LINKER_FLAGS "" CACHE STRING "envoy extra linker flags")
 
 #
 # Test Requirements
