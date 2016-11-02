@@ -131,4 +131,7 @@ wget -O gcovr-3.3.tar.gz https://github.com/gcovr/gcovr/archive/3.3.tar.gz
 tar xf gcovr-3.3.tar.gz
 rm gcovr-3.3.tar.gz
 
-
+# rapidjson
+wget -O rapidjson-1.1.0.tar.gz https://github.com/miloyip/rapidjson/archive/v1.1.0.tar.gz
+tar xf rapidjson-1.1.0.tar.gz
+rm rapidjson-1.1.0.tar.gz

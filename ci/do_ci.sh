@@ -45,6 +45,7 @@ $EXTRA_CMAKE_FLAGS -DENVOY_DEBUG:BOOL=OFF \
 -DENVOY_PROTOBUF_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_PROTOBUF_PROTOC:FILEPATH=/thirdparty_build/bin/protoc \
 -DENVOY_GCOVR:FILEPATH=/thirdparty/gcovr-3.3/scripts/gcovr \
+-DENVOY_RAPIDJSON_INCLUDE_DIR:FILEPATH=/thirdparth/rapidjson-1.1.0/include/rapidjson \
 -DENVOY_GCOVR_EXTRA_ARGS:STRING="-e test/* -e build/*" \
 -DENVOY_EXE_EXTRA_LINKER_FLAGS:STRING=-L/thirdparty_build/lib \
 -DENVOY_TEST_EXTRA_LINKER_FLAGS:STRING=-L/thirdparty_build/lib \
