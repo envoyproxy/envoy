@@ -47,7 +47,7 @@ private:
 
   Libevent::BasePtr base_;
   TimerPtr deferred_delete_timer_;
-  std::list<DeferredDeletablePtr> to_delete_;
+  std::vector<DeferredDeletablePtr> to_delete_;
   std::mutex post_lock_;
   std::list<std::function<void()>> post_callbacks_;
 };

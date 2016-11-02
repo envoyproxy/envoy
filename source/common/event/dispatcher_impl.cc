@@ -24,13 +24,14 @@ DispatcherImpl::DispatcherImpl()
 DispatcherImpl::~DispatcherImpl() {}
 
 void DispatcherImpl::clearDeferredDeleteList() {
-  while (!to_delete_.empty()) {
+  size_t index = 0;
+  while (index != to_delete_.size()) {
     // The destructor of a deferred deletion item can yield more deferred deletion. Loop
     // and destroy all of them until there is nothing left.
-    std::list<DeferredDeletablePtr> copy(std::move(to_delete_));
-    log_trace("clearing deferred deletion list (size={})", copy.size());
-    copy.clear();
+    log_trace("clearing deferred deletion list (index={})", index);
+    to_delete_[index++].reset();
   }
+  to_delete_.clear();
 }
 
 Network::ClientConnectionPtr DispatcherImpl::createClientConnection(const std::string& url) {
