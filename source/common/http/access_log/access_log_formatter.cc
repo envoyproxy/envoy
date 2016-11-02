@@ -145,7 +145,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         parseCommand(token, start, main_header, alternative_header, max_length);
 
         formatters.emplace_back(FormatterPtr(
-            new ResponseHeaderFormatter(main_header, alternative_header, max_length, false)));
+            new ResponseHeaderFormatter(main_header, alternative_header, max_length)));
       } else {
         formatters.emplace_back(FormatterPtr(new RequestInfoFormatter(token)));
       }
@@ -248,7 +248,7 @@ std::string HeaderFormatter::format(const HeaderMap& headers) const {
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
                                                  const std::string& alternative_header,
-                                                 const Optional<size_t>& max_length, bool)
+                                                 const Optional<size_t>& max_length)
     : HeaderFormatter(main_header, alternative_header, max_length, false) {}
 
 std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,

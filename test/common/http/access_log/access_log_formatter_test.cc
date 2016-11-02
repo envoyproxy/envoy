@@ -149,22 +149,22 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
   HeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
 
   {
-    ResponseHeaderFormatter formatter(":method", "", Optional<size_t>(), false);
+    ResponseHeaderFormatter formatter(":method", "", Optional<size_t>());
     EXPECT_EQ("PUT", formatter.format(request_header, response_header, requestInfo));
   }
 
   {
-    ResponseHeaderFormatter formatter("test", ":method", Optional<size_t>(), false);
+    ResponseHeaderFormatter formatter("test", ":method", Optional<size_t>());
     EXPECT_EQ("test", formatter.format(request_header, response_header, requestInfo));
   }
 
   {
-    ResponseHeaderFormatter formatter(":path", ":method", Optional<size_t>(), false);
+    ResponseHeaderFormatter formatter(":path", ":method", Optional<size_t>());
     EXPECT_EQ("PUT", formatter.format(request_header, response_header, requestInfo));
   }
 
   {
-    ResponseHeaderFormatter formatter("does_not_exist", "", Optional<size_t>(), false);
+    ResponseHeaderFormatter formatter("does_not_exist", "", Optional<size_t>());
     EXPECT_EQ("-", formatter.format(request_header, response_header, requestInfo));
   }
 }

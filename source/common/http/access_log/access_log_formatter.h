@@ -115,7 +115,7 @@ public:
 class ResponseHeaderFormatter : public Formatter, HeaderFormatter {
 public:
   ResponseHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                          const Optional<size_t>& max_length, bool);
+                          const Optional<size_t>& max_length);
 
   // Formatter::format
   std::string format(const HeaderMap&, const HeaderMap& response_headers,
