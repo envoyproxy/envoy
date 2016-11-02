@@ -9,22 +9,16 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 
-// Forward decls to avoid leaking libevent headers to reset of program.
-struct evbuffer_cb_info;
-typedef void (*evbuffer_cb_func)(evbuffer* buffer, const evbuffer_cb_info* info, void* arg);
-
 namespace Network {
 
 /**
- * libevent implementation of Network::Connection.
+ * Implementation of Network::Connection.
  */
 class ConnectionImpl : public virtual Connection,
                        public BufferSource,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
-  ConnectionImpl(Event::DispatcherImpl& dispatcher);
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, Event::Libevent::BufferEventPtr&& bev,
-                 const std::string& remote_address);
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& remote_address);
   ~ConnectionImpl();
 
   // Network::FilterManager
@@ -51,66 +45,45 @@ public:
   Buffer::Instance& getWriteBuffer() override { return *current_write_buffer_; }
 
 protected:
-  /**
-   * Called via close() when there is no data to flush or when data has been flushed.
-   */
-  void closeNow();
+  enum class PostIoAction { Close, KeepOpen };
 
-  /**
-   * Enable or disable each of the 3 socket level callbacks.
-   */
-  void enableCallbacks(bool read, bool write, bool event);
-
-  /**
-   * Called by libevent when an owned evbuffer changes size.
-   */
-  void onBufferChange(ConnectionBufferType type, const evbuffer_cb_info* info);
-
-  /**
-   * Fires when a connection event occurs.
-   * @param events supplies the libevent events that fired.
-   */
-  virtual void onEvent(short events);
-
-  /**
-   * Fires when new data is available on the connection.
-   */
-  void onRead();
-
-  /**
-   * Fires when the write buffer empties. This is only used when doing a flush/close operation.
-   */
-  void onWrite();
-
-  /**
-   * Send connection events to all registered callbacks.
-   */
+  virtual void closeSocket();
+  void doConnect(const sockaddr* addr, socklen_t addrlen);
   void raiseEvents(uint32_t events);
 
-  /**
-   * Close the underlying socket connection
-   */
-  virtual void closeBev();
-
-  static std::atomic<uint64_t> next_global_id_;
-  static const evbuffer_cb_func read_buffer_cb_;
-  static const evbuffer_cb_func write_buffer_cb_;
-
-  Event::DispatcherImpl& dispatcher_;
-  Event::Libevent::BufferEventPtr bev_;
-  const std::string remote_address_;
-  const uint64_t id_;
   FilterManagerImpl filter_manager_;
-  std::list<ConnectionCallbacks*> callbacks_;
-  Event::TimerPtr redispatch_read_event_;
-  bool read_enabled_;
-  bool closing_with_flush_{};
+  const std::string remote_address_;
+  Buffer::OwnedImpl read_buffer_;
+  Buffer::OwnedImpl write_buffer_;
 
 private:
-  void fakeBufferDrain(ConnectionBufferType type, evbuffer* buffer);
+  // clang-format off
+  struct InternalState {
+    static const uint32_t ReadEnabled              = 0x1;
+    static const uint32_t Connecting               = 0x2;
+    static const uint32_t CloseWithFlush           = 0x4;
+    static const uint32_t ImmediateConnectionError = 0x8;
+  };
+  // clang-format on
 
-  Buffer::WrappedImpl read_buffer_;
-  Buffer::WrappedImpl write_buffer_;
+  void doLocalClose();
+  virtual PostIoAction doReadFromSocket();
+  virtual PostIoAction doWriteToSocket();
+  void onBufferChange(ConnectionBufferType type, uint64_t old_size, int64_t delta);
+  virtual void onConnected();
+  void onFileEvent(uint32_t events);
+  void onRead();
+  void onReadReady();
+  void onWriteReady();
+
+  static std::atomic<uint64_t> next_global_id_;
+
+  Event::DispatcherImpl& dispatcher_;
+  int fd_{-1};
+  Event::FileEventPtr file_event_;
+  const uint64_t id_;
+  std::list<ConnectionCallbacks*> callbacks_;
+  uint32_t state_{InternalState::ReadEnabled};
   Buffer::Instance* current_write_buffer_{};
 };
 
@@ -119,18 +92,15 @@ private:
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
 public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Event::Libevent::BufferEventPtr&& bev,
-                       const std::string& url);
+  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& url);
 
   static Network::ClientConnectionPtr create(Event::DispatcherImpl& dispatcher,
-                                             Event::Libevent::BufferEventPtr&& bev,
                                              const std::string& url);
 };
 
 class TcpClientConnectionImpl : public ClientConnectionImpl {
 public:
-  TcpClientConnectionImpl(Event::DispatcherImpl& dispatcher, Event::Libevent::BufferEventPtr&& bev,
-                          const std::string& url);
+  TcpClientConnectionImpl(Event::DispatcherImpl& dispatcher, const std::string& url);
 
   // Network::ClientConnection
   void connect() override;
@@ -138,8 +108,7 @@ public:
 
 class UdsClientConnectionImpl final : public ClientConnectionImpl {
 public:
-  UdsClientConnectionImpl(Event::DispatcherImpl& dispatcher, Event::Libevent::BufferEventPtr&& bev,
-                          const std::string& url);
+  UdsClientConnectionImpl(Event::DispatcherImpl& dispatcher, const std::string& url);
 
   // Network::ClientConnection
   void connect() override;

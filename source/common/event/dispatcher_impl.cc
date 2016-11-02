@@ -34,30 +34,20 @@ void DispatcherImpl::clearDeferredDeleteList() {
 }
 
 Network::ClientConnectionPtr DispatcherImpl::createClientConnection(const std::string& url) {
-  Event::Libevent::BufferEventPtr bev{
-      bufferevent_socket_new(base_.get(), -1, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS)};
-  return Network::ClientConnectionImpl::create(*this, std::move(bev), url);
+  return Network::ClientConnectionImpl::create(*this, url);
 }
 
 Network::ClientConnectionPtr DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
                                                                        const std::string& url) {
-  // The dynamic_cast is necessary here in order to avoid exposing the SSL_CTX directly from
-  // Ssl::Context.
-  Ssl::ContextImpl& ctx = dynamic_cast<Ssl::ContextImpl&>(ssl_ctx);
-  Event::Libevent::BufferEventPtr bev{
-      bufferevent_openssl_socket_new(base_.get(), -1, ctx.newSsl(), BUFFEREVENT_SSL_CONNECTING,
-                                     BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS)};
-
-  return Network::ClientConnectionPtr{
-      new Ssl::ClientConnectionImpl(*this, std::move(bev), ctx, url)};
+  return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, url)};
 }
 
 Network::DnsResolverPtr DispatcherImpl::createDnsResolver() {
   return Network::DnsResolverPtr{new Network::DnsResolverImpl(*this)};
 }
 
-FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb read_cb, FileReadyCb write_cb) {
-  return FileEventPtr{new FileEventImpl(*this, fd, read_cb, write_cb)};
+FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb) {
+  return FileEventPtr{new FileEventImpl(*this, fd, cb)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {

@@ -1,49 +1,87 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
+#include "common/network/listen_socket_impl.h"
+#include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
 
 using testing::_;
-using testing::InSequence;
+using testing::Sequence;
+using testing::Invoke;
 using testing::Return;
 using testing::Test;
 
 namespace Network {
 
-class ConnectionImplForTest : public ConnectionImpl {
-public:
-  using ConnectionImpl::ConnectionImpl;
-
-  void raiseDisconnect() { onEvent(0x20); }
-};
-
-TEST(ConnectionImplTest, BufferCallbacks) {
-  InSequence s;
-
+TEST(ConnectionImplTest, BadFd) {
   Event::DispatcherImpl dispatcher;
-  ConnectionImplForTest connection(dispatcher);
+  ConnectionImpl connection(dispatcher, -1, "127.0.0.1");
   MockConnectionCallbacks callbacks;
   connection.addConnectionCallbacks(callbacks);
+  EXPECT_CALL(callbacks, onEvent(ConnectionEvent::RemoteClose));
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
 
-  EXPECT_EQ("", connection.nextProtocol());
+TEST(ConnectionImplTest, BufferCallbacks) {
+  Stats::IsolatedStoreImpl stats_store;
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(10000);
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::ListenerPtr listener =
+      dispatcher.createListener(socket, listener_callbacks, stats_store, false);
+
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createClientConnection("tcp://127.0.0.1:10000");
+  MockConnectionCallbacks client_callbacks;
+  client_connection->addConnectionCallbacks(client_callbacks);
+  client_connection->connect();
 
   std::shared_ptr<MockWriteFilter> write_filter(new MockWriteFilter());
   std::shared_ptr<MockFilter> filter(new MockFilter());
-  connection.addWriteFilter(write_filter);
-  connection.addFilter(filter);
+  client_connection->addWriteFilter(write_filter);
+  client_connection->addFilter(filter);
 
-  EXPECT_CALL(*write_filter, onWrite(_)).WillOnce(Return(FilterStatus::StopIteration));
-  EXPECT_CALL(*write_filter, onWrite(_)).WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(*filter, onWrite(_)).WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(callbacks, onBufferChange(ConnectionBufferType::Write, 0, 4));
-  EXPECT_CALL(callbacks, onBufferChange(ConnectionBufferType::Write, 4, -4));
-  EXPECT_CALL(callbacks, onEvent(ConnectionEvent::RemoteClose));
+  Sequence s1;
+  EXPECT_CALL(*write_filter, onWrite(_))
+      .InSequence(s1)
+      .WillOnce(Return(FilterStatus::StopIteration));
+  EXPECT_CALL(*write_filter, onWrite(_)).InSequence(s1).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onWrite(_)).InSequence(s1).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(client_callbacks, onBufferChange(ConnectionBufferType::Write, 0, 4)).InSequence(s1);
+  EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::Connected)).InSequence(s1);
+  EXPECT_CALL(client_callbacks, onBufferChange(ConnectionBufferType::Write, 4, -4)).InSequence(s1);
+
+  Network::ConnectionPtr server_connection;
+  Network::MockConnectionCallbacks server_callbacks;
+  std::shared_ptr<MockReadFilter> read_filter(new MockReadFilter());
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->addConnectionCallbacks(server_callbacks);
+        server_connection->addReadFilter(read_filter);
+        EXPECT_EQ("", server_connection->nextProtocol());
+      }));
+
+  Sequence s2;
+  EXPECT_CALL(server_callbacks, onBufferChange(ConnectionBufferType::Read, 0, 4)).InSequence(s2);
+  EXPECT_CALL(server_callbacks, onBufferChange(ConnectionBufferType::Read, 4, -4)).InSequence(s2);
+  EXPECT_CALL(server_callbacks, onEvent(ConnectionEvent::LocalClose)).InSequence(s2);
+
+  EXPECT_CALL(*read_filter, onData(_))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+        data.drain(data.length());
+        server_connection->close(ConnectionCloseType::FlushWrite);
+        return FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher.exit(); }));
 
   Buffer::OwnedImpl data("1234");
-  connection.write(data);
-  connection.write(data);
-  connection.raiseDisconnect();
+  client_connection->write(data);
+  client_connection->write(data);
+  dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
 TEST(TcpClientConnectionImplTest, BadConnectNotConnRefused) {

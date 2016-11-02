@@ -30,8 +30,8 @@ public:
     return Network::DnsResolverPtr{createDnsResolver_()};
   }
 
-  FileEventPtr createFileEvent(int fd, FileReadyCb read_cb, FileReadyCb write_cb) override {
-    return FileEventPtr{createFileEvent_(fd, read_cb, write_cb)};
+  FileEventPtr createFileEvent(int fd, FileReadyCb cb) override {
+    return FileEventPtr{createFileEvent_(fd, cb)};
   }
 
   Filesystem::WatcherPtr createFilesystemWatcher() override {
@@ -69,7 +69,7 @@ public:
   MOCK_METHOD2(createSslClientConnection_,
                Network::ClientConnection*(Ssl::ClientContext& ssl_ctx, const std::string& url));
   MOCK_METHOD0(createDnsResolver_, Network::DnsResolver*());
-  MOCK_METHOD3(createFileEvent_, FileEvent*(int fd, FileReadyCb read_cb, FileReadyCb write_cb));
+  MOCK_METHOD2(createFileEvent_, FileEvent*(int fd, FileReadyCb cb));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
   MOCK_METHOD4(createListener_,
                Network::Listener*(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,

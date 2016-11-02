@@ -27,9 +27,11 @@ struct SslStats {
   ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_TIMER_STRUCT)
 };
 
+typedef CSmartPtr<SSL, SSL_free> SslConPtr;
+
 class ContextImpl : public virtual Context {
 public:
-  virtual SSL* newSsl() const;
+  virtual SslConPtr newSsl() const;
 
   /**
    * Performs all configured cert verifications on the connection
@@ -64,7 +66,6 @@ protected:
   static const unsigned char SERVER_SESSION_ID_CONTEXT;
 
   typedef CSmartPtr<SSL_CTX, SSL_CTX_free> SslCtxPtr;
-  typedef CSmartPtr<SSL, SSL_free> SslConPtr;
 
   /**
    * Performs subjectAltName verification
@@ -111,7 +112,7 @@ class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
   ClientContextImpl(const std::string& name, Stats::Store& stats, ContextConfig& config);
 
-  SSL* newSsl() const override;
+  SslConPtr newSsl() const override;
 
 private:
   std::string server_name_indication_;

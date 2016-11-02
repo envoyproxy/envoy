@@ -133,6 +133,10 @@ void FakeConnectionBase::close() {
   }
 }
 
+void FakeConnectionBase::readDisable(bool disable) {
+  connection_.dispatcher().post([this, disable]() -> void { connection_.readDisable(disable); });
+}
+
 Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {
   std::unique_lock<std::mutex> lock(lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder));
@@ -234,7 +238,7 @@ FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& cli
   ASSERT(!new_connections_.empty());
   FakeHttpConnectionPtr connection(
       new FakeHttpConnection(*new_connections_.front(), stats_store_, http_type_));
-  new_connections_.front()->readDisable(false);
+  connection->readDisable(false);
   new_connections_.pop_front();
   return connection;
 }
@@ -248,7 +252,7 @@ FakeRawConnectionPtr FakeUpstream::waitForRawConnection() {
 
   ASSERT(!new_connections_.empty());
   FakeRawConnectionPtr connection(new FakeRawConnection(*new_connections_.front()));
-  new_connections_.front()->readDisable(false);
+  connection->readDisable(false);
   new_connections_.pop_front();
   return connection;
 }

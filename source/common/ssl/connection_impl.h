@@ -8,30 +8,37 @@ namespace Ssl {
 
 class ConnectionImpl : public Network::ConnectionImpl, public Connection {
 public:
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, Event::Libevent::BufferEventPtr&& bev,
-                 const std::string& remote_address, ContextImpl& ctx);
+  enum class InitialState { Client, Server };
+
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& remote_address,
+                 Context& ctx, InitialState state);
   ~ConnectionImpl();
 
   // Network::Connection
   std::string nextProtocol() override;
-  void onEvent(short events) override;
   Ssl::Connection* ssl() override { return this; }
-
-  // Network::ConnectionImpl
-  void closeBev() override;
 
   // Ssl::Connection
   std::string sha256PeerCertificateDigest() override;
 
 private:
+  PostIoAction doHandshake();
+  void drainErrorQueue();
+
+  // Network::ConnectionImpl
+  void closeSocket() override;
+  PostIoAction doReadFromSocket() override;
+  PostIoAction doWriteToSocket() override;
+  void onConnected() override;
+
   ContextImpl& ctx_;
+  SslConPtr ssl_;
   bool handshake_complete_{};
 };
 
 class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
 public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Event::Libevent::BufferEventPtr&& bev,
-                       ContextImpl& ctx, const std::string& url);
+  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx, const std::string& url);
 
   // Network::ClientConnection
   void connect() override;

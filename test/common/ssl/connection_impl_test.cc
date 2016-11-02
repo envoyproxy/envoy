@@ -116,7 +116,7 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
+  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](uint32_t) -> void {
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();

@@ -57,12 +57,9 @@ public:
    * Create a file event that will signal when a file is readable or writable. On UNIX systems this
    * can be used for any file like interface (files, sockets, etc.).
    * @param fd supplies the fd to watch.
-   * @param read_cb supplies the callback to fire when the file is readable. Can be nullptr if no
-   *                callback is desired.
-   * @param write_cb supplies the callback to fire when the file is writable. Can be nullptr if no
-   *                 callback is desired.
+   * @param cb supplies the callback to fire when the file is ready.
    */
-  virtual FileEventPtr createFileEvent(int fd, FileReadyCb read_cb, FileReadyCb write_cb) PURE;
+  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.

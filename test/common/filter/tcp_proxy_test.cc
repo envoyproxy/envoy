@@ -92,7 +92,7 @@ TEST_F(TcpProxyTest, UpstreamDisconnect) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response)));
   upstream_read_filter_->onData(response);
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -148,7 +148,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   EXPECT_CALL(*upstream_connection_, write(BufferEqual(&buffer)));
   filter_->onData(buffer);
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*connect_timer_, disableTimer());
   upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(1U, cluster_manager_.cluster_.stats_store_

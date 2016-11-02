@@ -154,10 +154,7 @@ void TcpProxy::onUpstreamEvent(uint32_t event) {
       read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();
     }
 
-    // TODO: If we close without flushing here we may drop some data. For flushing to work
-    //       downstream we need to drop any received data while we are waiting to flush and also
-    //       setup a flush timer.
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (event & Network::ConnectionEvent::Connected) {
     connect_timespan_->complete();
   }

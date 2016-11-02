@@ -203,7 +203,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-SSL* ContextImpl::newSsl() const { return SSL_new(ctx_.get()); }
+SslConPtr ContextImpl::newSsl() const { return SSL_new(ctx_.get()); }
 
 bool ContextImpl::verifyPeer(SSL* ssl) const {
   bool verified = true;
@@ -370,7 +370,7 @@ ClientContextImpl::ClientContextImpl(const std::string& name, Stats::Store& stat
   server_name_indication_ = config.serverNameIndication();
 }
 
-SSL* ClientContextImpl::newSsl() const {
+SslConPtr ClientContextImpl::newSsl() const {
   SslConPtr ssl_con = SslConPtr(ContextImpl::newSsl());
 
   if (!server_name_indication_.empty()) {
@@ -380,7 +380,7 @@ SSL* ClientContextImpl::newSsl() const {
     UNREFERENCED_PARAMETER(rc);
   }
 
-  return ssl_con.release();
+  return ssl_con;
 }
 
 ServerContextImpl::ServerContextImpl(const std::string& name, Stats::Store& stats,

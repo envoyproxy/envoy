@@ -13,6 +13,13 @@ struct RawSlice {
 };
 
 /**
+ * Buffer change callback.
+ * @param old_size supplies the size of the buffer prior to the change.
+ * @param data supplies how much data was added or removed.
+ */
+typedef std::function<void(uint64_t old_size, int64_t delta)> Callback;
+
+/**
  * A basic buffer abstraction.
  */
 class Instance {
@@ -37,6 +44,14 @@ public:
    * @param data supplies the buffer to copy.
    */
   virtual void add(const Instance& data) PURE;
+
+  /**
+   * Commit a set of slices originally obtained from reserve(). The number of slices can be
+   * different from the number obtained from reserve(). The size of each slice can also be altered.
+   * @param iovecs supplies the array of slices to commit.
+   * @param num_iovecs supplies the size of the slices array.
+   */
+  virtual void commit(RawSlice* iovecs, uint64_t num_iovecs) PURE;
 
   /**
    * Drain data from the buffer.
@@ -78,6 +93,23 @@ public:
   virtual void move(Instance& rhs, uint64_t length) PURE;
 
   /**
+   * Read from a file descriptor directly into the buffer.
+   * @param fd supplies the descriptor to read from.
+   * @param max_length supplies the maximum length to read.
+   * @return the number of bytes read or -1 if there was an error.
+   */
+  virtual int read(int fd, uint64_t max_length) PURE;
+
+  /**
+   * Reserve space in the buffer.
+   * @param length supplies the amount of space to reserve.
+   * @param iovecs supplies the slices to fill with reserved memory.
+   * @param num_iovecs supplies the size of the slices array.
+   * @return the number of iovecs used to reserve the space.
+   */
+  virtual uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) PURE;
+
+  /**
    * Search for an occurence of a buffer within the larger buffer.
    * @param data supplies the data to search for.
    * @param size supplies the length of the data to search for.
@@ -85,6 +117,20 @@ public:
    * @return the index where the match starts or -1 if there is no match.
    */
   virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
+
+  /**
+   * Set a buffer change callback. Only a single callback can be set at a time. The callback
+   * is invoked inline with buffer changes.
+   * @param callback supplies the callback to set. Pass nullptr to clear the callback.
+   */
+  virtual void setCallback(Callback callback) PURE;
+
+  /**
+   * Write the buffer out to a file descriptor.
+   * @param fd supplies the descriptor to write to.
+   * @return the number of bytes written or -1 if there was an error.
+   */
+  virtual int write(int fd) PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;
