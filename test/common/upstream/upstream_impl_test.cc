@@ -93,6 +93,11 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(4U, cluster.resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.maxRequestsPerConnection());
   EXPECT_EQ(Http::CodecOptions::NoCompression, cluster.httpCodecOptions());
+  EXPECT_EQ("cluster.name.", cluster.statPrefix());
+
+  EXPECT_CALL(runtime.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
+  EXPECT_FALSE(cluster.maintenanceMode());
+
   ReadyWatcher membership_updated;
   cluster.addMemberUpdateCb([&](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
                                 -> void { membership_updated.ready(); });

@@ -258,6 +258,14 @@ public:
   virtual LoadBalancerType lbType() const PURE;
 
   /**
+   * @return Whether the cluster is currently in maintenance mode and should not be routed to.
+   *         Different filters may handle this situation in different ways. The implementation
+   *         of this routine is typically based on randomness and may not return the same answer
+   *         on each call.
+   */
+  virtual bool maintenanceMode() const PURE;
+
+  /**
    * @return uint64_t the maximum number of outbound requests that a connection pool will make on
    *         each upstream connection. This can be used to increase spread if the backends cannot
    *         tolerate imbalance. 0 indicates no maximum.
@@ -279,6 +287,11 @@ public:
    * Shutdown the cluster prior to destroying connection pools and other thread local data.
    */
   virtual void shutdown() PURE;
+
+  /**
+   * @return the stat prefix to use for cluster specific stats.
+   */
+  virtual const std::string& statPrefix() const PURE;
 
   /**
    * @return ClusterStats& strongly named stats for this cluster.

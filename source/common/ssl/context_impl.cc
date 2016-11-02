@@ -49,8 +49,8 @@ DH* get_dh2048() {
 const unsigned char ContextImpl::SERVER_SESSION_ID_CONTEXT = 1;
 
 ContextImpl::ContextImpl(const std::string& name, Stats::Store& store, ContextConfig& config)
-    : ctx_(SSL_CTX_new(SSLv23_method())), store_(store),
-      stats_prefix_(fmt::format("{}.ssl.", name)), stats_(generateStats(stats_prefix_, store)) {
+    : ctx_(SSL_CTX_new(SSLv23_method())), store_(store), stats_prefix_(fmt::format("{}ssl.", name)),
+      stats_(generateStats(stats_prefix_, store)) {
   RELEASE_ASSERT(ctx_);
   // the list of ciphers that will be supported
   if (!config.cipherSuites().empty()) {

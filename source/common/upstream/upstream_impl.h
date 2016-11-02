@@ -159,7 +159,7 @@ class ClusterImplBase : public Cluster,
                         protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterStats generateStats(const std::string& name, Stats::Store& stats);
+  static ClusterStats generateStats(const std::string& prefix, Stats::Store& stats);
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
@@ -181,9 +181,11 @@ public:
   uint64_t httpCodecOptions() const override { return http_codec_options_; }
   Ssl::ClientContext* sslContext() const override { return ssl_ctx_; }
   LoadBalancerType lbType() const override { return lb_type_; }
+  bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
+  const std::string& statPrefix() const override { return stat_prefix_; }
   ClusterStats& stats() const override { return stats_; }
 
 protected:
@@ -197,15 +199,17 @@ protected:
 
   static const ConstHostListsPtr empty_host_lists_;
 
+  Runtime::Loader& runtime_;
   Ssl::ClientContext* ssl_ctx_;
-  std::string name_;
+  const std::string name_;
   LoadBalancerType lb_type_;
-  uint64_t max_requests_per_connection_;
-  std::chrono::milliseconds connect_timeout_;
+  const uint64_t max_requests_per_connection_;
+  const std::chrono::milliseconds connect_timeout_;
+  const std::string stat_prefix_;
   mutable ClusterStats stats_;
   HealthCheckerPtr health_checker_;
-  std::string alt_stat_name_;
-  uint64_t features_;
+  const std::string alt_stat_name_;
+  const uint64_t features_;
   OutlierDetectorPtr outlier_detector_;
 
 private:
@@ -224,6 +228,7 @@ private:
 
   const uint64_t http_codec_options_;
   mutable ResourceManagers resource_managers_;
+  const std::string maintenance_mode_runtime_key_;
 };
 
 typedef std::shared_ptr<ClusterImplBase> ClusterImplBasePtr;

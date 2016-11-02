@@ -39,8 +39,7 @@ void HostSetImpl::addMemberUpdateCb(MemberUpdateCb callback) const {
   callbacks_.emplace_back(callback);
 }
 
-ClusterStats ClusterImplBase::generateStats(const std::string& name, Stats::Store& stats) {
-  std::string prefix(fmt::format("cluster.{}.", name));
+ClusterStats ClusterImplBase::generateStats(const std::string& prefix, Stats::Store& stats) {
   return {ALL_CLUSTER_STATS(POOL_COUNTER_PREFIX(stats, prefix), POOL_GAUGE_PREFIX(stats, prefix),
                             POOL_TIMER_PREFIX(stats, prefix))};
 }
@@ -56,13 +55,14 @@ const ConstHostListsPtr ClusterImplBase::empty_host_lists_{new std::vector<std::
 
 ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime,
                                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
-    : name_(config.getString("name")),
+    : runtime_(runtime), name_(config.getString("name")),
       max_requests_per_connection_(config.getInteger("max_requests_per_connection", 0)),
       connect_timeout_(std::chrono::milliseconds(config.getInteger("connect_timeout_ms"))),
-      stats_(generateStats(name_, stats)), alt_stat_name_(config.getString("alt_stat_name", "")),
-      features_(parseFeatures(config)),
+      stat_prefix_(fmt::format("cluster.{}.", name_)), stats_(generateStats(stat_prefix_, stats)),
+      alt_stat_name_(config.getString("alt_stat_name", "")), features_(parseFeatures(config)),
       http_codec_options_(Http::Utility::parseCodecOptions(config)),
-      resource_managers_(config, runtime, name_) {
+      resource_managers_(config, runtime, name_),
+      maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)) {
 
   std::string string_lb_type = config.getString("lb_type");
   if (string_lb_type == "round_robin") {
@@ -78,8 +78,7 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& ru
   ssl_ctx_ = nullptr;
   if (config.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(config.getObject("ssl_context"));
-    ssl_ctx_ = &ssl_context_manager.createSslClientContext(fmt::format("cluster.{}", name_), stats,
-                                                           context_config);
+    ssl_ctx_ = &ssl_context_manager.createSslClientContext(stat_prefix_, stats, context_config);
   }
 }
 
@@ -109,6 +108,10 @@ ClusterImplBase::createHealthyHostLists(const std::vector<std::vector<HostPtr>>&
   }
 
   return healthy_list;
+}
+
+bool ClusterImplBase::maintenanceMode() const {
+  return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
 }
 
 uint64_t ClusterImplBase::parseFeatures(const Json::Object& config) {

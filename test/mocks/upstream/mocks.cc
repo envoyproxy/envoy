@@ -33,7 +33,7 @@ MockHost::MockHost() {}
 MockHost::~MockHost() {}
 
 MockCluster::MockCluster()
-    : stats_(ClusterImplBase::generateStats(name_, stats_store_)),
+    : stats_(ClusterImplBase::generateStats(stat_prefix_, stats_store_)),
       resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1)) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
@@ -47,6 +47,7 @@ MockCluster::MockCluster()
       .WillByDefault(Invoke([this](MemberUpdateCb cb) -> void { callbacks_.push_back(cb); }));
   ON_CALL(*this, maxRequestsPerConnection())
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
+  ON_CALL(*this, statPrefix()).WillByDefault(ReturnRef(stat_prefix_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke([this](ResourcePriority)

@@ -104,7 +104,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers) {
     }
 
     Http::CodeUtility::ResponseStatInfo info{
-        config_.stats_store_, stat_prefix_, response_headers,
+        config_.stats_store_, cluster_->statPrefix(), response_headers,
         downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true",
         route_->virtualHostName(), request_vcluster_ ? request_vcluster_->name() : "",
         config_.service_zone_, upstreamZone(), is_canary};
@@ -159,12 +159,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // Set up stat prefixes, etc.
   request_vcluster_ = route_->virtualCluster(headers);
-  stat_prefix_ = fmt::format("cluster.{}.", route_->clusterName());
   stream_log_debug("cluster '{}' match for URL '{}'", *callbacks_, route_->clusterName(),
                    headers.get(Http::Headers::get().Path));
 
-  const Upstream::Cluster& cluster = *config_.cm_.get(route_->clusterName());
-  const std::string& cluster_alt_name = cluster.altStatName();
+  cluster_ = config_.cm_.get(route_->clusterName());
+  const std::string& cluster_alt_name = cluster_->altStatName();
   if (!cluster_alt_name.empty()) {
     alt_stat_prefixes_.push_back(fmt::format("cluster.{}.", cluster_alt_name));
   }
@@ -177,8 +176,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   headers.remove(Http::Headers::get().EnvoyUpstreamAltStatName);
 
   // See if we are supposed to immediately kill some percentage of this cluster's traffic.
-  if (config_.runtime_.snapshot().featureEnabled(
-          fmt::format("upstream.maintenance_mode.{}", route_->clusterName()), 0)) {
+  if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().onFailedResponse(Http::AccessLog::FailureReason::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable);
     Http::Utility::sendLocalReply(*callbacks_, Http::Code::ServiceUnavailable, "maintenance mode");
@@ -195,7 +193,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   timeout_ = FilterUtility::finalTimeout(*route_, headers);
   route_->finalizeRequestHeaders(headers);
-  retry_state_ = createRetryState(route_->retryPolicy(), headers, cluster, config_.runtime_,
+  retry_state_ = createRetryState(route_->retryPolicy(), headers, *cluster_, config_.runtime_,
                                   config_.random_, callbacks_->dispatcher(), finalPriority());
   do_shadowing_ =
       FilterUtility::shouldShadow(route_->shadowPolicy(), config_.runtime_, callbacks_->streamId());
@@ -393,7 +391,7 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
                                 [this]() -> void { doRetry(); }) &&
       setupRetry(end_stream)) {
     Http::CodeUtility::chargeBasicResponseStat(
-        config_.stats_store_, stat_prefix_ + "retry.",
+        config_.stats_store_, cluster_->statPrefix() + "retry.",
         static_cast<Http::Code>(Http::Utility::getResponseStatus(*headers)));
     return;
   } else {
@@ -452,7 +450,8 @@ void Filter::onUpstreamComplete() {
     upstream_host_->outlierDetector().putResponseTime(response_time);
 
     Http::CodeUtility::ResponseTimingInfo info{
-        config_.stats_store_, stat_prefix_, response_time, upstream_request_->upstream_canary_,
+        config_.stats_store_, cluster_->statPrefix(), response_time,
+        upstream_request_->upstream_canary_,
         downstream_headers_->get(Http::Headers::get().EnvoyInternalRequest) == "true",
         route_->virtualHostName(), request_vcluster_ ? request_vcluster_->name() : "",
         config_.service_zone_, upstreamZone()};
