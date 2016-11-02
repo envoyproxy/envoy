@@ -90,6 +90,14 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
 
   const Router::RouteEntry* route = callbacks_->routeTable().routeForRequest(headers);
   if (route && route->rateLimitPolicy().doGlobalLimiting()) {
+    // Check if the route_key is enabled for rate limiting.
+    const std::string& route_key = route->rateLimitPolicy().routeKey();
+    if (!route_key.empty() &&
+        !config_->runtime().snapshot().featureEnabled(
+            fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
+      return FilterHeadersStatus::Continue;
+    }
+
     std::vector<::RateLimit::Descriptor> descriptors;
     for (const ActionPtr& action : config_->actions()) {
       action->populateDescriptors(*route, descriptors, *config_, headers, *callbacks_);
