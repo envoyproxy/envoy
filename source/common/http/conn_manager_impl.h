@@ -381,7 +381,7 @@ private:
 
     // NOTE: This is used for stable randomness. For performance reasons we use an incrementing
     //       counter shared across all threads. This may lead to burstiness but in general should
-    //       prove the intended behavior when doing runtime routing, etc.
+    //       provide the intended behavior when doing runtime routing, etc.
     static std::atomic<uint64_t> next_stream_id_;
 
     ConnectionManagerImpl& connection_manager_;
