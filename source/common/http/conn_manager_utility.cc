@@ -26,7 +26,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
   if (config.useRemoteAddress()) {
-    if (Network::Utility::isLoopbackAddress(connection.remoteAddress())) {
+    if (Network::Utility::isLoopbackAddress(connection.remoteAddress().c_str())) {
       Utility::appendXff(request_headers, config.localAddress());
     } else {
       Utility::appendXff(request_headers, connection.remoteAddress());
