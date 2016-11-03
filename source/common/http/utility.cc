@@ -87,7 +87,7 @@ bool Utility::isInternalRequest(const HeaderMap& headers) {
     return false;
   }
 
-  return Network::Utility::isInternalAddress(forwarded_for);
+  return Network::Utility::isInternalAddress(forwarded_for.c_str());
 }
 
 uint64_t Utility::parseCodecOptions(const Json::Object& config) {

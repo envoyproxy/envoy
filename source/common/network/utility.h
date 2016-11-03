@@ -112,13 +112,13 @@ public:
    * Determine whether this is an internal (RFC1918) address.
    * @return bool the address is an RFC1918 address.
    */
-  static bool isInternalAddress(const std::string& address);
+  static bool isInternalAddress(const char* address);
 
   /**
    * Check if address is loopback address.
    * @return true if so, otherwise false
    */
-  static bool isLoopbackAddress(const std::string& address);
+  static bool isLoopbackAddress(const char* address);
 };
 
 } // Network

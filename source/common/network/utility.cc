@@ -214,9 +214,9 @@ std::string Utility::getAddressName(sockaddr_in* addr) {
   return std::string(str);
 }
 
-bool Utility::isInternalAddress(const std::string& address) {
+bool Utility::isInternalAddress(const char* address) {
   in_addr addr;
-  int rc = inet_pton(AF_INET, address.c_str(), &addr);
+  int rc = inet_pton(AF_INET, address, &addr);
   if (1 != rc) {
     return false;
   }
@@ -232,9 +232,9 @@ bool Utility::isInternalAddress(const std::string& address) {
   return false;
 }
 
-bool Utility::isLoopbackAddress(const std::string& address) {
+bool Utility::isLoopbackAddress(const char* address) {
   in_addr addr;
-  int rc = inet_pton(AF_INET, address.c_str(), &addr);
+  int rc = inet_pton(AF_INET, address, &addr);
   if (1 != rc) {
     return false;
   }

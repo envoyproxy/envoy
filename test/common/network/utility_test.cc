@@ -108,11 +108,11 @@ TEST(NetworkUtility, GetLocalAddress) {
 TEST(NetworkUtility, loopbackAddress) {
   {
     std::string address = "127.0.0.1";
-    EXPECT_TRUE(Utility::isLoopbackAddress(address));
+    EXPECT_TRUE(Utility::isLoopbackAddress(address.c_str()));
   }
   {
     std::string address = "10.0.0.1";
-    EXPECT_FALSE(Utility::isLoopbackAddress(address));
+    EXPECT_FALSE(Utility::isLoopbackAddress(address.c_str()));
   }
 }
 
