@@ -98,4 +98,15 @@ public:
    */
   static const std::string& valueOrDefault(const std::string& input,
                                            const std::string& default_value);
+
+  /**
+   * Replace all instances of a substring in an input string with another string.
+   *
+   * @param input supplies string to perform replacement on
+   * @param search supplies substring to look for and replace
+   * @param replacement supplies string to replace search substring
+   * @return copy of string with all instances of substring replaced
+   */
+  static std::string replaceAll(const std::string& input, const std::string& search,
+                                const std::string& replacement);
 };

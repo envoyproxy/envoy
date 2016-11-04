@@ -85,7 +85,7 @@ private:
 class HeaderFormatter {
 public:
   HeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                  const Optional<size_t>& max_length);
+                  const Optional<size_t>& max_length, bool escape_newlines);
 
   std::string format(const HeaderMap& headers) const;
 
@@ -93,6 +93,7 @@ private:
   LowerCaseString main_header_;
   LowerCaseString alternative_header_;
   Optional<size_t> max_length_;
+  bool escape_newlines_;
 };
 
 /**
@@ -101,7 +102,7 @@ private:
 class RequestHeaderFormatter : public Formatter, HeaderFormatter {
 public:
   RequestHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                         const Optional<size_t>& max_length);
+                         const Optional<size_t>& max_length, bool escape_newlines);
 
   // Formatter::format
   std::string format(const HeaderMap& request_headers, const HeaderMap&,
