@@ -40,21 +40,24 @@ public:
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_CONST_METHOD0(sslContext, Ssl::ClientContext*());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
+  MOCK_CONST_METHOD0(maintenanceMode, bool());
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
   MOCK_METHOD0(shutdown, void());
+  MOCK_CONST_METHOD0(statPrefix, const std::string&());
   MOCK_CONST_METHOD0(stats, ClusterStats&());
 
   std::vector<HostPtr> hosts_;
   std::vector<HostPtr> healthy_hosts_;
   std::vector<std::vector<HostPtr>> hosts_per_zone_;
   std::vector<std::vector<HostPtr>> healthy_hosts_per_zone_;
-  std::string name_{"fake_cluster"};
-  std::string alt_stat_name_{"fake_alt_cluster"};
+  const std::string name_{"fake_cluster"};
+  const std::string alt_stat_name_{"fake_alt_cluster"};
   std::list<MemberUpdateCb> callbacks_;
   uint64_t max_requests_per_connection_{};
   Stats::IsolatedStoreImpl stats_store_;
+  const std::string stat_prefix_{"cluster.fake_cluster."};
   ClusterStats stats_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   NiceMock<Runtime::MockLoader> runtime_;

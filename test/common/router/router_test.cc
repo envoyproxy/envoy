@@ -142,8 +142,7 @@ TEST_F(RouterTest, NoHost) {
 }
 
 TEST_F(RouterTest, MaintenanceMode) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.fake_cluster", 0))
-      .WillOnce(Return(true));
+  EXPECT_CALL(cm_.cluster_, maintenanceMode()).WillOnce(Return(true));
 
   Http::HeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "16"}, {"content-type", "text/plain"}};
