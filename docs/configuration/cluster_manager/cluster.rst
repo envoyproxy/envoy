@@ -65,7 +65,8 @@ hosts
 
   strict_dns
     Strict DNS clusters can specify any number of hostname:port combinations. All names will be
-    resolved using DNS and grouped together to form the final cluster. If multiple records are returned for a single name, all will be used. For example:
+    resolved using DNS and grouped together to form the final cluster. If multiple records are 
+    returned for a single name, all will be used. For example:
 
     .. code-block:: json
 
