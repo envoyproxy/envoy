@@ -26,9 +26,6 @@ public:
 private:
   void drainSequenceTick();
 
-  static const std::chrono::minutes DEFAULT_DRAIN_TIME;
-  static const std::chrono::minutes DEFAULT_PARENT_SHUTDOWN_TIME;
-
   Instance& server_;
   Event::TimerPtr drain_tick_timer_;
   std::chrono::seconds drain_time_completed_{};

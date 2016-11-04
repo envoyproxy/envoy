@@ -22,7 +22,9 @@ public:
   uint64_t baseId() override { return 0; }
   uint32_t concurrency() override { return 1; }
   const std::string& configPath() override { return config_path_; }
+  std::chrono::seconds drainTime() override { return std::chrono::seconds(0); }
   spdlog::level::level_enum logLevel() override { NOT_IMPLEMENTED; }
+  std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(0); }
   uint64_t restartEpoch() override { return 0; }
   const std::string& serviceClusterName() override { return cluster_name_; }
   const std::string& serviceNodeName() override { return node_name_; }
