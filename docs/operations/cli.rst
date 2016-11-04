@@ -70,3 +70,19 @@ following are the command line options that Envoy supports.
   the interval has elapsed, whichever comes first. Adjusting this setting is useful
   when tailing :ref:`access logs <arch_overview_http_access_logs>` in order to
   get more (or less) immediate flushing.
+
+.. option:: --drain-time-s <integer>
+
+  *(optional)* The time in seconds that Envoy will drain connections during a hot restart. See the
+  :ref:`hot restart overview <arch_overview_hot_restart>` for more information. Defaults to 600
+  seconds (10 minutes). Generally the drain time should be less than the parent shutdown time
+  set via the :option:`--parent-shutdown-time-s` option. How the two settings are configured
+  depends on the specific deployment. In edge scenarios, it might be desirable to have a very long
+  drain time. In service to service scenarios, it might be possible to make the drain and shutdown
+  time much shorter (e.g., 60s/90s).
+
+.. option:: --parent-shutdown-time-s <integer>
+
+  *(optional)* The time in seconds that Envoy will wait before shutting down the parent process
+  during a hot restart. See the :ref:`hot restart overview <arch_overview_hot_restart>` for more
+  information. Defaults to 900 seconds (15 minutes).

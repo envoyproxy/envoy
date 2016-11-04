@@ -39,6 +39,11 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   TCLAP::ValueArg<uint64_t> file_flush_interval_msec("", "file-flush-interval-msec",
                                                      "Interval for log flushing in msec", false,
                                                      10000, "uint64_t", cmd);
+  TCLAP::ValueArg<uint64_t> drain_time_s("", "drain-time-s", "Hot restart drain time in seconds",
+                                         false, 600, "uint64_t", cmd);
+  TCLAP::ValueArg<uint64_t> parent_shutdown_time_s("", "parent-shutdown-time-s",
+                                                   "Hot restart parent shutdown time in seconds",
+                                                   false, 900, "uint64_t", cmd);
 
   try {
     cmd.parse(argc, argv);
@@ -68,4 +73,6 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
   service_node_ = service_node.getValue();
   service_zone_ = service_zone.getValue();
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());
+  drain_time_ = std::chrono::seconds(drain_time_s.getValue());
+  parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
 }

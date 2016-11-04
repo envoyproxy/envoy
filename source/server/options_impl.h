@@ -14,7 +14,9 @@ public:
   uint64_t baseId() { return base_id_; }
   uint32_t concurrency() override { return concurrency_; }
   const std::string& configPath() override { return config_path_; }
+  std::chrono::seconds drainTime() override { return drain_time_; }
   spdlog::level::level_enum logLevel() override { return log_level_; }
+  std::chrono::seconds parentShutdownTime() override { return parent_shutdown_time_; }
   uint64_t restartEpoch() override { return restart_epoch_; }
   const std::string& serviceClusterName() override { return service_cluster_; }
   const std::string& serviceNodeName() override { return service_node_; }
@@ -31,4 +33,6 @@ private:
   std::string service_node_;
   std::string service_zone_;
   std::chrono::milliseconds file_flush_interval_msec_;
+  std::chrono::seconds drain_time_;
+  std::chrono::seconds parent_shutdown_time_;
 };

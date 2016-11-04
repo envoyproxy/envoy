@@ -10,11 +10,13 @@ namespace Server {
 
 TEST(DrainManagerImplTest, All) {
   NiceMock<MockInstance> server;
+  ON_CALL(server.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(600)));
+  ON_CALL(server.options_, parentShutdownTime()).WillByDefault(Return(std::chrono::seconds(900)));
   DrainManagerImpl drain_manager(server);
 
   // Test parent shutdown.
   Event::MockTimer* shutdown_timer = new Event::MockTimer(&server.dispatcher_);
-  EXPECT_CALL(*shutdown_timer, enableTimer(_));
+  EXPECT_CALL(*shutdown_timer, enableTimer(std::chrono::milliseconds(900000)));
   drain_manager.startParentShutdownSequence();
 
   EXPECT_CALL(server.hot_restart_, terminateParent());

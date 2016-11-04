@@ -25,6 +25,11 @@ public:
   virtual uint32_t concurrency() PURE;
 
   /**
+   * @return the number of seconds that envoy will perform draining during a hot restart.
+   */
+  virtual std::chrono::seconds drainTime() PURE;
+
+  /**
    * @return const std::string& the path to the configuration file.
    */
   virtual const std::string& configPath() PURE;
@@ -33,6 +38,12 @@ public:
    * @return spdlog::level::level_enum the default log level for the server.
    */
   virtual spdlog::level::level_enum logLevel() PURE;
+
+  /**
+   * @return the number of seconds that envoy will wait before shutting down the parent envoy during
+   *         a host restart. Generally this will be longer than the drainTime() option.
+   */
+  virtual std::chrono::seconds parentShutdownTime() PURE;
 
   /**
    * @return the restart epoch. 0 indicates the first server start, 1 the second, and so on.
