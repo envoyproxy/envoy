@@ -64,15 +64,16 @@ hosts
       [{"url": "tcp://10.0.0.2:1234"}, {"url": "tcp://10.0.0.3:5678"}]
 
   strict_dns
-    Strict DNS clusters can specify any number of DNS/port combinations. All DNS addresses will be
-    resolved and grouped together to form the final cluster. For example:
+    Strict DNS clusters can specify any number of hostname:port combinations. All names will be
+    resolved using DNS and grouped together to form the final cluster. If multiple records are 
+    returned for a single name, all will be used. For example:
 
     .. code-block:: json
 
       [{"url": "tcp://foo1.bar.com:1234"}, {"url": "tcp://foo2.bar.com:5678"}]
 
   logical_dns
-    Logical DNS clusters specify a host much like strict DNS, however only the first host will be
+    Logical DNS clusters specify hostnames much like strict DNS, however only the first host will be
     used. For example:
 
     .. code-block:: json
