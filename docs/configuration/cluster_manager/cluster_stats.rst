@@ -3,13 +3,18 @@
 Statistics
 ==========
 
+.. contents::
+  :local:
+
+General
+-------
+
 Every cluster has a statistics tree rooted at *cluster.<name>.* with the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  lb_healthy_panic, Counter, Total requests load balanced with the load balancer in panic mode
   upstream_cx_total, Counter, Total connections
   upstream_cx_active, Gauge, Total active connections
   upstream_cx_http1_total, Counter, Total HTTP/1.1 connections
@@ -126,16 +131,17 @@ Envoy will track the following statistics in *cluster.<name>.zone.<from_zone>.<t
   upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
   upstream_rq_time, Timer, Request time milliseconds
 
-Zone aware routing statistics
-_____________________________
+Load balancer statistics
+------------------------
 
-Statistics for monitoring zone aware routing decisions. Stats
-are rooted at *cluster.<name>.* and contain the following statistics:
+Statistics for monitoring load balancer decisions. Stats are rooted at *cluster.<name>.* and contain
+the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  lb_healthy_panic, Counter, Total requests load balanced with the load balancer in panic mode
   lb_zone_cluster_too_small, Counter, No zone aware routing because of small upstream cluster size
   lb_zone_routing_all_directly, Counter, Sending all requests directly to the same zone
   lb_zone_routing_sampled, Counter, Sending some requests to the same zone

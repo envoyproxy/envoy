@@ -26,10 +26,11 @@ Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
   <arch_overview_service_discovery_sds>` cluster type, a global SDS configuration must be specified.
 
 local_cluster_name
-  *(optional, string)* Name of the local cluster. In order to enable
-  :ref:`zone aware routing <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
-  If local_cluster_name is defined then :ref:`clusters <config_cluster_manager_clusters>`
-  must contain definition of local cluster.
+  *(optional, string)* Name of the local cluster (i.e., the cluster that owns the Envoy running this 
+  configuration). In order to enable
+  :ref:`zone aware routing <arch_overview_load_balancing_zone_aware_routing>` this option must be
+  set. If *local_cluster_name* is defined then :ref:`clusters <config_cluster_manager_clusters>`
+  must contain a definition of a cluster with the same name.
 
 .. toctree::
   :hidden:

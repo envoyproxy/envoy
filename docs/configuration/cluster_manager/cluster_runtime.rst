@@ -38,8 +38,9 @@ upstream.zone_routing.enabled
   % of requests that will be routed to the same upstream zone. Defaults to 100% of requests.
 
 upstream.zone_routing.min_cluster_size
-  minimal size of upstream cluster for which zone aware routing can be attempted. Default value is 6.
-  If upstream cluster size is smaller than min_cluster_size zone aware routing will not be performed.
+  Minimal size of the upstream cluster for which zone aware routing can be attempted. Default value
+  is 6. If the upstream cluster size is smaller than *min_cluster_size* zone aware routing will not
+  be performed.
 
 circuit_breakers.<cluster_name>.<priority>.max_connections
   :ref:`Max connections circuit breaker setting <config_cluster_manager_cluster_circuit_breakers_max_connections>`
