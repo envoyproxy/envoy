@@ -33,7 +33,7 @@ Network::FilterStatus Instance::onData(Buffer::Instance&) {
     config_->stats().active_.inc();
     config_->stats().total_.inc();
     calling_limit_ = true;
-    client_->limit(*this, config_->domain(), config_->descriptors());
+    client_->limit(*this, config_->domain(), config_->descriptors(), "");
     calling_limit_ = false;
   }
 
