@@ -63,6 +63,7 @@ void GrpcClientImpl::onSuccess() {
 void GrpcClientImpl::onFailure(const Optional<uint64_t>&, const std::string&) {
   callbacks_->complete(LimitStatus::Error);
   callbacks_ = nullptr;
+  request_id_.clear();
 }
 
 GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm,
