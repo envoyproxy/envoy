@@ -50,6 +50,7 @@ private:
   std::vector<DeferredDeletablePtr> to_delete_;
   std::mutex post_lock_;
   std::list<std::function<void()>> post_callbacks_;
+  bool deferred_deleting_{};
 };
 
 } // Event
