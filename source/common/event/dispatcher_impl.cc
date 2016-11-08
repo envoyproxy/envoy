@@ -19,27 +19,39 @@ namespace Event {
 
 DispatcherImpl::DispatcherImpl()
     : base_(event_base_new()),
-      deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })) {}
+      deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
+      current_to_delete_(&to_delete_1_) {}
 
 DispatcherImpl::~DispatcherImpl() {}
 
 void DispatcherImpl::clearDeferredDeleteList() {
-  size_t num_to_delete = to_delete_.size();
+  std::vector<DeferredDeletablePtr>* to_delete = current_to_delete_;
+
+  size_t num_to_delete = to_delete->size();
   if (deferred_deleting_ || !num_to_delete) {
     return;
   }
 
   log_trace("clearing deferred deletion list (size={})", num_to_delete);
+
+  // Swap the current deletion vector so that if we do deferred delete while we are deleting, we
+  // use the other vector. We will get another callback to delete that vector.
+  if (current_to_delete_ == &to_delete_1_) {
+    current_to_delete_ = &to_delete_2_;
+  } else {
+    current_to_delete_ = &to_delete_1_;
+  }
+
   deferred_deleting_ = true;
 
   // Calling clear() on the vector does not specify which order destructors run in. We want to
   // destroy in FIFO order so just do it manually. This required 2 passes over the vector which is
   // not optimal but can be cleaned up later if needed.
   for (size_t i = 0; i < num_to_delete; i++) {
-    to_delete_[i].reset();
+    (*to_delete)[i].reset();
   }
 
-  to_delete_.clear();
+  to_delete->clear();
   deferred_deleting_ = false;
 }
 
@@ -84,15 +96,9 @@ Network::ListenerPtr DispatcherImpl::createSslListener(Ssl::ServerContext& ssl_c
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return TimerPtr{new TimerImpl(*this, cb)}; }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
-  if (deferred_deleting_) {
-    log_trace("deferred deletion immediate delete");
-    to_delete.reset();
-    return;
-  }
-
-  to_delete_.emplace_back(std::move(to_delete));
-  log_trace("item added to deferred deletion list (size={})", to_delete_.size());
-  if (1 == to_delete_.size()) {
+  current_to_delete_->emplace_back(std::move(to_delete));
+  log_trace("item added to deferred deletion list (size={})", current_to_delete_->size());
+  if (1 == current_to_delete_->size()) {
     deferred_delete_timer_->enableTimer(std::chrono::milliseconds(0));
   }
 }
