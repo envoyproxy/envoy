@@ -46,7 +46,7 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
 }
 
 void GrpcClientImpl::onPreRequestCustomizeHeaders(Http::HeaderMap& headers) {
-  if (request_id_ != EMPTY_STRING) {
+  if (!request_id_.empty()) {
     headers.addViaCopy(Http::Headers::get().RequestId, request_id_);
   }
 }
