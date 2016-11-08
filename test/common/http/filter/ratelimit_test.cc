@@ -181,7 +181,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
                     testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                         {{{"to_cluster", "fake_cluster"}}},
                         {{{"to_cluster", "fake_cluster"}, {"from_cluster", "service_cluster"}}}}),
-                    EMPTY_STRING))
+                    ""))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks) -> void {
         callbacks.complete(::RateLimit::LimitStatus::OK);
       })));
@@ -286,7 +286,7 @@ TEST_F(HttpRateLimitFilterTest, RequestHeaderOkResponse) {
   EXPECT_CALL(*client_,
               limit(_, "foobar", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                      {{{"my_header_name", "test_value"}}}}),
-                    EMPTY_STRING))
+                    ""))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks_ = &callbacks; })));
 
@@ -311,7 +311,7 @@ TEST_F(HttpRateLimitFilterTest, RateLimitKeyOkResponse) {
                               testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                   {{{"my_header_name", "test_value"}}},
                                   {{{"route_key", "test_key"}, {"my_header_name", "test_value"}}}}),
-                              EMPTY_STRING))
+                              ""))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks_ = &callbacks; })));
 
@@ -345,7 +345,7 @@ TEST_F(HttpRateLimitFilterTest, AddressRateLimiting) {
   EXPECT_CALL(filter_callbacks_, downstreamAddress()).WillOnce(ReturnRef(address));
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                             {{{"remote_address", address}}}}),
-                              EMPTY_STRING))
+                              ""))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks_ = &callbacks; })));
 
@@ -370,7 +370,7 @@ TEST_F(HttpRateLimitFilterTest, RouteAddressRateLimiting) {
               limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                   {{{"remote_address", address}}},
                                   {{{"route_key", "test_key"}, {"remote_address", address}}}}),
-                    EMPTY_STRING))
+                    ""))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks_ = &callbacks; })));
 

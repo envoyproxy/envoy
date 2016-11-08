@@ -1,5 +1,4 @@
 #include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
 #include "common/filter/ratelimit.h"
 #include "common/stats/stats_impl.h"
 
@@ -64,7 +63,7 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_CALL(*client_,
               limit(_, "foo", testing::ContainerEq(std::vector<Descriptor>{
                                   {{{"hello", "world"}, {"foo", "bar"}}}, {{{"foo2", "bar2"}}}}),
-                    EMPTY_STRING))
+                    ""))
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 

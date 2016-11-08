@@ -1,4 +1,3 @@
-#include "common/common/empty_string.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/ratelimit/ratelimit_impl.h"
@@ -49,7 +48,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
           response = dynamic_cast<pb::lyft::ratelimit::RateLimitResponse*>(raw_response);
         })));
 
-    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, EMPTY_STRING);
+    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, "");
 
     client_.onPreRequestCustomizeHeaders(headers);
     ASSERT_FALSE(headers.has(Http::Headers::get().RequestId));
@@ -90,8 +89,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
         })));
 
     client_.limit(request_callbacks_, "foo",
-                  {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}},
-                  EMPTY_STRING);
+                  {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}}, "");
 
     response->Clear();
     EXPECT_CALL(request_callbacks_, complete(LimitStatus::Error));
@@ -107,7 +105,7 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
         response = dynamic_cast<pb::lyft::ratelimit::RateLimitResponse*>(raw_response);
       })));
 
-  client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, EMPTY_STRING);
+  client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, "");
 
   EXPECT_CALL(*channel_, cancel());
   client_.cancel();
@@ -149,7 +147,7 @@ TEST(RateLimitNullFactoryTest, Basic) {
   ClientPtr client = factory.create(Optional<std::chrono::milliseconds>());
   MockRequestCallbacks request_callbacks;
   EXPECT_CALL(request_callbacks, complete(LimitStatus::OK));
-  client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, EMPTY_STRING);
+  client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, "");
   client->cancel();
 }
 
