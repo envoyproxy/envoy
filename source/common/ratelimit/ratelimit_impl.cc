@@ -1,3 +1,4 @@
+#include <common/common/empty_string.h>
 #include "ratelimit_impl.h"
 
 #include "common/common/assert.h"
@@ -45,7 +46,9 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
 }
 
 void GrpcClientImpl::onPreRequestCustomizeHeaders(Http::HeaderMap& headers) {
-  headers.addViaCopy(Http::Headers::get().RequestId, request_id_);
+  if (request_id_ != EMPTY_STRING) {
+    headers.addViaCopy(Http::Headers::get().RequestId, request_id_);
+  }
 }
 
 void GrpcClientImpl::onSuccess() {

@@ -1,4 +1,6 @@
 #include "common/common/empty_string.h"
+#include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/ratelimit/ratelimit_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
@@ -40,6 +42,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
   {
     pb::lyft::ratelimit::RateLimitRequest request;
+    Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
     EXPECT_CALL(*channel_, CallMethod(_, _, ProtoMessageEqual(&request), _, nullptr))
         .WillOnce(WithArg<3>(Invoke([&](proto::Message* raw_response) -> void {
@@ -47,6 +50,9 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
         })));
 
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, EMPTY_STRING);
+
+    client_.onPreRequestCustomizeHeaders(headers);
+    ASSERT_FALSE(headers.has(Http::Headers::get().RequestId));
 
     response->Clear();
     response->set_overall_code(pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT);
@@ -56,13 +62,17 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
 
   {
     pb::lyft::ratelimit::RateLimitRequest request;
+    Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}});
     EXPECT_CALL(*channel_, CallMethod(_, _, ProtoMessageEqual(&request), _, nullptr))
         .WillOnce(WithArg<3>(Invoke([&](proto::Message* raw_response) -> void {
           response = dynamic_cast<pb::lyft::ratelimit::RateLimitResponse*>(raw_response);
         })));
 
-    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}}, EMPTY_STRING);
+    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}}, "requestid");
+
+    client_.onPreRequestCustomizeHeaders(headers);
+    ASSERT_EQ(headers.get(Http::Headers::get().RequestId), "requestid");
 
     response->Clear();
     response->set_overall_code(pb::lyft::ratelimit::RateLimitResponse_Code_OK);
