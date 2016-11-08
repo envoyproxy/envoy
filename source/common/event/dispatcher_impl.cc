@@ -24,12 +24,21 @@ DispatcherImpl::DispatcherImpl()
 DispatcherImpl::~DispatcherImpl() {}
 
 void DispatcherImpl::clearDeferredDeleteList() {
-  if (deferred_deleting_) {
+  size_t num_to_delete = to_delete_.size();
+  if (deferred_deleting_ || !num_to_delete) {
     return;
   }
 
-  log_trace("clearing deferred deletion list (size={})", to_delete_.size());
+  log_trace("clearing deferred deletion list (size={})", num_to_delete);
   deferred_deleting_ = true;
+
+  // Calling clear() on the vector does not specify which order destructors run in. We want to
+  // destroy in FIFO order so just do it manually. This required 2 passes over the vector which is
+  // not optimal but can be cleaned up later if needed.
+  for (size_t i = 0; i < num_to_delete; i++) {
+    to_delete_[i].reset();
+  }
+
   to_delete_.clear();
   deferred_deleting_ = false;
 }
