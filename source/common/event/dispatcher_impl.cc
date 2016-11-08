@@ -24,14 +24,14 @@ DispatcherImpl::DispatcherImpl()
 DispatcherImpl::~DispatcherImpl() {}
 
 void DispatcherImpl::clearDeferredDeleteList() {
-  size_t index = 0;
-  while (index != to_delete_.size()) {
-    // The destructor of a deferred deletion item can yield more deferred deletion. Loop
-    // and destroy all of them until there is nothing left.
-    log_trace("clearing deferred deletion list (index={})", index);
-    to_delete_[index++].reset();
+  if (deferred_deleting_) {
+    return;
   }
+
+  log_trace("clearing deferred deletion list (size={})", to_delete_.size());
+  deferred_deleting_ = true;
   to_delete_.clear();
+  deferred_deleting_ = false;
 }
 
 Network::ClientConnectionPtr DispatcherImpl::createClientConnection(const std::string& url) {
@@ -75,6 +75,12 @@ Network::ListenerPtr DispatcherImpl::createSslListener(Ssl::ServerContext& ssl_c
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return TimerPtr{new TimerImpl(*this, cb)}; }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
+  if (deferred_deleting_) {
+    log_trace("deferred deletion immediate delete");
+    to_delete.reset();
+    return;
+  }
+
   to_delete_.emplace_back(std::move(to_delete));
   log_trace("item added to deferred deletion list (size={})", to_delete_.size());
   if (1 == to_delete_.size()) {
