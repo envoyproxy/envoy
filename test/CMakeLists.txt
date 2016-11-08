@@ -30,6 +30,7 @@ add_executable(envoy-test
   common/common/hex_test.cc
   common/common/optional_test.cc
   common/common/utility_test.cc
+  common/event/dispatcher_impl_test.cc
   common/event/file_event_impl_test.cc
   common/filesystem/filesystem_impl_test.cc
   common/filesystem/watcher_impl_test.cc
