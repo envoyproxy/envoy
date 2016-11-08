@@ -423,6 +423,8 @@ private:
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfig& config_;
+  ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on the
+                                  // config in the hot path.
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;

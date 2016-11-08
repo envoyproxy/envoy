@@ -35,17 +35,18 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Network::DrainDecision& drain_close,
                                              Runtime::RandomGenerator& random_generator,
                                              Tracing::HttpTracer& tracer, Runtime::Loader& runtime)
-    : config_(config), conn_length_(config_.stats().named_.downstream_cx_length_ms_.allocateSpan()),
+    : config_(config), stats_(config_.stats()),
+      conn_length_(stats_.named_.downstream_cx_length_ms_.allocateSpan()),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
       runtime_(runtime) {}
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
-  config_.stats().named_.downstream_cx_total_.inc();
-  config_.stats().named_.downstream_cx_active_.inc();
+  stats_.named_.downstream_cx_total_.inc();
+  stats_.named_.downstream_cx_active_.inc();
   if (read_callbacks_->connection().ssl()) {
-    config_.stats().named_.downstream_cx_ssl_total_.inc();
-    config_.stats().named_.downstream_cx_ssl_active_.inc();
+    stats_.named_.downstream_cx_ssl_total_.inc();
+    stats_.named_.downstream_cx_ssl_active_.inc();
   }
 
   read_callbacks_->connection().addConnectionCallbacks(*this);
@@ -58,18 +59,18 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
-  config_.stats().named_.downstream_cx_destroy_.inc();
-  config_.stats().named_.downstream_cx_active_.dec();
+  stats_.named_.downstream_cx_destroy_.inc();
+  stats_.named_.downstream_cx_active_.dec();
   if (read_callbacks_->connection().ssl()) {
-    config_.stats().named_.downstream_cx_ssl_active_.dec();
+    stats_.named_.downstream_cx_ssl_active_.dec();
   }
 
   if (codec_) {
     if (codec_->protocolString() == Http1::PROTOCOL_STRING) {
-      config_.stats().named_.downstream_cx_http1_active_.dec();
+      stats_.named_.downstream_cx_http1_active_.dec();
     } else {
       ASSERT(codec_->protocolString() == Http2::PROTOCOL_STRING);
-      config_.stats().named_.downstream_cx_http2_active_.dec();
+      stats_.named_.downstream_cx_http2_active_.dec();
     }
   }
 
@@ -138,12 +139,12 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
   if (!codec_) {
     codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
     if (codec_->protocolString() == Http1::PROTOCOL_STRING) {
-      config_.stats().named_.downstream_cx_http1_total_.inc();
-      config_.stats().named_.downstream_cx_http1_active_.inc();
+      stats_.named_.downstream_cx_http1_total_.inc();
+      stats_.named_.downstream_cx_http1_active_.inc();
     } else {
       ASSERT(codec_->protocolString() == Http2::PROTOCOL_STRING);
-      config_.stats().named_.downstream_cx_http2_total_.inc();
-      config_.stats().named_.downstream_cx_http2_active_.inc();
+      stats_.named_.downstream_cx_http2_total_.inc();
+      stats_.named_.downstream_cx_http2_active_.inc();
     }
   }
 
@@ -157,7 +158,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
       // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
       // GOAWAY.
       conn_log_debug("dispatch error: {}", read_callbacks_->connection(), e.what());
-      config_.stats().named_.downstream_cx_protocol_error_.inc();
+      stats_.named_.downstream_cx_protocol_error_.inc();
 
       // In the protocol error case, we need to reset all streams now. Since we do a flush write,
       // the connection might stick around long enough for a pending stream to come back and try
@@ -191,11 +192,10 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
 
 void ConnectionManagerImpl::onBufferChange(Network::ConnectionBufferType type, uint64_t,
                                            int64_t delta) {
-  Network::Utility::updateBufferStats(type, delta,
-                                      config_.stats().named_.downstream_cx_rx_bytes_total_,
-                                      config_.stats().named_.downstream_cx_rx_bytes_buffered_,
-                                      config_.stats().named_.downstream_cx_tx_bytes_total_,
-                                      config_.stats().named_.downstream_cx_tx_bytes_buffered_);
+  Network::Utility::updateBufferStats(type, delta, stats_.named_.downstream_cx_rx_bytes_total_,
+                                      stats_.named_.downstream_cx_rx_bytes_buffered_,
+                                      stats_.named_.downstream_cx_tx_bytes_total_,
+                                      stats_.named_.downstream_cx_tx_bytes_buffered_);
 }
 
 void ConnectionManagerImpl::resetAllStreams() {
@@ -207,11 +207,11 @@ void ConnectionManagerImpl::resetAllStreams() {
 
 void ConnectionManagerImpl::onEvent(uint32_t events) {
   if (events & Network::ConnectionEvent::LocalClose) {
-    config_.stats().named_.downstream_cx_destroy_local_.inc();
+    stats_.named_.downstream_cx_destroy_local_.inc();
   }
 
   if (events & Network::ConnectionEvent::RemoteClose) {
-    config_.stats().named_.downstream_cx_destroy_remote_.inc();
+    stats_.named_.downstream_cx_destroy_remote_.inc();
   }
 
   if ((events & Network::ConnectionEvent::RemoteClose) ||
@@ -229,13 +229,13 @@ void ConnectionManagerImpl::onEvent(uint32_t events) {
 
   if (!streams_.empty()) {
     if (events & Network::ConnectionEvent::LocalClose) {
-      config_.stats().named_.downstream_cx_destroy_local_active_rq_.inc();
+      stats_.named_.downstream_cx_destroy_local_active_rq_.inc();
     }
     if (events & Network::ConnectionEvent::RemoteClose) {
-      config_.stats().named_.downstream_cx_destroy_remote_active_rq_.inc();
+      stats_.named_.downstream_cx_destroy_remote_active_rq_.inc();
     }
 
-    config_.stats().named_.downstream_cx_destroy_active_rq_.inc();
+    stats_.named_.downstream_cx_destroy_active_rq_.inc();
     user_agent_.onConnectionDestroy(events, true);
     resetAllStreams();
   }
@@ -248,7 +248,7 @@ void ConnectionManagerImpl::onGoAway() {
 
 void ConnectionManagerImpl::onIdleTimeout() {
   conn_log_debug("idle timeout", read_callbacks_->connection());
-  config_.stats().named_.downstream_cx_idle_timeout_.inc();
+  stats_.named_.downstream_cx_idle_timeout_.inc();
   if (!codec_) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (drain_state_ == DrainState::NotDraining) {
@@ -268,20 +268,20 @@ std::atomic<uint64_t> ConnectionManagerImpl::ActiveStream::next_stream_id_(0);
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager), stream_id_(next_stream_id_++),
-      request_timer_(connection_manager_.config_.stats().named_.downstream_rq_time_.allocateSpan()),
+      request_timer_(connection_manager_.stats_.named_.downstream_rq_time_.allocateSpan()),
       request_info_(connection_manager_.codec_->protocolString()) {
-  connection_manager_.config_.stats().named_.downstream_rq_total_.inc();
-  connection_manager_.config_.stats().named_.downstream_rq_active_.inc();
+  connection_manager_.stats_.named_.downstream_rq_total_.inc();
+  connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocolString() == Http1::PROTOCOL_STRING) {
-    connection_manager_.config_.stats().named_.downstream_rq_http1_total_.inc();
+    connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   } else {
     ASSERT(connection_manager_.codec_->protocolString() == Http2::PROTOCOL_STRING);
-    connection_manager_.config_.stats().named_.downstream_rq_http2_total_.inc();
+    connection_manager_.stats_.named_.downstream_rq_http2_total_.inc();
   }
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
-  connection_manager_.config_.stats().named_.downstream_rq_active_.dec();
+  connection_manager_.stats_.named_.downstream_rq_active_.dec();
   for (AccessLog::InstancePtr access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
@@ -319,13 +319,13 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
   }
 
   if (CodeUtility::is2xx(response_code)) {
-    connection_manager_.config_.stats().named_.downstream_rq_2xx_.inc();
+    connection_manager_.stats_.named_.downstream_rq_2xx_.inc();
   } else if (CodeUtility::is3xx(response_code)) {
-    connection_manager_.config_.stats().named_.downstream_rq_3xx_.inc();
+    connection_manager_.stats_.named_.downstream_rq_3xx_.inc();
   } else if (CodeUtility::is4xx(response_code)) {
-    connection_manager_.config_.stats().named_.downstream_rq_4xx_.inc();
+    connection_manager_.stats_.named_.downstream_rq_4xx_.inc();
   } else if (CodeUtility::is5xx(response_code)) {
-    connection_manager_.config_.stats().named_.downstream_rq_5xx_.inc();
+    connection_manager_.stats_.named_.downstream_rq_5xx_.inc();
   }
 }
 
@@ -345,9 +345,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   });
 #endif
 
-  connection_manager_.user_agent_.initializeFromHeaders(*request_headers_,
-                                                        connection_manager_.config_.stats().prefix_,
-                                                        connection_manager_.config_.stats().store_);
+  connection_manager_.user_agent_.initializeFromHeaders(
+      *request_headers_, connection_manager_.stats_.prefix_, connection_manager_.stats_.store_);
 
   // Make sure we are getting a codec version we support.
   const std::string& codec_version = request_headers_->get(Headers::get().Version);
@@ -386,7 +385,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // so we only support relative paths in all cases.
   // https://tools.ietf.org/html/rfc7230#section-5.3
   if (request_headers_->get(Headers::get().Path).find('/') != 0) {
-    connection_manager_.config_.stats().named_.downstream_rq_non_relative_path_.inc();
+    connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::NotFound))}};
     encodeHeaders(nullptr, headers, true);
     return;
@@ -543,7 +542,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     // of time to race with incoming requests. It mainly just keeps the logic the same between
     // HTTP/1.1 and HTTP/2.
     connection_manager_.startDrainSequence();
-    connection_manager_.config_.stats().named_.downstream_cx_drain_close_.inc();
+    connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
     stream_log_debug("drain closing connection", *this);
   }
 
@@ -555,7 +554,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       connection_manager_.drain_state_ = DrainState::Closing;
     }
 
-    connection_manager_.config_.stats().named_.downstream_rq_response_before_rq_complete_.inc();
+    connection_manager_.stats_.named_.downstream_rq_response_before_rq_complete_.inc();
   }
 
   if (connection_manager_.drain_state_ == DrainState::Closing &&
@@ -631,7 +630,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
   //       2) The codec TX a codec level reset
   //       3) The codec RX a reset
   //       If we need to differentiate we need to do it inside the codec. Can start with this.
-  connection_manager_.config_.stats().named_.downstream_rq_rx_reset_.inc();
+  connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
 
   for (auto callback : reset_callbacks_) {
     callback();
@@ -780,7 +779,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapP
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::resetStream() {
-  parent_.connection_manager_.config_.stats().named_.downstream_rq_tx_reset_.inc();
+  parent_.connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
   parent_.connection_manager_.destroyStream(this->parent_);
 }
 
