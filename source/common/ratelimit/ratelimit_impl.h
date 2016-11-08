@@ -21,18 +21,19 @@ public:
   // RateLimit::Client
   void cancel() override;
   void limit(RequestCallbacks& callbacks, const std::string& domain,
-             const std::vector<Descriptor>& descriptors) override;
+             const std::vector<Descriptor>& descriptors, const std::string& request_id) override;
 
-private:
   // Grpc::RpcChannelCallbacks
-  void onPreRequestCustomizeHeaders(Http::HeaderMap&) override {}
+  void onPreRequestCustomizeHeaders(Http::HeaderMap&) override;
   void onSuccess() override;
   void onFailure(const Optional<uint64_t>& grpc_status, const std::string& message) override;
 
+private:
   Grpc::RpcChannelPtr channel_;
   pb::lyft::ratelimit::RateLimitService::Stub service_;
   RequestCallbacks* callbacks_{};
   pb::lyft::ratelimit::RateLimitResponse response_;
+  std::string request_id_;
 };
 
 class GrpcFactoryImpl : public ClientFactory, public Grpc::RpcChannelFactory {
@@ -57,8 +58,8 @@ class NullClientImpl : public Client {
 public:
   // RateLimit::Client
   void cancel() override {}
-  void limit(RequestCallbacks& callbacks, const std::string&,
-             const std::vector<Descriptor>&) override {
+  void limit(RequestCallbacks& callbacks, const std::string&, const std::vector<Descriptor>&,
+             const std::string&) override {
     callbacks.complete(LimitStatus::OK);
   }
 };

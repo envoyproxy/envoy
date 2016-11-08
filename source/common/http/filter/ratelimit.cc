@@ -109,7 +109,8 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
 
       state_ = State::Calling;
       initiating_call_ = true;
-      client_->limit(*this, config_->domain(), descriptors);
+      client_->limit(*this, config_->domain(), descriptors,
+                     headers.get(Http::Headers::get().RequestId));
       initiating_call_ = false;
     }
   }

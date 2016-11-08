@@ -1,7 +1,9 @@
 #include "ratelimit_impl.h"
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/grpc/rpc_channel_impl.h"
+#include "common/http/headers.h"
 
 namespace RateLimit {
 
@@ -32,13 +34,21 @@ void GrpcClientImpl::createRequest(pb::lyft::ratelimit::RateLimitRequest& reques
 }
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
-                           const std::vector<Descriptor>& descriptors) {
+                           const std::vector<Descriptor>& descriptors,
+                           const std::string& request_id) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
+  request_id_ = request_id;
 
   pb::lyft::ratelimit::RateLimitRequest request;
   createRequest(request, domain, descriptors);
   service_.ShouldRateLimit(nullptr, &request, &response_, nullptr);
+}
+
+void GrpcClientImpl::onPreRequestCustomizeHeaders(Http::HeaderMap& headers) {
+  if (!request_id_.empty()) {
+    headers.addViaCopy(Http::Headers::get().RequestId, request_id_);
+  }
 }
 
 void GrpcClientImpl::onSuccess() {
@@ -50,11 +60,13 @@ void GrpcClientImpl::onSuccess() {
 
   callbacks_->complete(status);
   callbacks_ = nullptr;
+  request_id_.clear();
 }
 
 void GrpcClientImpl::onFailure(const Optional<uint64_t>&, const std::string&) {
   callbacks_->complete(LimitStatus::Error);
   callbacks_ = nullptr;
+  request_id_.clear();
 }
 
 GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm,
