@@ -28,7 +28,9 @@ public:
       : client_(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
                 Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()},
                 "local_address") {
-    HttpTestUtility::addDefaultHeaders(message_->headers());
+    message_->headers().addViaCopy(":method", "GET");
+    message_->headers().addViaCopy(":authority", "host");
+    message_->headers().addViaCopy(":path", "/");
     ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
     ON_CALL(cm_.cluster_, altStatName()).WillByDefault(ReturnRef(EMPTY_STRING));
   }
@@ -69,6 +71,7 @@ TEST_F(AsyncClientImplTest, Basic) {
   HeaderMapImpl copy(message_->headers());
   copy.addViaCopy("x-envoy-internal", "true");
   copy.addViaCopy("x-forwarded-for", "local_address");
+  copy.addViaCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(ByRef(copy)), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));

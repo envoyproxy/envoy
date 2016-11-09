@@ -83,7 +83,6 @@ void Config::onFailure(Http::AsyncClient::FailureReason) {
 
 void Config::refreshPrincipals() {
   Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().addViaMoveValue(Http::Headers::get().Scheme, "http");
   message->headers().addViaMoveValue(Http::Headers::get().Method, "GET");
   message->headers().addViaMoveValue(Http::Headers::get().Path, "/v1/certs/list/approved");
   message->headers().addViaCopy(Http::Headers::get().Host, auth_api_cluster_);

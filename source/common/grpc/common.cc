@@ -38,7 +38,6 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                         const std::string& service_full_name,
                                         const std::string& method_name) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().addViaMoveValue(Http::Headers::get().Scheme, "http");
   message->headers().addViaMoveValue(Http::Headers::get().Method, "POST");
   message->headers().addViaMoveValue(Http::Headers::get().Path,
                                      fmt::format("/{}/{}", service_full_name, method_name));

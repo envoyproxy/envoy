@@ -49,8 +49,7 @@ TEST_F(GrpcRequestImplTest, NoError) {
       .WillOnce(Invoke([](Http::HeaderMap& headers) -> void { headers.addViaCopy("foo", "bar"); }));
   service_.SayHello(nullptr, &request, &response, nullptr);
 
-  Http::HeaderMapImpl expected_request_headers{{":scheme", "http"},
-                                               {":method", "POST"},
+  Http::HeaderMapImpl expected_request_headers{{":method", "POST"},
                                                {":path", "/helloworld.Greeter/SayHello"},
                                                {":authority", "cluster"},
                                                {"content-type", "application/grpc"},

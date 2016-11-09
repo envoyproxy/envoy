@@ -42,9 +42,6 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
                                     connection.ssl() ? "https" : "http");
   }
 
-  request_headers.replaceViaCopy(Headers::get().Scheme,
-                                 request_headers.get(Headers::get().ForwardedProto));
-
   // At this point we can determine whether this is an internal or external request. This is done
   // via XFF, which was set above or we trust.
   bool internal_request = Utility::isInternalRequest(request_headers);
