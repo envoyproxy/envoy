@@ -1,4 +1,5 @@
 #include "stats_impl.h"
+
 #include "common/common/utility.h"
 
 namespace Stats {

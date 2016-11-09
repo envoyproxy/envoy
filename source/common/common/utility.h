@@ -69,8 +69,7 @@ public:
   static void rtrim(std::string& source);
 
   /**
-   * size-bounded string copying and concatenation
-   * Adapted from https://github.com/freebsd/freebsd/blob/20c3c08/sys/libkern/strlcpy.c
+   * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t siz);
 

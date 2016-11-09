@@ -51,6 +51,9 @@ void StringUtil::rtrim(std::string& source) {
   }
 }
 
+/**
+ * strlcpy adapted from https://github.com/freebsd/freebsd/blob/20c3c08/sys/libkern/strlcpy.c
+ */
 size_t StringUtil::strlcpy(char* dst, const char* src, size_t siz) {
   char* d = dst;
   const char* s = src;
