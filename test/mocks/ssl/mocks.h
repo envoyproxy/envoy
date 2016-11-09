@@ -31,4 +31,14 @@ public:
   MOCK_METHOD0(sha256PeerCertificateDigest, std::string());
 };
 
+class MockClientContext : public ClientContext {
+public:
+  MockClientContext();
+  ~MockClientContext();
+
+  MOCK_METHOD0(daysUntilFirstCertExpires, size_t());
+  MOCK_METHOD0(getCaCertInformation, std::string());
+  MOCK_METHOD0(getCertChainInformation, std::string());
+};
+
 } // Ssl

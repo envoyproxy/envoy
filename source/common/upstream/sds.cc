@@ -116,7 +116,6 @@ void SdsClusterImpl::refreshHosts() {
   stats_.update_attempt_.inc();
 
   Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().addViaMoveValue(Http::Headers::get().Scheme, "http");
   message->headers().addViaMoveValue(Http::Headers::get().Method, "GET");
   message->headers().addViaMoveValue(Http::Headers::get().Path,
                                      "/v1/registration/" + service_name_);

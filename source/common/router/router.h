@@ -41,6 +41,11 @@ public:
   };
 
   /**
+   * Set the :scheme header based on the properties of the upstream cluster.
+   */
+  static void setUpstreamScheme(Http::HeaderMap& headers, const Upstream::Cluster& cluster);
+
+  /**
    * Determine whether a request should be shadowed.
    * @param policy supplies the route's shadow policy.
    * @param runtime supplies the runtime to lookup the shadow key in.

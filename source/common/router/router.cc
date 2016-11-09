@@ -23,6 +23,14 @@
 
 namespace Router {
 
+void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, const Upstream::Cluster& cluster) {
+  if (cluster.sslContext()) {
+    headers.replaceViaMoveValue(Http::Headers::get().Scheme, "https");
+  } else {
+    headers.replaceViaMoveValue(Http::Headers::get().Scheme, "http");
+  }
+}
+
 bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& runtime,
                                  uint64_t stable_random) {
   if (policy.cluster().empty()) {
@@ -193,6 +201,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   timeout_ = FilterUtility::finalTimeout(*route_, headers);
   route_->finalizeRequestHeaders(headers);
+  FilterUtility::setUpstreamScheme(headers, *cluster_);
   retry_state_ = createRetryState(route_->retryPolicy(), headers, *cluster_, config_.runtime_,
                                   config_.random_, callbacks_->dispatcher(), finalPriority());
   do_shadowing_ =

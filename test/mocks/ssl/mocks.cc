@@ -8,4 +8,7 @@ MockContextManager::~MockContextManager() {}
 MockConnection::MockConnection() {}
 MockConnection::~MockConnection() {}
 
+MockClientContext::MockClientContext() {}
+MockClientContext::~MockClientContext() {}
+
 } // Ssl

@@ -5,6 +5,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
 using testing::_;
@@ -686,6 +687,25 @@ TEST(RouterFilterUtilityTest, finalTimeout) {
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("5", headers.get("x-envoy-expected-rq-timeout-ms"));
+  }
+}
+
+TEST(RouterFilterUtilityTest, setUpstreamScheme) {
+  {
+    Upstream::MockCluster cluster;
+    Http::HeaderMapImpl headers;
+    EXPECT_CALL(cluster, sslContext()).WillOnce(Return(nullptr));
+    FilterUtility::setUpstreamScheme(headers, cluster);
+    EXPECT_EQ("http", headers.get(":scheme"));
+  }
+
+  {
+    Upstream::MockCluster cluster;
+    Ssl::MockClientContext context;
+    Http::HeaderMapImpl headers;
+    EXPECT_CALL(cluster, sslContext()).WillOnce(Return(&context));
+    FilterUtility::setUpstreamScheme(headers, cluster);
+    EXPECT_EQ("https", headers.get(":scheme"));
   }
 }
 
