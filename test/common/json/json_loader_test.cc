@@ -122,13 +122,6 @@ TEST(JsonLoaderTest, Integer) {
     EXPECT_EQ(std::numeric_limits<int64_t>::max(), json.getInteger("max"));
     EXPECT_EQ(std::numeric_limits<int64_t>::min(), json.getInteger("min"));
   }
-
-  //{
-  // Need to enforce at the schema level max/min int64_t. RapidJson allows for json object
-  // to be loaded with a value greater than max_int and less than min_int.
-  // EXPECT_THROW(StringLoader("{\"val\":9223372036854775808}"), Exception);
-  // EXPECT_THROW(StringLoader("{\"val\":-9223372036854775809}"), Exception);
-  //}
 }
 
 TEST(JsonLoaderTest, Double) {
@@ -146,14 +139,6 @@ TEST(JsonLoaderTest, Double) {
     StringLoader json("{\"foo\": \"bar\"}");
     EXPECT_THROW(json.getDouble("foo"), Exception);
   }
-}
-
-TEST(JsonLoaderTest, Bool) {
-  StringLoader json("{\"hello\":true}");
-  EXPECT_TRUE(json.getBoolean("hello"));
-  EXPECT_THROW(json.getBoolean("test"), Exception);
-  EXPECT_THROW(StringLoader("{"), Exception);
-  EXPECT_TRUE(json.getBoolean("test", true));
 }
 
 } // Json
