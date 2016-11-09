@@ -1,3 +1,5 @@
+#include "gtest/gtest.h"
+
 #include "common/common/utility.h"
 
 TEST(StringUtil, atoul) {
@@ -39,6 +41,13 @@ TEST(StringUtil, rtrim) {
     StringUtil::rtrim(test);
     EXPECT_EQ("   hello", test);
   }
+}
+
+TEST(StringUtil, strlcpy) {
+  // TODO: more tests
+  char dest[6];
+  StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), sizeof(dest));
+  ASSERT_THAT("hello", testing::ContainerEq(dest));
 }
 
 TEST(StringUtil, split) {

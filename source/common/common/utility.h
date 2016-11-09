@@ -69,6 +69,12 @@ public:
   static void rtrim(std::string& source);
 
   /**
+   * size-bounded string copying and concatenation
+   * Adapted from https://github.com/freebsd/freebsd/blob/20c3c08/sys/libkern/strlcpy.c
+   */
+  static size_t strlcpy(char* dst, const char* src, size_t siz);
+
+  /**
    * Split a string.
    * @param source supplies the string to split.
    * @param split supplies the char to split on.

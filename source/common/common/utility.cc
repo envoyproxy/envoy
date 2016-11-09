@@ -51,6 +51,28 @@ void StringUtil::rtrim(std::string& source) {
   }
 }
 
+size_t StringUtil::strlcpy(char* dst, const char* src, size_t siz) {
+  char* d = dst;
+  const char* s = src;
+  size_t n = siz;
+
+  if (n != 0 && --n != 0) {
+    do {
+      if ((*d++ = *s++) == 0)
+        break;
+    } while (--n != 0);
+  }
+
+  if (n == 0) {
+    if (siz != 0)
+      *d = '\0';
+    while (*s++)
+      ;
+  }
+
+  return (s - src - 1);
+}
+
 std::vector<std::string> StringUtil::split(const std::string& source, char split) {
   std::vector<std::string> ret;
   size_t last_index = 0;
