@@ -4,6 +4,10 @@
 
 #include "common/common/non_copyable.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+#include "rapidjson/document.h"
+#pragma GCC diagnostic pop
 struct json_t;
 
 namespace Json {
@@ -25,7 +29,12 @@ typedef std::function<bool(const std::string&, const Object&)> ObjectCallback;
  */
 class Object {
 public:
-  Object(json_t* json, const std::string& name) : json_(json), name_(name) {}
+  // Object(json_t* json, const std::string& name) : json_(json), name_(name) {}
+  Object(const rapidjson::Value& value, const std::string& name) : name_(name), document_() {
+    document_.CopyFrom(value, document_.GetAllocator());
+    //  value_.CopyFrom(value, document_.GetAllocator());
+  }
+  Object(const std::string& name) : name_(name), document_() {}
 
   /**
    * Convert a generic object into an array of objects. This is useful for dealing with arrays
@@ -128,17 +137,18 @@ public:
   bool hasObject(const std::string& name) const;
 
 protected:
-  Object() : name_("root") {}
+  Object() : name_("root"), document_(), value_() {}
 
-  json_t* json_;
   std::string name_;
+  rapidjson::Document document_;
+  rapidjson::Value value_;
 
 private:
   struct EmptyObject {
     EmptyObject();
     ~EmptyObject();
-
-    json_t* json_;
+    rapidjson::Document document_;
+    // json_t* json_;
   };
 
   static EmptyObject empty_;

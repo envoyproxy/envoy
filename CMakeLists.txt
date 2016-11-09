@@ -13,6 +13,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/source)
 include_directories(${PROJECT_SOURCE_DIR}/source)
 include_directories(${ENVOY_SPDLOG_INCLUDE_DIR})
+include_directories(SYSTEM ${ENVOY_SPDLOG_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_PROTOBUF_INCLUDE_DIR})
 
 add_subdirectory(source)

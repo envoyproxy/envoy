@@ -3,62 +3,74 @@
 // Do not let jansson leak outside of this file.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
-#include "jansson.h"
+//#include "jansson.h"
+#include <rapidjson/error/en.h>
+#include <rapidjson/filereadstream.h>
 #pragma GCC diagnostic pop
 
 namespace Json {
 
 FileLoader::FileLoader(const std::string& file_path) {
-  json_error_t error;
-  json_ = json_load_file(file_path.c_str(), 0, &error);
-  if (!json_) {
-    throw Exception(fmt::format("json parsing error: {} line: {} column: {}", error.text,
-                                error.line, error.column));
+  char buffer[4096];
+
+  FILE* fp = fopen(file_path.c_str(), "r");
+  if (!fp) {
+    throw Exception("file doesn't exist");
+  }
+
+  rapidjson::FileReadStream fs(fp, buffer, sizeof(buffer));
+  document_.ParseStream(fs);
+
+  if (document_.HasParseError()) {
+    throw Exception(fmt::format("Error(offset {}): {}\n",
+                                static_cast<unsigned>(document_.GetErrorOffset()),
+                                GetParseError_En(document_.GetParseError())));
   }
 }
 
-FileLoader::~FileLoader() { json_decref(json_); }
+FileLoader::~FileLoader() {}
 
 StringLoader::StringLoader(const std::string& json) {
-  json_error_t error;
-  json_ = json_loads(json.c_str(), 0, &error);
-  if (!json_) {
-    throw Exception(fmt::format("json parsing error: {}", error.text));
+  if (document_.Parse<0>(json.c_str()).HasParseError()) {
+    throw Exception(fmt::format("Error(offset {}): {}\n",
+                                static_cast<unsigned>(document_.GetErrorOffset()),
+                                GetParseError_En(document_.GetParseError())));
   }
 }
 
-StringLoader::~StringLoader() { json_decref(json_); }
+StringLoader::~StringLoader() {}
 
 Object::EmptyObject Object::empty_;
 
-Object::EmptyObject::EmptyObject() : json_(json_object()) {}
+Object::EmptyObject::EmptyObject() : document_() {}
 
-Object::EmptyObject::~EmptyObject() { json_decref(json_); }
+Object::EmptyObject::~EmptyObject() {}
 
 std::vector<Object> Object::asObjectArray() const {
-  if (!json_is_array(json_)) {
+  if (!document_.IsArray()) {
     throw Exception(fmt::format("'{}' is not an array", name_));
   }
 
   std::vector<Object> object_array;
-  for (size_t i = 0; i < json_array_size(json_); i++) {
-    object_array.emplace_back(json_array_get(json_, i), name_ + " (array item)");
+  for (rapidjson::SizeType i = 0; i < document_.Size(); i++) {
+    object_array.emplace_back(document_[i], name_ + " (array item)");
   }
 
   return object_array;
 }
 
 bool Object::getBoolean(const std::string& name) const {
-  json_t* boolean = json_object_get(json_, name.c_str());
-  if (!boolean || !json_is_boolean(boolean)) {
-    throw Exception(fmt::format("key '{}' missing or not a boolean in '{}'", name, name_));
+  if (!document_.HasMember(name.c_str())) {
+    throw Exception(fmt::format("key {} is missing", name));
   }
-
-  return json_boolean_value(boolean);
+  if (!document_[name.c_str()].IsBool()) {
+    throw Exception(fmt::format("Value for {} is not a boolean", name));
+  }
+  return document_[name.c_str()].GetBool();
 }
 
 bool Object::getBoolean(const std::string& name, bool default_value) const {
-  if (!json_object_get(json_, name.c_str())) {
+  if (!document_.HasMember(name.c_str())) {
     return default_value;
   } else {
     return getBoolean(name);
@@ -66,16 +78,17 @@ bool Object::getBoolean(const std::string& name, bool default_value) const {
 }
 
 int64_t Object::getInteger(const std::string& name) const {
-  json_t* integer = json_object_get(json_, name.c_str());
-  if (!integer || !json_is_integer(integer)) {
-    throw Exception(fmt::format("key '{}' missing or not an integer in '{}'", name, name_));
+  if (!document_.HasMember(name.c_str())) {
+    throw Exception(fmt::format("key {} is missing", name));
   }
-
-  return json_integer_value(integer);
+  if (!document_[name.c_str()].IsInt64()) {
+    throw Exception(fmt::format("Value for {} is not an integer", name));
+  }
+  return document_[name.c_str()].GetInt64();
 }
 
 int64_t Object::getInteger(const std::string& name, int64_t default_value) const {
-  if (!json_object_get(json_, name.c_str())) {
+  if (!document_.HasMember(name.c_str())) {
     return default_value;
   } else {
     return getInteger(name);
@@ -83,43 +96,51 @@ int64_t Object::getInteger(const std::string& name, int64_t default_value) const
 }
 
 Object Object::getObject(const std::string& name, bool allow_empty) const {
-  json_t* object = json_object_get(json_, name.c_str());
-  if (!object && allow_empty) {
-    object = empty_.json_;
-  }
-
+  /*
   if (!object) {
     throw Exception(fmt::format("key '{}' missing in '{}'", name, name_));
   }
-
-  return Object(object, name);
+  if ( (!document_.HasMember(name.c_str()) || !document_[name.c_str()].IsObject()) && allow_empty){
+    throw Exception(fmt::format("key '{}' missing in '{}'", name, name_));
+  }
+ */
+  // return Object(object, name);
+  if (allow_empty) {
+    if (!document_.HasMember(name.c_str()) || !document_[name.c_str()].IsObject()) {
+      return Object(name);
+    }
+  } else if (!document_.HasMember(name.c_str()) || !document_[name.c_str()].IsObject()) {
+    throw Exception(fmt::format("key '{}' missing in '{}'", name, name_));
+  }
+  return Object(document_[name.c_str()], name);
 }
 
 std::vector<Object> Object::getObjectArray(const std::string& name) const {
-  json_t* array = json_object_get(json_, name.c_str());
-  if (!array || !json_is_array(array)) {
+  if (!document_.HasMember(name.c_str()) || !document_[name.c_str()].IsArray()) {
     throw Exception(fmt::format("key '{}' missing or not an array in '{}'", name, name_));
   }
 
   std::vector<Object> object_array;
-  for (size_t i = 0; i < json_array_size(array); i++) {
-    object_array.emplace_back(json_array_get(array, i), name + " (array item)");
+  for (rapidjson::SizeType i = 0; i < document_[name.c_str()].Size(); i++) {
+    object_array.emplace_back(document_[name.c_str()][i], name + " (array item)");
   }
 
   return object_array;
 }
 
 std::string Object::getString(const std::string& name) const {
-  json_t* string = json_object_get(json_, name.c_str());
-  if (!string || !json_is_string(string)) {
-    throw Exception(fmt::format("key '{}' missing or not a string in '{}'", name, name_));
+  if (!document_.HasMember(name.c_str())) {
+    throw Exception(fmt::format("key {} is missing", name));
+  }
+  if (!document_[name.c_str()].IsString()) {
+    throw Exception(fmt::format("Value for {} is not a string", name));
   }
 
-  return json_string_value(string);
+  return document_[name.c_str()].GetString();
 }
 
 std::string Object::getString(const std::string& name, const std::string& default_value) const {
-  if (!json_object_get(json_, name.c_str())) {
+  if (!document_.HasMember(name.c_str())) {
     return default_value;
   } else {
     return getString(name);
@@ -129,27 +150,26 @@ std::string Object::getString(const std::string& name, const std::string& defaul
 std::vector<std::string> Object::getStringArray(const std::string& name) const {
   std::vector<std::string> string_array;
   for (Object& object : getObjectArray(name)) {
-    if (!json_is_string(object.json_)) {
+    if (!object.document_.IsString()) {
       throw Exception(fmt::format("array '{}' does not contain all strings", name));
-    } else {
-      string_array.push_back(json_string_value(object.json_));
     }
+    string_array.push_back(object.document_.GetString());
   }
 
   return string_array;
 }
 
 double Object::getDouble(const std::string& name) const {
-  json_t* real = json_object_get(json_, name.c_str());
-  if (!real || !json_is_real(real)) {
+  if (!document_.HasMember(name.c_str()) || !document_[name.c_str()].IsDouble()) {
+
     throw Exception(fmt::format("key '{}' missing or not a double in '{}'", name, name_));
   }
 
-  return json_real_value(real);
+  return document_[name.c_str()].GetDouble();
 }
 
 double Object::getDouble(const std::string& name, double default_value) const {
-  if (!json_object_get(json_, name.c_str())) {
+  if (!document_.HasMember(name.c_str())) {
     return default_value;
   } else {
     return getDouble(name);
@@ -157,13 +177,11 @@ double Object::getDouble(const std::string& name, double default_value) const {
 }
 
 void Object::iterate(const ObjectCallback& callback) {
-  const char* key;
-  json_t* value;
 
-  json_object_foreach(json_, key, value) {
-    Object object_value(value, "root");
-    std::string object_key(key);
-
+  for (rapidjson::Value::ConstMemberIterator itr = document_.MemberBegin();
+       itr != document_.MemberEnd(); ++itr) {
+    std::string object_key(itr->name.GetString());
+    Object object_value(itr->value, "root");
     bool need_continue = callback(object_key, object_value);
     if (!need_continue) {
       break;
@@ -172,7 +190,7 @@ void Object::iterate(const ObjectCallback& callback) {
 }
 
 bool Object::hasObject(const std::string& name) const {
-  return json_object_get(json_, name.c_str()) != nullptr;
+  return document_.HasMember(name.c_str()) && document_.IsObject();
 }
 
 } // Json
