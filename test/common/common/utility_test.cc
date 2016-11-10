@@ -27,6 +27,20 @@ TEST(StringUtil, caseInsensitiveCompare) {
   EXPECT_GT(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "hello"));
 }
 
+TEST(StringUtil, itoa) {
+  char buf[32];
+  EXPECT_THROW(StringUtil::itoa(buf, 31, 1), std::invalid_argument);
+
+  EXPECT_EQ(1UL, StringUtil::itoa(buf, sizeof(buf), 0));
+  EXPECT_STREQ("0", buf);
+
+  EXPECT_EQ(2UL, StringUtil::itoa(buf, sizeof(buf), 10));
+  EXPECT_STREQ("10", buf);
+
+  EXPECT_EQ(20UL, StringUtil::itoa(buf, sizeof(buf), std::numeric_limits<uint64_t>::max()));
+  EXPECT_STREQ("18446744073709551615", buf);
+}
+
 TEST(StringUtil, rtrim) {
   {
     std::string test("   ");

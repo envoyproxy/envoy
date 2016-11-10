@@ -17,11 +17,18 @@ namespace Http1 {
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
 
-void StreamEncoderImpl::encodeHeader(const std::string& key, const std::string& value) {
-  output_buffer_.add(key);
-  output_buffer_.add(": ");
-  output_buffer_.add(value);
-  output_buffer_.add(CRLF);
+void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const char* value,
+                                     uint32_t value_size) {
+
+  connection_.reserveBuffer(key_size + value_size + 4);
+  ASSERT(key_size > 0);
+
+  connection_.copyToBuffer(key, key_size);
+  connection_.addCharToBuffer(':');
+  connection_.addCharToBuffer(' ');
+  connection_.copyToBuffer(value, value_size);
+  connection_.addCharToBuffer('\r');
+  connection_.addCharToBuffer('\n');
 }
 
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
@@ -50,7 +57,7 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
       saw_chunk_encoding = true;
     }
 
-    encodeHeader(key_to_use->get(), value);
+    encodeHeader(key_to_use->get().c_str(), key_to_use->get().size(), value.c_str(), value.size());
   });
 
   // Assume we are chunk encoding unless we are passed a content length or this is a header only
@@ -64,21 +71,26 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
     chunk_encoding_ = !end_stream;
   } else {
     if (end_stream) {
-      encodeHeader(Headers::get().ContentLength.get(), "0");
+      encodeHeader(Headers::get().ContentLength.get().c_str(),
+                   Headers::get().ContentLength.get().size(), "0", 1);
       chunk_encoding_ = false;
     } else {
-      encodeHeader(Headers::get().TransferEncoding.get(),
-                   Headers::get().TransferEncodingValues.Chunked);
+      encodeHeader(Headers::get().TransferEncoding.get().c_str(),
+                   Headers::get().TransferEncoding.get().size(),
+                   Headers::get().TransferEncodingValues.Chunked.c_str(),
+                   Headers::get().TransferEncodingValues.Chunked.size());
       chunk_encoding_ = true;
     }
   }
 
-  output_buffer_.add(CRLF);
+  connection_.reserveBuffer(2);
+  connection_.addCharToBuffer('\r');
+  connection_.addCharToBuffer('\n');
 
   if (end_stream) {
     endEncode();
   } else {
-    flushOutput();
+    connection_.flushOutput();
   }
 }
 
@@ -87,20 +99,20 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // atually write the zero length buffer out.
   if (data.length() > 0) {
     if (chunk_encoding_) {
-      output_buffer_.add(fmt::format("{:x}\r\n", data.length()));
+      connection_.buffer().add(fmt::format("{:x}\r\n", data.length()));
     }
 
-    output_buffer_.move(data);
+    connection_.buffer().move(data);
 
     if (chunk_encoding_) {
-      output_buffer_.add(CRLF);
+      connection_.buffer().add(CRLF);
     }
   }
 
   if (end_stream) {
     endEncode();
   } else {
-    flushOutput();
+    connection_.flushOutput();
   }
 }
 
@@ -108,33 +120,83 @@ void StreamEncoderImpl::encodeTrailers(const HeaderMap&) { endEncode(); }
 
 void StreamEncoderImpl::endEncode() {
   if (chunk_encoding_) {
-    output_buffer_.add(LAST_CHUNK);
+    connection_.buffer().add(LAST_CHUNK);
   }
 
-  flushOutput();
+  connection_.flushOutput();
   connection_.onEncodeComplete();
 }
 
-void StreamEncoderImpl::flushOutput() {
-  connection_.connection().write(output_buffer_);
-  output_buffer_.drain(output_buffer_.length());
+void ConnectionImpl::flushOutput() {
+  if (reserved_current_) {
+    reserved_iovec_.len_ = reserved_current_ - static_cast<char*>(reserved_iovec_.mem_);
+    output_buffer_.commit(&reserved_iovec_, 1);
+    reserved_current_ = nullptr;
+  }
+
+  connection().write(output_buffer_);
+  ASSERT(0UL == output_buffer_.length());
+}
+
+void ConnectionImpl::addCharToBuffer(char c) {
+  ASSERT(bufferRemainingSize() >= 1);
+  *reserved_current_++ = c;
+}
+
+void ConnectionImpl::addIntToBuffer(uint64_t i) {
+  reserved_current_ += StringUtil::itoa(reserved_current_, bufferRemainingSize(), i);
+}
+
+uint64_t ConnectionImpl::bufferRemainingSize() {
+  return reserved_iovec_.len_ - (reserved_current_ - static_cast<char*>(reserved_iovec_.mem_));
+}
+
+void ConnectionImpl::copyToBuffer(const char* data, uint64_t length) {
+  ASSERT(bufferRemainingSize() >= length);
+  memcpy(reserved_current_, data, length);
+  reserved_current_ += length;
+}
+
+void ConnectionImpl::reserveBuffer(uint64_t size) {
+  if (reserved_current_ && bufferRemainingSize() >= size) {
+    return;
+  }
+
+  if (reserved_current_) {
+    reserved_iovec_.len_ = reserved_current_ - static_cast<char*>(reserved_iovec_.mem_);
+    output_buffer_.commit(&reserved_iovec_, 1);
+  }
+
+  output_buffer_.reserve(std::min(4096UL, size), &reserved_iovec_, 1);
+  reserved_current_ = static_cast<char*>(reserved_iovec_.mem_);
 }
 
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
 }
 
+static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
+
 void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   started_response_ = true;
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
-  output_buffer_.add("HTTP/1.1 ");
-  output_buffer_.add(std::to_string(numeric_status));
-  output_buffer_.add(" ");
-  output_buffer_.add(CodeUtility::toString(static_cast<Code>(numeric_status)));
-  output_buffer_.add(CRLF);
+  connection_.reserveBuffer(4096);
+  connection_.copyToBuffer(RESPONSE_PREFIX, sizeof(RESPONSE_PREFIX) - 1);
+  connection_.addIntToBuffer(numeric_status);
+  connection_.addCharToBuffer(' ');
+
+  const char* status_string = CodeUtility::toString(static_cast<Code>(numeric_status));
+  uint32_t status_string_len = strlen(status_string);
+  connection_.copyToBuffer(status_string, status_string_len);
+
+  connection_.addCharToBuffer('\r');
+  connection_.addCharToBuffer('\n');
+
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
 }
+
+static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
 void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   const std::string& method = headers.get(Headers::get().Method);
@@ -147,10 +209,12 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
     head_request_ = true;
   }
 
-  output_buffer_.add(method);
-  output_buffer_.add(" ");
-  output_buffer_.add(path);
-  output_buffer_.add(" HTTP/1.1\r\n");
+  connection_.reserveBuffer(4096);
+  connection_.copyToBuffer(method.c_str(), method.size());
+  connection_.addCharToBuffer(' ');
+  connection_.copyToBuffer(path.c_str(), path.size());
+  connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
+
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
 }
 
@@ -190,10 +254,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type
     : connection_(connection) {
   http_parser_init(&parser_, type);
   parser_.data = this;
-}
-
-ConnectionImpl::~ConnectionImpl() {
-  // needed to avoid unique_ptr forward decl issues.
 }
 
 void ConnectionImpl::completeLastHeader() {
