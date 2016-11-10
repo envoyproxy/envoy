@@ -44,25 +44,21 @@ protected:
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
-  Buffer::OwnedImpl output_buffer_;
 
 private:
   /**
    * Called to encode an individual header.
    * @param key supplies the header to encode.
+   * @param key_size supplies the byte size of the key.
    * @param value supplies the value to encode.
+   * @param value_size supplies the byte size of the value.
    */
-  void encodeHeader(const std::string& key, const std::string& value);
+  void encodeHeader(const char* key, uint32_t key_size, const char* value, uint32_t value_size);
 
   /**
    * Called to finalize a stream encode.
    */
   void endEncode();
-
-  /**
-   * Flush all pending output from encoding.
-   */
-  void flushOutput();
 
   std::list<StreamCallbacks*> callbacks_{};
   bool chunk_encoding_{true};
@@ -122,6 +118,18 @@ public:
    */
   void onResetStreamBase(StreamResetReason reason);
 
+  /**
+  * Flush all pending output from encoding.
+  */
+  void flushOutput();
+
+  void addCharToBuffer(char c);
+  void addIntToBuffer(uint64_t i);
+  Buffer::OwnedImpl& buffer() { return output_buffer_; }
+  uint64_t bufferRemainingSize();
+  void copyToBuffer(const char* data, uint64_t length);
+  void reserveBuffer(uint64_t size);
+
   // Http::Connection
   void dispatch(Buffer::Instance& data) override;
   uint64_t features() override { return 0; }
@@ -132,7 +140,6 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, http_parser_type type);
-  ~ConnectionImpl();
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -220,6 +227,9 @@ private:
   std::string current_header_field_;
   std::string current_header_value_;
   bool reset_stream_called_{};
+  Buffer::OwnedImpl output_buffer_;
+  Buffer::RawSlice reserved_iovec_;
+  char* reserved_current_{};
 };
 
 /**

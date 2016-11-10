@@ -42,6 +42,28 @@ int StringUtil::caseInsensitiveCompare(const std::string& lhs, const std::string
   return strcasecmp(lhs.c_str(), rhs.c_str());
 }
 
+uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
+  // The maximum size required for an unsigned 64-bit integer is 21 chars (including null).
+  if (buffer_size < 21) {
+    throw std::invalid_argument("itoa buffer too small");
+  }
+
+  char* current = out;
+  do {
+    *current++ = "0123456789"[i % 10];
+    i /= 10;
+  } while (i > 0);
+
+  for (uint64_t i = 0, j = current - out - 1; i < j; i++, j--) {
+    char c = out[i];
+    out[i] = out[j];
+    out[j] = c;
+  }
+
+  *current = 0;
+  return current - out;
+}
+
 void StringUtil::rtrim(std::string& source) {
   std::size_t pos = source.find_last_not_of(" \t\f\v\n\r");
   if (pos != std::string::npos) {

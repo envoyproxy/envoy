@@ -15,4 +15,5 @@ MATCHER_P(BufferStringEqual, rhs, rhs) {
 
 ACTION_P(AddBufferToString, target_string) {
   target_string->append(TestUtility::bufferToString(arg0));
+  arg0.drain(arg0.length());
 }
