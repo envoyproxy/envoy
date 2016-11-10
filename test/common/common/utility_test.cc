@@ -29,13 +29,16 @@ TEST(StringUtil, caseInsensitiveCompare) {
 
 TEST(StringUtil, itoa) {
   char buf[32];
-  EXPECT_THROW(StringUtil::itoa(buf, 31, 1), std::invalid_argument);
+  EXPECT_THROW(StringUtil::itoa(buf, 20, 1), std::invalid_argument);
 
   EXPECT_EQ(1UL, StringUtil::itoa(buf, sizeof(buf), 0));
   EXPECT_STREQ("0", buf);
 
   EXPECT_EQ(2UL, StringUtil::itoa(buf, sizeof(buf), 10));
   EXPECT_STREQ("10", buf);
+
+  EXPECT_EQ(10UL, StringUtil::itoa(buf, sizeof(buf), 10));
+  EXPECT_STREQ("1234567890", buf);
 
   EXPECT_EQ(20UL, StringUtil::itoa(buf, sizeof(buf), std::numeric_limits<uint64_t>::max()));
   EXPECT_STREQ("18446744073709551615", buf);
