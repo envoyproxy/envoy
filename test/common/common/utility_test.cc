@@ -37,7 +37,7 @@ TEST(StringUtil, itoa) {
   EXPECT_EQ(2UL, StringUtil::itoa(buf, sizeof(buf), 10));
   EXPECT_STREQ("10", buf);
 
-  EXPECT_EQ(10UL, StringUtil::itoa(buf, sizeof(buf), 10));
+  EXPECT_EQ(10UL, StringUtil::itoa(buf, sizeof(buf), 1234567890));
   EXPECT_STREQ("1234567890", buf);
 
   EXPECT_EQ(20UL, StringUtil::itoa(buf, sizeof(buf), std::numeric_limits<uint64_t>::max()));
