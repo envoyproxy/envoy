@@ -32,6 +32,7 @@ HeaderString::HeaderString(HeaderString&& move_value) {
   case Type::Dynamic: {
     buffer_.dynamic_ = move_value.buffer_.dynamic_;
     move_value.type_ = Type::Inline;
+    move_value.buffer_.dynamic_ = move_value.inline_buffer_;
     move_value.clear();
     break;
   }

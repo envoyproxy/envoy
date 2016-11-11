@@ -35,6 +35,39 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(5U, string2.size());
   }
 
+  // Inline move constructor
+  {
+    HeaderString string;
+    string.setCopy("hello", 5);
+    EXPECT_EQ(HeaderString::Type::Inline, string.type());
+    HeaderString string2(std::move(string));
+    EXPECT_TRUE(string.empty());
+    EXPECT_EQ(HeaderString::Type::Inline, string.type());
+    EXPECT_EQ(HeaderString::Type::Inline, string2.type());
+    string.append("world", 5);
+    EXPECT_STREQ("world", string.c_str());
+    EXPECT_EQ(5UL, string.size());
+    EXPECT_STREQ("hello", string2.c_str());
+    EXPECT_EQ(5UL, string2.size());
+  }
+
+  // Dynamic move constructor
+  {
+    std::string large(4096, 'a');
+    HeaderString string;
+    string.setCopy(large.c_str(), large.size());
+    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
+    HeaderString string2(std::move(string));
+    EXPECT_TRUE(string.empty());
+    EXPECT_EQ(HeaderString::Type::Inline, string.type());
+    EXPECT_EQ(HeaderString::Type::Dynamic, string2.type());
+    string.append("b", 1);
+    EXPECT_STREQ("b", string.c_str());
+    EXPECT_EQ(1UL, string.size());
+    EXPECT_STREQ(large.c_str(), string2.c_str());
+    EXPECT_EQ(4096UL, string2.size());
+  }
+
   // Static to inline number.
   {
     std::string static_string("HELLO");
