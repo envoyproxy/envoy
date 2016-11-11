@@ -200,6 +200,20 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(384U, string.size());
   }
 
+  // Append, realloc close to limit with small buffer.
+  {
+    HeaderString string;
+    std::string large(128, 'a');
+    string.append(large.c_str(), large.size());
+    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
+    std::string large2(120, 'b');
+    string.append(large2.c_str(), large2.size());
+    std::string large3(32, 'c');
+    string.append(large3.c_str(), large3.size());
+    EXPECT_STREQ((large + large2 + large3).c_str(), string.c_str());
+    EXPECT_EQ(280U, string.size());
+  }
+
   // Set integer, inline
   {
     HeaderString string;

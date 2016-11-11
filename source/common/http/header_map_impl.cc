@@ -81,7 +81,7 @@ void HeaderString::append(const char* data, uint32_t size) {
       dynamic_capacity_ = new_capacity;
       type_ = Type::Dynamic;
     } else {
-      if (size + 1 > dynamic_capacity_) {
+      if (size + 1 + string_length_ > dynamic_capacity_) {
         // Need to reallocate.
         dynamic_capacity_ = (string_length_ + size) * 2;
         buffer_.dynamic_ = static_cast<char*>(realloc(buffer_.dynamic_, dynamic_capacity_));
