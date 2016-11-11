@@ -121,9 +121,12 @@ private:
     const char* static_;
   } buffer_;
 
-  char inline_buffer_[128];
+  union {
+    char inline_buffer_[128];
+    uint32_t dynamic_capacity_;
+  };
+
   uint32_t string_length_;
-  uint32_t dynamic_capacity_;
   Type type_;
 };
 

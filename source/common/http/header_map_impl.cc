@@ -31,6 +31,7 @@ HeaderString::HeaderString(HeaderString&& move_value) {
   }
   case Type::Dynamic: {
     buffer_.dynamic_ = move_value.buffer_.dynamic_;
+    dynamic_capacity_ = move_value.dynamic_capacity_;
     move_value.type_ = Type::Inline;
     move_value.buffer_.dynamic_ = move_value.inline_buffer_;
     move_value.clear();
@@ -74,10 +75,11 @@ void HeaderString::append(const char* data, uint32_t size) {
   case Type::Dynamic: {
     // We can get here either because we didn't fit in inline or we are already dynamic.
     if (type_ == Type::Inline) {
-      dynamic_capacity_ = (string_length_ + size) * 2;
-      buffer_.dynamic_ = static_cast<char*>(malloc(dynamic_capacity_));
-      type_ = Type::Dynamic;
+      uint32_t new_capacity = (string_length_ + size) * 2;
+      buffer_.dynamic_ = static_cast<char*>(malloc(new_capacity));
       memcpy(buffer_.dynamic_, inline_buffer_, string_length_);
+      dynamic_capacity_ = new_capacity;
+      type_ = Type::Dynamic;
     } else {
       if (size + 1 > dynamic_capacity_) {
         // Need to reallocate.
