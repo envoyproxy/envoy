@@ -53,6 +53,10 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
     return {Reason::HealthCheck, false};
   }
 
+  if (!request_headers.RequestId()) {
+    return {Reason::NotTraceableRequestId, false};
+  }
+
   // TODO PERF: Avoid copy.
   UuidTraceStatus trace_status =
       UuidUtils::isTraceableUuid(request_headers.RequestId()->value().c_str());

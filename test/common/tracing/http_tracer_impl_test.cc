@@ -201,6 +201,15 @@ TEST(HttpTracerUtilityTest, IsTracing) {
     EXPECT_EQ(Reason::ClientForced, result.reason);
     EXPECT_TRUE(result.is_tracing);
   }
+
+  // No request id.
+  {
+    Http::TestHeaderMapImpl headers;
+    EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
+    Decision result = HttpTracerUtility::isTracing(request_info, headers);
+    EXPECT_EQ(Reason::NotTraceableRequestId, result.reason);
+    EXPECT_FALSE(result.is_tracing);
+  }
 }
 
 TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
