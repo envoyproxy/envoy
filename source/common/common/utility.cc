@@ -39,7 +39,8 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
 }
 
 uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
-  if (buffer_size < 32) {
+  // The maximum size required for an unsigned 64-bit integer is 21 chars (including null).
+  if (buffer_size < 21) {
     throw std::invalid_argument("itoa buffer too small");
   }
 
