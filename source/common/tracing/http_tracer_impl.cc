@@ -260,7 +260,7 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
   }
 
   if (request_headers.has(Http::Headers::get().ClientTraceId)) {
-    span.SetTag("join:x-client-trace-id", request_headers.get(Http::Headers::get().ClientTraceId));
+    span.SetTag("guid:x-client-trace-id", request_headers.get(Http::Headers::get().ClientTraceId));
   }
 
   span.Finish();
