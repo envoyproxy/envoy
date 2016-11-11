@@ -57,7 +57,6 @@ add_library(
   http/conn_manager_utility.cc
   http/header_map_impl.cc
   http/message_impl.cc
-  http/pooled_stream_encoder.cc
   http/http1/codec_impl.cc
   http/http1/conn_pool.cc
   http/http2/codec_impl.cc
