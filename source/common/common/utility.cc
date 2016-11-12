@@ -51,29 +51,10 @@ void StringUtil::rtrim(std::string& source) {
   }
 }
 
-/**
- * strlcpy adapted from https://github.com/freebsd/freebsd/blob/20c3c08/sys/libkern/strlcpy.c
- */
 size_t StringUtil::strlcpy(char* dst, const char* src, size_t siz) {
-  char* d = dst;
-  const char* s = src;
-  size_t n = siz;
-
-  if (n != 0 && --n != 0) {
-    do {
-      if ((*d++ = *s++) == 0)
-        break;
-    } while (--n != 0);
-  }
-
-  if (n == 0) {
-    if (siz != 0)
-      *d = '\0';
-    while (*s++)
-      ;
-  }
-
-  return (s - src - 1);
+  strncpy(dst, src, siz - 1);
+  dst[siz - 1] = '\0';
+  return strlen(src);
 }
 
 std::vector<std::string> StringUtil::split(const std::string& source, char split) {

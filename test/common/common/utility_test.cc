@@ -42,10 +42,37 @@ TEST(StringUtil, rtrim) {
 }
 
 TEST(StringUtil, strlcpy) {
-  // TODO: more tests
-  char dest[6];
-  StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), sizeof(dest));
-  EXPECT_STREQ("hello", dest);
+  {
+    char dest[6];
+    size_t result;
+    result = StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), sizeof(dest));
+    EXPECT_STREQ("hello", dest);
+    EXPECT_EQ(5U, result);
+  }
+
+  {
+    char dest[6];
+    size_t result;
+    result = StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), 3);
+    EXPECT_STREQ("he", dest);
+    EXPECT_EQ(5U, result);
+  }
+
+  {
+    char dest[3];
+    size_t result;
+    result = StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), sizeof(dest));
+    EXPECT_STREQ("he", dest);
+    EXPECT_EQ(5U, result);
+  }
+
+  {
+    char dest[3];
+    size_t result;
+    result = StringUtil::strlcpy(dest, std::string{""}.c_str(), sizeof(dest));
+    EXPECT_STREQ("", dest);
+    EXPECT_EQ(0U, result);
+  }
 }
 
 TEST(StringUtil, split) {
