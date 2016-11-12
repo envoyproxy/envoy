@@ -139,6 +139,13 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
     }
   }
 
+  // This is *extremely* unlikely but possible due to rounding errors when calculating
+  // zone percentages. In this case just select random zone.
+  if (residual_capacity[number_of_zones - 1] == 0) {
+    stats_.lb_zone_no_capacity_left_.inc();
+    return host_set_.healthyHostsPerZone()[random_.random() % number_of_zones];
+  }
+
   // Random sampling to select specific zone for cross zone traffic based on the additional
   // capacity in zones.
   uint64_t threshold = random_.random() % residual_capacity[number_of_zones - 1];
