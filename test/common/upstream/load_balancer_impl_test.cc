@@ -261,16 +261,19 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
 
   // The following host distribution with current precision should lead to the no_capacity_left
   // situation.
+  // Reuse the same host in all of the structures below to reduce time test takes and this does not
+  // impact load balancing logic.
+  HostPtr host = newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80");
   std::vector<HostPtr> current(45000);
 
   for (int i = 0; i < 45000; ++i) {
-    current[i] = newTestHost(cluster_, "tcp://127.0.0.1:0");
+    current[i] = host;
   }
   local_hosts_per_zone->push_back(current);
 
   current.resize(55000);
   for (int i = 0; i < 55000; ++i) {
-    current[i] = newTestHost(cluster_, "tcp://127.0.0.1:0");
+    current[i] = host;
   }
   local_hosts_per_zone->push_back(current);
   local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
@@ -278,19 +281,19 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
 
   current.resize(44999);
   for (int i = 0; i < 44999; ++i) {
-    current[i] = newTestHost(cluster_, "tcp://127.0.0.1:0");
+    current[i] = host;
   }
   upstream_hosts_per_zone->push_back(current);
 
   current.resize(55001);
   for (int i = 0; i < 55001; ++i) {
-    current[i] = newTestHost(cluster_, "tcp://127.0.0.1:0");
+    current[i] = host;
   }
   upstream_hosts_per_zone->push_back(current);
 
   cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
 
-  // Force request out of small zone.
+  // Force request out of small zone and to randomly select zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
   lb_->chooseHost();
   EXPECT_EQ(1U, stats_.lb_zone_no_capacity_left_.value());
