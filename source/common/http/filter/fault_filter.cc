@@ -73,6 +73,9 @@ void FaultFilter::postDelayInjection() {
         {Headers::get().Status, std::to_string(enumToInt(config_->abort_code_))}}};
     config_->stats_.aborts_injected_.inc();
     callbacks_->encodeHeaders(std::move(response_headers), true);
+  } else {
+    // Continue request processing
+    callbacks_->continueDecoding();
   }
 }
 
