@@ -263,7 +263,7 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   // situation.
   // Reuse the same host in all of the structures below to reduce time test takes and this does not
   // impact load balancing logic.
-  HostPtr host = newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80");
+  HostPtr host = newTestHost(cluster_, "tcp://127.0.0.1:80");
   std::vector<HostPtr> current(45000);
 
   for (int i = 0; i < 45000; ++i) {
