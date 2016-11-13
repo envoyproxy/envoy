@@ -167,7 +167,9 @@ void ConnectionImpl::reserveBuffer(uint64_t size) {
     output_buffer_.commit(&reserved_iovec_, 1);
   }
 
-  output_buffer_.reserve(std::min(4096UL, size), &reserved_iovec_, 1);
+  // TODO PERF: It would be better to allow a split reservation. That will make fill code more
+  //            complicated.
+  output_buffer_.reserve(std::max(4096UL, size), &reserved_iovec_, 1);
   reserved_current_ = static_cast<char*>(reserved_iovec_.mem_);
 }
 
@@ -209,7 +211,7 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
     head_request_ = true;
   }
 
-  connection_.reserveBuffer(4096);
+  connection_.reserveBuffer(std::max(4096UL, path.size() + 4096));
   connection_.copyToBuffer(method.c_str(), method.size());
   connection_.addCharToBuffer(' ');
   connection_.copyToBuffer(path.c_str(), path.size());
