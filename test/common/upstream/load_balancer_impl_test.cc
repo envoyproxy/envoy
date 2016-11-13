@@ -264,13 +264,13 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   std::vector<HostPtr> current(45000);
 
   for (int i = 0; i < 45000; ++i) {
-    current[i] = newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:0");
+    current[i] = newTestHost(cluster_, "tcp://127.0.0.1:0");
   }
   local_hosts_per_zone->push_back(current);
 
   current.resize(55000);
   for (int i = 0; i < 55000; ++i) {
-    current[i] = newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:0");
+    current[i] = newTestHost(cluster_, "tcp://127.0.0.1:0");
   }
   local_hosts_per_zone->push_back(current);
   local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
@@ -278,13 +278,13 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
 
   current.resize(44999);
   for (int i = 0; i < 44999; ++i) {
-    current[i] = newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:0");
+    current[i] = newTestHost(cluster_, "tcp://127.0.0.1:0");
   }
   upstream_hosts_per_zone->push_back(current);
 
   current.resize(55001);
   for (int i = 0; i < 55001; ++i) {
-    current[i] = newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:0");
+    current[i] = newTestHost(cluster_, "tcp://127.0.0.1:0");
   }
   upstream_hosts_per_zone->push_back(current);
 
