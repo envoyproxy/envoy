@@ -440,5 +440,17 @@ TEST_F(Http1ClientConnectionImplTest, ResponseWithTrailers) {
   EXPECT_EQ(0UL, response.length());
 }
 
+TEST_F(Http1ClientConnectionImplTest, GiantPath) {
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/" + std::string(16384, 'a')}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
+  codec_->dispatch(response);
+}
+
 } // Http1
 } // Http
