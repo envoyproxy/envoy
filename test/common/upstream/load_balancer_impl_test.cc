@@ -244,52 +244,51 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   // upstream_hosts and local_hosts do not matter, zone aware routing is based on per zone hosts.
   HostVectorPtr upstream_hosts(
       new std::vector<HostPtr>({newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80")}));
-  HostVectorPtr local_hosts(
-      new std::vector<HostPtr>({newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:0")}));
   cluster_.healthy_hosts_ = *upstream_hosts;
   cluster_.hosts_ = *upstream_hosts;
+  HostVectorPtr local_hosts(
+      new std::vector<HostPtr>({newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:0")}));
 
   HostListsPtr upstream_hosts_per_zone(new std::vector<std::vector<HostPtr>>());
   HostListsPtr local_hosts_per_zone(new std::vector<std::vector<HostPtr>>());
-
-  cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .WillOnce(Return(6));
+      .WillOnce(Return(1));
 
   // The following host distribution with current precision should lead to the no_capacity_left
   // situation.
-  std::vector<HostPtr> current;
+  std::vector<HostPtr> current(45000);
 
   for (int i = 0; i < 45000; ++i) {
-    current.push_back(newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1"));
+    current[i] = newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:0");
   }
   local_hosts_per_zone->push_back(current);
 
-  current.clear();
+  current.resize(55000);
   for (int i = 0; i < 55000; ++i) {
-    current.push_back(newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1"));
+    current[i] = newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:0");
   }
   local_hosts_per_zone->push_back(current);
-
-  current.clear();
-  for (int i = 0; i < 44999; ++i) {
-    current.push_back(newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1"));
-  }
-  upstream_hosts_per_zone->push_back(current);
-
-  current.clear();
-  for (int i = 0; i < 55001; ++i) {
-    current.push_back(newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1"));
-  }
-  upstream_hosts_per_zone->push_back(current);
-
   local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
                                     local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
+
+  current.resize(44999);
+  for (int i = 0; i < 44999; ++i) {
+    current[i] = newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:0");
+  }
+  upstream_hosts_per_zone->push_back(current);
+
+  current.resize(55001);
+  for (int i = 0; i < 55001; ++i) {
+    current[i] = newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:0");
+  }
+  upstream_hosts_per_zone->push_back(current);
+
+  cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
