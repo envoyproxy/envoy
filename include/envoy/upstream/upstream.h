@@ -151,6 +151,7 @@ public:
   COUNTER(lb_healthy_panic)                                                                        \
   COUNTER(lb_local_cluster_not_ok)                                                                 \
   COUNTER(lb_zone_cluster_too_small)                                                               \
+  COUNTER(lb_zone_no_capacity_left)                                                                \
   COUNTER(lb_zone_number_differs)                                                                  \
   COUNTER(lb_zone_routing_all_directly)                                                            \
   COUNTER(lb_zone_routing_sampled)                                                                 \
