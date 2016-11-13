@@ -447,7 +447,7 @@ TEST_F(Http1ClientConnectionImplTest, GiantPath) {
       {":method", "GET"}, {":path", "/" + std::string(16384, 'a')}, {":authority", "host"}};
   request_encoder.encodeHeaders(headers, true);
 
-  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
   codec_->dispatch(response);
 }
