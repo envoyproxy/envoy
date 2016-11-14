@@ -1,5 +1,6 @@
 #pragma once
 
+#include "date_provider.h"
 #include "user_agent.h"
 
 #include "envoy/event/deferred_deletable.h"
@@ -15,7 +16,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/linked_object.h"
-#include "common/common/utility.h"
 #include "common/http/access_log/request_info_impl.h"
 
 namespace Http {
@@ -117,6 +117,11 @@ public:
   virtual ServerConnectionPtr createCodec(Network::Connection& connection,
                                           const Buffer::Instance& data,
                                           ServerConnectionCallbacks& callbacks) PURE;
+
+  /**
+   * @return DateProvider& the date provider to use for
+   */
+  virtual DateProvider& dateProvider() PURE;
 
   /**
    * @return the time in milliseconds the connection manager will wait betwen issuing a "shutdown
@@ -369,8 +374,6 @@ private:
 
     // Tracing::TracingContext
     virtual const std::string& operationName() const override;
-
-    static DateFormatter date_formatter_;
 
     // All state for the stream. Put here for readability. We could move this to a bit field
     // eventually if we want.

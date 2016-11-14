@@ -7,6 +7,7 @@
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
+#include "common/http/date_provider_impl.h"
 #include "common/http/utility.h"
 #include "server/config/network/http_connection_manager.h"
 
@@ -43,6 +44,7 @@ public:
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks) override;
+  Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return false; }
@@ -102,6 +104,7 @@ private:
   Optional<std::chrono::milliseconds> idle_timeout_;
   Optional<std::string> user_agent_;
   Optional<Http::TracingConnectionManagerConfig> tracing_config_;
+  Http::SlowDateProviderImpl date_provider_;
 };
 
 /**

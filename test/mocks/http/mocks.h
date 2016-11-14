@@ -63,6 +63,7 @@ public:
   MOCK_METHOD0(accessLogs, const std::list<AccessLog::InstancePtr>&());
   MOCK_METHOD3(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
                                                ServerConnectionCallbacks&));
+  MOCK_METHOD0(dateProvider, DateProvider&());
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(generateRequestId, bool());

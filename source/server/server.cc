@@ -12,6 +12,7 @@
 
 #include "common/access_log/access_log_manager.h"
 #include "common/api/api_impl.h"
+#include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/memory/stats.h"
 #include "common/network/utility.h"

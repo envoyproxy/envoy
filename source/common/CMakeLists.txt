@@ -55,6 +55,7 @@ add_library(
   http/codes.cc
   http/conn_manager_impl.cc
   http/conn_manager_utility.cc
+  http/date_provider_impl.cc
   http/header_map_impl.cc
   http/message_impl.cc
   http/pooled_stream_encoder.cc

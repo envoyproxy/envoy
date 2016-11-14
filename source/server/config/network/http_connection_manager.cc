@@ -76,7 +76,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       route_config_(new Router::ConfigImpl(config.getObject("route_config"), server.runtime(),
                                            server.clusterManager())),
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
-      generate_request_id_(config.getBoolean("generate_request_id", true)) {
+      generate_request_id_(config.getBoolean("generate_request_id", true)),
+      date_provider_(server.dispatcher(), server.threadLocal()) {
 
   if (config.hasObject("use_remote_address")) {
     use_remote_address_ = config.getBoolean("use_remote_address");
