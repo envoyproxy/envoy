@@ -1,5 +1,7 @@
+#include "envoy/http/header_map.h"
 #include "envoy/server/instance.h"
 
+#include "common/common/empty_string.h"
 #include "common/http/filter/fault_filter.h"
 #include "server/config/network/http_connection_manager.h"
 
@@ -43,9 +45,19 @@ public:
       }
     }
 
+    std::vector<Http::FaultFilterHeaders> fault_filter_headers;
+    if (json_config.hasObject("headers")) {
+      std::vector<Json::Object> config_headers = json_config.getObjectArray("headers");
+      for (const Json::Object& header_map : config_headers) {
+        // allow header value to be empty, allows matching to be only based on header presence.
+        fault_filter_headers.emplace_back(Http::LowerCaseString(header_map.getString("name")),
+                                          header_map.getString("value", EMPTY_STRING));
+      }
+    }
+
     Http::FaultFilterConfigPtr config(new Http::FaultFilterConfig{
         Http::FaultFilter::generateStats(stats_prefix, server.stats()), delay_duration,
-        delay_probability, abort_code, abort_probability});
+        delay_probability, abort_code, abort_probability, fault_filter_headers});
     return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{new Http::FaultFilter(config)});
     };

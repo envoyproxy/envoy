@@ -24,6 +24,17 @@ struct FaultFilterStats {
 };
 
 /**
+ * HTTP request headers.
+ */
+struct FaultFilterHeaders {
+  FaultFilterHeaders(const Http::LowerCaseString& name, const std::string& value)
+      : name_(name), value_(value) {}
+
+  const Http::LowerCaseString name_;
+  const std::string value_;
+};
+
+/**
  * Configuration for the fault filter.
  */
 struct FaultFilterConfig {
@@ -32,6 +43,7 @@ struct FaultFilterConfig {
   uint32_t delay_probability_; // 0-100
   uint32_t abort_code_;        // HTTP or gRPC return codes
   uint32_t abort_probability_; // 0-100
+  std::vector<FaultFilterHeaders> fault_filter_headers_;
 };
 
 typedef std::shared_ptr<const FaultFilterConfig> FaultFilterConfigPtr;
@@ -55,6 +67,7 @@ private:
   void onResetStream();
   void resetInternalState();
   void postDelayInjection();
+  bool matches(const Http::HeaderMap& headers) const;
 
   FaultFilterConfigPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
@@ -64,5 +77,4 @@ private:
   std::uniform_int_distribution<uint32_t> prob_dist_{
       std::uniform_int_distribution<uint32_t>(1, 100)};
 };
-
 } // Http

@@ -5,9 +5,11 @@
 
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/header_map.h"
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -19,13 +21,18 @@ FaultFilter::FaultFilter(FaultFilterConfigPtr config) : config_(config), generat
 FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 
 // TODO: Need to inject faults based on header matches
-FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap&, bool) {
+FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
   /**
    * Delays and aborts are independent events. One can inject a delay
-   * followed by an abort or inject just a delay or abort In this callback,
-   * if we inject a delay, then we will inject the abort when the delay
-   * timer is fired.
+   * followed by an abort or inject just a delay or abort. In this callback,
+   * if we inject a delay, then we will inject the abort in the delay timer
+   * callback.
    */
+
+  // Check for header matches first
+  if (!matches(headers)) {
+    return FilterHeadersStatus::Continue;
+  }
 
   if ((config_->delay_probability_ > 0) &&
       (prob_dist_(generator_) <= config_->delay_probability_)) {
@@ -61,6 +68,26 @@ FilterTrailersStatus FaultFilter::decodeTrailers(HeaderMap&) {
 FaultFilterStats FaultFilter::generateStats(const std::string& prefix, Stats::Store& store) {
   std::string final_prefix = prefix + "fault.";
   return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
+}
+
+// header match semantics in fault filter works is same as the one in route block
+bool FaultFilter::matches(const Http::HeaderMap& headers) const {
+  bool matches = true;
+
+  if (!config_->fault_filter_headers_.empty()) {
+    for (const FaultFilterHeaders& header_data : config_->fault_filter_headers_) {
+      if (header_data.value_ == EMPTY_STRING) {
+        matches &= headers.has(header_data.name_);
+      } else {
+        matches &= (headers.get(header_data.name_) == header_data.value_);
+      }
+      if (!matches) {
+        break;
+      }
+    }
+  }
+
+  return matches;
 }
 
 void FaultFilter::onResetStream() { resetInternalState(); }
