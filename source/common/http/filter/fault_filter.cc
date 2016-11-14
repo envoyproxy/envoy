@@ -66,6 +66,8 @@ FaultFilterStats FaultFilter::generateStats(const std::string& prefix, Stats::St
 void FaultFilter::onResetStream() { resetInternalState(); }
 
 void FaultFilter::postDelayInjection() {
+
+  resetInternalState();
   // Delays can be followed by aborts
   if ((config_->abort_probability_ > 0) &&
       (prob_dist_(generator_) <= config_->abort_probability_)) {
@@ -79,7 +81,12 @@ void FaultFilter::postDelayInjection() {
   }
 }
 
-void FaultFilter::resetInternalState() { delay_timer_.reset(); }
+void FaultFilter::resetInternalState() {
+  if (delay_timer_) {
+    delay_timer_->disableTimer();
+    delay_timer_.reset();
+  }
+}
 
 void FaultFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
