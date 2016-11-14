@@ -20,7 +20,6 @@ FaultFilter::FaultFilter(FaultFilterConfigPtr config) : config_(config), generat
 
 FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 
-// TODO: Need to inject faults based on header matches
 FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
   /**
    * Delays and aborts are independent events. One can inject a delay
