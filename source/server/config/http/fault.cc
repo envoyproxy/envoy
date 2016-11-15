@@ -26,23 +26,21 @@ public:
      */
     std::chrono::milliseconds delay_duration =
         std::chrono::milliseconds(json_config.getInteger("delay_duration", 0));
-    uint64_t delay_probability =
-        static_cast<uint64_t>(json_config.getInteger("delay_probability", 0));
+    uint64_t delay_enabled = static_cast<uint64_t>(json_config.getInteger("delay_enabled", 0));
     uint64_t abort_code = static_cast<uint64_t>(json_config.getInteger("abort_code", 0));
-    uint64_t abort_probability =
-        static_cast<uint64_t>(json_config.getInteger("abort_probability", 0));
-    if (delay_probability > 0) {
-      if (delay_probability > 100) {
-        throw EnvoyException("delay probability cannot be greater than 100");
+    uint64_t abort_enabled = static_cast<uint64_t>(json_config.getInteger("abort_enabled", 0));
+    if (delay_enabled > 0) {
+      if (delay_enabled > 100) {
+        throw EnvoyException("delay_enabled cannot be greater than 100");
       }
       if (std::chrono::milliseconds(0) == delay_duration) {
-        throw EnvoyException("delay duration cannot be 0 when delay probability is greater than 1");
+        throw EnvoyException("delay duration cannot be 0 when delay enabled is greater than 1");
       }
     }
 
-    if (abort_probability > 0) {
-      if (abort_probability > 100) {
-        throw EnvoyException("abort probability cannot be greater than 100");
+    if (abort_enabled > 0) {
+      if (abort_enabled > 100) {
+        throw EnvoyException("abort enabled cannot be greater than 100");
       }
     }
 
@@ -57,8 +55,8 @@ public:
     }
 
     Http::FaultFilterConfigPtr config(new Http::FaultFilterConfig(
-        stats_prefix, server.stats(), server.random(), abort_code, abort_probability,
-        delay_probability, delay_duration, fault_filter_headers));
+        stats_prefix, server.stats(), server.random(), abort_code, abort_enabled, delay_enabled,
+        delay_duration, fault_filter_headers));
     return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{new Http::FaultFilter(config)});
     };
