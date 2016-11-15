@@ -28,10 +28,10 @@ void PooledStreamEncoder::encodeHeaders(const HeaderMap& headers, bool end_strea
 
   // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
   // These get stripped by HTTP/1 codec where applicable.
-  ASSERT(headers.has(Headers::get().Scheme));
-  ASSERT(headers.has(Headers::get().Method));
-  ASSERT(headers.has(Headers::get().Host));
-  ASSERT(headers.has(Headers::get().Path));
+  ASSERT(headers.Scheme());
+  ASSERT(headers.Method());
+  ASSERT(headers.Host());
+  ASSERT(headers.Path());
 
   // It's possible for a reset to happen inline within the newStream() call. In this case, we might
   // get deleted inline as well. Only write the returned handle out if it is not nullptr to deal

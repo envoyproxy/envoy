@@ -223,21 +223,24 @@ HeaderFormatter::HeaderFormatter(const std::string& main_header,
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
 std::string HeaderFormatter::format(const HeaderMap& headers) const {
-  std::string header_value = headers.get(main_header_);
+  const HeaderEntry* header = headers.get(main_header_);
 
-  if (header_value.empty() && !alternative_header_.get().empty()) {
-    header_value = headers.get(alternative_header_);
+  if (!header && !alternative_header_.get().empty()) {
+    header = headers.get(alternative_header_);
   }
 
-  if (header_value.empty()) {
-    header_value = "-";
+  std::string header_value_string;
+  if (!header) {
+    header_value_string = "-";
+  } else {
+    header_value_string = header->value().c_str();
   }
 
-  if (max_length_.valid() && header_value.length() > max_length_.value()) {
-    return header_value.substr(0, max_length_.value());
+  if (max_length_.valid() && header_value_string.length() > max_length_.value()) {
+    return header_value_string.substr(0, max_length_.value());
   }
 
-  return header_value;
+  return header_value_string;
 }
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,

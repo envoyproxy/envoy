@@ -55,10 +55,10 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   encoder.getStream().addCallbacks(*response);
 
   Http::HeaderMapImpl headers;
-  headers.addViaCopy(Http::Headers::get().Method, method);
-  headers.addViaCopy(Http::Headers::get().Path, url);
-  headers.addViaCopy(Http::Headers::get().Host, host);
-  headers.addViaMoveValue(Http::Headers::get().Scheme, "http");
+  headers.insertMethod().value(method);
+  headers.insertPath().value(url);
+  headers.insertHost().value(host);
+  headers.insertScheme().value(Http::Headers::get().SchemeValues.Http);
   encoder.encodeHeaders(headers, body.empty());
   if (!body.empty()) {
     Buffer::OwnedImpl body_buffer(body);

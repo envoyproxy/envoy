@@ -10,6 +10,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::DoAll;
@@ -144,7 +145,7 @@ struct ActiveTestRequest {
   void completeResponse(bool with_body) {
     // Test additional metric writes also.
     Http::HeaderMapPtr response_headers(
-        new HeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "true"}});
+        new TestHeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "true"}});
 
     inner_decoder_->decodeHeaders(std::move(response_headers), !with_body);
     if (with_body) {
@@ -159,7 +160,7 @@ struct ActiveTestRequest {
     EXPECT_CALL(callbacks_.pool_ready_, ready());
   }
 
-  void startRequest() { callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true); }
+  void startRequest() { callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true); }
 
   Http1ConnPoolImplTest& parent_;
   size_t client_index_;
@@ -367,12 +368,12 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks2.pool_ready_, ready());
 
-  callbacks.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
-  Http::HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
-  callbacks2.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
-  response_headers.reset(new HeaderMapImpl{{":status", "200"}});
+  callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  response_headers.reset(new TestHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   // Cause the connection to go away.
@@ -402,12 +403,12 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseHeader) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
   Http::HeaderMapPtr response_headers(
-      new HeaderMapImpl{{":status", "200"}, {"Connection", "Close"}});
+      new TestHeaderMapImpl{{":status", "200"}, {"Connection", "Close"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
@@ -437,11 +438,11 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  Http::HeaderMapPtr response_headers(new HeaderMapImpl{{":status", "200"}});
+  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 

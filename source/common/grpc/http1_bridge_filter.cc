@@ -11,20 +11,21 @@
 namespace Grpc {
 
 void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
-  const std::string& grpc_status_header = headers.get(Common::GRPC_STATUS_HEADER);
-  if (grpc_status_header.empty()) {
+  const Http::HeaderEntry* grpc_status_header = headers.GrpcStatus();
+  if (!grpc_status_header) {
     return;
   }
 
   uint64_t grpc_status_code;
-  bool success =
-      StringUtil::atoul(grpc_status_header.c_str(), grpc_status_code) && grpc_status_code == 0;
+  bool success = StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) &&
+                 grpc_status_code == 0;
 
   Common::chargeStat(stats_store_, cluster_, grpc_service_, grpc_method_, success);
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
-  bool grpc_request = headers.get(Http::Headers::get().ContentType) == Common::GRPC_CONTENT_TYPE;
+  const Http::HeaderEntry* content_type = headers.ContentType();
+  bool grpc_request = content_type && content_type->value() == Common::GRPC_CONTENT_TYPE.c_str();
   if (grpc_request) {
     setupStatTracking(headers);
   }
@@ -68,17 +69,19 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
     // Here we check for grpc-status. If it's not zero, we change the response code. We assume
     // that if a reset comes in and we disconnect the HTTP/1.1 client it will raise some type
     // of exception/error that the response was not complete.
-    const std::string& grpc_status_header = trailers.get(Common::GRPC_STATUS_HEADER);
-    uint64_t grpc_status_code;
-    if (!StringUtil::atoul(grpc_status_header.c_str(), grpc_status_code) || grpc_status_code != 0) {
-      response_headers_->replaceViaMoveValue(
-          Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
+    const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
+    if (grpc_status_header) {
+      uint64_t grpc_status_code;
+      if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) ||
+          grpc_status_code != 0) {
+        response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
+      }
+      response_headers_->insertGrpcStatus().value(*grpc_status_header);
     }
-    response_headers_->replaceViaCopy(Common::GRPC_STATUS_HEADER, grpc_status_header);
 
-    const std::string& grpc_message_header = trailers.get(Common::GRPC_MESSAGE_HEADER);
-    if (!grpc_message_header.empty()) {
-      response_headers_->replaceViaCopy(Common::GRPC_MESSAGE_HEADER, grpc_message_header);
+    const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
+    if (grpc_message_header) {
+      response_headers_->insertGrpcMessage().value(*grpc_message_header);
     }
   }
 
@@ -93,7 +96,7 @@ void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
     return;
   }
 
-  std::vector<std::string> parts = StringUtil::split(headers.get(Http::Headers::get().Path), '/');
+  std::vector<std::string> parts = StringUtil::split(headers.Path()->value().c_str(), '/');
   if (parts.size() != 2) {
     return;
   }

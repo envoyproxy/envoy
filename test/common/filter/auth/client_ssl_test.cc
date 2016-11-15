@@ -6,6 +6,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::Invoke;
@@ -111,7 +112,7 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
   // Respond.
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
       Filesystem::fileReadToEnd("test/common/filter/auth/test_data/vpn_response_1.json"))});
   callbacks_->onSuccess(std::move(message));
@@ -148,7 +149,7 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
   // Error response.
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}}));
   callbacks_->onSuccess(std::move(message));
 
   // Interval timer fires.
@@ -158,7 +159,7 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
   // Parsing error
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl("bad_json")});
   callbacks_->onSuccess(std::move(message));
 
@@ -178,7 +179,7 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
           Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}})});
+                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
   interval_timer_->callback_();

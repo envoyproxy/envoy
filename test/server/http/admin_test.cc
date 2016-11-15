@@ -1,6 +1,7 @@
 #include "server/http/admin.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -19,7 +20,7 @@ public:
   AdminImpl admin_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  Http::HeaderMapImpl request_headers_;
+  Http::TestHeaderMapImpl request_headers_;
 };
 
 TEST_F(AdminFilterTest, HeaderOnly) {

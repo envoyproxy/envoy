@@ -24,10 +24,10 @@ TEST(CommonTest, chargeStats) {
 TEST(CommonTest, prepareHeaders) {
   Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name");
 
-  EXPECT_EQ("POST", message->headers().get(Http::Headers::get().Method));
-  EXPECT_EQ("/service_name/method_name", message->headers().get(Http::Headers::get().Path));
-  EXPECT_EQ("cluster", message->headers().get(Http::Headers::get().Host));
-  EXPECT_EQ("application/grpc", message->headers().get(Http::Headers::get().ContentType));
+  EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
+  EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
+  EXPECT_STREQ("cluster", message->headers().Host()->value().c_str());
+  EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 }
 
 } // Grpc

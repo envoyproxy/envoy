@@ -15,6 +15,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -65,8 +66,8 @@ public:
   }
 
   NiceMock<Api::MockApi> api_;
-  HeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/"}};
-  HeaderMapImpl response_headers_;
+  TestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/"}};
+  TestHeaderMapImpl response_headers_;
   TestRequestInfo request_info_;
   Filesystem::MockFile* file_;
   std::string output_;
@@ -238,7 +239,7 @@ TEST_F(AccessLogImplTest, RuntimeFilter) {
   log->log(&request_headers_, &response_headers_, request_info_);
 
   // Value is taken from x-request-id.
-  request_headers_.replaceViaMoveValue("x-request-id", "000000ff-0000-0000-0000-000000000000");
+  request_headers_.addViaCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
   EXPECT_CALL(runtime.snapshot_, getInteger("access_log.test_key", 0)).WillOnce(Return(56));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -282,7 +283,7 @@ TEST_F(AccessLogImplTest, healthCheckTrue) {
   NiceMock<Runtime::MockLoader> runtime;
   InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
 
-  HeaderMapImpl header_map{};
+  TestHeaderMapImpl header_map{};
   request_info_.hc_request_ = true;
   EXPECT_CALL(*file_, write(_)).Times(0);
 
@@ -302,7 +303,7 @@ TEST_F(AccessLogImplTest, healthCheckFalse) {
   NiceMock<Runtime::MockLoader> runtime;
   InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
 
-  HeaderMapImpl header_map{};
+  TestHeaderMapImpl header_map{};
   EXPECT_CALL(*file_, write(_));
 
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -331,19 +332,19 @@ TEST_F(AccessLogImplTest, requestTracing) {
   InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
 
   {
-    HeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
+    TestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
     EXPECT_CALL(*file_, write(_));
     log->log(&forced_header, &response_headers_, request_info_);
   }
 
   {
-    HeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
+    TestHeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&not_traceable, &response_headers_, request_info_);
   }
 
   {
-    HeaderMapImpl sampled_header{{"x-request-id", sample_tracing_guid}};
+    TestHeaderMapImpl sampled_header{{"x-request-id", sample_tracing_guid}};
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&sampled_header, &response_headers_, request_info_);
   }
@@ -502,14 +503,14 @@ TEST_F(AccessLogImplTest, andFilter) {
 
   {
     EXPECT_CALL(*file_, write(_));
-    HeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
+    TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
 
     log->log(&header_map, &response_headers_, request_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
-    HeaderMapImpl header_map{};
+    TestHeaderMapImpl header_map{};
     request_info_.hc_request_ = true;
     log->log(&header_map, &response_headers_, request_info_);
   }
@@ -535,14 +536,14 @@ TEST_F(AccessLogImplTest, orFilter) {
 
   {
     EXPECT_CALL(*file_, write(_));
-    HeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
+    TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
 
     log->log(&header_map, &response_headers_, request_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_));
-    HeaderMapImpl header_map{{"user-agent", "Envoy/HC"}};
+    TestHeaderMapImpl header_map{{"user-agent", "Envoy/HC"}};
     log->log(&header_map, &response_headers_, request_info_);
   }
 }
@@ -571,14 +572,14 @@ TEST_F(AccessLogImplTest, multipleOperators) {
 
   {
     EXPECT_CALL(*file_, write(_));
-    HeaderMapImpl header_map{};
+    TestHeaderMapImpl header_map{};
 
     log->log(&header_map, &response_headers_, request_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
-    HeaderMapImpl header_map{};
+    TestHeaderMapImpl header_map{};
     request_info_.hc_request_ = true;
 
     log->log(&header_map, &response_headers_, request_info_);
@@ -597,7 +598,7 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
 
   Json::Object filter_object = loader.getObject("filter");
   DurationFilter filter(filter_object, runtime);
-  HeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo request_info;
 
   request_info.duration_ = 100;
@@ -630,7 +631,7 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   Json::Object filter_object = loader.getObject("filter");
   StatusCodeFilter filter(filter_object, runtime);
 
-  HeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo info;
 
   info.response_code_.value(400);

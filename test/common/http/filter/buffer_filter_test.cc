@@ -35,7 +35,7 @@ public:
 };
 
 TEST_F(BufferFilterTest, HeaderOnlyRequest) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, true));
 }
 
@@ -44,7 +44,7 @@ TEST_F(BufferFilterTest, RequestWithData) {
 
   expectTimerCreate();
 
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data1("hello");
@@ -59,11 +59,11 @@ TEST_F(BufferFilterTest, RequestTimeout) {
 
   expectTimerCreate();
 
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
-  HeaderMapImpl response_headers{{":status", "408"}};
-  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(response_headers), true));
+  TestHeaderMapImpl response_headers{{":status", "408"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   timer_->callback_();
 
   callbacks_.reset_callback_();
@@ -75,7 +75,7 @@ TEST_F(BufferFilterTest, RequestTooLarge) {
 
   expectTimerCreate();
 
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   Buffer::OwnedImpl buffered_data("buffered");
@@ -83,8 +83,8 @@ TEST_F(BufferFilterTest, RequestTooLarge) {
 
   Buffer::OwnedImpl data1("hello");
   config_->max_request_bytes_ = 1;
-  HeaderMapImpl response_headers{{":status", "413"}};
-  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(response_headers), true));
+  TestHeaderMapImpl response_headers{{":status", "413"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
 
   callbacks_.reset_callback_();
@@ -96,7 +96,7 @@ TEST_F(BufferFilterTest, TxResetAfterEndStream) {
 
   expectTimerCreate();
 
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data1("hello");

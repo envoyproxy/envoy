@@ -7,6 +7,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::InSequence;
@@ -110,7 +111,7 @@ public:
   std::unique_ptr<Filter> filter_;
   NiceMock<MockStreamDecoderFilterCallbacks> filter_callbacks_;
   ::RateLimit::RequestCallbacks* request_callbacks_{};
-  HeaderMapImpl request_headers_;
+  TestHeaderMapImpl request_headers_;
   Buffer::OwnedImpl data_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -227,8 +228,8 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
-  Http::HeaderMapImpl response_headers{{":status", "429"}};
-  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(response_headers), true));
+  Http::TestHeaderMapImpl response_headers{{":status", "429"}};
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   request_callbacks_->complete(::RateLimit::LimitStatus::OverLimit);
 
@@ -290,7 +291,7 @@ TEST_F(HttpRateLimitFilterTest, RequestHeaderOkResponse) {
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks_ = &callbacks; })));
 
-  HeaderMapImpl request_header{{"x-header-name", "test_value"}};
+  TestHeaderMapImpl request_header{{"x-header-name", "test_value"}};
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_header, false));
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_header));
@@ -315,7 +316,7 @@ TEST_F(HttpRateLimitFilterTest, RateLimitKeyOkResponse) {
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks_ = &callbacks; })));
 
-  HeaderMapImpl request_header{{"x-header-name", "test_value"}};
+  TestHeaderMapImpl request_header{{"x-header-name", "test_value"}};
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_header, false));
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_header));

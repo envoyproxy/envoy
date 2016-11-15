@@ -11,8 +11,8 @@
 namespace Http {
 namespace RateLimit {
 
-const Http::HeaderMapImpl Filter::TOO_MANY_REQUESTS_HEADER{
-    {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}};
+const Http::HeaderMapPtr Filter::TOO_MANY_REQUESTS_HEADER{new Http::HeaderMapImpl{
+    {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}}};
 
 void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route,
                                                  std::vector<::RateLimit::Descriptor>& descriptors,
@@ -31,19 +31,20 @@ void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
                                                std::vector<::RateLimit::Descriptor>& descriptors,
                                                FilterConfig&, const HeaderMap& headers,
                                                StreamDecoderFilterCallbacks&) {
-  const std::string& header_value = headers.get(header_name_);
-  if (header_value.empty()) {
+  const HeaderEntry* header_value = headers.get(header_name_);
+  if (!header_value) {
     return;
   }
 
-  descriptors.push_back({{{descriptor_key_, header_value}}});
+  descriptors.push_back({{{descriptor_key_, header_value->value().c_str()}}});
 
   const std::string& route_key = route.rateLimitPolicy().routeKey();
   if (route_key.empty()) {
     return;
   }
 
-  descriptors.push_back({{{"route_key", route_key}, {descriptor_key_, header_value}}});
+  descriptors.push_back(
+      {{{"route_key", route_key}, {descriptor_key_, header_value->value().c_str()}}});
 }
 
 void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
@@ -110,7 +111,7 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
       state_ = State::Calling;
       initiating_call_ = true;
       client_->limit(*this, config_->domain(), descriptors,
-                     headers.get(Http::Headers::get().RequestId));
+                     headers.RequestId() ? headers.RequestId()->value().c_str() : EMPTY_STRING);
       initiating_call_ = false;
     }
   }
@@ -154,7 +155,7 @@ void Filter::complete(::RateLimit::LimitStatus status) {
   case ::RateLimit::LimitStatus::OverLimit:
     config_->stats().counter(cluster_ratelimit_stat_prefix_ + "over_limit").inc();
     Http::CodeUtility::ResponseStatInfo info{config_->stats(), cluster_stat_prefix_,
-                                             TOO_MANY_REQUESTS_HEADER, true, EMPTY_STRING,
+                                             *TOO_MANY_REQUESTS_HEADER, true, EMPTY_STRING,
                                              EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, false};
     Http::CodeUtility::chargeResponseStat(info);
     break;
@@ -163,7 +164,7 @@ void Filter::complete(::RateLimit::LimitStatus status) {
   if (status == ::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    Http::HeaderMapPtr response_headers{new HeaderMapImpl(TOO_MANY_REQUESTS_HEADER)};
+    Http::HeaderMapPtr response_headers{new HeaderMapImpl(*TOO_MANY_REQUESTS_HEADER)};
     callbacks_->encodeHeaders(std::move(response_headers), true);
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();

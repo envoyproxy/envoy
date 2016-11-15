@@ -86,10 +86,11 @@ bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random
 
   if (!config_headers_.empty()) {
     for (const HeaderData& header_data : config_headers_) {
+      const Http::HeaderEntry* header = headers.get(header_data.name_);
       if (header_data.value_ == EMPTY_STRING) {
-        matches &= headers.has(header_data.name_);
+        matches &= (header != nullptr);
       } else {
-        matches &= (headers.get(header_data.name_) == header_data.value_);
+        matches &= (header != nullptr) && (header->value() == header_data.value_.c_str());
       }
       if (!matches) {
         break;
@@ -107,7 +108,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const 
     return;
   }
 
-  headers.replaceViaCopy(Http::Headers::get().Host, host_rewrite_);
+  headers.Host()->value(host_rewrite_);
 }
 
 Optional<RouteEntryImplBase::RuntimeData>
@@ -129,35 +130,34 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
     return;
   }
 
-  std::string path = headers.get(Http::Headers::get().Path);
-  headers.addViaCopy(Http::Headers::get().EnvoyOriginalPath, path);
-  ASSERT(StringUtil::startsWith(path, matched_path, case_sensitive_));
-  headers.replaceViaMoveValue(Http::Headers::get().Path,
-                              std::move(path.replace(0, matched_path.size(), prefix_rewrite_)));
+  std::string path = headers.Path()->value().c_str();
+  headers.insertEnvoyOriginalPath().value(*headers.Path());
+  ASSERT(StringUtil::startsWith(path.c_str(), matched_path, case_sensitive_));
+  headers.Path()->value(path.replace(0, matched_path.size(), prefix_rewrite_));
 }
 
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   ASSERT(isRedirect());
 
-  const std::string* final_host;
-  const std::string* final_path;
+  const char* final_host;
+  const char* final_path;
   if (!host_redirect_.empty()) {
-    final_host = &host_redirect_;
+    final_host = host_redirect_.c_str();
   } else {
-    ASSERT(headers.has(Http::Headers::get().Host));
-    final_host = &headers.get(Http::Headers::get().Host);
+    ASSERT(headers.Host());
+    final_host = headers.Host()->value().c_str();
   }
 
   if (!path_redirect_.empty()) {
-    final_path = &path_redirect_;
+    final_path = path_redirect_.c_str();
   } else {
-    ASSERT(headers.has(Http::Headers::get().Path));
-    final_path = &headers.get(Http::Headers::get().Path);
+    ASSERT(headers.Path());
+    final_path = headers.Path()->value().c_str();
   }
 
-  ASSERT(headers.has(Http::Headers::get().ForwardedProto));
-  return fmt::format("{}://{}{}", headers.get(Http::Headers::get().ForwardedProto), *final_host,
-                     *final_path);
+  ASSERT(headers.ForwardedProto());
+  return fmt::format("{}://{}{}", headers.ForwardedProto()->value().c_str(), final_host,
+                     final_path);
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHost& vhost, const Json::Object& route,
@@ -172,7 +172,7 @@ void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) cons
 
 bool PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
   return RouteEntryImplBase::matches(headers, random_value) &&
-         StringUtil::startsWith(headers.get(Http::Headers::get().Path), prefix_, case_sensitive_);
+         StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_);
 }
 
 PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHost& vhost, const Json::Object& route,
@@ -187,13 +187,15 @@ void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const 
 
 bool PathRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
   if (RouteEntryImplBase::matches(headers, random_value)) {
-    std::string path = headers.get(Http::Headers::get().Path);
+    // TODO PERF: Avoid copy.
+    std::string path = headers.Path()->value().c_str();
     size_t query_string_start = path.find("?");
 
     if (case_sensitive_) {
       return path.substr(0, query_string_start) == path_;
     } else {
-      return StringUtil::caseInsensitiveCompare(path.substr(0, query_string_start), path_) == 0;
+      return StringUtil::caseInsensitiveCompare(path.substr(0, query_string_start).c_str(),
+                                                path_.c_str()) == 0;
     }
   }
 
@@ -282,12 +284,10 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
 const RedirectEntry* VirtualHost::redirectFromEntries(const Http::HeaderMap& headers,
                                                       uint64_t random_value) const {
   // First we check to see if we have any vhost level SSL requirements.
-  if (ssl_requirements_ == SslRequirements::ALL &&
-      headers.get(Http::Headers::get().ForwardedProto) != "https") {
+  if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto()->value() != "https") {
     return &SSL_REDIRECTOR;
   } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
-             headers.get(Http::Headers::get().ForwardedProto) != "https" &&
-             !headers.has(Http::Headers::get().EnvoyInternalRequest)) {
+             headers.ForwardedProto()->value() != "https" && !headers.EnvoyInternalRequest()) {
     return &SSL_REDIRECTOR;
   } else {
     // See if there is a route level redirect that we need to do. We search for a route entry
@@ -309,7 +309,7 @@ const RouteEntryImplBase* VirtualHost::routeFromEntries(const Http::HeaderMap& h
 }
 
 const VirtualHost* RouteMatcher::findVirtualHost(const Http::HeaderMap& headers) const {
-  auto iter = virtual_hosts_.find(headers.get(Http::Headers::get().Host));
+  auto iter = virtual_hosts_.find(headers.Host()->value().c_str());
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
   } else if (default_virtual_host_) {
@@ -345,10 +345,9 @@ const SslRedirector VirtualHost::SSL_REDIRECTOR;
 const VirtualCluster* VirtualHost::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
   for (const VirtualClusterEntry& entry : virtual_clusters_) {
     bool method_matches =
-        !entry.method_.valid() || headers.get(Http::Headers::get().Method) == entry.method_.value();
+        !entry.method_.valid() || headers.Method()->value().c_str() == entry.method_.value();
 
-    if (method_matches &&
-        std::regex_match(headers.get(Http::Headers::get().Path), entry.pattern_)) {
+    if (method_matches && std::regex_match(headers.Path()->value().c_str(), entry.pattern_)) {
       return &entry;
     }
   }

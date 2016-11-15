@@ -36,6 +36,8 @@ public:
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
+  const LowerCaseString GrpcMessage{"grpc-message"};
+  const LowerCaseString GrpcStatus{"grpc-status"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
   const LowerCaseString KeepAlive{"keep-alive"};
@@ -61,6 +63,10 @@ public:
   } ContentTypeValues;
 
   struct {
+    const std::string True{"true"};
+  } EnvoyInternalRequestValues;
+
+  struct {
     const std::string _5xx{"5xx"};
     const std::string ConnectFailure{"connect-failure"};
     const std::string RefusedStream{"refused-stream"};
@@ -72,8 +78,15 @@ public:
   } ExpectValues;
 
   struct {
+    const std::string Get{"GET"};
     const std::string Head{"HEAD"};
+    const std::string Post{"POST"};
   } MethodValues;
+
+  struct {
+    const std::string Http{"http"};
+    const std::string Https{"https"};
+  } SchemeValues;
 
   struct {
     const std::string Chunked{"chunked"};

@@ -10,6 +10,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::Invoke;
@@ -29,11 +30,12 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
     EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
 
-    Http::HeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+    Http::TestHeaderMapImpl request_headers{
+        {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
     HttpTracerUtility::mutateHeaders(request_headers, runtime);
 
     EXPECT_EQ(UuidTraceStatus::Sampled,
-              UuidUtils::isTraceableUuid(request_headers.get("x-request-id")));
+              UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
   }
 
   // Sampling must not be done on client traced.
@@ -43,11 +45,12 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
     EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
 
-    Http::HeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
+    Http::TestHeaderMapImpl request_headers{
+        {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
     HttpTracerUtility::mutateHeaders(request_headers, runtime);
 
     EXPECT_EQ(UuidTraceStatus::Forced,
-              UuidUtils::isTraceableUuid(request_headers.get("x-request-id")));
+              UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
   }
 
   // Sampling, global off.
@@ -58,11 +61,12 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
     EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(false));
 
-    Http::HeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+    Http::TestHeaderMapImpl request_headers{
+        {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
     HttpTracerUtility::mutateHeaders(request_headers, runtime);
 
     EXPECT_EQ(UuidTraceStatus::NoTrace,
-              UuidUtils::isTraceableUuid(request_headers.get("x-request-id")));
+              UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
   }
 
   // Client, client enabled, global on.
@@ -73,13 +77,13 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
     EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
 
-    Http::HeaderMapImpl request_headers{
+    Http::TestHeaderMapImpl request_headers{
         {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
         {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
     HttpTracerUtility::mutateHeaders(request_headers, runtime);
 
     EXPECT_EQ(UuidTraceStatus::Client,
-              UuidUtils::isTraceableUuid(request_headers.get("x-request-id")));
+              UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
   }
 
   // Client, client disabled, global on.
@@ -90,13 +94,13 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
     EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
 
-    Http::HeaderMapImpl request_headers{
+    Http::TestHeaderMapImpl request_headers{
         {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
         {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
     HttpTracerUtility::mutateHeaders(request_headers, runtime);
 
     EXPECT_EQ(UuidTraceStatus::NoTrace,
-              UuidUtils::isTraceableUuid(request_headers.get("x-request-id")));
+              UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
   }
 
   // Forced, global on.
@@ -105,12 +109,12 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
     EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
 
-    Http::HeaderMapImpl request_headers{{"x-envoy-force-trace", "true"},
-                                        {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+    Http::TestHeaderMapImpl request_headers{
+        {"x-envoy-force-trace", "true"}, {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
     HttpTracerUtility::mutateHeaders(request_headers, runtime);
 
     EXPECT_EQ(UuidTraceStatus::Forced,
-              UuidUtils::isTraceableUuid(request_headers.get("x-request-id")));
+              UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
   }
 
   // Forced, global off.
@@ -119,23 +123,24 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
     EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(false));
 
-    Http::HeaderMapImpl request_headers{{"x-envoy-force-trace", "true"},
-                                        {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+    Http::TestHeaderMapImpl request_headers{
+        {"x-envoy-force-trace", "true"}, {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
     HttpTracerUtility::mutateHeaders(request_headers, runtime);
 
     EXPECT_EQ(UuidTraceStatus::NoTrace,
-              UuidUtils::isTraceableUuid(request_headers.get("x-request-id")));
+              UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
   }
 
   // Forced, global on, broken uuid.
   {
     NiceMock<Runtime::MockLoader> runtime;
 
-    Http::HeaderMapImpl request_headers{{"x-envoy-force-trace", "true"}, {"x-request-id", "bb"}};
+    Http::TestHeaderMapImpl request_headers{{"x-envoy-force-trace", "true"},
+                                            {"x-request-id", "bb"}};
     HttpTracerUtility::mutateHeaders(request_headers, runtime);
 
     EXPECT_EQ(UuidTraceStatus::NoTrace,
-              UuidUtils::isTraceableUuid(request_headers.get("x-request-id")));
+              UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
   }
 }
 
@@ -147,18 +152,18 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
   std::string forced_guid = random.uuid();
   UuidUtils::setTraceableUuid(forced_guid, UuidTraceStatus::Forced);
-  Http::HeaderMapImpl forced_header{{"x-request-id", forced_guid}};
+  Http::TestHeaderMapImpl forced_header{{"x-request-id", forced_guid}};
 
   std::string sampled_guid = random.uuid();
   UuidUtils::setTraceableUuid(sampled_guid, UuidTraceStatus::Sampled);
-  Http::HeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};
+  Http::TestHeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};
 
   std::string client_guid = random.uuid();
   UuidUtils::setTraceableUuid(client_guid, UuidTraceStatus::Client);
-  Http::HeaderMapImpl client_header{{"x-request-id", client_guid}};
+  Http::TestHeaderMapImpl client_header{{"x-request-id", client_guid}};
 
-  Http::HeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
-  Http::HeaderMapImpl empty_header{};
+  Http::TestHeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
+  Http::TestHeaderMapImpl empty_header{};
 
   // Force traced.
   {
@@ -180,7 +185,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
   // HC request.
   {
-    Http::HeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
+    Http::TestHeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(true));
 
     Decision result = HttpTracerUtility::isTracing(request_info, traceable_header_hc);
@@ -196,6 +201,15 @@ TEST(HttpTracerUtilityTest, IsTracing) {
     EXPECT_EQ(Reason::ClientForced, result.reason);
     EXPECT_TRUE(result.is_tracing);
   }
+
+  // No request id.
+  {
+    Http::TestHeaderMapImpl headers;
+    EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
+    Decision result = HttpTracerUtility::isTracing(request_info, headers);
+    EXPECT_EQ(Reason::NotTraceableRequestId, result.reason);
+    EXPECT_FALSE(result.is_tracing);
+  }
 }
 
 TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
@@ -206,14 +220,14 @@ TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
 
   std::string forced_guid = random.uuid();
   UuidUtils::setTraceableUuid(forced_guid, UuidTraceStatus::Forced);
-  Http::HeaderMapImpl forced_header{{"x-request-id", forced_guid}};
+  Http::TestHeaderMapImpl forced_header{{"x-request-id", forced_guid}};
 
   std::string sampled_guid = random.uuid();
   UuidUtils::setTraceableUuid(sampled_guid, UuidTraceStatus::Sampled);
-  Http::HeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};
+  Http::TestHeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};
 
-  Http::HeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
-  Http::HeaderMapImpl empty_header{};
+  Http::TestHeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
+  Http::TestHeaderMapImpl empty_header{};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
   NiceMock<MockTracingContext> context;
 
@@ -244,7 +258,7 @@ TEST(HttpTracerImplTest, AllSinksTraceableRequest) {
     EXPECT_CALL(*sink1, flushTrace(_, _, _, _)).Times(0);
     EXPECT_CALL(*sink2, flushTrace(_, _, _, _)).Times(0);
 
-    Http::HeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
+    Http::TestHeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
     NiceMock<Http::AccessLog::MockRequestInfo> request_info;
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(true));
     tracer.trace(&traceable_header_hc, &empty_header, request_info, context);
@@ -266,7 +280,7 @@ TEST(HttpTracerImplTest, ZeroSinksRunsFine) {
   Runtime::RandomGeneratorImpl random;
   std::string not_traceable_guid = random.uuid();
 
-  Http::HeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
+  Http::TestHeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
 
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
   NiceMock<MockTracingContext> context;
@@ -280,7 +294,7 @@ TEST(HttpNullTracerTest, NoFailures) {
 
   tracer.addSink(HttpSinkPtr{sink});
 
-  Http::HeaderMapImpl empty_header{};
+  Http::TestHeaderMapImpl empty_header{};
   Http::AccessLog::MockRequestInfo request_info;
   NiceMock<MockTracingContext> context;
 
@@ -320,8 +334,9 @@ public:
   }
 
   const std::string operation_name_{"test"};
-  const Http::HeaderMapImpl empty_header_{};
-  const Http::HeaderMapImpl response_headers_{{":status", "500"}};
+  const Http::TestHeaderMapImpl request_headers_{
+      {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
+  const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
 
   std::unique_ptr<LightStepSink> sink_;
   NiceMock<Event::MockTimer>* timer_;
@@ -403,10 +418,10 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_EQ("/lightstep.collector.CollectorService/Report",
-                      message->headers().get(Http::Headers::get().Path));
-            EXPECT_EQ("lightstep_saas", message->headers().get(Http::Headers::get().Host));
-            EXPECT_EQ("application/grpc", message->headers().get(Http::Headers::get().ContentType));
+            EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
+                         message->headers().Path()->value().c_str());
+            EXPECT_STREQ("lightstep_saas", message->headers().Host()->value().c_str());
+            EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 
             return &request;
           }));
@@ -425,13 +440,13 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
       .WillOnce(Return(5000U));
   EXPECT_CALL(context_, operationName()).Times(2).WillRepeatedly(ReturnRef(operation_name_));
 
-  sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
-  sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
+  sink_->flushTrace(request_headers_, response_headers_, request_info, context_);
+  sink_->flushTrace(request_headers_, response_headers_, request_info, context_);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
 
-  msg->trailers(std::move(Http::HeaderMapPtr{new Http::HeaderMapImpl{{"grpc-status", "0"}}}));
+  msg->trailers(std::move(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}}));
 
   callback->onSuccess(std::move(msg));
 
@@ -479,7 +494,7 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
       .WillOnce(Return(5));
   EXPECT_CALL(context_, operationName()).WillOnce(ReturnRef(operation_name_));
 
-  sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
+  sink_->flushTrace(request_headers_, response_headers_, request_info, context_);
   // Timer should be re-enabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
@@ -507,10 +522,10 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
                      const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_EQ("/lightstep.collector.CollectorService/Report",
-                      message->headers().get(Http::Headers::get().Path));
-            EXPECT_EQ("lightstep_saas", message->headers().get(Http::Headers::get().Host));
-            EXPECT_EQ("application/grpc", message->headers().get(Http::Headers::get().ContentType));
+            EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
+                         message->headers().Path()->value().c_str());
+            EXPECT_STREQ("lightstep_saas", message->headers().Host()->value().c_str());
+            EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 
             return &request;
           }));
@@ -528,10 +543,10 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
       .WillOnce(Return(5000U));
   EXPECT_CALL(context_, operationName()).WillOnce(ReturnRef(operation_name_));
 
-  sink_->flushTrace(empty_header_, response_headers_, request_info, context_);
+  sink_->flushTrace(request_headers_, response_headers_, request_info, context_);
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
 
   // No trailers, gRPC is considered failed.
   callback->onSuccess(std::move(msg));

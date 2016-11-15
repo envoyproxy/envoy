@@ -229,8 +229,9 @@ ConnPoolImpl::ResponseDecoderWrapper::~ResponseDecoderWrapper() {
 }
 
 void ConnPoolImpl::ResponseDecoderWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
-  if (0 == StringUtil::caseInsensitiveCompare(headers->get(Headers::get().Connection),
-                                              Headers::get().ConnectionValues.Close)) {
+  if (headers->Connection() &&
+      0 == StringUtil::caseInsensitiveCompare(headers->Connection()->value().c_str(),
+                                              Headers::get().ConnectionValues.Close.c_str())) {
     saw_close_header_ = true;
     parent_.parent_.host_->cluster().stats().upstream_cx_close_header_.inc();
   }

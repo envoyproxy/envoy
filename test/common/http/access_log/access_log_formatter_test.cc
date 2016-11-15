@@ -2,6 +2,7 @@
 #include "common/http/header_map_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -29,7 +30,7 @@ TEST(FailureReasonUtilsTest, toShortStringConversion) {
 
 TEST(AccessLogFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
-  HeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
+  TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
   MockRequestInfo request_info;
 
   EXPECT_EQ("plain", formatter.format(header, header, request_info));
@@ -39,7 +40,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   EXPECT_THROW(RequestInfoFormatter formatter("unknown_field"), EnvoyException);
 
   MockRequestInfo requestInfo;
-  HeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
+  TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
   {
     RequestInfoFormatter start_time_format("START_TIME");
@@ -114,8 +115,8 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
 TEST(AccessLogFormatterTest, requestHeaderFormatter) {
   MockRequestInfo requestInfo;
-  HeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
-  HeaderMapImpl response_header{{":method", "PUT"}};
+  TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+  TestHeaderMapImpl response_header{{":method", "PUT"}};
 
   {
     RequestHeaderFormatter formatter(":Method", "", Optional<size_t>());
@@ -140,8 +141,8 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
 
 TEST(AccessLogFormatterTest, responseHeaderFormatter) {
   MockRequestInfo requestInfo;
-  HeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
-  HeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
+  TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+  TestHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
 
   {
     ResponseHeaderFormatter formatter(":method", "", Optional<size_t>());
@@ -166,8 +167,8 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
 
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   MockRequestInfo request_info;
-  HeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
-  HeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
+  TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
 
   {
     const std::string format = "{{%PROTOCOL%}}   %RESP(not exist)%++%RESP(test)% "

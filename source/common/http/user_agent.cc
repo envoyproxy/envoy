@@ -22,16 +22,18 @@ void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::strin
     return;
   }
 
-  const std::string& user_agent = headers.get(Headers::get().UserAgent);
-  prefix_ = prefix;
-  if (user_agent.find("iOS") != std::string::npos) {
-    type_ = Type::iOS;
-    prefix_ += "user_agent.ios.";
-  } else if (user_agent.find("android") != std::string::npos) {
-    type_ = Type::Android;
-    prefix_ += "user_agent.android.";
-  } else {
-    type_ = Type::Unknown;
+  type_ = Type::Unknown;
+
+  const HeaderEntry* user_agent = headers.UserAgent();
+  if (user_agent) {
+    prefix_ = prefix;
+    if (user_agent->value().find("iOS")) {
+      type_ = Type::iOS;
+      prefix_ += "user_agent.ios.";
+    } else if (user_agent->value().find("android")) {
+      type_ = Type::Android;
+      prefix_ += "user_agent.android.";
+    }
   }
 
   if (type_ != Type::Unknown) {

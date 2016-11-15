@@ -4,6 +4,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 
@@ -16,7 +17,7 @@ public:
                    const std::string& request_vcluster_name = EMPTY_STRING,
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
-    HeaderMapImpl headers{{":status", std::to_string(code)}};
+    TestHeaderMapImpl headers{{":status", std::to_string(code)}};
 
     CodeUtility::ResponseStatInfo info{store_, "prefix.", headers, internal_request,
                                        request_vhost_name, request_vcluster_name, from_az, to_az,

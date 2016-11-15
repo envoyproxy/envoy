@@ -6,6 +6,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::DoAll;
@@ -67,7 +68,7 @@ protected:
         .WillOnce(Invoke([](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                             Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
           callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-              Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}})});
+              Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
           return nullptr;
         }));
   }
@@ -116,7 +117,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   cluster_->setInitializedCb([&]() -> void { membership_updated_.ready(); });
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
       Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json"))});
 
@@ -140,7 +141,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   timer_->callback_();
 
   message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
       "test/common/upstream/test_data/sds_response_weight_change.json"))});
   EXPECT_CALL(*timer_, enableTimer(_));
@@ -176,7 +177,7 @@ TEST_F(SdsTest, NoHealthChecker) {
 
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "503"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}}));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(50U, canary_host->weight());
@@ -200,7 +201,7 @@ TEST_F(SdsTest, HealthChecker) {
   // Load in all of the hosts the first time, this will setup first pass health checking. We expect
   // all the hosts to load in unhealthy.
   Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
       Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json"))});
 
@@ -243,7 +244,7 @@ TEST_F(SdsTest, HealthChecker) {
 
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
       Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json"))});
   callbacks_->onSuccess(std::move(message));
@@ -262,7 +263,7 @@ TEST_F(SdsTest, HealthChecker) {
   timer_->callback_();
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
       Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json"))});
   callbacks_->onSuccess(std::move(message));
@@ -280,7 +281,7 @@ TEST_F(SdsTest, HealthChecker) {
   timer_->callback_();
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl{{":status", "200"}}}));
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
       Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_3.json"))});
   callbacks_->onSuccess(std::move(message));

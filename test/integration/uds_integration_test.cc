@@ -4,7 +4,7 @@
 
 TEST_F(UdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(IntegrationTest::HTTP_PORT),
-                                       Http::CodecClient::Type::HTTP1, 1024, 512);
+                                       Http::CodecClient::Type::HTTP1, 1024, 512, false);
 }
 
 TEST_F(UdsIntegrationTest, RouterHeaderOnlyRequestAndResponse) {

@@ -65,19 +65,19 @@ void SslIntegrationTest::checkStats() {
 TEST_F(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   testRouterRequestAndResponseWithBody(makeSslClientConnection(false),
                                        Http::CodecClient::Type::HTTP1, 16 * 1024 * 1024,
-                                       16 * 1024 * 1024);
+                                       16 * 1024 * 1024, false);
   checkStats();
 }
 
 TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(makeSslClientConnection(false),
-                                       Http::CodecClient::Type::HTTP1, 1024, 512);
+                                       Http::CodecClient::Type::HTTP1, 1024, 512, false);
   checkStats();
 }
 
 TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
   testRouterRequestAndResponseWithBody(makeSslClientConnection(true),
-                                       Http::CodecClient::Type::HTTP2, 1024, 512);
+                                       Http::CodecClient::Type::HTTP2, 1024, 512, false);
   checkStats();
 }
 
@@ -110,7 +110,7 @@ TEST_F(SslIntegrationTest, AdminCertEndpoint) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       ADMIN_PORT, "GET", "/certs", "", Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().get(":status"));
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_F(SslIntegrationTest, AltAlpn) {
@@ -120,7 +120,7 @@ TEST_F(SslIntegrationTest, AltAlpn) {
   ON_CALL(server->runtime_->snapshot_, featureEnabled("ssl.alt_alpn", 0))
       .WillByDefault(Return(true));
   testRouterRequestAndResponseWithBody(makeSslClientConnection(true),
-                                       Http::CodecClient::Type::HTTP1, 1024, 512);
+                                       Http::CodecClient::Type::HTTP1, 1024, 512, false);
   checkStats();
 }
 

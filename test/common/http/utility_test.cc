@@ -2,6 +2,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
 
+#include "test/test_common/utility.h"
+
 namespace Http {
 
 // Satisfy linker
@@ -22,50 +24,50 @@ TEST(HttpUtility, parseQueryString) {
 }
 
 TEST(HttpUtility, getResponseStatus) {
-  EXPECT_THROW(Utility::getResponseStatus(HeaderMapImpl{}), CodecClientException);
-  EXPECT_EQ(200U, Utility::getResponseStatus(HeaderMapImpl{{":status", "200"}}));
+  EXPECT_THROW(Utility::getResponseStatus(TestHeaderMapImpl{}), CodecClientException);
+  EXPECT_EQ(200U, Utility::getResponseStatus(TestHeaderMapImpl{{":status", "200"}}));
 }
 
 TEST(HttpUtility, isInternalRequest) {
-  EXPECT_FALSE(Utility::isInternalRequest(HeaderMapImpl{}));
-  EXPECT_FALSE(Utility::isInternalRequest(
-      HeaderMapImpl{{"x-forwarded-for", "10.0.0.1"}, {"x-forwarded-for", "10.0.0.2"}}));
-  EXPECT_FALSE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "10.0.0.1,10.0.0.2"}}));
-  EXPECT_FALSE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "50.0.0.1"}}));
-  EXPECT_FALSE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "blah"}}));
+  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{}));
+  EXPECT_FALSE(
+      Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "10.0.0.1,10.0.0.2"}}));
+  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "50.0.0.1"}}));
+  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "blah"}}));
 
-  EXPECT_TRUE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "10.0.0.0"}}));
-  EXPECT_TRUE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "10.255.255.255"}}));
+  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "10.0.0.0"}}));
+  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "10.255.255.255"}}));
 
-  EXPECT_FALSE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "172.0.0.0"}}));
-  EXPECT_TRUE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "172.16.0.0"}}));
-  EXPECT_TRUE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "172.31.255.255"}}));
-  EXPECT_FALSE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "172.32.0.0"}}));
+  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "172.0.0.0"}}));
+  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "172.16.0.0"}}));
+  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "172.31.255.255"}}));
+  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "172.32.0.0"}}));
 
-  EXPECT_FALSE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "192.0.0.0"}}));
-  EXPECT_TRUE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "192.168.0.0"}}));
-  EXPECT_TRUE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "192.168.255.255"}}));
+  EXPECT_FALSE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "192.0.0.0"}}));
+  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "192.168.0.0"}}));
+  EXPECT_TRUE(
+      Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "192.168.255.255"}}));
 
-  EXPECT_TRUE(Utility::isInternalRequest(HeaderMapImpl{{"x-forwarded-for", "127.0.0.1"}}));
+  EXPECT_TRUE(Utility::isInternalRequest(TestHeaderMapImpl{{"x-forwarded-for", "127.0.0.1"}}));
 }
 
 TEST(HttpUtility, appendXff) {
   {
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     Utility::appendXff(headers, "127.0.0.1");
-    EXPECT_EQ("127.0.0.1", headers.get("x-forwarded-for"));
+    EXPECT_EQ("127.0.0.1", headers.get_("x-forwarded-for"));
   }
 
   {
-    HeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
+    TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
     Utility::appendXff(headers, "127.0.0.1");
-    EXPECT_EQ("10.0.0.1, 127.0.0.1", headers.get("x-forwarded-for"));
+    EXPECT_EQ("10.0.0.1, 127.0.0.1", headers.get_("x-forwarded-for"));
   }
 }
 
 TEST(HttpUtility, createSslRedirectPath) {
   {
-    HeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/hello"}};
+    TestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/hello"}};
     EXPECT_EQ("https://www.lyft.com/hello", Utility::createSslRedirectPath(headers));
   }
 }
@@ -90,19 +92,19 @@ TEST(HttpUtility, parseCodecOptions) {
 TEST(HttpUtility, TwoAddressesInXFF) {
   const std::string first_address = "34.0.0.1";
   const std::string second_address = "10.0.0.1";
-  HeaderMapImpl request_headers{
+  TestHeaderMapImpl request_headers{
       {"x-forwarded-for", fmt::format("{0},{1}", first_address, second_address)}};
   EXPECT_EQ(second_address, Utility::getLastAddressFromXFF(request_headers));
 }
 
 TEST(HttpUtility, EmptyXFF) {
-  HeaderMapImpl request_headers;
+  TestHeaderMapImpl request_headers;
   EXPECT_EQ("", Utility::getLastAddressFromXFF(request_headers));
 }
 
 TEST(HttpUtility, OneAddressInXFF) {
   const std::string first_address = "34.0.0.1";
-  HeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
+  TestHeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
   EXPECT_EQ(first_address, Utility::getLastAddressFromXFF(request_headers));
 }
 
