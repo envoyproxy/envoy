@@ -9,6 +9,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stats/mocks.h"
 
 using testing::NiceMock;
 
@@ -56,7 +57,7 @@ public:
   const std::string alt_stat_name_{"fake_alt_cluster"};
   std::list<MemberUpdateCb> callbacks_;
   uint64_t max_requests_per_connection_{};
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   const std::string stat_prefix_{"cluster.fake_cluster."};
   ClusterStats stats_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;

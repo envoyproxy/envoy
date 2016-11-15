@@ -129,7 +129,9 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, uint32_t events) {
     if (client.closed_with_active_rq_) {
       checkForDrained();
     }
-  } else if (events & Network::ConnectionEvent::Connected) {
+  }
+
+  if (events & Network::ConnectionEvent::Connected) {
     conn_connect_ms_->complete();
   }
 

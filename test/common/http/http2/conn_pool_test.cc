@@ -110,10 +110,30 @@ public:
   NiceMock<Http::MockStreamEncoder> inner_encoder_;
 };
 
+TEST_F(Http2ConnPoolImplTest, VerifyConectionTimingStats) {
+  expectClientCreate();
+  EXPECT_CALL(cluster_.stats_store_,
+              deliverTimingToSinks("cluster.fake_cluster.upstream_cx_connect_ms", _));
+  EXPECT_CALL(cluster_.stats_store_,
+              deliverTimingToSinks("cluster.fake_cluster.upstream_cx_length_ms", _));
+
+  ActiveTestRequest r1(*this, 0);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  expectClientConnect(0);
+  EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
+  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
+
+  test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
 TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
   InSequence s;
 
   expectClientCreate();
+
   ActiveTestRequest r1(*this, 0);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
   r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
