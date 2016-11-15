@@ -26,11 +26,11 @@ public:
      */
     std::chrono::milliseconds delay_duration =
         std::chrono::milliseconds(json_config.getInteger("delay_duration", 0));
-    uint32_t delay_probability =
-        static_cast<uint32_t>(json_config.getInteger("delay_probability", 0));
-    uint32_t abort_code = static_cast<uint32_t>(json_config.getInteger("abort_code", 0));
-    uint32_t abort_probability =
-        static_cast<uint32_t>(json_config.getInteger("abort_probability", 0));
+    uint64_t delay_probability =
+        static_cast<uint64_t>(json_config.getInteger("delay_probability", 0));
+    uint64_t abort_code = static_cast<uint64_t>(json_config.getInteger("abort_code", 0));
+    uint64_t abort_probability =
+        static_cast<uint64_t>(json_config.getInteger("abort_probability", 0));
     if (delay_probability > 0) {
       if (delay_probability > 100) {
         throw EnvoyException("delay probability cannot be greater than 100");
