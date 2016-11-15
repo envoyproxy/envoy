@@ -24,7 +24,8 @@ public:
     /**
      * TODO: Throw error if invalid return code is provided
      */
-    uint32_t delay_duration = static_cast<uint32_t>(json_config.getInteger("delay_duration", 0));
+    std::chrono::milliseconds delay_duration =
+        std::chrono::milliseconds(json_config.getInteger("delay_duration", 0));
     uint32_t delay_probability =
         static_cast<uint32_t>(json_config.getInteger("delay_probability", 0));
     uint32_t abort_code = static_cast<uint32_t>(json_config.getInteger("abort_code", 0));
@@ -34,7 +35,7 @@ public:
       if (delay_probability > 100) {
         throw EnvoyException("delay probability cannot be greater than 100");
       }
-      if (0 == delay_duration) {
+      if (std::chrono::milliseconds(0) == delay_duration) {
         throw EnvoyException("delay duration cannot be 0 when delay probability is greater than 1");
       }
     }
@@ -55,9 +56,9 @@ public:
       }
     }
 
-    Http::FaultFilterConfigPtr config(new Http::FaultFilterConfig{
-        Http::FaultFilter::generateStats(stats_prefix, server.stats()), delay_duration,
-        delay_probability, abort_code, abort_probability, fault_filter_headers});
+    Http::FaultFilterConfigPtr config(new Http::FaultFilterConfig(
+        stats_prefix, server.stats(), server.random(), abort_code, abort_probability,
+        delay_probability, delay_duration, fault_filter_headers));
     return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{new Http::FaultFilter(config)});
     };

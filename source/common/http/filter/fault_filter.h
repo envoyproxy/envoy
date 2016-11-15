@@ -1,9 +1,8 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
-
-#include <random>
 
 namespace Http {
 
@@ -38,12 +37,25 @@ struct FaultFilterHeaders {
  * Configuration for the fault filter.
  */
 struct FaultFilterConfig {
-  FaultFilterStats stats_;
-  uint32_t delay_duration_;    // in milliseconds
-  uint32_t delay_probability_; // 0-100
-  uint32_t abort_code_;        // HTTP or gRPC return codes
-  uint32_t abort_probability_; // 0-100
+  FaultFilterConfig(const std::string& stat_prefix, Stats::Store& stats,
+                    Runtime::RandomGenerator& random, uint32_t abort_code,
+                    uint32_t abort_probability, uint32_t delay_probability,
+                    std::chrono::milliseconds delay_duration,
+                    std::vector<FaultFilterHeaders> fault_filter_headers)
+      : random_(random), modulo_base_(100), abort_code_(abort_code),
+        abort_probability_(abort_probability), delay_probability_(delay_probability),
+        delay_duration_(delay_duration), fault_filter_headers_(fault_filter_headers),
+        stats_{ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))} {}
+
+  Runtime::RandomGenerator& random_;
+  uint32_t modulo_base_; // % of traffic to inject faults on, in increments of 1%. Hardcoded to 100,
+                         // until we need higher precision.
+  uint32_t abort_code_;  // HTTP or gRPC return codes
+  uint32_t abort_probability_;               // 0-100
+  uint32_t delay_probability_;               // 0-100
+  std::chrono::milliseconds delay_duration_; // in milliseconds
   std::vector<FaultFilterHeaders> fault_filter_headers_;
+  FaultFilterStats stats_;
 };
 
 typedef std::shared_ptr<const FaultFilterConfig> FaultFilterConfigPtr;
@@ -72,9 +84,5 @@ private:
   FaultFilterConfigPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr delay_timer_;
-  std::random_device rd_;
-  std::mt19937 generator_;
-  std::uniform_int_distribution<uint32_t> prob_dist_{
-      std::uniform_int_distribution<uint32_t>(1, 100)};
 };
 } // Http

@@ -1,11 +1,9 @@
-#include <chrono>
-#include <random>
-
 #include "fault_filter.h"
 
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
@@ -16,7 +14,7 @@
 #include "common/http/headers.h"
 
 namespace Http {
-FaultFilter::FaultFilter(FaultFilterConfigPtr config) : config_(config), generator_(rd_()) {}
+FaultFilter::FaultFilter(FaultFilterConfigPtr config) : config_(config) {}
 
 FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 
@@ -33,15 +31,15 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
     return FilterHeadersStatus::Continue;
   }
 
-  if ((config_->delay_probability_ > 0) &&
-      (prob_dist_(generator_) <= config_->delay_probability_)) {
+  if ((config_->delay_probability_) &&
+      ((config_->random_.random() % config_->modulo_base_) <= config_->delay_probability_)) {
     // Inject delays
     delay_timer_ = callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
-    delay_timer_->enableTimer(std::chrono::milliseconds(config_->delay_duration_));
+    delay_timer_->enableTimer(config_->delay_duration_);
     config_->stats_.delays_injected_.inc();
     return FilterHeadersStatus::StopIteration;
-  } else if ((config_->abort_probability_ > 0) &&
-             (prob_dist_(generator_) <= config_->abort_probability_)) {
+  } else if ((config_->abort_probability_) &&
+             ((config_->random_.random() % config_->modulo_base_) <= config_->abort_probability_)) {
     Http::HeaderMapPtr response_headers{new HeaderMapImpl{
         {Headers::get().Status, std::to_string(enumToInt(config_->abort_code_))}}};
     callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -95,8 +93,8 @@ void FaultFilter::postDelayInjection() {
 
   resetInternalState();
   // Delays can be followed by aborts
-  if ((config_->abort_probability_ > 0) &&
-      (prob_dist_(generator_) <= config_->abort_probability_)) {
+  if ((config_->abort_probability_) &&
+      ((config_->random_.random() % config_->modulo_base_) <= config_->abort_probability_)) {
     Http::HeaderMapPtr response_headers{new HeaderMapImpl{
         {Headers::get().Status, std::to_string(enumToInt(config_->abort_code_))}}};
     config_->stats_.aborts_injected_.inc();
