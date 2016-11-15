@@ -81,28 +81,23 @@ protected:
     const LowerCaseString* key_;
   };
 
-  struct StaticLookupKey {
-    bool operator==(const StaticLookupKey& rhs) const { return 0 == strcmp(key_, rhs.key_); }
+  struct StaticLookupEntry {
+    typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
 
-    const char* key_;
-  };
-
-  struct StaticLookupKeyHasher {
-    size_t operator()(const StaticLookupKey&) const;
+    EntryCb cb_{};
+    std::array<std::unique_ptr<StaticLookupEntry>, 256> entries_;
   };
 
   /**
    * This is the static lookup table that is used to determine whether a header is one of the O(1)
-   * headers. Right now this is a basic hash table using a custom hash/equality function so we can
-   * work with C strings.
-   * TODO PERF: Right now we have to both hash and do a strcmp() for every incoming header. We can
-   *            avoid the hash step by building the O(1) headers into a trie and walking that.
+   * headers. This uses a trie for lookup time at most equal to the size of the incoming string.
    */
   struct StaticLookupTable {
     StaticLookupTable();
+    void add(const char* key, StaticLookupEntry::EntryCb cb);
+    StaticLookupEntry::EntryCb find(const char* key) const;
 
-    typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
-    std::unordered_map<StaticLookupKey, EntryCb, StaticLookupKeyHasher> map_;
+    StaticLookupEntry root_;
   };
 
   static const StaticLookupTable static_lookup_table_;

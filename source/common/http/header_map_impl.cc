@@ -188,21 +188,10 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
   value(header.value().c_str(), header.value().size());
 }
 
-size_t HeaderMapImpl::StaticLookupKeyHasher::operator()(const StaticLookupKey& key) const {
-  // djb2: http://www.cse.yorku.ca/~oz/hash.html
-  const char* current = key.key_;
-  unsigned long hash = 5381;
-  while (int c = *current++) {
-    hash = ((hash << 5) + hash) + c;
-  }
-
-  return hash;
-}
-
 #define INLINE_HEADER_STATIC_MAP_ENTRY(name)                                                       \
-  map_[{Headers::get().name.get().c_str()}] = [](HeaderMapImpl & h) -> StaticLookupResponse {      \
+  add(Headers::get().name.get().c_str(), [](HeaderMapImpl & h) -> StaticLookupResponse {           \
     return {&h.inline_headers_.name##_, &Headers::get().name};                                     \
-  };
+  });
 
 const HeaderMapImpl::StaticLookupTable HeaderMapImpl::static_lookup_table_;
 
@@ -210,9 +199,38 @@ HeaderMapImpl::StaticLookupTable::StaticLookupTable() {
   ALL_INLINE_HEADERS(INLINE_HEADER_STATIC_MAP_ENTRY)
 
   // Special case where we map a legacy host header to :authority.
-  map_[{Headers::get().HostLegacy.get().c_str()}] = [](HeaderMapImpl& h) -> StaticLookupResponse {
+  add(Headers::get().HostLegacy.get().c_str(), [](HeaderMapImpl& h) -> StaticLookupResponse {
     return {&h.inline_headers_.Host_, &Headers::get().Host};
-  };
+  });
+}
+
+void HeaderMapImpl::StaticLookupTable::add(const char* key, StaticLookupEntry::EntryCb cb) {
+  StaticLookupEntry* current = &root_;
+  while (*key) {
+    if (!current->entries_[*key]) {
+      current->entries_[*key].reset(new StaticLookupEntry());
+    }
+
+    current = current->entries_[*key].get();
+    key++;
+  }
+
+  current->cb_ = cb;
+}
+
+HeaderMapImpl::StaticLookupEntry::EntryCb
+HeaderMapImpl::StaticLookupTable::find(const char* key) const {
+  const StaticLookupEntry* current = &root_;
+  while (char c = *key) {
+    current = current->entries_[c].get();
+    if (current) {
+      key++;
+    } else {
+      return nullptr;
+    }
+  }
+
+  return current->cb_;
 }
 
 HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_headers_)); }
@@ -257,15 +275,15 @@ bool HeaderMapImpl::operator==(const HeaderMapImpl& rhs) const {
 }
 
 void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
-  auto static_entry = static_lookup_table_.map_.find({key.c_str()});
-  if (static_entry != static_lookup_table_.map_.end()) {
+  StaticLookupEntry::EntryCb cb = static_lookup_table_.find(key.c_str());
+  if (cb) {
     // TODO: Currently, for all of the inline headers, we don't support appending. The only inline
     //       header where we should be converting multiple headers into a comma delimited list is
     //       XFF. This is not a crisis for now but we should allow an inline header to indicate that
     //       it should be appended to. In that case, we would do an append here. We can do this in
     //       a follow up.
     key.clear();
-    StaticLookupResponse static_lookup_response = static_entry->second(*this);
+    StaticLookupResponse static_lookup_response = cb(*this);
     maybeCreateInline(static_lookup_response.entry_, *static_lookup_response.key_,
                       std::move(value));
   } else {
@@ -328,9 +346,9 @@ void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
 }
 
 void HeaderMapImpl::remove(const LowerCaseString& key) {
-  auto static_entry = static_lookup_table_.map_.find({key.get().c_str()});
-  if (static_entry != static_lookup_table_.map_.end()) {
-    StaticLookupResponse static_lookup_response = static_entry->second(*this);
+  StaticLookupEntry::EntryCb cb = static_lookup_table_.find(key.get().c_str());
+  if (cb) {
+    StaticLookupResponse static_lookup_response = cb(*this);
     removeInline(static_lookup_response.entry_);
   } else {
     for (auto i = headers_.begin(); i != headers_.end();) {
