@@ -30,6 +30,7 @@ HeaderString::HeaderString(HeaderString&& move_value) {
     break;
   }
   case Type::Dynamic: {
+    // When we move a dynamic header, we switch the moved header back to its default state (inline).
     buffer_.dynamic_ = move_value.buffer_.dynamic_;
     dynamic_capacity_ = move_value.dynamic_capacity_;
     move_value.type_ = Type::Inline;
@@ -135,7 +136,7 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
       type_ = Type::Dynamic;
     } else {
       if (size + 1 > dynamic_capacity_) {
-        // Need to reallocate.
+        // Need to reallocate. Use free/malloc to avoid the copy since we are about to overwrite.
         dynamic_capacity_ = size * 2;
         free(buffer_.dynamic_);
         buffer_.dynamic_ = static_cast<char*>(malloc(dynamic_capacity_));

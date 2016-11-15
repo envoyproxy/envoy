@@ -42,7 +42,8 @@ public:
   void addViaMove(HeaderString&& key, HeaderString&& value);
 
   /**
-   * For testing. Equality is based on equality of the backing list.
+   * For testing. Equality is based on equality of the backing list. This is an exact match
+   * comparison (order matters).
    */
   bool operator==(const HeaderMapImpl& rhs) const;
 
