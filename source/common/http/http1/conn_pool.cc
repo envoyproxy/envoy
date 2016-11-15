@@ -155,6 +155,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, uint32_t events) {
       checkForDrained();
     }
   } else if (events & Network::ConnectionEvent::Connected) {
+    conn_connect_ms_->complete();
     processIdleClient(client);
   }
 
@@ -262,6 +263,8 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
 
+  parent_.conn_connect_ms_ =
+      parent_.host_->cluster().stats().upstream_cx_connect_ms_.allocateSpan();
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(parent_.dispatcher_);
   real_host_description_ = data.host_description_;
   codec_client_ = parent_.createCodecClient(data);

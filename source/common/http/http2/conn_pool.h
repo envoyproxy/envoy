@@ -71,6 +71,7 @@ protected:
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
 
+  Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
   Upstream::ConstHostPtr host_;
   Stats::Store& stats_store_;

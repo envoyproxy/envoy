@@ -129,6 +129,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, uint32_t events) {
     if (client.closed_with_active_rq_) {
       checkForDrained();
     }
+  } else if (events & Network::ConnectionEvent::Connected) {
+    conn_connect_ms_->complete();
   }
 
   if (client.connect_timer_) {
@@ -206,6 +208,8 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
 
+  parent_.conn_connect_ms_ =
+      parent_.host_->cluster().stats().upstream_cx_connect_ms_.allocateSpan();
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(parent_.dispatcher_);
   real_host_description_ = data.host_description_;
   client_ = parent_.createCodecClient(data);
