@@ -263,7 +263,6 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose();
 }
 
-DateFormatter ConnectionManagerImpl::ActiveStream::date_formatter_("%a, %d %b %Y %H:%M:%S GMT");
 std::atomic<uint64_t> ConnectionManagerImpl::ActiveStream::next_stream_id_(0);
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
@@ -527,8 +526,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 
   // Base headers.
+  connection_manager_.config_.dateProvider().setDateHeader(headers);
   headers.insertServer().value(connection_manager_.config_.serverName());
-  headers.insertDate().value(date_formatter_.now());
   headers.insertEnvoyProtocolVersion().value(connection_manager_.codec_->protocolString());
   ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
                                                   connection_manager_.config_);

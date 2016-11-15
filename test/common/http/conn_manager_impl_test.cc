@@ -7,6 +7,7 @@
 #include "common/http/access_log/access_log_impl.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/conn_manager_impl.h"
+#include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
@@ -69,6 +70,7 @@ public:
                                   ServerConnectionCallbacks&) override {
     return ServerConnectionPtr{codec_};
   }
+  Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() override { return true; }
@@ -106,6 +108,7 @@ public:
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
   NiceMock<Router::MockConfig> route_config_;
   Optional<Http::TracingConnectionManagerConfig> tracing_config_;
+  Http::SlowDateProviderImpl date_provider_;
 };
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {

@@ -5,6 +5,7 @@
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
+#include "common/http/date_provider_impl.h"
 #include "common/json/json_loader.h"
 
 namespace Server {
@@ -62,6 +63,7 @@ public:
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks) override;
+  Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return generate_request_id_; }
@@ -107,6 +109,7 @@ private:
   Router::ConfigPtr route_config_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
+  Http::TlsCachingDateProviderImpl date_provider_;
 };
 
 /**

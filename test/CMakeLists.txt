@@ -45,6 +45,7 @@ add_executable(envoy-test
   common/http/common.cc
   common/http/conn_manager_impl_test.cc
   common/http/conn_manager_utility_test.cc
+  common/http/date_provider_impl_test.cc
   common/http/filter/buffer_filter_test.cc
   common/http/filter/ratelimit_test.cc
   common/http/header_map_impl_test.cc
