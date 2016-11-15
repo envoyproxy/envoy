@@ -56,7 +56,7 @@ HeaderString::~HeaderString() {
 void HeaderString::append(const char* data, uint32_t size) {
   switch (type_) {
   case Type::Static: {
-    // Switch back to inline and fall through. We do not actually pend to the static string
+    // Switch back to inline and fall through. We do not actually append to the static string
     // currently which would require a copy.
     type_ = Type::Inline;
     buffer_.dynamic_ = inline_buffer_;

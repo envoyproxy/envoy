@@ -187,7 +187,6 @@ private:
   HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyExternalAddress)                                                                \
   HEADER_FUNC(EnvoyForceTrace)                                                                     \
-  HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
@@ -195,14 +194,15 @@ private:
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
+  HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
   HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)                                                 \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedFor)                                                                        \
   HEADER_FUNC(ForwardedProto)                                                                      \
-  HEADER_FUNC(GrpcStatus)                                                                          \
   HEADER_FUNC(GrpcMessage)                                                                         \
+  HEADER_FUNC(GrpcStatus)                                                                          \
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(Method)                                                                              \
@@ -273,7 +273,7 @@ public:
   /**
    * Callback when calling iterate() over a const header map.
    * @param header supplies the header entry.
-   * @param context supplies the context passd to iterate().
+   * @param context supplies the context passed to iterate().
    */
   typedef void (*ConstIterateCb)(const HeaderEntry& header, void* context);
 
