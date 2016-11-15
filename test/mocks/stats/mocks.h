@@ -1,4 +1,8 @@
+#pragma once
+
 #include "envoy/stats/stats.h"
+
+#include "common/stats/stats_impl.h"
 
 namespace Stats {
 
@@ -40,6 +44,18 @@ public:
   MOCK_METHOD1(timer, Timer&(const std::string& name));
 
   testing::NiceMock<MockCounter> counter_;
+};
+
+/**
+ * With IsolatedStoreImpl it's hard to test timing stats.
+ * MockIsolatedStatsStore mocks only deliverTimingToSinks for better testing.
+ */
+class MockIsolatedStatsStore : public IsolatedStoreImpl {
+public:
+  MockIsolatedStatsStore();
+  ~MockIsolatedStatsStore();
+
+  MOCK_METHOD2(deliverTimingToSinks, void(const std::string&, std::chrono::milliseconds));
 };
 
 } // Stats

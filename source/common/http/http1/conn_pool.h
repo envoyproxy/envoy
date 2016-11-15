@@ -121,6 +121,7 @@ protected:
   void onResponseComplete(ActiveClient& client);
   void processIdleClient(ActiveClient& client);
 
+  Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
   Upstream::ConstHostPtr host_;
   std::list<ActiveClientPtr> ready_clients_;
