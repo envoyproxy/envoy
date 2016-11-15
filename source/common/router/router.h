@@ -9,7 +9,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
-#include "common/http/pooled_stream_encoder.h"
 
 namespace Router {
 
@@ -99,7 +98,10 @@ typedef std::shared_ptr<FilterConfig> FilterConfigPtr;
  */
 class Filter : Logger::Loggable<Logger::Id::router>, public Http::StreamDecoderFilter {
 public:
-  Filter(FilterConfig& config);
+  Filter(FilterConfig& config)
+      : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
+        do_shadowing_(false) {}
+
   ~Filter();
 
   // Http::StreamDecoderFilter
@@ -114,12 +116,24 @@ public:
 private:
   struct UpstreamRequest : public Http::StreamDecoder,
                            public Http::StreamCallbacks,
-                           public Http::PooledStreamEncoderCallbacks {
-    UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool);
+                           public Http::ConnectionPool::Callbacks {
+    UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
+        : parent_(parent), conn_pool_(pool), calling_encode_headers_(false),
+          upstream_canary_(false), encode_complete_(false), encode_trailers_(false) {}
+
     ~UpstreamRequest();
 
+    void encodeHeaders(bool end_stream);
+    void encodeData(Buffer::Instance& data, bool end_stream);
+    void encodeTrailers(const Http::HeaderMap& trailers);
+    void resetStream();
     void setupPerTryTimeout();
     void onPerTryTimeout();
+
+    void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) {
+      parent_.upstream_host_ = host;
+      parent_.callbacks_->requestInfo().onUpstreamHostSelected(host);
+    }
 
     // Http::StreamDecoder
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
@@ -129,16 +143,24 @@ private:
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason) override;
 
-    // Http::PooledStreamEncoderCallbacks
-    void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override {
-      parent_.upstream_host_ = host;
-      parent_.callbacks_->requestInfo().onUpstreamHostSelected(host);
-    }
+    // Http::ConnectionPool::Callbacks
+    void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+                       Upstream::HostDescriptionPtr host) override;
+    void onPoolReady(Http::StreamEncoder& request_encoder,
+                     Upstream::HostDescriptionPtr host) override;
 
     Filter& parent_;
-    Http::PooledStreamEncoderPtr upstream_encoder_;
-    bool upstream_canary_{};
+    Http::ConnectionPool::Instance& conn_pool_;
     Event::TimerPtr per_try_timeout_;
+    Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
+    Http::StreamEncoder* request_encoder_{};
+    Optional<Http::StreamResetReason> deferred_reset_reason_;
+    Buffer::InstancePtr buffered_request_body_;
+
+    bool calling_encode_headers_ : 1;
+    bool upstream_canary_ : 1;
+    bool encode_complete_ : 1;
+    bool encode_trailers_ : 1;
   };
 
   typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;
@@ -179,16 +201,18 @@ private:
   const Upstream::Cluster* cluster_;
   std::list<std::string> alt_stat_prefixes_;
   const VirtualCluster* request_vcluster_;
-  bool downstream_response_started_{};
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
   UpstreamRequestPtr upstream_request_;
   RetryStatePtr retry_state_;
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
-  bool downstream_end_stream_{};
-  bool do_shadowing_{};
   Upstream::HostDescriptionPtr upstream_host_;
+  SystemTime downstream_request_complete_time_;
+
+  bool downstream_response_started_ : 1;
+  bool downstream_end_stream_ : 1;
+  bool do_shadowing_ : 1;
 };
 
 class ProdFilter : public Filter {
