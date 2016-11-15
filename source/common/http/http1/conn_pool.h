@@ -36,39 +36,30 @@ public:
 protected:
   struct ActiveClient;
 
-  struct RequestEncoderWrapper : public StreamEncoderWrapper, public StreamCallbacks {
-    RequestEncoderWrapper(StreamEncoder& inner, ActiveClient& parent)
-        : StreamEncoderWrapper(inner), parent_(parent) {
-      inner.getStream().addCallbacks(*this);
-    }
+  struct StreamWrapper : public StreamEncoderWrapper,
+                         public StreamDecoderWrapper,
+                         public StreamCallbacks {
+    StreamWrapper(StreamDecoder& response_decoder, ActiveClient& parent);
+    ~StreamWrapper();
 
     // StreamEncoderWrapper
     void onEncodeComplete() override;
-
-    // Http::StreamCallbacks
-    void onResetStream(StreamResetReason) override { parent_.parent_.onDownstreamReset(parent_); }
-
-    ActiveClient& parent_;
-    bool encode_complete_{};
-  };
-
-  typedef std::unique_ptr<RequestEncoderWrapper> RequestEncoderWrapperPtr;
-
-  struct ResponseDecoderWrapper : public StreamDecoderWrapper {
-    ResponseDecoderWrapper(StreamDecoder& inner, ActiveClient& parent);
-    ~ResponseDecoderWrapper();
 
     // StreamDecoderWrapper
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void onPreDecodeComplete() override {}
     void onDecodeComplete() override;
 
+    // Http::StreamCallbacks
+    void onResetStream(StreamResetReason) override { parent_.parent_.onDownstreamReset(parent_); }
+
     ActiveClient& parent_;
+    bool encode_complete_{};
     bool saw_close_header_{};
-    bool complete_{};
+    bool decode_complete_{};
   };
 
-  typedef std::unique_ptr<ResponseDecoderWrapper> ResponseDecoderWrapperPtr;
+  typedef std::unique_ptr<StreamWrapper> StreamWrapperPtr;
 
   struct ActiveClient : LinkedObject<ActiveClient>,
                         public Network::ConnectionCallbacks,
@@ -86,8 +77,7 @@ protected:
     ConnPoolImpl& parent_;
     CodecClientPtr codec_client_;
     Upstream::HostDescriptionPtr real_host_description_;
-    RequestEncoderWrapperPtr request_encoder_;
-    ResponseDecoderWrapperPtr response_decoder_;
+    StreamWrapperPtr stream_wrapper_;
     Event::TimerPtr connect_timer_;
     Stats::TimespanPtr conn_length_;
     uint64_t remaining_requests_;

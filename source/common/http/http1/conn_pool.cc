@@ -36,12 +36,9 @@ void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
 
 void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) {
-  ASSERT(!client.request_encoder_);
-  ASSERT(!client.response_decoder_)
-  client.response_decoder_.reset(new ResponseDecoderWrapper(response_decoder, client));
-  client.request_encoder_.reset(new RequestEncoderWrapper(
-      client.codec_client_->newStream(*client.response_decoder_), client));
-  callbacks.onPoolReady(*client.request_encoder_, client.real_host_description_);
+  ASSERT(!client.stream_wrapper_);
+  client.stream_wrapper_.reset(new StreamWrapper(response_decoder, client));
+  callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_);
 }
 
 void ConnPoolImpl::checkForDrained() {
@@ -102,8 +99,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, uint32_t events) {
     conn_log_debug("client disconnected", *client.codec_client_);
     ActiveClientPtr removed;
     bool check_for_drained = true;
-    if (client.response_decoder_) {
-      if (!client.response_decoder_->complete_) {
+    if (client.stream_wrapper_) {
+      if (!client.stream_wrapper_->decode_complete_) {
         if (events & Network::ConnectionEvent::LocalClose) {
           host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
         }
@@ -179,10 +176,10 @@ void ConnPoolImpl::onPendingRequestCancel(PendingRequest& request) {
 
 void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   conn_log_debug("response complete", *client.codec_client_);
-  if (!client.request_encoder_->encode_complete_) {
+  if (!client.stream_wrapper_->encode_complete_) {
     conn_log_debug("response before request complete", *client.codec_client_);
     onDownstreamReset(client);
-  } else if (client.response_decoder_->saw_close_header_) {
+  } else if (client.stream_wrapper_->saw_close_header_) {
     conn_log_debug("saw upstream connection: close", *client.codec_client_);
     onDownstreamReset(client);
   } else if (client.remaining_requests_ > 0 && --client.remaining_requests_ == 0) {
@@ -195,8 +192,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
 }
 
 void ConnPoolImpl::processIdleClient(ActiveClient& client) {
-  client.request_encoder_.reset();
-  client.response_decoder_.reset();
+  client.stream_wrapper_.reset();
   if (pending_requests_.empty()) {
     // There is nothing to service so just move the connection into the ready list.
     conn_log_debug("moving to ready", *client.codec_client_);
@@ -213,23 +209,25 @@ void ConnPoolImpl::processIdleClient(ActiveClient& client) {
   checkForDrained();
 }
 
-void ConnPoolImpl::RequestEncoderWrapper::onEncodeComplete() { encode_complete_ = true; }
+ConnPoolImpl::StreamWrapper::StreamWrapper(StreamDecoder& response_decoder, ActiveClient& parent)
+    : StreamEncoderWrapper(parent.codec_client_->newStream(*this)),
+      StreamDecoderWrapper(response_decoder), parent_(parent) {
 
-ConnPoolImpl::ResponseDecoderWrapper::ResponseDecoderWrapper(StreamDecoder& inner,
-                                                             ActiveClient& parent)
-    : StreamDecoderWrapper(inner), parent_(parent) {
+  StreamEncoderWrapper::inner_.getStream().addCallbacks(*this);
   parent_.parent_.host_->cluster().stats().upstream_rq_total_.inc();
   parent_.parent_.host_->cluster().stats().upstream_rq_active_.inc();
   parent_.parent_.host_->stats().rq_total_.inc();
   parent_.parent_.host_->stats().rq_active_.inc();
 }
 
-ConnPoolImpl::ResponseDecoderWrapper::~ResponseDecoderWrapper() {
+ConnPoolImpl::StreamWrapper::~StreamWrapper() {
   parent_.parent_.host_->cluster().stats().upstream_rq_active_.dec();
   parent_.parent_.host_->stats().rq_active_.dec();
 }
 
-void ConnPoolImpl::ResponseDecoderWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
+void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
+
+void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   if (headers->Connection() &&
       0 == StringUtil::caseInsensitiveCompare(headers->Connection()->value().c_str(),
                                               Headers::get().ConnectionValues.Close.c_str())) {
@@ -240,8 +238,8 @@ void ConnPoolImpl::ResponseDecoderWrapper::decodeHeaders(HeaderMapPtr&& headers,
   StreamDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
 
-void ConnPoolImpl::ResponseDecoderWrapper::onDecodeComplete() {
-  complete_ = parent_.request_encoder_->encode_complete_;
+void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
+  decode_complete_ = encode_complete_;
   parent_.parent_.onResponseComplete(parent_);
 }
 

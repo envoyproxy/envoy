@@ -24,10 +24,11 @@ public:
 
 private:
   struct ThreadLocalData {
-    std::map<uint32_t, ThreadLocalObjectPtr> data_;
+    std::vector<ThreadLocalObjectPtr> data_;
   };
 
   void reset();
+  static void setThreadLocal(uint32_t index, ThreadLocalObjectPtr object);
 
   static std::atomic<uint32_t> next_slot_id_;
   static thread_local ThreadLocalData thread_local_data_;

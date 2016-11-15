@@ -34,10 +34,9 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
   }
 }
 
-Http::StreamEncoder& CodecClient::newStream(Http::StreamDecoder& response_decoder) {
-  ActiveRequestPtr request(new ActiveRequest(*this));
-  request->decoder_wrapper_.reset(new ResponseDecoderWrapper(response_decoder, *request));
-  request->encoder_ = &codec_->newStream(*request->decoder_wrapper_);
+StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
+  ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
+  request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
   request->moveIntoList(std::move(request), active_requests_);
   return *active_requests_.front()->encoder_;
@@ -79,7 +78,7 @@ void CodecClient::responseDecodeComplete(ActiveRequest& request) {
   request.encoder_->getStream().removeCallbacks(request);
 }
 
-void CodecClient::onReset(ActiveRequest& request, Http::StreamResetReason reason) {
+void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
   conn_log_debug("request reset", *connection_);
   if (codec_client_callbacks_) {
     codec_client_callbacks_->onStreamReset(reason);
@@ -102,7 +101,7 @@ void CodecClient::onData(Buffer::Instance& data) {
 
     // Don't count 408 responses where we have no active requests as protocol errors
     if (!active_requests_.empty() ||
-        Utility::getResponseStatus(e.headers()) != enumToInt(Http::Code::RequestTimeout)) {
+        Utility::getResponseStatus(e.headers()) != enumToInt(Code::RequestTimeout)) {
       protocol_error = true;
     }
   }
@@ -118,11 +117,11 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     : CodecClient(type, std::move(connection), stats) {
   switch (type) {
   case Type::HTTP1: {
-    codec_.reset(new Http::Http1::ClientConnectionImpl(*connection_, *this));
+    codec_.reset(new Http1::ClientConnectionImpl(*connection_, *this));
     break;
   }
   case Type::HTTP2: {
-    codec_.reset(new Http::Http2::ClientConnectionImpl(*connection_, *this, store, codec_options));
+    codec_.reset(new Http2::ClientConnectionImpl(*connection_, *this, store, codec_options));
     break;
   }
   }
