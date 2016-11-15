@@ -133,7 +133,6 @@ TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
   InSequence s;
 
   expectClientCreate();
-
   ActiveTestRequest r1(*this, 0);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
   r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
