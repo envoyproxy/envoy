@@ -37,23 +37,20 @@ struct FaultFilterHeaders {
  * Configuration for the fault filter.
  */
 struct FaultFilterConfig {
-  FaultFilterConfig(const std::string& stat_prefix, Stats::Store& stats,
-                    Runtime::RandomGenerator& random, uint64_t abort_code, uint64_t abort_enabled,
-                    uint64_t delay_enabled, std::chrono::milliseconds delay_duration,
-                    std::vector<FaultFilterHeaders> fault_filter_headers)
-      : random_(random), modulo_base_(100), abort_code_(abort_code), abort_enabled_(abort_enabled),
-        delay_enabled_(delay_enabled), delay_duration_(delay_duration),
-        fault_filter_headers_(fault_filter_headers),
-        stats_{ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))} {}
+  FaultFilterConfig(uint64_t abort_enabled, uint64_t abort_code, uint64_t delay_enabled,
+                    uint64_t delay_duration, std::vector<FaultFilterHeaders> fault_filter_headers,
+                    Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Store& stats)
+      : abort_enabled_(abort_enabled), abort_code_(abort_code), delay_enabled_(delay_enabled),
+        delay_duration_(delay_duration), fault_filter_headers_(fault_filter_headers),
+        runtime_(runtime), stats_{ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))} {
+  }
 
-  Runtime::RandomGenerator& random_;
-  uint64_t modulo_base_; // % of traffic to inject faults on, in increments of 1%. Hardcoded to 100,
-                         // until we need higher precision.
-  uint64_t abort_code_;  // HTTP or gRPC return codes
-  uint64_t abort_enabled_;                   // 0-100
-  uint64_t delay_enabled_;                   // 0-100
-  std::chrono::milliseconds delay_duration_; // in milliseconds
+  uint64_t abort_enabled_;  // 0-100
+  uint64_t abort_code_;     // HTTP or gRPC return codes
+  uint64_t delay_enabled_;  // 0-100
+  uint64_t delay_duration_; // in milliseconds
   std::vector<FaultFilterHeaders> fault_filter_headers_;
+  Runtime::Loader& runtime_;
   FaultFilterStats stats_;
 };
 
