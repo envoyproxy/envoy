@@ -251,7 +251,7 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag("response code", buildResponseCode(request_info)),
        lightstep::SetTag("request size", request_info.bytesReceived()),
        lightstep::SetTag("response size", request_info.bytesSent()),
-       lightstep::SetTag("host header", request_headers.Host()->value().c_str(),
+       lightstep::SetTag("host header", request_headers.Host()->value().c_str()),
        lightstep::SetTag("downstream cluster",
                          valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-")),
        lightstep::SetTag("user agent", valueOrDefault(request_headers.UserAgent(), "-")),
