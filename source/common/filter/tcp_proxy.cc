@@ -89,7 +89,8 @@ void TcpProxy::initializeUpstreamConnection() {
 void TcpProxy::onConnectTimeout() {
   conn_log_debug("connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
-  upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
+
+  // This will close the upstream connection as well.
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -113,7 +114,9 @@ void TcpProxy::onDownstreamBufferChange(Network::ConnectionBufferType type, uint
 }
 
 void TcpProxy::onDownstreamEvent(uint32_t event) {
-  if (event & Network::ConnectionEvent::RemoteClose && upstream_connection_) {
+  if ((event & Network::ConnectionEvent::RemoteClose ||
+       event & Network::ConnectionEvent::LocalClose) &&
+      upstream_connection_) {
     // TODO: If we close without flushing here we may drop some data. The downstream connection
     //       is about to go away. So to support this we need to either have a way for the downstream
     //       connection to stick around, or, we need to be able to pass this connection to a flush
