@@ -96,7 +96,7 @@ TEST_F(TcpProxyTest, UpstreamDisconnect) {
   upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(TcpProxyTest, DowntsreamDisconnectRemote) {
+TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
   setup(true);
 
   Buffer::OwnedImpl buffer("hello");
@@ -114,7 +114,7 @@ TEST_F(TcpProxyTest, DowntsreamDisconnectRemote) {
   filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(TcpProxyTest, DowntsreamDisconnectLocal) {
+TEST_F(TcpProxyTest, DownstreamDisconnectLocal) {
   setup(true);
 
   Buffer::OwnedImpl buffer("hello");
