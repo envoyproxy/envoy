@@ -7,26 +7,24 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/router/config_impl.h"
 
 namespace Http {
+
 FaultFilter::FaultFilter(FaultFilterConfigPtr config) : config_(config) {}
 
 FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 
-/**
- * Delays and aborts are independent events. One can inject a delay
- * followed by an abort or inject just a delay or abort. In this callback,
- * if we inject a delay, then we will inject the abort in the delay timer
- * callback.
- */
+// Delays and aborts are independent events. One can inject a delay
+// followed by an abort or inject just a delay or abort. In this callback,
+// if we inject a delay, then we will inject the abort in the delay timer
+// callback.
 FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
   // Check for header matches first
-  if (!matches(headers)) {
+  if (!Router::ConfigUtility::matchHeaders(headers, config_->fault_filter_headers_)) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -40,8 +38,8 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
   } else if (config_->runtime_.snapshot().featureEnabled("fault.http.abort_enabled",
                                                          config_->abort_enabled_)) {
     Http::HeaderMapPtr response_headers{new HeaderMapImpl{
-        {Headers::get().Status, std::to_string(enumToInt(config_->runtime_.snapshot().getInteger(
-                                    "fault.http.abort_code", config_->abort_code_)))}}};
+        {Headers::get().Status, std::to_string(config_->runtime_.snapshot().getInteger(
+                                    "fault.http.abort_code", config_->abort_code_))}}};
     callbacks_->encodeHeaders(std::move(response_headers), true);
     config_->stats_.aborts_injected_.inc();
     return FilterHeadersStatus::StopIteration;
@@ -67,26 +65,6 @@ FaultFilterStats FaultFilter::generateStats(const std::string& prefix, Stats::St
   return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
 }
 
-// header match semantics in fault filter works is same as the one in route block
-bool FaultFilter::matches(const Http::HeaderMap& headers) const {
-  bool matches = true;
-
-  if (!config_->fault_filter_headers_.empty()) {
-    for (const FaultFilterHeaders& header_data : config_->fault_filter_headers_) {
-      if (header_data.value_ == EMPTY_STRING) {
-        matches &= headers.has(header_data.name_);
-      } else {
-        matches &= (headers.get(header_data.name_) == header_data.value_);
-      }
-      if (!matches) {
-        break;
-      }
-    }
-  }
-
-  return matches;
-}
-
 void FaultFilter::onResetStream() { resetInternalState(); }
 
 void FaultFilter::postDelayInjection() {
@@ -96,8 +74,8 @@ void FaultFilter::postDelayInjection() {
   if (config_->runtime_.snapshot().featureEnabled("fault.http.abort_enabled",
                                                   config_->abort_enabled_)) {
     Http::HeaderMapPtr response_headers{new HeaderMapImpl{
-        {Headers::get().Status, std::to_string(enumToInt(config_->runtime_.snapshot().getInteger(
-                                    "fault.http.abort_code", config_->abort_code_)))}}};
+        {Headers::get().Status, std::to_string(config_->runtime_.snapshot().getInteger(
+                                    "fault.http.abort_code", config_->abort_code_))}}};
     config_->stats_.aborts_injected_.inc();
     callbacks_->encodeHeaders(std::move(response_headers), true);
   } else {
@@ -117,4 +95,5 @@ void FaultFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callba
   callbacks_ = &callbacks;
   callbacks_->addResetStreamCallback([this]() -> void { onResetStream(); });
 }
+
 } // Http

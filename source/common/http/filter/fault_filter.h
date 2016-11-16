@@ -4,6 +4,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/router/config_impl.h"
+
 namespace Http {
 
 /**
@@ -23,22 +25,12 @@ struct FaultFilterStats {
 };
 
 /**
- * HTTP request headers.
- */
-struct FaultFilterHeaders {
-  FaultFilterHeaders(const Http::LowerCaseString& name, const std::string& value)
-      : name_(name), value_(value) {}
-
-  const Http::LowerCaseString name_;
-  const std::string value_;
-};
-
-/**
  * Configuration for the fault filter.
  */
 struct FaultFilterConfig {
   FaultFilterConfig(uint64_t abort_enabled, uint64_t abort_code, uint64_t delay_enabled,
-                    uint64_t delay_duration, std::vector<FaultFilterHeaders> fault_filter_headers,
+                    uint64_t delay_duration,
+                    const std::vector<Router::ConfigUtility::HeaderData> fault_filter_headers,
                     Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Store& stats)
       : abort_enabled_(abort_enabled), abort_code_(abort_code), delay_enabled_(delay_enabled),
         delay_duration_(delay_duration), fault_filter_headers_(fault_filter_headers),
@@ -49,7 +41,7 @@ struct FaultFilterConfig {
   uint64_t abort_code_;     // HTTP or gRPC return codes
   uint64_t delay_enabled_;  // 0-100
   uint64_t delay_duration_; // in milliseconds
-  std::vector<FaultFilterHeaders> fault_filter_headers_;
+  const std::vector<Router::ConfigUtility::HeaderData> fault_filter_headers_;
   Runtime::Loader& runtime_;
   FaultFilterStats stats_;
 };
@@ -75,10 +67,10 @@ private:
   void onResetStream();
   void resetInternalState();
   void postDelayInjection();
-  bool matches(const Http::HeaderMap& headers) const;
 
   FaultFilterConfigPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr delay_timer_;
 };
+
 } // Http

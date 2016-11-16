@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/common/optional.h"
-#include "envoy/upstream/cluster_manager.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/json/json_loader.h"
 
@@ -39,14 +39,32 @@ public:
 };
 
 /**
- * Utility routines for loading route configuration.
+ * Utility routines for loading route configuration and matching runtime request headers.
  */
 class ConfigUtility {
 public:
+  struct HeaderData {
+    HeaderData(const Http::LowerCaseString& name, const std::string& value)
+        : name_(name), value_(value) {}
+
+    const Http::LowerCaseString name_;
+    const std::string value_;
+  };
+
   /**
    * @return the resource priority parsed from JSON.
    */
   static Upstream::ResourcePriority parsePriority(const Json::Object& config);
+
+  /**
+   * See if the specified headers are present in the request headers.
+   * @param headers supplies the list of headers to match
+   * @param request_headers supplies the list of request headers to compare against search_list
+   * @return true all the headers (and values) in the search_list set are found in the
+   * request_headers
+   */
+  static bool matchHeaders(const Http::HeaderMap& headers,
+                           const std::vector<HeaderData> request_headers);
 };
 
 /**
@@ -194,14 +212,6 @@ private:
     uint64_t default_;
   };
 
-  struct HeaderData {
-    HeaderData(const Http::LowerCaseString& name, const std::string& value)
-        : name_(name), value_(value) {}
-
-    const Http::LowerCaseString name_;
-    const std::string value_;
-  };
-
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
 
   // Default timeout is 15s if nothing is specified in the route config.
@@ -218,7 +228,7 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
-  std::vector<HeaderData> config_headers_;
+  std::vector<ConfigUtility::HeaderData> config_headers_;
 };
 
 /**

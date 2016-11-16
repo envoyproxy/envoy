@@ -3,6 +3,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/http/filter/fault_filter.h"
+#include "common/router/config_impl.h"
 #include "server/config/network/http_connection_manager.h"
 
 namespace Server {
@@ -21,13 +22,12 @@ public:
       return nullptr;
     }
 
-    /**
-     * TODO: Throw error if invalid return code is provided
-     */
+    // TODO: Throw error if invalid return code is provided
     uint64_t delay_duration = static_cast<uint64_t>(json_config.getInteger("delay_duration", 0));
     uint64_t delay_enabled = static_cast<uint64_t>(json_config.getInteger("delay_enabled", 0));
     uint64_t abort_code = static_cast<uint64_t>(json_config.getInteger("abort_code", 0));
     uint64_t abort_enabled = static_cast<uint64_t>(json_config.getInteger("abort_enabled", 0));
+
     if (delay_enabled > 0) {
       if (delay_enabled > 100) {
         throw EnvoyException("delay_enabled cannot be greater than 100");
@@ -43,7 +43,7 @@ public:
       }
     }
 
-    std::vector<Http::FaultFilterHeaders> fault_filter_headers;
+    std::vector<Router::ConfigUtility::HeaderData> fault_filter_headers;
     if (json_config.hasObject("headers")) {
       std::vector<Json::Object> config_headers = json_config.getObjectArray("headers");
       for (const Json::Object& header_map : config_headers) {

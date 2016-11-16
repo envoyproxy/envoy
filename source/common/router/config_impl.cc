@@ -48,6 +48,27 @@ Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& conf
   }
 }
 
+bool ConfigUtility::matchHeaders(const Http::HeaderMap& headers,
+                                 const std::vector<HeaderData> request_headers) {
+  bool matches = true;
+
+  if (!request_headers.empty()) {
+    for (const HeaderData& header_data : request_headers) {
+      const Http::HeaderEntry* header = headers.get(header_data.name_);
+      if (header_data.value_ == EMPTY_STRING) {
+        matches &= (header != nullptr);
+      } else {
+        matches &= (header != nullptr) && (header->value() == header_data.value_.c_str());
+      }
+      if (!matches) {
+        break;
+      }
+    }
+  }
+
+  return matches;
+}
+
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Object& route,
                                        Runtime::Loader& loader)
     : case_sensitive_(route.getBoolean("case_sensitive", true)),
@@ -84,19 +105,7 @@ bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random
                                                  random_value);
   }
 
-  if (!config_headers_.empty()) {
-    for (const HeaderData& header_data : config_headers_) {
-      const Http::HeaderEntry* header = headers.get(header_data.name_);
-      if (header_data.value_ == EMPTY_STRING) {
-        matches &= (header != nullptr);
-      } else {
-        matches &= (header != nullptr) && (header->value() == header_data.value_.c_str());
-      }
-      if (!matches) {
-        break;
-      }
-    }
-  }
+  matches &= ConfigUtility::matchHeaders(headers, config_headers_);
 
   return matches;
 }
