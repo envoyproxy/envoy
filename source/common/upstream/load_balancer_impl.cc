@@ -32,6 +32,7 @@ void LoadBalancerBase::regenerateZoneRoutingStructures() {
   // Do not perform any calculations if we cannot perform zone routing based on non runtime params.
   if (earlyExitNonZoneRouting()) {
     zone_routing_state_ = ZoneRoutingState::NoZoneRouting;
+    return;
   }
 
   size_t num_zones = host_set_.healthyHostsPerZone().size();
