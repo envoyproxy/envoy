@@ -305,4 +305,12 @@ TEST(HeaderMapImplTest, Equality) {
   EXPECT_FALSE(headers1 == headers2);
 }
 
+TEST(HeaderMapImplTest, LargeCharInHeader) {
+  HeaderMapImpl headers;
+  LowerCaseString static_key("\x90hello");
+  std::string static_value("value");
+  headers.addStatic(static_key, static_value);
+  EXPECT_STREQ("value", headers.get(static_key)->value().c_str());
+}
+
 } // Http

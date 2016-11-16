@@ -206,12 +206,12 @@ HeaderMapImpl::StaticLookupTable::StaticLookupTable() {
 
 void HeaderMapImpl::StaticLookupTable::add(const char* key, StaticLookupEntry::EntryCb cb) {
   StaticLookupEntry* current = &root_;
-  while (*key) {
-    if (!current->entries_[*key]) {
-      current->entries_[*key].reset(new StaticLookupEntry());
+  while (uint8_t c = *key) {
+    if (!current->entries_[c]) {
+      current->entries_[c].reset(new StaticLookupEntry());
     }
 
-    current = current->entries_[*key].get();
+    current = current->entries_[c].get();
     key++;
   }
 
@@ -221,7 +221,7 @@ void HeaderMapImpl::StaticLookupTable::add(const char* key, StaticLookupEntry::E
 HeaderMapImpl::StaticLookupEntry::EntryCb
 HeaderMapImpl::StaticLookupTable::find(const char* key) const {
   const StaticLookupEntry* current = &root_;
-  while (char c = *key) {
+  while (uint8_t c = *key) {
     current = current->entries_[c].get();
     if (current) {
       key++;
