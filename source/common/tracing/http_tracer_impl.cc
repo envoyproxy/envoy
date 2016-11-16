@@ -246,17 +246,16 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
   lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
       tracing_context.operationName(),
       {lightstep::StartTimestamp(request_info.startTime()),
-       lightstep::SetTag("guid:x-request-id", request_headers.get(Http::Headers::get().RequestId)),
+       lightstep::SetTag("guid:x-request-id", request_headers.RequestId()->value().c_str()),
        lightstep::SetTag("request line", buildRequestLine(request_headers, request_info)),
        lightstep::SetTag("response code", buildResponseCode(request_info)),
        lightstep::SetTag("request size", request_info.bytesReceived()),
        lightstep::SetTag("response size", request_info.bytesSent()),
-       lightstep::SetTag("host header", request_headers.get(Http::Headers::get().Host)),
+       lightstep::SetTag("host header", valueOrDefault(request_headers.Host(), "-")),
        lightstep::SetTag("downstream cluster",
                          valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-")),
        lightstep::SetTag("user agent", valueOrDefault(request_headers.UserAgent(), "-")),
-       lightstep::SetTag("node id", service_node_),
-       lightstep::SetTag("x-request-id", request_headers.RequestId()->value().c_str())});
+       lightstep::SetTag("node id", service_node_)});
 
   if (request_info.responseCode().valid() &&
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {
