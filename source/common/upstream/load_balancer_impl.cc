@@ -30,16 +30,17 @@ void LoadBalancerBase::regenerateZoneRoutingStructures() {
   stats_.lb_recalculate_zone_structures_.inc();
 
   early_exit_zone_routing_ = earlyExitNonZoneRouting();
+  // Do not perform any calculations if we cannot perform zone routing based on non runtime params.
   if (early_exit_zone_routing_) {
     return;
   }
 
-  size_t upstream_num_zones = host_set_.healthyHostsPerZone().size();
+  size_t num_zones = host_set_.healthyHostsPerZone().size();
 
-  uint64_t local_percentage[upstream_num_zones];
+  uint64_t local_percentage[num_zones];
   calculateZonePercentage(local_host_set_->healthyHostsPerZone(), local_percentage);
 
-  uint64_t upstream_percentage[upstream_num_zones];
+  uint64_t upstream_percentage[num_zones];
   calculateZonePercentage(host_set_.healthyHostsPerZone(), upstream_percentage);
 
   // If we have lower percent of hosts in the local cluster in the same zone,
@@ -69,11 +70,11 @@ void LoadBalancerBase::regenerateZoneRoutingStructures() {
   // residual_capacity: 0 10000 15000
   // Now to find a zone to route (bucket) we could simply iterate over residual_capacity searching
   // where sampled value is placed.
-  residual_capacity_.resize(upstream_num_zones);
+  residual_capacity_.resize(num_zones);
 
   // Local zone (index 0) does not have residual capacity as we have routed all we could.
   residual_capacity_[0] = 0;
-  for (size_t i = 1; i < upstream_num_zones; ++i) {
+  for (size_t i = 1; i < num_zones; ++i) {
     // Only route to the zones that have additional capacity.
     if (upstream_percentage[i] > local_percentage[i]) {
       residual_capacity_[i] =
