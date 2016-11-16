@@ -12,9 +12,7 @@ namespace Upstream {
 class LoadBalancerBase {
 protected:
   LoadBalancerBase(const HostSet& host_set, const HostSet* local_host_set, ClusterStats& stats,
-                   Runtime::Loader& runtime, Runtime::RandomGenerator& random)
-      : stats_(stats), runtime_(runtime), random_(random), host_set_(host_set),
-        local_host_set_(local_host_set) {}
+                   Runtime::Loader& runtime, Runtime::RandomGenerator& random);
 
   /**
    * Pick the host list to use (healthy or all depending on how many in the set are not healthy).
@@ -27,9 +25,15 @@ protected:
 
 private:
   /*
-   * @return decision on quick exit from zone aware host selection.
+   * @return decision on quick exit from zone aware based on cluster configurations or other non
+   * runtime params.
    */
   bool earlyExitNonZoneRouting();
+
+  /*
+   * @return decision on quick exit from zone aware routing based on runtime params.
+   */
+  bool earlyExitNonZoneRoutingRuntime();
 
   /**
    * For the given host_set it @return if we should be in a panic mode or not.
@@ -51,8 +55,18 @@ private:
   void calculateZonePercentage(const std::vector<std::vector<HostPtr>>& hosts_per_zone,
                                uint64_t* ret);
 
+  /**
+   * Regenerate zone aware routing structures for fast decisions on upstream zone selection.
+   */
+  void regenerateZoneRoutingStructures();
+
   const HostSet& host_set_;
   const HostSet* local_host_set_;
+
+  bool early_exit_zone_routing_;
+  uint64_t local_percent_to_route_{};
+  bool route_directly_{};
+  std::vector<uint64_t> residual_capacity_;
 };
 
 /**

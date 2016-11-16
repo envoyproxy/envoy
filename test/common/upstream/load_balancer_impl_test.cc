@@ -146,8 +146,7 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .WillOnce(Return(1));
+
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost());
   EXPECT_EQ(1U, stats_.lb_zone_number_differs_.value());
 }
@@ -257,7 +256,7 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .WillOnce(Return(1));
+      .WillRepeatedly(Return(1));
 
   // The following host distribution with current precision should lead to the no_capacity_left
   // situation.
@@ -276,8 +275,6 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
     current[i] = host;
   }
   local_hosts_per_zone->push_back(current);
-  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
-                                    local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
 
   current.resize(44999);
   for (int i = 0; i < 44999; ++i) {
@@ -292,6 +289,10 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   upstream_hosts_per_zone->push_back(current);
 
   cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
+
+  // To trigger update callback.
+  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
+                                    local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
 
   // Force request out of small zone and to randomly select zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));

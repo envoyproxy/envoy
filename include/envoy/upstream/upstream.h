@@ -150,6 +150,7 @@ public:
 #define ALL_CLUSTER_STATS(COUNTER, GAUGE, TIMER)                                                   \
   COUNTER(lb_healthy_panic)                                                                        \
   COUNTER(lb_local_cluster_not_ok)                                                                 \
+  COUNTER(lb_recalculate_zone_structures)                                                          \
   COUNTER(lb_zone_cluster_too_small)                                                               \
   COUNTER(lb_zone_no_capacity_left)                                                                \
   COUNTER(lb_zone_number_differs)                                                                  \
