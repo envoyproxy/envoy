@@ -24,16 +24,13 @@ protected:
   Runtime::RandomGenerator& random_;
 
 private:
+  enum class ZoneRoutingState { NoZoneRouting, ZoneDirect, ZoneResidual };
+
   /*
    * @return decision on quick exit from zone aware routing based on cluster configuration
    * or other non runtime params.
    */
   bool earlyExitNonZoneRouting();
-
-  /*
-   * @return decision on quick exit from zone aware routing based on runtime params.
-   */
-  bool earlyExitNonZoneRoutingRuntime();
 
   /**
    * For the given host_set it @return if we should be in a panic mode or not.
@@ -63,9 +60,8 @@ private:
   const HostSet& host_set_;
   const HostSet* local_host_set_;
 
-  bool early_exit_zone_routing_;
   uint64_t local_percent_to_route_{};
-  bool route_directly_{};
+  ZoneRoutingState zone_routing_state_{ZoneRoutingState::NoZoneRouting};
   std::vector<uint64_t> residual_capacity_;
 };
 

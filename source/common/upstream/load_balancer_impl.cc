@@ -16,7 +16,7 @@ LoadBalancerBase::LoadBalancerBase(const HostSet& host_set, const HostSet* local
                                    ClusterStats& stats, Runtime::Loader& runtime,
                                    Runtime::RandomGenerator& random)
     : stats_(stats), runtime_(runtime), random_(random), host_set_(host_set),
-      local_host_set_(local_host_set), early_exit_zone_routing_(true) {
+      local_host_set_(local_host_set) {
   if (local_host_set_) {
     host_set_.addMemberUpdateCb([this](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
                                     -> void { regenerateZoneRoutingStructures(); });
@@ -29,10 +29,9 @@ LoadBalancerBase::LoadBalancerBase(const HostSet& host_set, const HostSet* local
 void LoadBalancerBase::regenerateZoneRoutingStructures() {
   stats_.lb_recalculate_zone_structures_.inc();
 
-  early_exit_zone_routing_ = earlyExitNonZoneRouting();
   // Do not perform any calculations if we cannot perform zone routing based on non runtime params.
-  if (early_exit_zone_routing_) {
-    return;
+  if (earlyExitNonZoneRouting()) {
+    zone_routing_state_ = ZoneRoutingState::NoZoneRouting;
   }
 
   size_t num_zones = host_set_.healthyHostsPerZone().size();
@@ -45,10 +44,12 @@ void LoadBalancerBase::regenerateZoneRoutingStructures() {
 
   // If we have lower percent of hosts in the local cluster in the same zone,
   // we can push all of the requests directly to upstream cluster in the same zone.
-  if ((route_directly_ = upstream_percentage[0] >= local_percentage[0])) {
+  if (upstream_percentage[0] >= local_percentage[0]) {
+    zone_routing_state_ = ZoneRoutingState::ZoneDirect;
     return;
   }
 
+  zone_routing_state_ = ZoneRoutingState::ZoneResidual;
   // If we cannot route all requests to the same zone, calculate what percentage can be routed.
   // For example, if local percentage is 20% and upstream is 10%
   // we can route only 50% of requests directly.
@@ -86,30 +87,6 @@ void LoadBalancerBase::regenerateZoneRoutingStructures() {
     }
   }
 };
-
-bool LoadBalancerBase::earlyExitNonZoneRoutingRuntime() {
-  // Global kill switch for zone aware routing.
-  if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, 100)) {
-    return true;
-  }
-
-  ASSERT(local_host_set_ != nullptr);
-
-  if (local_host_set_->hosts().empty() || isGlobalPanic(*local_host_set_)) {
-    stats_.lb_local_cluster_not_ok_.inc();
-    return true;
-  }
-
-  // Do not perform zone routing for small clusters.
-  uint64_t min_cluster_size = runtime_.snapshot().getInteger(RuntimeMinClusterSize, 6U);
-
-  if (host_set_.healthyHosts().size() < min_cluster_size) {
-    stats_.lb_zone_cluster_too_small_.inc();
-    return true;
-  }
-
-  return false;
-}
 
 bool LoadBalancerBase::earlyExitNonZoneRouting() {
   uint32_t number_of_zones = host_set_.healthyHostsPerZone().size();
@@ -161,6 +138,8 @@ void LoadBalancerBase::calculateZonePercentage(
 }
 
 const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
+  ASSERT(zone_routing_state_ != ZoneRoutingState::NoZoneRouting);
+
   // At this point it's guaranteed to be at least 2 zones.
   size_t number_of_zones = host_set_.healthyHostsPerZone().size();
 
@@ -168,7 +147,7 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
   ASSERT(local_host_set_->healthyHostsPerZone().size() == host_set_.healthyHostsPerZone().size());
 
   // Try to push all of the requests to the same zone first.
-  if (route_directly_) {
+  if (zone_routing_state_ == ZoneRoutingState::ZoneDirect) {
     stats_.lb_zone_routing_all_directly_.inc();
     return host_set_.healthyHostsPerZone()[0];
   }
@@ -211,7 +190,24 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.hosts();
   }
 
-  if (early_exit_zone_routing_ || earlyExitNonZoneRoutingRuntime()) {
+  if (zone_routing_state_ == ZoneRoutingState::NoZoneRouting) {
+    return host_set_.healthyHosts();
+  }
+
+  if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, 100)) {
+    return host_set_.healthyHosts();
+  }
+
+  ASSERT(local_host_set_ != nullptr);
+  if (local_host_set_->hosts().empty() || isGlobalPanic(*local_host_set_)) {
+    stats_.lb_local_cluster_not_ok_.inc();
+    return host_set_.healthyHosts();
+  }
+
+  // Do not perform zone routing for small clusters.
+  uint64_t min_cluster_size = runtime_.snapshot().getInteger(RuntimeMinClusterSize, 6U);
+  if (host_set_.healthyHosts().size() < min_cluster_size) {
+    stats_.lb_zone_cluster_too_small_.inc();
     return host_set_.healthyHosts();
   }
 
