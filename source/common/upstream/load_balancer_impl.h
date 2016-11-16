@@ -25,8 +25,8 @@ protected:
 
 private:
   /*
-   * @return decision on quick exit from zone aware based on cluster configurations or other non
-   * runtime params.
+   * @return decision on quick exit from zone aware routing based on cluster
+   * configuration or other non runtime params.
    */
   bool earlyExitNonZoneRouting();
 

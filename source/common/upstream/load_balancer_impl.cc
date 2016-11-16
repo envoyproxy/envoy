@@ -172,9 +172,8 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
     return host_set_.healthyHostsPerZone()[0];
   }
 
-  // If we cannot route all requests to the same zone, we already have a value of how much we can
-  // push to
-  // the local zone, check if we can push to local zone on current iteration.
+  // If we cannot route all requests to the same zone, we already calculated how much we can
+  // push to the local zone, check if we can push to local zone on current iteration.
   if (random_.random() % 10000 < local_percent_to_route_) {
     stats_.lb_zone_routing_sampled_.inc();
     return host_set_.healthyHostsPerZone()[0];
