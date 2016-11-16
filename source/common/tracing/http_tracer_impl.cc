@@ -255,8 +255,7 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag("downstream cluster",
                          valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-")),
        lightstep::SetTag("user agent", valueOrDefault(request_headers.UserAgent(), "-")),
-       lightstep::SetTag("node id", service_node_),
-       lightstep::SetTag("x-request-id", request_headers.RequestId()->value().c_str())});
+       lightstep::SetTag("node id", service_node_)});
 
   if (request_info.responseCode().valid() &&
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {
@@ -268,7 +267,7 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
                 Http::AccessLog::FilterReasonUtils::toShortString(request_info.failureReason()));
   }
 
-  if (request_headers.ClientTraceId()) {
+  if (request_headers.Client_tracerTraceId()) {
     span.SetTag("guid:x-client-trace-id", request_headers.ClientTraceId()->value().c_str());
   }
 
