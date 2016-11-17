@@ -110,16 +110,16 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
       .WillRepeatedly(Return(6));
 
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost());
-  EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
   EXPECT_EQ(cluster_.healthy_hosts_[1], lb_->chooseHost());
-  EXPECT_EQ(2U, stats_.lb_zone_cluster_too_small_.value());
   EXPECT_EQ(cluster_.healthy_hosts_[2], lb_->chooseHost());
-  EXPECT_EQ(3U, stats_.lb_zone_cluster_too_small_.value());
+
+  // Computed once at zone aware struct regeneration point.
+  EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(1));
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
-  EXPECT_EQ(3U, stats_.lb_zone_cluster_too_small_.value());
+  EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
 }
 
 TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {

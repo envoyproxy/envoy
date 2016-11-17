@@ -27,8 +27,8 @@ private:
   enum class ZoneRoutingState { NoZoneRouting, ZoneDirect, ZoneResidual };
 
   /*
-   * @return decision on quick exit from zone aware routing based on cluster configuration
-   * or other non runtime params.
+   * @return decision on quick exit from zone aware routing based on cluster configuration.
+   * This gets recalculated on update callback.
    */
   bool earlyExitNonZoneRouting();
 

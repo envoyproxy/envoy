@@ -90,19 +90,24 @@ void LoadBalancerBase::regenerateZoneRoutingStructures() {
 };
 
 bool LoadBalancerBase::earlyExitNonZoneRouting() {
-  uint32_t number_of_zones = host_set_.healthyHostsPerZone().size();
-  if (number_of_zones < 2) {
+  if (host_set_.healthyHostsPerZone().size() < 2) {
     return true;
   }
 
-  const std::vector<HostPtr>& local_zone_healthy_hosts = host_set_.healthyHostsPerZone()[0];
-  if (local_zone_healthy_hosts.empty()) {
+  if (host_set_.healthyHostsPerZone()[0].empty()) {
     return true;
   }
 
   // Same number of zones should be for local and upstream cluster.
   if (host_set_.healthyHostsPerZone().size() != local_host_set_->healthyHostsPerZone().size()) {
     stats_.lb_zone_number_differs_.inc();
+    return true;
+  }
+
+  // Do not perform zone routing for small clusters.
+  uint64_t min_cluster_size = runtime_.snapshot().getInteger(RuntimeMinClusterSize, 6U);
+  if (host_set_.healthyHosts().size() < min_cluster_size) {
+    stats_.lb_zone_cluster_too_small_.inc();
     return true;
   }
 
@@ -153,6 +158,8 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
     return host_set_.healthyHostsPerZone()[0];
   }
 
+  ASSERT(zone_routing_state_ == ZoneRoutingState::ZoneResidual);
+
   // If we cannot route all requests to the same zone, we already calculated how much we can
   // push to the local zone, check if we can push to local zone on current iteration.
   if (random_.random() % 10000 < local_percent_to_route_) {
@@ -199,16 +206,8 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  ASSERT(local_host_set_ != nullptr);
   if (local_host_set_->hosts().empty() || isGlobalPanic(*local_host_set_)) {
     stats_.lb_local_cluster_not_ok_.inc();
-    return host_set_.healthyHosts();
-  }
-
-  // Do not perform zone routing for small clusters.
-  uint64_t min_cluster_size = runtime_.snapshot().getInteger(RuntimeMinClusterSize, 6U);
-  if (host_set_.healthyHosts().size() < min_cluster_size) {
-    stats_.lb_zone_cluster_too_small_.inc();
     return host_set_.healthyHosts();
   }
 
