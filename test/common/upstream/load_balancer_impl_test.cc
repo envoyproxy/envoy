@@ -113,12 +113,7 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   EXPECT_EQ(cluster_.healthy_hosts_[1], lb_->chooseHost());
   EXPECT_EQ(cluster_.healthy_hosts_[2], lb_->chooseHost());
 
-  // Computed once at zone aware struct regeneration point.
-  EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .WillRepeatedly(Return(1));
-  EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
+  // Cluster size is computed once at zone aware struct regeneration point.
   EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
 }
 
@@ -162,19 +157,18 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
        {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80")},
        {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:82")}}));
 
-  cluster_.healthy_hosts_ = *hosts;
-  cluster_.hosts_ = *hosts;
-  cluster_.healthy_hosts_per_zone_ = *hosts_per_zone;
-  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
-                                    empty_host_vector_, empty_host_vector_);
-
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .Times(2)
       .WillRepeatedly(Return(3));
+
+  cluster_.healthy_hosts_ = *hosts;
+  cluster_.hosts_ = *hosts;
+  cluster_.healthy_hosts_per_zone_ = *hosts_per_zone;
+  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
+                                    empty_host_vector_, empty_host_vector_);
 
   // There is only one host in the given zone for zone aware routing.
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
@@ -213,24 +207,24 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
        {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:1")},
        {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:2")}}));
 
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillRepeatedly(Return(5));
+
   cluster_.healthy_hosts_ = *upstream_hosts;
   cluster_.hosts_ = *upstream_hosts;
   cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
   local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
                                     local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
-      .WillRepeatedly(Return(50));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .Times(2)
-      .WillRepeatedly(Return(5));
-
   // There is only one host in the given zone for zone aware routing.
   EXPECT_CALL(random_, random()).WillOnce(Return(100));
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
   EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
+
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[1][1], lb_->chooseHost());

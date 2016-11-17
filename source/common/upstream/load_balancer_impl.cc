@@ -51,6 +51,7 @@ void LoadBalancerBase::regenerateZoneRoutingStructures() {
   }
 
   zone_routing_state_ = ZoneRoutingState::ZoneResidual;
+  
   // If we cannot route all requests to the same zone, calculate what percentage can be routed.
   // For example, if local percentage is 20% and upstream is 10%
   // we can route only 50% of requests directly.
