@@ -16,7 +16,6 @@ public:
   ~MockConnectionCallbacks();
 
   // Network::ConnectionCallbacks
-  MOCK_METHOD3(onBufferChange, void(ConnectionBufferType type, uint64_t old_size, int64_t delta));
   MOCK_METHOD1(onEvent, void(uint32_t events));
 };
 
@@ -54,6 +53,7 @@ public:
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD0(readEnabled, bool());
   MOCK_METHOD0(remoteAddress, const std::string&());
+  MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(state, State());
   MOCK_METHOD1(write, void(Buffer::Instance& data));
@@ -82,6 +82,7 @@ public:
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD0(readEnabled, bool());
   MOCK_METHOD0(remoteAddress, const std::string&());
+  MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(state, State());
   MOCK_METHOD1(write, void(Buffer::Instance& data));

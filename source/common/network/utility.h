@@ -38,14 +38,6 @@ public:
   static const std::string UNIX_SCHEME;
 
   /**
-   * Update buffering stats for a connection. Meant to be paired with
-   * ConnectionCallbacks::onBufferChange().
-   */
-  static void updateBufferStats(ConnectionBufferType type, int64_t delta, Stats::Counter& rx_total,
-                                Stats::Gauge& rx_buffered, Stats::Counter& tx_total,
-                                Stats::Gauge& tx_buffered);
-
-  /**
    * Resolve a TCP address.
    * @param host supplies the host name.
    * @param port supplies the port.

@@ -70,27 +70,6 @@ bool IpWhiteList::contains(const std::string& remote_address) const {
 const std::string Utility::TCP_SCHEME = "tcp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 
-void Utility::updateBufferStats(ConnectionBufferType type, int64_t delta, Stats::Counter& rx_total,
-                                Stats::Gauge& rx_buffered, Stats::Counter& tx_total,
-                                Stats::Gauge& tx_buffered) {
-  if (type == ConnectionBufferType::Read) {
-    if (delta > 0) {
-      rx_total.add(delta);
-      rx_buffered.add(delta);
-    } else {
-      rx_buffered.sub(std::abs(delta));
-    }
-  } else {
-    ASSERT(type == ConnectionBufferType::Write);
-    if (delta > 0) {
-      tx_total.add(delta);
-      tx_buffered.add(delta);
-    } else {
-      tx_buffered.sub(std::abs(delta));
-    }
-  }
-}
-
 AddrInfoPtr Utility::resolveTCP(const std::string& host, uint32_t port) {
   addrinfo addrinfo_hints;
   memset(&addrinfo_hints, 0, sizeof(addrinfo_hints));

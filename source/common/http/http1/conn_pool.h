@@ -70,8 +70,6 @@ protected:
     void onConnectTimeout();
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType type, uint64_t old_size,
-                        int64_t delta) override;
     void onEvent(uint32_t events) override { parent_.onConnectionEvent(*this, events); }
 
     ConnPoolImpl& parent_;

@@ -226,21 +226,17 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_active_.inc();
   parent_.host_->cluster().stats().upstream_cx_http2_total_.inc();
   conn_length_ = parent_.host_->cluster().stats().upstream_cx_length_ms_.allocateSpan();
+
+  client_->setBufferStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
+                           parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
+                           parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
+                           parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_});
 }
 
 ConnPoolImpl::ActiveClient::~ActiveClient() {
   parent_.host_->stats().cx_active_.dec();
   parent_.host_->cluster().stats().upstream_cx_active_.dec();
   conn_length_->complete();
-}
-
-void ConnPoolImpl::ActiveClient::onBufferChange(Network::ConnectionBufferType type, uint64_t,
-                                                int64_t delta) {
-  Network::Utility::updateBufferStats(
-      type, delta, parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
-      parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
-      parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
-      parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_);
 }
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {

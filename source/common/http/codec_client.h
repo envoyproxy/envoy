@@ -99,6 +99,10 @@ public:
    */
   StreamEncoder& newStream(StreamDecoder& response_decoder);
 
+  void setBufferStats(const Network::Connection::BufferStats& stats) {
+    connection_->setBufferStats(stats);
+  }
+
   void setCodecClientCallbacks(CodecClientCallbacks& callbacks) {
     codec_client_callbacks_ = &callbacks;
   }
@@ -180,7 +184,6 @@ private:
   void onData(Buffer::Instance& data);
 
   // Network::ConnectionCallbacks
-  void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
   void onEvent(uint32_t events) override;
 
   std::list<ActiveRequestPtr> active_requests_;

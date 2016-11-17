@@ -27,8 +27,8 @@ private:
 
   // Network::ConnectionImpl
   void closeSocket(uint32_t close_type) override;
-  PostIoAction doReadFromSocket() override;
-  PostIoAction doWriteToSocket() override;
+  IoResult doReadFromSocket() override;
+  IoResult doWriteToSocket() override;
   void onConnected() override;
 
   ContextImpl& ctx_;

@@ -68,7 +68,6 @@ private:
     ConnectionCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
     void onEvent(uint32_t events) override;
 
     IntegrationCodecClient& parent_;
@@ -113,7 +112,6 @@ private:
     ConnectionCallbacks(IntegrationTcpClient& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
     void onEvent(uint32_t events) override;
 
     // Network::ReadFilter

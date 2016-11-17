@@ -13,13 +13,6 @@ struct RawSlice {
 };
 
 /**
- * Buffer change callback.
- * @param old_size supplies the size of the buffer prior to the change.
- * @param data supplies how much data was added or removed.
- */
-typedef std::function<void(uint64_t old_size, int64_t delta)> Callback;
-
-/**
  * A basic buffer abstraction.
  */
 class Instance {
@@ -117,13 +110,6 @@ public:
    * @return the index where the match starts or -1 if there is no match.
    */
   virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
-
-  /**
-   * Set a buffer change callback. Only a single callback can be set at a time. The callback
-   * is invoked inline with buffer changes.
-   * @param callback supplies the callback to set. Pass nullptr to clear the callback.
-   */
-  virtual void setCallback(Callback callback) PURE;
 
   /**
    * Write the buffer out to a file descriptor.

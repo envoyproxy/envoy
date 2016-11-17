@@ -5,21 +5,58 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/stats/mocks.h"
 
 using testing::_;
 using testing::Sequence;
+using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
+using testing::StrictMock;
 using testing::Test;
 
 namespace Network {
+
+TEST(ConnectionImplUtility, updateBufferStats) {
+  StrictMock<Stats::MockCounter> counter;
+  StrictMock<Stats::MockGauge> gauge;
+  uint64_t previous_total = 0;
+
+  InSequence s;
+  EXPECT_CALL(counter, add(5));
+  EXPECT_CALL(gauge, add(5));
+  ConnectionImplUtility::updateBufferStats(5, 5, previous_total, counter, gauge);
+  EXPECT_EQ(5UL, previous_total);
+
+  EXPECT_CALL(counter, add(1));
+  EXPECT_CALL(gauge, sub(1));
+  ConnectionImplUtility::updateBufferStats(1, 4, previous_total, counter, gauge);
+
+  EXPECT_CALL(gauge, sub(4));
+  ConnectionImplUtility::updateBufferStats(0, 0, previous_total, counter, gauge);
+
+  EXPECT_CALL(counter, add(3));
+  EXPECT_CALL(gauge, add(3));
+  ConnectionImplUtility::updateBufferStats(3, 3, previous_total, counter, gauge);
+}
 
 TEST(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
   EXPECT_DEATH(ConnectionImpl(dispatcher, -1, "127.0.0.1"), ".*assert failure: fd_ != -1.*");
 }
 
-TEST(ConnectionImplTest, BufferCallbacks) {
+struct MockBufferStats {
+  Connection::BufferStats toBufferStats() {
+    return {rx_total_, rx_current_, tx_total_, tx_current_};
+  }
+
+  StrictMock<Stats::MockCounter> rx_total_;
+  StrictMock<Stats::MockGauge> rx_current_;
+  StrictMock<Stats::MockCounter> tx_total_;
+  StrictMock<Stats::MockGauge> tx_current_;
+};
+
+TEST(ConnectionImplTest, BufferStats) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(10000);
@@ -31,6 +68,8 @@ TEST(ConnectionImplTest, BufferCallbacks) {
       dispatcher.createClientConnection("tcp://127.0.0.1:10000");
   MockConnectionCallbacks client_callbacks;
   client_connection->addConnectionCallbacks(client_callbacks);
+  MockBufferStats client_buffer_stats;
+  client_connection->setBufferStats(client_buffer_stats.toBufferStats());
   client_connection->connect();
 
   std::shared_ptr<MockWriteFilter> write_filter(new MockWriteFilter());
@@ -44,24 +83,26 @@ TEST(ConnectionImplTest, BufferCallbacks) {
       .WillOnce(Return(FilterStatus::StopIteration));
   EXPECT_CALL(*write_filter, onWrite(_)).InSequence(s1).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*filter, onWrite(_)).InSequence(s1).WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(client_callbacks, onBufferChange(ConnectionBufferType::Write, 0, 4)).InSequence(s1);
   EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::Connected)).InSequence(s1);
-  EXPECT_CALL(client_callbacks, onBufferChange(ConnectionBufferType::Write, 4, -4)).InSequence(s1);
+  EXPECT_CALL(client_buffer_stats.tx_total_, add(4)).InSequence(s1);
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_callbacks;
+  MockBufferStats server_buffer_stats;
   std::shared_ptr<MockReadFilter> read_filter(new MockReadFilter());
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         server_connection = std::move(conn);
         server_connection->addConnectionCallbacks(server_callbacks);
+        server_connection->setBufferStats(server_buffer_stats.toBufferStats());
         server_connection->addReadFilter(read_filter);
         EXPECT_EQ("", server_connection->nextProtocol());
       }));
 
   Sequence s2;
-  EXPECT_CALL(server_callbacks, onBufferChange(ConnectionBufferType::Read, 0, 4)).InSequence(s2);
-  EXPECT_CALL(server_callbacks, onBufferChange(ConnectionBufferType::Read, 4, -4)).InSequence(s2);
+  EXPECT_CALL(server_buffer_stats.rx_total_, add(4)).InSequence(s2);
+  EXPECT_CALL(server_buffer_stats.rx_current_, add(4)).InSequence(s2);
+  EXPECT_CALL(server_buffer_stats.rx_current_, sub(4)).InSequence(s2);
   EXPECT_CALL(server_callbacks, onEvent(ConnectionEvent::LocalClose)).InSequence(s2);
 
   EXPECT_CALL(*read_filter, onNewConnection());

@@ -104,7 +104,6 @@ public:
 
   // Network::ConnectionCallbacks
   void onEvent(uint32_t event) override;
-  void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
 
 private:
   struct ActiveQuery {

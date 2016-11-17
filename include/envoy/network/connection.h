@@ -35,14 +35,6 @@ public:
   virtual ~ConnectionCallbacks() {}
 
   /**
-   * Callback for connection buffer changes.
-   * @param type supplies which buffer has changed.
-   * @param old_size supplies the original size of the buffer.
-   * @param delta supplies how much data was added or removed from the buffer.
-   */
-  virtual void onBufferChange(ConnectionBufferType type, uint64_t old_size, int64_t delta) PURE;
-
-  /**
    * Callback for connection events.
    * @param events supplies the ConnectionEvent events that occurred as a bitmask.
    */
@@ -63,6 +55,13 @@ enum class ConnectionCloseType {
 class Connection : public Event::DeferredDeletable, public FilterManager {
 public:
   enum class State { Open, Closing, Closed };
+
+  struct BufferStats {
+    Stats::Counter& read_total_;
+    Stats::Gauge& read_current_;
+    Stats::Counter& write_total_;
+    Stats::Gauge& write_current_;
+  };
 
   virtual ~Connection() {}
 
@@ -115,6 +114,13 @@ public:
    * @return The address of the remote client
    */
   virtual const std::string& remoteAddress() PURE;
+
+  /**
+   * Set the buffer stats to update when the connection's read/write buffers change. Note that
+   * for performance reasons these stats are eventually consistent and may not always accurately
+   * represent the buffer contents at any given point in time.
+   */
+  virtual void setBufferStats(const BufferStats& stats) PURE;
 
   /**
    * @return the SSL connection data if this is an SSL connection, or nullptr if it is not.
