@@ -109,7 +109,10 @@ typedef std::shared_ptr<const std::vector<std::vector<HostPtr>>> ConstHostListsP
  */
 class HostSetImpl : public virtual HostSet {
 public:
-  HostSetImpl() : hosts_(new std::vector<HostPtr>()), healthy_hosts_(new std::vector<HostPtr>()) {}
+  HostSetImpl()
+      : hosts_(new std::vector<HostPtr>()), healthy_hosts_(new std::vector<HostPtr>()),
+        hosts_per_zone_(new std::vector<std::vector<HostPtr>>()),
+        healthy_hosts_per_zone_(new std::vector<std::vector<HostPtr>>()) {}
 
   ConstHostVectorPtr rawHosts() const { return hosts_; }
   ConstHostVectorPtr rawHealthyHosts() const { return healthy_hosts_; }

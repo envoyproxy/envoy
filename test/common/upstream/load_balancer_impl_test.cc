@@ -110,16 +110,18 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
       .WillRepeatedly(Return(6));
 
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost());
-  EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
   EXPECT_EQ(cluster_.healthy_hosts_[1], lb_->chooseHost());
-  EXPECT_EQ(2U, stats_.lb_zone_cluster_too_small_.value());
   EXPECT_EQ(cluster_.healthy_hosts_[2], lb_->chooseHost());
-  EXPECT_EQ(3U, stats_.lb_zone_cluster_too_small_.value());
+
+  // Cluster size is computed once at zone aware struct regeneration point.
+  EXPECT_EQ(1U, stats_.lb_zone_cluster_too_small_.value());
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(1));
+  // Trigger reload.
+  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
+                                    empty_host_vector_, empty_host_vector_);
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
-  EXPECT_EQ(3U, stats_.lb_zone_cluster_too_small_.value());
 }
 
 TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
@@ -146,8 +148,7 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .WillOnce(Return(1));
+
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost());
   EXPECT_EQ(1U, stats_.lb_zone_number_differs_.value());
 }
@@ -163,19 +164,18 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
        {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:80")},
        {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:82")}}));
 
-  cluster_.healthy_hosts_ = *hosts;
-  cluster_.hosts_ = *hosts;
-  cluster_.healthy_hosts_per_zone_ = *hosts_per_zone;
-  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
-                                    empty_host_vector_, empty_host_vector_);
-
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .Times(2)
       .WillRepeatedly(Return(3));
+
+  cluster_.healthy_hosts_ = *hosts;
+  cluster_.hosts_ = *hosts;
+  cluster_.healthy_hosts_per_zone_ = *hosts_per_zone;
+  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
+                                    empty_host_vector_, empty_host_vector_);
 
   // There is only one host in the given zone for zone aware routing.
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
@@ -214,24 +214,24 @@ TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
        {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:1")},
        {newTestHost(Upstream::MockCluster{}, "tcp://127.0.0.1:2")}}));
 
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillRepeatedly(Return(5));
+
   cluster_.healthy_hosts_ = *upstream_hosts;
   cluster_.hosts_ = *upstream_hosts;
   cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
   local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
                                     local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
-      .WillRepeatedly(Return(50));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .Times(2)
-      .WillRepeatedly(Return(5));
-
   // There is only one host in the given zone for zone aware routing.
   EXPECT_CALL(random_, random()).WillOnce(Return(100));
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[0][0], lb_->chooseHost());
   EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
+
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
   EXPECT_EQ(cluster_.healthy_hosts_per_zone_[1][1], lb_->chooseHost());
@@ -257,7 +257,7 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .WillOnce(Return(1));
+      .WillRepeatedly(Return(1));
 
   // The following host distribution with current precision should lead to the no_capacity_left
   // situation.
@@ -276,8 +276,6 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
     current[i] = host;
   }
   local_hosts_per_zone->push_back(current);
-  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
-                                    local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
 
   current.resize(44999);
   for (int i = 0; i < 44999; ++i) {
@@ -292,6 +290,10 @@ TEST_F(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   upstream_hosts_per_zone->push_back(current);
 
   cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
+
+  // To trigger update callback.
+  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
+                                    local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
 
   // Force request out of small zone and to randomly select zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(9999)).WillOnce(Return(2));
