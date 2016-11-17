@@ -203,18 +203,6 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   UNREFERENCED_PARAMETER(rc);
 }
 
-void ConnectionImpl::StreamImpl::runResetCallbacks(StreamResetReason reason) {
-  if (reset_callbacks_run_) {
-    return;
-  }
-
-  for (StreamCallbacks* callbacks : callbacks_) {
-    callbacks->onResetStream(reason);
-  }
-
-  reset_callbacks_run_ = true;
-}
-
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
 void ConnectionImpl::dispatch(Buffer::Instance& data) {

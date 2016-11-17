@@ -43,7 +43,7 @@ public:
    * Called when a stream is reset by the client.
    * @param reason supplies the reset reason.
    */
-  virtual void onStreamReset(Http::StreamResetReason reason) PURE;
+  virtual void onStreamReset(StreamResetReason reason) PURE;
 };
 
 /**
@@ -95,9 +95,9 @@ public:
    * connections. Thus, calling newStream() before the previous request has been fully encoded
    * is an error. Pipelining is supported however.
    * @param response_decoder supplies the decoder to use for response callbacks.
-   * @return Http::StreamEncoder& the encoder to use for encoding the request.
+   * @return StreamEncoder& the encoder to use for encoding the request.
    */
-  Http::StreamEncoder& newStream(Http::StreamDecoder& response_decoder);
+  StreamEncoder& newStream(StreamDecoder& response_decoder);
 
   void setCodecClientCallbacks(CodecClientCallbacks& callbacks) {
     codec_client_callbacks_ = &callbacks;
@@ -124,7 +124,7 @@ protected:
   }
 
   const Type type_;
-  Http::ClientConnectionPtr codec_;
+  ClientConnectionPtr codec_;
   Network::ClientConnectionPtr connection_;
 
 private:
@@ -147,34 +147,23 @@ private:
   struct ActiveRequest;
 
   /**
-   * Wrapper for the client response decoder. We use this only for managing end of stream.
-   */
-  struct ResponseDecoderWrapper : public StreamDecoderWrapper {
-    ResponseDecoderWrapper(Http::StreamDecoder& inner, ActiveRequest& parent)
-        : StreamDecoderWrapper(inner), parent_(parent) {}
-
-    // StreamDecoderWrapper
-    void onPreDecodeComplete() override { parent_.parent_.responseDecodeComplete(parent_); }
-    void onDecodeComplete() override {}
-
-    ActiveRequest& parent_;
-  };
-
-  typedef std::unique_ptr<ResponseDecoderWrapper> ResponseDecoderWrapperPtr;
-
-  /**
    * Wrapper for an outstanding request. Designed for handling stream multiplexing.
    */
   struct ActiveRequest : LinkedObject<ActiveRequest>,
                          public Event::DeferredDeletable,
-                         public Http::StreamCallbacks {
-    ActiveRequest(CodecClient& parent) : parent_(parent) {}
+                         public StreamCallbacks,
+                         public StreamDecoderWrapper {
+    ActiveRequest(CodecClient& parent, StreamDecoder& inner)
+        : StreamDecoderWrapper(inner), parent_(parent) {}
 
-    // Http::StreamCallbacks
-    void onResetStream(Http::StreamResetReason reason) override { parent_.onReset(*this, reason); }
+    // StreamCallbacks
+    void onResetStream(StreamResetReason reason) override { parent_.onReset(*this, reason); }
 
-    Http::StreamEncoder* encoder_{};
-    ResponseDecoderWrapperPtr decoder_wrapper_;
+    // StreamDecoderWrapper
+    void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }
+    void onDecodeComplete() override {}
+
+    StreamEncoder* encoder_{};
     CodecClient& parent_;
   };
 
@@ -187,7 +176,7 @@ private:
   void responseDecodeComplete(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
-  void onReset(ActiveRequest& request, Http::StreamResetReason reason);
+  void onReset(ActiveRequest& request, StreamResetReason reason);
   void onData(Buffer::Instance& data);
 
   // Network::ConnectionCallbacks

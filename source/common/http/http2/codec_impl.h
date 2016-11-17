@@ -10,6 +10,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
 
 #include "nghttp2/nghttp2.h"
@@ -98,7 +99,8 @@ protected:
   struct StreamImpl : public StreamEncoder,
                       public Stream,
                       public LinkedObject<StreamImpl>,
-                      public Event::DeferredDeletable {
+                      public Event::DeferredDeletable,
+                      public StreamCallbackHelper {
 
     StreamImpl(ConnectionImpl& parent);
     ~StreamImpl();
@@ -107,7 +109,6 @@ protected:
     ssize_t onDataSourceRead(size_t length, uint32_t* data_flags);
     int onDataSourceSend(const uint8_t* framehd, size_t length);
     void resetStreamWorker(StreamResetReason reason);
-    void runResetCallbacks(StreamResetReason reason);
     void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -121,10 +122,8 @@ protected:
     Stream& getStream() override { return *this; }
 
     // Http::Stream
-    void addCallbacks(StreamCallbacks& callbacks) override { callbacks_.push_back(&callbacks); }
-    void removeCallbacks(Http::StreamCallbacks& callbacks) override {
-      callbacks_.remove(&callbacks);
-    }
+    void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
+    void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
     void resetStream(StreamResetReason reason) override;
 
     // Max header size of 63K. This is arbitrary but makes it easier to test since nghttp2 doesn't
@@ -133,7 +132,6 @@ protected:
     static const uint64_t MAX_HEADER_SIZE = 63 * 1024;
 
     ConnectionImpl& parent_;
-    std::list<StreamCallbacks*> callbacks_{};
     HeaderMapImplPtr headers_;
     StreamDecoder* decoder_{};
     int32_t stream_id_{-1};
@@ -143,7 +141,6 @@ protected:
     Buffer::OwnedImpl pending_recv_data_;
     Buffer::OwnedImpl pending_send_data_;
     bool data_deferred_{};
-    bool reset_callbacks_run_{};
     HeaderMapPtr pending_trailers_;
     Optional<StreamResetReason> deferred_reset_;
     HeaderString cookies_;

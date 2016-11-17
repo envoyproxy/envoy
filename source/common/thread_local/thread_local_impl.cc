@@ -14,7 +14,7 @@ std::list<std::reference_wrapper<Event::Dispatcher>> InstanceImpl::registered_th
 InstanceImpl::~InstanceImpl() { reset(); }
 
 ThreadLocalObjectPtr InstanceImpl::get(uint32_t index) {
-  ASSERT(thread_local_data_.data_.find(index) != thread_local_data_.data_.end());
+  ASSERT(thread_local_data_.data_.size() > index);
   return thread_local_data_.data_[index];
 }
 
@@ -42,17 +42,24 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
 void InstanceImpl::set(uint32_t index, InitializeCb cb) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
   for (Event::Dispatcher& dispatcher : registered_threads_) {
-    dispatcher.post([index, cb, &dispatcher]()
-                        -> void { thread_local_data_.data_[index] = cb(dispatcher); });
+    dispatcher.post([index, cb, &dispatcher]() -> void { setThreadLocal(index, cb(dispatcher)); });
   }
 
   // Handle main thread.
-  thread_local_data_.data_[index] = cb(*main_thread_dispatcher_);
+  setThreadLocal(index, cb(*main_thread_dispatcher_));
+}
+
+void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectPtr object) {
+  if (thread_local_data_.data_.size() <= index) {
+    thread_local_data_.data_.resize(index + 1);
+  }
+
+  thread_local_data_.data_[index] = object;
 }
 
 void InstanceImpl::shutdownThread() {
   for (auto& entry : thread_local_data_.data_) {
-    entry.second->shutdown();
+    entry->shutdown();
   }
 }
 

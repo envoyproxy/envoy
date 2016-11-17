@@ -5,6 +5,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
 
 #include "http_parser.h"
@@ -19,14 +20,11 @@ class ConnectionImpl;
 /**
  * Base class for HTTP/1.1 request and response encoders.
  */
-class StreamEncoderImpl : public StreamEncoder, public Stream, Logger::Loggable<Logger::Id::http> {
+class StreamEncoderImpl : public StreamEncoder,
+                          public Stream,
+                          Logger::Loggable<Logger::Id::http>,
+                          public StreamCallbackHelper {
 public:
-  void runResetCallbacks(StreamResetReason reason) {
-    for (StreamCallbacks* callbacks : callbacks_) {
-      callbacks->onResetStream(reason);
-    }
-  }
-
   // Http::StreamEncoder
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -34,8 +32,8 @@ public:
   Stream& getStream() override { return *this; }
 
   // Http::Stream
-  void addCallbacks(StreamCallbacks& callbacks) override { callbacks_.push_back(&callbacks); }
-  void removeCallbacks(StreamCallbacks& callbacks) override { callbacks_.remove(&callbacks); }
+  void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
+  void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
   void resetStream(StreamResetReason reason) override;
 
 protected:
@@ -61,7 +59,6 @@ private:
    */
   void endEncode();
 
-  std::list<StreamCallbacks*> callbacks_{};
   bool chunk_encoding_{true};
 };
 
