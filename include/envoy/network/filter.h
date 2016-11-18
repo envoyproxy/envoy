@@ -94,7 +94,7 @@ public:
    * construction that requires the backing connection should take place in the context of this
    * function.
    *
-   * IMPORTANT: No outbound networking and complex processing should be done in this function.
+   * IMPORTANT: No outbound networking or complex processing should be done in this function.
    *            That should be done in the context of onNewConnection() if needed.
    *
    * @param callbacks supplies the callbacks.
