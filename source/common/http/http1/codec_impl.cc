@@ -339,18 +339,13 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   current_header_value_.append(data, length);
 }
 
-static const std::string HTTP_1_1 = "HTTP/1.1";
-static const std::string HTTP_1_0 = "HTTP/1.0";
-
 int ConnectionImpl::onHeadersCompleteBase() {
   conn_log_trace("headers complete", connection_);
   completeLastHeader();
-  if (parser_.http_major == 1 && parser_.http_minor == 1) {
-    current_header_map_->insertVersion().value(HTTP_1_1);
-  } else {
+  if (!(parser_.http_major == 1 && parser_.http_minor == 1)) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
     // HTTP/1.1 or not.
-    current_header_map_->insertVersion().value(HTTP_1_0);
+    protocol_ = Protocol::Http10;
   }
 
   int rc = onHeadersComplete(std::move(current_header_map_));

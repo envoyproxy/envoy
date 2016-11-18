@@ -6,7 +6,7 @@ namespace Http {
 namespace AccessLog {
 
 struct RequestInfoImpl : public RequestInfo {
-  RequestInfoImpl(const std::string& protocol)
+  RequestInfoImpl(Protocol protocol)
       : protocol_(protocol), start_time_(std::chrono::system_clock::now()) {}
 
   // Http::AccessLog::RequestInfo
@@ -14,7 +14,8 @@ struct RequestInfoImpl : public RequestInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  const std::string& protocol() const override { return protocol_; }
+  Protocol protocol() const override { return protocol_; }
+  void protocol(Protocol protocol) override { protocol_ = protocol; }
 
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
 
@@ -39,7 +40,7 @@ struct RequestInfoImpl : public RequestInfo {
 
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
-  const std::string& protocol_;
+  Protocol protocol_;
   const SystemTime start_time_;
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;

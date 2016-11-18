@@ -29,6 +29,12 @@ TEST(FailureReasonUtilsTest, toShortStringConversion) {
   }
 }
 
+TEST(AccessLogFormatUtilsTest, protocolToString) {
+  EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Protocol::Http10));
+  EXPECT_EQ("HTTP/1.1", AccessLogFormatUtils::protocolToString(Protocol::Http11));
+  EXPECT_EQ("HTTP/2", AccessLogFormatUtils::protocolToString(Protocol::Http2));
+}
+
 TEST(AccessLogFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
   TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
@@ -59,9 +65,8 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter protocol_format("PROTOCOL");
-    std::string protocol = "proto";
-    EXPECT_CALL(requestInfo, protocol()).WillOnce(ReturnRef(protocol));
-    EXPECT_EQ("proto", protocol_format.format(header, header, requestInfo));
+    EXPECT_CALL(requestInfo, protocol()).WillOnce(Return(Protocol::Http11));
+    EXPECT_EQ("HTTP/1.1", protocol_format.format(header, header, requestInfo));
   }
 
   {
@@ -176,10 +181,10 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
                                "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%[]";
     FormatterImpl formatter(format);
 
-    const std::string protocol = "protocol";
-    EXPECT_CALL(request_info, protocol()).WillRepeatedly(ReturnRef(protocol));
+    Protocol protocol = Protocol::Http11;
+    EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
 
-    EXPECT_EQ("{{protocol}}   -++test GET PUT[]",
+    EXPECT_EQ("{{HTTP/1.1}}   -++test GET PUT[]",
               formatter.format(request_header, response_header, request_info));
   }
 

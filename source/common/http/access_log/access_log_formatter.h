@@ -45,9 +45,10 @@ private:
 class AccessLogFormatUtils {
 public:
   static FormatterPtr defaultAccessLogFormatter();
+  static const std::string& protocolToString(Protocol protocol);
 
 private:
-  AccessLogFormatUtils(){};
+  AccessLogFormatUtils();
 
   static const std::string DEFAULT_FORMAT;
 };

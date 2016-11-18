@@ -30,8 +30,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& head
     setupStatTracking(headers);
   }
 
-  if (decoder_callbacks_->requestInfo().protocol() == Http::Http1::PROTOCOL_STRING &&
-      grpc_request) {
+  if (decoder_callbacks_->requestInfo().protocol() != Http::Protocol::Http2 && grpc_request) {
     do_bridging_ = true;
   }
 

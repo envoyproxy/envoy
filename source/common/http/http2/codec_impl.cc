@@ -281,7 +281,6 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     }
 
     if (frame->headers.cat == NGHTTP2_HCAT_REQUEST || frame->headers.cat == NGHTTP2_HCAT_RESPONSE) {
-      stream->headers_->insertVersion().value(PROTOCOL_STRING);
       stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
     } else {
       ASSERT(frame->headers.cat == NGHTTP2_HCAT_HEADERS);

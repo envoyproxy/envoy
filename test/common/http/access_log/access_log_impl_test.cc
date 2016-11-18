@@ -36,7 +36,8 @@ public:
 
   SystemTime startTime() const override { return start_time_; }
   uint64_t bytesReceived() const override { return 1; }
-  const std::string& protocol() const override { return protocol_; }
+  Protocol protocol() const override { return protocol_; }
+  void protocol(Protocol protocol) override { protocol_ = protocol; }
   const Optional<uint32_t>& responseCode() const override { return response_code_; }
   uint64_t bytesSent() const override { return 2; }
   std::chrono::milliseconds duration() const override {
@@ -50,7 +51,7 @@ public:
   void healthCheck(bool is_hc) { hc_request_ = is_hc; }
 
   SystemTime start_time_;
-  std::string protocol_{"HTTP/1.1"};
+  Protocol protocol_{Protocol::Http11};
   Optional<uint32_t> response_code_;
   FailureReason failure_reason_{FailureReason::None};
   uint64_t duration_{3};

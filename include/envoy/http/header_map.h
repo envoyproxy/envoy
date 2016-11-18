@@ -190,7 +190,6 @@ private:
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
-  HEADER_FUNC(EnvoyProtocolVersion)                                                                \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
@@ -214,8 +213,7 @@ private:
   HEADER_FUNC(Status)                                                                              \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \
-  HEADER_FUNC(UserAgent)                                                                           \
-  HEADER_FUNC(Version)
+  HEADER_FUNC(UserAgent)
 
 /**
  * The following functions are defined for each inline header above. E.g., for ContentLength we

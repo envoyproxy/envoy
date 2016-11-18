@@ -20,7 +20,6 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
   request_headers.removeUpgrade();
-  request_headers.removeVersion();
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
@@ -111,7 +110,6 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
                                                      ConnectionManagerConfig& config) {
   response_headers.removeConnection();
   response_headers.removeTransferEncoding();
-  response_headers.removeVersion();
 
   for (const Http::LowerCaseString& to_remove : config.routeConfig().responseHeadersToRemove()) {
     response_headers.remove(to_remove);

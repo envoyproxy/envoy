@@ -1,5 +1,6 @@
 #include "access_log_formatter.h"
 
+#include "common/common/assert.h"
 #include "common/common/utility.h"
 
 namespace Http {
@@ -52,6 +53,23 @@ const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
 
 FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
   return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT)};
+}
+
+static const std::string Http10String = "HTTP/1.0";
+static const std::string Http11String = "HTTP/1.1";
+static const std::string Http2String = "HTTP/2";
+
+const std::string& AccessLogFormatUtils::protocolToString(Protocol protocol) {
+  switch (protocol) {
+  case Protocol::Http10:
+    return Http10String;
+  case Protocol::Http11:
+    return Http11String;
+  case Protocol::Http2:
+    return Http2String;
+  }
+
+  NOT_IMPLEMENTED;
 }
 
 FormatterImpl::FormatterImpl(const std::string& format) {
@@ -173,7 +191,9 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
       return std::to_string(request_info.bytesReceived());
     };
   } else if (field_name == "PROTOCOL") {
-    field_extractor_ = [](const RequestInfo& request_info) { return request_info.protocol(); };
+    field_extractor_ = [](const RequestInfo& request_info) {
+      return AccessLogFormatUtils::protocolToString(request_info.protocol());
+    };
   } else if (field_name == "RESPONSE_CODE") {
     field_extractor_ = [](const RequestInfo& request_info) {
       return request_info.responseCode().valid()

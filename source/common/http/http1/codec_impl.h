@@ -13,8 +13,6 @@
 namespace Http {
 namespace Http1 {
 
-const std::string PROTOCOL_STRING = "HTTP/1.1";
-
 class ConnectionImpl;
 
 /**
@@ -130,9 +128,8 @@ public:
 
   // Http::Connection
   void dispatch(Buffer::Instance& data) override;
-  uint64_t features() override { return 0; }
   void goAway() override {} // Called during connection manager drain flow
-  const std::string& protocolString() override { return Http1::PROTOCOL_STRING; }
+  Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
   bool wantsToWrite() override { return false; }
 
@@ -236,6 +233,7 @@ private:
   Buffer::OwnedImpl output_buffer_;
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
+  Protocol protocol_{Protocol::Http11};
 };
 
 /**

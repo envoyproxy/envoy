@@ -82,6 +82,27 @@ void BaseIntegrationTest::testDrainClose(Http::CodecClient::Type type) {
   test_server_->drainManager().draining_ = false;
 }
 
+TEST_F(IntegrationTest, ConnectionClose) {
+  IntegrationCodecClientPtr codec_client;
+  IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
+  executeActions({[&]() -> void {
+    codec_client = makeHttpConnection(HTTP_PORT, Http::CodecClient::Type::HTTP1);
+  },
+                  [&]() -> void {
+                    codec_client->makeHeaderOnlyRequest(
+                        Http::TestHeaderMapImpl{{":method", "GET"},
+                                                {":path", "/healthcheck"},
+                                                {":authority", "host"},
+                                                {"connection", "close"}},
+                        *response);
+                  },
+                  [&]() -> void { response->waitForEndStream(); },
+                  [&]() -> void { codec_client->waitForDisconnect(); }});
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+
 void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
                                                                Http::CodecClient::Type type,
                                                                uint64_t request_size,

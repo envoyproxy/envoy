@@ -37,7 +37,8 @@ public:
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionPtr host));
   MOCK_CONST_METHOD0(startTime, SystemTime());
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
-  MOCK_CONST_METHOD0(protocol, const std::string&());
+  MOCK_CONST_METHOD0(protocol, Protocol());
+  MOCK_METHOD1(protocol, void(Protocol protocol));
   MOCK_CONST_METHOD0(responseCode, Optional<uint32_t>&());
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
   MOCK_CONST_METHOD0(duration, std::chrono::milliseconds());
@@ -157,13 +158,12 @@ public:
 
   // Http::Connection
   MOCK_METHOD1(dispatch, void(Buffer::Instance& data));
-  MOCK_METHOD0(features, uint64_t());
   MOCK_METHOD0(goAway, void());
-  MOCK_METHOD0(protocolString, const std::string&());
+  MOCK_METHOD0(protocol, Protocol());
   MOCK_METHOD0(shutdownNotice, void());
   MOCK_METHOD0(wantsToWrite, bool());
 
-  const std::string protocol_{"HTTP/1.1"};
+  Protocol protocol_{Protocol::Http11};
 };
 
 class MockClientConnection : public ClientConnection {
@@ -173,9 +173,8 @@ public:
 
   // Http::Connection
   MOCK_METHOD1(dispatch, void(Buffer::Instance& data));
-  MOCK_METHOD0(features, uint64_t());
   MOCK_METHOD0(goAway, void());
-  MOCK_METHOD0(protocolString, const std::string&());
+  MOCK_METHOD0(protocol, Protocol());
   MOCK_METHOD0(shutdownNotice, void());
   MOCK_METHOD0(wantsToWrite, bool());
 

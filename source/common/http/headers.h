@@ -23,7 +23,6 @@ public:
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
-  const LowerCaseString EnvoyProtocolVersion{"x-envoy-protocol-version"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
@@ -52,7 +51,6 @@ public:
   const LowerCaseString TransferEncoding{"transfer-encoding"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
-  const LowerCaseString Version{":version"};
 
   struct {
     const std::string Close{"close"};
