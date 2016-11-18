@@ -60,11 +60,11 @@ public:
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
+  Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
     conn_log_info("new tcp proxy session", read_callbacks_->connection());
     read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-    initializeUpstreamConnection();
   }
 
 private:
@@ -103,7 +103,7 @@ private:
     TcpProxy& parent_;
   };
 
-  void initializeUpstreamConnection();
+  Network::FilterStatus initializeUpstreamConnection();
   void onConnectTimeout();
   void onDownstreamBufferChange(Network::ConnectionBufferType type, uint64_t old_size,
                                 int64_t delta);

@@ -99,12 +99,10 @@ void Config::requestComplete() {
 }
 
 Network::FilterStatus Instance::onData(Buffer::Instance&) {
-  if (auth_checked_) {
-    return Network::FilterStatus::Continue;
-  }
+  return Network::FilterStatus::Continue;
+}
 
-  auth_checked_ = true;
-
+Network::FilterStatus Instance::onNewConnection() {
   // If this is not an SSL connection, do no further checking. High layers should redirect, etc.
   // if SSL is required.
   if (!read_callbacks_->connection().ssl()) {

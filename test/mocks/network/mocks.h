@@ -48,6 +48,7 @@ public:
   MOCK_METHOD1(close, void(ConnectionCloseType type));
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(id, uint64_t());
+  MOCK_METHOD0(initializeReadFilters, void());
   MOCK_METHOD0(nextProtocol, std::string());
   MOCK_METHOD1(noDelay, void(bool enable));
   MOCK_METHOD1(readDisable, void(bool disable));
@@ -75,6 +76,7 @@ public:
   MOCK_METHOD1(close, void(ConnectionCloseType type));
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(id, uint64_t());
+  MOCK_METHOD0(initializeReadFilters, void());
   MOCK_METHOD0(nextProtocol, std::string());
   MOCK_METHOD1(noDelay, void(bool enable));
   MOCK_METHOD1(readDisable, void(bool disable));
@@ -120,6 +122,7 @@ public:
   ~MockReadFilter();
 
   MOCK_METHOD1(onData, FilterStatus(Buffer::Instance& data));
+  MOCK_METHOD0(onNewConnection, FilterStatus());
   MOCK_METHOD1(initializeReadFilterCallbacks, void(ReadFilterCallbacks& callbacks));
 
   ReadFilterCallbacks* callbacks_{};
@@ -139,6 +142,7 @@ public:
   ~MockFilter();
 
   MOCK_METHOD1(onData, FilterStatus(Buffer::Instance& data));
+  MOCK_METHOD0(onNewConnection, FilterStatus());
   MOCK_METHOD1(onWrite, FilterStatus(Buffer::Instance& data));
   MOCK_METHOD1(initializeReadFilterCallbacks, void(ReadFilterCallbacks& callbacks));
 

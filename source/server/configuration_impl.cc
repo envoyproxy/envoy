@@ -14,17 +14,13 @@
 namespace Server {
 namespace Configuration {
 
-void FilterChainUtility::buildFilterChain(Network::Connection& connection,
+void FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
                                           const std::list<NetworkFilterFactoryCb>& factories) {
   for (const NetworkFilterFactoryCb& factory : factories) {
-    // It's possible for a connection to be closed immediately in the middle of chain creation.
-    // If this happened, do not instantiate any more filters.
-    if (connection.state() != Network::Connection::State::Open) {
-      break;
-    }
-
-    factory(connection);
+    factory(filter_manager);
   }
+
+  filter_manager.initializeReadFilters();
 }
 
 MainImpl::MainImpl(Server::Instance& server) : server_(server) {}

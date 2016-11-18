@@ -49,6 +49,12 @@ TEST_F(NetworkFilterManagerTest, All) {
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
 
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::StopIteration));
+  manager.initializeReadFilters();
+
+  EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  read_filter->callbacks_->continueReading();
+
   read_buffer_.add("hello");
   EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello")))
       .WillOnce(Return(FilterStatus::StopIteration));

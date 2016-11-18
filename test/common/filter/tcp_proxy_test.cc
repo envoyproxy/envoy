@@ -66,6 +66,9 @@ public:
 
     filter_.reset(new TcpProxy(config_, cluster_manager_));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
+    EXPECT_EQ(return_connection ? Network::FilterStatus::Continue
+                                : Network::FilterStatus::StopIteration,
+              filter_->onNewConnection());
   }
 
   TcpProxyConfigPtr config_;
@@ -183,6 +186,7 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  filter_->onNewConnection();
 
   EXPECT_EQ(
       1U,

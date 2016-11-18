@@ -97,6 +97,7 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
 
   // Check no SSL case, mulitple iterations.
   EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillOnce(Return(nullptr));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onNewConnection());
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
 
@@ -107,7 +108,7 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
       .WillOnce(ReturnRefOfCopy(std::string("192.168.1.1")));
   EXPECT_CALL(ssl_, sha256PeerCertificateDigest()).WillOnce(Return("digest"));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onData(dummy));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
 
   // Respond.
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -125,6 +126,7 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
       .WillOnce(ReturnRefOfCopy(std::string("192.168.1.1")));
   EXPECT_CALL(ssl_, sha256PeerCertificateDigest())
       .WillOnce(Return("1b7d42ef0025ad89c1c911d6c10d7e86a4cb7c5863b2980abcbad1895f8b5314"));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onNewConnection());
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
 
@@ -133,6 +135,7 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
   EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillOnce(Return(&ssl_));
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
       .WillOnce(ReturnRefOfCopy(std::string("1.2.3.4")));
+  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onNewConnection());
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
 
