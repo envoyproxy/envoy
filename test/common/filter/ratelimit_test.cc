@@ -67,6 +67,7 @@ TEST_F(RateLimitFilterTest, OK) {
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
@@ -90,6 +91,7 @@ TEST_F(RateLimitFilterTest, OverLimit) {
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
 
@@ -111,6 +113,7 @@ TEST_F(RateLimitFilterTest, OverLimitNotEnforcing) {
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
 
@@ -135,6 +138,7 @@ TEST_F(RateLimitFilterTest, Error) {
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
 
@@ -157,6 +161,7 @@ TEST_F(RateLimitFilterTest, Disconnect) {
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data));
 
@@ -174,6 +179,7 @@ TEST_F(RateLimitFilterTest, ImmediateOK) {
       .WillOnce(WithArgs<0>(Invoke([&](RequestCallbacks& callbacks)
                                        -> void { callbacks.complete(LimitStatus::OK); })));
 
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
@@ -192,6 +198,7 @@ TEST_F(RateLimitFilterTest, RuntimeDisable) {
       .WillOnce(Return(false));
   EXPECT_CALL(*client_, limit(_, _, _, _)).Times(0);
 
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data));
 }

@@ -49,7 +49,7 @@ public:
   /**
    * If a read filter stopped filter iteration, continueReading() can be called to continue the
    * filter chain. The next filter will be called with all currently available data in the read
-   * buffer.
+   * buffer (it will also have onNewConnection() called on it if it was not previously called).
    */
   virtual void continueReading() PURE;
 
@@ -81,10 +81,22 @@ public:
   virtual FilterStatus onData(Buffer::Instance& data) PURE;
 
   /**
+   * Called when a connection is first established. Filters should do one time long term processing
+   * that needs to be done when a connection is established. Filter chain iteration can be stopped
+   * if needed.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual FilterStatus onNewConnection() PURE;
+
+  /**
    * Initializes the read filter callbacks used to interact with the filter manager. It will be
    * called by the filter manager a single time when the filter is first registered. Thus, any
    * construction that requires the backing connection should take place in the context of this
    * function.
+   *
+   * IMPORTANT: No outbound networking and complex processing should be done in this function.
+   *            That should be done in the context of onNewConnection() if needed.
+   *
    * @param callbacks supplies the callbacks.
    */
   virtual void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) PURE;
@@ -123,6 +135,12 @@ public:
    * first is called first).
    */
   virtual void addReadFilter(ReadFilterPtr filter) PURE;
+
+  /**
+   * Initialize all of the installe read filters. This effectively calls onNewConnection() on
+   * each of them.
+   */
+  virtual void initializeReadFilters() PURE;
 };
 
 /**

@@ -17,11 +17,8 @@ TEST(FilterChainUtility, buildFilterChain) {
   factories.push_back(factory);
   factories.push_back(factory);
 
-  // Make sure we short circuit if needed.
-  InSequence s;
-  EXPECT_CALL(connection, state()).WillOnce(Return(Network::Connection::State::Open));
-  EXPECT_CALL(watcher, ready());
-  EXPECT_CALL(connection, state()).WillOnce(Return(Network::Connection::State::Closing));
+  EXPECT_CALL(watcher, ready()).Times(2);
+  EXPECT_CALL(connection, initializeReadFilters());
   FilterChainUtility::buildFilterChain(connection, factories);
 }
 

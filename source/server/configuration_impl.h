@@ -43,7 +43,7 @@ public:
    * Given a connection and a list of factories, create a new filter chain. Chain creation will
    * exit early if any filters immediately close the connection.
    */
-  static void buildFilterChain(Network::Connection& connection,
+  static void buildFilterChain(Network::FilterManager& filter_manager,
                                const std::list<NetworkFilterFactoryCb>& factories);
 };
 

@@ -103,6 +103,7 @@ public:
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
+  Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
   }
@@ -110,7 +111,6 @@ public:
 private:
   ConfigPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
-  bool auth_checked_{};
 };
 
 } // ClientSsl

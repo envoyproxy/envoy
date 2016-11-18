@@ -53,6 +53,8 @@ void ConnectionImpl::addFilter(FilterPtr filter) { filter_manager_.addFilter(fil
 
 void ConnectionImpl::addReadFilter(ReadFilterPtr filter) { filter_manager_.addReadFilter(filter); }
 
+void ConnectionImpl::initializeReadFilters() { filter_manager_.initializeReadFilters(); }
+
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (fd_ == -1) {
     return;

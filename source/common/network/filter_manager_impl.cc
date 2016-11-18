@@ -28,6 +28,11 @@ void FilterManagerImpl::destroyFilters() {
   downstream_filters_.clear();
 }
 
+void FilterManagerImpl::initializeReadFilters() {
+  ASSERT(!upstream_filters_.empty());
+  onContinueReading(nullptr);
+}
+
 void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter) {
   std::list<ActiveReadFilterPtr>::iterator entry;
   if (!filter) {
@@ -37,9 +42,20 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter) {
   }
 
   for (; entry != upstream_filters_.end(); entry++) {
-    FilterStatus status = (*entry)->filter_->onData(buffer_source_.getReadBuffer());
-    if (status == FilterStatus::StopIteration) {
-      return;
+    if (!(*entry)->initialized_) {
+      (*entry)->initialized_ = true;
+      FilterStatus status = (*entry)->filter_->onNewConnection();
+      if (status == FilterStatus::StopIteration) {
+        return;
+      }
+    }
+
+    Buffer::Instance& read_buffer = buffer_source_.getReadBuffer();
+    if (read_buffer.length() > 0) {
+      FilterStatus status = (*entry)->filter_->onData(read_buffer);
+      if (status == FilterStatus::StopIteration) {
+        return;
+      }
     }
   }
 }

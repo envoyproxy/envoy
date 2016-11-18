@@ -56,6 +56,7 @@ public:
     access_log_.reset(new AccessLog(api_, "test", dispatcher_, lock, store_));
     filter_.reset(new TestProxyFilter("test.", store_, runtime_, access_log_));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
+    filter_->onNewConnection();
   }
 
   Buffer::OwnedImpl fake_data_;

@@ -25,6 +25,11 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Store& store
 }
 
 Network::FilterStatus Instance::onData(Buffer::Instance&) {
+  return status_ == Status::Calling ? Network::FilterStatus::StopIteration
+                                    : Network::FilterStatus::Continue;
+}
+
+Network::FilterStatus Instance::onNewConnection() {
   if (status_ == Status::NotStarted &&
       !config_->runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enabled", 100)) {
     status_ = Status::Complete;
