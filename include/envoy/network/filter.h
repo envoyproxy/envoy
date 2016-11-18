@@ -137,7 +137,7 @@ public:
   virtual void addReadFilter(ReadFilterPtr filter) PURE;
 
   /**
-   * Initialize all of the installe read filters. This effectively calls onNewConnection() on
+   * Initialize all of the installed read filters. This effectively calls onNewConnection() on
    * each of them.
    */
   virtual void initializeReadFilters() PURE;
