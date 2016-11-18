@@ -4,6 +4,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
 
 namespace Http {
@@ -27,26 +28,32 @@ struct FaultFilterStats {
 /**
  * Configuration for the fault filter.
  */
-struct FaultFilterConfig {
-  FaultFilterConfig(uint64_t abort_enabled, uint64_t abort_code, uint64_t delay_enabled,
-                    uint64_t delay_duration,
-                    const std::vector<Router::ConfigUtility::HeaderData> fault_filter_headers,
-                    Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Store& stats)
-      : abort_enabled_(abort_enabled), abort_code_(abort_code), delay_enabled_(delay_enabled),
-        delay_duration_(delay_duration), fault_filter_headers_(fault_filter_headers),
-        runtime_(runtime), stats_{ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))} {
-  }
+class FaultFilterConfig {
+public:
+  FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
+                    const std::string& stat_prefix, Stats::Store& stats);
 
-  uint64_t abort_enabled_;  // 0-100
-  uint64_t abort_code_;     // HTTP or gRPC return codes
-  uint64_t delay_enabled_;  // 0-100
-  uint64_t delay_duration_; // in milliseconds
-  const std::vector<Router::ConfigUtility::HeaderData> fault_filter_headers_;
+  const std::vector<Router::ConfigUtility::HeaderData>& filterHeaders() {
+    return fault_filter_headers_;
+  }
+  uint64_t abortPercent() { return abort_percent_; }
+  uint64_t delayPercent() { return fixed_delay_percent_; }
+  uint64_t delayDuration() { return fixed_duration_ms_; }
+  uint64_t abortCode() { return http_status_; }
+  Runtime::Loader& runtime() { return runtime_; }
+  FaultFilterStats& stats() { return stats_; }
+
+private:
+  uint64_t abort_percent_;       // 0-100
+  uint64_t http_status_;         // HTTP or gRPC return codes
+  uint64_t fixed_delay_percent_; // 0-100
+  uint64_t fixed_duration_ms_;   // in milliseconds
+  std::vector<Router::ConfigUtility::HeaderData> fault_filter_headers_;
   Runtime::Loader& runtime_;
   FaultFilterStats stats_;
 };
 
-typedef std::shared_ptr<const FaultFilterConfig> FaultFilterConfigPtr;
+typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigPtr;
 
 /**
  * A filter that is capable of faulting an entire request before dispatching it upstream.
@@ -65,7 +72,7 @@ public:
 
 private:
   void onResetStream();
-  void resetInternalState();
+  void resetTimerState();
   void postDelayInjection();
 
   FaultFilterConfigPtr config_;
