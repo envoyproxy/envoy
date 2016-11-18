@@ -148,6 +148,13 @@ protected:
 private:
   enum class HeaderParsingState { Field, Value, Done };
 
+  struct ToLowerTable {
+    ToLowerTable();
+    void toLowerCase(HeaderString& text) const;
+
+    std::array<uint8_t, 256> table_;
+  };
+
   /**
    * Called in order to complete an in progress header decode.
    */
@@ -219,6 +226,7 @@ private:
   virtual void sendProtocolError() PURE;
 
   static http_parser_settings settings_;
+  static const ToLowerTable to_lower_table_;
 
   HeaderMapImplPtr current_header_map_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};

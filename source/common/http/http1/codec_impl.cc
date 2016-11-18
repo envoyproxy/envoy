@@ -244,28 +244,36 @@ http_parser_settings ConnectionImpl::settings_{
     nullptr  // on_chunk_complete
 };
 
+const ConnectionImpl::ToLowerTable ConnectionImpl::to_lower_table_;
+
+ConnectionImpl::ToLowerTable::ToLowerTable() {
+  for (size_t c = 0; c < 256; c++) {
+    table_[c] = c;
+    if ((c >= 'A') && (c <= 'Z')) {
+      table_[c] |= 0x20;
+    }
+  }
+}
+
+void ConnectionImpl::ToLowerTable::toLowerCase(HeaderString& text) const {
+  char* buffer = text.buffer();
+  uint32_t size = text.size();
+  for (size_t i = 0; i < size; i++) {
+    buffer[i] = table_[static_cast<uint8_t>(buffer[i])];
+  }
+}
+
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type)
     : connection_(connection) {
   http_parser_init(&parser_, type);
   parser_.data = this;
 }
 
-static void toLowerCase(HeaderString& text) {
-  char* buffer = text.buffer();
-  uint32_t size = text.size();
-  for (size_t i = 0; i < size; i++) {
-    char c = buffer[i];
-    if ((c >= 'A') && (c <= 'Z')) {
-      buffer[i] |= 0x20;
-    }
-  }
-}
-
 void ConnectionImpl::completeLastHeader() {
   conn_log_trace("completed header: key={} value={}", connection_, current_header_field_.c_str(),
                  current_header_value_.c_str());
   if (!current_header_field_.empty()) {
-    toLowerCase(current_header_field_);
+    to_lower_table_.toLowerCase(current_header_field_);
     current_header_map_->addViaMove(std::move(current_header_field_),
                                     std::move(current_header_value_));
   }
