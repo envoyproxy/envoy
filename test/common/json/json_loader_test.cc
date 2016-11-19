@@ -3,8 +3,9 @@
 namespace Json {
 
 TEST(JsonLoaderTest, Basic) {
-  EXPECT_THROW(FileLoader("bad_file"), Exception);
+  EXPECT_THROW(Factory::LoadFromFile("bad_file"), Exception);
   EXPECT_THROW(StringLoader("{"), Exception);
+  // TODO add Factory::LoadFromString test
 
   {
     StringLoader json("{\"hello\":123}");
