@@ -151,6 +151,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
       .WillOnce(ReturnRefOfCopy(std::string("1.2.3.4")));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
+  EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::Connected);
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
