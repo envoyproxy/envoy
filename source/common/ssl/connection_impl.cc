@@ -92,7 +92,9 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
 
     handshake_complete_ = true;
     raiseEvents(Network::ConnectionEvent::Connected);
-    return PostIoAction::KeepOpen;
+
+    // It's possible that we closed during the handshake callback.
+    return state() == State::Open ? PostIoAction::KeepOpen : PostIoAction::Close;
   } else {
     int err = SSL_get_error(ssl_.get(), rc);
     conn_log_debug("handshake error: {}", *this, err);

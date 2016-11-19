@@ -97,7 +97,7 @@ typedef std::shared_ptr<Config> ConfigPtr;
 /**
  * A client SSL auth filter instance. One per connection.
  */
-class Instance : public Network::ReadFilter {
+class Instance : public Network::ReadFilter, public Network::ConnectionCallbacks {
 public:
   Instance(ConfigPtr config) : config_(config) {}
 
@@ -106,7 +106,12 @@ public:
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
+    read_callbacks_->connection().addConnectionCallbacks(*this);
   }
+
+  // Network::ConnectionCallbacks
+  void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
+  void onEvent(uint32_t events) override;
 
 private:
   ConfigPtr config_;

@@ -50,7 +50,8 @@ TEST_F(ProxyProtocolTest, Basic) {
       }));
 
   read_filter_.reset(new MockReadFilter());
-  EXPECT_CALL(*read_filter_.get(), onData(BufferStringEqual("more data")));
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(BufferStringEqual("more data")));
 
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   accepted_connection->close(ConnectionCloseType::NoFlush);
