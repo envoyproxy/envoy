@@ -108,22 +108,33 @@ Network::FilterStatus Instance::onNewConnection() {
   if (!read_callbacks_->connection().ssl()) {
     config_->stats().auth_no_ssl_.inc();
     return Network::FilterStatus::Continue;
+  } else {
+    // Otherwise we need to wait for handshake to be complete before proceeding.
+    return Network::FilterStatus::StopIteration;
+  }
+}
+
+void Instance::onEvent(uint32_t events) {
+  if (!(events & Network::ConnectionEvent::Connected)) {
+    return;
   }
 
+  ASSERT(read_callbacks_->connection().ssl());
   if (config_->ipWhiteList().contains(read_callbacks_->connection().remoteAddress())) {
     config_->stats().auth_ip_white_list_.inc();
-    return Network::FilterStatus::Continue;
+    read_callbacks_->continueReading();
+    return;
   }
 
   if (!config_->allowedPrincipals().allowed(
           read_callbacks_->connection().ssl()->sha256PeerCertificateDigest())) {
     config_->stats().auth_digest_no_match_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    return Network::FilterStatus::StopIteration;
+    return;
   }
 
   config_->stats().auth_digest_match_.inc();
-  return Network::FilterStatus::Continue;
+  read_callbacks_->continueReading();
 }
 
 } // Client Ssl

@@ -9,6 +9,7 @@
 #include "test/test_common/utility.h"
 
 using testing::_;
+using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnNew;
@@ -49,6 +50,7 @@ public:
   }
 
   void createAuthFilter() {
+    filter_callbacks_.connection_.callbacks_.clear();
     instance_.reset(new Instance(config_));
     instance_->initializeReadFilterCallbacks(filter_callbacks_);
   }
@@ -91,7 +93,7 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
   EXPECT_THROW(new Config(loader, tls_, cm_, dispatcher_, stats_store_, runtime_), EnvoyException);
 }
 
-TEST_F(ClientSslAuthFilterTest, Basic) {
+TEST_F(ClientSslAuthFilterTest, NoSsl) {
   setup();
   Buffer::OwnedImpl dummy("hello");
 
@@ -100,15 +102,27 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onNewConnection());
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
+  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_no_ssl").value());
+}
+
+TEST_F(ClientSslAuthFilterTest, Ssl) {
+  InSequence s;
+
+  setup();
+  Buffer::OwnedImpl dummy("hello");
 
   // Create a new filter for an SSL connection, with no backing auth data yet.
   createAuthFilter();
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).Times(2).WillRepeatedly(Return(&ssl_));
+  ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(&ssl_));
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
       .WillOnce(ReturnRefOfCopy(std::string("192.168.1.1")));
   EXPECT_CALL(ssl_, sha256PeerCertificateDigest()).WillOnce(Return("digest"));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
+  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::Connected);
+  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
 
   // Respond.
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -121,26 +135,29 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
 
   // Create a new filter for an SSL connection with an authorized cert.
   createAuthFilter();
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).Times(2).WillRepeatedly(Return(&ssl_));
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
       .WillOnce(ReturnRefOfCopy(std::string("192.168.1.1")));
   EXPECT_CALL(ssl_, sha256PeerCertificateDigest())
       .WillOnce(Return("1b7d42ef0025ad89c1c911d6c10d7e86a4cb7c5863b2980abcbad1895f8b5314"));
-  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
+  EXPECT_CALL(filter_callbacks_, continueReading());
+  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::Connected);
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
+  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
 
   // White list case.
   createAuthFilter();
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillOnce(Return(&ssl_));
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
       .WillOnce(ReturnRefOfCopy(std::string("1.2.3.4")));
-  EXPECT_EQ(Network::FilterStatus::Continue, instance_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
+  EXPECT_CALL(filter_callbacks_, continueReading());
+  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::Connected);
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy));
+  filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.update_success").value());
-  EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_no_ssl").value());
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_ip_white_list").value());
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_digest_match").value());
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_digest_no_match").value());
@@ -175,7 +192,6 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
   callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
 
   // Interval timer fires, cannot obtain async client.
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -185,6 +201,7 @@ TEST_F(ClientSslAuthFilterTest, Basic) {
                 Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
   interval_timer_->callback_();
 
   EXPECT_EQ(4U, stats_store_.counter("auth.clientssl.vpn.update_failure").value());

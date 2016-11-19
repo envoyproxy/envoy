@@ -68,6 +68,7 @@ TEST(ConnectionImplTest, BufferCallbacks) {
   EXPECT_CALL(server_callbacks, onBufferChange(ConnectionBufferType::Read, 4, -4)).InSequence(s2);
   EXPECT_CALL(server_callbacks, onEvent(ConnectionEvent::LocalClose)).InSequence(s2);
 
+  EXPECT_CALL(*read_filter, onNewConnection());
   EXPECT_CALL(*read_filter, onData(_))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> FilterStatus {
         data.drain(data.length());
