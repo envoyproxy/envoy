@@ -196,6 +196,8 @@ void ConnectionImpl::readDisable(bool disable) {
 
 void ConnectionImpl::raiseEvents(uint32_t events) {
   for (ConnectionCallbacks* callback : callbacks_) {
+    // TODO: If we close while raising a connected event we should not raise further connected
+    //       events.
     callback->onEvent(events);
   }
 }
