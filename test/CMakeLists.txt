@@ -69,6 +69,7 @@ add_executable(envoy-test
   common/network/connection_impl_test.cc
   common/network/dns_impl_test.cc
   common/network/filter_manager_impl_test.cc
+  common/network/listener_impl_test.cc
   common/network/listen_socket_impl_test.cc
   common/network/proxy_protocol_test.cc
   common/network/utility_test.cc

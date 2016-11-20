@@ -6,7 +6,6 @@
  * assert macro that uses our builtin logging which gives us thread ID and can log to various
  * sinks.
  */
-#ifndef COVERAGE
 #define RELEASE_ASSERT(X)                                                                          \
   {                                                                                                \
     if (!(X)) {                                                                                    \
@@ -15,9 +14,6 @@
       abort();                                                                                     \
     }                                                                                              \
   }
-#else
-#define RELEASE_ASSERT(X)
-#endif
 
 #ifndef NDEBUG
 #define ASSERT(X) RELEASE_ASSERT(X)

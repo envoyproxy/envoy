@@ -195,7 +195,7 @@ void ClientConnectionImpl::connect() {
   doConnect(addr_info->ai_addr, addr_info->ai_addrlen);
 }
 
-void ConnectionImpl::closeSocket() {
+void ConnectionImpl::closeSocket(uint32_t close_type) {
   if (handshake_complete_) {
     // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
     // there is no room on the socket. We can extend the state machine to handle this at some point
@@ -206,7 +206,7 @@ void ConnectionImpl::closeSocket() {
     drainErrorQueue();
   }
 
-  Network::ConnectionImpl::closeSocket();
+  Network::ConnectionImpl::closeSocket(close_type);
 }
 
 std::string ConnectionImpl::nextProtocol() {

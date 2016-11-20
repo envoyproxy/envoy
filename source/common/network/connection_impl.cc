@@ -19,13 +19,12 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
     : filter_manager_(*this, *this), remote_address_(remote_address), dispatcher_(dispatcher),
       fd_(fd), id_(++next_global_id_) {
 
+  // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
+  // condition and just crash.
+  RELEASE_ASSERT(fd_ != -1);
+
   file_event_ =
       dispatcher_.createFileEvent(fd_, [this](uint32_t events) -> void { onFileEvent(events); });
-  if (fd_ == -1) {
-    // Can't obtain a socket.
-    state_ |= InternalState::ImmediateConnectionError;
-    file_event_->activate(Event::FileReadyType::Write);
-  }
 
   read_buffer_.setCallback([this](uint64_t old_size, int64_t delta) -> void {
     onBufferChange(ConnectionBufferType::Read, old_size, delta);
@@ -69,7 +68,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       doWriteToSocket();
     }
 
-    doLocalClose();
+    closeSocket(ConnectionEvent::LocalClose);
   } else {
     ASSERT(type == ConnectionCloseType::FlushWrite);
     state_ |= InternalState::CloseWithFlush;
@@ -87,9 +86,12 @@ Connection::State ConnectionImpl::state() {
   }
 }
 
-void ConnectionImpl::closeSocket() {
-  ASSERT(fd_ != -1 || (state_ & InternalState::ImmediateConnectionError));
-  conn_log_debug("closing socket", *this);
+void ConnectionImpl::closeSocket(uint32_t close_type) {
+  if (fd_ == -1) {
+    return;
+  }
+
+  conn_log_debug("closing socket: {}", *this, close_type);
 
   // Drain input and output buffers so that callbacks get fired. This does not happen automatically
   // as part of destruction.
@@ -109,15 +111,8 @@ void ConnectionImpl::closeSocket() {
   file_event_.reset();
   ::close(fd_);
   fd_ = -1;
-}
 
-void ConnectionImpl::doLocalClose() {
-  conn_log_debug("doing local close", *this);
-  closeSocket();
-
-  // We expect our owner to deal with freeing us in whatever way makes sense. We raise an event
-  // to kick that off.
-  raiseEvents(ConnectionEvent::LocalClose);
+  raiseEvents(close_type);
 }
 
 Event::Dispatcher& ConnectionImpl::dispatcher() { return dispatcher_; }
@@ -232,8 +227,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 
   if (state_ & InternalState::ImmediateConnectionError) {
     conn_log_debug("raising immediate connect error", *this);
-    closeSocket();
-    raiseEvents(ConnectionEvent::RemoteClose);
+    closeSocket(ConnectionEvent::RemoteClose);
     return;
   }
 
@@ -282,10 +276,9 @@ void ConnectionImpl::onReadReady() {
   onRead();
 
   // The read callback may have already closed the connection.
-  if (fd_ != -1 && action == PostIoAction::Close) {
+  if (action == PostIoAction::Close) {
     conn_log_debug("remote close", *this);
-    closeSocket();
-    raiseEvents(ConnectionEvent::RemoteClose);
+    closeSocket(ConnectionEvent::RemoteClose);
   }
 }
 
@@ -326,8 +319,7 @@ void ConnectionImpl::onWriteReady() {
       onConnected();
     } else {
       conn_log_debug("delayed connection error: {}", *this, error);
-      closeSocket();
-      raiseEvents(ConnectionEvent::RemoteClose);
+      closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
   }
@@ -336,13 +328,10 @@ void ConnectionImpl::onWriteReady() {
     // It is possible (though unlikely) for the connection to have already been closed during the
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.
-    if (fd_ != -1) {
-      closeSocket();
-      raiseEvents(ConnectionEvent::RemoteClose);
-    }
+    closeSocket(ConnectionEvent::RemoteClose);
   } else if ((state_ & InternalState::CloseWithFlush) && write_buffer_.length() == 0) {
     conn_log_debug("write flush complete", *this);
-    doLocalClose();
+    closeSocket(ConnectionEvent::LocalClose);
   }
 }
 
