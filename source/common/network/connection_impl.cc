@@ -196,6 +196,8 @@ void ConnectionImpl::readDisable(bool disable) {
 
 void ConnectionImpl::raiseEvents(uint32_t events) {
   for (ConnectionCallbacks* callback : callbacks_) {
+    // TODO: If we close while raising a connected event we should not raise further connected
+    //       events.
     callback->onEvent(events);
   }
 }
@@ -331,8 +333,13 @@ void ConnectionImpl::onWriteReady() {
   }
 
   if (doWriteToSocket() == PostIoAction::Close) {
-    closeSocket();
-    raiseEvents(ConnectionEvent::RemoteClose);
+    // It is possible (though unlikely) for the connection to have already been closed during the
+    // write callback. This can happen if we manage to complete the SSL handshake in the write
+    // callback, raise a connected event, and close the connection.
+    if (fd_ != -1) {
+      closeSocket();
+      raiseEvents(ConnectionEvent::RemoteClose);
+    }
   } else if ((state_ & InternalState::CloseWithFlush) && write_buffer_.length() == 0) {
     conn_log_debug("write flush complete", *this);
     doLocalClose();
