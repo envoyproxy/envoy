@@ -3,6 +3,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
 
+#include "common/common/non_copyable.h"
+
 namespace Json {
 
 class Factory {
@@ -110,19 +112,19 @@ protected:
 };
 
 /**
- * Loads a JSON from a string.
+ * Loads a JSON file into memory.
  */
-class StringLoader : public Object {
+class FileLoader : NonCopyable, public Object {
 public:
-  StringLoader(const std::string& json) { abstract_object_ = Factory::LoadFromString(json); }
+  FileLoader(const std::string& file_path) { abstract_object_ = Factory::LoadFromFile(file_path); }
 };
 
 /**
- * Loads a JSON file into memory.
+ * Loads JSON from a string.
  */
-class FileLoader : public Object {
+class StringLoader : NonCopyable, public Object {
 public:
-  FileLoader(const std::string& file_path) { abstract_object_ = Factory::LoadFromFile(file_path); }
+  StringLoader(const std::string& json) { abstract_object_ = Factory::LoadFromString(json); }
 };
 
 } // Json
