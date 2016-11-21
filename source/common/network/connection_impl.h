@@ -48,7 +48,7 @@ public:
 protected:
   enum class PostIoAction { Close, KeepOpen };
 
-  virtual void closeSocket();
+  virtual void closeSocket(uint32_t close_type);
   void doConnect(const sockaddr* addr, socklen_t addrlen);
   void raiseEvents(uint32_t events);
 
@@ -67,7 +67,6 @@ private:
   };
   // clang-format on
 
-  void doLocalClose();
   virtual PostIoAction doReadFromSocket();
   virtual PostIoAction doWriteToSocket();
   void onBufferChange(ConnectionBufferType type, uint64_t old_size, int64_t delta);

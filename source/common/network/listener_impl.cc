@@ -26,6 +26,14 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& sock
   if (!listener_) {
     throw CreateListenerException(fmt::format("cannot listen on socket: {}", socket.name()));
   }
+
+  evconnlistener_set_error_cb(listener_.get(), errorCallback);
+}
+
+void ListenerImpl::errorCallback(evconnlistener*, void*) {
+  // We should never get an error callback. This can happen if we run out of FDs or memory. In those
+  // cases just crash.
+  PANIC(fmt::format("listener accept failure: {}", strerror(errno)));
 }
 
 void ListenerImpl::newConnection(int fd, sockaddr* addr) {

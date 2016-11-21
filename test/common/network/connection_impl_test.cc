@@ -14,13 +14,9 @@ using testing::Test;
 
 namespace Network {
 
-TEST(ConnectionImplTest, BadFd) {
+TEST(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
-  ConnectionImpl connection(dispatcher, -1, "127.0.0.1");
-  MockConnectionCallbacks callbacks;
-  connection.addConnectionCallbacks(callbacks);
-  EXPECT_CALL(callbacks, onEvent(ConnectionEvent::RemoteClose));
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  EXPECT_DEATH(ConnectionImpl(dispatcher, -1, "127.0.0.1"), ".*assert failure: fd_ != -1.*");
 }
 
 TEST(ConnectionImplTest, BufferCallbacks) {

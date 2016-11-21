@@ -1,5 +1,13 @@
 #include "server/options_impl.h"
 
+TEST(OptionsImplDeathTest, HotRestartVersion) {
+  std::vector<const char*> argv;
+  argv.push_back("envoy");
+  argv.push_back("--hot-restart-version");
+  EXPECT_EXIT(OptionsImpl(argv.size(), const_cast<char**>(&argv[0]), "1", spdlog::level::warn),
+              testing::ExitedWithCode(0), "");
+}
+
 TEST(OptionsImplTest, All) {
   std::vector<const char*> argv;
   argv.push_back("envoy");

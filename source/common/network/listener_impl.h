@@ -41,6 +41,8 @@ protected:
   ProxyProtocol proxy_protocol_;
 
 private:
+  static void errorCallback(evconnlistener* listener, void* context);
+
   Event::Libevent::ListenerPtr listener_;
 };
 

@@ -26,7 +26,7 @@ private:
   void drainErrorQueue();
 
   // Network::ConnectionImpl
-  void closeSocket() override;
+  void closeSocket(uint32_t close_type) override;
   PostIoAction doReadFromSocket() override;
   PostIoAction doWriteToSocket() override;
   void onConnected() override;
