@@ -3,10 +3,9 @@
 // Do not let RapidJson leak outside of this file.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
+#include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/istreamwrapper.h"
-#include <fstream>
-#include "rapidjson/document.h"
 #pragma GCC diagnostic pop
 
 namespace Json {
