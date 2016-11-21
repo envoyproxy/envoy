@@ -44,10 +44,10 @@ public:
   FaultFilterStats& stats() { return stats_; }
 
 private:
-  uint64_t abort_percent_;       // 0-100
-  uint64_t http_status_;         // HTTP or gRPC return codes
-  uint64_t fixed_delay_percent_; // 0-100
-  uint64_t fixed_duration_ms_;   // in milliseconds
+  uint64_t abort_percent_{};       // 0-100
+  uint64_t http_status_{};         // HTTP or gRPC return codes
+  uint64_t fixed_delay_percent_{}; // 0-100
+  uint64_t fixed_duration_ms_{};   // in milliseconds
   std::vector<Router::ConfigUtility::HeaderData> fault_filter_headers_;
   Runtime::Loader& runtime_;
   FaultFilterStats stats_;
@@ -74,6 +74,7 @@ private:
   void onResetStream();
   void resetTimerState();
   void postDelayInjection();
+  void abortWithHTTPStatus();
 
   FaultFilterConfigPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};

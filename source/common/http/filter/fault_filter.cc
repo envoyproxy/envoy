@@ -17,11 +17,6 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
                                      const std::string& stat_prefix, Stats::Store& stats)
     : runtime_(runtime), stats_{ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))} {
 
-  abort_percent_ = 0UL;
-  http_status_ = 0UL;
-  fixed_delay_percent_ = 0UL;
-  fixed_duration_ms_ = 0UL;
-
   if (json_config.hasObject("abort")) {
     const Json::Object& abort = json_config.getObject("abort");
     abort_percent_ = static_cast<uint64_t>(abort.getInteger("abort_percent", 0));
@@ -101,11 +96,7 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
 
   if (config_->runtime().snapshot().featureEnabled("fault.http.abort.abort_percent",
                                                    config_->abortPercent())) {
-    // todo check http status codes obtained from runtime
-    Http::HeaderMapPtr response_headers{new HeaderMapImpl{
-        {Headers::get().Status, std::to_string(config_->runtime().snapshot().getInteger(
-                                    "fault.http.abort.http_status", config_->abortCode()))}}};
-    callbacks_->encodeHeaders(std::move(response_headers), true);
+    abortWithHTTPStatus();
     config_->stats().aborts_injected_.inc();
     return FilterHeadersStatus::StopIteration;
   }
@@ -133,15 +124,20 @@ void FaultFilter::postDelayInjection() {
   // Delays can be followed by aborts
   if (config_->runtime().snapshot().featureEnabled("fault.http.abort.abort_percent",
                                                    config_->abortPercent())) {
-    Http::HeaderMapPtr response_headers{new HeaderMapImpl{
-        {Headers::get().Status, std::to_string(config_->runtime().snapshot().getInteger(
-                                    "fault.http.abort.http_status", config_->abortCode()))}}};
+    abortWithHTTPStatus();
     config_->stats().aborts_injected_.inc();
-    callbacks_->encodeHeaders(std::move(response_headers), true);
   } else {
     // Continue request processing
     callbacks_->continueDecoding();
   }
+}
+
+void FaultFilter::abortWithHTTPStatus() {
+  // TODO: check http status codes obtained from runtime
+  Http::HeaderMapPtr response_headers{new HeaderMapImpl{
+      {Headers::get().Status, std::to_string(config_->runtime().snapshot().getInteger(
+                                  "fault.http.abort.http_status", config_->abortCode()))}}};
+  callbacks_->encodeHeaders(std::move(response_headers), true);
 }
 
 void FaultFilter::resetTimerState() {
