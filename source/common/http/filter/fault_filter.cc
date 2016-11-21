@@ -97,7 +97,6 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
   if (config_->runtime().snapshot().featureEnabled("fault.http.abort.abort_percent",
                                                    config_->abortPercent())) {
     abortWithHTTPStatus();
-    config_->stats().aborts_injected_.inc();
     return FilterHeadersStatus::StopIteration;
   }
 
@@ -125,7 +124,6 @@ void FaultFilter::postDelayInjection() {
   if (config_->runtime().snapshot().featureEnabled("fault.http.abort.abort_percent",
                                                    config_->abortPercent())) {
     abortWithHTTPStatus();
-    config_->stats().aborts_injected_.inc();
   } else {
     // Continue request processing
     callbacks_->continueDecoding();
@@ -138,6 +136,7 @@ void FaultFilter::abortWithHTTPStatus() {
       {Headers::get().Status, std::to_string(config_->runtime().snapshot().getInteger(
                                   "fault.http.abort.http_status", config_->abortCode()))}}};
   callbacks_->encodeHeaders(std::move(response_headers), true);
+  config_->stats().aborts_injected_.inc();
 }
 
 void FaultFilter::resetTimerState() {
