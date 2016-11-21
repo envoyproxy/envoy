@@ -1,7 +1,5 @@
 #include "json_loader.h"
 
-#include "common/common/non_copyable.h"
-
 // Do not let RapidJson leak outside of this file.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
@@ -12,6 +10,10 @@
 #pragma GCC diagnostic pop
 
 namespace Json {
+
+/**
+ * Implementation of AbstractObject.
+ */
 class AbstractObjectImpl : public AbstractObject {
 public:
   AbstractObjectImpl(const rapidjson::Document& document, const std::string& name) : name_(name) {
@@ -143,7 +145,7 @@ public:
     for (rapidjson::Value::ConstMemberIterator itr = document_.MemberBegin();
          itr != document_.MemberEnd(); ++itr) {
       std::string object_key(itr->name.GetString());
-      AbstractObjectImpl object_value(itr->value, "root");
+      AbstractObjectImpl object_value(itr->value, object_key);
       bool need_continue = callback(object_key, object_value);
       if (!need_continue) {
         break;
