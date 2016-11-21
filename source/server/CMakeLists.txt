@@ -1,6 +1,7 @@
 add_library(envoy-server OBJECT
   config/http/buffer.cc
   config/http/dynamo.cc
+  config/http/fault.cc
   config/http/grpc_http1_bridge.cc
   config/http/ratelimit.cc
   config/http/router.cc

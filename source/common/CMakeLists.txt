@@ -63,6 +63,7 @@ add_library(
   http/http2/codec_impl.cc
   http/http2/conn_pool.cc
   http/filter/buffer_filter.cc
+  http/filter/fault_filter.cc
   http/filter/ratelimit.cc
   http/user_agent.cc
   http/utility.cc
