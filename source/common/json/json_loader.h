@@ -117,7 +117,6 @@ protected:
 class FileLoader : NonCopyable, public Object {
 public:
   FileLoader(const std::string& file_path) { abstract_object_ = Factory::LoadFromFile(file_path); }
-  ~FileLoader();
 };
 
 /**
@@ -126,7 +125,6 @@ public:
 class StringLoader : NonCopyable, public Object {
 public:
   StringLoader(const std::string& json) { abstract_object_ = Factory::LoadFromString(json); }
-  ~StringLoader();
 };
 
 } // Json

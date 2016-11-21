@@ -176,8 +176,7 @@ AbstractObjectPtr Factory::LoadFromFile(const std::string& file_path) {
   std::fstream file_stream(file_path);
   rapidjson::IStreamWrapper stream_wrapper(file_stream);
   if (document.ParseStream(stream_wrapper).HasParseError()) {
-    throw Exception(fmt::format("Error(offset {}): {}\n",
-                                static_cast<unsigned>(document.GetErrorOffset()),
+    throw Exception(fmt::format("Error(offset {}): {}\n", document.GetErrorOffset(),
                                 GetParseError_En(document.GetParseError())));
   }
   return AbstractObjectPtr{new AbstractObjectImpl(document, "root")};
@@ -186,8 +185,7 @@ AbstractObjectPtr Factory::LoadFromFile(const std::string& file_path) {
 AbstractObjectPtr Factory::LoadFromString(const std::string& json) {
   rapidjson::Document document;
   if (document.Parse<0>(json.c_str()).HasParseError()) {
-    throw Exception(fmt::format("Error(offset {}): {}\n",
-                                static_cast<unsigned>(document.GetErrorOffset()),
+    throw Exception(fmt::format("Error(offset {}): {}\n", document.GetErrorOffset(),
                                 GetParseError_En(document.GetParseError())));
   }
   return AbstractObjectPtr{new AbstractObjectImpl(document, "root")};
