@@ -71,9 +71,7 @@ add_user_agent
   :ref:`config_http_conn_man_headers_downstream-service-cluster` headers. See the linked
   documentation for more information. Defaults to false.
 
-.. _config_http_conn_man_tracing:
-
-:ref:`tracing <config_http_conn_man_tracing_format>`
+:ref:`tracing <config_http_conn_man_tracing>`
   *(optional, object)* Presence of the object defines whether the connection manager
   emits :ref:`tracing <arch_overview_tracing>` data to the :ref:`configured tracing provider <config_tracing>`.
   
@@ -137,38 +135,13 @@ generate_request_id
   *true*. Generating a random UUID4 is expensive so in high throughput scenarios where this
   feature is not desired it can be disabled.
 
-.. _config_http_conn_man_tracing_format:
-
-Tracing configuration
-^^^^^^^^^^^^^^^^^^^^^
-.. code-block:: json
-  
-  {
-    "tracing": {
-      "operation_name": "...",
-      "type": "..."
-    }
-  }
- 
-operation_name
-  *(required, string)* Span name that will be emitted on completed request.
-  
-type
-  *(optional, string)* Allows filtering of requests so that only some of them are traced. Default 
-  value is *all*. Possible values are:
-    
-  all
-    Trace all requests.
-
-  upstream_failure
-    Trace only requests for which an upstream failure occurred.
-
 .. toctree::
   :hidden:
 
   route_config/route_config
   filters
   access_log
+  tracing
   headers
   stats
   runtime
