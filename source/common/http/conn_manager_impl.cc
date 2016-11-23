@@ -171,7 +171,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
     // Processing incoming data may release outbound data so check for closure here as well.
     checkForDeferredClose();
 
-    // The HTTP/1.1 codec will pause dispatch after a single message is complete. We want to
+    // The HTTP/1 codec will pause dispatch after a single message is complete. We want to
     // either redispatch if there are no streams and we have more data, or if we have a single
     // complete stream but have not responded yet we will pause socket reads to apply back pressure.
     if (codec_->protocol() != Protocol::Http2) {
@@ -348,7 +348,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
-  if (!(protocol == Protocol::Http11 || protocol == Protocol::Http2)) {
+  if (protocol == Protocol::Http10) {
     // The protocol may have shifted in the HTTP/1.0 case so reset it.
     request_info_.protocol(protocol);
     HeaderMapImpl headers{
