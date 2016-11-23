@@ -256,7 +256,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
 
 TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
   {
-    TestHeaderMapImpl headers{{":version", "HTTP/1.1"}, {":authority", "host"}, {":path", "/"}};
+    TestHeaderMapImpl headers{{":authority", "host"}, {":path", "/"}};
     EXPECT_CALL(random_, uuid()).WillOnce(Return("generated_uuid"));
 
     ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, random_,
@@ -354,10 +354,8 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   config_.route_config_.response_headers_to_remove_.push_back(LowerCaseString("custom_header"));
   config_.route_config_.response_headers_to_add_.push_back({LowerCaseString("to_add"), "foo"});
 
-  TestHeaderMapImpl response_headers{{"connection", "foo"},
-                                     {"transfer-encoding", "foo"},
-                                     {":version", "foo"},
-                                     {"custom_header", "foo"}};
+  TestHeaderMapImpl response_headers{
+      {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "foo"}};
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, config_);

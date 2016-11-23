@@ -7,7 +7,7 @@
 #include "test/test_common/utility.h"
 
 using testing::NiceMock;
-using testing::ReturnRef;
+using testing::ReturnPointee;
 
 namespace Grpc {
 
@@ -16,18 +16,18 @@ public:
   GrpcHttp1BridgeFilterTest() {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
-    ON_CALL(decoder_callbacks_.request_info_, protocol()).WillByDefault(ReturnRef(protocol_));
+    ON_CALL(decoder_callbacks_.request_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
   }
 
   Stats::IsolatedStoreImpl stats_store_;
   Http1BridgeFilter filter_{stats_store_};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  std::string protocol_{"HTTP/1.1"};
+  Http::Protocol protocol_{Http::Protocol::Http11};
 };
 
 TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
-  protocol_ = "HTTP/2";
+  protocol_ = Http::Protocol::Http2;
 
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
                                           {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
@@ -49,7 +49,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2NormalResponse) {
-  protocol_ = "HTTP/2";
+  protocol_ = Http::Protocol::Http2;
 
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
                                           {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
@@ -75,7 +75,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2NormalResponse) {
 }
 
 TEST_F(GrpcHttp1BridgeFilterTest, NotHandlingHttp2) {
-  protocol_ = "HTTP/2";
+  protocol_ = Http::Protocol::Http2;
 
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/foo"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));

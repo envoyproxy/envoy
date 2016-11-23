@@ -19,7 +19,6 @@ namespace Http {
 namespace Http2 {
 
 const std::string ALPN_STRING = "h2";
-const std::string PROTOCOL_STRING = "HTTP/2";
 
 // This is not the full client magic, but it's the smallest size that should be able to
 // differentiate between HTTP/1 and HTTP/2.
@@ -70,9 +69,8 @@ public:
 
   // Http::Connection
   void dispatch(Buffer::Instance& data) override;
-  uint64_t features() override { return CodecFeatures::Multiplexing; }
   void goAway() override;
-  const std::string& protocolString() override { return PROTOCOL_STRING; }
+  Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
 

@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
 
 namespace Http {
 
@@ -145,14 +146,6 @@ public:
 };
 
 /**
- * A list of features that a codec provides.
- */
-class CodecFeatures {
-public:
-  static const uint64_t Multiplexing = 0x1;
-};
-
-/**
  * A list of options that can be specified when creating a codec.
  */
 class CodecOptions {
@@ -174,19 +167,15 @@ public:
   virtual void dispatch(Buffer::Instance& data) PURE;
 
   /**
-   * Get the features that a connection provides. Maps to entries in CodecFeatures.
-   */
-  virtual uint64_t features() PURE;
-
-  /**
    * Indicate "go away" to the remote. No new streams can be created beyond this point.
    */
   virtual void goAway() PURE;
 
   /**
-   * @return const std::string& the human readable name of the protocol that this codec wraps.
+   * @return the protocol backing the connection. This can change if for example an HTTP/1.1
+   *         connection gets an HTTP/1.0 request on it.
    */
-  virtual const std::string& protocolString() PURE;
+  virtual Protocol protocol() PURE;
 
   /**
    * Indicate a "shutdown notice" to the remote. This is a hint that the remote should not send

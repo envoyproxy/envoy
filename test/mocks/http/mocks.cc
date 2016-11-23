@@ -56,7 +56,7 @@ MockStreamEncoder::MockStreamEncoder() {
 MockStreamEncoder::~MockStreamEncoder() {}
 
 MockServerConnection::MockServerConnection() {
-  ON_CALL(*this, protocolString()).WillByDefault(ReturnRef(protocol_));
+  ON_CALL(*this, protocol()).WillByDefault(Return(protocol_));
 }
 
 MockServerConnection::~MockServerConnection() {}

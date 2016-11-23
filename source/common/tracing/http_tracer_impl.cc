@@ -229,7 +229,8 @@ std::string LightStepSink::buildRequestLine(const Http::HeaderMap& request_heade
     path = path.substr(0, max_path_length);
   }
 
-  return fmt::format("{} {} {}", request_headers.Method()->value().c_str(), path, info.protocol());
+  return fmt::format("{} {} {}", request_headers.Method()->value().c_str(), path,
+                     Http::AccessLog::AccessLogFormatUtils::protocolToString(info.protocol()));
 }
 
 std::string LightStepSink::buildResponseCode(const Http::AccessLog::RequestInfo& info) {

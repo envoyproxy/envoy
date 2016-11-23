@@ -38,7 +38,7 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
                                    const Optional<std::chrono::milliseconds>& timeout)
     : request_(std::move(request)), parent_(parent), callbacks_(callbacks),
       stream_id_(parent.config_.random_.random()), router_(parent.config_),
-      request_info_(EMPTY_STRING), route_(parent_.cluster_.name(), timeout) {
+      request_info_(Protocol::Http11), route_(parent_.cluster_.name(), timeout) {
 
   router_.setDecoderFilterCallbacks(*this);
   request_->headers().insertEnvoyInternalRequest().value(
@@ -50,6 +50,7 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
   }
 
   // TODO: Support request trailers.
+  // TODO: Correctly set protocol in request info when we support access logging.
 }
 
 AsyncRequestImpl::~AsyncRequestImpl() { ASSERT(!reset_callback_); }

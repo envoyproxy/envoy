@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Http {
@@ -64,7 +65,12 @@ public:
   /**
    * @return the protocol of the request.
    */
-  virtual const std::string& protocol() const PURE;
+  virtual Protocol protocol() const PURE;
+
+  /**
+   * Set the request's protocol.
+   */
+  virtual void protocol(Protocol protocol) PURE;
 
   /**
    * @return the response code.

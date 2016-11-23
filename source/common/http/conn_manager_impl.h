@@ -379,8 +379,11 @@ private:
     // All state for the stream. Put here for readability. We could move this to a bit field
     // eventually if we want.
     struct State {
-      bool remote_complete_{};
-      bool local_complete_{};
+      State() : remote_complete_(false), local_complete_(false), saw_connection_close_(false) {}
+
+      bool remote_complete_ : 1;
+      bool local_complete_ : 1;
+      bool saw_connection_close_ : 1;
     };
 
     // NOTE: This is used for stable randomness. For performance reasons we use an incrementing

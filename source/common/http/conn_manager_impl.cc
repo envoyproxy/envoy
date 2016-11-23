@@ -12,6 +12,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
@@ -66,11 +67,10 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
   }
 
   if (codec_) {
-    if (codec_->protocolString() == Http1::PROTOCOL_STRING) {
-      stats_.named_.downstream_cx_http1_active_.dec();
-    } else {
-      ASSERT(codec_->protocolString() == Http2::PROTOCOL_STRING);
+    if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_active_.dec();
+    } else {
+      stats_.named_.downstream_cx_http1_active_.dec();
     }
   }
 
@@ -104,14 +104,14 @@ void ConnectionManagerImpl::destroyStream(ActiveStream& stream) {
     read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
   }
 
-  if (reset_stream && !(codec_->features() & CodecFeatures::Multiplexing)) {
+  if (reset_stream && codec_->protocol() != Protocol::Http2) {
     drain_state_ = DrainState::Closing;
   }
 
   checkForDeferredClose();
 
   // Reading may have been disabled for the non-multiplexing case, so enable it again.
-  if (drain_state_ != DrainState::Closing && !(codec_->features() & CodecFeatures::Multiplexing) &&
+  if (drain_state_ != DrainState::Closing && codec_->protocol() != Protocol::Http2 &&
       !read_callbacks_->connection().readEnabled()) {
     read_callbacks_->connection().readDisable(false);
   }
@@ -138,13 +138,12 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
   if (!codec_) {
     codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
-    if (codec_->protocolString() == Http1::PROTOCOL_STRING) {
-      stats_.named_.downstream_cx_http1_total_.inc();
-      stats_.named_.downstream_cx_http1_active_.inc();
-    } else {
-      ASSERT(codec_->protocolString() == Http2::PROTOCOL_STRING);
+    if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_total_.inc();
       stats_.named_.downstream_cx_http2_active_.inc();
+    } else {
+      stats_.named_.downstream_cx_http1_total_.inc();
+      stats_.named_.downstream_cx_http1_active_.inc();
     }
   }
 
@@ -172,10 +171,10 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
     // Processing incoming data may release outbound data so check for closure here as well.
     checkForDeferredClose();
 
-    // The HTTP/1.1 codec will pause dispatch after a single message is complete. We want to
+    // The HTTP/1 codec will pause dispatch after a single message is complete. We want to
     // either redispatch if there are no streams and we have more data, or if we have a single
     // complete stream but have not responded yet we will pause socket reads to apply back pressure.
-    if (!(codec_->features() & CodecFeatures::Multiplexing)) {
+    if (codec_->protocol() != Protocol::Http2) {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
         redispatch = true;
@@ -268,14 +267,13 @@ std::atomic<uint64_t> ConnectionManagerImpl::ActiveStream::next_stream_id_(0);
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager), stream_id_(next_stream_id_++),
       request_timer_(connection_manager_.stats_.named_.downstream_rq_time_.allocateSpan()),
-      request_info_(connection_manager_.codec_->protocolString()) {
+      request_info_(connection_manager_.codec_->protocol()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
-  if (connection_manager_.codec_->protocolString() == Http1::PROTOCOL_STRING) {
-    connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
-  } else {
-    ASSERT(connection_manager_.codec_->protocolString() == Http2::PROTOCOL_STRING);
+  if (connection_manager_.codec_->protocol() == Protocol::Http2) {
     connection_manager_.stats_.named_.downstream_rq_http2_total_.inc();
+  } else {
+    connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
 }
 
@@ -349,8 +347,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       *request_headers_, connection_manager_.stats_.prefix_, connection_manager_.stats_.store_);
 
   // Make sure we are getting a codec version we support.
-  const HeaderString& codec_version = request_headers_->Version()->value();
-  if (!(codec_version == "HTTP/1.1" || codec_version == "HTTP/2")) {
+  Protocol protocol = connection_manager_.codec_->protocol();
+  if (protocol == Protocol::Http10) {
+    // The protocol may have shifted in the HTTP/1.0 case so reset it.
+    request_info_.protocol(protocol);
     HeaderMapImpl headers{
         {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
     encodeHeaders(nullptr, headers, true);
@@ -389,6 +389,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::NotFound))}};
     encodeHeaders(nullptr, headers, true);
     return;
+  }
+
+  if (protocol == Protocol::Http11 && request_headers_->Connection() &&
+      0 ==
+          StringUtil::caseInsensitiveCompare(request_headers_->Connection()->value().c_str(),
+                                             Http::Headers::get().ConnectionValues.Close.c_str())) {
+    state_.saw_connection_close_ = true;
   }
 
   ConnectionManagerUtility::mutateRequestHeaders(
@@ -528,7 +535,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   // Base headers.
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   headers.insertServer().value(connection_manager_.config_.serverName());
-  headers.insertEnvoyProtocolVersion().value(connection_manager_.codec_->protocolString());
   ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
                                                   connection_manager_.config_);
 
@@ -545,11 +551,16 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     stream_log_debug("drain closing connection", *this);
   }
 
+  if (connection_manager_.drain_state_ == DrainState::NotDraining && state_.saw_connection_close_) {
+    stream_log_debug("closing connection due to connection close header", *this);
+    connection_manager_.drain_state_ = DrainState::Closing;
+  }
+
   // If we are destroying a stream before remote is complete and the connection does not support
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
   if (!state_.remote_complete_) {
-    if (!(connection_manager_.codec_->features() & CodecFeatures::Multiplexing)) {
+    if (connection_manager_.codec_->protocol() != Protocol::Http2) {
       connection_manager_.drain_state_ = DrainState::Closing;
     }
 
@@ -557,7 +568,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 
   if (connection_manager_.drain_state_ == DrainState::Closing &&
-      !(connection_manager_.codec_->features() & CodecFeatures::Multiplexing)) {
+      connection_manager_.codec_->protocol() != Protocol::Http2) {
     headers.insertConnection().value(Headers::get().ConnectionValues.Close);
   }
 

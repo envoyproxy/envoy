@@ -35,11 +35,7 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
   TestHeaderMapImpl expected_headers{
-      {"Test", ""},
-      {"Hello", "World"},
-      {":version", "HTTP/1.1"},
-      {":path", "/"},
-      {":method", "GET"},
+      {"Test", ""}, {"Hello", "World"}, {":path", "/"}, {":method", "GET"},
   };
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
@@ -54,12 +50,13 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
   Http::MockStreamDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{{":version", "HTTP/1.0"}, {":path", "/"}, {":method", "GET"}};
+  TestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(Protocol::Http10, codec_->protocol());
 }
 
 TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
@@ -68,7 +65,7 @@ TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
   Http::MockStreamDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{{":version", "HTTP/1.1"}, {":path", "/"}, {":method", "GET"}};
+  TestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
@@ -106,8 +103,7 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   Http::MockStreamDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{
-      {":authority", "hello"}, {":version", "HTTP/1.1"}, {":path", "/"}, {":method", "GET"}};
+  TestHeaderMapImpl expected_headers{{":authority", "hello"}, {":path", "/"}, {":method", "GET"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHOST: hello\r\n\r\n");
@@ -121,8 +117,7 @@ TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
   Http::MockStreamDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{
-      {"content-length", "5"}, {":version", "HTTP/1.1"}, {":path", "/"}, {":method", "POST"}};
+  TestHeaderMapImpl expected_headers{{"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false))
       .WillOnce(Invoke([&](Http::HeaderMapPtr&, bool)
                            -> void { connection_.state_ = Network::Connection::State::Closing; }));
@@ -139,8 +134,7 @@ TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
   Http::MockStreamDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{
-      {"content-length", "5"}, {":version", "HTTP/1.1"}, {":path", "/"}, {":method", "POST"}};
+  TestHeaderMapImpl expected_headers{{"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false)).Times(1);
 
   Buffer::OwnedImpl expected_data1("12345");
@@ -258,7 +252,7 @@ TEST_F(Http1ServerConnectionImplTest, ExpectContinueResponse) {
   ON_CALL(connection_, write(_)).WillByDefault(AddBufferToString(&output));
 
   TestHeaderMapImpl expected_headers{
-      {"content-length", "100"}, {":version", "HTTP/1.1"}, {":path", "/"}, {":method", "POST"}};
+      {"content-length", "100"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false)).Times(1);
 
   Buffer::OwnedImpl buffer(

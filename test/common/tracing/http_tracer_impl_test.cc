@@ -431,8 +431,8 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
   Optional<uint32_t> code(200);
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
 
-  const std::string protocol = "http/1";
-  EXPECT_CALL(request_info, protocol()).Times(2).WillRepeatedly(ReturnRef(protocol));
+  Http::Protocol protocol = Http::Protocol::Http11;
+  EXPECT_CALL(request_info, protocol()).Times(2).WillRepeatedly(Return(protocol));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .Times(2)
       .WillRepeatedly(Return(2));
@@ -488,8 +488,8 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10UL));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100UL));
 
-  const std::string protocol = "http/1";
-  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
+  Http::Protocol protocol = Http::Protocol::Http11;
+  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(5));
   EXPECT_CALL(context_, operationName()).WillOnce(ReturnRef(operation_name_));
@@ -535,8 +535,8 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
   Optional<uint32_t> code(200);
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
 
-  const std::string protocol = "http/1";
-  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
+  Http::Protocol protocol = Http::Protocol::Http11;
+  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
