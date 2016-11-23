@@ -15,24 +15,28 @@ namespace Json {
  */
 class AbstractObjectImpl : public AbstractObject {
 public:
-  AbstractObjectImpl(const rapidjson::Value& value, const std::string& name)
+  AbstractObjectImpl(std::shared_ptr<rapidjson::Value> value, const std::string& name)
       : name_(name), value_(value) {}
 
+  AbstractObjectImpl(const std::string& name) : name_(name) {
+    value_ = std::make_shared<rapidjson::Value>();
+  }
   std::vector<AbstractObjectPtr> asObjectArray() const override {
-    if (!value_.IsArray()) {
+    if (!value_->IsArray()) {
       throw Exception(fmt::format("'{}' is not an array", name_));
     }
 
     std::vector<AbstractObjectPtr> object_array;
-    for (rapidjson::SizeType i = 0; i < value_.Size(); i++) {
-      object_array.emplace_back(new AbstractObjectImpl(value_[i], name_ + " (array item)"));
+    for (rapidjson::SizeType i = 0; i < value_->Size(); i++) {
+      //  object_array.emplace_back(new AbstractObjectImpl(value_[i], name_ + " (array item)"));
+      object_array.emplace_back(new AbstractObjectImpl(name_ + " (array item)"));
     }
 
     return object_array;
   }
 
   bool getBoolean(const std::string& name) const override {
-    const rapidjson::Value& value = value_[name.c_str()];
+    const rapidjson::Value& value = (*value_.get())[name.c_str()];
     if (!value.IsBool()) {
       throw Exception(fmt::format("key '{}' missing or not a boolean in '{}'", name, name_));
     }
@@ -40,7 +44,7 @@ public:
   }
 
   bool getBoolean(const std::string& name, bool default_value) const override {
-    if (!value_.HasMember(name.c_str())) {
+    if (!value_.get()->HasMember(name.c_str())) {
       return default_value;
     } else {
       return getBoolean(name);
@@ -48,7 +52,7 @@ public:
   }
 
   int64_t getInteger(const std::string& name) const override {
-    const rapidjson::Value& value = value_[name.c_str()];
+    const rapidjson::Value& value = (*value_.get())[name.c_str()];
     if (!value.IsInt64()) {
       throw Exception(fmt::format("key '{}' missing or not an integer in '{}'", name, name_));
     }
@@ -56,7 +60,7 @@ public:
   }
 
   int64_t getInteger(const std::string& name, int64_t default_value) const override {
-    if (!value_.HasMember(name.c_str())) {
+    if (!(*value_).HasMember(name.c_str())) {
       return default_value;
     } else {
       return getInteger(name);
@@ -64,32 +68,34 @@ public:
   }
 
   AbstractObjectPtr getObject(const std::string& name, bool allow_empty) const override {
-    const rapidjson::Value& value = value_[name.c_str()];
+    const rapidjson::Value& value = (*value_.get())[name.c_str()];
     if (allow_empty && !value.IsObject()) {
       rapidjson::Value empty_value;
-      return AbstractObjectPtr{new AbstractObjectImpl(empty_value, name)};
+      return AbstractObjectPtr{new AbstractObjectImpl(name)};
     } else if (!value.IsObject()) {
       throw Exception(fmt::format("key '{}' missing in '{}'", name, name_));
     }
-    return AbstractObjectPtr{new AbstractObjectImpl(value, name)};
+    //  return AbstractObjectPtr{new AbstractObjectImpl(value, name)};
+    return AbstractObjectPtr{new AbstractObjectImpl(name)};
   }
 
   std::vector<AbstractObjectPtr> getObjectArray(const std::string& name) const override {
-    const rapidjson::Value& value = value_[name.c_str()];
+    const rapidjson::Value& value = (*value_.get())[name.c_str()];
     if (!value.IsArray()) {
       throw Exception(fmt::format("key '{}' missing or not an array in '{}'", name, name_));
     }
 
     std::vector<AbstractObjectPtr> object_array;
     for (rapidjson::SizeType i = 0; i < value.Size(); i++) {
-      object_array.emplace_back(new AbstractObjectImpl(value[i], name + " (array item)"));
+      //  object_array.emplace_back(new AbstractObjectImpl(value[i], name + " (array item)"));
+      object_array.emplace_back(new AbstractObjectImpl(name + " (array item)"));
     }
 
     return object_array;
   }
 
   std::string getString(const std::string& name) const override {
-    const rapidjson::Value& value = value_[name.c_str()];
+    const rapidjson::Value& value = (*value_.get())[name.c_str()];
     if (!value.IsString()) {
       throw Exception(fmt::format("key '{}' missing or not a string in '{}'", name, name_));
     }
@@ -98,7 +104,7 @@ public:
   }
 
   std::string getString(const std::string& name, const std::string& default_value) const override {
-    if (!value_.HasMember(name.c_str())) {
+    if (!value_.get()->HasMember(name.c_str())) {
       return default_value;
     } else {
       return getString(name);
@@ -106,7 +112,7 @@ public:
   }
 
   std::vector<std::string> getStringArray(const std::string& name) const override {
-    const rapidjson::Value& value = value_[name.c_str()];
+    const rapidjson::Value& value = (*value_.get())[name.c_str()];
     if (!value.IsArray()) {
       throw Exception(fmt::format("key '{}' missing or not an array in '{}'", name, name_));
     }
@@ -122,7 +128,7 @@ public:
   }
 
   double getDouble(const std::string& name) const override {
-    const rapidjson::Value& value = value_[name.c_str()];
+    const rapidjson::Value& value = (*value_.get())[name.c_str()];
     if (!value.IsDouble()) {
       throw Exception(fmt::format("key '{}' missing or not a double in '{}'", name, name_));
     }
@@ -131,7 +137,7 @@ public:
   }
 
   double getDouble(const std::string& name, double default_value) const override {
-    if (!value_.HasMember(name.c_str())) {
+    if (!value_->HasMember(name.c_str())) {
       return default_value;
     } else {
       return getDouble(name);
@@ -150,13 +156,15 @@ public:
     //      }
     //    }
   }
-  bool hasObject(const std::string& name) const override { return value_.HasMember(name.c_str()); }
+  bool hasObject(const std::string& name) const override { return value_->HasMember(name.c_str()); }
 
   std::vector<AbstractObjectPtr> getMembers() const override {
     std::vector<AbstractObjectPtr> return_vector;
-    for (rapidjson::Value::ConstMemberIterator itr = value_.MemberBegin();
-         itr != value_.MemberEnd(); ++itr) {
-      return_vector.emplace_back(new AbstractObjectImpl(itr->value, itr->name.GetString()));
+    for (rapidjson::Value::ConstMemberIterator itr = value_->MemberBegin();
+         itr != value_->MemberEnd(); ++itr) {
+      //  return_vnector.emplace_back(new AbstractObjectImpl(std::makeitr->value,
+      //  itr->name.GetString()));
+      return_vector.emplace_back(new AbstractObjectImpl(itr->name.GetString()));
     }
     return return_vector;
   }
@@ -165,27 +173,29 @@ public:
 
 private:
   const std::string name_;
-  const rapidjson::Value& value_;
+  std::shared_ptr<rapidjson::Value> value_;
 };
 
 AbstractObjectPtr Factory::LoadFromFile(const std::string& file_path) {
-  rapidjson::Document document;
+  rapidjson::Document* document = new rapidjson::Document();
   std::fstream file_stream(file_path);
   rapidjson::IStreamWrapper stream_wrapper(file_stream);
-  if (document.ParseStream(stream_wrapper).HasParseError()) {
-    throw Exception(fmt::format("Error(offset {}): {}\n", document.GetErrorOffset(),
-                                GetParseError_En(document.GetParseError())));
+  if (document->ParseStream(stream_wrapper).HasParseError()) {
+    throw Exception(fmt::format("Error(offset {}): {}\n", document->GetErrorOffset(),
+                                GetParseError_En(document->GetParseError())));
   }
-  return AbstractObjectPtr{new AbstractObjectImpl(document, "root")};
+  std::shared_ptr<rapidjson::Value> value(document);
+  return AbstractObjectPtr{new AbstractObjectImpl(value, "root")};
 }
 
 AbstractObjectPtr Factory::LoadFromString(const std::string& json) {
-  rapidjson::Document document;
-  if (document.Parse<0>(json.c_str()).HasParseError()) {
-    throw Exception(fmt::format("Error(offset {}): {}\n", document.GetErrorOffset(),
-                                GetParseError_En(document.GetParseError())));
+  rapidjson::Document* document = new rapidjson::Document();
+  if (document->Parse<0>(json.c_str()).HasParseError()) {
+    throw Exception(fmt::format("Error(offset {}): {}\n", document->GetErrorOffset(),
+                                GetParseError_En(document->GetParseError())));
   }
-  return AbstractObjectPtr{new AbstractObjectImpl(document, "root")};
+  std::shared_ptr<rapidjson::Value> value(document);
+  return AbstractObjectPtr{new AbstractObjectImpl(value, "root")};
 }
 
 } // Json
