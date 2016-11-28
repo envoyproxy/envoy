@@ -110,12 +110,12 @@ public:
   virtual double getDouble(const std::string& name, double default_value) const PURE;
 
   /**
-   * Iterate over key-value pairs in an Abstract Object and call callback on each pair.
+   * Iterate over key-value pairs in an AbstractObject and call callback on each pair.
    */
   virtual void iterate(const AbstractObjectCallback& callback) PURE;
 
   /**
-   * @return TRUE if the abstract object contains an element.
+   * @return TRUE if the AbstractObject contains the key.
    * @param name supplies the key name to lookup.
    */
   virtual bool hasObject(const std::string& name) const PURE;
