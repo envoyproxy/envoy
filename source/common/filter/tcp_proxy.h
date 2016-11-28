@@ -18,7 +18,7 @@ namespace Filter {
 // clang-format off
 #define ALL_TCP_PROXY_STATS(COUNTER, GAUGE)                                                        \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_rx_bytes_buffered) \
+  GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   GAUGE  (downstream_cx_tx_bytes_buffered)
 // clang-format on
