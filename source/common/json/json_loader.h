@@ -39,13 +39,14 @@ class Object {
 public:
   Object() {}
 
-  Object(AbstractObjectPtr&& abstract_object_ptr) {
-    abstract_object_ = std::move(abstract_object_ptr);
-  }
+  Object(AbstractObjectPtr&& abstract_object_ptr)
+      : abstract_object_(std::move(abstract_object_ptr)) {}
 
   std::vector<Object> asObjectArray() const {
     std::vector<AbstractObjectPtr> abstract_object_array = abstract_object_->asObjectArray();
     std::vector<Object> return_vector;
+    return_vector.reserve(abstract_object_array.size());
+
     for (AbstractObjectPtr& abstract_object : abstract_object_array) {
       return_vector.emplace_back(Object(std::move(abstract_object)));
     }
@@ -65,13 +66,14 @@ public:
   }
 
   Object getObject(const std::string& name, bool allow_empty = false) const {
-    AbstractObjectPtr abstract_object = abstract_object_->getObject(name, allow_empty);
-    return Object(std::move(abstract_object));
+    return Object(std::move(abstract_object_->getObject(name, allow_empty)));
   }
 
   std::vector<Object> getObjectArray(const std::string& name) const {
     std::vector<AbstractObjectPtr> abstract_object_array = abstract_object_->getObjectArray(name);
     std::vector<Object> return_vector;
+    return_vector.reserve(abstract_object_array.size());
+
     for (AbstractObjectPtr& abstract_object : abstract_object_array) {
       return_vector.emplace_back(Object(std::move(abstract_object)));
     }
@@ -95,14 +97,11 @@ public:
   }
 
   void iterate(const ObjectCallback& callback) {
-    for (AbstractObjectPtr& object : abstract_object_->getMembers()) {
-      std::string object_key(object->getName());
-      Object json(std::move(object));
-      bool need_continue = callback(object_key, json);
-      if (!need_continue) {
-        break;
-      }
-    }
+    abstract_object_->iterate(
+        [&callback](const std::string key, AbstractObjectPtr& abstract_object_ptr) {
+          Object object(std::move(abstract_object_ptr));
+          return callback(key, object);
+        });
   }
 
   bool hasObject(const std::string& name) const { return abstract_object_->hasObject(name); }
@@ -116,7 +115,7 @@ protected:
  */
 class FileLoader : NonCopyable, public Object {
 public:
-  FileLoader(const std::string& file_path) { abstract_object_ = Factory::LoadFromFile(file_path); }
+  FileLoader(const std::string& file_path) : Object(std::move(Factory::LoadFromFile(file_path))) {}
 };
 
 /**
@@ -124,7 +123,7 @@ public:
  */
 class StringLoader : NonCopyable, public Object {
 public:
-  StringLoader(const std::string& json) { abstract_object_ = Factory::LoadFromString(json); }
+  StringLoader(const std::string& json) : Object(std::move(Factory::LoadFromString(json))) {}
 };
 
 } // Json
