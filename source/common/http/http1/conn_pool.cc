@@ -276,6 +276,11 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   conn_length_ = parent_.host_->cluster().stats().upstream_cx_length_ms_.allocateSpan();
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
+
+  codec_client_->setBufferStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
+                                 parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
+                                 parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
+                                 parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_});
 }
 
 ConnPoolImpl::ActiveClient::~ActiveClient() {
@@ -283,15 +288,6 @@ ConnPoolImpl::ActiveClient::~ActiveClient() {
   parent_.host_->stats().cx_active_.dec();
   conn_length_->complete();
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().dec();
-}
-
-void ConnPoolImpl::ActiveClient::onBufferChange(Network::ConnectionBufferType type, uint64_t,
-                                                int64_t delta) {
-  Network::Utility::updateBufferStats(
-      type, delta, parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
-      parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
-      parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
-      parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_);
 }
 
 void ConnPoolImpl::ActiveClient::onConnectTimeout() {

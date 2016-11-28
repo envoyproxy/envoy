@@ -6,10 +6,6 @@
 
 namespace Buffer {
 
-const evbuffer_cb_func OwnedImpl::buffer_cb_ =
-    [](evbuffer*, const evbuffer_cb_info* info, void* arg)
-        -> void { static_cast<OwnedImpl*>(arg)->onBufferChange(*info); };
-
 void OwnedImpl::add(const void* data, uint64_t size) { evbuffer_add(buffer_.get(), data, size); }
 
 void OwnedImpl::add(const std::string& data) {
@@ -78,10 +74,6 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   UNREFERENCED_PARAMETER(rc);
 }
 
-void OwnedImpl::onBufferChange(const evbuffer_cb_info& info) {
-  cb_(info.orig_size, info.n_added - info.n_deleted);
-}
-
 int OwnedImpl::read(int fd, uint64_t max_length) {
   return evbuffer_read(buffer_.get(), fd, max_length);
 }
@@ -106,17 +98,6 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   evbuffer_ptr result_ptr =
       evbuffer_search(buffer_.get(), static_cast<const char*>(data), size, &start_ptr);
   return result_ptr.pos;
-}
-
-void OwnedImpl::setCallback(Callback callback) {
-  ASSERT(!callback || !cb_);
-  if (callback) {
-    evbuffer_add_cb(buffer_.get(), buffer_cb_, this);
-    cb_ = callback;
-  } else {
-    evbuffer_remove_cb(buffer_.get(), buffer_cb_, this);
-    cb_ = nullptr;
-  }
 }
 
 int OwnedImpl::write(int fd) { return evbuffer_write(buffer_.get(), fd); }

@@ -120,8 +120,6 @@ private:
     ~ActiveConnection();
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
-
     void onEvent(uint32_t event) override {
       // Any event leads to destruction of the connection.
       if (event == Network::ConnectionEvent::LocalClose ||

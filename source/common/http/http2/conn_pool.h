@@ -37,7 +37,6 @@ protected:
     void onConnectTimeout() { parent_.onConnectTimeout(*this); }
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType type, uint64_t, int64_t delta) override;
     void onEvent(uint32_t events) override { parent_.onConnectionEvent(*this, events); }
 
     // CodecClientCallbacks

@@ -17,6 +17,8 @@ namespace Filter {
  */
 // clang-format off
 #define ALL_TCP_PROXY_STATS(COUNTER, GAUGE)                                                        \
+  COUNTER(downstream_cx_rx_bytes_total)                                                            \
+  GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   GAUGE  (downstream_cx_tx_bytes_buffered)
 // clang-format on
@@ -61,22 +63,13 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
   Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
-    read_callbacks_ = &callbacks;
-    conn_log_info("new tcp proxy session", read_callbacks_->connection());
-    read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
 private:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
     DownstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType type, uint64_t old_size,
-                        int64_t delta) override {
-      parent_.onDownstreamBufferChange(type, old_size, delta);
-    }
-
     void onEvent(uint32_t event) override { parent_.onDownstreamEvent(event); }
 
     TcpProxy& parent_;
@@ -87,11 +80,6 @@ private:
     UpstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType type, uint64_t old_size,
-                        int64_t delta) override {
-      parent_.onUpstreamBufferChange(type, old_size, delta);
-    }
-
     void onEvent(uint32_t event) override { parent_.onUpstreamEvent(event); }
 
     // Network::ReadFilter
@@ -105,10 +93,7 @@ private:
 
   Network::FilterStatus initializeUpstreamConnection();
   void onConnectTimeout();
-  void onDownstreamBufferChange(Network::ConnectionBufferType type, uint64_t old_size,
-                                int64_t delta);
   void onDownstreamEvent(uint32_t event);
-  void onUpstreamBufferChange(Network::ConnectionBufferType type, uint64_t old_size, int64_t delta);
   void onUpstreamData(Buffer::Instance& data);
   void onUpstreamEvent(uint32_t event);
 

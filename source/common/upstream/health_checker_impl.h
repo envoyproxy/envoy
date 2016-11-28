@@ -136,7 +136,6 @@ private:
     void onResetStream(Http::StreamResetReason reason) override;
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
     void onEvent(uint32_t events) override;
 
     HttpHealthCheckerImpl& parent_;
@@ -241,7 +240,6 @@ private:
     TcpSessionCallbacks(TcpActiveHealthCheckSession& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
     void onEvent(uint32_t events) override { parent_.onEvent(events); }
 
     // Network::ReadFilter

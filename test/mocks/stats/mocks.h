@@ -20,6 +20,21 @@ public:
   MOCK_METHOD0(value, uint64_t());
 };
 
+class MockGauge : public Gauge {
+public:
+  MockGauge();
+  ~MockGauge();
+
+  MOCK_METHOD1(add, void(uint64_t amount));
+  MOCK_METHOD0(dec, void());
+  MOCK_METHOD0(inc, void());
+  MOCK_METHOD0(name, std::string());
+  MOCK_METHOD1(set, void(uint64_t value));
+  MOCK_METHOD1(sub, void(uint64_t amount));
+  MOCK_METHOD0(used, bool());
+  MOCK_METHOD0(value, uint64_t());
+};
+
 class MockTimespan : public Timespan {
 public:
   MockTimespan();

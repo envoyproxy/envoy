@@ -7,6 +7,9 @@ namespace Stats {
 MockCounter::MockCounter() {}
 MockCounter::~MockCounter() {}
 
+MockGauge::MockGauge() {}
+MockGauge::~MockGauge() {}
+
 MockTimespan::MockTimespan() {}
 MockTimespan::~MockTimespan() {}
 

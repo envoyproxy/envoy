@@ -12,6 +12,24 @@
 
 namespace Network {
 
+void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
+                                              uint64_t& previous_total, Stats::Counter& stat_total,
+                                              Stats::Gauge& stat_current) {
+  if (delta) {
+    stat_total.add(delta);
+  }
+
+  if (new_total != previous_total) {
+    if (new_total > previous_total) {
+      stat_current.add(new_total - previous_total);
+    } else {
+      stat_current.sub(previous_total - new_total);
+    }
+
+    previous_total = new_total;
+  }
+}
+
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
@@ -25,13 +43,6 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
 
   file_event_ =
       dispatcher_.createFileEvent(fd_, [this](uint32_t events) -> void { onFileEvent(events); });
-
-  read_buffer_.setCallback([this](uint64_t old_size, int64_t delta) -> void {
-    onBufferChange(ConnectionBufferType::Read, old_size, delta);
-  });
-  write_buffer_.setCallback([this](uint64_t old_size, int64_t delta) -> void {
-    onBufferChange(ConnectionBufferType::Write, old_size, delta);
-  });
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -93,20 +104,10 @@ void ConnectionImpl::closeSocket(uint32_t close_type) {
 
   conn_log_debug("closing socket: {}", *this, close_type);
 
-  // Drain input and output buffers so that callbacks get fired. This does not happen automatically
-  // as part of destruction.
-  uint64_t current_read_buffer_length = read_buffer_.length();
-  read_buffer_.setCallback(nullptr);
-  if (current_read_buffer_length > 0) {
-    onBufferChange(ConnectionBufferType::Read, current_read_buffer_length,
-                   -current_read_buffer_length);
-  }
-  uint64_t current_write_buffer_length = write_buffer_.length();
-  write_buffer_.setCallback(nullptr);
-  if (current_write_buffer_length > 0) {
-    onBufferChange(ConnectionBufferType::Write, current_write_buffer_length,
-                   -current_write_buffer_length);
-  }
+  // Drain input and output buffers.
+  updateReadBufferStats(0, 0);
+  updateWriteBufferStats(0, 0);
+  buffer_stats_.reset();
 
   file_event_.reset();
   ::close(fd_);
@@ -148,18 +149,12 @@ void ConnectionImpl::noDelay(bool enable) {
 
 uint64_t ConnectionImpl::id() { return id_; }
 
-void ConnectionImpl::onBufferChange(ConnectionBufferType type, uint64_t old_size, int64_t delta) {
-  for (ConnectionCallbacks* callbacks : callbacks_) {
-    callbacks->onBufferChange(type, old_size, delta);
-  }
-}
-
-void ConnectionImpl::onRead() {
+void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   if (!(state_ & InternalState::ReadEnabled)) {
     return;
   }
 
-  if (read_buffer_.length() == 0) {
+  if (read_buffer_size == 0) {
     return;
   }
 
@@ -243,7 +238,9 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 }
 
-ConnectionImpl::PostIoAction ConnectionImpl::doReadFromSocket() {
+ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
+  PostIoAction action;
+  uint64_t bytes_read = 0;
   do {
     // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
     // use an ioctl() before every read to figure out how much data there is to read.
@@ -254,38 +251,48 @@ ConnectionImpl::PostIoAction ConnectionImpl::doReadFromSocket() {
 
     // Remote close. Might need to raise data before raising close.
     if (rc == 0) {
-      return PostIoAction::Close;
-    }
-
-    // Remote error (might be no data).
-    if (rc == -1) {
+      action = PostIoAction::Close;
+      break;
+    } else if (rc == -1) {
+      // Remote error (might be no data).
       conn_log_trace("read error: {}", *this, errno);
       if (errno == EAGAIN) {
-        return PostIoAction::KeepOpen;
+        action = PostIoAction::KeepOpen;
       } else {
-        return PostIoAction::Close;
+        action = PostIoAction::Close;
       }
+
+      break;
+    } else {
+      bytes_read += rc;
     }
   } while (true);
+
+  return {action, bytes_read};
 }
 
 void ConnectionImpl::onReadReady() {
   ASSERT(!(state_ & InternalState::Connecting));
 
-  PostIoAction action = doReadFromSocket();
-  onRead();
+  IoResult result = doReadFromSocket();
+  uint64_t new_buffer_size = read_buffer_.length();
+  updateReadBufferStats(result.bytes_processed_, new_buffer_size);
+  onRead(new_buffer_size);
 
   // The read callback may have already closed the connection.
-  if (action == PostIoAction::Close) {
+  if (result.action_ == PostIoAction::Close) {
     conn_log_debug("remote close", *this);
     closeSocket(ConnectionEvent::RemoteClose);
   }
 }
 
-ConnectionImpl::PostIoAction ConnectionImpl::doWriteToSocket() {
+ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
+  PostIoAction action;
+  uint64_t bytes_written = 0;
   do {
     if (write_buffer_.length() == 0) {
-      return PostIoAction::KeepOpen;
+      action = PostIoAction::KeepOpen;
+      break;
     }
 
     int rc = write_buffer_.write(fd_);
@@ -293,12 +300,18 @@ ConnectionImpl::PostIoAction ConnectionImpl::doWriteToSocket() {
     if (rc == -1) {
       conn_log_trace("write error: {}", *this, errno);
       if (errno == EAGAIN) {
-        return PostIoAction::KeepOpen;
+        action = PostIoAction::KeepOpen;
       } else {
-        return PostIoAction::Close;
+        action = PostIoAction::Close;
       }
+
+      break;
+    } else {
+      bytes_written += rc;
     }
   } while (true);
+
+  return {action, bytes_written};
 }
 
 void ConnectionImpl::onConnected() { raiseEvents(ConnectionEvent::Connected); }
@@ -324,12 +337,16 @@ void ConnectionImpl::onWriteReady() {
     }
   }
 
-  if (doWriteToSocket() == PostIoAction::Close) {
+  IoResult result = doWriteToSocket();
+  uint64_t new_buffer_size = write_buffer_.length();
+  updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
+
+  if (result.action_ == PostIoAction::Close) {
     // It is possible (though unlikely) for the connection to have already been closed during the
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.
     closeSocket(ConnectionEvent::RemoteClose);
-  } else if ((state_ & InternalState::CloseWithFlush) && write_buffer_.length() == 0) {
+  } else if ((state_ & InternalState::CloseWithFlush) && new_buffer_size == 0) {
     conn_log_debug("write flush complete", *this);
     closeSocket(ConnectionEvent::LocalClose);
   }
@@ -351,6 +368,31 @@ void ConnectionImpl::doConnect(const sockaddr* addr, socklen_t addrlen) {
       conn_log_debug("immediate connection error: {}", *this, errno);
     }
   }
+}
+
+void ConnectionImpl::setBufferStats(const BufferStats& stats) {
+  ASSERT(!buffer_stats_);
+  buffer_stats_.reset(new BufferStats(stats));
+}
+
+void ConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size) {
+  if (!buffer_stats_) {
+    return;
+  }
+
+  ConnectionImplUtility::updateBufferStats(num_read, new_size, last_read_buffer_size_,
+                                           buffer_stats_->read_total_,
+                                           buffer_stats_->read_current_);
+}
+
+void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_size) {
+  if (!buffer_stats_) {
+    return;
+  }
+
+  ConnectionImplUtility::updateBufferStats(num_written, new_size, last_write_buffer_size_,
+                                           buffer_stats_->write_total_,
+                                           buffer_stats_->write_current_);
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,

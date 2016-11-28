@@ -215,8 +215,6 @@ public:
   StreamDecoder& newStream(StreamEncoder& response_encoder) override;
 
   // Network::ConnectionCallbacks
-  void onBufferChange(Network::ConnectionBufferType type, uint64_t old_size,
-                      int64_t delta) override;
   void onEvent(uint32_t events) override;
 
 private:

@@ -92,7 +92,6 @@ private:
     void shutdown() override;
 
     // Network::ConnectionCallbacks
-    void onBufferChange(Network::ConnectionBufferType, uint64_t, int64_t) override {}
     void onEvent(uint32_t events) override;
 
     TcpStatsdSink& parent_;

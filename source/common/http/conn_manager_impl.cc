@@ -57,6 +57,11 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
         [this]() -> void { onIdleTimeout(); });
     idle_timer_->enableTimer(config_.idleTimeout().value());
   }
+
+  read_callbacks_->connection().setBufferStats({stats_.named_.downstream_cx_rx_bytes_total_,
+                                                stats_.named_.downstream_cx_rx_bytes_buffered_,
+                                                stats_.named_.downstream_cx_tx_bytes_total_,
+                                                stats_.named_.downstream_cx_tx_bytes_buffered_});
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
@@ -187,14 +192,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data) {
   } while (redispatch);
 
   return Network::FilterStatus::StopIteration;
-}
-
-void ConnectionManagerImpl::onBufferChange(Network::ConnectionBufferType type, uint64_t,
-                                           int64_t delta) {
-  Network::Utility::updateBufferStats(type, delta, stats_.named_.downstream_cx_rx_bytes_total_,
-                                      stats_.named_.downstream_cx_rx_bytes_buffered_,
-                                      stats_.named_.downstream_cx_tx_bytes_total_,
-                                      stats_.named_.downstream_cx_tx_bytes_buffered_);
 }
 
 void ConnectionManagerImpl::resetAllStreams() {

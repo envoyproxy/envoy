@@ -32,16 +32,17 @@ ConnectionImpl::~ConnectionImpl() {
   filter_manager_.destroyFilters();
 }
 
-Network::ConnectionImpl::PostIoAction ConnectionImpl::doReadFromSocket() {
+Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
   if (!handshake_complete_) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || !handshake_complete_) {
-      return action;
+      return {action, 0};
     }
   }
 
   bool keep_reading = true;
   PostIoAction action = PostIoAction::KeepOpen;
+  uint64_t bytes_read = 0;
   while (keep_reading) {
     // We use 2 slices here so that we can use the remainder of an existing buffer chain element
     // if there is extra space. 16K read is arbitrary and can be tuned later.
@@ -54,6 +55,7 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doReadFromSocket() {
       if (rc > 0) {
         slices[i].len_ = rc;
         slices_to_commit++;
+        bytes_read += rc;
       } else {
         keep_reading = false;
         int err = SSL_get_error(ssl_.get(), rc);
@@ -77,7 +79,7 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doReadFromSocket() {
     }
   }
 
-  return action;
+  return {action, bytes_read};
 }
 
 Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
@@ -117,16 +119,16 @@ void ConnectionImpl::drainErrorQueue() {
   }
 }
 
-Network::ConnectionImpl::PostIoAction ConnectionImpl::doWriteToSocket() {
+Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
   if (!handshake_complete_) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || !handshake_complete_) {
-      return action;
+      return {action, 0};
     }
   }
 
   if (write_buffer_.length() == 0) {
-    return PostIoAction::KeepOpen;
+    return {PostIoAction::KeepOpen, 0};
   }
 
   uint64_t num_slices = write_buffer_.getRawSlices(nullptr, 0);
@@ -154,7 +156,7 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doWriteToSocket() {
       // Renegotiation has started. We don't handle renegotiation so just fall through.
       default:
         drainErrorQueue();
-        return PostIoAction::Close;
+        return {PostIoAction::Close, bytes_written};
       }
 
       break;
@@ -165,7 +167,7 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doWriteToSocket() {
     write_buffer_.drain(bytes_written);
   }
 
-  return PostIoAction::KeepOpen;
+  return {PostIoAction::KeepOpen, bytes_written};
 }
 
 void ConnectionImpl::onConnected() { ASSERT(!handshake_complete_); }

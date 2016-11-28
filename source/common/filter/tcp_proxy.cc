@@ -45,6 +45,16 @@ TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Stor
                               POOL_GAUGE_PREFIX(store, final_prefix))};
 }
 
+void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+  read_callbacks_ = &callbacks;
+  conn_log_info("new tcp proxy session", read_callbacks_->connection());
+  read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
+  read_callbacks_->connection().setBufferStats({config_->stats().downstream_cx_rx_bytes_total_,
+                                                config_->stats().downstream_cx_rx_bytes_buffered_,
+                                                config_->stats().downstream_cx_tx_bytes_total_,
+                                                config_->stats().downstream_cx_tx_bytes_buffered_});
+}
+
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   Upstream::ResourceManager& upstream_cluster_resource_manager =
       cluster_manager_.get(config_->clusterName())
@@ -68,6 +78,11 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
 
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
+  upstream_connection_->setBufferStats(
+      {read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_total_,
+       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_buffered_,
+       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_total_,
+       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_buffered_});
   upstream_connection_->connect();
   upstream_connection_->noDelay(true);
 
@@ -103,18 +118,6 @@ Network::FilterStatus TcpProxy::onData(Buffer::Instance& data) {
   return Network::FilterStatus::StopIteration;
 }
 
-void TcpProxy::onDownstreamBufferChange(Network::ConnectionBufferType type, uint64_t,
-                                        int64_t delta) {
-  if (type == Network::ConnectionBufferType::Write) {
-    if (delta > 0) {
-      config_->stats().downstream_cx_tx_bytes_total_.add(delta);
-      config_->stats().downstream_cx_tx_bytes_buffered_.add(delta);
-    } else {
-      config_->stats().downstream_cx_tx_bytes_buffered_.sub(std::abs(delta));
-    }
-  }
-}
-
 void TcpProxy::onDownstreamEvent(uint32_t event) {
   if ((event & Network::ConnectionEvent::RemoteClose ||
        event & Network::ConnectionEvent::LocalClose) &&
@@ -124,18 +127,6 @@ void TcpProxy::onDownstreamEvent(uint32_t event) {
     //       connection to stick around, or, we need to be able to pass this connection to a flush
     //       worker which will attempt to flush the remaining data with a timeout.
     upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
-  }
-}
-
-void TcpProxy::onUpstreamBufferChange(Network::ConnectionBufferType type, uint64_t, int64_t delta) {
-  if (type == Network::ConnectionBufferType::Write) {
-    if (delta > 0) {
-      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_total_.add(delta);
-      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_buffered_.add(delta);
-    } else {
-      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_buffered_.sub(
-          std::abs(delta));
-    }
   }
 }
 
