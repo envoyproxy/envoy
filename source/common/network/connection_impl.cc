@@ -253,10 +253,8 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     if (rc == 0) {
       action = PostIoAction::Close;
       break;
-    }
-
-    // Remote error (might be no data).
-    if (rc == -1) {
+    } else if (rc == -1) {
+      // Remote error (might be no data).
       conn_log_trace("read error: {}", *this, errno);
       if (errno == EAGAIN) {
         action = PostIoAction::KeepOpen;
