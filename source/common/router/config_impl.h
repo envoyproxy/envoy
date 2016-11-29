@@ -80,6 +80,7 @@ public:
                                            uint64_t random_value) const;
   const RouteEntryImplBase* routeFromEntries(const Http::HeaderMap& headers, bool redirect,
                                              uint64_t random_value) const;
+  bool usesRuntime() const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
 
 private:
@@ -179,6 +180,7 @@ public:
   RouteEntryImplBase(const VirtualHost& vhost, const Json::Object& route, Runtime::Loader& loader);
 
   bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
+  bool usesRuntime() const { return runtime_.valid(); }
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -276,12 +278,14 @@ public:
 
   const RedirectEntry* redirectRequest(const Http::HeaderMap& headers, uint64_t random_value) const;
   const RouteEntry* routeForRequest(const Http::HeaderMap& headers, uint64_t random_value) const;
+  bool usesRuntime() const { return uses_runtime_; }
 
 private:
   const VirtualHost* findVirtualHost(const Http::HeaderMap& headers) const;
 
   std::unordered_map<std::string, VirtualHostPtr> virtual_hosts_;
   VirtualHostPtr default_virtual_host_;
+  bool uses_runtime_{};
 };
 
 /**
@@ -314,6 +318,8 @@ public:
   const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
     return response_headers_to_remove_;
   }
+
+  bool usesRuntime() const override { return route_matcher_->usesRuntime(); }
 
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
@@ -348,6 +354,8 @@ public:
   const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
     return response_headers_to_remove_;
   }
+
+  bool usesRuntime() const override { return false; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;

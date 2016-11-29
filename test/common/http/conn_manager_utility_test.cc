@@ -9,6 +9,7 @@
 #include "test/test_common/utility.h"
 
 using testing::_;
+using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -33,6 +34,17 @@ public:
   Optional<Http::TracingConnectionManagerConfig> tracing_not_set_;
   Optional<Http::TracingConnectionManagerConfig> set_tracing_all_;
 };
+
+TEST_F(ConnectionManagerUtilityTest, generateStreamId) {
+  InSequence s;
+
+  EXPECT_CALL(config_.route_config_, usesRuntime()).WillOnce(Return(false));
+  ConnectionManagerUtility::generateStreamId(config_.route_config_, random_);
+
+  EXPECT_CALL(config_.route_config_, usesRuntime()).WillOnce(Return(true));
+  EXPECT_CALL(random_, random()).WillOnce(Return(5));
+  EXPECT_EQ(5UL, ConnectionManagerUtility::generateStreamId(config_.route_config_, random_));
+}
 
 TEST_F(ConnectionManagerUtilityTest, ShouldTraceRequest) {
   {

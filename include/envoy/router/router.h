@@ -244,6 +244,13 @@ public:
    * router.
    */
   virtual const std::list<Http::LowerCaseString>& responseHeadersToRemove() const PURE;
+
+  /**
+   * Return whether the configuration makes use of runtime or not. Callers can use this to
+   * determine whether they should use a fast or slow source of randomness when calling route
+   * functions.
+   */
+  virtual bool usesRuntime() const PURE;
 };
 
 typedef std::unique_ptr<Config> ConfigPtr;
