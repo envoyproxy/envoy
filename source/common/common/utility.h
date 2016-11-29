@@ -80,6 +80,11 @@ public:
   static void rtrim(std::string& source);
 
   /**
+   * Size-bounded string copying and concatenation
+   */
+  static size_t strlcpy(char* dst, const char* src, size_t size);
+
+  /**
    * Split a string.
    * @param source supplies the string to split.
    * @param split supplies the char to split on.

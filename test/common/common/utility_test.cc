@@ -58,6 +58,42 @@ TEST(StringUtil, rtrim) {
   }
 }
 
+TEST(StringUtil, strlcpy) {
+  {
+    char dest[6];
+    EXPECT_EQ(5U, StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("hello", dest);
+  }
+
+  {
+    char dest[6];
+    EXPECT_EQ(5U, StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), 3));
+    EXPECT_STREQ("he", dest);
+  }
+
+  {
+    char dest[3];
+    EXPECT_EQ(5U, StringUtil::strlcpy(dest, std::string{"hello"}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("he", dest);
+  }
+
+  {
+    char dest[3];
+    EXPECT_EQ(0U, StringUtil::strlcpy(dest, std::string{""}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("", dest);
+  }
+
+  {
+    char dest[3] = "yo";
+
+    EXPECT_EQ(1U, StringUtil::strlcpy(dest, std::string{"a"}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("a", dest);
+
+    EXPECT_EQ(10U, StringUtil::strlcpy(dest, std::string{"absolutely"}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("ab", dest);
+  }
+}
+
 TEST(StringUtil, split) {
   EXPECT_EQ(std::vector<std::string>{}, StringUtil::split("", ','));
   EXPECT_EQ(std::vector<std::string>{"a"}, StringUtil::split("a", ','));

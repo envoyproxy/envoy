@@ -1,5 +1,7 @@
 #include "stats_impl.h"
 
+#include "common/common/utility.h"
+
 namespace Stats {
 
 void TimerImpl::TimespanImpl::complete(const std::string& dynamic_name) {
@@ -17,7 +19,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
 void RawStatData::initialize(const std::string& name) {
   ASSERT(!initialized());
   ASSERT(name.size() <= MAX_NAME_SIZE);
-  strncpy(name_, name.substr(0, MAX_NAME_SIZE).c_str(), MAX_NAME_SIZE + 1);
+  StringUtil::strlcpy(name_, name.substr(0, MAX_NAME_SIZE).c_str(), MAX_NAME_SIZE + 1);
 }
 
 bool RawStatData::matches(const std::string& name) {

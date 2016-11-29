@@ -69,6 +69,12 @@ void StringUtil::rtrim(std::string& source) {
   }
 }
 
+size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
+  strncpy(dst, src, size - 1);
+  dst[size - 1] = '\0';
+  return strlen(src);
+}
+
 std::vector<std::string> StringUtil::split(const std::string& source, char split) {
   std::vector<std::string> ret;
   size_t last_index = 0;
