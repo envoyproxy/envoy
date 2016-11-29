@@ -9,7 +9,7 @@ class AbstractObject;
 typedef std::unique_ptr<AbstractObject> AbstractObjectPtr;
 
 // @return false if immediate exit from iteration required.
-typedef std::function<bool(const std::string&, AbstractObjectPtr&)> AbstractObjectCallback;
+typedef std::function<bool(const std::string&, const AbstractObject&)> AbstractObjectCallback;
 
 /**
  * Wraps an individual JSON node.
@@ -112,7 +112,7 @@ public:
   /**
    * Iterate over key-value pairs in an AbstractObject and call callback on each pair.
    */
-  virtual void iterate(const AbstractObjectCallback& callback) PURE;
+  virtual void iterate(const AbstractObjectCallback& callback) const PURE;
 
   /**
    * @return TRUE if the AbstractObject contains the key.
