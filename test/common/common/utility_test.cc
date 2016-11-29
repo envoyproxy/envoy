@@ -65,6 +65,16 @@ TEST(StringUtil, strlcpy) {
     EXPECT_EQ(0U, StringUtil::strlcpy(dest, std::string{""}.c_str(), sizeof(dest)));
     EXPECT_STREQ("", dest);
   }
+
+  {
+    char dest[3] = "yo";
+
+    EXPECT_EQ(1U, StringUtil::strlcpy(dest, std::string{"a"}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("a", dest);
+
+    EXPECT_EQ(10U, StringUtil::strlcpy(dest, std::string{"absolutely"}.c_str(), sizeof(dest)));
+    EXPECT_STREQ("ab", dest);
+  }
 }
 
 TEST(StringUtil, split) {
