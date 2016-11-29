@@ -71,7 +71,7 @@ public:
   /**
    * Size-bounded string copying and concatenation
    */
-  static size_t strlcpy(char* dst, const char* src, size_t siz);
+  static size_t strlcpy(char* dst, const char* src, size_t size);
 
   /**
    * Split a string.

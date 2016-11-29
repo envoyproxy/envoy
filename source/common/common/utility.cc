@@ -51,9 +51,9 @@ void StringUtil::rtrim(std::string& source) {
   }
 }
 
-size_t StringUtil::strlcpy(char* dst, const char* src, size_t siz) {
-  strncpy(dst, src, siz - 1);
-  dst[siz - 1] = '\0';
+size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
+  strncpy(dst, src, size - 1);
+  dst[size - 1] = '\0';
   return strlen(src);
 }
 
