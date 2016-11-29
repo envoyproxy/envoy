@@ -259,10 +259,10 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose();
 }
 
-std::atomic<uint64_t> ConnectionManagerImpl::ActiveStream::next_stream_id_(0);
-
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
-    : connection_manager_(connection_manager), stream_id_(next_stream_id_++),
+    : connection_manager_(connection_manager),
+      stream_id_(ConnectionManagerUtility::generateStreamId(
+          connection_manager.config_.routeConfig(), connection_manager.random_generator_)),
       request_timer_(connection_manager_.stats_.named_.downstream_rq_time_.allocateSpan()),
       request_info_(connection_manager_.codec_->protocol()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();

@@ -124,6 +124,7 @@ public:
   MOCK_CONST_METHOD0(responseHeadersToAdd,
                      const std::list<std::pair<Http::LowerCaseString, std::string>>&());
   MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
+  MOCK_CONST_METHOD0(usesRuntime, bool());
 
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;

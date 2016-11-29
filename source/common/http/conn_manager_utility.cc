@@ -8,6 +8,18 @@
 
 namespace Http {
 
+std::atomic<uint64_t> ConnectionManagerUtility::next_stream_id_(0);
+
+uint64_t ConnectionManagerUtility::generateStreamId(const Router::Config& route_table,
+                                                    Runtime::RandomGenerator& random_generator) {
+  // See the comment for next_stream_id_ in conn_manager_utility.h for why we do this.
+  if (route_table.usesRuntime()) {
+    return random_generator.random();
+  } else {
+    return ++next_stream_id_;
+  }
+}
+
 void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_headers,
                                                     Network::Connection& connection,
                                                     ConnectionManagerConfig& config,

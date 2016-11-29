@@ -149,6 +149,8 @@ TEST(RouteMatcherTest, TestRoutes) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(loader, runtime, cm);
 
+  EXPECT_FALSE(config.usesRuntime());
+
   // Base routing testing.
   EXPECT_EQ("instant-server",
             config.routeForRequest(genHeaders("api.lyft.com", "/", "GET"), 0)->clusterName());
@@ -384,6 +386,8 @@ TEST(RouteMatcherTest, Priority) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(loader, runtime, cm);
 
+  EXPECT_FALSE(config.usesRuntime());
+
   EXPECT_EQ(Upstream::ResourcePriority::High,
             config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)->priority());
   EXPECT_EQ(Upstream::ResourcePriority::Default,
@@ -446,6 +450,8 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(loader, runtime, cm);
+
+  EXPECT_FALSE(config.usesRuntime());
 
   {
     EXPECT_EQ("local_service_without_headers",
@@ -510,6 +516,8 @@ TEST(RouteMatcherTest, ContentType) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(loader, runtime, cm);
 
+  EXPECT_FALSE(config.usesRuntime());
+
   {
     EXPECT_EQ("local_service",
               config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 0)->clusterName());
@@ -563,6 +571,8 @@ TEST(RouteMatcherTest, Runtime) {
 
   ConfigImpl config(loader, runtime, cm);
 
+  EXPECT_TRUE(config.usesRuntime());
+
   EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 10)).WillOnce(Return(true));
   EXPECT_EQ("something_else",
             config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 10)->clusterName());
@@ -601,6 +611,8 @@ TEST(RouteMatcherTest, RateLimit) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(loader, runtime, cm);
+
+  EXPECT_FALSE(config.usesRuntime());
 
   EXPECT_TRUE(config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                   ->rateLimitPolicy()
@@ -678,6 +690,8 @@ TEST(RouteMatcherTest, Shadow) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(loader, runtime, cm);
 
+  EXPECT_TRUE(config.usesRuntime());
+
   EXPECT_EQ("some_cluster", config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                                 ->shadowPolicy()
                                 .cluster());
@@ -737,6 +751,8 @@ TEST(RouteMatcherTest, Retry) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(loader, runtime, cm);
+
+  EXPECT_FALSE(config.usesRuntime());
 
   EXPECT_EQ(1U, config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->retryPolicy()
@@ -898,6 +914,8 @@ TEST(RouteMatcherTest, Redirect) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(loader, runtime, cm);
 
+  EXPECT_FALSE(config.usesRuntime());
+
   EXPECT_EQ(nullptr,
             config.redirectRequest(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
   EXPECT_EQ(nullptr,
@@ -942,6 +960,7 @@ TEST(NullConfigImplTest, All) {
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
   EXPECT_EQ(0UL, config.responseHeadersToAdd().size());
   EXPECT_EQ(0UL, config.responseHeadersToRemove().size());
+  EXPECT_FALSE(config.usesRuntime());
 }
 
 } // Router

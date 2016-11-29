@@ -257,6 +257,16 @@ VirtualHost::VirtualHost(const Json::Object& virtual_host, Runtime::Loader& runt
   }
 }
 
+bool VirtualHost::usesRuntime() const {
+  bool uses = false;
+  for (const RouteEntryImplBasePtr& route : routes_) {
+    // Currently a base runtime rule as well as a shadow rule can use runtime.
+    uses |= (route->usesRuntime() || !route->shadowPolicy().runtimeKey().empty());
+  }
+
+  return uses;
+}
+
 VirtualHost::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& virtual_cluster) {
   if (virtual_cluster.hasObject("method")) {
     method_ = virtual_cluster.getString("method");
@@ -271,6 +281,7 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
                            Upstream::ClusterManager& cm) {
   for (const Json::Object& virtual_host_config : config.getObjectArray("virtual_hosts")) {
     VirtualHostPtr virtual_host(new VirtualHost(virtual_host_config, runtime, cm));
+    uses_runtime_ |= virtual_host->usesRuntime();
 
     for (const std::string& domain : virtual_host_config.getStringArray("domains")) {
       if ("*" == domain) {
@@ -318,6 +329,11 @@ const RouteEntryImplBase* VirtualHost::routeFromEntries(const Http::HeaderMap& h
 }
 
 const VirtualHost* RouteMatcher::findVirtualHost(const Http::HeaderMap& headers) const {
+  // Fast path the case where we only have a default virtual host.
+  if (virtual_hosts_.empty() && default_virtual_host_) {
+    return default_virtual_host_.get();
+  }
+
   auto iter = virtual_hosts_.find(headers.Host()->value().c_str());
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
