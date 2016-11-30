@@ -99,13 +99,13 @@ tar xf tclap-1.2.1.tar.gz
 rm tclap-1.2.1.tar.gz
 
 # lightstep
-wget https://github.com/lightstep/lightstep-tracer-cpp/releases/download/v0_16/lightstep-tracer-cpp-0.16.tar.gz
-tar xf lightstep-tracer-cpp-0.16.tar.gz
-cd lightstep-tracer-cpp-0.16
+wget https://github.com/lightstep/lightstep-tracer-cpp/releases/download/v0_18/lightstep-tracer-cpp-0.18.tar.gz
+tar xf lightstep-tracer-cpp-0.18.tar.gz
+cd lightstep-tracer-cpp-0.18
 ./configure --disable-grpc --prefix=$THIRDPARTY_BUILD --enable-shared=no \
 	    protobuf_CFLAGS="-I$THIRDPARTY_BUILD/include" protobuf_LIBS="-L$THIRDPARTY_BUILD/lib -lprotobuf"
 make install
-rm -rf lightstep-tracer-cpp-0.16
+rm -rf lightstep-tracer-cpp-0.18
 cd ..
 
 # rapidjson
