@@ -18,10 +18,15 @@ elif [[ "$1" == "coverage" ]]; then
   TEST_TARGET="envoy.check-coverage"
 elif [[ "$1" == "asan" ]]; then
   echo "asan build..."
-  EXTRA_CMAKE_FLAGS="-DENVOY_SANITIZE:BOOL=ON"
+  EXTRA_CMAKE_FLAGS="-DENVOY_SANITIZE:BOOL=ON -DENVOY_DEBUG:BOOL=OFF"
+  TEST_TARGET="envoy.check"
+elif [[ "$1" == "debug" ]]; then
+  echo "debug build..."
+  EXTRA_CMAKE_FLAGS="-DENVOY_DEBUG:BOOL=ON"
   TEST_TARGET="envoy.check"
 else
   echo "normal build..."
+  EXTRA_CMAKE_FLAGS="-DENVOY_DEBUG:BOOL=OFF"
   TEST_TARGET="envoy.check"
 fi
 
@@ -29,7 +34,7 @@ mkdir -p build
 cd build
 
 cmake \
-$EXTRA_CMAKE_FLAGS -DENVOY_DEBUG:BOOL=OFF \
+$EXTRA_CMAKE_FLAGS \
 -DENVOY_COTIRE_MODULE_DIR:FILEPATH=/thirdparty/cotire-cotire-1.7.8/CMake \
 -DENVOY_GMOCK_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_GPERFTOOLS_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
@@ -50,6 +55,8 @@ $EXTRA_CMAKE_FLAGS -DENVOY_DEBUG:BOOL=OFF \
 -DENVOY_EXE_EXTRA_LINKER_FLAGS:STRING=-L/thirdparty_build/lib \
 -DENVOY_TEST_EXTRA_LINKER_FLAGS:STRING=-L/thirdparty_build/lib \
 ..
+
+cmake -L || true
 
 make check_format
 make -j$NUM_CPUS $TEST_TARGET
