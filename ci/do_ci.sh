@@ -13,19 +13,23 @@ if [[ "$1" == "docs" ]]; then
   make docs
   exit 0
 elif [[ "$1" == "coverage" ]]; then
-  echo "coverage build..."
+  echo "coverage build with tests..."
   EXTRA_CMAKE_FLAGS="-DENVOY_CODE_COVERAGE:BOOL=ON"
   TEST_TARGET="envoy.check-coverage"
 elif [[ "$1" == "asan" ]]; then
-  echo "asan build..."
+  echo "asan build with tests..."
   EXTRA_CMAKE_FLAGS="-DENVOY_SANITIZE:BOOL=ON -DENVOY_DEBUG:BOOL=OFF"
   TEST_TARGET="envoy.check"
 elif [[ "$1" == "debug" ]]; then
-  echo "debug build..."
+  echo "debug build with tests..."
   EXTRA_CMAKE_FLAGS="-DENVOY_DEBUG:BOOL=ON"
   TEST_TARGET="envoy.check"
+elif [[ "$1" == "server_only" ]]; then
+  echo "normal build server only..."
+  EXTRA_CMAKE_FLAGS="-DENVOY_DEBUG:BOOL=OFF"
+  TEST_TARGET="envoy"
 else
-  echo "normal build..."
+  echo "normal build with tests..."
   EXTRA_CMAKE_FLAGS="-DENVOY_DEBUG:BOOL=OFF"
   TEST_TARGET="envoy.check"
 fi
