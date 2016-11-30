@@ -155,7 +155,7 @@ private:
   static const rapidjson::Value empty_rapid_json_value_;
 };
 
-const rapidjson::Value ObjectImplBase::empty_rapid_json_value_;
+const rapidjson::Value ObjectImplBase::empty_rapid_json_value_(rapidjson::kObjectType);
 
 /**
  * Holds the root Object reference.
