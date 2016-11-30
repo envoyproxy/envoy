@@ -18,7 +18,7 @@ elif [[ "$1" == "coverage" ]]; then
   TEST_TARGET="envoy.check-coverage"
 elif [[ "$1" == "asan" ]]; then
   echo "asan build..."
-  EXTRA_CMAKE_FLAGS="-DENVOY_SANITIZE:BOOL=ON"
+  EXTRA_CMAKE_FLAGS="-DENVOY_SANITIZE:BOOL=ON -DENVOY_DEBUG:BOOL=OFF"
   TEST_TARGET="envoy.check"
 elif [[ "$1" == "debug" ]]; then
   echo "debug build..."
