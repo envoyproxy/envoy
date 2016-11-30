@@ -15,7 +15,7 @@ namespace Http {
 
 FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
                                      const std::string& stat_prefix, Stats::Store& stats)
-    : runtime_(runtime), stats_{generateStats(stat_prefix, stats)} {
+    : runtime_(runtime), stats_(generateStats(stat_prefix, stats)) {
 
   if (json_config.hasObject("abort")) {
     const Json::Object& abort = json_config.getObject("abort");
