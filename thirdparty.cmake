@@ -30,10 +30,6 @@ set(ENVOY_TCLAP_INCLUDE_DIR "" CACHE FILEPATH "location of tclap includes")
 # Last tested with 2.5.0
 set(ENVOY_GPERFTOOLS_INCLUDE_DIR "" CACHE FILEPATH "location of gperftools includes")
 
-# https://github.com/akheron/jansson
-# Last tested with 2.7
-set(ENVOY_JANSSON_INCLUDE_DIR "" CACHE FILEPATH "location of jansson includes")
-
 # https://www.openssl.org/
 # Last tested with 1.0.2i
 set(ENVOY_OPENSSL_INCLUDE_DIR "" CACHE FILEPATH "location of openssl includes")

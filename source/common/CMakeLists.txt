@@ -108,7 +108,6 @@ add_library(
   ${gen_git_sha_target})
 
 include_directories(SYSTEM ${ENVOY_HTTP_PARSER_INCLUDE_DIR})
-include_directories(${ENVOY_JANSSON_INCLUDE_DIR})
 include_directories(${ENVOY_RAPIDJSON_INCLUDE_DIR})
 
 if (NOT ENVOY_SANITIZE)

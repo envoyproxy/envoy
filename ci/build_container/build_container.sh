@@ -54,15 +54,6 @@ make install
 cd ..
 rm -fr gperftools*
 
-# jansson
-wget http://www.digip.org/jansson/releases/jansson-2.7.tar.gz
-tar xf jansson-2.7.tar.gz
-cd jansson-2.7
-./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no
-make install
-cd ..
-rm -fr jansson*
-
 # nghttp2
 wget https://github.com/nghttp2/nghttp2/releases/download/v1.14.1/nghttp2-1.14.1.tar.gz
 tar xf nghttp2-1.14.1.tar.gz
