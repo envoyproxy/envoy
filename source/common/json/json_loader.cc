@@ -11,22 +11,22 @@
 namespace Json {
 
 /**
- * Implementation of AbstractObject.
+ * Implementation of Object.
  */
-class AbstractObjectImplBase : public AbstractObject {
+class ObjectImplBase : public Object {
 public:
-  AbstractObjectImplBase(const rapidjson::Value& value, const std::string& name)
+  ObjectImplBase(const rapidjson::Value& value, const std::string& name)
       : name_(name), value_(value) {}
 
-  std::vector<AbstractObjectPtr> asObjectArray() const override {
+  std::vector<ObjectPtr> asObjectArray() const override {
     if (!value_.IsArray()) {
       throw Exception(fmt::format("'{}' is not an array", name_));
     }
 
-    std::vector<AbstractObjectPtr> object_array;
+    std::vector<ObjectPtr> object_array;
     object_array.reserve(value_.Size());
     for (auto& array_value : value_.GetArray()) {
-      object_array.emplace_back(new AbstractObjectImplBase(array_value, name_ + " (array item)"));
+      object_array.emplace_back(new ObjectImplBase(array_value, name_ + " (array item)"));
     }
     return object_array;
   }
@@ -63,26 +63,26 @@ public:
     }
   }
 
-  AbstractObjectPtr getObject(const std::string& name, bool allow_empty) const override {
+  ObjectPtr getObject(const std::string& name, bool allow_empty) const override {
     rapidjson::Value::ConstMemberIterator member_itr = value_.FindMember(name.c_str());
     if (member_itr == value_.MemberEnd() && !allow_empty) {
       throw Exception(fmt::format("key '{}' missing or not an integer in '{}'", name, name_));
     } else if (member_itr == value_.MemberEnd()) {
-      return AbstractObjectPtr{new AbstractObjectImplBase(empty_rapid_json_value_, name)};
+      return ObjectPtr{new ObjectImplBase(empty_rapid_json_value_, name)};
     }
-    return AbstractObjectPtr{new AbstractObjectImplBase(member_itr->value, name)};
+    return ObjectPtr{new ObjectImplBase(member_itr->value, name)};
   }
 
-  std::vector<AbstractObjectPtr> getObjectArray(const std::string& name) const override {
+  std::vector<ObjectPtr> getObjectArray(const std::string& name) const override {
     rapidjson::Value::ConstMemberIterator member_itr = value_.FindMember(name.c_str());
     if (member_itr == value_.MemberEnd() || !member_itr->value.IsArray()) {
       throw Exception(fmt::format("key '{}' missing or not a array in '{}'", name, name_));
     }
 
-    std::vector<AbstractObjectPtr> object_array;
+    std::vector<ObjectPtr> object_array;
     object_array.reserve(member_itr->value.Size());
     for (auto& array_value : member_itr->value.GetArray()) {
-      object_array.emplace_back(new AbstractObjectImplBase(array_value, name + " (array item)"));
+      object_array.emplace_back(new ObjectImplBase(array_value, name + " (array item)"));
     }
     return object_array;
   }
@@ -136,10 +136,10 @@ public:
     }
   }
 
-  void iterate(const AbstractObjectCallback& callback) const override {
+  void iterate(const ObjectCallback& callback) const override {
     for (auto& member : value_.GetObject()) {
-      AbstractObjectImplBase abstract_object(member.value, member.name.GetString());
-      bool need_continue = callback(member.name.GetString(), abstract_object);
+      ObjectImplBase object(member.value, member.name.GetString());
+      bool need_continue = callback(member.name.GetString(), object);
       if (!need_continue) {
         break;
       }
@@ -155,21 +155,21 @@ private:
   static const rapidjson::Value empty_rapid_json_value_;
 };
 
-const rapidjson::Value AbstractObjectImplBase::empty_rapid_json_value_;
+const rapidjson::Value ObjectImplBase::empty_rapid_json_value_;
 
 /**
- * Holds the root AbstractObject reference.
+ * Holds the root Object reference.
  */
-class AbstractObjectImplRoot : public AbstractObjectImplBase {
+class ObjectImplRoot : public ObjectImplBase {
 public:
-  AbstractObjectImplRoot(rapidjson::Document&& document)
-      : AbstractObjectImplBase(root_, "root"), root_(std::move(document)) {}
+  ObjectImplRoot(rapidjson::Document&& document)
+      : ObjectImplBase(root_, "root"), root_(std::move(document)) {}
 
 private:
   rapidjson::Document root_;
 };
 
-AbstractObjectPtr Factory::LoadFromFile(const std::string& file_path) {
+ObjectPtr Factory::LoadFromFile(const std::string& file_path) {
   rapidjson::Document document;
   std::fstream file_stream(file_path);
   rapidjson::IStreamWrapper stream_wrapper(file_stream);
@@ -177,42 +177,16 @@ AbstractObjectPtr Factory::LoadFromFile(const std::string& file_path) {
     throw Exception(fmt::format("Error(offset {}): {}\n", document.GetErrorOffset(),
                                 GetParseError_En(document.GetParseError())));
   }
-  return AbstractObjectPtr{new AbstractObjectImplRoot(std::move(document))};
+  return ObjectPtr{new ObjectImplRoot(std::move(document))};
 }
 
-AbstractObjectPtr Factory::LoadFromString(const std::string& json) {
+ObjectPtr Factory::LoadFromString(const std::string& json) {
   rapidjson::Document document;
   if (document.Parse<0>(json.c_str()).HasParseError()) {
     throw Exception(fmt::format("Error(offset {}): {}\n", document.GetErrorOffset(),
                                 GetParseError_En(document.GetParseError())));
   }
-  return AbstractObjectPtr{new AbstractObjectImplRoot(std::move(document))};
+  return ObjectPtr{new ObjectImplRoot(std::move(document))};
 }
 
-std::vector<Object> Object::asObjectArray() const {
-  std::vector<AbstractObjectPtr> abstract_object_array = abstract_object_.asObjectArray();
-  std::vector<Object> return_vector;
-  return_vector.reserve(abstract_object_array.size());
-
-  for (AbstractObjectPtr& abstract_object : abstract_object_array) {
-    return_vector.push_back(ObjectRoot(std::move(abstract_object)));
-  }
-  return return_vector;
-}
-
-std::vector<Object> Object::getObjectArray(const std::string& name) const {
-  std::vector<AbstractObjectPtr> abstract_object_array = abstract_object_.getObjectArray(name);
-  std::vector<Object> return_vector;
-  return_vector.reserve(abstract_object_array.size());
-
-  for (AbstractObjectPtr& abstract_object : abstract_object_array) {
-    return_vector.push_back(ObjectRoot(std::move(abstract_object)));
-  }
-  return return_vector;
-}
-
-Object Object::getObject(const std::string& name, bool allow_empty) const {
-  AbstractObjectPtr abstractObjectPtr = abstract_object_.getObject(name, allow_empty);
-  return ObjectRoot(std::move(abstractObjectPtr));
-}
 } // Json

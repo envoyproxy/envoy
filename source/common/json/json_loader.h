@@ -1,23 +1,29 @@
 #pragma once
 
 #include "envoy/common/exception.h"
-#include "envoy/json/json_object.h"
+#include "envoy/common/pure.h"
 
 #include "common/common/non_copyable.h"
 
 namespace Json {
+class Object;
+
+typedef std::unique_ptr<Object> ObjectPtr;
+
+// @return false if immediate exit from iteration required.
+typedef std::function<bool(const std::string&, const Object&)> ObjectCallback;
 
 class Factory {
 public:
   /*
    * Constructs a Json Object from a File.
    */
-  static AbstractObjectPtr LoadFromFile(const std::string& file_path);
+  static ObjectPtr LoadFromFile(const std::string& file_path);
 
   /*
    * Constructs a Json Object from a String.
    */
-  static AbstractObjectPtr LoadFromString(const std::string& json);
+  static ObjectPtr LoadFromString(const std::string& json);
 };
 
 /**
@@ -29,106 +35,112 @@ public:
 };
 
 /**
- * Wrapper around AbstractObjectPtr to maintain calling pattern across code base.
+ * Wraps an individual JSON node.
  */
-class Object;
-// @return false if immediate exit from iteration required.
-typedef std::function<bool(const std::string&, const Object&)> ObjectCallback;
-
 class Object {
 public:
-  Object(const AbstractObject& abstract_object) : abstract_object_(abstract_object) {}
+  virtual ~Object() {}
 
-  std::vector<Object> asObjectArray() const; /*{
-    std::vector<AbstractObjectPtr> abstract_object_array = abstract_object_.asObjectArray();
-    std::vector<Object> return_vector;
-    return_vector.reserve(abstract_object_array.size());
+  /**
+   * Convert a generic object into an array of objects. This is useful for dealing
+   * with arrays of arrays.
+   * @return std::vector<ObjectPtr> the converted object.
+   */
+  virtual std::vector<ObjectPtr> asObjectArray() const PURE;
 
-    for (AbstractObjectPtr& abstract_object : abstract_object_array) {
-      return_vector.emplace_back(*abstract_object);
-    }
-    return return_vector;
-  }*/
+  /**
+   * Get a boolean value by name.
+   * @param name supplies the key name.
+   * @return bool the value.
+   */
+  virtual bool getBoolean(const std::string& name) const PURE;
 
-  bool getBoolean(const std::string& name) const { return abstract_object_.getBoolean(name); }
+  /**
+   * Get a boolean value by name.
+   * @param name supplies the key name.
+   * @param default_value supplies the value to return if the name does not exist.
+   * @return bool the value.
+   */
+  virtual bool getBoolean(const std::string& name, bool default_value) const PURE;
 
-  bool getBoolean(const std::string& name, bool default_value) const {
-    return abstract_object_.getBoolean(name, default_value);
-  }
+  /**
+   * Get an integer value by name.
+   * @param name supplies the key name.
+   * @return int64_t the value.
+   */
+  virtual int64_t getInteger(const std::string& name) const PURE;
 
-  int64_t getInteger(const std::string& name) const { return abstract_object_.getInteger(name); }
+  /**
+   * Get an integer value by name or return a default if name does not exist.
+   * @param name supplies the key name.
+   * @param default_value supplies the value to return if name does not exist.
+   * @return int64_t the value.
+   */
+  virtual int64_t getInteger(const std::string& name, int64_t default_value) const PURE;
 
-  int64_t getInteger(const std::string& name, int64_t default_value) const {
-    return abstract_object_.getInteger(name, default_value);
-  }
+  /**
+   * Get a sub-object by name.
+   * @param name supplies the key name.
+   * @param allow_empty supplies whether to return an empty object if the key does not
+   * exist.
+   * @return ObjectObjectPtr the sub-object.
+   */
+  virtual ObjectPtr getObject(const std::string& name, bool allow_empty = false) const PURE;
 
-  Object getObject(const std::string& name, bool allow_empty = false) const; /* {
-    return Object(*(abstract_object_.getObject(name, allow_empty)));
-  }*/
+  /**
+   * Get an array by name.
+   * @param name supplies the key name.
+   * @return std::vector<ObjectPtr> the array of JSON  objects.
+   */
+  virtual std::vector<ObjectPtr> getObjectArray(const std::string& name) const PURE;
 
-  std::vector<Object> getObjectArray(const std::string& name) const; /* {
-    std::vector<AbstractObjectPtr> abstract_object_array = abstract_object_.getObjectArray(name);
-    std::vector<Object> return_vector;
-    return_vector.reserve(abstract_object_array.size());
+  /**
+   * Get a string value by name.
+   * @param name supplies the key name.
+   * @return std::string the value.
+   */
+  virtual std::string getString(const std::string& name) const PURE;
 
-    for (AbstractObjectPtr& abstract_object : abstract_object_array) {
-      return_vector.emplace_back(*abstract_object);
-    }
-    return return_vector;
-  }*/
+  /**
+   * Get a string value by name or return a default if name does not exist.
+   * @param name supplies the key name.
+   * @param default_value supplies the value to return if name does not exist.
+   * @return std::string the value.
+   */
+  virtual std::string getString(const std::string& name,
+                                const std::string& default_value) const PURE;
 
-  std::string getString(const std::string& name) const { return abstract_object_.getString(name); }
+  /**
+   * Get a string array by name.
+   * @param name supplies the key name.
+   * @return std::vector<std::string> the array of strings.
+   */
+  virtual std::vector<std::string> getStringArray(const std::string& name) const PURE;
 
-  std::string getString(const std::string& name, const std::string& default_value) const {
-    return abstract_object_.getString(name, default_value);
-  }
+  /**
+   * Get a double value by name.
+   * @param name supplies the key name.
+   * @return double the value.
+   */
+  virtual double getDouble(const std::string& name) const PURE;
 
-  std::vector<std::string> getStringArray(const std::string& name) const {
-    return abstract_object_.getStringArray(name);
-  }
+  /**
+   * Get a double value by name.
+   * @param name supplies the key name.
+   * @param default_value supplies the value to return if name does not exist.
+   * @return double the value.
+   */
+  virtual double getDouble(const std::string& name, double default_value) const PURE;
 
-  double getDouble(const std::string& name) const { return abstract_object_.getDouble(name); }
+  /**
+   * Iterate over key-value pairs in an Object and call callback on each pair.
+   */
+  virtual void iterate(const ObjectCallback& callback) const PURE;
 
-  double getDouble(const std::string& name, double default_value) const {
-    return abstract_object_.getDouble(name, default_value);
-  }
-
-  void iterate(const ObjectCallback& callback) {
-    abstract_object_.iterate(
-        [&callback](const std::string key, const AbstractObject& abstract_object) {
-          Object object(abstract_object);
-          return callback(key, object);
-        });
-  }
-
-  bool hasObject(const std::string& name) const { return abstract_object_.hasObject(name); }
-
-private:
-  const AbstractObject& abstract_object_;
+  /**
+   * @return TRUE if the Object contains the key.
+   * @param name supplies the key name to lookup.
+   */
+  virtual bool hasObject(const std::string& name) const PURE;
 };
-class ObjectRoot : public Object {
-public:
-  ObjectRoot(AbstractObjectPtr&& abstract_object_ptr)
-      : Object(*abstract_object_ptr), abstract_object_ptr_(std::move(abstract_object_ptr)) {}
-
-private:
-  AbstractObjectPtr abstract_object_ptr_;
-};
-/**
- * Loads a JSON file into memory.
- */
-class FileLoader : NonCopyable, public ObjectRoot {
-public:
-  FileLoader(const std::string& file_path)
-      : ObjectRoot(std::move(Factory::LoadFromFile(file_path))) {}
-};
-
-/**
- * Loads JSON from a string.
- */
-class StringLoader : NonCopyable, public ObjectRoot {
-public:
-  StringLoader(const std::string& json) : ObjectRoot(std::move(Factory::LoadFromString(json))) {}
-};
-
 } // Json

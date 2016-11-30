@@ -144,10 +144,10 @@ TEST(RouteMatcherTest, TestRoutes) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(loader, runtime, cm);
+  ConfigImpl config(*loader, runtime, cm);
 
   EXPECT_FALSE(config.usesRuntime());
 
@@ -350,10 +350,10 @@ TEST(RouteMatcherTest, InvalidPriority) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_THROW(ConfigImpl(loader, runtime, cm), EnvoyException);
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
 }
 
 TEST(RouteMatcherTest, Priority) {
@@ -381,10 +381,10 @@ TEST(RouteMatcherTest, Priority) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(loader, runtime, cm);
+  ConfigImpl config(*loader, runtime, cm);
 
   EXPECT_FALSE(config.usesRuntime());
 
@@ -446,10 +446,10 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(loader, runtime, cm);
+  ConfigImpl config(*loader, runtime, cm);
 
   EXPECT_FALSE(config.usesRuntime());
 
@@ -511,10 +511,10 @@ TEST(RouteMatcherTest, ContentType) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(loader, runtime, cm);
+  ConfigImpl config(*loader, runtime, cm);
 
   EXPECT_FALSE(config.usesRuntime());
 
@@ -562,14 +562,14 @@ TEST(RouteMatcherTest, Runtime) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   Runtime::MockSnapshot snapshot;
 
   ON_CALL(runtime, snapshot()).WillByDefault(ReturnRef(snapshot));
 
-  ConfigImpl config(loader, runtime, cm);
+  ConfigImpl config(*loader, runtime, cm);
 
   EXPECT_TRUE(config.usesRuntime());
 
@@ -607,10 +607,10 @@ TEST(RouteMatcherTest, RateLimit) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(loader, runtime, cm);
+  ConfigImpl config(*loader, runtime, cm);
 
   EXPECT_FALSE(config.usesRuntime());
 
@@ -643,13 +643,13 @@ TEST(RouteMatcherTest, ShadowClusterNotFound) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_CALL(cm, get("www2")).WillRepeatedly(Return(&cm.cluster_));
   EXPECT_CALL(cm, get("some_cluster")).WillRepeatedly(Return(nullptr));
 
-  EXPECT_THROW(ConfigImpl(loader, runtime, cm), EnvoyException);
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
 }
 
 TEST(RouteMatcherTest, Shadow) {
@@ -685,10 +685,10 @@ TEST(RouteMatcherTest, Shadow) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(loader, runtime, cm);
+  ConfigImpl config(*loader, runtime, cm);
 
   EXPECT_TRUE(config.usesRuntime());
 
@@ -747,10 +747,10 @@ TEST(RouteMatcherTest, Retry) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(loader, runtime, cm);
+  ConfigImpl config(*loader, runtime, cm);
 
   EXPECT_FALSE(config.usesRuntime());
 
@@ -809,10 +809,10 @@ TEST(RouteMatcherTest, TestBadDefaultConfig) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_THROW(ConfigImpl config(loader, runtime, cm), EnvoyException);
+  EXPECT_THROW(ConfigImpl config(*loader, runtime, cm), EnvoyException);
 }
 
 TEST(RouteMatcherTest, TestDuplicateDomainConfig) {
@@ -843,10 +843,10 @@ TEST(RouteMatcherTest, TestDuplicateDomainConfig) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_THROW(ConfigImpl config(loader, runtime, cm), EnvoyException);
+  EXPECT_THROW(ConfigImpl config(*loader, runtime, cm), EnvoyException);
 }
 
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
@@ -909,10 +909,10 @@ TEST(RouteMatcherTest, Redirect) {
 }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(loader, runtime, cm);
+  ConfigImpl config(*loader, runtime, cm);
 
   EXPECT_FALSE(config.usesRuntime());
 

@@ -73,7 +73,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     : server_(server), stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, server.stats())),
       codec_options_(Http::Utility::parseCodecOptions(config)),
-      route_config_(new Router::ConfigImpl(config.getObject("route_config"), server.runtime(),
+      route_config_(new Router::ConfigImpl(*config.getObject("route_config"), server.runtime(),
                                            server.clusterManager())),
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
@@ -88,9 +88,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("tracing")) {
-    const std::string operation_name = config.getObject("tracing").getString("operation_name");
+    const std::string operation_name = config.getObject("tracing")->getString("operation_name");
 
-    std::string tracing_type = config.getObject("tracing").getString("type", "all");
+    std::string tracing_type = config.getObject("tracing")->getString("type", "all");
     Http::TracingType type;
     if (tracing_type == "all") {
       type = Http::TracingType::All;
@@ -108,9 +108,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("access_log")) {
-    for (Json::Object& access_log : config.getObjectArray("access_log")) {
+    for (Json::ObjectPtr& access_log : config.getObjectArray("access_log")) {
       Http::AccessLog::InstancePtr current_access_log = Http::AccessLog::InstanceImpl::fromJson(
-          access_log, server.api(), server.dispatcher(), server.accessLogLock(), server.stats(),
+          *access_log, server.api(), server.dispatcher(), server.accessLogLock(), server.stats(),
           server.runtime());
       server.accessLogManager().registerAccessLog(current_access_log);
       access_logs_.push_back(current_access_log);
@@ -130,11 +130,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     throw EnvoyException(fmt::format("invalid connection manager codec '{}'", codec_type));
   }
 
-  std::vector<Json::Object> filters = config.getObjectArray("filters");
+  std::vector<Json::ObjectPtr> filters = config.getObjectArray("filters");
   for (size_t i = 0; i < filters.size(); i++) {
-    std::string string_type = filters[i].getString("type");
-    std::string string_name = filters[i].getString("name");
-    Json::Object config = filters[i].getObject("config");
+    std::string string_type = filters[i]->getString("type");
+    std::string string_name = filters[i]->getString("name");
+    Json::ObjectPtr config_object = filters[i]->getObject("config");
 
     log().info("    filter #{}", i);
     log().info("      type: {}", string_type);
@@ -144,7 +144,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     bool found_filter = false;
     for (HttpFilterConfigFactory* factory : filterConfigFactories()) {
       HttpFilterFactoryCb callback =
-          factory->tryCreateFilterFactory(type, string_name, config, stats_prefix_, server);
+          factory->tryCreateFilterFactory(type, string_name, *config_object, stats_prefix_, server);
       if (callback) {
         filter_factories_.push_back(callback);
         found_filter = true;

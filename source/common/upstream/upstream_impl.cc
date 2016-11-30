@@ -77,7 +77,7 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& ru
 
   ssl_ctx_ = nullptr;
   if (config.hasObject("ssl_context")) {
-    Ssl::ContextConfigImpl context_config(config.getObject("ssl_context"));
+    Ssl::ContextConfigImpl context_config(*config.getObject("ssl_context"));
     ssl_ctx_ = &ssl_context_manager.createSslClientContext(stat_prefix_, stats, context_config);
   }
 }
@@ -185,11 +185,11 @@ ResourceManagerImplPtr ClusterImplBase::ResourceManagers::load(const Json::Objec
   uint64_t max_retries = 3;
   std::string runtime_prefix = fmt::format("circuit_breakers.{}.{}.", cluster_name, priority);
 
-  Json::Object settings = config.getObject("circuit_breakers", true).getObject(priority, true);
-  max_connections = settings.getInteger("max_connections", max_connections);
-  max_pending_requests = settings.getInteger("max_pending_requests", max_pending_requests);
-  max_requests = settings.getInteger("max_requests", max_requests);
-  max_retries = settings.getInteger("max_retries", max_retries);
+  Json::ObjectPtr settings = config.getObject("circuit_breakers", true)->getObject(priority, true);
+  max_connections = settings->getInteger("max_connections", max_connections);
+  max_pending_requests = settings->getInteger("max_pending_requests", max_pending_requests);
+  max_requests = settings->getInteger("max_requests", max_requests);
+  max_retries = settings->getInteger("max_retries", max_retries);
 
   return ResourceManagerImplPtr{new ResourceManagerImpl(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};
@@ -198,10 +198,10 @@ ResourceManagerImplPtr ClusterImplBase::ResourceManagers::load(const Json::Objec
 StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
                                      Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
     : ClusterImplBase(config, runtime, stats, ssl_context_manager) {
-  std::vector<Json::Object> hosts_json = config.getObjectArray("hosts");
+  std::vector<Json::ObjectPtr> hosts_json = config.getObjectArray("hosts");
   HostVectorPtr new_hosts(new std::vector<HostPtr>());
-  for (Json::Object& host : hosts_json) {
-    std::string url = host.getString("url");
+  for (Json::ObjectPtr& host : hosts_json) {
+    std::string url = host->getString("url");
     // resolve the URL to make sure it's valid
     Network::Utility::resolve(url);
     new_hosts->emplace_back(HostPtr{new HostImpl(*this, url, false, 1, "")});
@@ -293,8 +293,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
       dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
                                        config.getInteger("dns_refresh_rate_ms", 5000))) {
-  for (Json::Object& host : config.getObjectArray("hosts")) {
-    resolve_targets_.emplace_back(new ResolveTarget(*this, host.getString("url")));
+  for (Json::ObjectPtr& host : config.getObjectArray("hosts")) {
+    resolve_targets_.emplace_back(new ResolveTarget(*this, host->getString("url")));
   }
 }
 

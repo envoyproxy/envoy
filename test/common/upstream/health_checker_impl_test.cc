@@ -63,9 +63,9 @@ public:
     }
     )EOF";
 
-    Json::StringLoader config(json);
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
     health_checker_.reset(
-        new TestHttpHealthCheckerImpl(*cluster_, config, dispatcher_, stats_, runtime_, random_));
+        new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, stats_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostPtr host, bool changed_state)
                                                 -> void { onHostStatus(host, changed_state); });
   }
@@ -84,9 +84,9 @@ public:
     }
     )EOF";
 
-    Json::StringLoader config(json);
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
     health_checker_.reset(
-        new TestHttpHealthCheckerImpl(*cluster_, config, dispatcher_, stats_, runtime_, random_));
+        new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, stats_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostPtr host, bool changed_state)
                                                 -> void { onHostStatus(host, changed_state); });
   }
@@ -492,9 +492,9 @@ TEST(TcpHealthCheckMatcher, loadJsonBytes) {
     }
     )EOF";
 
-    Json::StringLoader config(json);
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
     TcpHealthCheckMatcher::MatchSegments segments =
-        TcpHealthCheckMatcher::loadJsonBytes(config.getObjectArray("bytes"));
+        TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes"));
     EXPECT_EQ(2U, segments.size());
   }
 
@@ -507,8 +507,8 @@ TEST(TcpHealthCheckMatcher, loadJsonBytes) {
     }
     )EOF";
 
-    Json::StringLoader config(json);
-    EXPECT_THROW(TcpHealthCheckMatcher::loadJsonBytes(config.getObjectArray("bytes")),
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+    EXPECT_THROW(TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes")),
                  EnvoyException);
   }
 
@@ -521,8 +521,8 @@ TEST(TcpHealthCheckMatcher, loadJsonBytes) {
     }
     )EOF";
 
-    Json::StringLoader config(json);
-    EXPECT_THROW(TcpHealthCheckMatcher::loadJsonBytes(config.getObjectArray("bytes")),
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+    EXPECT_THROW(TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes")),
                  EnvoyException);
   }
 }
@@ -541,9 +541,9 @@ TEST(TcpHealthCheckMatcher, match) {
   }
   )EOF";
 
-  Json::StringLoader config(json);
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   TcpHealthCheckMatcher::MatchSegments segments =
-      TcpHealthCheckMatcher::loadJsonBytes(config.getObjectArray("bytes"));
+      TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes"));
 
   Buffer::OwnedImpl buffer;
   EXPECT_FALSE(TcpHealthCheckMatcher::match(segments, buffer));
@@ -585,9 +585,9 @@ public:
     }
     )EOF";
 
-    Json::StringLoader config(json);
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
     health_checker_.reset(
-        new TcpHealthCheckerImpl(*cluster_, config, dispatcher_, stats_, runtime_, random_));
+        new TcpHealthCheckerImpl(*cluster_, *config, dispatcher_, stats_, runtime_, random_));
   }
 
   void expectSessionCreate() {

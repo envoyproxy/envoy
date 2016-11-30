@@ -35,8 +35,8 @@ public:
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enforcing", 100))
         .WillByDefault(Return(true));
 
-    Json::StringLoader config(json);
-    config_.reset(new Config(config, stats_store_, runtime_));
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+    config_.reset(new Config(*config, stats_store_, runtime_));
     client_ = new MockClient();
     filter_.reset(new Instance(config_, ClientPtr{client_}));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);

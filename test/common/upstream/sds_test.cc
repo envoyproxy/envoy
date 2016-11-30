@@ -33,10 +33,10 @@ protected:
     }
     )EOF";
 
-    Json::StringLoader config(raw_config);
+    Json::ObjectPtr config = Json::Factory::LoadFromString(raw_config);
 
     timer_ = new Event::MockTimer(&dispatcher_);
-    cluster_.reset(new SdsClusterImpl(config, runtime_, stats_, ssl_context_manager_, sds_config_,
+    cluster_.reset(new SdsClusterImpl(*config, runtime_, stats_, ssl_context_manager_, sds_config_,
                                       cm_, dispatcher_, random_));
   }
 

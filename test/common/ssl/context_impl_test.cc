@@ -26,8 +26,8 @@ TEST(SslContextImplTest, TestCipherSuites) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  ContextConfigImpl cfg(loader);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  ContextConfigImpl cfg(*loader);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW(ClientContextImpl("", store, cfg), EnvoyException);
 }
@@ -40,8 +40,8 @@ TEST(SslContextImplTest, TestExpiringCert) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  ContextConfigImpl cfg(loader);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  ContextConfigImpl cfg(*loader);
   Stats::IsolatedStoreImpl store;
   ClientContextImpl context("", store, cfg);
 
@@ -61,8 +61,8 @@ TEST(SslContextImplTest, TestExpiredCert) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  ContextConfigImpl cfg(loader);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  ContextConfigImpl cfg(*loader);
   Stats::IsolatedStoreImpl store;
   ClientContextImpl context("", store, cfg);
   EXPECT_EQ(0U, context.daysUntilFirstCertExpires());
@@ -77,8 +77,8 @@ TEST(SslContextImplTest, TestGetCertInformation) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  ContextConfigImpl cfg(loader);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  ContextConfigImpl cfg(*loader);
   Stats::IsolatedStoreImpl store;
 
   ClientContextImpl context("", store, cfg);
@@ -99,8 +99,8 @@ TEST(SslContextImplTest, TestGetCertInformation) {
 }
 
 TEST(SslContextImplTest, TestNoCert) {
-  Json::StringLoader loader("{}");
-  ContextConfigImpl cfg(loader);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString("{}");
+  ContextConfigImpl cfg(*loader);
   Stats::IsolatedStoreImpl store;
   ClientContextImpl context("", store, cfg);
   EXPECT_EQ("", context.getCaCertInformation());
