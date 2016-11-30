@@ -12,8 +12,8 @@ TEST(IpWhiteListTest, Errors) {
     }
     )EOF";
 
-    Json::StringLoader loader(json);
-    EXPECT_THROW({ IpWhiteList wl(loader); }, EnvoyException);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+    EXPECT_THROW({ IpWhiteList wl(*loader); }, EnvoyException);
   }
 
   {
@@ -23,8 +23,8 @@ TEST(IpWhiteListTest, Errors) {
     }
     )EOF";
 
-    Json::StringLoader loader(json);
-    EXPECT_THROW({ IpWhiteList wl(loader); }, EnvoyException);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+    EXPECT_THROW({ IpWhiteList wl(*loader); }, EnvoyException);
   }
 
   {
@@ -34,8 +34,8 @@ TEST(IpWhiteListTest, Errors) {
     }
     )EOF";
 
-    Json::StringLoader loader(json);
-    EXPECT_THROW({ IpWhiteList wl(loader); }, EnvoyException);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+    EXPECT_THROW({ IpWhiteList wl(*loader); }, EnvoyException);
   }
 
   {
@@ -45,8 +45,8 @@ TEST(IpWhiteListTest, Errors) {
     }
     )EOF";
 
-    Json::StringLoader loader(json);
-    EXPECT_THROW({ IpWhiteList wl(loader); }, EnvoyException);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+    EXPECT_THROW({ IpWhiteList wl(*loader); }, EnvoyException);
   }
 }
 
@@ -61,8 +61,8 @@ TEST(IpWhiteListTest, Normal) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  IpWhiteList wl(loader);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  IpWhiteList wl(*loader);
 
   EXPECT_TRUE(wl.contains("192.168.3.0"));
   EXPECT_TRUE(wl.contains("192.168.3.3"));

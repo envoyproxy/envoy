@@ -26,8 +26,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
   }
   )EOF";
 
-  Json::StringLoader server_ctx_loader(server_ctx_json);
-  ContextConfigImpl server_ctx_config(server_ctx_loader);
+  Json::ObjectPtr server_ctx_loader = Json::Factory::LoadFromString(server_ctx_json);
+  ContextConfigImpl server_ctx_config(*server_ctx_loader);
   ServerContextImpl server_ctx("server_ctx", stats_store, server_ctx_config, runtime);
 
   Event::DispatcherImpl dispatcher;
@@ -43,8 +43,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
   }
   )EOF";
 
-  Json::StringLoader client_ctx_loader(client_ctx_json);
-  ContextConfigImpl client_ctx_config(client_ctx_loader);
+  Json::ObjectPtr client_ctx_loader = Json::Factory::LoadFromString(client_ctx_json);
+  ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextImpl client_ctx("client_ctx", stats_store, client_ctx_config);
   Network::ClientConnectionPtr client_connection =
       dispatcher.createSslClientConnection(client_ctx, "tcp://127.0.0.1:10000");
@@ -84,8 +84,8 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   }
   )EOF";
 
-  Json::StringLoader server_ctx_loader(server_ctx_json);
-  ContextConfigImpl server_ctx_config(server_ctx_loader);
+  Json::ObjectPtr server_ctx_loader = Json::Factory::LoadFromString(server_ctx_json);
+  ContextConfigImpl server_ctx_config(*server_ctx_loader);
   ServerContextImpl server_ctx("server_ctx", stats_store, server_ctx_config, runtime);
 
   Event::DispatcherImpl dispatcher;
@@ -101,8 +101,8 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   }
   )EOF";
 
-  Json::StringLoader client_ctx_loader(client_ctx_json);
-  ContextConfigImpl client_ctx_config(client_ctx_loader);
+  Json::ObjectPtr client_ctx_loader = Json::Factory::LoadFromString(client_ctx_json);
+  ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextImpl client_ctx("client_ctx", stats_store, client_ctx_config);
   Network::ClientConnectionPtr client_connection =
       dispatcher.createSslClientConnection(client_ctx, "tcp://127.0.0.1:10000");
@@ -138,8 +138,8 @@ TEST(SslConnectionImplTest, SslError) {
   }
   )EOF";
 
-  Json::StringLoader server_ctx_loader(server_ctx_json);
-  ContextConfigImpl server_ctx_config(server_ctx_loader);
+  Json::ObjectPtr server_ctx_loader = Json::Factory::LoadFromString(server_ctx_json);
+  ContextConfigImpl server_ctx_config(*server_ctx_loader);
   ServerContextImpl server_ctx("server_ctx", stats_store, server_ctx_config, runtime);
 
   Event::DispatcherImpl dispatcher;

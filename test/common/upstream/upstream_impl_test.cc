@@ -81,8 +81,8 @@ TEST(StrictDnsClusterImplTest, Basic) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  StrictDnsClusterImpl cluster(loader, runtime, stats, ssl_context_manager, dns_resolver);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver);
   EXPECT_EQ(43U, cluster.resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(57U, cluster.resourceManager(ResourcePriority::Default).pendingRequests().max());
   EXPECT_EQ(50U, cluster.resourceManager(ResourcePriority::Default).requests().max());
@@ -206,8 +206,8 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   }
   )EOF";
 
-  Json::StringLoader config(json);
-  StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager);
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
 
   MockOutlierDetector* detector = new MockOutlierDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
@@ -244,8 +244,8 @@ TEST(StaticClusterImplTest, UrlConfig) {
   }
   )EOF";
 
-  Json::StringLoader config(json);
-  StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager);
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
   EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).pendingRequests().max());
   EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).requests().max());
@@ -279,8 +279,8 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   }
   )EOF";
 
-  Json::StringLoader config(json);
-  EXPECT_THROW(StaticClusterImpl(config, runtime, stats, ssl_context_manager), EnvoyException);
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(StaticClusterImpl(*config, runtime, stats, ssl_context_manager), EnvoyException);
 }
 
 TEST(StaticClusterImplTest, UnsupportedFeature) {
@@ -299,8 +299,8 @@ TEST(StaticClusterImplTest, UnsupportedFeature) {
   }
   )EOF";
 
-  Json::StringLoader config(json);
-  EXPECT_THROW(StaticClusterImpl(config, runtime, stats, ssl_context_manager), EnvoyException);
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(StaticClusterImpl(*config, runtime, stats, ssl_context_manager), EnvoyException);
 }
 
 } // Upstream

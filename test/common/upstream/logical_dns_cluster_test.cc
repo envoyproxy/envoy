@@ -15,9 +15,9 @@ namespace Upstream {
 class LogicalDnsClusterTest : public testing::Test {
 public:
   void setup(const std::string& json) {
-    Json::StringLoader config(json);
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
     resolve_timer_ = new Event::MockTimer(&dns_resolver_.dispatcher_);
-    cluster_.reset(new LogicalDnsCluster(config, runtime_, stats_store_, ssl_context_manager_,
+    cluster_.reset(new LogicalDnsCluster(*config, runtime_, stats_store_, ssl_context_manager_,
                                          dns_resolver_, tls_));
     cluster_->addMemberUpdateCb([&](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
                                     -> void { membership_updated_.ready(); });

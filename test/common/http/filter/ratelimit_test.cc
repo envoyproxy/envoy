@@ -30,10 +30,10 @@ TEST(HttpRateLimitFilterBadConfigTest, BadType) {
   }
   )EOF";
 
-  Json::StringLoader config(json);
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Runtime::MockLoader> runtime;
-  EXPECT_THROW(FilterConfig(config, "service_cluster", stats_store, runtime), EnvoyException);
+  EXPECT_THROW(FilterConfig(*config, "service_cluster", stats_store, runtime), EnvoyException);
 }
 
 TEST(HttpRateLimitFilterBadConfigTest, NoDescriptorKey) {
@@ -49,10 +49,10 @@ TEST(HttpRateLimitFilterBadConfigTest, NoDescriptorKey) {
   }
   )EOF";
 
-  Json::StringLoader config(json);
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Runtime::MockLoader> runtime;
-  EXPECT_THROW(FilterConfig(config, "service_cluster", stats_store, runtime), EnvoyException);
+  EXPECT_THROW(FilterConfig(*config, "service_cluster", stats_store, runtime), EnvoyException);
 }
 
 class HttpRateLimitFilterTest : public testing::Test {
@@ -67,8 +67,8 @@ public:
   }
 
   void SetUpTest(const std::string json) {
-    Json::StringLoader config(json);
-    config_.reset(new FilterConfig(config, "service_cluster", stats_store_, runtime_));
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+    config_.reset(new FilterConfig(*config, "service_cluster", stats_store_, runtime_));
 
     client_ = new ::RateLimit::MockClient();
     filter_.reset(new Filter(config_, ::RateLimit::ClientPtr{client_}));

@@ -50,20 +50,20 @@ void SdsClusterImpl::onFailure(Http::AsyncClient::FailureReason) {
 }
 
 void SdsClusterImpl::parseSdsResponse(Http::Message& response) {
-  Json::StringLoader json(response.bodyAsString());
+  Json::ObjectPtr json = Json::Factory::LoadFromString(response.bodyAsString());
   std::vector<HostPtr> new_hosts;
-  for (const Json::Object& host : json.getObjectArray("hosts")) {
+  for (const Json::ObjectPtr& host : json->getObjectArray("hosts")) {
     bool canary = false;
     uint32_t weight = 1;
     std::string zone = "";
-    if (host.hasObject("tags")) {
-      canary = host.getObject("tags").getBoolean("canary", canary);
-      weight = host.getObject("tags").getInteger("load_balancing_weight", weight);
-      zone = host.getObject("tags").getString("az", zone);
+    if (host->hasObject("tags")) {
+      canary = host->getObject("tags")->getBoolean("canary", canary);
+      weight = host->getObject("tags")->getInteger("load_balancing_weight", weight);
+      zone = host->getObject("tags")->getString("az", zone);
     }
 
     new_hosts.emplace_back(new HostImpl(
-        *this, Network::Utility::urlForTcp(host.getString("ip_address"), host.getInteger("port")),
+        *this, Network::Utility::urlForTcp(host->getString("ip_address"), host->getInteger("port")),
         canary, weight, zone));
   }
 

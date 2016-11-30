@@ -118,12 +118,12 @@ TEST(RateLimitGrpcFactoryTest, NoCluster) {
   }
   )EOF";
 
-  Json::StringLoader config(json);
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   Upstream::MockClusterManager cm;
   Stats::IsolatedStoreImpl stats_store;
 
   EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
-  EXPECT_THROW(GrpcFactoryImpl(config, cm, stats_store), EnvoyException);
+  EXPECT_THROW(GrpcFactoryImpl(*config, cm, stats_store), EnvoyException);
 }
 
 TEST(RateLimitGrpcFactoryTest, Create) {
@@ -133,12 +133,12 @@ TEST(RateLimitGrpcFactoryTest, Create) {
   }
   )EOF";
 
-  Json::StringLoader config(json);
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   Upstream::MockClusterManager cm;
   Stats::IsolatedStoreImpl stats_store;
 
   EXPECT_CALL(cm, get("foo"));
-  GrpcFactoryImpl factory(config, cm, stats_store);
+  GrpcFactoryImpl factory(*config, cm, stats_store);
   factory.create(Optional<std::chrono::milliseconds>());
 }
 

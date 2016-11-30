@@ -15,11 +15,11 @@ namespace Http {
 
 FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
                                      const std::string& stat_prefix, Stats::Store& stats)
-    : runtime_(runtime), stats_{ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))} {
+    : runtime_(runtime), stats_(generateStats(stat_prefix, stats)) {
 
   if (json_config.hasObject("abort")) {
-    const Json::Object& abort = json_config.getObject("abort");
-    abort_percent_ = static_cast<uint64_t>(abort.getInteger("abort_percent", 0));
+    const Json::ObjectPtr& abort = json_config.getObject("abort");
+    abort_percent_ = static_cast<uint64_t>(abort->getInteger("abort_percent", 0));
 
     if (abort_percent_ > 0) {
       if (abort_percent_ > 100) {
@@ -28,19 +28,19 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
     }
 
     // TODO: Throw error if invalid return code is provided
-    if (abort.hasObject("http_status")) {
-      http_status_ = static_cast<uint64_t>(abort.getInteger("http_status"));
+    if (abort->hasObject("http_status")) {
+      http_status_ = static_cast<uint64_t>(abort->getInteger("http_status"));
     } else {
       throw EnvoyException("missing http_status in abort config");
     }
   }
 
   if (json_config.hasObject("delay")) {
-    const Json::Object& delay = json_config.getObject("delay");
-    const std::string type = delay.getString("type", "empty");
+    const Json::ObjectPtr& delay = json_config.getObject("delay");
+    const std::string type = delay->getString("type", "empty");
     if (type == "fixed") {
-      fixed_delay_percent_ = static_cast<uint64_t>(delay.getInteger("fixed_delay_percent", 0));
-      fixed_duration_ms_ = static_cast<uint64_t>(delay.getInteger("fixed_duration_ms", 0));
+      fixed_delay_percent_ = static_cast<uint64_t>(delay->getInteger("fixed_delay_percent", 0));
+      fixed_duration_ms_ = static_cast<uint64_t>(delay->getInteger("fixed_duration_ms", 0));
 
       if (fixed_delay_percent_ > 0) {
         if (fixed_delay_percent_ > 100) {
@@ -56,11 +56,11 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
   }
 
   if (json_config.hasObject("headers")) {
-    std::vector<Json::Object> config_headers = json_config.getObjectArray("headers");
-    for (const Json::Object& header_map : config_headers) {
+    std::vector<Json::ObjectPtr> config_headers = json_config.getObjectArray("headers");
+    for (const Json::ObjectPtr& header_map : config_headers) {
       // allow header value to be empty, allows matching to be only based on header presence.
-      fault_filter_headers_.emplace_back(Http::LowerCaseString(header_map.getString("name")),
-                                         header_map.getString("value", EMPTY_STRING));
+      fault_filter_headers_.emplace_back(Http::LowerCaseString(header_map->getString("name")),
+                                         header_map->getString("value", EMPTY_STRING));
     }
   }
 }
@@ -111,7 +111,7 @@ FilterTrailersStatus FaultFilter::decodeTrailers(HeaderMap&) {
   return FilterTrailersStatus::Continue;
 }
 
-FaultFilterStats FaultFilter::generateStats(const std::string& prefix, Stats::Store& store) {
+FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Stats::Store& store) {
   std::string final_prefix = prefix + "fault.";
   return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
 }

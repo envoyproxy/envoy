@@ -10,10 +10,10 @@ using testing::NiceMock;
 namespace Upstream {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
-  Json::StringLoader loader("{}");
+  Json::ObjectPtr loader = Json::Factory::LoadFromString("{}");
   MockCluster cluster;
   Event::MockDispatcher dispatcher;
-  EXPECT_EQ(nullptr, OutlierDetectorImplFactory::createForCluster(cluster, loader, dispatcher));
+  EXPECT_EQ(nullptr, OutlierDetectorImplFactory::createForCluster(cluster, *loader, dispatcher));
 }
 
 TEST(OutlierDetectorImplFactoryTest, Detector) {
@@ -23,10 +23,10 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<MockCluster> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_NE(nullptr, OutlierDetectorImplFactory::createForCluster(cluster, loader, dispatcher));
+  EXPECT_NE(nullptr, OutlierDetectorImplFactory::createForCluster(cluster, *loader, dispatcher));
 }
 
 TEST(OutlierDetectorImplTest, Callbacks) {

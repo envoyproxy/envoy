@@ -142,8 +142,8 @@ private:
 class RateLimitPolicyImpl : public RateLimitPolicy {
 public:
   RateLimitPolicyImpl(const Json::Object& config)
-      : do_global_limiting_(config.getObject("rate_limit", true).getBoolean("global", false)),
-        route_key_(config.getObject("rate_limit", true).getString("route_key", "")) {}
+      : do_global_limiting_(config.getObject("rate_limit", true)->getBoolean("global", false)),
+        route_key_(config.getObject("rate_limit", true)->getString("route_key", "")) {}
 
   // Router::RateLimitPolicy
   bool doGlobalLimiting() const override { return do_global_limiting_; }

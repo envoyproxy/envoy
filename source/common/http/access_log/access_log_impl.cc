@@ -110,14 +110,14 @@ bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header
 
 OperatorFilter::OperatorFilter(const Json::Object& json, Runtime::Loader& runtime) {
   if (json.hasObject("filters")) {
-    std::vector<Json::Object> filters = json.getObjectArray("filters");
+    std::vector<Json::ObjectPtr> filters = json.getObjectArray("filters");
     if (filters.size() < 2) {
       throw EnvoyException(fmt::format("Filter list must have at least 2 filters, {} filters given",
                                        filters.size()));
     }
 
-    for (Json::Object& filter : filters) {
-      filters_.emplace_back(FilterImpl::fromJson(filter, runtime));
+    for (Json::ObjectPtr& filter : filters) {
+      filters_.emplace_back(FilterImpl::fromJson(*filter, runtime));
     }
   } else {
     throw EnvoyException(fmt::format("Filter list cannot be empty in OperatorFilter"));
@@ -174,8 +174,8 @@ InstancePtr InstanceImpl::fromJson(Json::Object& json, Api::Api& api, Event::Dis
 
   FilterPtr filter;
   if (json.hasObject("filter")) {
-    Json::Object filterObject = json.getObject("filter");
-    filter = FilterImpl::fromJson(filterObject, runtime);
+    Json::ObjectPtr filterObject = json.getObject("filter");
+    filter = FilterImpl::fromJson(*filterObject, runtime);
   }
 
   FormatterPtr formatter;

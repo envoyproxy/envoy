@@ -24,23 +24,23 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, Stats::Store&
                                        const std::string& local_address)
     : runtime_(runtime), tls_(tls), stats_(stats), thread_local_slot_(tls.allocateSlot()) {
 
-  std::vector<Json::Object> clusters = config.getObjectArray("clusters");
+  std::vector<Json::ObjectPtr> clusters = config.getObjectArray("clusters");
   pending_cluster_init_ = clusters.size();
 
   if (config.hasObject("sds")) {
     pending_cluster_init_++;
-    loadCluster(config.getObject("sds").getObject("cluster"), stats, dns_resolver,
+    loadCluster(*config.getObject("sds")->getObject("cluster"), stats, dns_resolver,
                 ssl_context_manager, runtime, random);
 
     SdsConfig sds_config{
-        local_zone_name, config.getObject("sds").getObject("cluster").getString("name"),
-        std::chrono::milliseconds(config.getObject("sds").getInteger("refresh_delay_ms"))};
+        local_zone_name, config.getObject("sds")->getObject("cluster")->getString("name"),
+        std::chrono::milliseconds(config.getObject("sds")->getInteger("refresh_delay_ms"))};
 
     sds_config_.value(sds_config);
   }
 
-  for (const Json::Object& cluster : clusters) {
-    loadCluster(cluster, stats, dns_resolver, ssl_context_manager, runtime, random);
+  for (const Json::ObjectPtr& cluster : clusters) {
+    loadCluster(*cluster, stats, dns_resolver, ssl_context_manager, runtime, random);
   }
 
   Optional<std::string> local_cluster_name;
@@ -127,14 +127,14 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, Stats::Store& 
   });
 
   if (cluster.hasObject("health_check")) {
-    Json::Object health_check_config = cluster.getObject("health_check");
-    std::string hc_type = health_check_config.getString("type");
+    Json::ObjectPtr health_check_config = cluster.getObject("health_check");
+    std::string hc_type = health_check_config->getString("type");
     if (hc_type == "http") {
       new_cluster->setHealthChecker(HealthCheckerPtr{new ProdHttpHealthCheckerImpl(
-          *new_cluster, health_check_config, dns_resolver.dispatcher(), stats, runtime, random)});
+          *new_cluster, *health_check_config, dns_resolver.dispatcher(), stats, runtime, random)});
     } else if (hc_type == "tcp") {
       new_cluster->setHealthChecker(HealthCheckerPtr{new TcpHealthCheckerImpl(
-          *new_cluster, health_check_config, dns_resolver.dispatcher(), stats, runtime, random)});
+          *new_cluster, *health_check_config, dns_resolver.dispatcher(), stats, runtime, random)});
     } else {
       throw EnvoyException(fmt::format("cluster: unknown health check type '{}'", hc_type));
     }
