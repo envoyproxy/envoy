@@ -123,6 +123,12 @@ TEST(JsonLoaderTest, Integer) {
     EXPECT_EQ(std::numeric_limits<int64_t>::max(), json->getInteger("max"));
     EXPECT_EQ(std::numeric_limits<int64_t>::min(), json->getInteger("min"));
   }
+  {
+    ObjectPtr json_max = Factory::LoadFromString("{\"val\":9223372036854775808}");
+    EXPECT_THROW(json_max->getInteger("val"), Exception);
+    ObjectPtr json_min = Factory::LoadFromString("{\"val\":-9223372036854775809}");
+    EXPECT_THROW(json_min->getInteger("val"), Exception);
+  }
 }
 
 TEST(JsonLoaderTest, Double) {
