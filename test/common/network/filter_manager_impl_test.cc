@@ -112,10 +112,10 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   ON_CALL(runtime.snapshot_, featureEnabled("ratelimit.tcp_filter_enforcing", 100))
       .WillByDefault(Return(true));
 
-  Json::StringLoader rl_config_loader(rl_json);
+  Json::ObjectPtr rl_config_loader = Json::Factory::LoadFromString(rl_json);
 
   RateLimit::TcpFilter::ConfigPtr rl_config(
-      new RateLimit::TcpFilter::Config(rl_config_loader, stats_store, runtime));
+      new RateLimit::TcpFilter::Config(*rl_config_loader, stats_store, runtime));
   RateLimit::MockClient* rl_client = new RateLimit::MockClient();
   manager.addReadFilter(ReadFilterPtr{
       new RateLimit::TcpFilter::Instance(rl_config, RateLimit::ClientPtr{rl_client})});
@@ -127,9 +127,9 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
     }
     )EOF";
 
-  Json::StringLoader tcp_proxy_config_loader(tcp_proxy_json);
+  Json::ObjectPtr tcp_proxy_config_loader = Json::Factory::LoadFromString(tcp_proxy_json);
   ::Filter::TcpProxyConfigPtr tcp_proxy_config(
-      new ::Filter::TcpProxyConfig(tcp_proxy_config_loader, cm, stats_store));
+      new ::Filter::TcpProxyConfig(*tcp_proxy_config_loader, cm, stats_store));
   manager.addReadFilter(ReadFilterPtr{new ::Filter::TcpProxy(tcp_proxy_config, cm)});
 
   RateLimit::RequestCallbacks* request_callbacks{};
