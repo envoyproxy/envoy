@@ -65,7 +65,7 @@ hosts
 
   strict_dns
     Strict DNS clusters can specify any number of hostname:port combinations. All names will be
-    resolved using DNS and grouped together to form the final cluster. If multiple records are 
+    resolved using DNS and grouped together to form the final cluster. If multiple records are
     returned for a single name, all will be used. For example:
 
     .. code-block:: json
@@ -130,6 +130,8 @@ alt_stat_name
   *(optional, string)* If an alternate stat name is specified, some :ref:`statistics
   <config_cluster_manager_cluster_stats>` will be duplicated between the standard statistics and a
   tree specified by this parameter (e.g., *cluster.<alt_stat_name>.*).
+
+.. _config_cluster_manager_cluster_dns_refresh_rate_ms:
 
 dns_refresh_rate_ms
   *(optional, integer)* If the dns refresh rate is specified and the cluster type is either *strict_dns*,

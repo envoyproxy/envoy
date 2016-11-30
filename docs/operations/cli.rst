@@ -1,3 +1,5 @@
+.. _operations_cli:
+
 Command line options
 ====================
 
