@@ -44,6 +44,8 @@ public:
   FaultFilterStats& stats() { return stats_; }
 
 private:
+  static FaultFilterStats generateStats(const std::string& prefix, Stats::Store& store);
+
   uint64_t abort_percent_{};       // 0-100
   uint64_t http_status_{};         // HTTP or gRPC return codes
   uint64_t fixed_delay_percent_{}; // 0-100
@@ -62,8 +64,6 @@ class FaultFilter : public StreamDecoderFilter {
 public:
   FaultFilter(FaultFilterConfigPtr config);
   ~FaultFilter();
-
-  static FaultFilterStats generateStats(const std::string& prefix, Stats::Store& store);
 
   FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
   FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;

@@ -15,7 +15,7 @@ namespace Http {
 
 FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
                                      const std::string& stat_prefix, Stats::Store& stats)
-    : runtime_(runtime), stats_{ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))} {
+    : runtime_(runtime), stats_(generateStats(stat_prefix, stats)) {
 
   if (json_config.hasObject("abort")) {
     const Json::Object& abort = json_config.getObject("abort");
@@ -111,7 +111,7 @@ FilterTrailersStatus FaultFilter::decodeTrailers(HeaderMap&) {
   return FilterTrailersStatus::Continue;
 }
 
-FaultFilterStats FaultFilter::generateStats(const std::string& prefix, Stats::Store& store) {
+FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Stats::Store& store) {
   std::string final_prefix = prefix + "fault.";
   return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
 }
