@@ -10,8 +10,8 @@ Initial open source release.
 =====
 
 * Switch from Jannson to RapidJSON for our JSON library (allowing for a configuration schema in
-  the next release). Upgrade :ref:`recommended version <install_requirements>` of various other
-  libraries.
+  1.2.0).
+* Upgrade :ref:`recommended version <install_requirements>` of various other libraries.
 * :ref:`Configurable DNS refresh rate <config_cluster_manager_cluster_dns_refresh_rate_ms>` for
   DNS service discovery types.
 * Upstream circuit breaker configuration can be :ref:`overridden via runtime
