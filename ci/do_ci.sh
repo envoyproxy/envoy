@@ -56,7 +56,7 @@ $EXTRA_CMAKE_FLAGS \
 -DENVOY_TEST_EXTRA_LINKER_FLAGS:STRING=-L/thirdparty_build/lib \
 ..
 
-cmake -L
+cmake -L || true
 
 make check_format
 make -j$NUM_CPUS $TEST_TARGET
