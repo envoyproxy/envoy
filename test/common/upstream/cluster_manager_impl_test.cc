@@ -59,8 +59,8 @@ TEST_F(ClusterManagerImplTest, NoSdsConfig) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  EXPECT_THROW(create(loader), EnvoyException);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(create(*loader), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, UnknownClusterType) {
@@ -76,8 +76,8 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  EXPECT_THROW(create(loader), EnvoyException);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(create(*loader), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
@@ -102,8 +102,8 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  EXPECT_THROW(create(loader), EnvoyException);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(create(*loader), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
@@ -135,8 +135,8 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  create(loader);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  create(*loader);
 }
 
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
@@ -160,8 +160,8 @@ TEST_F(ClusterManagerImplTest, DuplicateCluster) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  EXPECT_THROW(create(loader), EnvoyException);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(create(*loader), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, UnknownHcType) {
@@ -181,8 +181,8 @@ TEST_F(ClusterManagerImplTest, UnknownHcType) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  EXPECT_THROW(create(loader), EnvoyException);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(create(*loader), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
@@ -212,11 +212,11 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dns_resolver_.dispatcher_, createClientConnection_("tcp://127.0.0.1:11001"))
       .WillOnce(Return(connection));
-  create(loader);
+  create(*loader);
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
@@ -233,8 +233,8 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
-  create(loader);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  create(*loader);
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_THROW(cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default),
                EnvoyException);
@@ -256,12 +256,12 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&dns_resolver_.dispatcher_);
   EXPECT_CALL(dns_resolver_, resolve(_, _)).WillRepeatedly(SaveArg<1>(&dns_callback));
-  create(loader);
+  create(*loader);
 
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr,

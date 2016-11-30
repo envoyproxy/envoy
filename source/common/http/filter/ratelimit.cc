@@ -70,12 +70,12 @@ FilterConfig::FilterConfig(const Json::Object& config, const std::string& local_
                            Stats::Store& stats_store, Runtime::Loader& runtime)
     : domain_(config.getString("domain")), local_service_cluster_(local_service_cluster),
       stats_store_(stats_store), runtime_(runtime) {
-  for (const Json::Object& action : config.getObjectArray("actions")) {
-    std::string type = action.getString("type");
+  for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
+    std::string type = action->getString("type");
     if (type == "service_to_service") {
       actions_.emplace_back(new ServiceToServiceAction());
     } else if (type == "request_headers") {
-      actions_.emplace_back(new RequestHeadersAction(action));
+      actions_.emplace_back(new RequestHeadersAction(*action));
     } else if (type == "remote_address") {
       actions_.emplace_back(new RemoteAddressAction());
     } else {

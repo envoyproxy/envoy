@@ -41,10 +41,10 @@ public:
     }
     )EOF";
 
-    Json::StringLoader loader(json);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
     EXPECT_CALL(cm_, get("vpn"));
     setupRequest();
-    config_.reset(new Config(loader, tls_, cm_, dispatcher_, stats_store_, runtime_));
+    config_.reset(new Config(*loader, tls_, cm_, dispatcher_, stats_store_, runtime_));
 
     createAuthFilter();
   }
@@ -88,9 +88,9 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(new Config(loader, tls_, cm_, dispatcher_, stats_store_, runtime_), EnvoyException);
+  EXPECT_THROW(new Config(*loader, tls_, cm_, dispatcher_, stats_store_, runtime_), EnvoyException);
 }
 
 TEST_F(ClientSslAuthFilterTest, NoSsl) {

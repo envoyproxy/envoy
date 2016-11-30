@@ -74,18 +74,19 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 TEST(HttpUtility, parseCodecOptions) {
   {
-    Json::StringLoader json("{}");
-    EXPECT_EQ(0UL, Utility::parseCodecOptions(json));
+    Json::ObjectPtr json = Json::Factory::LoadFromString("{}");
+    EXPECT_EQ(0UL, Utility::parseCodecOptions(*json));
   }
 
   {
-    Json::StringLoader json("{\"http_codec_options\": \"no_compression\"}");
-    EXPECT_EQ(CodecOptions::NoCompression, Utility::parseCodecOptions(json));
+    Json::ObjectPtr json =
+        Json::Factory::LoadFromString("{\"http_codec_options\": \"no_compression\"}");
+    EXPECT_EQ(CodecOptions::NoCompression, Utility::parseCodecOptions(*json));
   }
 
   {
-    Json::StringLoader json("{\"http_codec_options\": \"foo\"}");
-    EXPECT_THROW(Utility::parseCodecOptions(json), EnvoyException);
+    Json::ObjectPtr json = Json::Factory::LoadFromString("{\"http_codec_options\": \"foo\"}");
+    EXPECT_THROW(Utility::parseCodecOptions(*json), EnvoyException);
   }
 }
 

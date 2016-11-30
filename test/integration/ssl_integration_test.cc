@@ -21,8 +21,8 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext(const std::string&
 }
 )EOF";
 
-  Json::StringLoader loader(json);
-  ContextConfigImpl cfg(loader);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  ContextConfigImpl cfg(*loader);
   return ServerContextPtr(new TestServerContextImpl(name, store, cfg));
 }
 
@@ -45,8 +45,8 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(const std::string& n
 }
 )EOF";
 
-  Json::StringLoader loader(alpn ? json_alpn : json_no_alpn);
-  ContextConfigImpl cfg(loader);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(alpn ? json_alpn : json_no_alpn);
+  ContextConfigImpl cfg(*loader);
   return ClientContextPtr(new ClientContextImpl(name, store, cfg));
 }
 

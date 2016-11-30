@@ -83,10 +83,10 @@ TEST_F(AccessLogImplTest, LogMoreData) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   Runtime::MockLoader runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   EXPECT_CALL(*file_, write(_));
   request_info_.failure_reason_ = FailureReason::UpstreamConnectionFailure;
@@ -108,10 +108,10 @@ TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   Runtime::MockLoader runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   EXPECT_CALL(*file_, write(_));
   response_headers_.addViaCopy(Http::Headers::get().EnvoyUpstreamServiceTime, "999");
@@ -129,10 +129,10 @@ TEST_F(AccessLogImplTest, NoFilter) {
     }
     )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   Runtime::MockLoader runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -152,10 +152,10 @@ TEST_F(AccessLogImplTest, UpstreamHost) {
       }
       )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   Runtime::MockLoader runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -176,10 +176,10 @@ TEST_F(AccessLogImplTest, WithFilterMiss) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   Runtime::MockLoader runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -201,10 +201,10 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   Runtime::MockLoader runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   EXPECT_CALL(*file_, write(_)).Times(3);
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -225,10 +225,10 @@ TEST_F(AccessLogImplTest, RuntimeFilter) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   NiceMock<Runtime::MockLoader> runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   // Value is taken from random generator.
   EXPECT_CALL(runtime.snapshot_, featureEnabled("access_log.test_key", 0)).WillOnce(Return(true));
@@ -259,10 +259,10 @@ TEST_F(AccessLogImplTest, PathRewrite) {
       }
       )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   Runtime::MockLoader runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -279,10 +279,10 @@ TEST_F(AccessLogImplTest, healthCheckTrue) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   NiceMock<Runtime::MockLoader> runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   TestHeaderMapImpl header_map{};
   request_info_.hc_request_ = true;
@@ -299,10 +299,10 @@ TEST_F(AccessLogImplTest, healthCheckFalse) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   NiceMock<Runtime::MockLoader> runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   TestHeaderMapImpl header_map{};
   EXPECT_CALL(*file_, write(_));
@@ -327,10 +327,10 @@ TEST_F(AccessLogImplTest, requestTracing) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   NiceMock<Runtime::MockLoader> runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
 
   {
     TestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
@@ -365,8 +365,8 @@ TEST(AccessLogImplTestCtor, OperatorIsNotSupported) {
         "{ \"path\": \"/dev/null\", \"filter\": {\"type\": \"status_code\", \"op\": \"" + oper +
         "\", \"value\" : 500}}";
 
-    Json::StringLoader loader(json);
-    EXPECT_THROW(InstanceImpl::fromJson(loader, api, dispatcher, lock, store, runtime),
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+    EXPECT_THROW(InstanceImpl::fromJson(*loader, api, dispatcher, lock, store, runtime),
                  EnvoyException);
   }
 }
@@ -384,9 +384,9 @@ TEST(AccessLogImplTestCtor, FilterTypeNotSupported) {
       "filter": {"type": "unknown"}
     }
   )EOF";
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 
-  EXPECT_THROW(InstanceImpl::fromJson(loader, api, dispatcher, lock, store, runtime),
+  EXPECT_THROW(InstanceImpl::fromJson(*loader, api, dispatcher, lock, store, runtime),
                EnvoyException);
 }
 
@@ -404,9 +404,9 @@ TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
         "filter": {"type": "logical_or"}
       }
     )EOF";
-    Json::StringLoader loader(json);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 
-    EXPECT_THROW(InstanceImpl::fromJson(loader, api, dispatcher, lock, store, runtime),
+    EXPECT_THROW(InstanceImpl::fromJson(*loader, api, dispatcher, lock, store, runtime),
                  EnvoyException);
   }
 
@@ -417,9 +417,9 @@ TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
         "filter": {"type": "logical_and"}
       }
     )EOF";
-    Json::StringLoader loader(json);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 
-    EXPECT_THROW(InstanceImpl::fromJson(loader, api, dispatcher, lock, store, runtime),
+    EXPECT_THROW(InstanceImpl::fromJson(*loader, api, dispatcher, lock, store, runtime),
                  EnvoyException);
   }
 }
@@ -438,9 +438,9 @@ TEST(AccessLogImplTestCtor, lessThanTwoInFilterList) {
       "filter": {"type": "logical_or", "filters" : []}
     }
     )EOF";
-    Json::StringLoader loader(json);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 
-    EXPECT_THROW(InstanceImpl::fromJson(loader, api, dispatcher, lock, store, runtime),
+    EXPECT_THROW(InstanceImpl::fromJson(*loader, api, dispatcher, lock, store, runtime),
                  EnvoyException);
   }
 
@@ -451,9 +451,9 @@ TEST(AccessLogImplTestCtor, lessThanTwoInFilterList) {
       "filter": {"type": "logical_and", "filters" : []}
     }
     )EOF";
-    Json::StringLoader loader(json);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 
-    EXPECT_THROW(InstanceImpl::fromJson(loader, api, dispatcher, lock, store, runtime),
+    EXPECT_THROW(InstanceImpl::fromJson(*loader, api, dispatcher, lock, store, runtime),
                  EnvoyException);
   }
 
@@ -464,9 +464,9 @@ TEST(AccessLogImplTestCtor, lessThanTwoInFilterList) {
       "filter": {"type": "logical_or", "filters" : [ {"type": "not_healthcheck"} ]}
     }
     )EOF";
-    Json::StringLoader loader(json);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 
-    EXPECT_THROW(InstanceImpl::fromJson(loader, api, dispatcher, lock, store, runtime),
+    EXPECT_THROW(InstanceImpl::fromJson(*loader, api, dispatcher, lock, store, runtime),
                  EnvoyException);
   }
 
@@ -477,9 +477,9 @@ TEST(AccessLogImplTestCtor, lessThanTwoInFilterList) {
       "filter": {"type": "logical_and", "filters" : [ {"type": "not_healthcheck"} ]}
     }
     )EOF";
-    Json::StringLoader loader(json);
+    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 
-    EXPECT_THROW(InstanceImpl::fromJson(loader, api, dispatcher, lock, store, runtime),
+    EXPECT_THROW(InstanceImpl::fromJson(*loader, api, dispatcher, lock, store, runtime),
                  EnvoyException);
   }
 }
@@ -496,10 +496,10 @@ TEST_F(AccessLogImplTest, andFilter) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   Runtime::MockLoader runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
   request_info_.response_code_.value(500);
 
   {
@@ -529,10 +529,10 @@ TEST_F(AccessLogImplTest, orFilter) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   Runtime::MockLoader runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
   request_info_.response_code_.value(500);
 
   {
@@ -565,10 +565,10 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   }
   )EOF";
 
-  Json::StringLoader loader(json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Stats::IsolatedStoreImpl store;
   Runtime::MockLoader runtime;
-  InstancePtr log = InstanceImpl::fromJson(loader, api_, dispatcher_, lock_, store, runtime);
+  InstancePtr log = InstanceImpl::fromJson(*loader, api_, dispatcher_, lock_, store, runtime);
   request_info_.response_code_.value(500);
 
   {
@@ -594,11 +594,11 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
     }
     )EOF";
 
-  Json::StringLoader loader(filter_json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(filter_json);
   NiceMock<Runtime::MockLoader> runtime;
 
-  Json::Object filter_object = loader.getObject("filter");
-  DurationFilter filter(filter_object, runtime);
+  Json::ObjectPtr filter_object = loader->getObject("filter");
+  DurationFilter filter(*filter_object, runtime);
   TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo request_info;
 
@@ -626,11 +626,11 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
     }
     )EOF";
 
-  Json::StringLoader loader(filter_json);
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(filter_json);
   NiceMock<Runtime::MockLoader> runtime;
 
-  Json::Object filter_object = loader.getObject("filter");
-  StatusCodeFilter filter(filter_object, runtime);
+  Json::ObjectPtr filter_object = loader->getObject("filter");
+  StatusCodeFilter filter(*filter_object, runtime);
 
   TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo info;

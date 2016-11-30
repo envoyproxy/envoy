@@ -13,12 +13,12 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
       tls_(tls), tls_slot_(tls.allocateSlot()),
       resolve_timer_(dns_resolver.dispatcher().createTimer([this]() -> void { startResolve(); })) {
 
-  std::vector<Json::Object> hosts_json = config.getObjectArray("hosts");
+  std::vector<Json::ObjectPtr> hosts_json = config.getObjectArray("hosts");
   if (hosts_json.size() != 1) {
     throw EnvoyException("logical_dns clusters must have a single host");
   }
 
-  dns_url_ = hosts_json[0].getString("url");
+  dns_url_ = hosts_json[0]->getString("url");
   Network::Utility::hostFromUrl(dns_url_);
   Network::Utility::portFromUrl(dns_url_);
   startResolve();

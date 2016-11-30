@@ -24,10 +24,10 @@ TEST(TcpProxyConfigTest, NoCluster) {
     }
     )EOF";
 
-  Json::StringLoader config(json);
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   EXPECT_CALL(cluster_manager, get("fake_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(TcpProxyConfig(config, cluster_manager, cluster_manager.cluster_.stats_store_),
+  EXPECT_THROW(TcpProxyConfig(*config, cluster_manager, cluster_manager.cluster_.stats_store_),
                EnvoyException);
 }
 
@@ -41,9 +41,9 @@ public:
     }
     )EOF";
 
-    Json::StringLoader config(json);
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
     config_.reset(
-        new TcpProxyConfig(config, cluster_manager_, cluster_manager_.cluster_.stats_store_));
+        new TcpProxyConfig(*config, cluster_manager_, cluster_manager_.cluster_.stats_store_));
   }
 
   void setup(bool return_connection) {

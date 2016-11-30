@@ -9,10 +9,10 @@ Config::Config(const Json::Object& config, Stats::Store& stats_store, Runtime::L
     : domain_(config.getString("domain")),
       stats_(generateStats(config.getString("stat_prefix"), stats_store)), runtime_(runtime) {
 
-  for (const Json::Object& descriptor : config.getObjectArray("descriptors")) {
+  for (const Json::ObjectPtr& descriptor : config.getObjectArray("descriptors")) {
     Descriptor new_descriptor;
-    for (const Json::Object& entry : descriptor.asObjectArray()) {
-      new_descriptor.entries_.push_back({entry.getString("key"), entry.getString("value")});
+    for (const Json::ObjectPtr& entry : descriptor->asObjectArray()) {
+      new_descriptor.entries_.push_back({entry->getString("key"), entry->getString("value")});
     }
     descriptors_.push_back(new_descriptor);
   }

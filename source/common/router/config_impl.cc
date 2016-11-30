@@ -24,8 +24,8 @@ RetryPolicyImpl::RetryPolicyImpl(const Json::Object& config) {
     return;
   }
 
-  num_retries_ = config.getObject("retry_policy").getInteger("num_retries", 1);
-  retry_on_ = RetryStateImpl::parseRetryOn(config.getObject("retry_policy").getString("retry_on"));
+  num_retries_ = config.getObject("retry_policy")->getInteger("num_retries", 1);
+  retry_on_ = RetryStateImpl::parseRetryOn(config.getObject("retry_policy")->getString("retry_on"));
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const Json::Object& config) {
@@ -33,8 +33,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const Json::Object& config) {
     return;
   }
 
-  cluster_ = config.getObject("shadow").getString("cluster");
-  runtime_key_ = config.getObject("shadow").getString("runtime_key", "");
+  cluster_ = config.getObject("shadow")->getString("cluster");
+  runtime_key_ = config.getObject("shadow")->getString("runtime_key", "");
 }
 
 Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& config) {
@@ -88,11 +88,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHost& vhost, const Json::Obj
   }
 
   if (route.hasObject("headers")) {
-    std::vector<Json::Object> config_headers = route.getObjectArray("headers");
-    for (const Json::Object& header_map : config_headers) {
+    std::vector<Json::ObjectPtr> config_headers = route.getObjectArray("headers");
+    for (const Json::ObjectPtr& header_map : config_headers) {
       // allow header value to be empty, allows matching to be only based on header presence.
-      config_headers_.emplace_back(Http::LowerCaseString(header_map.getString("name")),
-                                   header_map.getString("value", EMPTY_STRING));
+      config_headers_.emplace_back(Http::LowerCaseString(header_map->getString("name")),
+                                   header_map->getString("value", EMPTY_STRING));
     }
   }
 }
@@ -125,8 +125,8 @@ RouteEntryImplBase::loadRuntimeData(const Json::Object& route) {
   Optional<RuntimeData> runtime;
   if (route.hasObject("runtime")) {
     RuntimeData data;
-    data.key_ = route.getObject("runtime").getString("key");
-    data.default_ = route.getObject("runtime").getInteger("default");
+    data.key_ = route.getObject("runtime")->getString("key");
+    data.default_ = route.getObject("runtime")->getInteger("default");
     runtime.value(data);
   }
 
@@ -226,11 +226,11 @@ VirtualHost::VirtualHost(const Json::Object& virtual_host, Runtime::Loader& runt
     throw EnvoyException(fmt::format("unknown 'require_ssl' type '{}'", require_ssl));
   }
 
-  for (const Json::Object& route : virtual_host.getObjectArray("routes")) {
-    if (route.hasObject("prefix")) {
-      routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, runtime));
-    } else if (route.hasObject("path")) {
-      routes_.emplace_back(new PathRouteEntryImpl(*this, route, runtime));
+  for (const Json::ObjectPtr& route : virtual_host.getObjectArray("routes")) {
+    if (route->hasObject("prefix")) {
+      routes_.emplace_back(new PrefixRouteEntryImpl(*this, *route, runtime));
+    } else if (route->hasObject("path")) {
+      routes_.emplace_back(new PathRouteEntryImpl(*this, *route, runtime));
     } else {
       throw EnvoyException("unknown routing configuration type");
     }
@@ -251,8 +251,8 @@ VirtualHost::VirtualHost(const Json::Object& virtual_host, Runtime::Loader& runt
   }
 
   if (virtual_host.hasObject("virtual_clusters")) {
-    for (const Json::Object& virtual_cluster : virtual_host.getObjectArray("virtual_clusters")) {
-      virtual_clusters_.push_back(VirtualClusterEntry(virtual_cluster));
+    for (const Json::ObjectPtr& virtual_cluster : virtual_host.getObjectArray("virtual_clusters")) {
+      virtual_clusters_.push_back(VirtualClusterEntry(*virtual_cluster));
     }
   }
 }
@@ -279,11 +279,11 @@ VirtualHost::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& virtua
 
 RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
                            Upstream::ClusterManager& cm) {
-  for (const Json::Object& virtual_host_config : config.getObjectArray("virtual_hosts")) {
-    VirtualHostPtr virtual_host(new VirtualHost(virtual_host_config, runtime, cm));
+  for (const Json::ObjectPtr& virtual_host_config : config.getObjectArray("virtual_hosts")) {
+    VirtualHostPtr virtual_host(new VirtualHost(*virtual_host_config, runtime, cm));
     uses_runtime_ |= virtual_host->usesRuntime();
 
-    for (const std::string& domain : virtual_host_config.getStringArray("domains")) {
+    for (const std::string& domain : virtual_host_config->getStringArray("domains")) {
       if ("*" == domain) {
         if (default_virtual_host_) {
           throw EnvoyException(fmt::format("Only a single single wildcard domain is permitted"));
@@ -395,9 +395,9 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
   }
 
   if (config.hasObject("response_headers_to_add")) {
-    for (const Json::Object& header : config.getObjectArray("response_headers_to_add")) {
+    for (const Json::ObjectPtr& header : config.getObjectArray("response_headers_to_add")) {
       response_headers_to_add_.push_back(
-          {Http::LowerCaseString(header.getString("key")), header.getString("value")});
+          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
   }
 
