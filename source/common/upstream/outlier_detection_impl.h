@@ -81,9 +81,6 @@ struct OutlierDetectionStats {
  */
 class OutlierDetectorImpl : public OutlierDetector {
 public:
-  /**
-   * FIXFIX
-   */
   void onConsecutive5xx(HostPtr host);
   Runtime::Loader& runtime() { return runtime_; }
 
@@ -113,9 +110,6 @@ private:
   std::unordered_map<HostPtr, OutlierDetectorHostSinkImpl*> host_sinks_;
 };
 
-/**
- * FIXFIX
- */
 class ProdOutlierDetectorImpl : public OutlierDetectorImpl, public SystemTimeSource {
 public:
   ProdOutlierDetectorImpl(Cluster& cluster, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
