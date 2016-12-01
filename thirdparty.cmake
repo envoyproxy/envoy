@@ -40,7 +40,7 @@ set(ENVOY_PROTOBUF_INCLUDE_DIR "" CACHE FILEPATH "location of protobuf includes"
 set(ENVOY_PROTOBUF_PROTOC "" CACHE FILEPATH "location of protoc")
 
 # http://lightstep.com/
-# Last tested with lightstep-tracer-cpp-0.16
+# Last tested with lightstep-tracer-cpp-0.19
 set(ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR "" CACHE FILEPATH "location of lighstep tracer includes")
 
 # https://github.com/miloyip/rapidjson
