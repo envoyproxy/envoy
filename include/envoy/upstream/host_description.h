@@ -46,7 +46,7 @@ public:
   /**
    * @return the host's outlier detection sink.
    */
-  virtual OutlierDetectorHostSink& outlierDetector() const PURE;
+  virtual Outlier::DetectorHostSink& outlierDetector() const PURE;
 
   /**
    * @return the URL used to connect to the host.
