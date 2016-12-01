@@ -137,6 +137,7 @@ void FaultFilter::abortWithHTTPStatus() {
                                   "fault.http.abort.http_status", config_->abortCode()))}}};
   callbacks_->encodeHeaders(std::move(response_headers), true);
   config_->stats().aborts_injected_.inc();
+  callbacks_->requestInfo().onFailedResponse(Http::AccessLog::FailureReason::FaultInjected);
 }
 
 void FaultFilter::resetTimerState() {
