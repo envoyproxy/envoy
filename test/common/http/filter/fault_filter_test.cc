@@ -213,6 +213,9 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   Http::TestHeaderMapImpl response_headers{{":status", "429"}};
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              onFailedResponse(Http::AccessLog::FailureReason::FaultInjected));
+
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -241,6 +244,7 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.request_info_, onFailedResponse(_)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
   // Expect filter to continue execution when delay is 0ms
@@ -277,6 +281,7 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
   // Delay only case
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.request_info_, onFailedResponse(_)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(1);
   timer_->callback_();
 
@@ -315,6 +320,10 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 
   Http::TestHeaderMapImpl response_headers{{":status", "503"}};
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              onFailedResponse(Http::AccessLog::FailureReason::FaultInjected));
+
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
   timer_->callback_();
@@ -356,6 +365,9 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 
   Http::TestHeaderMapImpl response_headers{{":status", "503"}};
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              onFailedResponse(Http::AccessLog::FailureReason::FaultInjected));
+
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
   timer_->callback_();
@@ -378,6 +390,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", _)).Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.request_info_, onFailedResponse(_)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
   // Expect filter to continue execution when headers don't match
