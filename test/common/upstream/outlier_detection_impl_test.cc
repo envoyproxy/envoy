@@ -178,6 +178,32 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
                      .value());
 }
 
+TEST_F(OutlierDetectorImplTest, NotEnforcing) {
+  EXPECT_CALL(cluster_, addMemberUpdateCb(_));
+  cluster_.hosts_ = {HostPtr{new HostImpl(cluster_, "tcp://127.0.0.1:80", false, 1, "")}};
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  TestDetectorImpl detector(cluster_, dispatcher_, runtime_, stats_store_);
+  detector.addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+
+  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing", 100))
+      .WillByDefault(Return(false));
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  EXPECT_FALSE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(0UL,
+            stats_store_.gauge("cluster.fake_cluster.outlier_detection.ejections_active").value());
+  EXPECT_EQ(1UL,
+            stats_store_.counter("cluster.fake_cluster.outlier_detection.ejections_total").value());
+  EXPECT_EQ(1UL,
+            stats_store_.counter("cluster.fake_cluster.outlier_detection.ejections_consecutive_5xx")
+                .value());
+}
+
 TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   cluster_.hosts_ = {HostPtr{new HostImpl(cluster_, "tcp://127.0.0.1:80", false, 1, "")}};
