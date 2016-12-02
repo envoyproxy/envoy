@@ -3,8 +3,8 @@
 #include "common/filesystem/filesystem_impl.h"
 #include "common/stats/stats_impl.h"
 
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 
 using testing::_;
 using testing::InSequence;

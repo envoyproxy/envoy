@@ -1,11 +1,14 @@
 #include "mocks.h"
 
+using testing::_;
+using testing::Return;
+
 namespace AccessLog {
 
-MockAccessLog::MockAccessLog() {}
-MockAccessLog::~MockAccessLog() {}
+MockAccessLogManager::MockAccessLogManager() {
+  ON_CALL(*this, createAccessLog(_)).WillByDefault(Return(file_));
+}
 
-MockAccessLogManager::MockAccessLogManager() {}
 MockAccessLogManager::~MockAccessLogManager() {}
 
 } // AccessLog

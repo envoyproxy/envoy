@@ -3,9 +3,9 @@
 #include "utility.h"
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/api.h"
 #include "envoy/common/time.h"
 #include "envoy/mongo/codec.h"
+#include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -52,15 +52,12 @@ struct MongoProxyStats {
 /**
  * Access logger for mongo messages.
  */
-class AccessLog : public ::AccessLog::AccessLog {
+class AccessLog {
 public:
-  AccessLog(Api::Api& api, const std::string& file_name, Event::Dispatcher& dispatcher,
-            Thread::BasicLockable& lock, Stats::Store& stats_store);
-  ~AccessLog();
+  AccessLog(const std::string& file_name, ::AccessLog::AccessLogManager& log_manager);
 
   void logMessage(const Message& message, const std::string& base64, bool full,
                   const Upstream::HostDescription* upstream_host);
-  void reopen() override;
 
 private:
   Filesystem::FilePtr file_;

@@ -110,9 +110,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   if (config.hasObject("access_log")) {
     for (Json::ObjectPtr& access_log : config.getObjectArray("access_log")) {
       Http::AccessLog::InstancePtr current_access_log = Http::AccessLog::InstanceImpl::fromJson(
-          *access_log, server.api(), server.dispatcher(), server.accessLogLock(), server.stats(),
-          server.runtime());
-      server.accessLogManager().registerAccessLog(current_access_log);
+          *access_log, server.runtime(), server.accessLogManager());
       access_logs_.push_back(current_access_log);
     }
   }

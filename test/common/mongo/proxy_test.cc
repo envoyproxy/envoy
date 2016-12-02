@@ -1,11 +1,11 @@
-#include "common/common/thread.h"
 #include "common/mongo/bson_impl.h"
 #include "common/mongo/codec_impl.h"
 #include "common/mongo/proxy.h"
 #include "common/stats/stats_impl.h"
 
-#include "test/mocks/api/mocks.h"
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 
@@ -52,8 +52,8 @@ public:
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.logging_enabled", 100))
         .WillByDefault(Return(true));
 
-    EXPECT_CALL(api_, createFile_(_, _, _, _)).WillOnce(Return(file_));
-    access_log_.reset(new AccessLog(api_, "test", dispatcher_, lock, store_));
+    EXPECT_CALL(log_manager_, createAccessLog(_)).WillOnce(Return(file_));
+    access_log_.reset(new AccessLog("test", log_manager_));
     filter_.reset(new TestProxyFilter("test.", store_, runtime_, access_log_));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
@@ -62,13 +62,12 @@ public:
   Buffer::OwnedImpl fake_data_;
   NiceMock<TestStatStore> store_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Api::MockApi> api_;
   Event::MockDispatcher dispatcher_;
-  Thread::MutexBasicLockable lock;
-  Filesystem::MockFile* file_{new NiceMock<Filesystem::MockFile>()};
+  std::shared_ptr<Filesystem::MockFile> file_{new NiceMock<Filesystem::MockFile>()};
   AccessLogPtr access_log_;
   std::unique_ptr<TestProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
+  ::AccessLog::MockAccessLogManager log_manager_;
 };
 
 TEST_F(MongoProxyFilterTest, Stats) {

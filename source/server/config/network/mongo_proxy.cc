@@ -24,10 +24,8 @@ public:
     std::string stat_prefix = "mongo." + config.getString("stat_prefix") + ".";
     Mongo::AccessLogPtr access_log;
     if (config.hasObject("access_log")) {
-      access_log.reset(new Mongo::AccessLog(server.api(), config.getString("access_log"),
-                                            server.dispatcher(), server.accessLogLock(),
-                                            server.stats()));
-      server.accessLogManager().registerAccessLog(access_log);
+      access_log.reset(
+          new Mongo::AccessLog(config.getString("access_log"), server.accessLogManager()));
     }
 
     return [stat_prefix, &server, access_log](Network::FilterManager& filter_manager) -> void {

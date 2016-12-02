@@ -1,7 +1,6 @@
 #include "codec_impl.h"
 #include "proxy.h"
 
-#include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
@@ -11,14 +10,9 @@
 
 namespace Mongo {
 
-AccessLog::AccessLog(Api::Api& api, const std::string& file_name, Event::Dispatcher& dispatcher,
-                     Thread::BasicLockable& lock, Stats::Store& stats_store) {
-  file_ = api.createFile(file_name, dispatcher, lock, stats_store);
+AccessLog::AccessLog(const std::string& file_name, ::AccessLog::AccessLogManager& log_manager) {
+  file_ = log_manager.createAccessLog(file_name);
 }
-
-AccessLog::~AccessLog() {}
-
-void AccessLog::reopen() { file_->reopen(); }
 
 void AccessLog::logMessage(const Message& message, const std::string&, bool full,
                            const Upstream::HostDescription* upstream_host) {

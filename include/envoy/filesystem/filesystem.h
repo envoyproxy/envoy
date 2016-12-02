@@ -40,13 +40,14 @@ public:
    * Write data to the file.
    */
   virtual void write(const std::string& data) PURE;
+
   /**
    * Reopen the file.
    */
   virtual void reopen() PURE;
 };
 
-typedef std::unique_ptr<File> FilePtr;
+typedef std::shared_ptr<File> FilePtr;
 
 /**
  * Abstraction for a file watcher.
