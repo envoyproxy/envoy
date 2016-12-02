@@ -16,6 +16,7 @@ const std::string FilterReasonUtils::UPSTREAM_CONNECTION_FAILURE = "UF";
 const std::string FilterReasonUtils::UPSTREAM_CONNECTION_TERMINATION = "UC";
 const std::string FilterReasonUtils::UPSTREAM_OVERFLOW = "UO";
 const std::string FilterReasonUtils::NO_ROUTE_FOUND = "NR";
+const std::string FilterReasonUtils::FAULT_INJECTED = "FI";
 
 const std::string& FilterReasonUtils::toShortString(FailureReason failure_reason) {
   switch (failure_reason) {
@@ -39,6 +40,8 @@ const std::string& FilterReasonUtils::toShortString(FailureReason failure_reason
     return UPSTREAM_OVERFLOW;
   case FailureReason::NoRouteFound:
     return NO_ROUTE_FOUND;
+  case FailureReason::FaultInjected:
+    return FAULT_INJECTED;
   }
 
   throw std::invalid_argument("Unknown failure_reason");

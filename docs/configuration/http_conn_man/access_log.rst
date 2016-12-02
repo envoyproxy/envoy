@@ -83,6 +83,7 @@ The following command operators are supported:
   * **UC**: Upstream connection termination in addition to 503 response code.
   * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
   * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
+  * **FI**: The request was aborted as a result of :ref:`fault injection <config_http_filters_fault_injection>`.
 
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).

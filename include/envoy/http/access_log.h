@@ -32,6 +32,8 @@ enum class FailureReason {
   UpstreamOverflow,
   // No route found for a given request.
   NoRouteFound,
+  // Used when faults (abort with error codes) are injected.
+  FaultInjected,
 };
 
 /**

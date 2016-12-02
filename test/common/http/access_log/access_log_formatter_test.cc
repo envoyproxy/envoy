@@ -22,7 +22,8 @@ TEST(FailureReasonUtilsTest, toShortStringConversion) {
       std::make_pair(FailureReason::UpstreamConnectionFailure, "UF"),
       std::make_pair(FailureReason::UpstreamConnectionTermination, "UC"),
       std::make_pair(FailureReason::UpstreamOverflow, "UO"),
-      std::make_pair(FailureReason::NoRouteFound, "NR")};
+      std::make_pair(FailureReason::NoRouteFound, "NR"),
+      std::make_pair(FailureReason::FaultInjected, "FI")};
 
   for (const auto& testCase : expected) {
     EXPECT_EQ(testCase.second, FilterReasonUtils::toShortString(testCase.first));
