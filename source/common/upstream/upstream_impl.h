@@ -33,7 +33,7 @@ public:
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
   const Cluster& cluster() const override { return cluster_; }
-  OutlierDetectorHostSink& outlierDetector() const override {
+  Outlier::DetectorHostSink& outlierDetector() const override {
     if (outlier_detector_) {
       return *outlier_detector_;
     } else {
@@ -51,12 +51,12 @@ protected:
   const std::string zone_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
-  OutlierDetectorHostSinkPtr outlier_detector_;
+  Outlier::DetectorHostSinkPtr outlier_detector_;
 
 private:
   void checkUrl();
 
-  static OutlierDetectorHostSinkNullImpl null_outlier_detector_;
+  static Outlier::DetectorHostSinkNullImpl null_outlier_detector_;
 };
 
 /**
@@ -83,7 +83,7 @@ public:
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
-  void setOutlierDetector(OutlierDetectorHostSinkPtr&& outlier_detector) override {
+  void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) override {
     outlier_detector_ = std::move(outlier_detector);
   }
   bool healthy() const override { return !health_flags_; }
@@ -175,7 +175,7 @@ public:
    * Optionally set the outlier detector for the primary cluster. Done for the same reason as
    * documented in setHealthChecker().
    */
-  void setOutlierDetector(OutlierDetectorPtr&& outlier_detector);
+  void setOutlierDetector(Outlier::DetectorPtr&& outlier_detector);
 
   // Upstream::Cluster
   const std::string& altStatName() const override { return alt_stat_name_; }
@@ -213,7 +213,7 @@ protected:
   HealthCheckerPtr health_checker_;
   const std::string alt_stat_name_;
   const uint64_t features_;
-  OutlierDetectorPtr outlier_detector_;
+  Outlier::DetectorPtr outlier_detector_;
 
 private:
   struct ResourceManagers {

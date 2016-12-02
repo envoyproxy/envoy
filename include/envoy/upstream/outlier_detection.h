@@ -7,12 +7,14 @@ namespace Upstream {
 class Host;
 typedef std::shared_ptr<Host> HostPtr;
 
+namespace Outlier {
+
 /**
  * Sink for per host data. Proxy filters should send pertinent data when available.
  */
-class OutlierDetectorHostSink {
+class DetectorHostSink {
 public:
-  virtual ~OutlierDetectorHostSink() {}
+  virtual ~DetectorHostSink() {}
 
   /**
    * Add an HTTP response code for a host.
@@ -26,15 +28,15 @@ public:
   virtual void putResponseTime(std::chrono::milliseconds time) PURE;
 };
 
-typedef std::unique_ptr<OutlierDetectorHostSink> OutlierDetectorHostSinkPtr;
+typedef std::unique_ptr<DetectorHostSink> DetectorHostSinkPtr;
 
 /**
  * Interface for an outlier detection engine. Uses per host data to determine which hosts in a
  * cluster are outliers and should be ejected.
  */
-class OutlierDetector {
+class Detector {
 public:
-  virtual ~OutlierDetector() {}
+  virtual ~Detector() {}
 
   /**
    * Outlier detection change state callback.
@@ -48,6 +50,7 @@ public:
   virtual void addChangedStateCb(ChangeStateCb cb) PURE;
 };
 
-typedef std::unique_ptr<OutlierDetector> OutlierDetectorPtr;
+typedef std::unique_ptr<Detector> DetectorPtr;
 
+} // Outlier
 } // Upstream

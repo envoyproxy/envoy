@@ -209,9 +209,9 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
 
-  MockOutlierDetector* detector = new MockOutlierDetector();
+  Outlier::MockDetector* detector = new Outlier::MockDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
-  cluster.setOutlierDetector(OutlierDetectorPtr{detector});
+  cluster.setOutlierDetector(Outlier::DetectorPtr{detector});
 
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
 

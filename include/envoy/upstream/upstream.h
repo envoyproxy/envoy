@@ -72,7 +72,7 @@ public:
    * a new outlier detector must be installed before the host is used across threads. Thus,
    * this routine should only be called on the main thread before the host is used across threads.
    */
-  virtual void setOutlierDetector(OutlierDetectorHostSinkPtr&& outlier_detector) PURE;
+  virtual void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) PURE;
 
   /**
    * @return the current load balancing weight of the host, in the range 1-100.

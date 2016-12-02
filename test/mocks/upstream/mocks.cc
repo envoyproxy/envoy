@@ -11,16 +11,19 @@ using testing::ReturnPointee;
 using testing::ReturnRef;
 
 namespace Upstream {
+namespace Outlier {
 
-MockOutlierDetectorHostSink::MockOutlierDetectorHostSink() {}
-MockOutlierDetectorHostSink::~MockOutlierDetectorHostSink() {}
+MockDetectorHostSink::MockDetectorHostSink() {}
+MockDetectorHostSink::~MockDetectorHostSink() {}
 
-MockOutlierDetector::MockOutlierDetector() {
+MockDetector::MockDetector() {
   ON_CALL(*this, addChangedStateCb(_))
       .WillByDefault(Invoke([this](ChangeStateCb cb) -> void { callbacks_.push_back(cb); }));
 }
 
-MockOutlierDetector::~MockOutlierDetector() {}
+MockDetector::~MockDetector() {}
+
+} // Outlier
 
 MockHostDescription::MockHostDescription() {
   ON_CALL(*this, url()).WillByDefault(ReturnRef(url_));
