@@ -37,7 +37,8 @@ public:
     ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
         .WillByDefault(Return("access_token"));
 
-    Server::Configuration::InitialImpl initial_config(file_path);
+    Json::ObjectPtr config_json = Json::Factory::LoadFromFile(file_path);
+    Server::Configuration::InitialImpl initial_config(*config_json);
     Server::Configuration::MainImpl main_config(server_);
 
     ON_CALL(server_, clusterManager())
@@ -45,7 +46,7 @@ public:
             Invoke([&]() -> Upstream::ClusterManager& { return main_config.clusterManager(); }));
 
     try {
-      main_config.initialize(file_path);
+      main_config.initialize(*config_json);
     } catch (const EnvoyException& ex) {
       throw EnvoyException(fmt::format("'{}' config failed. Error: {}", file_path, ex.what()));
     }

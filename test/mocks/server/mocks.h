@@ -40,6 +40,8 @@ public:
   MOCK_METHOD0(serviceNodeName, const std::string&());
   MOCK_METHOD0(serviceZone, const std::string&());
   MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
+
+  std::string service_zone_;
 };
 
 class MockAdmin : public Admin {

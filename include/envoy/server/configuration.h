@@ -102,6 +102,12 @@ public:
    * @return Optional<uint32_t> the optional local UDP statsd port to write to.
    */
   virtual Optional<uint32_t> statsdUdpPort() PURE;
+
+  /**
+   * @return the time interval between flushing to configured stat sinks. The server latches
+   *         counters.
+   */
+  virtual std::chrono::milliseconds statsFlushInterval() PURE;
 };
 
 /**

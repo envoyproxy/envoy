@@ -63,7 +63,7 @@ public:
    * will call through the server to get the cluster manager so the server variable must be
    * initialized.
    */
-  void initialize(const std::string& file_path);
+  void initialize(const Json::Object& json);
 
   // Server::Configuration::Main
   Upstream::ClusterManager& clusterManager() override { return *cluster_manager_; }
@@ -72,12 +72,13 @@ public:
   RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   Optional<std::string> statsdTcpClusterName() override { return statsd_tcp_cluster_name_; }
   Optional<uint32_t> statsdUdpPort() override { return statsd_udp_port_; }
+  std::chrono::milliseconds statsFlushInterval() override { return stats_flush_interval_; }
 
 private:
   /**
    * Initialize tracers and corresponding sinks.
    */
-  void initializeTracers(const Json::Object& tracing_configuration_);
+  void initializeTracers(const Json::Object& tracing_configuration);
 
   /**
    * Maps JSON config to runtime config for a listener with network filter chain.
@@ -116,6 +117,7 @@ private:
   Optional<std::string> statsd_tcp_cluster_name_;
   Optional<uint32_t> statsd_udp_port_;
   RateLimit::ClientFactoryPtr ratelimit_client_factory_;
+  std::chrono::milliseconds stats_flush_interval_;
 };
 
 /**
@@ -134,7 +136,7 @@ public:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const std::string& file_path);
+  InitialImpl(const Json::Object& json);
 
   // Server::Configuration::Initial
   Admin& admin() { return admin_; }

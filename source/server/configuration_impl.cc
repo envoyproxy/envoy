@@ -25,15 +25,13 @@ void FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
 
 MainImpl::MainImpl(Server::Instance& server) : server_(server) {}
 
-void MainImpl::initialize(const std::string& file_path) {
-  Json::ObjectPtr loader = Json::Factory::LoadFromFile(file_path);
-
+void MainImpl::initialize(const Json::Object& json) {
   cluster_manager_.reset(new Upstream::ProdClusterManagerImpl(
-      *loader->getObject("cluster_manager"), server_.stats(), server_.threadLocal(),
+      *json.getObject("cluster_manager"), server_.stats(), server_.threadLocal(),
       server_.dnsResolver(), server_.sslContextManager(), server_.runtime(), server_.random(),
       server_.options().serviceZone(), server_.getLocalAddress()));
 
-  std::vector<Json::ObjectPtr> listeners = loader->getObjectArray("listeners");
+  std::vector<Json::ObjectPtr> listeners = json.getObjectArray("listeners");
   log().info("loading {} listener(s)", listeners.size());
   for (size_t i = 0; i < listeners.size(); i++) {
     log().info("listener #{}:", i);
@@ -41,22 +39,25 @@ void MainImpl::initialize(const std::string& file_path) {
         Server::Configuration::ListenerPtr{new ListenerConfig(*this, *listeners[i])});
   }
 
-  if (loader->hasObject("statsd_local_udp_port")) {
-    statsd_udp_port_.value(loader->getInteger("statsd_local_udp_port"));
+  if (json.hasObject("statsd_local_udp_port")) {
+    statsd_udp_port_.value(json.getInteger("statsd_local_udp_port"));
   }
 
-  if (loader->hasObject("statsd_tcp_cluster_name")) {
-    statsd_tcp_cluster_name_.value(loader->getString("statsd_tcp_cluster_name"));
+  if (json.hasObject("statsd_tcp_cluster_name")) {
+    statsd_tcp_cluster_name_.value(json.getString("statsd_tcp_cluster_name"));
   }
 
-  if (loader->hasObject("tracing")) {
-    initializeTracers(*loader->getObject("tracing"));
+  stats_flush_interval_ =
+      std::chrono::milliseconds(json.getInteger("stats_flush_interval_ms", 5000));
+
+  if (json.hasObject("tracing")) {
+    initializeTracers(*json.getObject("tracing"));
   } else {
     http_tracer_.reset(new Tracing::HttpNullTracer());
   }
 
-  if (loader->hasObject("rate_limit_service")) {
-    Json::ObjectPtr rate_limit_service_config = loader->getObject("rate_limit_service");
+  if (json.hasObject("rate_limit_service")) {
+    Json::ObjectPtr rate_limit_service_config = json.getObject("rate_limit_service");
     std::string type = rate_limit_service_config->getString("type");
     if (type == "grpc_service") {
       ratelimit_client_factory_.reset(new RateLimit::GrpcFactoryImpl(
@@ -69,14 +70,14 @@ void MainImpl::initialize(const std::string& file_path) {
   }
 }
 
-void MainImpl::initializeTracers(const Json::Object& tracing_configuration_) {
+void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
   log().info("loading tracing configuration");
 
   // Initialize http sinks
-  if (tracing_configuration_.hasObject("http")) {
+  if (tracing_configuration.hasObject("http")) {
     http_tracer_.reset(new Tracing::HttpTracerImpl(server_.runtime(), server_.stats()));
 
-    Json::ObjectPtr http_tracer_config = tracing_configuration_.getObject("http");
+    Json::ObjectPtr http_tracer_config = tracing_configuration.getObject("http");
 
     if (http_tracer_config->hasObject("sinks")) {
       std::vector<Json::ObjectPtr> sinks = http_tracer_config->getObjectArray("sinks");
@@ -170,22 +171,21 @@ void MainImpl::ListenerConfig::createFilterChain(Network::Connection& connection
   FilterChainUtility::buildFilterChain(connection, filter_factories_);
 }
 
-InitialImpl::InitialImpl(const std::string& file_path) {
-  Json::ObjectPtr loader = Json::Factory::LoadFromFile(file_path);
-  Json::ObjectPtr admin = loader->getObject("admin");
+InitialImpl::InitialImpl(const Json::Object& json) {
+  Json::ObjectPtr admin = json.getObject("admin");
   admin_.access_log_path_ = admin->getString("access_log_path");
   admin_.port_ = admin->getInteger("port");
 
-  if (loader->hasObject("flags_path")) {
-    flags_path_.value(loader->getString("flags_path"));
+  if (json.hasObject("flags_path")) {
+    flags_path_.value(json.getString("flags_path"));
   }
 
-  if (loader->hasObject("runtime")) {
+  if (json.hasObject("runtime")) {
     runtime_.reset(new RuntimeImpl());
-    runtime_->symlink_root_ = loader->getObject("runtime")->getString("symlink_root");
-    runtime_->subdirectory_ = loader->getObject("runtime")->getString("subdirectory");
+    runtime_->symlink_root_ = json.getObject("runtime")->getString("symlink_root");
+    runtime_->subdirectory_ = json.getObject("runtime")->getString("subdirectory");
     runtime_->override_subdirectory_ =
-        loader->getObject("runtime")->getString("override_subdirectory", "");
+        json.getObject("runtime")->getString("override_subdirectory", "");
   }
 }
 

@@ -104,7 +104,7 @@ void InstanceImpl::flushStats() {
     }
   }
 
-  stat_flush_timer_->enableTimer(std::chrono::milliseconds(5000));
+  stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
 int InstanceImpl::getListenSocketFd(uint32_t port) {
@@ -130,7 +130,8 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
              restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  Configuration::InitialImpl initial_config(options.configPath());
+  Json::ObjectPtr config_json = Json::Factory::LoadFromFile(options.configPath());
+  Configuration::InitialImpl initial_config(*config_json);
   log().info("admin port: {}", initial_config.admin().port());
 
   HotRestart::ShutdownParentAdminInfo info;
@@ -164,7 +165,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // per above. See MainImpl::initialize() for why we do this pointer dance.
   Configuration::MainImpl* main_config = new Configuration::MainImpl(*this);
   config_.reset(main_config);
-  main_config->initialize(options.configPath());
+  main_config->initialize(*config_json);
 
   for (const Configuration::ListenerPtr& listener : config_->listeners()) {
     // For each listener config we share a single TcpListenSocket among all threaded listeners.
@@ -227,7 +228,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
   // Just setup the timer.
   stat_flush_timer_ = handler_.dispatcher().createTimer([this]() -> void { flushStats(); });
-  stat_flush_timer_->enableTimer(std::chrono::milliseconds(5000));
+  stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
