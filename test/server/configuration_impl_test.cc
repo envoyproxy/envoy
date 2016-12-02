@@ -2,6 +2,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/mocks.h"
 
 using testing::InSequence;
 using testing::Return;
@@ -20,6 +21,48 @@ TEST(FilterChainUtility, buildFilterChain) {
   EXPECT_CALL(watcher, ready()).Times(2);
   EXPECT_CALL(connection, initializeReadFilters());
   FilterChainUtility::buildFilterChain(connection, factories);
+}
+
+TEST(ConfigurationImplTest, DefaultStatsFlushInterval) {
+  std::string json = R"EOF(
+{
+  "listeners": [],
+
+  "cluster_manager": {
+    "clusters": []
+  }
+}
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  MainImpl config(server);
+  config.initialize(*loader);
+
+  EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
+}
+
+TEST(ConfigurationImplTest, CustomStatsFlushInterval) {
+  std::string json = R"EOF(
+{
+  "listeners": [],
+
+  "stats_flush_interval_ms": 500,
+
+  "cluster_manager": {
+    "clusters": []
+  }
+}
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  MainImpl config(server);
+  config.initialize(*loader);
+
+  EXPECT_EQ(std::chrono::milliseconds(500), config.statsFlushInterval());
 }
 
 } // Configuration

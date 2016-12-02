@@ -16,6 +16,7 @@ miscellaneous configuration.
     "flags_path": "...",
     "statsd_local_udp_port": "...",
     "statsd_tcp_cluster_name": "...",
+    "stats_flush_interval_ms": "...",
     "tracing": "{...}",
     "rate_limit_service": "{...}",
     "runtime": "{...}",
@@ -47,6 +48,11 @@ statsd_tcp_cluster_name
   *(optional, string)* The name of a cluster manager cluster that is running a TCP statsd compliant
   listener. If specified, Envoy will connect to this cluster to flush :ref:`statistics
   <arch_overview_statistics>`.
+
+stats_flush_interval_ms
+  *(optional, integer)* The time in milliseconds between flushes to configured stats sinks. For
+  performance reasons Envoy latches counters and only flushes counters and gauges at a periodic
+  interval. If not specified the default is 5000ms (5 seconds).
 
 :ref:`tracing <config_tracing>`
   *(optional, object)* Configuration for an external :ref:`tracing <arch_overview_tracing>`

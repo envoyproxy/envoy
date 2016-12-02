@@ -20,7 +20,10 @@ using testing::SaveArg;
 
 namespace Server {
 
-MockOptions::MockOptions() {}
+MockOptions::MockOptions() {
+  ON_CALL(*this, serviceZone()).WillByDefault(ReturnRef(service_zone_));
+}
+
 MockOptions::~MockOptions() {}
 
 MockAdmin::MockAdmin() {}
