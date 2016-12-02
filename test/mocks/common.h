@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/time.h"
+
 #include "test/precompiled/precompiled_test.h"
 
 /**
@@ -16,4 +18,12 @@ public:
   ~ReadyWatcher();
 
   MOCK_METHOD0(ready, void());
+};
+
+class MockSystemTimeSource : public SystemTimeSource {
+public:
+  MockSystemTimeSource();
+  ~MockSystemTimeSource();
+
+  MOCK_METHOD0(currentSystemTime, SystemTime());
 };

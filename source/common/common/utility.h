@@ -34,6 +34,17 @@ public:
 };
 
 /**
+ * Production implementation of SystemTimeSource that returns the current time.
+ */
+class ProdSystemTimeSource : public SystemTimeSource {
+public:
+  // SystemTimeSource
+  SystemTime currentSystemTime() override { return std::chrono::system_clock::now(); }
+
+  static ProdSystemTimeSource instance_;
+};
+
+/**
  * Utility class for date/time helpers.
  */
 class DateUtil {
