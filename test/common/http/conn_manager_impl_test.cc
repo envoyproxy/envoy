@@ -3,7 +3,6 @@
 #include "envoy/http/access_log.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/thread.h"
 #include "common/http/access_log/access_log_impl.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/conn_manager_impl.h"
@@ -13,7 +12,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/stats/stats_impl.h"
 
-#include "test/mocks/api/mocks.h"
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
@@ -38,9 +37,9 @@ public:
   HttpConnectionManagerImplTest()
       : access_log_path_("dummy_path"),
         access_logs_{Http::AccessLog::InstancePtr{new Http::AccessLog::InstanceImpl(
-            access_log_path_, api_, {},
-            std::move(AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter()), dispatcher_,
-            lock_, fake_stats_)}},
+            access_log_path_, {},
+            std::move(AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter()),
+            log_manager_)}},
         codec_(new NiceMock<Http::MockServerConnection>()),
         stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_TIMER(fake_stats_))},
@@ -87,10 +86,9 @@ public:
 
   NiceMock<Tracing::MockHttpTracer> tracer_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Api::MockApi> api_;
   Event::MockDispatcher dispatcher_;
+  NiceMock<::AccessLog::MockAccessLogManager> log_manager_;
   std::string access_log_path_;
-  Thread::MutexBasicLockable lock_;
   std::list<Http::AccessLog::InstancePtr> access_logs_;
   Stats::IsolatedStoreImpl fake_stats_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;

@@ -21,7 +21,7 @@ set_source_files_properties(generated/ratelimit.pb.cc PROPERTIES COMPILE_FLAGS -
 add_library(
   envoy-common OBJECT
   api/api_impl.cc
-  access_log/access_log_manager.cc
+  access_log/access_log_manager_impl.cc
   buffer/buffer_impl.cc
   common/base64.cc
   common/hex.cc

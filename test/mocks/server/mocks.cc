@@ -1,16 +1,5 @@
 #include "mocks.h"
 
-#include "envoy/server/admin.h"
-#include "envoy/api/api.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/http/header_map.h"
-#include "envoy/network/dns.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/server/hot_restart.h"
-#include "envoy/server/options.h"
-#include "envoy/stats/stats.h"
-#include "envoy/upstream/cluster_manager.h"
-
 using testing::_;
 using testing::Return;
 using testing::ReturnNew;
@@ -44,7 +33,6 @@ MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
-  ON_CALL(*this, accessLogLock()).WillByDefault(ReturnRef(access_log_lock_));
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));

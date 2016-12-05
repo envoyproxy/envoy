@@ -10,7 +10,6 @@
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/access_log/access_log_manager.h"
 #include "common/api/api_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
@@ -26,11 +25,12 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
                            Stats::Store& store, Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory)
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_), stats_store_(store), access_log_lock_(access_log_lock),
+      original_start_time_(start_time_), stats_store_(store),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
       handler_(stats_store_, log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
       dns_resolver_(handler_.dispatcher().createDnsResolver()),
-      local_address_(Network::Utility::getLocalAddress()) {
+      local_address_(Network::Utility::getLocalAddress()),
+      access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {
 
   failHealthcheck(false);
 

@@ -10,7 +10,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "common/access_log/access_log_manager.h"
+#include "common/access_log/access_log_manager_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -80,7 +80,6 @@ public:
   void run();
 
   // Server::Instance
-  Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
   Admin& admin() override { return *admin_; }
   Api::Api& api() override { return handler_.api(); }
   Upstream::ClusterManager& clusterManager() override;
@@ -125,7 +124,6 @@ private:
   time_t original_start_time_;
   Stats::Store& stats_store_;
   std::list<Stats::SinkPtr> stat_sinks_;
-  Thread::BasicLockable& access_log_lock_;
   ServerStats server_stats_;
   ThreadLocal::InstanceImpl thread_local_;
   SocketMap socket_map_;

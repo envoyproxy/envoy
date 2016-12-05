@@ -1,7 +1,6 @@
 #include "access_log_impl.h"
 #include "access_log_formatter.h"
 
-#include "envoy/api/api.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
@@ -160,16 +159,14 @@ bool NotHealthCheckFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
   return !info.healthCheck();
 }
 
-InstanceImpl::InstanceImpl(const std::string& access_log_path, Api::Api& api, FilterPtr&& filter,
-                           FormatterPtr&& formatter, Event::Dispatcher& dispatcher,
-                           Thread::BasicLockable& lock, Stats::Store& stats_store)
+InstanceImpl::InstanceImpl(const std::string& access_log_path, FilterPtr&& filter,
+                           FormatterPtr&& formatter, ::AccessLog::AccessLogManager& log_manager)
     : filter_(std::move(filter)), formatter_(std::move(formatter)) {
-  log_file_ = api.createFile(access_log_path, dispatcher, lock, stats_store);
+  log_file_ = log_manager.createAccessLog(access_log_path);
 }
 
-InstancePtr InstanceImpl::fromJson(Json::Object& json, Api::Api& api, Event::Dispatcher& dispatcher,
-                                   Thread::BasicLockable& lock, Stats::Store& stats_store,
-                                   Runtime::Loader& runtime) {
+InstancePtr InstanceImpl::fromJson(Json::Object& json, Runtime::Loader& runtime,
+                                   ::AccessLog::AccessLogManager& log_manager) {
   std::string access_log_path = json.getString("path");
 
   FilterPtr filter;
@@ -185,11 +182,9 @@ InstancePtr InstanceImpl::fromJson(Json::Object& json, Api::Api& api, Event::Dis
     formatter = AccessLogFormatUtils::defaultAccessLogFormatter();
   }
 
-  return InstancePtr{new InstanceImpl(access_log_path, api, std::move(filter), std::move(formatter),
-                                      dispatcher, lock, stats_store)};
+  return InstancePtr{
+      new InstanceImpl(access_log_path, std::move(filter), std::move(formatter), log_manager)};
 }
-
-void InstanceImpl::reopen() { log_file_->reopen(); }
 
 void InstanceImpl::log(const HeaderMap* request_headers, const HeaderMap* response_headers,
                        const RequestInfo& request_info) {

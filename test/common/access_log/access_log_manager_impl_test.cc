@@ -1,24 +1,32 @@
-#include "common/access_log/access_log_manager.h"
+#include "common/access_log/access_log_manager_impl.h"
+#include "common/stats/stats_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
-#include "test/mocks/common.h"
+#include "test/mocks/api/mocks.h"
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 
 using testing::_;
+using testing::Return;
 
 namespace AccessLog {
 
 TEST(AccessLogManagerImpl, reopenAllFiles) {
-  AccessLogManagerImpl access_log_manager;
-  MockAccessLog* log1 = new MockAccessLog();
-  MockAccessLog* log2 = new MockAccessLog();
+  Api::MockApi api;
+  Event::MockDispatcher dispatcher;
+  Thread::MutexBasicLockable lock;
+  Stats::IsolatedStoreImpl stats_store;
 
-  // Register access log in access log manager
-  access_log_manager.registerAccessLog(std::shared_ptr<MockAccessLog>(log1));
-  access_log_manager.registerAccessLog(std::shared_ptr<MockAccessLog>(log2));
+  std::shared_ptr<Filesystem::MockFile> log1(new Filesystem::MockFile());
+  std::shared_ptr<Filesystem::MockFile> log2(new Filesystem::MockFile());
+  AccessLogManagerImpl access_log_manager(api, dispatcher, lock, stats_store);
+  EXPECT_CALL(api, createFile("foo", _, _, _)).WillOnce(Return(log1));
+  access_log_manager.createAccessLog("foo");
+  EXPECT_CALL(api, createFile("bar", _, _, _)).WillOnce(Return(log2));
+  access_log_manager.createAccessLog("bar");
 
   EXPECT_CALL(*log1, reopen());
   EXPECT_CALL(*log2, reopen());
-
   access_log_manager.reopen();
 }
 

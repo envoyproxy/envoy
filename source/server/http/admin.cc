@@ -311,9 +311,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, uint32_t port, Server::
           {"/stats", "print server stats", MAKE_HANDLER(handlerStats)}} {
 
   access_logs_.emplace_back(new Http::AccessLog::InstanceImpl(
-      access_log_path, server.api(), {},
-      Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(), server.dispatcher(),
-      server.accessLogLock(), server.stats()));
+      access_log_path, {}, Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
+      server.accessLogManager()));
 }
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,

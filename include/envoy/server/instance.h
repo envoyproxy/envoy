@@ -9,7 +9,6 @@
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -22,12 +21,6 @@ namespace Server {
 class Instance {
 public:
   virtual ~Instance() {}
-
-  /**
-   * @return Thread::BasicLockable& the single lock used for writing out to access logs. In the
-   *         future we may decide to allow multiple access log locks.
-   */
-  virtual Thread::BasicLockable& accessLogLock() PURE;
 
   /**
    * @return Admin& the global HTTP admin endpoint for the server.

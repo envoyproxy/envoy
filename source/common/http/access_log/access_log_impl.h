@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/api.h"
+#include "envoy/access_log/access_log.h"
 #include "envoy/http/access_log.h"
 #include "envoy/runtime/runtime.h"
 
@@ -132,19 +132,15 @@ private:
 
 class InstanceImpl : public Instance {
 public:
-  InstanceImpl(const std::string& access_log_path, Api::Api& api, FilterPtr&& filter,
-               FormatterPtr&& formatter, Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
-               Stats::Store& stats_store);
+  InstanceImpl(const std::string& access_log_path, FilterPtr&& filter, FormatterPtr&& formatter,
+               ::AccessLog::AccessLogManager& log_manager);
 
-  static InstancePtr fromJson(Json::Object& json, Api::Api& api, Event::Dispatcher& dispatcher,
-                              Thread::BasicLockable& lock, Stats::Store& stats_store,
-                              Runtime::Loader& runtime);
+  static InstancePtr fromJson(Json::Object& json, Runtime::Loader& runtime,
+                              ::AccessLog::AccessLogManager& log_manager);
 
   // Http::AccessLog::Instance
   void log(const HeaderMap* request_headers, const HeaderMap* response_headers,
            const RequestInfo& request_info) override;
-  // AccessLog::AccessLog
-  void reopen() override;
 
 private:
   Filesystem::FilePtr log_file_;

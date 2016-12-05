@@ -6,7 +6,6 @@
 #include "envoy/server/options.h"
 #include "envoy/ssl/context_manager.h"
 
-#include "common/common/thread.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -91,7 +90,6 @@ public:
     return RateLimit::ClientPtr{rateLimitClient_()};
   }
 
-  MOCK_METHOD0(accessLogLock, Thread::BasicLockable&());
   MOCK_METHOD0(admin, Admin&());
   MOCK_METHOD0(api, Api::Api&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
