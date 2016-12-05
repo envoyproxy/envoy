@@ -42,7 +42,7 @@ public:
   MOCK_CONST_METHOD0(responseCode, Optional<uint32_t>&());
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
   MOCK_CONST_METHOD0(duration, std::chrono::milliseconds());
-  MOCK_CONST_METHOD0(failureReason, FailureReason());
+  MOCK_CONST_METHOD0(failureReason, uint64_t());
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionPtr());
   MOCK_CONST_METHOD0(healthCheck, bool());
   MOCK_METHOD1(healthCheck, void(bool is_hc));

@@ -23,11 +23,19 @@ TEST(FailureReasonUtilsTest, toShortStringConversion) {
       std::make_pair(FailureReason::UpstreamConnectionTermination, "UC"),
       std::make_pair(FailureReason::UpstreamOverflow, "UO"),
       std::make_pair(FailureReason::NoRouteFound, "NR"),
-      std::make_pair(FailureReason::FaultInjected, "FI")};
+      std::make_pair(FailureReason::FaultInjected, "FI"),
+      std::make_pair(FailureReason::DelayInjected, "DI")};
 
   for (const auto& testCase : expected) {
     EXPECT_EQ(testCase.second, FilterReasonUtils::toShortString(testCase.first));
   }
+
+  // Test combinations.
+  EXPECT_EQ("UT,DI", FilterReasonUtils::toShortString(FailureReason::DelayInjected |
+                                                      FailureReason::UpstreamRequestTimeout));
+  EXPECT_EQ("UT,FI,DI", FilterReasonUtils::toShortString(FailureReason::FaultInjected |
+                                                         FailureReason::DelayInjected |
+                                                         FailureReason::UpstreamRequestTimeout));
 }
 
 TEST(AccessLogFormatUtilsTest, protocolToString) {

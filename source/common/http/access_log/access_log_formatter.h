@@ -10,10 +10,11 @@ namespace AccessLog {
  */
 class FilterReasonUtils {
 public:
-  static const std::string& toShortString(FailureReason failure_reason);
+  static const std::string toShortString(uint64_t failure_reason);
 
 private:
-  FilterReasonUtils(){};
+  FilterReasonUtils();
+  static void appendString(std::string& result, const std::string& append);
 
   const static std::string NONE;
   const static std::string FAILED_LOCAL_HEALTH_CHECK;
@@ -26,6 +27,7 @@ private:
   const static std::string UPSTREAM_OVERFLOW;
   const static std::string NO_ROUTE_FOUND;
   const static std::string FAULT_INJECTED;
+  const static std::string DELAY_INJECTED;
 };
 
 /**

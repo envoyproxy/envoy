@@ -17,34 +17,72 @@ const std::string FilterReasonUtils::UPSTREAM_CONNECTION_TERMINATION = "UC";
 const std::string FilterReasonUtils::UPSTREAM_OVERFLOW = "UO";
 const std::string FilterReasonUtils::NO_ROUTE_FOUND = "NR";
 const std::string FilterReasonUtils::FAULT_INJECTED = "FI";
+const std::string FilterReasonUtils::DELAY_INJECTED = "DI";
 
-const std::string& FilterReasonUtils::toShortString(FailureReason failure_reason) {
-  switch (failure_reason) {
-  case FailureReason::None:
+void FilterReasonUtils::appendString(std::string& result, const std::string& append) {
+  if (result.empty()) {
+    result = append;
+  } else {
+    result += "," + append;
+  }
+}
+
+const std::string FilterReasonUtils::toShortString(uint64_t failure_reason) {
+  std::string result = "";
+
+  if (failure_reason == FailureReason::None) {
     return NONE;
-  case FailureReason::FailedLocalHealthCheck:
-    return FAILED_LOCAL_HEALTH_CHECK;
-  case FailureReason::NoHealthyUpstream:
-    return NO_HEALTHY_UPSTREAM;
-  case FailureReason::UpstreamRequestTimeout:
-    return UPSTREAM_REQUEST_TIMEOUT;
-  case FailureReason::LocalReset:
-    return LOCAL_RESET;
-  case FailureReason::UpstreamRemoteReset:
-    return UPSTREAM_REMOTE_RESET;
-  case FailureReason::UpstreamConnectionFailure:
-    return UPSTREAM_CONNECTION_FAILURE;
-  case FailureReason::UpstreamConnectionTermination:
-    return UPSTREAM_CONNECTION_TERMINATION;
-  case FailureReason::UpstreamOverflow:
-    return UPSTREAM_OVERFLOW;
-  case FailureReason::NoRouteFound:
-    return NO_ROUTE_FOUND;
-  case FailureReason::FaultInjected:
-    return FAULT_INJECTED;
   }
 
-  throw std::invalid_argument("Unknown failure_reason");
+  if (failure_reason & FailureReason::FailedLocalHealthCheck) {
+    appendString(result, FAILED_LOCAL_HEALTH_CHECK);
+  }
+
+  if (failure_reason & FailureReason::NoHealthyUpstream) {
+    appendString(result, NO_HEALTHY_UPSTREAM);
+  }
+
+  if (failure_reason & FailureReason::UpstreamRequestTimeout) {
+    appendString(result, UPSTREAM_REQUEST_TIMEOUT);
+  }
+
+  if (failure_reason & FailureReason::LocalReset) {
+    appendString(result, LOCAL_RESET);
+  }
+
+  if (failure_reason & FailureReason::UpstreamRemoteReset) {
+    appendString(result, UPSTREAM_REMOTE_RESET);
+  }
+
+  if (failure_reason & FailureReason::UpstreamConnectionFailure) {
+    appendString(result, UPSTREAM_CONNECTION_FAILURE);
+  }
+
+  if (failure_reason & FailureReason::UpstreamConnectionTermination) {
+    appendString(result, UPSTREAM_CONNECTION_TERMINATION);
+  }
+
+  if (failure_reason & FailureReason::UpstreamOverflow) {
+    appendString(result, UPSTREAM_OVERFLOW);
+  }
+
+  if (failure_reason & FailureReason::NoRouteFound) {
+    appendString(result, NO_ROUTE_FOUND);
+  }
+
+  if (failure_reason & FailureReason::FaultInjected) {
+    appendString(result, FAULT_INJECTED);
+  }
+
+  if (failure_reason & FailureReason::DelayInjected) {
+    appendString(result, DELAY_INJECTED);
+  }
+
+  if (result.empty()) {
+    throw std::invalid_argument(fmt::format("Unknown failure_reason code {}", failure_reason));
+  }
+
+  return result;
 }
 
 const std::string AccessLogFormatUtils::DEFAULT_FORMAT =

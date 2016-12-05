@@ -10,29 +10,31 @@
 namespace Http {
 namespace AccessLog {
 
-enum class FailureReason {
+enum FailureReason {
   // No failure.
-  None,
+  None = 0x0,
   // Local server healthcheck failed.
-  FailedLocalHealthCheck,
+  FailedLocalHealthCheck = 0x1,
   // No healthy upstream.
-  NoHealthyUpstream,
+  NoHealthyUpstream = 0x2,
   // Request timeout on upstream.
-  UpstreamRequestTimeout,
+  UpstreamRequestTimeout = 0x4,
   // Local codec level reset was sent on the stream.
-  LocalReset,
+  LocalReset = 0x8,
   // Remote codec level reset was received on the stream.
-  UpstreamRemoteReset,
+  UpstreamRemoteReset = 0x10,
   // Local reset by a connection pool due to an initial connection failure.
-  UpstreamConnectionFailure,
+  UpstreamConnectionFailure = 0x20,
   // If the stream was locally reset due to connection termination.
-  UpstreamConnectionTermination,
+  UpstreamConnectionTermination = 0x40,
   // The stream was reset because of a resource overflow.
-  UpstreamOverflow,
+  UpstreamOverflow = 0x80,
   // No route found for a given request.
-  NoRouteFound,
-  // Used when faults (abort with error codes) are injected.
-  FaultInjected,
+  NoRouteFound = 0x100,
+  // Abort with error code is injected.
+  FaultInjected = 0x200,
+  // Delay is injected.
+  DelayInjected = 0x400
 };
 
 /**
@@ -89,9 +91,10 @@ public:
   virtual std::chrono::milliseconds duration() const PURE;
 
   /**
-   * @return the failure reason for richer log experience.
+   * @return the failure reason for richer log experience, this can be represented as binary OR of
+   * FailureReason enum values.
    */
-  virtual FailureReason failureReason() const PURE;
+  virtual uint64_t failureReason() const PURE;
 
   /**
    * @return upstream host description.

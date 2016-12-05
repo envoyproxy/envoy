@@ -408,6 +408,8 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
   setupValidSink();
 
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  ON_CALL(request_info, failureReason())
+      .WillByDefault(Return(Http::AccessLog::FailureReason::None));
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
   const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
@@ -477,6 +479,8 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   setupValidSink();
 
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  ON_CALL(request_info, failureReason())
+      .WillByDefault(Return(Http::AccessLog::FailureReason::None));
 
   const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout));
@@ -512,6 +516,8 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
   setupValidSink();
 
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  ON_CALL(request_info, failureReason())
+      .WillByDefault(Return(Http::AccessLog::FailureReason::None));
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
   const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));

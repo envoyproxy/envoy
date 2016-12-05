@@ -43,7 +43,7 @@ public:
   std::chrono::milliseconds duration() const override {
     return std::chrono::milliseconds(duration_);
   }
-  Http::AccessLog::FailureReason failureReason() const override { return failure_reason_; }
+  uint64_t failureReason() const override { return failure_reason_; }
   void onFailedResponse(FailureReason failure_reason) override { failure_reason_ = failure_reason; }
   void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override { upstream_host_ = host; }
   Upstream::HostDescriptionPtr upstreamHost() const override { return upstream_host_; }
@@ -53,7 +53,7 @@ public:
   SystemTime start_time_;
   Protocol protocol_{Protocol::Http11};
   Optional<uint32_t> response_code_;
-  FailureReason failure_reason_{FailureReason::None};
+  uint64_t failure_reason_{FailureReason::None};
   uint64_t duration_{3};
   Upstream::HostDescriptionPtr upstream_host_{};
   bool hc_request_{};
