@@ -15,7 +15,7 @@ public:
   virtual void reopen() PURE;
 
   /**
-   * Create a new access log filed managed by the access log manager.
+   * Create a new access log file managed by the access log manager.
    * @param file_name specifies the file to create/open.
    * @return the opened file.
    */
