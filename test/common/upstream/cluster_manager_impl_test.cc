@@ -4,6 +4,7 @@
 #include "common/stats/stats_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -32,9 +33,9 @@ public:
 class ClusterManagerImplTest : public testing::Test {
 public:
   void create(const Json::Object& config) {
-    cluster_manager_.reset(new ClusterManagerImplForTest(config, stats_, tls_, dns_resolver_,
-                                                         ssl_context_manager_, runtime_, random_,
-                                                         "us-east-1d", "local_address"));
+    cluster_manager_.reset(new ClusterManagerImplForTest(
+        config, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_, "us-east-1d",
+        "local_address", log_manager_));
   }
 
   Stats::IsolatedStoreImpl stats_;
@@ -44,7 +45,23 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   std::unique_ptr<ClusterManagerImplForTest> cluster_manager_;
+  AccessLog::MockAccessLogManager log_manager_;
 };
+
+TEST_F(ClusterManagerImplTest, OutlierEventLog) {
+  std::string json = R"EOF(
+  {
+    "outlier_detection": {
+      "event_log_path": "foo"
+    },
+    "clusters": []
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_CALL(log_manager_, createAccessLog("foo"));
+  create(*loader);
+}
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
   std::string json = R"EOF(

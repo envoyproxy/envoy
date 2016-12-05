@@ -29,7 +29,7 @@ void MainImpl::initialize(const Json::Object& json) {
   cluster_manager_.reset(new Upstream::ProdClusterManagerImpl(
       *json.getObject("cluster_manager"), server_.stats(), server_.threadLocal(),
       server_.dnsResolver(), server_.sslContextManager(), server_.runtime(), server_.random(),
-      server_.options().serviceZone(), server_.getLocalAddress()));
+      server_.options().serviceZone(), server_.getLocalAddress(), server_.accessLogManager()));
 
   std::vector<Json::ObjectPtr> listeners = json.getObjectArray("listeners");
   log().info("loading {} listener(s)", listeners.size());

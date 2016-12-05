@@ -8,6 +8,7 @@
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/utility.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/http/async_client_impl.h"
@@ -15,22 +16,30 @@
 
 namespace Upstream {
 
-ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, Stats::Store& stats,
-                                       ThreadLocal::Instance& tls,
-                                       Network::DnsResolver& dns_resolver,
-                                       Ssl::ContextManager& ssl_context_manager,
-                                       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                       const std::string& local_zone_name,
-                                       const std::string& local_address)
+ClusterManagerImpl::ClusterManagerImpl(
+    const Json::Object& config, Stats::Store& stats, ThreadLocal::Instance& tls,
+    Network::DnsResolver& dns_resolver, Ssl::ContextManager& ssl_context_manager,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random, const std::string& local_zone_name,
+    const std::string& local_address, AccessLog::AccessLogManager& log_manager)
     : runtime_(runtime), tls_(tls), stats_(stats), thread_local_slot_(tls.allocateSlot()) {
 
   std::vector<Json::ObjectPtr> clusters = config.getObjectArray("clusters");
   pending_cluster_init_ = clusters.size();
 
+  Outlier::EventLoggerPtr outlier_event_logger;
+  if (config.hasObject("outlier_detection")) {
+    std::string event_log_file_path =
+        config.getObject("outlier_detection")->getString("event_log_path", "");
+    if (!event_log_file_path.empty()) {
+      outlier_event_logger.reset(new Outlier::EventLoggerImpl(log_manager, event_log_file_path,
+                                                              ProdSystemTimeSource::instance_));
+    }
+  }
+
   if (config.hasObject("sds")) {
     pending_cluster_init_++;
     loadCluster(*config.getObject("sds")->getObject("cluster"), stats, dns_resolver,
-                ssl_context_manager, runtime, random);
+                ssl_context_manager, runtime, random, outlier_event_logger);
 
     SdsConfig sds_config{
         local_zone_name, config.getObject("sds")->getObject("cluster")->getString("name"),
@@ -40,7 +49,8 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, Stats::Store&
   }
 
   for (const Json::ObjectPtr& cluster : clusters) {
-    loadCluster(*cluster, stats, dns_resolver, ssl_context_manager, runtime, random);
+    loadCluster(*cluster, stats, dns_resolver, ssl_context_manager, runtime, random,
+                outlier_event_logger);
   }
 
   Optional<std::string> local_cluster_name;
@@ -74,7 +84,8 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, Stats::Store&
 void ClusterManagerImpl::loadCluster(const Json::Object& cluster, Stats::Store& stats,
                                      Network::DnsResolver& dns_resolver,
                                      Ssl::ContextManager& ssl_context_manager,
-                                     Runtime::Loader& runtime, Runtime::RandomGenerator& random) {
+                                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                     Outlier::EventLoggerPtr event_logger) {
 
   std::string string_type = cluster.getString("type");
   ClusterImplBasePtr new_cluster;
@@ -141,7 +152,7 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, Stats::Store& 
   }
 
   new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster, cluster, dns_resolver.dispatcher(), runtime, stats));
+      *new_cluster, cluster, dns_resolver.dispatcher(), runtime, stats, event_logger));
   primary_clusters_.emplace(new_cluster->name(), new_cluster);
 }
 

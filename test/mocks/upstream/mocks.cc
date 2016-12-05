@@ -16,6 +16,9 @@ namespace Outlier {
 MockDetectorHostSink::MockDetectorHostSink() {}
 MockDetectorHostSink::~MockDetectorHostSink() {}
 
+MockEventLogger::MockEventLogger() {}
+MockEventLogger::~MockEventLogger() {}
+
 MockDetector::MockDetector() {
   ON_CALL(*this, addChangedStateCb(_))
       .WillByDefault(Invoke([this](ChangeStateCb cb) -> void { callbacks_.push_back(cb); }));

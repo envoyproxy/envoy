@@ -21,7 +21,8 @@ public:
   ClusterManagerImpl(const Json::Object& config, Stats::Store& stats, ThreadLocal::Instance& tls,
                      Network::DnsResolver& dns_resolver, Ssl::ContextManager& ssl_context_manager,
                      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                     const std::string& local_zone_name, const std::string& local_address);
+                     const std::string& local_zone_name, const std::string& local_address,
+                     AccessLog::AccessLogManager& log_manager);
 
   // Upstream::ClusterManager
   void setInitializedCb(std::function<void()> callback) override {
@@ -116,7 +117,8 @@ private:
                                                              ResourcePriority priority) PURE;
   void loadCluster(const Json::Object& cluster, Stats::Store& stats,
                    Network::DnsResolver& dns_resolver, Ssl::ContextManager& ssl_context_manager,
-                   Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                   Outlier::EventLoggerPtr event_logger);
   void postThreadLocalClusterUpdate(const ClusterImplBase& primary_cluster,
                                     const std::vector<HostPtr>& hosts_added,
                                     const std::vector<HostPtr>& hosts_removed);

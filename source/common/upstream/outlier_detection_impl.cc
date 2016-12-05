@@ -3,6 +3,7 @@
 #include "envoy/event/dispatcher.h"
 
 #include "common/common/assert.h"
+#include "common/common/utility.h"
 #include "common/http/codes.h"
 
 namespace Upstream {
@@ -11,11 +12,13 @@ namespace Outlier {
 DetectorPtr DetectorImplFactory::createForCluster(Cluster& cluster,
                                                   const Json::Object& cluster_config,
                                                   Event::Dispatcher& dispatcher,
-                                                  Runtime::Loader& runtime, Stats::Store& stats) {
+                                                  Runtime::Loader& runtime, Stats::Store& stats,
+                                                  EventLoggerPtr event_logger) {
   // Right now we don't support any configuration but in order to make the config backwards
   // compatible we just look for an empty object.
   if (cluster_config.hasObject("outlier_detection")) {
-    return DetectorPtr{new ProdDetectorImpl(cluster, dispatcher, runtime, stats)};
+    return DetectorPtr{new DetectorImpl(cluster, dispatcher, runtime, stats,
+                                        ProdSystemTimeSource::instance_, event_logger)};
   } else {
     return nullptr;
   }
@@ -41,10 +44,11 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
 
 DetectorImpl::DetectorImpl(Cluster& cluster, Event::Dispatcher& dispatcher,
                            Runtime::Loader& runtime, Stats::Store& stats,
-                           SystemTimeSource& time_source)
+                           SystemTimeSource& time_source, EventLoggerPtr event_logger)
     : dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.name(), stats)),
-      interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })) {
+      interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
+      event_logger_(event_logger) {
   for (HostPtr host : cluster.hosts()) {
     addHostSink(host);
   }
@@ -93,10 +97,14 @@ void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink,
     stats_.ejections_active_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     runCallbacks(host);
+
+    if (event_logger_) {
+      event_logger_->logUneject(host);
+    }
   }
 }
 
-void DetectorImpl::ejectHost(HostPtr host) {
+void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
   uint64_t max_ejection_percent =
       std::min(100UL, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent", 10));
   if ((stats_.ejections_active_.value() / host_sinks_.size()) < max_ejection_percent) {
@@ -105,6 +113,10 @@ void DetectorImpl::ejectHost(HostPtr host) {
       stats_.ejections_active_.inc();
       host_sinks_[host]->eject(time_source_.currentSystemTime());
       runCallbacks(host);
+
+      if (event_logger_) {
+        event_logger_->logEject(host, type);
+      }
     }
   } else {
     stats_.ejections_overflow_.inc();
@@ -134,7 +146,7 @@ void DetectorImpl::onConsecutive5xxWorker(HostPtr host) {
   }
 
   stats_.ejections_consecutive_5xx_.inc();
-  ejectHost(host);
+  ejectHost(host, EjectionType::Consecutive5xx);
 }
 
 void DetectorImpl::onIntervalTimer() {
@@ -150,6 +162,50 @@ void DetectorImpl::runCallbacks(HostPtr host) {
   for (ChangeStateCb cb : callbacks_) {
     cb(host);
   }
+}
+
+void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
+  // TODO: Log friendly host name (e.g., instance ID or DNS name).
+  // clang-format off
+  static const std::string json =
+    std::string("{{") +
+    "\"time\": \"{}\", " +
+    "\"cluster\": \"{}\", " +
+    "\"upstream_ip\": \"{}\", " +
+    "\"action\": \"eject\", " +
+    "\"type\": \"{}\"" +
+    "}}\n";
+  // clang-format on
+
+  file_->write(fmt::format(json,
+                           AccessLogDateTimeFormatter::fromTime(time_source_.currentSystemTime()),
+                           host->cluster().name(), host->url(), typeToString(type)));
+}
+
+void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
+  // TODO: Log friendly host name (e.g., instance ID or DNS name).
+  // clang-format off
+  static const std::string json =
+    std::string("{{") +
+    "\"time\": \"{}\", " +
+    "\"cluster\": \"{}\", " +
+    "\"upstream_ip\": \"{}\", " +
+    "\"action\": \"uneject\""
+    "}}\n";
+  // clang-format on
+
+  file_->write(fmt::format(json,
+                           AccessLogDateTimeFormatter::fromTime(time_source_.currentSystemTime()),
+                           host->cluster().name(), host->url()));
+}
+
+std::string EventLoggerImpl::typeToString(EjectionType type) {
+  switch (type) {
+  case EjectionType::Consecutive5xx:
+    return "5xx";
+  }
+
+  NOT_IMPLEMENTED;
 }
 
 } // Outlier

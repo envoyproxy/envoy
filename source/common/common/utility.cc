@@ -19,6 +19,8 @@ std::string DateFormatter::now() {
   return fromTimeT(current_time_t);
 }
 
+ProdSystemTimeSource ProdSystemTimeSource::instance_;
+
 bool DateUtil::timePointValid(SystemTime time_point) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
              .count() != 0;

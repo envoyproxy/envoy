@@ -7,6 +7,9 @@ namespace Upstream {
 class Host;
 typedef std::shared_ptr<Host> HostPtr;
 
+class HostDescription;
+typedef std::shared_ptr<const HostDescription> HostDescriptionPtr;
+
 namespace Outlier {
 
 /**
@@ -29,6 +32,31 @@ public:
 };
 
 typedef std::unique_ptr<DetectorHostSink> DetectorHostSinkPtr;
+
+enum class EjectionType { Consecutive5xx };
+
+/**
+ * Sink for outlier detection event logs.
+ */
+class EventLogger {
+public:
+  virtual ~EventLogger() {}
+
+  /**
+   * Log an ejection event.
+   * @param host supplies the host that generated the event.
+   * @param type supplies the type of the event.
+   */
+  virtual void logEject(HostDescriptionPtr host, EjectionType type) PURE;
+
+  /**
+   * Log an unejection event.
+   * @param host supplies the host that generated the event.
+   */
+  virtual void logUneject(HostDescriptionPtr host) PURE;
+};
+
+typedef std::shared_ptr<EventLogger> EventLoggerPtr;
 
 /**
  * Interface for an outlier detection engine. Uses per host data to determine which hosts in a
