@@ -49,8 +49,9 @@ If the route has a runtime object, the request will be additionally matched base
 a runtime object in the first route, we can accomplish traffic shifting by changing the runtime value. The flow would
 look something like this:
 
-1. Set ``routing.traffic_shift.service`` to ``100``. This would mean that all requests would match with the v1 route.
-2. Set ``routing.traffic_shift.service`` to values ``0 < x < 100``. For instance at ``50``, half of the requests
-   will not match the v1 route and fall through to the v2 route.
-3. Set ``routing.traffic_shift.service`` to ``0``. This means no requests will match on the v1 route and they will all
-   fall through to the v2 route.
+1. Set ``routing.traffic_shift.service`` to ``100``. This would mean that all requests to the ``service`` virtual host
+   would match with the v1 route.
+2. Set ``routing.traffic_shift.service`` to values ``0 < x < 100``. For instance at ``50``, half of the requests to the
+   ``service`` virtual host will not match the v1 route and fall through to the v2 route.
+3. Set ``routing.traffic_shift.service`` to ``0``. This means no requests to the ``service`` virtual host will match
+   to the v1 route and they will all fall through to the v2 route.
