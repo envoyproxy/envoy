@@ -71,8 +71,8 @@ The following command operators are supported:
 %DURATION%
   Total duration in milliseconds of the request from the start time to the last byte out.
 
-%FAILURE_REASON%
-  Additional failure reason if any in addition to response code. Possible values are:
+%RESPONSE_FLAGS%
+  Additional details to response code if any. Possible values are:
 
   * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
   * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
@@ -83,7 +83,7 @@ The following command operators are supported:
   * **UC**: Upstream connection termination in addition to 503 response code.
   * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
   * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
-  * **FI**: The request was aborted as a result of :ref:`fault injection <config_http_filters_fault_injection>`.
+  * **FI**: The request was aborted with injected response code by :ref:`fault injection <config_http_filters_fault_injection>`.
 
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
@@ -107,7 +107,7 @@ If custom format is not specified, Envoy uses the following default format:
 .. code-block:: none
 
   [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
-  %RESPONSE_CODE% %FAILURE_REASON% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
+  %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
   %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
   "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
 
