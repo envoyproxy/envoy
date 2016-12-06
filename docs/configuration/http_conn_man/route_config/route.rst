@@ -113,6 +113,8 @@ key
   the route matches or not. See the :ref:`runtime documentation <operations_runtime>` for how key
   names map to the underlying implementation.
 
+.. _config_http_conn_man_route_table_route_runtime_default:
+
 default
   *(required, integer)* An integer between 0-100. Every time the route is considered for a match,
   a random number between 0-99 is selected. If the number is <= the value found in the *key*
