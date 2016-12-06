@@ -5,6 +5,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
+using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -27,15 +28,31 @@ TEST(FailureReasonUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::DelayInjected, "DI")};
 
   for (const auto& testCase : expected) {
-    EXPECT_EQ(testCase.second, FilterReasonUtils::toShortString(testCase.first));
+    NiceMock<MockRequestInfo> request_info;
+    ON_CALL(request_info, isSetResponseFlag(testCase.first)).WillByDefault(Return(true));
+    EXPECT_EQ(testCase.second, FilterReasonUtils::toShortString(request_info));
   }
 
   // Test combinations.
-  EXPECT_EQ("UT,DI", FilterReasonUtils::toShortString(ResponseFlag::DelayInjected |
-                                                      ResponseFlag::UpstreamRequestTimeout));
-  EXPECT_EQ("UT,FI,DI", FilterReasonUtils::toShortString(ResponseFlag::FaultInjected |
-                                                         ResponseFlag::DelayInjected |
-                                                         ResponseFlag::UpstreamRequestTimeout));
+  {
+    NiceMock<MockRequestInfo> request_info;
+    ON_CALL(request_info, isSetResponseFlag(ResponseFlag::DelayInjected))
+        .WillByDefault(Return(true));
+    ON_CALL(request_info, isSetResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+        .WillByDefault(Return(true));
+    EXPECT_EQ("UT,DI", FilterReasonUtils::toShortString(request_info));
+  }
+
+  {
+    NiceMock<MockRequestInfo> request_info;
+    ON_CALL(request_info, isSetResponseFlag(ResponseFlag::DelayInjected))
+        .WillByDefault(Return(true));
+    ON_CALL(request_info, isSetResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+        .WillByDefault(Return(true));
+    ON_CALL(request_info, isSetResponseFlag(ResponseFlag::FaultInjected))
+        .WillByDefault(Return(true));
+    EXPECT_EQ("UT,FI,DI", FilterReasonUtils::toShortString(request_info));
+  }
 }
 
 TEST(AccessLogFormatUtilsTest, protocolToString) {
@@ -55,7 +72,7 @@ TEST(AccessLogFormatterTest, plainStringFormatter) {
 TEST(AccessLogFormatterTest, requestInfoFormatter) {
   EXPECT_THROW(RequestInfoFormatter formatter("unknown_field"), EnvoyException);
 
-  MockRequestInfo requestInfo;
+  NiceMock<MockRequestInfo> requestInfo;
   TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
   {
@@ -107,8 +124,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter response_flags_format("RESPONSE_FLAGS");
-    uint64_t response_flags = ResponseFlag::LocalReset;
-    EXPECT_CALL(requestInfo, getResponseFlags()).WillOnce(Return(response_flags));
+    ON_CALL(requestInfo, isSetResponseFlag(ResponseFlag::LocalReset)).WillByDefault(Return(true));
     EXPECT_EQ("LR", response_flags_format.format(header, header, requestInfo));
   }
 

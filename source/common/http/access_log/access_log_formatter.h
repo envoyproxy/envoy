@@ -10,7 +10,7 @@ namespace AccessLog {
  */
 class FilterReasonUtils {
 public:
-  static const std::string toShortString(uint64_t failure_reason);
+  static const std::string toShortString(const RequestInfo& request_info);
 
 private:
   FilterReasonUtils();

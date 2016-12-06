@@ -30,7 +30,13 @@ struct RequestInfoImpl : public RequestInfo {
     response_flags_ |= response_flag;
   }
 
-  uint64_t getResponseFlags() const override { return response_flags_; }
+  bool isSetResponseFlag(ResponseFlag flag) const override {
+    if (flag == ResponseFlag::None) {
+      return response_flags_ == ResponseFlag::None;
+    }
+
+    return response_flags_ & flag;
+  }
 
   void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override { upstream_host_ = host; }
 

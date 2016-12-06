@@ -61,12 +61,13 @@ TEST_F(ConnectionManagerUtilityTest, ShouldTraceRequest) {
     NiceMock<Http::AccessLog::MockRequestInfo> request_info;
     Optional<Http::TracingConnectionManagerConfig> tracing_failure(
         {"operation", Http::TracingType::UpstreamFailure});
-    EXPECT_CALL(request_info, getResponseFlags())
-        .WillOnce(Return(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure));
+    ON_CALL(request_info,
+            isSetResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure))
+        .WillByDefault(Return(true));
     EXPECT_TRUE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
 
-    EXPECT_CALL(request_info, getResponseFlags())
-        .WillOnce(Return(Http::AccessLog::ResponseFlag::None));
+    ON_CALL(request_info, isSetResponseFlag(Http::AccessLog::ResponseFlag::None))
+        .WillByDefault(Return(true));
     EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
   }
 }

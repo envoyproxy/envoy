@@ -27,59 +27,55 @@ void FilterReasonUtils::appendString(std::string& result, const std::string& app
   }
 }
 
-const std::string FilterReasonUtils::toShortString(uint64_t response_flags) {
+const std::string FilterReasonUtils::toShortString(const RequestInfo& request_info) {
   std::string result = "";
 
-  if (response_flags == ResponseFlag::None) {
+  if (request_info.isSetResponseFlag(ResponseFlag::None)) {
     return NONE;
   }
 
-  if (response_flags & ResponseFlag::FailedLocalHealthCheck) {
+  if (request_info.isSetResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
   }
 
-  if (response_flags & ResponseFlag::NoHealthyUpstream) {
+  if (request_info.isSetResponseFlag(ResponseFlag::NoHealthyUpstream)) {
     appendString(result, NO_HEALTHY_UPSTREAM);
   }
 
-  if (response_flags & ResponseFlag::UpstreamRequestTimeout) {
+  if (request_info.isSetResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
     appendString(result, UPSTREAM_REQUEST_TIMEOUT);
   }
 
-  if (response_flags & ResponseFlag::LocalReset) {
+  if (request_info.isSetResponseFlag(ResponseFlag::LocalReset)) {
     appendString(result, LOCAL_RESET);
   }
 
-  if (response_flags & ResponseFlag::UpstreamRemoteReset) {
+  if (request_info.isSetResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
     appendString(result, UPSTREAM_REMOTE_RESET);
   }
 
-  if (response_flags & ResponseFlag::UpstreamConnectionFailure) {
+  if (request_info.isSetResponseFlag(ResponseFlag::UpstreamConnectionFailure)) {
     appendString(result, UPSTREAM_CONNECTION_FAILURE);
   }
 
-  if (response_flags & ResponseFlag::UpstreamConnectionTermination) {
+  if (request_info.isSetResponseFlag(ResponseFlag::UpstreamConnectionTermination)) {
     appendString(result, UPSTREAM_CONNECTION_TERMINATION);
   }
 
-  if (response_flags & ResponseFlag::UpstreamOverflow) {
+  if (request_info.isSetResponseFlag(ResponseFlag::UpstreamOverflow)) {
     appendString(result, UPSTREAM_OVERFLOW);
   }
 
-  if (response_flags & ResponseFlag::NoRouteFound) {
+  if (request_info.isSetResponseFlag(ResponseFlag::NoRouteFound)) {
     appendString(result, NO_ROUTE_FOUND);
   }
 
-  if (response_flags & ResponseFlag::FaultInjected) {
+  if (request_info.isSetResponseFlag(ResponseFlag::FaultInjected)) {
     appendString(result, FAULT_INJECTED);
   }
 
-  if (response_flags & ResponseFlag::DelayInjected) {
+  if (request_info.isSetResponseFlag(ResponseFlag::DelayInjected)) {
     appendString(result, DELAY_INJECTED);
-  }
-
-  if (result.empty()) {
-    throw std::invalid_argument(fmt::format("unknown response flags: {}", response_flags));
   }
 
   return result;
@@ -250,7 +246,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "RESPONSE_FLAGS") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      return FilterReasonUtils::toShortString(request_info.getResponseFlags());
+      return FilterReasonUtils::toShortString(request_info);
     };
   } else if (field_name == "UPSTREAM_HOST") {
     field_extractor_ = [](const RequestInfo& request_info) {

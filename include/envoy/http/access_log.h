@@ -94,7 +94,7 @@ public:
    * complements response
    * code and add details to it.
    */
-  virtual uint64_t getResponseFlags() const PURE;
+  virtual bool isSetResponseFlag(ResponseFlag response_flag) const PURE;
 
   /**
    * @return upstream host description.
