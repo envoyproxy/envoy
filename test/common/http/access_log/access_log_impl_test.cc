@@ -43,8 +43,8 @@ public:
   std::chrono::milliseconds duration() const override {
     return std::chrono::milliseconds(duration_);
   }
-  uint64_t failureReason() const override { return failure_reason_; }
-  void onFailedResponse(FailureReason failure_reason) override { failure_reason_ = failure_reason; }
+  uint64_t getResponseFlags() const override { return response_flags_; }
+  void setResponseFlag(ResponseFlag response_flag) override { response_flags_ = response_flag; }
   void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override { upstream_host_ = host; }
   Upstream::HostDescriptionPtr upstreamHost() const override { return upstream_host_; }
   bool healthCheck() const override { return hc_request_; }
@@ -53,7 +53,7 @@ public:
   SystemTime start_time_;
   Protocol protocol_{Protocol::Http11};
   Optional<uint32_t> response_code_;
-  uint64_t failure_reason_{FailureReason::None};
+  uint64_t response_flags_{ResponseFlag::None};
   uint64_t duration_{3};
   Upstream::HostDescriptionPtr upstream_host_{};
   bool hc_request_{};
@@ -86,7 +86,7 @@ TEST_F(AccessLogImplTest, LogMoreData) {
   InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
-  request_info_.failure_reason_ = FailureReason::UpstreamConnectionFailure;
+  request_info_.response_flags_ = ResponseFlag::UpstreamConnectionFailure;
   request_headers_.addViaCopy(Http::Headers::get().UserAgent, "user-agent-set");
   request_headers_.addViaCopy(Http::Headers::get().RequestId, "id");
   request_headers_.addViaCopy(Http::Headers::get().Host, "host");

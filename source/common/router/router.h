@@ -167,8 +167,8 @@ private:
 
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
 
-  Http::AccessLog::FailureReason
-  streamResetReasonToFailureReason(Http::StreamResetReason reset_reason);
+  Http::AccessLog::ResponseFlag
+  streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
   const std::string& upstreamZone();
   void chargeUpstreamCode(const Http::HeaderMap& response_headers);

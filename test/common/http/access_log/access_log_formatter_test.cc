@@ -12,30 +12,30 @@ namespace Http {
 namespace AccessLog {
 
 TEST(FailureReasonUtilsTest, toShortStringConversion) {
-  std::vector<std::pair<FailureReason, std::string>> expected = {
-      std::make_pair(FailureReason::None, "-"),
-      std::make_pair(FailureReason::FailedLocalHealthCheck, "LH"),
-      std::make_pair(FailureReason::NoHealthyUpstream, "UH"),
-      std::make_pair(FailureReason::UpstreamRequestTimeout, "UT"),
-      std::make_pair(FailureReason::LocalReset, "LR"),
-      std::make_pair(FailureReason::UpstreamRemoteReset, "UR"),
-      std::make_pair(FailureReason::UpstreamConnectionFailure, "UF"),
-      std::make_pair(FailureReason::UpstreamConnectionTermination, "UC"),
-      std::make_pair(FailureReason::UpstreamOverflow, "UO"),
-      std::make_pair(FailureReason::NoRouteFound, "NR"),
-      std::make_pair(FailureReason::FaultInjected, "FI"),
-      std::make_pair(FailureReason::DelayInjected, "DI")};
+  std::vector<std::pair<ResponseFlag, std::string>> expected = {
+      std::make_pair(ResponseFlag::None, "-"),
+      std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
+      std::make_pair(ResponseFlag::NoHealthyUpstream, "UH"),
+      std::make_pair(ResponseFlag::UpstreamRequestTimeout, "UT"),
+      std::make_pair(ResponseFlag::LocalReset, "LR"),
+      std::make_pair(ResponseFlag::UpstreamRemoteReset, "UR"),
+      std::make_pair(ResponseFlag::UpstreamConnectionFailure, "UF"),
+      std::make_pair(ResponseFlag::UpstreamConnectionTermination, "UC"),
+      std::make_pair(ResponseFlag::UpstreamOverflow, "UO"),
+      std::make_pair(ResponseFlag::NoRouteFound, "NR"),
+      std::make_pair(ResponseFlag::FaultInjected, "FI"),
+      std::make_pair(ResponseFlag::DelayInjected, "DI")};
 
   for (const auto& testCase : expected) {
     EXPECT_EQ(testCase.second, FilterReasonUtils::toShortString(testCase.first));
   }
 
   // Test combinations.
-  EXPECT_EQ("UT,DI", FilterReasonUtils::toShortString(FailureReason::DelayInjected |
-                                                      FailureReason::UpstreamRequestTimeout));
-  EXPECT_EQ("UT,FI,DI", FilterReasonUtils::toShortString(FailureReason::FaultInjected |
-                                                         FailureReason::DelayInjected |
-                                                         FailureReason::UpstreamRequestTimeout));
+  EXPECT_EQ("UT,DI", FilterReasonUtils::toShortString(ResponseFlag::DelayInjected |
+                                                      ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_EQ("UT,FI,DI", FilterReasonUtils::toShortString(ResponseFlag::FaultInjected |
+                                                         ResponseFlag::DelayInjected |
+                                                         ResponseFlag::UpstreamRequestTimeout));
 }
 
 TEST(AccessLogFormatUtilsTest, protocolToString) {
@@ -106,10 +106,10 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
-    RequestInfoFormatter failure_reason_format("FAILURE_REASON");
-    FailureReason reason = FailureReason::LocalReset;
-    EXPECT_CALL(requestInfo, failureReason()).WillOnce(Return(reason));
-    EXPECT_EQ("LR", failure_reason_format.format(header, header, requestInfo));
+    RequestInfoFormatter response_flags_format("RESPONSE_FLAGS");
+    uint64_t response_flags = ResponseFlag::LocalReset;
+    EXPECT_CALL(requestInfo, getResponseFlags()).WillOnce(Return(response_flags));
+    EXPECT_EQ("LR", response_flags_format.format(header, header, requestInfo));
   }
 
   {

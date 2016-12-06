@@ -27,59 +27,59 @@ void FilterReasonUtils::appendString(std::string& result, const std::string& app
   }
 }
 
-const std::string FilterReasonUtils::toShortString(uint64_t failure_reason) {
+const std::string FilterReasonUtils::toShortString(uint64_t response_flags) {
   std::string result = "";
 
-  if (failure_reason == FailureReason::None) {
+  if (response_flags == ResponseFlag::None) {
     return NONE;
   }
 
-  if (failure_reason & FailureReason::FailedLocalHealthCheck) {
+  if (response_flags & ResponseFlag::FailedLocalHealthCheck) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
   }
 
-  if (failure_reason & FailureReason::NoHealthyUpstream) {
+  if (response_flags & ResponseFlag::NoHealthyUpstream) {
     appendString(result, NO_HEALTHY_UPSTREAM);
   }
 
-  if (failure_reason & FailureReason::UpstreamRequestTimeout) {
+  if (response_flags & ResponseFlag::UpstreamRequestTimeout) {
     appendString(result, UPSTREAM_REQUEST_TIMEOUT);
   }
 
-  if (failure_reason & FailureReason::LocalReset) {
+  if (response_flags & ResponseFlag::LocalReset) {
     appendString(result, LOCAL_RESET);
   }
 
-  if (failure_reason & FailureReason::UpstreamRemoteReset) {
+  if (response_flags & ResponseFlag::UpstreamRemoteReset) {
     appendString(result, UPSTREAM_REMOTE_RESET);
   }
 
-  if (failure_reason & FailureReason::UpstreamConnectionFailure) {
+  if (response_flags & ResponseFlag::UpstreamConnectionFailure) {
     appendString(result, UPSTREAM_CONNECTION_FAILURE);
   }
 
-  if (failure_reason & FailureReason::UpstreamConnectionTermination) {
+  if (response_flags & ResponseFlag::UpstreamConnectionTermination) {
     appendString(result, UPSTREAM_CONNECTION_TERMINATION);
   }
 
-  if (failure_reason & FailureReason::UpstreamOverflow) {
+  if (response_flags & ResponseFlag::UpstreamOverflow) {
     appendString(result, UPSTREAM_OVERFLOW);
   }
 
-  if (failure_reason & FailureReason::NoRouteFound) {
+  if (response_flags & ResponseFlag::NoRouteFound) {
     appendString(result, NO_ROUTE_FOUND);
   }
 
-  if (failure_reason & FailureReason::FaultInjected) {
+  if (response_flags & ResponseFlag::FaultInjected) {
     appendString(result, FAULT_INJECTED);
   }
 
-  if (failure_reason & FailureReason::DelayInjected) {
+  if (response_flags & ResponseFlag::DelayInjected) {
     appendString(result, DELAY_INJECTED);
   }
 
   if (result.empty()) {
-    throw std::invalid_argument(fmt::format("Unknown failure_reason code {}", failure_reason));
+    throw std::invalid_argument(fmt::format("unknown response flags: {}", response_flags));
   }
 
   return result;
@@ -87,7 +87,7 @@ const std::string FilterReasonUtils::toShortString(uint64_t failure_reason) {
 
 const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
     "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
-    "%RESPONSE_CODE% %FAILURE_REASON% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
+    "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
     "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "
     "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
     "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
@@ -248,9 +248,9 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     field_extractor_ = [](const RequestInfo& request_info) {
       return std::to_string(request_info.duration().count());
     };
-  } else if (field_name == "FAILURE_REASON") {
+  } else if (field_name == "RESPONSE_FLAG") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      return FilterReasonUtils::toShortString(request_info.failureReason());
+      return FilterReasonUtils::toShortString(request_info.getResponseFlags());
     };
   } else if (field_name == "UPSTREAM_HOST") {
     field_extractor_ = [](const RequestInfo& request_info) {

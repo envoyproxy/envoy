@@ -76,7 +76,7 @@ public:
 
 TEST_F(RouterTest, RouteNotFound) {
   EXPECT_CALL(callbacks_.request_info_,
-              onFailedResponse(Http::AccessLog::FailureReason::NoRouteFound));
+              setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -105,7 +105,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.request_info_,
-              onFailedResponse(Http::AccessLog::FailureReason::UpstreamConnectionFailure));
+              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
                            -> void { EXPECT_EQ(host_url_, host->url()); }));
@@ -136,7 +136,7 @@ TEST_F(RouterTest, NoHost) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.request_info_,
-              onFailedResponse(Http::AccessLog::FailureReason::NoHealthyUpstream));
+              setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -151,7 +151,7 @@ TEST_F(RouterTest, MaintenanceMode) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.request_info_,
-              onFailedResponse(Http::AccessLog::FailureReason::UpstreamOverflow));
+              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -202,7 +202,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
   router_.decodeData(data, true);
 
   EXPECT_CALL(callbacks_.request_info_,
-              onFailedResponse(Http::AccessLog::FailureReason::UpstreamRequestTimeout));
+              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
@@ -240,7 +240,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   router_.decodeData(data, true);
 
   EXPECT_CALL(callbacks_.request_info_,
-              onFailedResponse(Http::AccessLog::FailureReason::UpstreamRequestTimeout));
+              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestHeaderMapImpl response_headers{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
@@ -264,7 +264,7 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
                              return nullptr;
                            }));
   EXPECT_CALL(callbacks_.request_info_,
-              onFailedResponse(Http::AccessLog::FailureReason::UpstreamRemoteReset));
+              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRemoteReset));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
                            -> void { EXPECT_EQ(host_url_, host->url()); }));
@@ -306,7 +306,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.request_info_,
-              onFailedResponse(Http::AccessLog::FailureReason::NoHealthyUpstream));
+              setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream));
   router_.retry_state_->callback_();
 }
 
@@ -472,7 +472,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
 
   // Fire timeout.
   EXPECT_CALL(callbacks_.request_info_,
-              onFailedResponse(Http::AccessLog::FailureReason::UpstreamRequestTimeout));
+              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putResponseTime(_)).Times(0);
   Http::TestHeaderMapImpl response_headers{

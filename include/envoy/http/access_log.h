@@ -10,7 +10,7 @@
 namespace Http {
 namespace AccessLog {
 
-enum FailureReason {
+enum ResponseFlag {
   // No failure.
   None = 0x0,
   // Local server healthcheck failed.
@@ -45,10 +45,9 @@ public:
   virtual ~RequestInfo() {}
 
   /**
-   * filter can trigger this callback on failed response to provide more details about
-   * failure.
+   * filter can set response flags.
    */
-  virtual void onFailedResponse(FailureReason failure_reason) PURE;
+  virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
    * filter can trigger this callback when an upstream host has been selected.
@@ -91,10 +90,11 @@ public:
   virtual std::chrono::milliseconds duration() const PURE;
 
   /**
-   * @return the failure reason for richer log experience, this can be represented as binary OR of
-   * FailureReason enum values.
+   * @return response flags to enrich access log with details around response code. Response flag
+   * complements response
+   * code and add details to it.
    */
-  virtual uint64_t failureReason() const PURE;
+  virtual uint64_t getResponseFlags() const PURE;
 
   /**
    * @return upstream host description.
