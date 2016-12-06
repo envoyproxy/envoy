@@ -595,7 +595,10 @@ TEST(RouteMatcherTest, RateLimit) {
           "cluster": "www2",
           "rate_limit": {
             "global": true
-          }
+          },
+          "rate_limits": [
+          { "actions":[ {"type": "remote_address"}] }
+          ]
         },
         {
           "prefix": "/bar",
@@ -620,6 +623,10 @@ TEST(RouteMatcherTest, RateLimit) {
   EXPECT_FALSE(config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                    ->rateLimitPolicy()
                    .doGlobalLimiting());
+  EXPECT_EQ("default", config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                           ->rateLimitPolicy()
+                           .getApplicableRateLimit("default")[0]
+                           .stage());
 }
 
 TEST(RouteMatcherTest, ShadowClusterNotFound) {

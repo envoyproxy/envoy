@@ -80,7 +80,25 @@ public:
 typedef std::unique_ptr<RetryState> RetryStatePtr;
 
 /**
- * Per route policy for rate limiting.
+ * Rate limit configuration
+ */
+class RateLimitPolicyEntry {
+public:
+  virtual ~RateLimitPolicyEntry() {}
+
+  /**
+   * @return the stage value that the configuration is applicable to.
+   */
+  virtual const std::string& stage() const PURE;
+
+  /**
+   * @return runtime key to be set to disable the configuration.
+   */
+  virtual const std::string& killSwitchKey() const PURE;
+};
+
+/**
+ * Rate limiting policy
  */
 class RateLimitPolicy {
 public:
@@ -95,6 +113,13 @@ public:
    * @return the route key, if it exists.
    */
   virtual const std::string& routeKey() const PURE;
+
+  /**
+   * @param the stage value to use for comparison finding the set of applicable rate limits.
+   * @return set of RateLimitPolicyEntry that are applicable for a stage.
+   */
+  // virtual std::vector<std::reference_wrapper<Router::RateLimitPolicyEntry>>
+  // getApplicableRateLimit(const std::string& stage) PURE;
 };
 
 /**

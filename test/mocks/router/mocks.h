@@ -47,6 +47,12 @@ public:
   // Router::RateLimitPolicy
   const std::string& routeKey() const override { return route_key_; }
 
+  // Router::RateLimitPolicy
+  /* std::vector<std::reference_wrapper<Router::RateLimitPolicyEntry>>
+   getApplicableRateLimit(const std::string&) override {
+     return {};
+   }
+ */
   bool do_global_limiting_{};
   std::string route_key_;
 };

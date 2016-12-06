@@ -1,3 +1,4 @@
+#include <vector>
 #include "config_impl.h"
 #include "retry_state_impl.h"
 
@@ -15,6 +16,89 @@
 
 namespace Router {
 
+void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route,
+                                                 std::vector<::RateLimit::Descriptor>& descriptors,
+                                                 Http::RateLimit::FilterConfig& config,
+                                                 const Http::HeaderMap&,
+                                                 Http::StreamDecoderFilterCallbacks&) {
+  // We limit on 2 dimensions.
+  // 1) All calls to the given cluster.
+  // 2) Calls to the given cluster and from this cluster.
+  // The service side configuration can choose to limit on 1 or both of the above.
+  descriptors.push_back({{{"to_cluster", route.clusterName()}}});
+  descriptors.push_back(
+      {{{"to_cluster", route.clusterName()}, {"from_cluster", config.localServiceCluster()}}});
+}
+
+void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
+                                               std::vector<::RateLimit::Descriptor>& descriptors,
+                                               Http::RateLimit::FilterConfig&,
+                                               const Http::HeaderMap& headers,
+                                               Http::StreamDecoderFilterCallbacks&) {
+  const Http::HeaderEntry* header_value = headers.get(header_name_);
+  if (!header_value) {
+    return;
+  }
+
+  descriptors.push_back({{{descriptor_key_, header_value->value().c_str()}}});
+
+  const std::string& route_key = route.rateLimitPolicy().routeKey();
+  if (route_key.empty()) {
+    return;
+  }
+
+  descriptors.push_back(
+      {{{"route_key", route_key}, {descriptor_key_, header_value->value().c_str()}}});
+}
+
+void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
+                                              std::vector<::RateLimit::Descriptor>& descriptors,
+                                              Http::RateLimit::FilterConfig&,
+                                              const Http::HeaderMap&,
+                                              Http::StreamDecoderFilterCallbacks& callbacks) {
+  const std::string& remote_address = callbacks.downstreamAddress();
+  if (remote_address.empty()) {
+    return;
+  }
+
+  descriptors.push_back({{{"remote_address", remote_address}}});
+
+  const std::string& route_key = route.rateLimitPolicy().routeKey();
+  if (route_key.empty()) {
+    return;
+  }
+
+  descriptors.push_back({{{"route_key", route_key}, {"remote_address", remote_address}}});
+}
+
+RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
+    : kill_switch_key_(config.getString("kill_switch_key", "")),
+      stage_(config.getString("stage", "default")) {
+  for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
+    std::string type = action->getString("type");
+    if (type == "service_to_service") {
+      actions_.emplace_back(new ServiceToServiceAction());
+      std::cout << "service to service" << std::endl;
+    } else if (type == "request_headers") {
+      actions_.emplace_back(new RequestHeadersAction(*action));
+    } else if (type == "remote_address") {
+      actions_.emplace_back(new RemoteAddressAction());
+      std::cout << "remote" << std::endl;
+    } else {
+      throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
+    }
+  }
+}
+
+void RateLimitPolicyEntryImpl::populateDescriptors(
+    const Router::RouteEntry& route, std::vector<::RateLimit::Descriptor>& descriptors,
+    Http::RateLimit::FilterConfig& config, const Http::HeaderMap& headers,
+    Http::StreamDecoderFilterCallbacks& callbacks) {
+  for (ActionPtr& action : actions_) {
+    action->populateDescriptors(route, descriptors, config, headers, callbacks);
+  }
+}
+
 std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
@@ -28,6 +112,25 @@ RetryPolicyImpl::RetryPolicyImpl(const Json::Object& config) {
   retry_on_ = RetryStateImpl::parseRetryOn(config.getObject("retry_policy")->getString("retry_on"));
 }
 
+RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
+    : do_global_limiting_(config.getObject("rate_limit", true)->getBoolean("global", false)),
+      route_key_(config.getObject("rate_limit", true)->getString("route_key", "")) {
+  if (config.hasObject("rate_limits")) {
+    for (const Json::ObjectPtr& rate_limit : config.getObjectArray("rate_limits")) {
+      rate_limit_entries_.emplace_back(new RateLimitPolicyEntryImpl(*rate_limit));
+    }
+  }
+}
+
+std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
+RateLimitPolicyImpl::getApplicableRateLimit(const std::string&) {
+  // TODO: only return rate limit policy entries that match for the stage
+  std::vector<std::reference_wrapper<RateLimitPolicyEntryImpl>> result_vector;
+  for (RateLimitPolicyEntryImplPtr& rate_limit_entry : rate_limit_entries_) {
+    result_vector.push_back(*rate_limit_entry);
+  }
+  return result_vector;
+}
 ShadowPolicyImpl::ShadowPolicyImpl(const Json::Object& config) {
   if (!config.hasObject("shadow")) {
     return;
