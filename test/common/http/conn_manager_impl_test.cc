@@ -194,6 +194,29 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPath) {
   conn_manager_->onData(fake_input);
 }
 
+TEST_F(HttpConnectionManagerImplTest, NoPath) {
+  setup(false, "");
+  EXPECT_CALL(tracer_, trace(_, _, _, _));
+
+  Http::StreamDecoder* decoder = nullptr;
+  NiceMock<Http::MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+        decoder = &conn_manager_->newStream(encoder);
+        Http::HeaderMapPtr headers{
+            new TestHeaderMapImpl{{":authority", "host"}, {":method", "CONNECT"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+        data.drain(4);
+      }));
+
+  EXPECT_CALL(encoder, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const Http::HeaderMap& headers, bool)
+                           -> void { EXPECT_STREQ("404", headers.Status()->value().c_str()); }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+}
+
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   setup(true, "");
   EXPECT_CALL(tracer_, trace(_, _, _, _));
