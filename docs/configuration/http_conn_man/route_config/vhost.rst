@@ -34,6 +34,8 @@ domains
   *(required, array)* The list of routes that will be matched, in order, for incoming requests.
   The first route that matches will be used.
 
+.. _config_http_conn_man_route_table_vhost_require_ssl:
+
 require_ssl
   *(optional, string)* Specifies the type of TLS enforcement the virtual host expects. Possible
   values are:
