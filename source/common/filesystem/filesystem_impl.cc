@@ -53,7 +53,7 @@ ssize_t OsSysCallsImpl::write(int fd, const void* buffer, size_t num_bytes) {
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
                    Thread::BasicLockable& lock, OsSysCalls& os_sys_calls, Stats::Store& stats_store,
                    std::chrono::milliseconds flush_interval_msec)
-    : path_(path), lock_(lock), dispatcher_(dispatcher), os_sys_calls_(os_sys_calls),
+    : path_(path), flush_lock_(lock), dispatcher_(dispatcher), os_sys_calls_(os_sys_calls),
       flush_interval_msec_(flush_interval_msec),
       stats_{FILESYSTEM_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
                               POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {
@@ -73,7 +73,7 @@ void FileImpl::reopen() { reopen_file_ = true; }
 
 FileImpl::~FileImpl() {
   {
-    std::unique_lock<Thread::BasicLockable> lock(lock_);
+    std::unique_lock<std::mutex> lock(write_lock_);
     flush_thread_exit_ = true;
     flush_event_.notify_one();
   }
@@ -86,7 +86,6 @@ FileImpl::~FileImpl() {
   if (fd_ != -1) {
     if (flush_buffer_.length() > 0) {
       doWrite(flush_buffer_);
-      stats_.write_total_buffered_.sub(flush_buffer_.length());
     }
 
     os_sys_calls_.close(fd_);
@@ -97,16 +96,30 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
   buffer.getRawSlices(slices, num_slices);
+
+  // We must do the actual writes to disk under lock, so that we don't intermix chunks from
+  // different FileImpl pointing to the same underlying file. This can happen either via hot
+  // restart or if calling code opens the same underlying file into a different FileImpl in the
+  // same process.
+  // TODO PERF: Currently, we use a single cross process lock to serialize all disk writes. This
+  //            will never block network workers, but does mean that only a single flush thread can
+  //            actually flush to disk. In the future it would be nice if we did away with the cross
+  //            process lock or had multiple locks.
+  std::unique_lock<Thread::BasicLockable> lock(flush_lock_);
   for (Buffer::RawSlice& slice : slices) {
     ssize_t rc = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
     ASSERT(rc == static_cast<ssize_t>(slice.len_));
     UNREFERENCED_PARAMETER(rc);
     stats_.write_completed_.inc();
   }
+  lock.unlock();
+
+  stats_.write_total_buffered_.sub(buffer.length());
+  buffer.drain(buffer.length());
 }
 
 void FileImpl::flushThreadFunc() {
-  std::unique_lock<Thread::BasicLockable> lock(lock_);
+  std::unique_lock<std::mutex> lock(write_lock_);
 
   while (true) {
     // flush_event_ can be woken up either by large enough flush_buffer or by timer.
@@ -120,12 +133,8 @@ void FileImpl::flushThreadFunc() {
     }
 
     ASSERT(flush_buffer_.length() > 0);
-    Buffer::RawSlice slices[1];
-    flush_buffer_.getRawSlices(slices, 1);
-    Buffer::OwnedImpl copy(slices[0].mem_, slices[0].len_);
-    flush_buffer_.drain(slices[0].len_);
-    stats_.write_total_buffered_.sub(slices[0].len_);
-
+    about_to_write_buffer_.move(flush_buffer_);
+    ASSERT(flush_buffer_.length() == 0);
     lock.unlock();
 
     // if we failed to open file before (-1 == fd_), then simply ignore
@@ -137,7 +146,7 @@ void FileImpl::flushThreadFunc() {
           open();
         }
 
-        doWrite(copy);
+        doWrite(about_to_write_buffer_);
       } catch (const EnvoyException&) {
         stats_.reopen_failed_.inc();
       }
@@ -148,7 +157,7 @@ void FileImpl::flushThreadFunc() {
 }
 
 void FileImpl::write(const std::string& data) {
-  std::unique_lock<Thread::BasicLockable> lock(lock_);
+  std::unique_lock<std::mutex> lock(write_lock_);
 
   if (flush_thread_ == nullptr) {
     createFlushStructures();

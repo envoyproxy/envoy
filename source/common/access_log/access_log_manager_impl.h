@@ -20,7 +20,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Thread::BasicLockable& lock_;
   Stats::Store& stats_store_;
-  std::list<Filesystem::FilePtr> access_logs_;
+  std::unordered_map<std::string, Filesystem::FilePtr> access_logs_;
 };
 
 } // AccessLog
