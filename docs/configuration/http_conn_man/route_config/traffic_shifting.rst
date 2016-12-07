@@ -19,10 +19,6 @@ A common use case is shifting traffic between clusters with different versions o
               {
                 "prefix": "/",
                 "cluster": "service_v1",
-                "retry_policy": {
-                  "retry_on": "connect-failure"
-                },
-                "host_rewrite": "v1.service.net",
                 "runtime": {
                   "key": "routing.traffic_shift.service",
                   "default": 50
@@ -31,10 +27,6 @@ A common use case is shifting traffic between clusters with different versions o
               {
                 "prefix": "/",
                 "cluster": "service_v2",
-                "retry_policy": {
-                  "retry_on": "connect-failure"
-                },
-                "host_rewrite": "v2.service.net"
               }
             ]
           }
@@ -46,7 +38,7 @@ Envoy matches routes with a :ref:`first match <config_http_conn_man_route_table_
 If the route has a runtime object, the request will be additionally matched based on the runtime
 :ref:`value <config_http_conn_man_route_table_route_runtime_default>`
 (or the default, if no value is specified). Thus, by placing routes back-to-back in the above example and specifying
-a runtime object in the first route, we can accomplish traffic shifting by changing the runtime value. The flow would
+a runtime object in the first route, traffic shifting can be accomplished by changing the runtime value. The flow would
 look something like this:
 
 1. Set ``routing.traffic_shift.service`` to ``100``. This would mean that all requests to the ``service`` virtual host

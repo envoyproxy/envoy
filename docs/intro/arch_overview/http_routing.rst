@@ -23,8 +23,9 @@ request. The router filter supports the following features:
 * Prefix rewriting.
 * Request retries specified either via HTTP header or via route configuration.
 * Request timeout specified either via HTTP header or via route configuration.
-* Runtime configuration routing rules.
-* Content type routing rules.
+* Runtime configuration routing rules. Runtime configuration can be used to create :ref:`traffic
+  shifting <config_http_conn_man_route_table_traffic_shifting>`.
+* Arbitrary headers :ref:`routing rules <config_http_conn_man_route_table_route_headers>`.
 * Virtual cluster specifications. A virtual cluster is specified at the virtual host level and is
   used by Envoy to generate additional statistics on top of the standard cluster level ones. Virtual
   clusters can use regex matching.
