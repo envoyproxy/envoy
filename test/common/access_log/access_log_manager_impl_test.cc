@@ -25,6 +25,10 @@ TEST(AccessLogManagerImpl, reopenAllFiles) {
   EXPECT_CALL(api, createFile("bar", _, _, _)).WillOnce(Return(log2));
   access_log_manager.createAccessLog("bar");
 
+  // Make sure that getting the access log with the same name returns the same underlying file.
+  EXPECT_EQ(log1, access_log_manager.createAccessLog("foo"));
+  EXPECT_EQ(log2, access_log_manager.createAccessLog("bar"));
+
   EXPECT_CALL(*log1, reopen());
   EXPECT_CALL(*log2, reopen());
   access_log_manager.reopen();
