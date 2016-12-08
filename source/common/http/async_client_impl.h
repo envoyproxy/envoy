@@ -7,6 +7,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
+#include "envoy/router/ratelimit_router.h"
 #include "envoy/router/router.h"
 #include "envoy/router/shadow_writer.h"
 
@@ -64,6 +65,10 @@ private:
     // Router::RateLimitPolicy
     bool doGlobalLimiting() const override { return false; }
     const std::string& routeKey() const override { return EMPTY_STRING; }
+    std::vector<std::reference_wrapper<Router::RateLimitPolicyEntry>>
+    getApplicableRateLimit(const std::string&) const override {
+      return {};
+    }
   };
 
   struct NullRetryPolicy : public Router::RetryPolicy {

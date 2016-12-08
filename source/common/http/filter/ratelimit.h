@@ -13,7 +13,7 @@ namespace RateLimit {
 /**
  * Global configuration for the HTTP rate limit filter.
  */
-class FilterConfig {
+class FilterConfig : public ::RateLimit::FilterConfig {
 public:
   FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
                Stats::Store& stats_store, Runtime::Loader& runtime)
@@ -21,11 +21,11 @@ public:
         local_service_cluster_(local_service_cluster), stats_store_(stats_store),
         runtime_(runtime) {}
 
-  const std::string& domain() { return domain_; }
-  const std::string& localServiceCluster() { return local_service_cluster_; }
-  const std::string& stage() { return stage_; }
-  Runtime::Loader& runtime() { return runtime_; }
-  Stats::Store& stats() { return stats_store_; }
+  const std::string& domain() const override { return domain_; }
+  const std::string& localServiceCluster() const override { return local_service_cluster_; }
+  const std::string& stage() const override { return stage_; }
+  Runtime::Loader& runtime() override { return runtime_; }
+  Stats::Store& stats() override { return stats_store_; }
 
 private:
   const std::string domain_;
@@ -43,7 +43,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigPtr;
  */
 class Filter : public StreamDecoderFilter, public ::RateLimit::RequestCallbacks {
 public:
-  Filter(FilterConfigPtr config, ::RateLimit::ClientPtr&& client)
+  Filter(RateLimit::FilterConfigPtr config, ::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamDecoderFilter

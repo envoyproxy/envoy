@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/router/ratelimit_router.h"
 #include "envoy/router/router.h"
 #include "envoy/router/shadow_writer.h"
 
@@ -38,6 +39,17 @@ public:
 
   DoRetryCallback callback_;
 };
+class TestRateLimitPolicyEntry : public RateLimitPolicyEntry {
+public:
+  const std::string& stage() const override { return stage_; }
+  const std::string& killSwitchKey() const override { return kill_switch_key_; }
+  void populateDescriptors(const RouteEntry&, std::vector<::RateLimit::Descriptor>&,
+                           ::RateLimit::FilterConfig&, const Http::HeaderMap&,
+                           Http::StreamDecoderFilterCallbacks&) const override{};
+
+  std::string stage_;
+  std::string kill_switch_key_;
+};
 
 class TestRateLimitPolicy : public RateLimitPolicy {
 public:
@@ -48,13 +60,18 @@ public:
   const std::string& routeKey() const override { return route_key_; }
 
   // Router::RateLimitPolicy
-  /* std::vector<std::reference_wrapper<Router::RateLimitPolicyEntry>>
-   getApplicableRateLimit(const std::string&) override {
-     return {};
-   }
- */
+  std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
+  getApplicableRateLimit(const std::string&) const override {
+    std::vector<std::reference_wrapper<RateLimitPolicyEntry>> result_vector;
+    for (const TestRateLimitPolicyEntry& rate_limit : rate_limit_policy_entries_) {
+      result_vector.insert(rate_limit);
+    }
+    return result_vector;
+  }
+
   bool do_global_limiting_{};
   std::string route_key_;
+  std::vector<TestRateLimitPolicyEntry*> rate_limit_policy_entries_;
 };
 
 class TestShadowPolicy : public ShadowPolicy {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/optional.h"
+#include "envoy/router/ratelimit_router.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -31,28 +32,6 @@ class RouteEntryImplBase;
 typedef std::shared_ptr<RouteEntryImplBase> RouteEntryImplBasePtr;
 
 /**
- * Generic rate limit action that the filter performs.
- */
-class Action {
-public:
-  virtual ~Action() {}
-
-  /**
-   * Potentially populate the descriptor array with new descriptors to query.
-   * @param route supplies the target route for the request.
-   * @param descriptors supplies the descriptor array to optionally fill.
-   * @param config supplies the filter configuration.
-   */
-  virtual void populateDescriptors(const Router::RouteEntry& route,
-                                   std::vector<::RateLimit::Descriptor>& descriptors,
-                                   Http::RateLimit::FilterConfig& config,
-                                   const Http::HeaderMap& headers,
-                                   Http::StreamDecoderFilterCallbacks& callbacks) PURE;
-};
-
-typedef std::unique_ptr<Action> ActionPtr;
-
-/**
 * Action for service to service rate limiting.
 */
 class ServiceToServiceAction : public Action {
@@ -60,8 +39,8 @@ public:
   // Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
-                           Http::RateLimit::FilterConfig& config, const Http::HeaderMap&,
-                           Http::StreamDecoderFilterCallbacks&) override;
+                           ::RateLimit::FilterConfig& config, const Http::HeaderMap&,
+                           Http::StreamDecoderFilterCallbacks&) const override;
 };
 
 /**
@@ -75,8 +54,8 @@ public:
   // Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
-                           Http::RateLimit::FilterConfig& config, const Http::HeaderMap& headers,
-                           Http::StreamDecoderFilterCallbacks&) override;
+                           ::RateLimit::FilterConfig& config, const Http::HeaderMap& headers,
+                           Http::StreamDecoderFilterCallbacks&) const override;
 
 private:
   const Http::LowerCaseString header_name_;
@@ -91,8 +70,8 @@ public:
   // Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
-                           Http::RateLimit::FilterConfig&, const Http::HeaderMap&,
-                           Http::StreamDecoderFilterCallbacks& callbacks) override;
+                           ::RateLimit::FilterConfig&, const Http::HeaderMap&,
+                           Http::StreamDecoderFilterCallbacks& callbacks) const override;
 };
 
 class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
@@ -106,8 +85,8 @@ public:
 
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
-                           Http::RateLimit::FilterConfig&, const Http::HeaderMap&,
-                           Http::StreamDecoderFilterCallbacks& callbacks);
+                           ::RateLimit::FilterConfig&, const Http::HeaderMap&,
+                           Http::StreamDecoderFilterCallbacks& callbacks) const override;
 
 private:
   const std::string kill_switch_key_;
@@ -237,8 +216,8 @@ public:
   // Router::RateLimitPolicy
   const std::string& routeKey() const override { return route_key_; }
 
-  std::vector<std::reference_wrapper<RateLimitPolicyEntryImpl>>
-  getApplicableRateLimit(const std::string& stage);
+  std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
+  getApplicableRateLimit(const std::string& stage) const override;
 
 private:
   const bool do_global_limiting_;

@@ -2,6 +2,8 @@
 
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/stats/stats.h"
 
 namespace RateLimit {
 
@@ -89,5 +91,20 @@ public:
 };
 
 typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;
+
+/**
+ * An interface for the rate limit filter configuration.
+ */
+class FilterConfig {
+public:
+  virtual ~FilterConfig() {}
+
+  // TODO add comments
+  virtual const std::string& domain() const PURE;
+  virtual const std::string& localServiceCluster() const PURE;
+  virtual const std::string& stage() const PURE;
+  virtual Runtime::Loader& runtime() PURE;
+  virtual Stats::Store& stats() PURE;
+};
 
 } // RateLimit

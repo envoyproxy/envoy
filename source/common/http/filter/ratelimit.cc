@@ -23,7 +23,7 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   if (route) {
     std::vector<::RateLimit::Descriptor> descriptors;
 
-    for (Router::RateLimitPolicyEntryImpl& rate_limit :
+    for (Router::RateLimitPolicyEntry& rate_limit :
          route->rateLimitPolicy().getApplicableRateLimit(config_->stage())) {
       rate_limit.populateDescriptors(*route, descriptors, *config_, headers, *callbacks_);
     }

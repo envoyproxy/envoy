@@ -80,49 +80,6 @@ public:
 typedef std::unique_ptr<RetryState> RetryStatePtr;
 
 /**
- * Rate limit configuration
- */
-class RateLimitPolicyEntry {
-public:
-  virtual ~RateLimitPolicyEntry() {}
-
-  /**
-   * @return the stage value that the configuration is applicable to.
-   */
-  virtual const std::string& stage() const PURE;
-
-  /**
-   * @return runtime key to be set to disable the configuration.
-   */
-  virtual const std::string& killSwitchKey() const PURE;
-};
-
-/**
- * Rate limiting policy
- */
-class RateLimitPolicy {
-public:
-  virtual ~RateLimitPolicy() {}
-
-  /**
-   * @return whether the global rate limiting service should be called for the owning route.
-   */
-  virtual bool doGlobalLimiting() const PURE;
-
-  /**
-   * @return the route key, if it exists.
-   */
-  virtual const std::string& routeKey() const PURE;
-
-  /**
-   * @param the stage value to use for comparison finding the set of applicable rate limits.
-   * @return set of RateLimitPolicyEntry that are applicable for a stage.
-   */
-  // virtual std::vector<std::reference_wrapper<Router::RateLimitPolicyEntry>>
-  // getApplicableRateLimit(const std::string& stage) PURE;
-};
-
-/**
  * Per route policy for request shadowing.
  */
 class ShadowPolicy {
@@ -162,6 +119,8 @@ public:
    */
   virtual Upstream::ResourcePriority priority() const PURE;
 };
+
+class RateLimitPolicy;
 
 /**
  * An individual resolved route entry.

@@ -3,7 +3,10 @@
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/mocks/ratelimit/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -582,53 +585,6 @@ TEST(RouteMatcherTest, Runtime) {
             config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 20)->clusterName());
 }
 
-TEST(RouteMatcherTest, RateLimit) {
-  std::string json = R"EOF(
-{
-  "virtual_hosts": [
-    {
-      "name": "www2",
-      "domains": ["www.lyft.com"],
-      "routes": [
-        {
-          "prefix": "/foo",
-          "cluster": "www2",
-          "rate_limit": {
-            "global": true
-          },
-          "rate_limits": [
-          { "actions":[ {"type": "remote_address"}] }
-          ]
-        },
-        {
-          "prefix": "/bar",
-          "cluster": "www2"
-        }
-      ]
-    }
-  ]
-}
-  )EOF";
-
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(*loader, runtime, cm);
-
-  EXPECT_FALSE(config.usesRuntime());
-
-  EXPECT_TRUE(config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                  ->rateLimitPolicy()
-                  .doGlobalLimiting());
-  EXPECT_FALSE(config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                   ->rateLimitPolicy()
-                   .doGlobalLimiting());
-  EXPECT_EQ("default", config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                           ->rateLimitPolicy()
-                           .getApplicableRateLimit("default")[0]
-                           .stage());
-}
-
 TEST(RouteMatcherTest, ShadowClusterNotFound) {
   std::string json = R"EOF(
 {
@@ -968,6 +924,245 @@ TEST(NullConfigImplTest, All) {
   EXPECT_EQ(0UL, config.responseHeadersToAdd().size());
   EXPECT_EQ(0UL, config.responseHeadersToRemove().size());
   EXPECT_FALSE(config.usesRuntime());
+}
+
+TEST(RateLimitConfiguration, MissingActions) {
+  std::string json = R"EOF(
+{
+"virtual_hosts": [
+{
+  "name": "www2",
+  "domains": ["www.lyft.com"],
+  "routes": [
+    {
+      "prefix": "/",
+      "cluster": "www2",
+      "rate_limit": {
+        "global": true
+      },
+      "rate_limits": [
+      { }
+      ]
+    }
+  ]
+}
+]
+}
+)EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+}
+
+TEST(RateLimitConfiguration, BadType) {
+  std::string json = R"EOF(
+{
+"virtual_hosts": [
+  {
+    "name": "www2",
+    "domains": ["www.lyft.com"],
+    "routes": [
+      {
+        "prefix": "/",
+        "cluster": "www2",
+        "rate_limits": [
+        { "actions":[ {"type": "bad_type"}] }
+        ]
+      }
+    ]
+  }
+]
+}
+)EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+}
+
+TEST(RateLimitConfiguration, ActionsMissingRequiredFields) {
+  std::string json_one = R"EOF(
+{
+"virtual_hosts": [
+  {
+    "name": "www2",
+    "domains": ["www.lyft.com"],
+    "routes": [
+      {
+        "prefix": "/",
+        "cluster": "www2",
+        "rate_limits": [
+        { "actions":[ {"type": "request_headers"}] }
+        ]
+      }
+    ]
+  }
+]
+}
+)EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json_one);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+
+  std::string json_two = R"EOF(
+{
+"virtual_hosts": [
+  {
+    "name": "www2",
+    "domains": ["www.lyft.com"],
+    "routes": [
+      {
+        "prefix": "/",
+        "cluster": "www2",
+        "rate_limits": [
+        { "actions":[
+            {"type": "request_headers",
+              "header_name" : "test"}]
+          }
+        ]
+      }
+    ]
+  }
+]
+}
+)EOF";
+  loader = Json::Factory::LoadFromString(json_two);
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+  std::string json_three = R"EOF(
+{
+"virtual_hosts": [
+{
+  "name": "www2",
+  "domains": ["www.lyft.com"],
+  "routes": [
+    {
+      "prefix": "/",
+      "cluster": "www2",
+      "rate_limits": [
+      { "actions":[
+          {"type": "request_headers",
+            "descriptor_key" : "test" }]
+        }
+      ]
+    }
+  ]
+}
+]
+}
+)EOF";
+  loader = Json::Factory::LoadFromString(json_three);
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+}
+
+TEST(RateLimitConfiguration, RemoteAddress) {
+  std::string json = R"EOF(
+{
+"virtual_hosts": [
+  {
+    "name": "www2",
+    "domains": ["www.lyft.com"],
+    "routes": [
+      {
+        "prefix": "/foo",
+        "cluster": "www2",
+        "rate_limit": {
+          "global": true
+        },
+        "rate_limits": [
+        { "actions":[ {"type": "remote_address"}] }
+        ]
+      },
+      {
+        "prefix": "/bar",
+        "cluster": "www2"
+      }
+    ]
+  }
+]
+}
+)EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(*loader, runtime, cm);
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<Router::MockRouteEntry> route;
+  NiceMock<RateLimit::MockFilterConfig> filter_config;
+  Http::TestHeaderMapImpl header;
+  route.rate_limit_policy_.route_key_ = "";
+  std::string address = "10.0.0.1";
+  EXPECT_CALL(callbacks, downstreamAddress()).WillOnce(ReturnRef(address));
+
+  EXPECT_EQ(0u, config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->rateLimitPolicy()
+                    .getApplicableRateLimit("default")
+                    .size());
+  std::vector<std::reference_wrapper<RateLimitPolicyEntry>> rate_limits =
+      config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+          ->rateLimitPolicy()
+          .getApplicableRateLimit("default");
+  EXPECT_EQ(1u, rate_limits.size());
+  std::vector<::RateLimit::Descriptor> descriptors;
+  for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
+    rate_limit.populateDescriptors(route, descriptors, filter_config, header, callbacks);
+    // TODO compare descriptors
+  }
+}
+
+TEST(RateLimitConfiguration, ServiceToService) {
+  std::string json = R"EOF(
+{
+"virtual_hosts": [
+  {
+    "name": "www2",
+    "domains": ["www.lyft.com"],
+    "routes": [
+      {
+        "prefix": "/foo",
+        "cluster": "www2",
+        "rate_limit": {
+          "global": true
+        },
+        "rate_limits": [
+        { "actions":[ {"type": "service_to_service"}] }
+        ]
+      },
+      {
+        "prefix": "/bar",
+        "cluster": "www2"
+      }
+    ]
+  }
+]
+}
+)EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(*loader, runtime, cm);
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<Router::MockRouteEntry> route;
+  NiceMock<RateLimit::MockFilterConfig> filter_config;
+  Http::TestHeaderMapImpl header;
+  route.rate_limit_policy_.route_key_ = "my_route";
+  filter_config.local_service_cluster_ = "service_cluster";
+  std::vector<std::reference_wrapper<RateLimitPolicyEntry>> rate_limits =
+      config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+          ->rateLimitPolicy()
+          .getApplicableRateLimit("default");
+  EXPECT_EQ(1u, rate_limits.size());
+  std::vector<::RateLimit::Descriptor> descriptors;
+  for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
+    rate_limit.populateDescriptors(route, descriptors, filter_config, header, callbacks);
+    // TODO compare descriptors
+  }
 }
 
 } // Router
