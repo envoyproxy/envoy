@@ -1111,8 +1111,9 @@ TEST(RateLimitConfiguration, RemoteAddress) {
   std::vector<::RateLimit::Descriptor> descriptors;
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(route, descriptors, filter_config, header, callbacks);
-    // TODO compare descriptors
   }
+  std::vector<::RateLimit::Descriptor> expected_descriptors = {{{{"remote_address", address}}}};
+  EXPECT_EQ(descriptors, expected_descriptors);
 }
 
 TEST(RateLimitConfiguration, ServiceToService) {
@@ -1161,8 +1162,11 @@ TEST(RateLimitConfiguration, ServiceToService) {
   std::vector<::RateLimit::Descriptor> descriptors;
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(route, descriptors, filter_config, header, callbacks);
-    // TODO compare descriptors
   }
+  std::vector<::RateLimit::Descriptor> expected_descriptors = {
+      {{{"to_cluster", "fake_cluster"}}},
+      {{{"to_cluster", "fake_cluster"}, {"from_cluster", "service_cluster"}}}};
+  EXPECT_EQ(descriptors, expected_descriptors);
 }
 
 } // Router

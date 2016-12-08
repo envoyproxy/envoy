@@ -62,11 +62,12 @@ public:
   // Router::RateLimitPolicy
   std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
   getApplicableRateLimit(const std::string&) const override {
-    std::vector<std::reference_wrapper<RateLimitPolicyEntry>> result_vector;
-    for (const TestRateLimitPolicyEntry& rate_limit : rate_limit_policy_entries_) {
-      result_vector.insert(rate_limit);
-    }
-    return result_vector;
+    //    std::vector<std::reference_wrapper<RateLimitPolicyEntry>> result_vector;
+    //    for (const TestRateLimitPolicyEntry& rate_limit : rate_limit_policy_entries_) {
+    //      result_vector.insert(rate_limit);
+    //    }
+    //    return result_vector;
+    return {};
   }
 
   bool do_global_limiting_{};
