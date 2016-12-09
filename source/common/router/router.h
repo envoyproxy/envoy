@@ -131,7 +131,7 @@ private:
     void onPerTryTimeout();
 
     void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) {
-      parent_.upstream_host_ = host;
+      upstream_host_ = host;
       parent_.callbacks_->requestInfo().onUpstreamHostSelected(host);
     }
 
@@ -156,6 +156,7 @@ private:
     Http::StreamEncoder* request_encoder_{};
     Optional<Http::StreamResetReason> deferred_reset_reason_;
     Buffer::InstancePtr buffered_request_body_;
+    Upstream::HostDescriptionPtr upstream_host_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
@@ -170,9 +171,10 @@ private:
   Http::AccessLog::FailureReason
   streamResetReasonToFailureReason(Http::StreamResetReason reset_reason);
 
-  const std::string& upstreamZone();
-  void chargeUpstreamCode(const Http::HeaderMap& response_headers);
-  void chargeUpstreamCode(Http::Code code);
+  static const std::string& upstreamZone(Upstream::HostDescriptionPtr upstream_host);
+  void chargeUpstreamCode(const Http::HeaderMap& response_headers,
+                          Upstream::HostDescriptionPtr upstream_host);
+  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionPtr upstream_host);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::HeaderMap& request_headers,
@@ -207,7 +209,6 @@ private:
   RetryStatePtr retry_state_;
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
-  Upstream::HostDescriptionPtr upstream_host_;
   SystemTime downstream_request_complete_time_;
 
   bool downstream_response_started_ : 1;
