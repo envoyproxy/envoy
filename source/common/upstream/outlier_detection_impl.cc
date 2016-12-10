@@ -107,7 +107,8 @@ void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink,
 void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
   uint64_t max_ejection_percent =
       std::min(100UL, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent", 10));
-  if ((stats_.ejections_active_.value() / host_sinks_.size()) < max_ejection_percent) {
+  double ejected_percent = 100.0 * stats_.ejections_active_.value() / host_sinks_.size();
+  if (ejected_percent < max_ejection_percent) {
     stats_.ejections_total_.inc();
     if (runtime_.snapshot().featureEnabled("outlier_detection.enforcing", 100)) {
       stats_.ejections_active_.inc();
