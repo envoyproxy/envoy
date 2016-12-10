@@ -2,6 +2,8 @@
 
 #include "envoy/upstream/upstream.h"
 
+#include "common/stats/stats_impl.h"
+
 namespace Upstream {
 namespace Outlier {
 
@@ -55,6 +57,8 @@ public:
 
   std::string url_{"tcp://10.0.0.1:443"};
   testing::NiceMock<Outlier::MockDetectorHostSink> outlier_detector_;
+  Stats::IsolatedStoreImpl stats_store_;
+  HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
 };
 
 class MockHost : public Host {
