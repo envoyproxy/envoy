@@ -214,6 +214,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   cluster.setOutlierDetector(Outlier::DetectorPtr{detector});
 
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
+  EXPECT_EQ(2UL, cluster.stats().membership_healthy_.value());
 
   // Set a single host as having failed and fire outlier detector callbacks. This should result
   // in only a single healthy host.
@@ -221,12 +222,72 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   detector->runCallbacks(cluster.hosts()[0]);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.stats().membership_healthy_.value());
   EXPECT_NE(cluster.healthyHosts()[0], cluster.hosts()[0]);
 
   // Bring the host back online.
   cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   detector->runCallbacks(cluster.hosts()[0]);
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
+  EXPECT_EQ(2UL, cluster.stats().membership_healthy_.value());
+}
+
+TEST(StaticClusterImplTest, HealthyStat) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
+  std::string json = R"EOF(
+  {
+    "name": "addressportconfig",
+    "connect_timeout_ms": 250,
+    "type": "static",
+    "lb_type": "random",
+    "hosts": [{"url": "tcp://10.0.0.1:11001"},
+              {"url": "tcp://10.0.0.2:11002"}]
+  }
+  )EOF";
+
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
+
+  Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
+  cluster.setOutlierDetector(Outlier::DetectorPtr{outlier_detector});
+
+  MockHealthChecker* health_checker = new NiceMock<MockHealthChecker>();
+  cluster.setHealthChecker(HealthCheckerPtr{health_checker});
+
+  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+  EXPECT_EQ(2UL, cluster.stats().membership_healthy_.value());
+
+  cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector->runCallbacks(cluster.hosts()[0]);
+  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.stats().membership_healthy_.value());
+
+  cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(cluster.hosts()[0], true);
+  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.stats().membership_healthy_.value());
+
+  cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector->runCallbacks(cluster.hosts()[0]);
+  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.stats().membership_healthy_.value());
+
+  cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(cluster.hosts()[0], true);
+  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+  EXPECT_EQ(2UL, cluster.stats().membership_healthy_.value());
+
+  cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector->runCallbacks(cluster.hosts()[0]);
+  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.stats().membership_healthy_.value());
+
+  cluster.hosts()[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(cluster.hosts()[1], true);
+  EXPECT_EQ(0UL, cluster.healthyHosts().size());
+  EXPECT_EQ(0UL, cluster.stats().membership_healthy_.value());
 }
 
 TEST(StaticClusterImplTest, UrlConfig) {
