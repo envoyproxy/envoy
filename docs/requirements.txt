@@ -1,4 +1,5 @@
-sphinx==1.4.5
+docutils==0.12
+sphinx==1.5.0
 sphinx_rtd_theme==0.1.9
 sphinxcontrib-httpdomain==1.5.0
 GitPython==2.0.8
