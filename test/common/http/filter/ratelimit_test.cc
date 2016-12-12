@@ -20,6 +20,41 @@ using testing::WithArgs;
 namespace Http {
 namespace RateLimit {
 
+TEST(HttpRateLimitFilterBadConfigTest, BadType) {
+  std::string json = R"EOF(
+  {
+    "domain": "foo",
+    "actions": [
+      {"type": "foo"}
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Stats::IsolatedStoreImpl stats_store;
+  NiceMock<Runtime::MockLoader> runtime;
+  EXPECT_THROW(FilterConfig(*config, "service_cluster", stats_store, runtime), EnvoyException);
+}
+
+TEST(HttpRateLimitFilterBadConfigTest, NoDescriptorKey) {
+  std::string json = R"EOF(
+  {
+    "domain": "foo",
+    "actions": [
+      {
+        "type": "request_headers",
+        "header_name" : "test"
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Stats::IsolatedStoreImpl stats_store;
+  NiceMock<Runtime::MockLoader> runtime;
+  EXPECT_THROW(FilterConfig(*config, "service_cluster", stats_store, runtime), EnvoyException);
+}
+
 class HttpRateLimitFilterTest : public testing::Test {
 public:
   HttpRateLimitFilterTest() {

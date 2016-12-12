@@ -102,7 +102,7 @@ public:
   // TODO add comments
   virtual const std::string& domain() const PURE;
   virtual const std::string& localServiceCluster() const PURE;
-  virtual const std::string& stage() const PURE;
+  virtual int64_t stage() const PURE;
   virtual Runtime::Loader& runtime() PURE;
   virtual Stats::Store& stats() PURE;
 };

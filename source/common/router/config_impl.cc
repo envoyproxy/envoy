@@ -71,7 +71,7 @@ void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
     : kill_switch_key_(config.getString("kill_switch_key", "")),
-      stage_(config.getString("stage", "default")) {
+      stage_(config.getInteger("stage", 0)) {
   for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
     std::string type = action->getString("type");
     if (type == "service_to_service") {
@@ -119,8 +119,9 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
 }
 
 std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
-RateLimitPolicyImpl::getApplicableRateLimit(const std::string&) const {
-  // TODO: only return rate limit policy entries that match for the stage
+    RateLimitPolicyImpl::getApplicableRateLimit(int64_t) const {
+  // Currently return all rate limit policy entries.
+  // TODO: Implement returning only rate limit policy entries that match the stage setting.
   std::vector<std::reference_wrapper<RateLimitPolicyEntry>> result_vector;
   for (const RateLimitPolicyEntryImplPtr& rate_limit_entry : rate_limit_entries_) {
     result_vector.push_back(*rate_limit_entry);

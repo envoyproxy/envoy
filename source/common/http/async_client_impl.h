@@ -66,7 +66,7 @@ private:
     bool doGlobalLimiting() const override { return false; }
     const std::string& routeKey() const override { return EMPTY_STRING; }
     std::vector<std::reference_wrapper<Router::RateLimitPolicyEntry>>
-    getApplicableRateLimit(const std::string&) const override {
+        getApplicableRateLimit(int64_t) const override {
       return {};
     }
   };

@@ -41,13 +41,13 @@ public:
 };
 class TestRateLimitPolicyEntry : public RateLimitPolicyEntry {
 public:
-  const std::string& stage() const override { return stage_; }
+  int64_t stage() const override { return stage_; }
   const std::string& killSwitchKey() const override { return kill_switch_key_; }
   void populateDescriptors(const RouteEntry&, std::vector<::RateLimit::Descriptor>&,
                            ::RateLimit::FilterConfig&, const Http::HeaderMap&,
                            Http::StreamDecoderFilterCallbacks&) const override{};
 
-  std::string stage_;
+  int64_t stage_{};
   std::string kill_switch_key_;
 };
 
@@ -61,7 +61,7 @@ public:
 
   // Router::RateLimitPolicy
   std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
-  getApplicableRateLimit(const std::string&) const override {
+      getApplicableRateLimit(int64_t) const override {
     //    std::vector<std::reference_wrapper<RateLimitPolicyEntry>> result_vector;
     //    for (const TestRateLimitPolicyEntry& rate_limit : rate_limit_policy_entries_) {
     //      result_vector.insert(rate_limit);

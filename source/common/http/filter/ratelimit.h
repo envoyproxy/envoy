@@ -17,19 +17,19 @@ class FilterConfig : public ::RateLimit::FilterConfig {
 public:
   FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
                Stats::Store& stats_store, Runtime::Loader& runtime)
-      : domain_(config.getString("domain")), stage_(config.getString("stage", "default")),
+      : domain_(config.getString("domain")), stage_(config.getInteger("stage", 0)),
         local_service_cluster_(local_service_cluster), stats_store_(stats_store),
         runtime_(runtime) {}
 
   const std::string& domain() const override { return domain_; }
   const std::string& localServiceCluster() const override { return local_service_cluster_; }
-  const std::string& stage() const override { return stage_; }
+  int64_t stage() const override { return stage_; }
   Runtime::Loader& runtime() override { return runtime_; }
   Stats::Store& stats() override { return stats_store_; }
 
 private:
   const std::string domain_;
-  const std::string stage_;
+  int64_t stage_{};
   const std::string local_service_cluster_;
   Stats::Store& stats_store_;
   Runtime::Loader& runtime_;

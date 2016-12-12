@@ -36,13 +36,13 @@ public:
   // RateLimit::FilterConfig
   MOCK_CONST_METHOD0(domain, const std::string&());
   MOCK_CONST_METHOD0(localServiceCluster, const std::string&());
-  MOCK_CONST_METHOD0(stage, const std::string&());
+  MOCK_CONST_METHOD0(stage, int64_t());
   MOCK_METHOD0(runtime, Runtime::Loader&());
   MOCK_METHOD0(stats, Stats::Store&());
 
   std::string domain_;
   std::string local_service_cluster_;
-  std::string stage_;
+  int64_t stage_{};
   testing::NiceMock<Runtime::MockLoader> loader_;
   testing::NiceMock<Stats::MockStore> store_;
 };

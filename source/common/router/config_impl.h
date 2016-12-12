@@ -79,7 +79,7 @@ public:
   RateLimitPolicyEntryImpl(const Json::Object& config);
 
   //
-  const std::string& stage() const override { return stage_; }
+  int64_t stage() const override { return stage_; }
 
   const std::string& killSwitchKey() const override { return kill_switch_key_; }
 
@@ -90,7 +90,7 @@ public:
 
 private:
   const std::string kill_switch_key_;
-  const std::string stage_;
+  int64_t stage_{};
   std::vector<ActionPtr> actions_;
 };
 
@@ -181,7 +181,6 @@ private:
   const std::string name_;
   std::vector<RouteEntryImplBasePtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
-  // TODO add vector of RateLimitPolicyPtrs
   SslRequirements ssl_requirements_;
 };
 
@@ -217,7 +216,7 @@ public:
   const std::string& routeKey() const override { return route_key_; }
 
   std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
-  getApplicableRateLimit(const std::string& stage) const override;
+  getApplicableRateLimit(int64_t stage) const override;
 
 private:
   const bool do_global_limiting_;
