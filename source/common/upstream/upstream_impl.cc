@@ -138,6 +138,7 @@ void ClusterImplBase::runUpdateCallbacks(const std::vector<HostPtr>& hosts_added
     stats_.membership_change_.inc();
   }
 
+  stats_.membership_healthy_.set(healthyHosts().size());
   stats_.membership_total_.set(hosts().size());
   HostSetImpl::runUpdateCallbacks(hosts_added, hosts_removed);
 }

@@ -53,6 +53,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking
   membership_change, Counter, Total cluster membership changes
+  membership_healthy, Gauge, Current cluster healthy total (inclusive of both health checking and outlier detection)
   membership_total, Gauge, Current cluster membership total
   update_attempt, Counter, Total cluster membership update attempts
   update_success, Counter, Total cluster membership update successes

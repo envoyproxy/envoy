@@ -125,6 +125,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
+  EXPECT_EQ(13UL, cluster_->stats().membership_healthy_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
@@ -209,6 +210,7 @@ TEST_F(SdsTest, HealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(0UL, cluster_->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster_->stats().membership_healthy_.value());
   EXPECT_EQ(0UL, numHealthy());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(3UL, cluster_->hostsPerZone().size());
@@ -223,6 +225,7 @@ TEST_F(SdsTest, HealthChecker) {
   }
 
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
+  EXPECT_EQ(12UL, cluster_->stats().membership_healthy_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone()[0].size());
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
@@ -233,6 +236,7 @@ TEST_F(SdsTest, HealthChecker) {
   cluster_->hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster_->hosts()[0], true);
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
+  EXPECT_EQ(13UL, cluster_->stats().membership_healthy_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
@@ -250,6 +254,7 @@ TEST_F(SdsTest, HealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
+  EXPECT_EQ(13UL, cluster_->stats().membership_healthy_.value());
   EXPECT_EQ(13UL, numHealthy());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
@@ -269,6 +274,7 @@ TEST_F(SdsTest, HealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(12UL, cluster_->hosts().size());
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
+  EXPECT_EQ(12UL, cluster_->stats().membership_healthy_.value());
   EXPECT_EQ(12UL, numHealthy());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone()[0].size());
@@ -287,6 +293,7 @@ TEST_F(SdsTest, HealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(12UL, cluster_->hosts().size());
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
+  EXPECT_EQ(12UL, cluster_->stats().membership_healthy_.value());
   EXPECT_EQ(12UL, numHealthy());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone()[0].size());
