@@ -256,7 +256,7 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,
                            ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
-        callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure, nullptr);
+        callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
         return nullptr;
       }));
 
