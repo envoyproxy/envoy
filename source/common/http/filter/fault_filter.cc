@@ -90,6 +90,7 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
           callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
       delay_timer_->enableTimer(std::chrono::milliseconds(duration_ms));
       config_->stats().delays_injected_.inc();
+      callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected);
       return FilterHeadersStatus::StopIteration;
     }
   }
