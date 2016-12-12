@@ -215,6 +215,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
 
   EXPECT_EQ(1U,
             cm_.cluster_.stats_store_.counter("cluster.fake_cluster.upstream_rq_timeout").value());
+  EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
 TEST_F(RouterTest, UpstreamPerTryTimeout) {
@@ -254,6 +255,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_EQ(1U,
             cm_.cluster_.stats_store_.counter("cluster.fake_cluster.upstream_rq_per_try_timeout")
                 .value());
+  EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
 TEST_F(RouterTest, RetryRequestNotComplete) {

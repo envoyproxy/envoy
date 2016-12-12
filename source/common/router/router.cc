@@ -326,6 +326,7 @@ void Filter::onResponseTimeout() {
   // It's possible to timeout during a retry backoff delay when we have no upstream request. In
   // this case we fake a reset since onUpstreamReset() doesn't care.
   if (upstream_request_) {
+    upstream_request_->upstream_host_->stats().rq_timeout_.inc();
     upstream_request_->resetStream();
   }
 
@@ -641,6 +642,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
   parent_.config_.cm_.get(parent_.route_->clusterName())
       ->stats()
       .upstream_rq_per_try_timeout_.inc();
+  upstream_host_->stats().rq_timeout_.inc();
   resetStream();
   parent_.onUpstreamReset(UpstreamResetType::PerTryTimeout,
                           Optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));

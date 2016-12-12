@@ -14,6 +14,7 @@ namespace Upstream {
   GAUGE  (cx_active)                                                                               \
   COUNTER(cx_connect_fail)                                                                         \
   COUNTER(rq_total)                                                                                \
+  COUNTER(rq_timeout)                                                                              \
   GAUGE  (rq_active)
 // clang-format on
 
