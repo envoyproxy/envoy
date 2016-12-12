@@ -96,7 +96,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
                            -> Http::ConnectionPool::Cancellable* {
                              callbacks.onPoolFailure(
                                  Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                 nullptr);
+                                 cm_.conn_pool_.host_);
                              return nullptr;
                            }));
 
@@ -106,7 +106,9 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.request_info_,
               onFailedResponse(Http::AccessLog::FailureReason::UpstreamConnectionFailure));
-  EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(Upstream::HostDescriptionPtr{}));
+  EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+                           -> void { EXPECT_EQ(host_url_, host->url()); }));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
