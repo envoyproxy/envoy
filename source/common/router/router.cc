@@ -343,9 +343,11 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   Upstream::HostDescriptionPtr upstream_host;
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
-    upstream_host->outlierDetector().putHttpResponseCode(
-        enumToInt(type == UpstreamResetType::Reset ? Http::Code::ServiceUnavailable
-                                                   : Http::Code::GatewayTimeout));
+    if (upstream_host) {
+      upstream_host->outlierDetector().putHttpResponseCode(
+          enumToInt(type == UpstreamResetType::Reset ? Http::Code::ServiceUnavailable
+                                                     : Http::Code::GatewayTimeout));
+    }
   }
 
   // We don't retry on a global timeout or if we already started the response.
