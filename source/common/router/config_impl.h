@@ -1,7 +1,8 @@
 #pragma once
 
+#include "router_ratelimit.h"
+
 #include "envoy/common/optional.h"
-#include "envoy/router/ratelimit_router.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -31,70 +32,6 @@ public:
 class RouteEntryImplBase;
 typedef std::shared_ptr<RouteEntryImplBase> RouteEntryImplBasePtr;
 
-/**
-* Action for service to service rate limiting.
-*/
-class ServiceToServiceAction : public Action {
-public:
-  // Action
-  void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors,
-                           ::RateLimit::FilterConfig& config, const Http::HeaderMap&,
-                           Http::StreamDecoderFilterCallbacks&) const override;
-};
-
-/**
-* Action for request headers rate limiting.
-*/
-class RequestHeadersAction : public Action {
-public:
-  RequestHeadersAction(const Json::Object& action)
-      : header_name_(action.getString("header_name")),
-        descriptor_key_(action.getString("descriptor_key")) {}
-  // Action
-  void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors,
-                           ::RateLimit::FilterConfig& config, const Http::HeaderMap& headers,
-                           Http::StreamDecoderFilterCallbacks&) const override;
-
-private:
-  const Http::LowerCaseString header_name_;
-  const std::string descriptor_key_;
-};
-
-/**
- * Action for remote address rate limiting.
- */
-class RemoteAddressAction : public Action {
-public:
-  // Action
-  void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors,
-                           ::RateLimit::FilterConfig&, const Http::HeaderMap&,
-                           Http::StreamDecoderFilterCallbacks& callbacks) const override;
-};
-
-class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
-public:
-  RateLimitPolicyEntryImpl(const Json::Object& config);
-
-  //
-  int64_t stage() const override { return stage_; }
-
-  const std::string& killSwitchKey() const override { return kill_switch_key_; }
-
-  void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors,
-                           ::RateLimit::FilterConfig&, const Http::HeaderMap&,
-                           Http::StreamDecoderFilterCallbacks& callbacks) const override;
-
-private:
-  const std::string kill_switch_key_;
-  int64_t stage_{};
-  std::vector<ActionPtr> actions_;
-};
-
-typedef std::unique_ptr<RateLimitPolicyEntryImpl> RateLimitPolicyEntryImplPtr;
 /**
  * Redirect entry that does an SSL redirect.
  */
@@ -203,28 +140,6 @@ private:
 };
 
 /**
- * Implementation of RateLimitPolicy that reads from the JSON route config.
- */
-class RateLimitPolicyImpl : public RateLimitPolicy {
-public:
-  RateLimitPolicyImpl(const Json::Object& config);
-
-  // Router::RateLimitPolicy
-  bool doGlobalLimiting() const override { return do_global_limiting_; }
-
-  // Router::RateLimitPolicy
-  const std::string& routeKey() const override { return route_key_; }
-
-  std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
-  getApplicableRateLimit(int64_t stage) const override;
-
-private:
-  const bool do_global_limiting_;
-  const std::string route_key_;
-  std::vector<RateLimitPolicyEntryImplPtr> rate_limit_entries_;
-};
-
-/**
  * Implementation of ShadowPolicy that reads from the JSON route config.
  */
 class ShadowPolicyImpl : public ShadowPolicy {
@@ -299,7 +214,6 @@ private:
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
   std::vector<ConfigUtility::HeaderData> config_headers_;
-  // TODO: add vector of RateLimitPolicyPtrs
 };
 
 /**

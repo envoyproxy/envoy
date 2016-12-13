@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/router/ratelimit_router.h"
 #include "envoy/router/router.h"
+#include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
 
 namespace Router {
@@ -43,10 +43,18 @@ class TestRateLimitPolicyEntry : public RateLimitPolicyEntry {
 public:
   int64_t stage() const override { return stage_; }
   const std::string& killSwitchKey() const override { return kill_switch_key_; }
-  void populateDescriptors(const RouteEntry&, std::vector<::RateLimit::Descriptor>&,
-                           ::RateLimit::FilterConfig&, const Http::HeaderMap&,
-                           Http::StreamDecoderFilterCallbacks&) const override{};
+  void populateDescriptors(const RouteEntry& route,
+                           std::vector<::RateLimit::Descriptor>& descriptors,
+                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                           Http::StreamDecoderFilterCallbacks& callbacks) const override {
+    populateDescriptors_(route, descriptors, local_service_cluster, headers, callbacks);
+  }
 
+  MOCK_CONST_METHOD5(populateDescriptors_,
+                     void(const RouteEntry& route,
+                          std::vector<::RateLimit::Descriptor>& descriptors,
+                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          Http::StreamDecoderFilterCallbacks& callbacks));
   int64_t stage_{};
   std::string kill_switch_key_;
 };
@@ -60,19 +68,16 @@ public:
   const std::string& routeKey() const override { return route_key_; }
 
   // Router::RateLimitPolicy
-  std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
-      getApplicableRateLimit(int64_t) const override {
-    //    std::vector<std::reference_wrapper<RateLimitPolicyEntry>> result_vector;
-    //    for (const TestRateLimitPolicyEntry& rate_limit : rate_limit_policy_entries_) {
-    //      result_vector.insert(rate_limit);
-    //    }
-    //    return result_vector;
-    return {};
+  const std::vector<std::reference_wrapper<RateLimitPolicyEntry>>&
+  getApplicableRateLimit(int64_t stage) const override {
+    return getApplicableRateLimit_(stage);
   }
+
+  MOCK_CONST_METHOD1(getApplicableRateLimit_,
+                     std::vector<std::reference_wrapper<RateLimitPolicyEntry>>&(int64_t stage));
 
   bool do_global_limiting_{};
   std::string route_key_;
-  std::vector<TestRateLimitPolicyEntry*> rate_limit_policy_entries_;
 };
 
 class TestShadowPolicy : public ShadowPolicy {

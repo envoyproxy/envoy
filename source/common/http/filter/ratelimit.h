@@ -13,7 +13,7 @@ namespace RateLimit {
 /**
  * Global configuration for the HTTP rate limit filter.
  */
-class FilterConfig : public ::RateLimit::FilterConfig {
+class FilterConfig {
 public:
   FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
                Stats::Store& stats_store, Runtime::Loader& runtime)
@@ -21,11 +21,11 @@ public:
         local_service_cluster_(local_service_cluster), stats_store_(stats_store),
         runtime_(runtime) {}
 
-  const std::string& domain() const override { return domain_; }
-  const std::string& localServiceCluster() const override { return local_service_cluster_; }
-  int64_t stage() const override { return stage_; }
-  Runtime::Loader& runtime() override { return runtime_; }
-  Stats::Store& stats() override { return stats_store_; }
+  const std::string& domain() const { return domain_; }
+  const std::string& localServiceCluster() const { return local_service_cluster_; }
+  int64_t stage() const { return stage_; }
+  Runtime::Loader& runtime() { return runtime_; }
+  Stats::Store& stats() { return stats_store_; }
 
 private:
   const std::string domain_;

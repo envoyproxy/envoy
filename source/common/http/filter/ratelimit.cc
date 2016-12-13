@@ -25,7 +25,8 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
 
     for (Router::RateLimitPolicyEntry& rate_limit :
          route->rateLimitPolicy().getApplicableRateLimit(config_->stage())) {
-      rate_limit.populateDescriptors(*route, descriptors, *config_, headers, *callbacks_);
+      rate_limit.populateDescriptors(*route, descriptors, config_->localServiceCluster(), headers,
+                                     *callbacks_);
     }
 
     if (!descriptors.empty()) {

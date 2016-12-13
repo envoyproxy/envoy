@@ -20,7 +20,7 @@ public:
    */
   virtual void populateDescriptors(const RouteEntry& route,
                                    std::vector<::RateLimit::Descriptor>& descriptors,
-                                   ::RateLimit::FilterConfig& config,
+                                   const std::string& local_service_cluster,
                                    const Http::HeaderMap& headers,
                                    Http::StreamDecoderFilterCallbacks& callbacks) const PURE;
 };
@@ -52,7 +52,7 @@ public:
    */
   virtual void populateDescriptors(const RouteEntry& route,
                                    std::vector<::RateLimit::Descriptor>& descriptors,
-                                   ::RateLimit::FilterConfig& config,
+                                   const std::string& local_service_cluster,
                                    const Http::HeaderMap& headers,
                                    Http::StreamDecoderFilterCallbacks& callbacks) const PURE;
 };
@@ -78,8 +78,8 @@ public:
    * @param the stage value to use for comparison finding the set of applicable rate limits.
    * @return set of RateLimitPolicyEntry that are applicable for a stage.
    */
-  virtual std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
-  getApplicableRateLimit(int64_t stage = 0) const PURE;
+  virtual const std::vector<std::reference_wrapper<RateLimitPolicyEntry>>&
+  getApplicableRateLimit(int64_t stage) const PURE;
 };
 
 } // Router
