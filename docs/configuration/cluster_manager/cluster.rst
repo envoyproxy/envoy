@@ -19,7 +19,8 @@ Cluster
     "features": "...",
     "http_codec_options": "...",
     "alt_stat_name": "...",
-    "dns_refresh_rate_ms": "..."
+    "dns_refresh_rate_ms": "...",
+    "outlier_detection": "..."
   }
 
 .. _config_cluster_manager_cluster_name:
@@ -138,6 +139,14 @@ dns_refresh_rate_ms
   or *logical_dns*, this value is used as the cluster's dns refresh rate. If this setting is not specified,
   the value defaults to 5000. For cluster types other than *strict_dns* and *logical_dns* this setting is
   ignored.
+
+.. _config_cluster_manager_cluster_outlier_detection:
+
+outlier_detection
+  *(optional, object)* If specified, outlier detection will be enabled for this upstream cluster.
+  Currently the presence of the empty object enables it and there are no options. See the
+  :ref:`architecture overview <arch_overview_outlier_detection>` for more information on outlier
+  detection.
 
 .. toctree::
   :hidden:

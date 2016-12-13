@@ -172,7 +172,7 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
     std::string("{{") +
     "\"time\": \"{}\", " +
     "\"cluster\": \"{}\", " +
-    "\"upstream_ip\": \"{}\", " +
+    "\"upstream_url\": \"{}\", " +
     "\"action\": \"eject\", " +
     "\"type\": \"{}\"" +
     "}}\n";
@@ -190,7 +190,7 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
     std::string("{{") +
     "\"time\": \"{}\", " +
     "\"cluster\": \"{}\", " +
-    "\"upstream_ip\": \"{}\", " +
+    "\"upstream_url\": \"{}\", " +
     "\"action\": \"uneject\""
     "}}\n";
   // clang-format on
