@@ -23,3 +23,11 @@ include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 set_target_properties(envoy PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT
                       "../precompiled/precompiled.h")
 cotire(envoy)
+
+if (ENVOY_STRIP)
+  add_custom_command(TARGET envoy POST_BUILD
+    COMMAND objcopy --only-keep-debug $<TARGET_FILE:envoy> $<TARGET_FILE:envoy>.dbg
+    COMMAND strip $<TARGET_FILE:envoy>
+    COMMAND objcopy --add-gnu-debuglink=$<TARGET_FILE:envoy>.dbg $<TARGET_FILE:envoy>
+  )
+endif()
