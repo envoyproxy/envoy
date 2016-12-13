@@ -32,5 +32,7 @@ if (ENVOY_TCMALLOC)
   add_definitions(-DTCMALLOC)
 endif()
 
+option(ENVOY_STRIP "strip symbols from binaries" OFF)
+
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${ENVOY_COTIRE_MODULE_DIR}")
 include(cotire)
