@@ -4,6 +4,7 @@
 #include "common/router/router_ratelimit.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -213,6 +214,53 @@ TEST_F(RateLimitConfiguration, RemoteAddress) {
   EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
               testing::ContainerEq(descriptors));
 }
+TEST_F(RateLimitConfiguration, NoAddress) {
+  std::string json = R"EOF(
+{
+"virtual_hosts": [
+  {
+    "name": "www2",
+    "domains": ["www.lyft.com"],
+    "routes": [
+      {
+        "prefix": "/foo",
+        "cluster": "www2",
+        "rate_limit": {
+          "global": true
+        },
+        "rate_limits": [
+        { "actions":[ {"type": "remote_address"}] }
+        ]
+      },
+      {
+        "prefix": "/bar",
+        "cluster": "www2"
+      }
+    ]
+  }
+]
+}
+)EOF";
+  SetUpTest(json);
+  route_.rate_limit_policy_.route_key_ = "";
+  std::string address = "10.0.0.1";
+  EXPECT_CALL(callbacks_, downstreamAddress()).WillOnce(ReturnRef(EMPTY_STRING));
+
+  EXPECT_EQ(0u, config_->routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->rateLimitPolicy()
+                    .getApplicableRateLimit(0)
+                    .size());
+  std::vector<std::reference_wrapper<RateLimitPolicyEntry>> rate_limits =
+      config_->routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+          ->rateLimitPolicy()
+          .getApplicableRateLimit(0);
+  EXPECT_EQ(1u, rate_limits.size());
+  std::vector<::RateLimit::Descriptor> descriptors;
+  for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
+    rate_limit.populateDescriptors(route_, descriptors, "", header_, callbacks_);
+  }
+  EXPECT_TRUE(descriptors.empty());
+}
 
 TEST_F(RateLimitConfiguration, ServiceToService) {
   std::string json = R"EOF(
@@ -256,7 +304,7 @@ TEST_F(RateLimitConfiguration, ServiceToService) {
   std::vector<::RateLimit::Descriptor> expected_descriptors = {
       {{{"to_cluster", "fake_cluster"}}},
       {{{"to_cluster", "fake_cluster"}, {"from_cluster", "service_cluster"}}}};
-  // EXPECT_THAT(ContainerEq(expected_descriptors), ContainerEq(descriptors));
+  EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
 }
 TEST_F(RateLimitConfiguration, RequestHeaders) {
   std::string json = R"EOF(
@@ -297,11 +345,55 @@ TEST_F(RateLimitConfiguration, RequestHeaders) {
   EXPECT_EQ(1u, rate_limits.size());
   std::vector<::RateLimit::Descriptor> descriptors;
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
-    rate_limit.populateDescriptors(route_, descriptors, "service_cluster", header_, callbacks_);
+    rate_limit.populateDescriptors(route_, descriptors, "service_cluster", header, callbacks_);
   }
   std::vector<::RateLimit::Descriptor> expected_descriptors = {
       {{{"my_header_name", "test_value"}}},
       {{{"route_key", "test_key"}, {"my_header_name", "test_value"}}}};
-  // EXPECT_EQ(ContainerEq(descriptors), ContainerEq(expected_descriptors));
+  EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
+}
+
+TEST_F(RateLimitConfiguration, RequestHeadersNoMatch) {
+  std::string json = R"EOF(
+{
+"virtual_hosts": [
+  {
+    "name": "www2",
+    "domains": ["www.lyft.com"],
+    "routes": [
+      {
+        "prefix": "/",
+        "cluster": "www2",
+        "rate_limit": {
+          "global": true
+        },
+        "rate_limits": [
+        { "actions": [
+          {
+            "type": "request_headers",
+            "header_name": "x-header",
+            "descriptor_key" : "my_header_name"
+          }
+        ]}
+        ]
+      }
+    ]
+  }
+]
+}
+)EOF";
+  SetUpTest(json);
+  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
+  route_.rate_limit_policy_.route_key_ = "test_key";
+  std::vector<std::reference_wrapper<RateLimitPolicyEntry>> rate_limits =
+      config_->routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+          ->rateLimitPolicy()
+          .getApplicableRateLimit(0);
+  EXPECT_EQ(1u, rate_limits.size());
+  std::vector<::RateLimit::Descriptor> descriptors;
+  for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
+    rate_limit.populateDescriptors(route_, descriptors, "service_cluster", header, callbacks_);
+  }
+  EXPECT_TRUE(descriptors.empty());
 }
 }

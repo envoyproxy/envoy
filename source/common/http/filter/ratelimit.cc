@@ -21,6 +21,12 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
 
   const Router::RouteEntry* route = callbacks_->routeTable().routeForRequest(headers);
   if (route) {
+    const std::string& route_key = route->rateLimitPolicy().routeKey();
+    if (!route_key.empty() &&
+        !config_->runtime().snapshot().featureEnabled(
+            fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
+      return FilterHeadersStatus::Continue;
+    }
     std::vector<::RateLimit::Descriptor> descriptors;
 
     for (Router::RateLimitPolicyEntry& rate_limit :

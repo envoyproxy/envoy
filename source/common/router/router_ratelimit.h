@@ -78,16 +78,12 @@ public:
   RateLimitPolicyImpl(const Json::Object& config);
 
   // Router::RateLimitPolicy
-  bool doGlobalLimiting() const override { return do_global_limiting_; }
-
-  // Router::RateLimitPolicy
   const std::string& routeKey() const override { return route_key_; }
 
   const std::vector<std::reference_wrapper<RateLimitPolicyEntry>>&
   getApplicableRateLimit(int64_t stage = 0) const override;
 
 private:
-  const bool do_global_limiting_;
   const std::string route_key_;
   std::vector<std::vector<std::reference_wrapper<RateLimitPolicyEntry>>> rate_limit_entries_;
   static const std::vector<std::reference_wrapper<RateLimitPolicyEntry>> empty_rate_limit_;

@@ -63,7 +63,6 @@ public:
 private:
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {
     // Router::RateLimitPolicy
-    bool doGlobalLimiting() const override { return false; }
     const std::string& routeKey() const override { return EMPTY_STRING; }
     const std::vector<std::reference_wrapper<Router::RateLimitPolicyEntry>>&
         getApplicableRateLimit(int64_t) const override {

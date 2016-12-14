@@ -62,9 +62,6 @@ public:
 class TestRateLimitPolicy : public RateLimitPolicy {
 public:
   // Router::RateLimitPolicy
-  bool doGlobalLimiting() const override { return do_global_limiting_; }
-
-  // Router::RateLimitPolicy
   const std::string& routeKey() const override { return route_key_; }
 
   // Router::RateLimitPolicy
@@ -76,7 +73,6 @@ public:
   MOCK_CONST_METHOD1(getApplicableRateLimit_,
                      std::vector<std::reference_wrapper<RateLimitPolicyEntry>>&(int64_t stage));
 
-  bool do_global_limiting_{};
   std::string route_key_;
 };
 

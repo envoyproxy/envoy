@@ -84,8 +84,7 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
 }
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
-    : do_global_limiting_(config.getObject("rate_limit", true)->getBoolean("global", false)),
-      route_key_(config.getObject("rate_limit", true)->getString("route_key", "")) {
+    : route_key_(config.getObject("rate_limit", true)->getString("route_key", "")) {
   if (config.hasObject("rate_limits")) {
     std::vector<std::reference_wrapper<RateLimitPolicyEntry>> rate_limit_policy;
     for (const Json::ObjectPtr& rate_limit : config.getObjectArray("rate_limits")) {
