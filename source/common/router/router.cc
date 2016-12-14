@@ -373,9 +373,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       code = Http::Code::GatewayTimeout;
       body = "upstream request timeout";
     } else {
-      Http::AccessLog::ResponseFlag failure_reason =
+      Http::AccessLog::ResponseFlag response_flags =
           streamResetReasonToResponseFlag(reset_reason.value());
-      callbacks_->requestInfo().setResponseFlag(failure_reason);
+      callbacks_->requestInfo().setResponseFlag(response_flags);
       code = Http::Code::ServiceUnavailable;
       body = "upstream connect error or disconnect/reset before headers";
     }

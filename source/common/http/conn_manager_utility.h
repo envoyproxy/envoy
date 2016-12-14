@@ -27,7 +27,7 @@ public:
                                  const Optional<TracingConnectionManagerConfig>& config);
 
 private:
-  static bool isUpstreamFailure(const Http::AccessLog::RequestInfo& request_info);
+  static bool isTraceableFailure(const Http::AccessLog::RequestInfo& request_info);
 
   // NOTE: This is used for stable randomness in the case where the route table does not use any
   //       runtime rules. If runtime rules are used, we use true randomness which is slower but
