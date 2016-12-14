@@ -62,7 +62,8 @@ being ejected and for what reasons. The log uses a JSON format with one object p
     "cluster": "...",
     "upstream_url": "...",
     "action": "...",
-    "type": "..."
+    "type": "...",
+    "num_ejections": "..."
   }
 
 time
@@ -81,6 +82,10 @@ action
 type
   If ``action`` is ``eject``, species the type of ejection that took place. Currently this can
   only be ``5xx``.
+
+num_ejections
+  The number of times the host has been ejected (local to that Envoy and gets reset if the host
+  gets removed from the upstream cluster for any reason and then re-added).
 
 Configuration reference
 -----------------------
