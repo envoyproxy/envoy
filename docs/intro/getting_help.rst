@@ -1,3 +1,5 @@
+.. _getting_help:
+
 Getting help
 ============
 

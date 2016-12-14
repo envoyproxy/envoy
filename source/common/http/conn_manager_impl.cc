@@ -379,9 +379,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Currently we only support relative paths at the application layer. We expect the codec to have
   // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec does not do this
-  // so we only support relative paths in all cases.
-  // https://tools.ietf.org/html/rfc7230#section-5.3
-  if (request_headers_->Path()->value().c_str()[0] != '/') {
+  // so we only support relative paths in all cases. https://tools.ietf.org/html/rfc7230#section-5.3
+  // We also need to check for the existence of :path because CONNECT does not have a path, and we
+  // don't support that currently.
+  if (!request_headers_->Path() || request_headers_->Path()->value().c_str()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::NotFound))}};
     encodeHeaders(nullptr, headers, true);

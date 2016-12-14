@@ -42,24 +42,34 @@ cluster
   *path_redirect* is specified), *cluster* must be specified and indicates which upstream cluster
   the request should be forwarded to.
 
+.. _config_http_conn_man_route_table_route_host_redirect:
+
 host_redirect
   *(sometimes required, string)* Indicates that the route is a redirect rule. If there is a match,
   A 302 redirect response will be sent which swaps the host portion of the URL with this value.
   *path_redirect* can also be specified along with this option.
+
+.. _config_http_conn_man_route_table_route_path_redirect:
 
 path_redirect
   *(sometimes required, string)* Indicates that the route is a redirect rule. If there is a match,
   A 302 redirect response will be sent which swaps the path portion of the URL with this value.
   *host_redirect*  can also be specified along with this option.
 
+.. _config_http_conn_man_route_table_route_prefix_rewrite:
+
 prefix_rewrite
   *(optional, string)* Indicates that during forwarding, the matched prefix (or path) should be
   swapped with this value. This option allows application URLs to be rooted at a different path
   from those exposed at the reverse proxy layer.
 
+.. _config_http_conn_man_route_table_route_host_rewrite:
+
 host_rewrite
   *(optional, string)* Indicates that during forwarding, the host header will be swapped with this
   value.
+
+.. _config_http_conn_man_route_table_route_case_sensitive:
 
 case_sensitive
   *(optional, string)* Indicates that prefix/path matching should be case sensitive. The default
@@ -112,6 +122,8 @@ key
   *(required, string)* Specifies the runtime key name that should be consulted to determine whether
   the route matches or not. See the :ref:`runtime documentation <operations_runtime>` for how key
   names map to the underlying implementation.
+
+.. _config_http_conn_man_route_table_route_runtime_default:
 
 default
   *(required, integer)* An integer between 0-100. Every time the route is considered for a match,

@@ -53,6 +53,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking
   membership_change, Counter, Total cluster membership changes
+  membership_healthy, Gauge, Current cluster healthy total (inclusive of both health checking and outlier detection)
   membership_total, Gauge, Current cluster membership total
   update_attempt, Counter, Total cluster membership update attempts
   update_success, Counter, Total cluster membership update successes
@@ -76,6 +77,23 @@ If health check is configured, the cluster has an additional statistics tree roo
   protocol_error, Counter, Number of protocol errors
   verify_cluster, Counter, Number of health checks that attempted cluster name verification
   healthy, Gauge, Number of healthy members
+
+.. _config_cluster_manager_cluster_stats_outlier_detection:
+
+Outlier detection statistics
+----------------------------
+
+If :ref:`outlier detection <arch_overview_outlier_detection>` is configured for a cluster,
+statistics will be rooted at *cluster.<name>.outlier_detection.* and contain the following:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  ejections_total, Counter, Number of ejections due to any outlier type
+  ejections_active, Gauge, Number of currently ejected hosts
+  ejections_overflow, Counter, Number of ejections aborted due to the max ejection %
+  ejections_consecutive_5xx, Counter, Number of consecutive 5xx ejections
 
 .. _config_cluster_manager_cluster_stats_dynamic_http:
 

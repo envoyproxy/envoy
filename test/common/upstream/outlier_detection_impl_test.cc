@@ -159,22 +159,37 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
 
 TEST_F(OutlierDetectorImplTest, Overflow) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(cluster_, "tcp://127.0.0.1:80", false, 1, "")}};
+  cluster_.hosts_ = {HostPtr{new HostImpl(cluster_, "tcp://127.0.0.1:80", false, 1, "")},
+                     HostPtr{new HostImpl(cluster_, "tcp://127.0.0.1:81", false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   DetectorImpl detector(cluster_, dispatcher_, runtime_, stats_store_, time_source_, event_logger_);
   detector.addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
 
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-
   ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.max_ejection_percent", _))
-      .WillByDefault(Return(0));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  EXPECT_FALSE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+      .WillByDefault(Return(1));
 
-  EXPECT_EQ(0UL,
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+
+  EXPECT_CALL(time_source_, currentSystemTime())
+      .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
+  EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
+                       EjectionType::Consecutive5xx));
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  cluster_.hosts_[1]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[1]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[1]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[1]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[1]->outlierDetector().putHttpResponseCode(503);
+  EXPECT_FALSE(cluster_.hosts_[1]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL,
             stats_store_.gauge("cluster.fake_cluster.outlier_detection.ejections_active").value());
   EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.outlier_detection.ejections_overflow")
                      .value());
@@ -299,17 +314,19 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EventLoggerImpl event_logger(log_manager, "foo", time_source);
 
   std::string log1;
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"cluster\": "
-                           "\"fake_cluster\", \"upstream_ip\": \"tcp://10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"5xx\"}\n")).WillOnce(SaveArg<0>(&log1));
+  EXPECT_CALL(*file,
+              write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"cluster\": "
+                    "\"fake_cluster\", \"upstream_url\": \"tcp://10.0.0.1:443\", \"action\": "
+                    "\"eject\", \"type\": \"5xx\", \"num_ejections\": 0}\n"))
+      .WillOnce(SaveArg<0>(&log1));
   event_logger.logEject(host, EjectionType::Consecutive5xx);
   Json::Factory::LoadFromString(log1);
 
   std::string log2;
   EXPECT_CALL(*file,
               write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"cluster\": \"fake_cluster\", "
-                    "\"upstream_ip\": \"tcp://10.0.0.1:443\", \"action\": \"uneject\"}\n"))
-      .WillOnce(SaveArg<0>(&log2));
+                    "\"upstream_url\": \"tcp://10.0.0.1:443\", \"action\": \"uneject\", "
+                    "\"num_ejections\": 0}\n")).WillOnce(SaveArg<0>(&log2));
   event_logger.logUneject(host);
   Json::Factory::LoadFromString(log2);
 }

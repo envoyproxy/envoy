@@ -54,3 +54,4 @@ response_headers_to_remove
   route
   vcluster
   route_matching
+  traffic_shifting

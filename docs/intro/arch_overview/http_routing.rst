@@ -12,19 +12,24 @@ level the router takes an incoming HTTP request, matches it to an upstream clust
 request. The router filter supports the following features:
 
 * Virtual hosts that map domains/authorities to a set of routing rules.
-* Prefix and exact path matching rules (both case sensitive and case insensitive). Regex/slug
+* Prefix and exact path matching rules (both :ref:`case sensitive
+  <config_http_conn_man_route_table_route_case_sensitive>` and case insensitive). Regex/slug
   matching is not currently supported, mainly because it makes it difficult/impossible to
   programmatically determine whether routing rules conflict with each other. For this reason we
   don’t recommend regex/slug routing at the reverse proxy level, however we may add support in the
   future depending on demand.
-* TLS redirection at the virtual host level.
-* Path/host redirection at the route level.
-* Host rewriting.
-* Prefix rewriting.
-* Request retries specified either via HTTP header or via route configuration.
-* Request timeout specified either via HTTP header or via route configuration.
-* Runtime configuration routing rules.
-* Content type routing rules.
+* :ref:`TLS redirection <config_http_conn_man_route_table_vhost_require_ssl>` at the virtual host level.
+* :ref:`Path <config_http_conn_man_route_table_route_path_redirect>`/:ref:`host
+  <config_http_conn_man_route_table_route_host_redirect>` redirection at the route level.
+* :ref:`Host rewriting <config_http_conn_man_route_table_route_host_rewrite>`.
+* :ref:`Prefix rewriting <config_http_conn_man_route_table_route_prefix_rewrite>`.
+* :ref:`Request retries <arch_overview_http_routing_retry>` specified either via HTTP header or via route configuration.
+* Request timeout specified either via :ref:`HTTP
+  header <config_http_filters_router_headers>` or via :ref:`route configuration
+  <config_http_conn_man_route_table_route_timeout>`.
+* Runtime configuration routing rules. Runtime configuration can be used to create :ref:`traffic
+  shifting <config_http_conn_man_route_table_traffic_shifting>`.
+* Arbitrary headers :ref:`routing rules <config_http_conn_man_route_table_route_headers>`.
 * Virtual cluster specifications. A virtual cluster is specified at the virtual host level and is
   used by Envoy to generate additional statistics on top of the standard cluster level ones. Virtual
   clusters can use regex matching.

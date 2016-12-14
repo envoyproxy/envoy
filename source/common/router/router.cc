@@ -91,45 +91,41 @@ Filter::~Filter() {
   ASSERT(!retry_state_);
 }
 
-const std::string& Filter::upstreamZone() {
-  return upstream_host_ ? upstream_host_->zone() : EMPTY_STRING;
+const std::string& Filter::upstreamZone(Upstream::HostDescriptionPtr upstream_host) {
+  return upstream_host ? upstream_host->zone() : EMPTY_STRING;
 }
 
-void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers) {
+void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
+                                Upstream::HostDescriptionPtr upstream_host) {
   if (config_.emit_dynamic_stats_ && !callbacks_->requestInfo().healthCheck()) {
     const Http::HeaderEntry* upstream_canary_header = response_headers.EnvoyUpstreamCanary();
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
 
     bool is_canary = (upstream_canary_header && upstream_canary_header->value() == "true") ||
-                     (upstream_host_ ? upstream_host_->canary() : false);
+                     (upstream_host ? upstream_host->canary() : false);
     bool internal_request = internal_request_header && internal_request_header->value() == "true";
-
-    if (upstream_host_) {
-      upstream_host_->outlierDetector().putHttpResponseCode(
-          Http::Utility::getResponseStatus(response_headers));
-    }
 
     Http::CodeUtility::ResponseStatInfo info{
         config_.stats_store_, cluster_->statPrefix(), response_headers, internal_request,
         route_->virtualHostName(), request_vcluster_ ? request_vcluster_->name() : "",
-        config_.service_zone_, upstreamZone(), is_canary};
+        config_.service_zone_, upstreamZone(upstream_host), is_canary};
 
     Http::CodeUtility::chargeResponseStat(info);
 
     for (const std::string& alt_prefix : alt_stat_prefixes_) {
       Http::CodeUtility::ResponseStatInfo info{config_.stats_store_, alt_prefix, response_headers,
                                                internal_request, "", "", config_.service_zone_,
-                                               upstreamZone(), is_canary};
+                                               upstreamZone(upstream_host), is_canary};
 
       Http::CodeUtility::chargeResponseStat(info);
     }
   }
 }
 
-void Filter::chargeUpstreamCode(Http::Code code) {
+void Filter::chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionPtr upstream_host) {
   Http::HeaderMapImpl fake_response_headers{
       {Http::Headers::get().Status, std::to_string(enumToInt(code))}};
-  chargeUpstreamCode(fake_response_headers);
+  chargeUpstreamCode(fake_response_headers, upstream_host);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
@@ -181,7 +177,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // See if we are supposed to immediately kill some percentage of this cluster's traffic.
   if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
-    chargeUpstreamCode(Http::Code::ServiceUnavailable);
+    chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
     Http::Utility::sendLocalReply(*callbacks_, Http::Code::ServiceUnavailable, "maintenance mode");
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -227,7 +223,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream);
-  chargeUpstreamCode(Http::Code::ServiceUnavailable);
+  chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
   Http::Utility::sendLocalReply(*callbacks_, Http::Code::ServiceUnavailable, "no healthy upstream");
 }
 
@@ -330,6 +326,7 @@ void Filter::onResponseTimeout() {
   // It's possible to timeout during a retry backoff delay when we have no upstream request. In
   // this case we fake a reset since onUpstreamReset() doesn't care.
   if (upstream_request_) {
+    upstream_request_->upstream_host_->stats().rq_timeout_.inc();
     upstream_request_->resetStream();
   }
 
@@ -341,6 +338,16 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   ASSERT(type == UpstreamResetType::GlobalTimeout || upstream_request_);
   if (type == UpstreamResetType::Reset) {
     stream_log_debug("upstream reset", *callbacks_);
+  }
+
+  Upstream::HostDescriptionPtr upstream_host;
+  if (upstream_request_) {
+    upstream_host = upstream_request_->upstream_host_;
+    if (upstream_host) {
+      upstream_host->outlierDetector().putHttpResponseCode(
+          enumToInt(type == UpstreamResetType::Reset ? Http::Code::ServiceUnavailable
+                                                     : Http::Code::GatewayTimeout));
+    }
   }
 
   // We don't retry on a global timeout or if we already started the response.
@@ -373,7 +380,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       body = "upstream connect error or disconnect/reset before headers";
     }
 
-    chargeUpstreamCode(code);
+    chargeUpstreamCode(code, upstream_host);
     Http::Utility::sendLocalReply(*callbacks_, code, body);
   }
 }
@@ -402,6 +409,9 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   stream_log_debug("upstream headers complete: end_stream={}", *callbacks_, end_stream);
   ASSERT(!downstream_response_started_);
 
+  upstream_request_->upstream_host_->outlierDetector().putHttpResponseCode(
+      Http::Utility::getResponseStatus(*headers));
+
   if (retry_state_ &&
       retry_state_->shouldRetry(headers.get(), Optional<Http::StreamResetReason>(),
                                 [this]() -> void { doRetry(); }) &&
@@ -426,8 +436,8 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
 
   upstream_request_->upstream_canary_ =
       (headers->EnvoyUpstreamCanary() && headers->EnvoyUpstreamCanary()->value() == "true") ||
-      (upstream_host_ ? upstream_host_->canary() : false);
-  chargeUpstreamCode(*headers);
+      upstream_request_->upstream_host_->canary();
+  chargeUpstreamCode(*headers, upstream_request_->upstream_host_);
 
   downstream_response_started_ = true;
   if (end_stream) {
@@ -460,7 +470,7 @@ void Filter::onUpstreamComplete() {
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now() - downstream_request_complete_time_);
 
-    upstream_host_->outlierDetector().putResponseTime(response_time);
+    upstream_request_->upstream_host_->outlierDetector().putResponseTime(response_time);
 
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
     bool internal_request = internal_request_header && internal_request_header->value() == "true";
@@ -468,14 +478,16 @@ void Filter::onUpstreamComplete() {
     Http::CodeUtility::ResponseTimingInfo info{
         config_.stats_store_, cluster_->statPrefix(), response_time,
         upstream_request_->upstream_canary_, internal_request, route_->virtualHostName(),
-        request_vcluster_ ? request_vcluster_->name() : "", config_.service_zone_, upstreamZone()};
+        request_vcluster_ ? request_vcluster_->name() : "", config_.service_zone_,
+        upstreamZone(upstream_request_->upstream_host_)};
 
     Http::CodeUtility::chargeResponseTiming(info);
 
     for (const std::string& alt_prefix : alt_stat_prefixes_) {
-      Http::CodeUtility::ResponseTimingInfo info{
-          config_.stats_store_, alt_prefix, response_time, upstream_request_->upstream_canary_,
-          internal_request, "", "", config_.service_zone_, upstreamZone()};
+      Http::CodeUtility::ResponseTimingInfo info{config_.stats_store_, alt_prefix, response_time,
+                                                 upstream_request_->upstream_canary_,
+                                                 internal_request, "", "", config_.service_zone_,
+                                                 upstreamZone(upstream_request_->upstream_host_)};
 
       Http::CodeUtility::chargeResponseTiming(info);
     }
@@ -632,6 +644,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
   parent_.config_.cm_.get(parent_.route_->clusterName())
       ->stats()
       .upstream_rq_per_try_timeout_.inc();
+  upstream_host_->stats().rq_timeout_.inc();
   resetStream();
   parent_.onUpstreamReset(UpstreamResetType::PerTryTimeout,
                           Optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));

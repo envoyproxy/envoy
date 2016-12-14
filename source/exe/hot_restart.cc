@@ -105,7 +105,8 @@ int HotRestartImpl::bindDomainSocket(uint64_t id) {
   sockaddr_un address = createDomainSocketAddress(id);
   int rc = bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
   if (rc != 0) {
-    throw EnvoyException(fmt::format("unable to bind domain socket with id={}", id));
+    throw EnvoyException(
+        fmt::format("unable to bind domain socket with id={} (see --base-id option)", id));
   }
 
   return fd;

@@ -26,7 +26,7 @@ elif [[ "$1" == "debug" ]]; then
   TEST_TARGET="envoy.check"
 elif [[ "$1" == "server_only" ]]; then
   echo "normal build server only..."
-  EXTRA_CMAKE_FLAGS="-DENVOY_DEBUG:BOOL=OFF"
+  EXTRA_CMAKE_FLAGS="-DENVOY_DEBUG:BOOL=OFF -DENVOY_STRIP:BOOL=ON"
   TEST_TARGET="envoy"
 else
   echo "normal build with tests..."

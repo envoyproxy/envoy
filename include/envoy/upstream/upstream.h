@@ -196,6 +196,7 @@ public:
   COUNTER(upstream_rq_retry_overflow)                                                              \
   GAUGE  (max_host_weight)                                                                         \
   COUNTER(membership_change)                                                                       \
+  GAUGE  (membership_healthy)                                                                      \
   GAUGE  (membership_total)                                                                        \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_success)                                                                          \

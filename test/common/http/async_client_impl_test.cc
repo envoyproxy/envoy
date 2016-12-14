@@ -256,8 +256,7 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,
                            ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
-        callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                cm_.conn_pool_.host_);
+        callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
         return nullptr;
       }));
 
@@ -286,6 +285,7 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
 
   EXPECT_EQ(1UL,
             cm_.cluster_.stats_store_.counter("cluster.fake_cluster.upstream_rq_timeout").value());
+  EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_504").value());
 }
 

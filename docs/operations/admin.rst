@@ -29,11 +29,24 @@ modify different aspects of the server.
     cx_active, Gauge, Total active connections
     cx_connect_fail, Counter, Total connection failures
     rq_total, Counter, Total requests
+    rq_timeout, Counter, Total timed out requests
     rq_active, Gauge, Total active requests
-    healthy, Boolean, Whether the host is healthy (1) or not (0)
+    healthy, String, The health status of the host. See below
     weight, Integer, Load balancing weight (1-100)
     zone, String, Service zone
     canary, Boolean, Whether the host is a canary
+
+  Host health status
+    A host is either healthy or unhealthy because of one or more different failing health states.
+    If the host is healthy the ``healthy`` output will be equal to *healthy*.
+
+    If the host is not healthy, the ``healthy`` output will be composed of one or more of the
+    following strings:
+
+    */failed_active_hc*: The host has failed an :ref:`active health check
+    <config_cluster_manager_cluster_hc>`.
+
+    */failed_outlier_check*: The host has failed an outlier detection check.
 
 .. http:get:: /cpuprofiler
 

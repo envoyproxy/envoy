@@ -107,7 +107,8 @@ void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink,
 void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
   uint64_t max_ejection_percent =
       std::min(100UL, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent", 10));
-  if ((stats_.ejections_active_.value() / host_sinks_.size()) < max_ejection_percent) {
+  double ejected_percent = 100.0 * stats_.ejections_active_.value() / host_sinks_.size();
+  if (ejected_percent < max_ejection_percent) {
     stats_.ejections_total_.inc();
     if (runtime_.snapshot().featureEnabled("outlier_detection.enforcing", 100)) {
       stats_.ejections_active_.inc();
@@ -171,15 +172,17 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
     std::string("{{") +
     "\"time\": \"{}\", " +
     "\"cluster\": \"{}\", " +
-    "\"upstream_ip\": \"{}\", " +
+    "\"upstream_url\": \"{}\", " +
     "\"action\": \"eject\", " +
-    "\"type\": \"{}\"" +
+    "\"type\": \"{}\", " +
+    "\"num_ejections\": {}" +
     "}}\n";
   // clang-format on
 
   file_->write(fmt::format(json,
                            AccessLogDateTimeFormatter::fromTime(time_source_.currentSystemTime()),
-                           host->cluster().name(), host->url(), typeToString(type)));
+                           host->cluster().name(), host->url(), typeToString(type),
+                           host->outlierDetector().numEjections()));
 }
 
 void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
@@ -189,14 +192,15 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
     std::string("{{") +
     "\"time\": \"{}\", " +
     "\"cluster\": \"{}\", " +
-    "\"upstream_ip\": \"{}\", " +
-    "\"action\": \"uneject\""
+    "\"upstream_url\": \"{}\", " +
+    "\"action\": \"uneject\", " +
+    "\"num_ejections\": {}" +
     "}}\n";
   // clang-format on
 
-  file_->write(fmt::format(json,
-                           AccessLogDateTimeFormatter::fromTime(time_source_.currentSystemTime()),
-                           host->cluster().name(), host->url()));
+  file_->write(
+      fmt::format(json, AccessLogDateTimeFormatter::fromTime(time_source_.currentSystemTime()),
+                  host->cluster().name(), host->url(), host->outlierDetector().numEjections()));
 }
 
 std::string EventLoggerImpl::typeToString(EjectionType type) {
