@@ -4,8 +4,9 @@ set -e
 
 export CC=gcc-4.9
 export CXX=g++-4.9
-NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
+export HEAPCHECK=normal
 
+NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 echo "building using $NUM_CPUS CPUs"
 
 if [[ "$1" == "docs" ]]; then
