@@ -314,16 +314,17 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EventLoggerImpl event_logger(log_manager, "foo", time_source);
 
   std::string log1;
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"cluster\": "
-                           "\"fake_cluster\", \"upstream_ip\": \"tcp://10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"5xx\"}\n")).WillOnce(SaveArg<0>(&log1));
+  EXPECT_CALL(*file,
+              write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"cluster\": "
+                    "\"fake_cluster\", \"upstream_url\": \"tcp://10.0.0.1:443\", \"action\": "
+                    "\"eject\", \"type\": \"5xx\"}\n")).WillOnce(SaveArg<0>(&log1));
   event_logger.logEject(host, EjectionType::Consecutive5xx);
   Json::Factory::LoadFromString(log1);
 
   std::string log2;
   EXPECT_CALL(*file,
               write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"cluster\": \"fake_cluster\", "
-                    "\"upstream_ip\": \"tcp://10.0.0.1:443\", \"action\": \"uneject\"}\n"))
+                    "\"upstream_url\": \"tcp://10.0.0.1:443\", \"action\": \"uneject\"}\n"))
       .WillOnce(SaveArg<0>(&log2));
   event_logger.logUneject(host);
   Json::Factory::LoadFromString(log2);

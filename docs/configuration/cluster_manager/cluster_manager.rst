@@ -10,7 +10,8 @@ Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
   {
     "clusters": [],
     "sds": "{...}",
-    "local_cluster_name": "..."
+    "local_cluster_name": "...",
+    "outlier_detection": "{...}"
   }
 
 .. _config_cluster_manager_clusters:
@@ -26,11 +27,14 @@ Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
   <arch_overview_service_discovery_sds>` cluster type, a global SDS configuration must be specified.
 
 local_cluster_name
-  *(optional, string)* Name of the local cluster (i.e., the cluster that owns the Envoy running this 
+  *(optional, string)* Name of the local cluster (i.e., the cluster that owns the Envoy running this
   configuration). In order to enable
   :ref:`zone aware routing <arch_overview_load_balancing_zone_aware_routing>` this option must be
   set. If *local_cluster_name* is defined then :ref:`clusters <config_cluster_manager_clusters>`
   must contain a definition of a cluster with the same name.
+
+:ref:`outlier_detection <config_cluster_manager_outlier_detection>`
+  *(optional, object)* Optional global configuration for outlier detection.
 
 .. toctree::
   :hidden:
@@ -38,3 +42,4 @@ local_cluster_name
   cluster
   sds
   sds_api
+  outlier

@@ -17,6 +17,7 @@ Architecture overview
   health_checking
   connection_pooling
   load_balancing
+  outlier
   circuit_breaking
   global_rate_limiting
   ssl

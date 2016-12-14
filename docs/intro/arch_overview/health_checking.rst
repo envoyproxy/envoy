@@ -18,6 +18,9 @@ unhealthy, successes required before marking a host healthy, etc.):
   upstream host. It expects the byte buffer to be echoed in the response if the host is to be
   considered healthy.
 
+Note that Envoy also supports passive health checking via :ref:`outlier detection
+<arch_overview_outlier_detection>`.
+
 .. _arch_overview_health_checking_filter:
 
 HTTP health checking filter
