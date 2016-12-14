@@ -156,7 +156,8 @@ bool ConnectionManagerUtility::shouldTraceRequest(
   NOT_IMPLEMENTED;
 }
 
-bool ConnectionManagerUtility::isTraceableFailure(const Http::AccessLog::RequestInfo& request_info) {
+bool ConnectionManagerUtility::isTraceableFailure(
+    const Http::AccessLog::RequestInfo& request_info) {
   return request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream) |
          request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure) |
          request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow) |
