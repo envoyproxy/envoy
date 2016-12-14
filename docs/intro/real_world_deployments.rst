@@ -1,7 +1,7 @@
 Real world deployments
 ----------------------
 
-If you have an Envoy deployment let us know!
+If you have an Envoy deployment open a PR to add yourself or :ref:`let us know <getting_help>`!
 
 Lyft
   Envoy was initially developed for use at Lyft as the primary edge and service to service
