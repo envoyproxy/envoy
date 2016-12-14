@@ -45,7 +45,7 @@ public:
   virtual ~RequestInfo() {}
 
   /**
-   * filter can set response flags.
+   * each filter can set independent response flag, flags are accumulated.
    */
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
@@ -90,11 +90,9 @@ public:
   virtual std::chrono::milliseconds duration() const PURE;
 
   /**
-   * @return response flags to enrich access log with details around response code. Response flag
-   * complements response
-   * code and add details to it.
+   * @return whether response flag is set or not.
    */
-  virtual bool isSetResponseFlag(ResponseFlag response_flag) const PURE;
+  virtual bool getResponseFlag(ResponseFlag response_flag) const PURE;
 
   /**
    * @return upstream host description.

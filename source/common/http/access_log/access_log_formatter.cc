@@ -28,54 +28,46 @@ void FilterReasonUtils::appendString(std::string& result, const std::string& app
 }
 
 const std::string FilterReasonUtils::toShortString(const RequestInfo& request_info) {
-  std::string result = "";
+  std::string result;
 
-  if (request_info.isSetResponseFlag(ResponseFlag::None)) {
-    return NONE;
-  }
-
-  if (request_info.isSetResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
+  if (request_info.getResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
   }
 
-  if (request_info.isSetResponseFlag(ResponseFlag::NoHealthyUpstream)) {
+  if (request_info.getResponseFlag(ResponseFlag::NoHealthyUpstream)) {
     appendString(result, NO_HEALTHY_UPSTREAM);
   }
 
-  if (request_info.isSetResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
+  if (request_info.getResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
     appendString(result, UPSTREAM_REQUEST_TIMEOUT);
   }
 
-  if (request_info.isSetResponseFlag(ResponseFlag::LocalReset)) {
+  if (request_info.getResponseFlag(ResponseFlag::LocalReset)) {
     appendString(result, LOCAL_RESET);
   }
 
-  if (request_info.isSetResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
+  if (request_info.getResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
     appendString(result, UPSTREAM_REMOTE_RESET);
   }
 
-  if (request_info.isSetResponseFlag(ResponseFlag::UpstreamConnectionFailure)) {
+  if (request_info.getResponseFlag(ResponseFlag::UpstreamConnectionFailure)) {
     appendString(result, UPSTREAM_CONNECTION_FAILURE);
   }
 
-  if (request_info.isSetResponseFlag(ResponseFlag::UpstreamConnectionTermination)) {
+  if (request_info.getResponseFlag(ResponseFlag::UpstreamConnectionTermination)) {
     appendString(result, UPSTREAM_CONNECTION_TERMINATION);
   }
 
-  if (request_info.isSetResponseFlag(ResponseFlag::UpstreamOverflow)) {
+  if (request_info.getResponseFlag(ResponseFlag::UpstreamOverflow)) {
     appendString(result, UPSTREAM_OVERFLOW);
   }
 
-  if (request_info.isSetResponseFlag(ResponseFlag::NoRouteFound)) {
+  if (request_info.getResponseFlag(ResponseFlag::NoRouteFound)) {
     appendString(result, NO_ROUTE_FOUND);
   }
 
-  if (request_info.isSetResponseFlag(ResponseFlag::FaultInjected)) {
+  if (request_info.getResponseFlag(ResponseFlag::FaultInjected)) {
     appendString(result, FAULT_INJECTED);
-  }
-
-  if (request_info.isSetResponseFlag(ResponseFlag::DelayInjected)) {
-    appendString(result, DELAY_INJECTED);
   }
 
   return result;

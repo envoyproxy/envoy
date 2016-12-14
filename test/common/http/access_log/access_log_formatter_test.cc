@@ -29,27 +29,27 @@ TEST(FailureReasonUtilsTest, toShortStringConversion) {
 
   for (const auto& testCase : expected) {
     NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, isSetResponseFlag(testCase.first)).WillByDefault(Return(true));
+    ON_CALL(request_info, getResponseFlag(testCase.first)).WillByDefault(Return(true));
     EXPECT_EQ(testCase.second, FilterReasonUtils::toShortString(request_info));
   }
 
   // Test combinations.
   {
     NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, isSetResponseFlag(ResponseFlag::DelayInjected))
+    ON_CALL(request_info, getResponseFlag(ResponseFlag::DelayInjected))
         .WillByDefault(Return(true));
-    ON_CALL(request_info, isSetResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+    ON_CALL(request_info, getResponseFlag(ResponseFlag::UpstreamRequestTimeout))
         .WillByDefault(Return(true));
     EXPECT_EQ("UT,DI", FilterReasonUtils::toShortString(request_info));
   }
 
   {
     NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, isSetResponseFlag(ResponseFlag::DelayInjected))
+    ON_CALL(request_info, getResponseFlag(ResponseFlag::DelayInjected))
         .WillByDefault(Return(true));
-    ON_CALL(request_info, isSetResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+    ON_CALL(request_info, getResponseFlag(ResponseFlag::UpstreamRequestTimeout))
         .WillByDefault(Return(true));
-    ON_CALL(request_info, isSetResponseFlag(ResponseFlag::FaultInjected))
+    ON_CALL(request_info, getResponseFlag(ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
     EXPECT_EQ("UT,FI,DI", FilterReasonUtils::toShortString(request_info));
   }
@@ -124,7 +124,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter response_flags_format("RESPONSE_FLAGS");
-    ON_CALL(requestInfo, isSetResponseFlag(ResponseFlag::LocalReset)).WillByDefault(Return(true));
+    ON_CALL(requestInfo, getResponseFlag(ResponseFlag::LocalReset)).WillByDefault(Return(true));
     EXPECT_EQ("LR", response_flags_format.format(header, header, requestInfo));
   }
 

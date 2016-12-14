@@ -62,11 +62,11 @@ TEST_F(ConnectionManagerUtilityTest, ShouldTraceRequest) {
     Optional<Http::TracingConnectionManagerConfig> tracing_failure(
         {"operation", Http::TracingType::UpstreamFailure});
     ON_CALL(request_info,
-            isSetResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure))
+            getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure))
         .WillByDefault(Return(true));
     EXPECT_TRUE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
 
-    ON_CALL(request_info, isSetResponseFlag(Http::AccessLog::ResponseFlag::None))
+    ON_CALL(request_info, getResponseFlag(Http::AccessLog::ResponseFlag::None))
         .WillByDefault(Return(true));
     EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
   }

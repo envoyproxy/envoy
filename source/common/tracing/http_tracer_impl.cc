@@ -264,7 +264,7 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
     span.SetTag("error", "true");
   }
 
-  if (!request_info.isSetResponseFlag(Http::AccessLog::ResponseFlag::None)) {
+  if (!request_info.getResponseFlag(Http::AccessLog::ResponseFlag::None)) {
     span.SetTag("failure reason", Http::AccessLog::FilterReasonUtils::toShortString(request_info));
   }
 

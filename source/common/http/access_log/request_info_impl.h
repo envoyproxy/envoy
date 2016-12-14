@@ -30,7 +30,7 @@ struct RequestInfoImpl : public RequestInfo {
     response_flags_ |= response_flag;
   }
 
-  bool isSetResponseFlag(ResponseFlag flag) const override {
+  bool getResponseFlag(ResponseFlag flag) const override {
     if (flag == ResponseFlag::None) {
       return response_flags_ == ResponseFlag::None;
     }
