@@ -159,9 +159,12 @@ bool ConnectionManagerUtility::shouldTraceRequest(
 bool ConnectionManagerUtility::isUpstreamFailure(const Http::AccessLog::RequestInfo& request_info) {
   return request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream) |
          request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow) |
          request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionTermination);
+         request_info.getResponseFlag(
+             Http::AccessLog::ResponseFlag::UpstreamConnectionTermination) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
 }
 
 } // Http
