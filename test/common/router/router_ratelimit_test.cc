@@ -26,9 +26,6 @@ TEST(BadRateLimitConfiguration, MissingActions) {
     {
       "prefix": "/",
       "cluster": "www2",
-      "rate_limit": {
-        "global": true
-      },
       "rate_limits": [
       { }
       ]
@@ -155,12 +152,14 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
                                           const std::string& method) {
   return Http::TestHeaderMapImpl{{":authority", host}, {":path", path}, {":method", method}};
 }
+
 class RateLimitConfiguration : public testing::Test {
 public:
   void SetUpTest(const std::string json) {
     Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
     config_.reset(new ConfigImpl(*loader, runtime_, cm_));
   }
+
   std::unique_ptr<ConfigImpl> config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -292,18 +291,11 @@ TEST_F(RateLimitConfiguration, NoAddress) {
     "domains": ["www.lyft.com"],
     "routes": [
       {
-        "prefix": "/foo",
+        "prefix": "/",
         "cluster": "www2",
-        "rate_limit": {
-          "global": true
-        },
         "rate_limits": [
         { "actions":[ {"type": "remote_address"}] }
         ]
-      },
-      {
-        "prefix": "/bar",
-        "cluster": "www2"
       }
     ]
   }
@@ -358,10 +350,10 @@ TEST_F(RateLimitConfiguration, ServiceToService) {
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, callbacks_);
   }
-  std::vector<::RateLimit::Descriptor> expected_descriptors = {
-      {{{"to_cluster", "fake_cluster"}}},
-      {{{"to_cluster", "fake_cluster"}, {"from_cluster", "service_cluster"}}}};
-  EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>(
+                  {{{{"to_cluster", "fake_cluster"}}},
+                   {{{"to_cluster", "fake_cluster"}, {"from_cluster", "service_cluster"}}}}),
+              testing::ContainerEq(descriptors));
 }
 
 TEST_F(RateLimitConfiguration, RequestHeaders) {
@@ -449,10 +441,10 @@ TEST_F(RateLimitConfiguration, RequestHeadersRouteKey) {
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header, callbacks_);
   }
-  std::vector<::RateLimit::Descriptor> expected_descriptors = {
-      {{{"my_header_name", "test_value"}}},
-      {{{"route_key", "my_route"}, {"my_header_name", "test_value"}}}};
-  EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>(
+                  {{{{"my_header_name", "test_value"}}},
+                   {{{"route_key", "my_route"}, {"my_header_name", "test_value"}}}}),
+              testing::ContainerEq(descriptors));
 }
 
 TEST_F(RateLimitConfiguration, RequestHeadersNoMatch) {
