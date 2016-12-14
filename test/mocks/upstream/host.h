@@ -12,6 +12,7 @@ public:
   MockDetectorHostSink();
   ~MockDetectorHostSink();
 
+  MOCK_METHOD0(numEjections, uint32_t());
   MOCK_METHOD1(putHttpResponseCode, void(uint64_t code));
   MOCK_METHOD1(putResponseTime, void(std::chrono::milliseconds time));
 };

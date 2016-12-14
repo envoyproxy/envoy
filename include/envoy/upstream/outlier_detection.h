@@ -20,6 +20,11 @@ public:
   virtual ~DetectorHostSink() {}
 
   /**
+   * @return the number of times this host has been ejected.
+   */
+  virtual uint32_t numEjections() PURE;
+
+  /**
    * Add an HTTP response code for a host.
    */
   virtual void putHttpResponseCode(uint64_t code) PURE;

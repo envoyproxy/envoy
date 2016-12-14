@@ -18,6 +18,7 @@ namespace Outlier {
 class DetectorHostSinkNullImpl : public DetectorHostSink {
 public:
   // Upstream::Outlier::DetectorHostSink
+  uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
 };
@@ -43,9 +44,9 @@ public:
 
   void eject(SystemTime ejection_time);
   SystemTime ejectionTime() { return ejection_time_; }
-  uint32_t numEjections() { return num_ejections_; }
 
   // Upstream::Outlier::DetectorHostSink
+  uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
   void putResponseTime(std::chrono::milliseconds) override {}
 
