@@ -28,7 +28,9 @@ SharedMemory& SharedMemory::initialize(Options& options) {
   }
 
   int shmem_fd = shm_open(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
-  RELEASE_ASSERT(shmem_fd != -1);
+  if (shmem_fd == -1) {
+    PANIC(fmt::format("cannot open shared memory region {} check user permissions", shmem_name));
+  }
 
   if (options.restartEpoch() == 0) {
     int rc = ftruncate(shmem_fd, sizeof(SharedMemory));
