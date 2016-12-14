@@ -70,7 +70,7 @@ const std::string FilterReasonUtils::toShortString(const RequestInfo& request_in
     appendString(result, FAULT_INJECTED);
   }
 
-  return result;
+  return result.empty() ? NONE : result;
 }
 
 const std::string AccessLogFormatUtils::DEFAULT_FORMAT =

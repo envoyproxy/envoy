@@ -11,8 +11,6 @@ namespace Http {
 namespace AccessLog {
 
 enum ResponseFlag {
-  // No failure.
-  None = 0x0,
   // Local server healthcheck failed.
   FailedLocalHealthCheck = 0x1,
   // No healthy upstream.
@@ -32,9 +30,7 @@ enum ResponseFlag {
   // No route found for a given request.
   NoRouteFound = 0x100,
   // Abort with error code is injected.
-  FaultInjected = 0x200,
-  // Delay is injected.
-  DelayInjected = 0x400
+  FaultInjected = 0x200
 };
 
 /**

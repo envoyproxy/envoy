@@ -55,7 +55,7 @@ public:
   SystemTime start_time_;
   Protocol protocol_{Protocol::Http11};
   Optional<uint32_t> response_code_;
-  uint64_t response_flags_{ResponseFlag::None};
+  uint64_t response_flags_{};
   uint64_t duration_{3};
   Upstream::HostDescriptionPtr upstream_host_{};
   bool hc_request_{};

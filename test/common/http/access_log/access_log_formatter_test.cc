@@ -5,6 +5,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -14,7 +15,6 @@ namespace AccessLog {
 
 TEST(FailureReasonUtilsTest, toShortStringConversion) {
   std::vector<std::pair<ResponseFlag, std::string>> expected = {
-      std::make_pair(ResponseFlag::None, "-"),
       std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
       std::make_pair(ResponseFlag::NoHealthyUpstream, "UH"),
       std::make_pair(ResponseFlag::UpstreamRequestTimeout, "UT"),
@@ -24,8 +24,7 @@ TEST(FailureReasonUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::UpstreamConnectionTermination, "UC"),
       std::make_pair(ResponseFlag::UpstreamOverflow, "UO"),
       std::make_pair(ResponseFlag::NoRouteFound, "NR"),
-      std::make_pair(ResponseFlag::FaultInjected, "FI"),
-      std::make_pair(ResponseFlag::DelayInjected, "DI")};
+      std::make_pair(ResponseFlag::FaultInjected, "FI")};
 
   for (const auto& testCase : expected) {
     NiceMock<MockRequestInfo> request_info;
@@ -33,25 +32,21 @@ TEST(FailureReasonUtilsTest, toShortStringConversion) {
     EXPECT_EQ(testCase.second, FilterReasonUtils::toShortString(request_info));
   }
 
-  // Test combinations.
+  // No flag is set.
   {
     NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::DelayInjected))
-        .WillByDefault(Return(true));
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::UpstreamRequestTimeout))
-        .WillByDefault(Return(true));
-    EXPECT_EQ("UT,DI", FilterReasonUtils::toShortString(request_info));
+    ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(false));
+    EXPECT_EQ("-", FilterReasonUtils::toShortString(request_info));
   }
 
+  // Test combinations.
+  // These are not real use cases, but are used to cover multiple response flags case.
   {
     NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::DelayInjected))
-        .WillByDefault(Return(true));
+    ON_CALL(request_info, getResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
     ON_CALL(request_info, getResponseFlag(ResponseFlag::UpstreamRequestTimeout))
         .WillByDefault(Return(true));
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::FaultInjected))
-        .WillByDefault(Return(true));
-    EXPECT_EQ("UT,FI,DI", FilterReasonUtils::toShortString(request_info));
+    EXPECT_EQ("UT,FI", FilterReasonUtils::toShortString(request_info));
   }
 }
 

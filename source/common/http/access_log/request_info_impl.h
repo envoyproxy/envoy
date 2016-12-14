@@ -30,13 +30,7 @@ struct RequestInfoImpl : public RequestInfo {
     response_flags_ |= response_flag;
   }
 
-  bool getResponseFlag(ResponseFlag flag) const override {
-    if (flag == ResponseFlag::None) {
-      return response_flags_ == ResponseFlag::None;
-    }
-
-    return response_flags_ & flag;
-  }
+  bool getResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
 
   void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override { upstream_host_ = host; }
 
@@ -51,7 +45,7 @@ struct RequestInfoImpl : public RequestInfo {
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};
-  uint64_t response_flags_{ResponseFlag::None};
+  uint64_t response_flags_{};
   Upstream::HostDescriptionPtr upstream_host_{};
   bool hc_request_{};
 };

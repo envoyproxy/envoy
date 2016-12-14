@@ -148,12 +148,20 @@ bool ConnectionManagerUtility::shouldTraceRequest(
   case Http::TracingType::All:
     return true;
   case Http::TracingType::UpstreamFailure:
-    return !request_info.getResponseFlag(Http::AccessLog::ResponseFlag::None);
+    return isUpstreamFailure(request_info);
   }
 
   // Compiler enforces switch above to cover all the cases and it's impossible to be here,
   // but compiler complains on missing return statement, this is to make compiler happy.
   NOT_IMPLEMENTED;
+}
+
+bool ConnectionManagerUtility::isUpstreamFailure(const Http::AccessLog::RequestInfo& request_info) {
+  return request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionTermination);
 }
 
 } // Http
