@@ -27,8 +27,8 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
             fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
       return FilterHeadersStatus::Continue;
     }
-    std::vector<::RateLimit::Descriptor> descriptors;
 
+    std::vector<::RateLimit::Descriptor> descriptors;
     for (Router::RateLimitPolicyEntry& rate_limit :
          route->rateLimitPolicy().getApplicableRateLimit(config_->stage())) {
       rate_limit.populateDescriptors(*route, descriptors, config_->localServiceCluster(), headers,

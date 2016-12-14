@@ -12,7 +12,7 @@ namespace Router {
 */
 class ServiceToServiceAction : public Action {
 public:
-  // Action
+  // Router::Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap&,
@@ -27,7 +27,7 @@ public:
   RequestHeadersAction(const Json::Object& action)
       : header_name_(action.getString("header_name")),
         descriptor_key_(action.getString("descriptor_key")) {}
-  // Action
+  // Router::Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors, const std::string&,
                            const Http::HeaderMap& headers,
@@ -43,7 +43,7 @@ private:
  */
 class RemoteAddressAction : public Action {
 public:
-  // Action
+  // Router::Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors, const std::string&,
                            const Http::HeaderMap&,
@@ -54,11 +54,13 @@ class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
 public:
   RateLimitPolicyEntryImpl(const Json::Object& config);
 
-  // RateLimitPolicyEntry
+  // Router::RateLimitPolicyEntry
   int64_t stage() const override { return stage_; }
 
+  // Router::RateLimitPolicyEntry
   const std::string& killSwitchKey() const override { return kill_switch_key_; }
 
+  // Router::RateLimitPolicyEntry
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap&,
@@ -80,6 +82,7 @@ public:
   // Router::RateLimitPolicy
   const std::string& routeKey() const override { return route_key_; }
 
+  // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<RateLimitPolicyEntry>>&
   getApplicableRateLimit(int64_t stage = 0) const override;
 

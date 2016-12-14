@@ -3,9 +3,7 @@
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
 
-#include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
 

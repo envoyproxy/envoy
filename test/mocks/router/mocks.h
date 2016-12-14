@@ -41,8 +41,13 @@ public:
 };
 class TestRateLimitPolicyEntry : public RateLimitPolicyEntry {
 public:
+  // Router::RateLimitPolicyEntry
   int64_t stage() const override { return stage_; }
+
+  // Router::RateLimitPolicyEntry
   const std::string& killSwitchKey() const override { return kill_switch_key_; }
+
+  // Router::RateLimitPolicyEntry
   void populateDescriptors(const RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap& headers,

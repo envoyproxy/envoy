@@ -8,7 +8,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/json/json_loader.h"
-#include "common/http/filter/ratelimit.h"
 
 namespace Router {
 

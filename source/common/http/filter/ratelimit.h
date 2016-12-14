@@ -43,7 +43,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigPtr;
  */
 class Filter : public StreamDecoderFilter, public ::RateLimit::RequestCallbacks {
 public:
-  Filter(RateLimit::FilterConfigPtr config, ::RateLimit::ClientPtr&& client)
+  Filter(FilterConfigPtr config, ::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamDecoderFilter
