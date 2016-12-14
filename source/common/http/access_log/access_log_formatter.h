@@ -6,14 +6,14 @@ namespace Http {
 namespace AccessLog {
 
 /**
- * Util class for FilterReason.
+ * Util class for ResponseFlags.
  */
-class FilterReasonUtils {
+class ResponseFlagUtils {
 public:
   static const std::string toShortString(const RequestInfo& request_info);
 
 private:
-  FilterReasonUtils();
+  ResponseFlagUtils();
   static void appendString(std::string& result, const std::string& append);
 
   const static std::string NONE;
@@ -27,7 +27,6 @@ private:
   const static std::string UPSTREAM_OVERFLOW;
   const static std::string NO_ROUTE_FOUND;
   const static std::string FAULT_INJECTED;
-  const static std::string DELAY_INJECTED;
 };
 
 /**

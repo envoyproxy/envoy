@@ -6,20 +6,19 @@
 namespace Http {
 namespace AccessLog {
 
-const std::string FilterReasonUtils::NONE = "-";
-const std::string FilterReasonUtils::FAILED_LOCAL_HEALTH_CHECK = "LH";
-const std::string FilterReasonUtils::NO_HEALTHY_UPSTREAM = "UH";
-const std::string FilterReasonUtils::UPSTREAM_REQUEST_TIMEOUT = "UT";
-const std::string FilterReasonUtils::LOCAL_RESET = "LR";
-const std::string FilterReasonUtils::UPSTREAM_REMOTE_RESET = "UR";
-const std::string FilterReasonUtils::UPSTREAM_CONNECTION_FAILURE = "UF";
-const std::string FilterReasonUtils::UPSTREAM_CONNECTION_TERMINATION = "UC";
-const std::string FilterReasonUtils::UPSTREAM_OVERFLOW = "UO";
-const std::string FilterReasonUtils::NO_ROUTE_FOUND = "NR";
-const std::string FilterReasonUtils::FAULT_INJECTED = "FI";
-const std::string FilterReasonUtils::DELAY_INJECTED = "DI";
+const std::string ResponseFlagUtils::NONE = "-";
+const std::string ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK = "LH";
+const std::string ResponseFlagUtils::NO_HEALTHY_UPSTREAM = "UH";
+const std::string ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT = "UT";
+const std::string ResponseFlagUtils::LOCAL_RESET = "LR";
+const std::string ResponseFlagUtils::UPSTREAM_REMOTE_RESET = "UR";
+const std::string ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE = "UF";
+const std::string ResponseFlagUtils::UPSTREAM_CONNECTION_TERMINATION = "UC";
+const std::string ResponseFlagUtils::UPSTREAM_OVERFLOW = "UO";
+const std::string ResponseFlagUtils::NO_ROUTE_FOUND = "NR";
+const std::string ResponseFlagUtils::FAULT_INJECTED = "FI";
 
-void FilterReasonUtils::appendString(std::string& result, const std::string& append) {
+void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {
     result = append;
   } else {
@@ -27,7 +26,7 @@ void FilterReasonUtils::appendString(std::string& result, const std::string& app
   }
 }
 
-const std::string FilterReasonUtils::toShortString(const RequestInfo& request_info) {
+const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_info) {
   std::string result;
 
   if (request_info.getResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
@@ -238,7 +237,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "RESPONSE_FLAGS") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      return FilterReasonUtils::toShortString(request_info);
+      return ResponseFlagUtils::toShortString(request_info);
     };
   } else if (field_name == "UPSTREAM_HOST") {
     field_extractor_ = [](const RequestInfo& request_info) {

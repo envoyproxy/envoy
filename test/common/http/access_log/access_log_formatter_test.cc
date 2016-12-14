@@ -13,7 +13,7 @@ using testing::ReturnRef;
 namespace Http {
 namespace AccessLog {
 
-TEST(FailureReasonUtilsTest, toShortStringConversion) {
+TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   std::vector<std::pair<ResponseFlag, std::string>> expected = {
       std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
       std::make_pair(ResponseFlag::NoHealthyUpstream, "UH"),
@@ -29,14 +29,14 @@ TEST(FailureReasonUtilsTest, toShortStringConversion) {
   for (const auto& testCase : expected) {
     NiceMock<MockRequestInfo> request_info;
     ON_CALL(request_info, getResponseFlag(testCase.first)).WillByDefault(Return(true));
-    EXPECT_EQ(testCase.second, FilterReasonUtils::toShortString(request_info));
+    EXPECT_EQ(testCase.second, ResponseFlagUtils::toShortString(request_info));
   }
 
   // No flag is set.
   {
     NiceMock<MockRequestInfo> request_info;
     ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(false));
-    EXPECT_EQ("-", FilterReasonUtils::toShortString(request_info));
+    EXPECT_EQ("-", ResponseFlagUtils::toShortString(request_info));
   }
 
   // Test combinations.
@@ -46,7 +46,7 @@ TEST(FailureReasonUtilsTest, toShortStringConversion) {
     ON_CALL(request_info, getResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
     ON_CALL(request_info, getResponseFlag(ResponseFlag::UpstreamRequestTimeout))
         .WillByDefault(Return(true));
-    EXPECT_EQ("UT,FI", FilterReasonUtils::toShortString(request_info));
+    EXPECT_EQ("UT,FI", ResponseFlagUtils::toShortString(request_info));
   }
 }
 
