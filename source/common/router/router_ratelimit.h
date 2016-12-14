@@ -27,6 +27,7 @@ public:
   RequestHeadersAction(const Json::Object& action)
       : header_name_(action.getString("header_name")),
         descriptor_key_(action.getString("descriptor_key")) {}
+
   // Router::Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors, const std::string&,
