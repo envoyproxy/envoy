@@ -30,9 +30,9 @@ public:
 typedef std::unique_ptr<RateLimitAction> RateLimitActionPtr;
 
 /**
- * Rate limit configuration
+ * Rate limit configuration.
  */
-class RateLimitPolicyEntry : public virtual RateLimitAction {
+class RateLimitPolicyEntry : public RateLimitAction {
 public:
   /**
    * @return the stage value that the configuration is applicable to.
@@ -46,7 +46,7 @@ public:
 };
 
 /**
- * Rate limiting policy
+ * Rate limiting policy.
  */
 class RateLimitPolicy {
 public:

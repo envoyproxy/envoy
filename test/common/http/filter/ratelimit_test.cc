@@ -79,7 +79,7 @@ TEST_F(HttpRateLimitFilterTest, NoApplicableRateLimit) {
 
   rate_limit_policies_.clear();
   EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit_(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
+              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -88,9 +88,9 @@ TEST_F(HttpRateLimitFilterTest, NoApplicableRateLimit) {
 TEST_F(HttpRateLimitFilterTest, NoDescriptor) {
   SetUpTest(filter_config);
   EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit_(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
+              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
-  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors_(_, _, _, _, _)).Times(1);
+  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _)).Times(1);
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -111,9 +111,9 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit_(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
+              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
-  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors_(_, _, _, _, _))
+  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
@@ -138,9 +138,9 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit_(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
+              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
-  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors_(_, _, _, _, _))
+  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                             {{{"descriptor_key", "descriptor_value"}}}}),
@@ -162,9 +162,9 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit_(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
+              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
-  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors_(_, _, _, _, _))
+  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
@@ -186,9 +186,9 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit_(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
+              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
-  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors_(_, _, _, _, _))
+  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
@@ -211,9 +211,9 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit_(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
+              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
-  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors_(_, _, _, _, _))
+  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
@@ -238,9 +238,9 @@ TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
   SetUpTest(filter_config);
   InSequence s;
   EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit_(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
+              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
-  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors_(_, _, _, _, _))
+  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
@@ -260,7 +260,7 @@ TEST_F(HttpRateLimitFilterTest, RateLimitDisabledForRouteKey) {
       .WillByDefault(Return(false));
 
   EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit_(_)).Times(0);
+              getApplicableRateLimit(_)).Times(0);
   EXPECT_CALL(*client_, limit(_, _, _, _)).Times(0);
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));

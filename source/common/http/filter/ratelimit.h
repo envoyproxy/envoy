@@ -29,7 +29,7 @@ public:
 
 private:
   const std::string domain_;
-  int64_t stage_{};
+  int64_t stage_;
   const std::string local_service_cluster_;
   Stats::Store& stats_store_;
   Runtime::Loader& runtime_;

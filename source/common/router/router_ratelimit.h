@@ -12,7 +12,7 @@ namespace Router {
 */
 class ServiceToServiceAction : public RateLimitAction {
 public:
-  // Router::Action
+  // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap&,
@@ -28,7 +28,7 @@ public:
       : header_name_(action.getString("header_name")),
         descriptor_key_(action.getString("descriptor_key")) {}
 
-  // Router::Action
+  // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors, const std::string&,
                            const Http::HeaderMap& headers, const std::string&) const override;
@@ -43,13 +43,16 @@ private:
  */
 class RemoteAddressAction : public RateLimitAction {
 public:
-  // Router::Action
+  // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors, const std::string&,
                            const Http::HeaderMap&,
                            const std::string& remote_address) const override;
 };
 
+/*
+ * Implementation of RateLimitPolicyEntry that holds the action for the configuration.
+ */
 class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
 public:
   RateLimitPolicyEntryImpl(const Json::Object& config);
@@ -68,7 +71,7 @@ public:
 
 private:
   const std::string kill_switch_key_;
-  int64_t stage_{};
+  int64_t stage_;
   std::vector<RateLimitActionPtr> actions_;
 };
 
