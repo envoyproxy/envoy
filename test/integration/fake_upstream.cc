@@ -26,7 +26,7 @@ void FakeStream::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
 void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
   std::unique_lock<std::mutex> lock(lock_);
   end_stream_ = end_stream;
-  body_length_ += data.length();
+  body_.add(data);
   decoder_event_.notify_one();
 }
 
@@ -84,10 +84,10 @@ void FakeStream::waitForHeadersComplete() {
 
 void FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length) {
   std::unique_lock<std::mutex> lock(lock_);
-  while (body_length_ != body_length) {
+  while (bodyLength() != body_length) {
     decoder_event_.wait_until(lock,
                               std::chrono::system_clock::now() + std::chrono::milliseconds(5));
-    if (body_length_ != body_length) {
+    if (bodyLength() != body_length) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
     }
