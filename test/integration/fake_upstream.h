@@ -21,7 +21,7 @@ class FakeStream : public Http::StreamDecoder, public Http::StreamCallbacks {
 public:
   FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder);
 
-  uint64_t bodyLength() { return body_length_; }
+  uint64_t bodyLength() { return body_.length(); }
   Buffer::Instance& body() { return body_; }
   bool complete() { return end_stream_; }
   void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
@@ -52,7 +52,6 @@ private:
   Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
   bool end_stream_{};
-  uint64_t body_length_{};
   Buffer::OwnedImpl body_;
   bool saw_reset_{};
 };
