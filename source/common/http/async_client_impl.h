@@ -64,12 +64,12 @@ private:
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {
     // Router::RateLimitPolicy
     const std::string& routeKey() const override { return EMPTY_STRING; }
-    const std::vector<std::reference_wrapper<Router::RateLimitPolicyEntry>>&
+    const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>&
         getApplicableRateLimit(int64_t) const override {
       return rate_limit_policy_entry_;
     }
 
-    static const std::vector<std::reference_wrapper<Router::RateLimitPolicyEntry>>
+    static const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
         rate_limit_policy_entry_;
   };
 

@@ -10,19 +10,19 @@ namespace Router {
 /**
 * Action for service to service rate limiting.
 */
-class ServiceToServiceAction : public Action {
+class ServiceToServiceAction : public RateLimitAction {
 public:
   // Router::Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap&,
-                           Http::StreamDecoderFilterCallbacks&) const override;
+                           const std::string&) const override;
 };
 
 /**
 * Action for request headers rate limiting.
 */
-class RequestHeadersAction : public Action {
+class RequestHeadersAction : public RateLimitAction {
 public:
   RequestHeadersAction(const Json::Object& action)
       : header_name_(action.getString("header_name")),
@@ -31,8 +31,7 @@ public:
   // Router::Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors, const std::string&,
-                           const Http::HeaderMap& headers,
-                           Http::StreamDecoderFilterCallbacks&) const override;
+                           const Http::HeaderMap& headers, const std::string&) const override;
 
 private:
   const Http::LowerCaseString header_name_;
@@ -42,13 +41,13 @@ private:
 /**
  * Action for remote address rate limiting.
  */
-class RemoteAddressAction : public Action {
+class RemoteAddressAction : public RateLimitAction {
 public:
   // Router::Action
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors, const std::string&,
                            const Http::HeaderMap&,
-                           Http::StreamDecoderFilterCallbacks& callbacks) const override;
+                           const std::string& remote_address) const override;
 };
 
 class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
@@ -61,16 +60,16 @@ public:
   // Router::RateLimitPolicyEntry
   const std::string& killSwitchKey() const override { return kill_switch_key_; }
 
-  // Router::RateLimitPolicyEntry
+  // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap&,
-                           Http::StreamDecoderFilterCallbacks& callbacks) const override;
+                           const std::string& remote_address) const override;
 
 private:
   const std::string kill_switch_key_;
   int64_t stage_{};
-  std::vector<ActionPtr> actions_;
+  std::vector<RateLimitActionPtr> actions_;
 };
 
 /**
@@ -84,13 +83,15 @@ public:
   const std::string& routeKey() const override { return route_key_; }
 
   // Router::RateLimitPolicy
-  const std::vector<std::reference_wrapper<RateLimitPolicyEntry>>&
+  const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
   getApplicableRateLimit(int64_t stage = 0) const override;
 
 private:
   const std::string route_key_;
-  std::vector<std::vector<std::reference_wrapper<RateLimitPolicyEntry>>> rate_limit_entries_;
-  static const std::vector<std::reference_wrapper<RateLimitPolicyEntry>> empty_rate_limit_;
+  std::vector<std::vector<std::unique_ptr<RateLimitPolicyEntry>>> rate_limit_entries_;
+  std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
+      rate_limit_entries_reference_;
+  static const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> empty_rate_limit_;
 };
 
 } // Router

@@ -39,6 +39,7 @@ public:
 
   DoRetryCallback callback_;
 };
+
 class TestRateLimitPolicyEntry : public RateLimitPolicyEntry {
 public:
   // Router::RateLimitPolicyEntry
@@ -47,19 +48,19 @@ public:
   // Router::RateLimitPolicyEntry
   const std::string& killSwitchKey() const override { return kill_switch_key_; }
 
-  // Router::RateLimitPolicyEntry
+  // Router::RateLimitAction
   void populateDescriptors(const RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                           Http::StreamDecoderFilterCallbacks& callbacks) const override {
-    populateDescriptors_(route, descriptors, local_service_cluster, headers, callbacks);
+                           const std::string& remote_address) const override {
+    populateDescriptors_(route, descriptors, local_service_cluster, headers, remote_address);
   }
 
   MOCK_CONST_METHOD5(populateDescriptors_,
                      void(const RouteEntry& route,
                           std::vector<::RateLimit::Descriptor>& descriptors,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          Http::StreamDecoderFilterCallbacks& callbacks));
+                          const std::string& remote_address));
   int64_t stage_{};
   std::string kill_switch_key_;
 };
@@ -70,13 +71,14 @@ public:
   const std::string& routeKey() const override { return route_key_; }
 
   // Router::RateLimitPolicy
-  const std::vector<std::reference_wrapper<RateLimitPolicyEntry>>&
+  const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
   getApplicableRateLimit(int64_t stage) const override {
     return getApplicableRateLimit_(stage);
   }
 
-  MOCK_CONST_METHOD1(getApplicableRateLimit_,
-                     std::vector<std::reference_wrapper<RateLimitPolicyEntry>>&(int64_t stage));
+  MOCK_CONST_METHOD1(
+      getApplicableRateLimit_,
+      std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(int64_t stage));
 
   std::string route_key_;
 };

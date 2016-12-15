@@ -30,6 +30,7 @@ public:
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_key.http_filter_enabled", 100))
         .WillByDefault(Return(true));
+    ON_CALL(filter_callbacks_, downstreamAddress()).WillByDefault(ReturnRef(EMPTY_STRING));
   }
 
   void SetUpTest(const std::string json) {
@@ -58,7 +59,7 @@ public:
   Buffer::OwnedImpl data_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
-  std::vector<std::reference_wrapper<Router::RateLimitPolicyEntry>> rate_limit_policies_;
+  std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>> rate_limit_policies_;
   Router::TestRateLimitPolicyEntry rate_limit_policy_entry_;
   std::vector<::RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};
 };

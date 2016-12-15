@@ -2,14 +2,13 @@
 
 namespace Router {
 
-const std::vector<std::reference_wrapper<RateLimitPolicyEntry>>
-    RateLimitPolicyImpl::empty_rate_limit_ = {};
+const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>
+    RateLimitPolicyImpl::empty_rate_limit_;
 
 void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route,
                                                  std::vector<::RateLimit::Descriptor>& descriptors,
                                                  const std::string& local_service_cluster,
-                                                 const Http::HeaderMap&,
-                                                 Http::StreamDecoderFilterCallbacks&) const {
+                                                 const Http::HeaderMap&, const std::string&) const {
   // We limit on 2 dimensions.
   // 1) All calls to the given cluster.
   // 2) Calls to the given cluster and from this cluster.
@@ -22,7 +21,7 @@ void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route
 void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
                                                std::vector<::RateLimit::Descriptor>& descriptors,
                                                const std::string&, const Http::HeaderMap& headers,
-                                               Http::StreamDecoderFilterCallbacks&) const {
+                                               const std::string&) const {
   const Http::HeaderEntry* header_value = headers.get(header_name_);
   if (!header_value) {
     return;
@@ -42,8 +41,7 @@ void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
 void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
                                               std::vector<::RateLimit::Descriptor>& descriptors,
                                               const std::string&, const Http::HeaderMap&,
-                                              Http::StreamDecoderFilterCallbacks& callbacks) const {
-  const std::string& remote_address = callbacks.downstreamAddress();
+                                              const std::string& remote_address) const {
   if (remote_address.empty()) {
     return;
   }
@@ -77,32 +75,36 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
 void RateLimitPolicyEntryImpl::populateDescriptors(
     const Router::RouteEntry& route, std::vector<::RateLimit::Descriptor>& descriptors,
     const std::string& local_service_cluster, const Http::HeaderMap& headers,
-    Http::StreamDecoderFilterCallbacks& callbacks) const {
-  for (const ActionPtr& action : actions_) {
-    action->populateDescriptors(route, descriptors, local_service_cluster, headers, callbacks);
+    const std::string& remote_address) const {
+  for (const RateLimitActionPtr& action : actions_) {
+    action->populateDescriptors(route, descriptors, local_service_cluster, headers, remote_address);
   }
 }
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
     : route_key_(config.getObject("rate_limit", true)->getString("route_key", "")) {
   if (config.hasObject("rate_limits")) {
-    std::vector<std::reference_wrapper<RateLimitPolicyEntry>> rate_limit_policy;
+    std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_policy;
+    std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limit_policy_reference;
     for (const Json::ObjectPtr& rate_limit : config.getObjectArray("rate_limits")) {
-      RateLimitPolicyEntryImpl* rate_limit_policy_entry = new RateLimitPolicyEntryImpl(*rate_limit);
-      rate_limit_policy.emplace_back(*rate_limit_policy_entry);
+      std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
+          new RateLimitPolicyEntryImpl(*rate_limit));
+      rate_limit_policy_reference.emplace_back(*rate_limit_policy_entry);
+      rate_limit_policy.emplace_back(std::move(rate_limit_policy_entry));
     }
-    rate_limit_entries_.push_back(rate_limit_policy);
+    rate_limit_entries_.emplace_back(std::move(rate_limit_policy));
+    rate_limit_entries_reference_.emplace_back(rate_limit_policy_reference);
   }
 }
 
-const std::vector<std::reference_wrapper<RateLimitPolicyEntry>>&
+const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
     RateLimitPolicyImpl::getApplicableRateLimit(int64_t) const {
   // Currently return all rate limit policy entries.
   // TODO: Implement returning only rate limit policy entries that match the stage setting.
   if (rate_limit_entries_.empty()) {
     return empty_rate_limit_;
   } else {
-    return rate_limit_entries_[0];
+    return rate_limit_entries_reference_[0];
   }
 }
 

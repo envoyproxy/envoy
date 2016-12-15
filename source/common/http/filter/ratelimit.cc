@@ -29,10 +29,10 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
     }
 
     std::vector<::RateLimit::Descriptor> descriptors;
-    for (Router::RateLimitPolicyEntry& rate_limit :
+    for (const Router::RateLimitPolicyEntry& rate_limit :
          route->rateLimitPolicy().getApplicableRateLimit(config_->stage())) {
       rate_limit.populateDescriptors(*route, descriptors, config_->localServiceCluster(), headers,
-                                     *callbacks_);
+                                     callbacks_->downstreamAddress());
     }
 
     if (!descriptors.empty()) {
