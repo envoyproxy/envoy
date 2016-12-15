@@ -16,6 +16,7 @@ const std::string ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE = "UF";
 const std::string ResponseFlagUtils::UPSTREAM_CONNECTION_TERMINATION = "UC";
 const std::string ResponseFlagUtils::UPSTREAM_OVERFLOW = "UO";
 const std::string ResponseFlagUtils::NO_ROUTE_FOUND = "NR";
+const std::string ResponseFlagUtils::DELAY_INJECTED = "DI";
 const std::string ResponseFlagUtils::FAULT_INJECTED = "FI";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
@@ -65,6 +66,10 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
     appendString(result, NO_ROUTE_FOUND);
   }
 
+  if (request_info.getResponseFlag(ResponseFlag::DelayInjected)) {
+    appendString(result, DELAY_INJECTED);
+  }
+
   if (request_info.getResponseFlag(ResponseFlag::FaultInjected)) {
     appendString(result, FAULT_INJECTED);
   }
@@ -80,6 +85,7 @@ bool ResponseFlagUtils::isTraceableFailure(const Http::AccessLog::RequestInfo& r
          request_info.getResponseFlag(
              Http::AccessLog::ResponseFlag::UpstreamConnectionTermination) |
          request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected) |
          request_info.getResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
 }
 
@@ -240,8 +246,9 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
                  : "0";
     };
   } else if (field_name == "BYTES_SENT") {
-    field_extractor_ =
-        [](const RequestInfo& request_info) { return std::to_string(request_info.bytesSent()); };
+    field_extractor_ = [](const RequestInfo& request_info) {
+      return std::to_string(request_info.bytesSent());
+    };
   } else if (field_name == "DURATION") {
     field_extractor_ = [](const RequestInfo& request_info) {
       return std::to_string(request_info.duration().count());
