@@ -61,13 +61,38 @@ TEST_F(ConnectionManagerUtilityTest, ShouldTraceRequest) {
     NiceMock<Http::AccessLog::MockRequestInfo> request_info;
     Optional<Http::TracingConnectionManagerConfig> tracing_failure(
         {"operation", Http::TracingType::UpstreamFailure});
-    EXPECT_CALL(request_info, failureReason())
-        .WillOnce(Return(Http::AccessLog::FailureReason::UpstreamConnectionFailure));
-    EXPECT_TRUE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
 
-    EXPECT_CALL(request_info, failureReason())
-        .WillOnce(Return(Http::AccessLog::FailureReason::None));
-    EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
+    std::vector<Http::AccessLog::ResponseFlag> upstream_failed_response_flag{
+        Http::AccessLog::ResponseFlag::UpstreamConnectionFailure,
+        Http::AccessLog::ResponseFlag::UpstreamConnectionTermination,
+        Http::AccessLog::ResponseFlag::NoHealthyUpstream,
+        Http::AccessLog::ResponseFlag::UpstreamRequestTimeout,
+        Http::AccessLog::ResponseFlag::UpstreamOverflow,
+        Http::AccessLog::ResponseFlag::FaultInjected, Http::AccessLog::ResponseFlag::NoRouteFound};
+
+    for (Http::AccessLog::ResponseFlag flag : upstream_failed_response_flag) {
+      ON_CALL(request_info, getResponseFlag(flag)).WillByDefault(Return(true));
+      EXPECT_TRUE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
+
+      ON_CALL(request_info, getResponseFlag(flag)).WillByDefault(Return(false));
+      EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
+    }
+  }
+
+  {
+    NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+    Optional<Http::TracingConnectionManagerConfig> tracing_failure(
+        {"operation", Http::TracingType::UpstreamFailure});
+
+    std::vector<Http::AccessLog::ResponseFlag> upstream_not_failed_response_flag{
+        Http::AccessLog::ResponseFlag::FailedLocalHealthCheck,
+        Http::AccessLog::ResponseFlag::LocalReset,
+        Http::AccessLog::ResponseFlag::UpstreamRemoteReset};
+
+    for (Http::AccessLog::ResponseFlag flag : upstream_not_failed_response_flag) {
+      ON_CALL(request_info, getResponseFlag(flag)).WillByDefault(Return(true));
+      EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
+    }
   }
 }
 

@@ -149,7 +149,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     config_.stats_.no_route_.inc();
     stream_log_debug("no cluster match for URL '{}'", *callbacks_, headers.Path()->value().c_str());
 
-    callbacks_->requestInfo().onFailedResponse(Http::AccessLog::FailureReason::NoRouteFound);
+    callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound);
     Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
         {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound))}}};
     callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -176,7 +176,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // See if we are supposed to immediately kill some percentage of this cluster's traffic.
   if (cluster_->maintenanceMode()) {
-    callbacks_->requestInfo().onFailedResponse(Http::AccessLog::FailureReason::UpstreamOverflow);
+    callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
     Http::Utility::sendLocalReply(*callbacks_, Http::Code::ServiceUnavailable, "maintenance mode");
     return Http::FilterHeadersStatus::StopIteration;
@@ -222,7 +222,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
-  callbacks_->requestInfo().onFailedResponse(Http::AccessLog::FailureReason::NoHealthyUpstream);
+  callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
   Http::Utility::sendLocalReply(*callbacks_, Http::Code::ServiceUnavailable, "no healthy upstream");
 }
@@ -367,15 +367,15 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     Http::Code code;
     const char* body;
     if (type == UpstreamResetType::GlobalTimeout || type == UpstreamResetType::PerTryTimeout) {
-      callbacks_->requestInfo().onFailedResponse(
-          Http::AccessLog::FailureReason::UpstreamRequestTimeout);
+      callbacks_->requestInfo().setResponseFlag(
+          Http::AccessLog::ResponseFlag::UpstreamRequestTimeout);
 
       code = Http::Code::GatewayTimeout;
       body = "upstream request timeout";
     } else {
-      Http::AccessLog::FailureReason failure_reason =
-          streamResetReasonToFailureReason(reset_reason.value());
-      callbacks_->requestInfo().onFailedResponse(failure_reason);
+      Http::AccessLog::ResponseFlag response_flags =
+          streamResetReasonToResponseFlag(reset_reason.value());
+      callbacks_->requestInfo().setResponseFlag(response_flags);
       code = Http::Code::ServiceUnavailable;
       body = "upstream connect error or disconnect/reset before headers";
     }
@@ -385,21 +385,21 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   }
 }
 
-Http::AccessLog::FailureReason
-Filter::streamResetReasonToFailureReason(Http::StreamResetReason reset_reason) {
+Http::AccessLog::ResponseFlag
+Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   switch (reset_reason) {
   case Http::StreamResetReason::ConnectionFailure:
-    return Http::AccessLog::FailureReason::UpstreamConnectionFailure;
+    return Http::AccessLog::ResponseFlag::UpstreamConnectionFailure;
   case Http::StreamResetReason::ConnectionTermination:
-    return Http::AccessLog::FailureReason::UpstreamConnectionTermination;
+    return Http::AccessLog::ResponseFlag::UpstreamConnectionTermination;
   case Http::StreamResetReason::LocalReset:
   case Http::StreamResetReason::LocalRefusedStreamReset:
-    return Http::AccessLog::FailureReason::LocalReset;
+    return Http::AccessLog::ResponseFlag::LocalReset;
   case Http::StreamResetReason::Overflow:
-    return Http::AccessLog::FailureReason::UpstreamOverflow;
+    return Http::AccessLog::ResponseFlag::UpstreamOverflow;
   case Http::StreamResetReason::RemoteReset:
   case Http::StreamResetReason::RemoteRefusedStreamReset:
-    return Http::AccessLog::FailureReason::UpstreamRemoteReset;
+    return Http::AccessLog::ResponseFlag::UpstreamRemoteReset;
   }
 
   throw std::invalid_argument("Unknown reset_reason");

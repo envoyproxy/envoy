@@ -33,7 +33,7 @@ public:
   ~MockRequestInfo();
 
   // Http::AccessLog::RequestInfo
-  MOCK_METHOD1(onFailedResponse, void(FailureReason failure_reason));
+  MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionPtr host));
   MOCK_CONST_METHOD0(startTime, SystemTime());
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
@@ -42,7 +42,7 @@ public:
   MOCK_CONST_METHOD0(responseCode, Optional<uint32_t>&());
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
   MOCK_CONST_METHOD0(duration, std::chrono::milliseconds());
-  MOCK_CONST_METHOD0(failureReason, FailureReason());
+  MOCK_CONST_METHOD1(getResponseFlag, bool(Http::AccessLog::ResponseFlag));
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionPtr());
   MOCK_CONST_METHOD0(healthCheck, bool());
   MOCK_METHOD1(healthCheck, void(bool is_hc));

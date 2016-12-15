@@ -10,29 +10,27 @@
 namespace Http {
 namespace AccessLog {
 
-enum class FailureReason {
-  // No failure.
-  None,
+enum ResponseFlag {
   // Local server healthcheck failed.
-  FailedLocalHealthCheck,
+  FailedLocalHealthCheck = 0x1,
   // No healthy upstream.
-  NoHealthyUpstream,
+  NoHealthyUpstream = 0x2,
   // Request timeout on upstream.
-  UpstreamRequestTimeout,
+  UpstreamRequestTimeout = 0x4,
   // Local codec level reset was sent on the stream.
-  LocalReset,
+  LocalReset = 0x8,
   // Remote codec level reset was received on the stream.
-  UpstreamRemoteReset,
+  UpstreamRemoteReset = 0x10,
   // Local reset by a connection pool due to an initial connection failure.
-  UpstreamConnectionFailure,
+  UpstreamConnectionFailure = 0x20,
   // If the stream was locally reset due to connection termination.
-  UpstreamConnectionTermination,
+  UpstreamConnectionTermination = 0x40,
   // The stream was reset because of a resource overflow.
-  UpstreamOverflow,
+  UpstreamOverflow = 0x80,
   // No route found for a given request.
-  NoRouteFound,
-  // Used when faults (abort with error codes) are injected.
-  FaultInjected,
+  NoRouteFound = 0x100,
+  // Abort with error code is injected.
+  FaultInjected = 0x200
 };
 
 /**
@@ -43,13 +41,12 @@ public:
   virtual ~RequestInfo() {}
 
   /**
-   * filter can trigger this callback on failed response to provide more details about
-   * failure.
+   * Each filter can set independent response flag, flags are accumulated.
    */
-  virtual void onFailedResponse(FailureReason failure_reason) PURE;
+  virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
-   * filter can trigger this callback when an upstream host has been selected.
+   * Filter can trigger this callback when an upstream host has been selected.
    */
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) PURE;
 
@@ -89,9 +86,9 @@ public:
   virtual std::chrono::milliseconds duration() const PURE;
 
   /**
-   * @return the failure reason for richer log experience.
+   * @return whether response flag is set or not.
    */
-  virtual FailureReason failureReason() const PURE;
+  virtual bool getResponseFlag(ResponseFlag response_flag) const PURE;
 
   /**
    * @return upstream host description.

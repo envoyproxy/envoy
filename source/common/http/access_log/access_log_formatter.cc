@@ -6,50 +6,86 @@
 namespace Http {
 namespace AccessLog {
 
-const std::string FilterReasonUtils::NONE = "-";
-const std::string FilterReasonUtils::FAILED_LOCAL_HEALTH_CHECK = "LH";
-const std::string FilterReasonUtils::NO_HEALTHY_UPSTREAM = "UH";
-const std::string FilterReasonUtils::UPSTREAM_REQUEST_TIMEOUT = "UT";
-const std::string FilterReasonUtils::LOCAL_RESET = "LR";
-const std::string FilterReasonUtils::UPSTREAM_REMOTE_RESET = "UR";
-const std::string FilterReasonUtils::UPSTREAM_CONNECTION_FAILURE = "UF";
-const std::string FilterReasonUtils::UPSTREAM_CONNECTION_TERMINATION = "UC";
-const std::string FilterReasonUtils::UPSTREAM_OVERFLOW = "UO";
-const std::string FilterReasonUtils::NO_ROUTE_FOUND = "NR";
-const std::string FilterReasonUtils::FAULT_INJECTED = "FI";
+const std::string ResponseFlagUtils::NONE = "-";
+const std::string ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK = "LH";
+const std::string ResponseFlagUtils::NO_HEALTHY_UPSTREAM = "UH";
+const std::string ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT = "UT";
+const std::string ResponseFlagUtils::LOCAL_RESET = "LR";
+const std::string ResponseFlagUtils::UPSTREAM_REMOTE_RESET = "UR";
+const std::string ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE = "UF";
+const std::string ResponseFlagUtils::UPSTREAM_CONNECTION_TERMINATION = "UC";
+const std::string ResponseFlagUtils::UPSTREAM_OVERFLOW = "UO";
+const std::string ResponseFlagUtils::NO_ROUTE_FOUND = "NR";
+const std::string ResponseFlagUtils::FAULT_INJECTED = "FI";
 
-const std::string& FilterReasonUtils::toShortString(FailureReason failure_reason) {
-  switch (failure_reason) {
-  case FailureReason::None:
-    return NONE;
-  case FailureReason::FailedLocalHealthCheck:
-    return FAILED_LOCAL_HEALTH_CHECK;
-  case FailureReason::NoHealthyUpstream:
-    return NO_HEALTHY_UPSTREAM;
-  case FailureReason::UpstreamRequestTimeout:
-    return UPSTREAM_REQUEST_TIMEOUT;
-  case FailureReason::LocalReset:
-    return LOCAL_RESET;
-  case FailureReason::UpstreamRemoteReset:
-    return UPSTREAM_REMOTE_RESET;
-  case FailureReason::UpstreamConnectionFailure:
-    return UPSTREAM_CONNECTION_FAILURE;
-  case FailureReason::UpstreamConnectionTermination:
-    return UPSTREAM_CONNECTION_TERMINATION;
-  case FailureReason::UpstreamOverflow:
-    return UPSTREAM_OVERFLOW;
-  case FailureReason::NoRouteFound:
-    return NO_ROUTE_FOUND;
-  case FailureReason::FaultInjected:
-    return FAULT_INJECTED;
+void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
+  if (result.empty()) {
+    result = append;
+  } else {
+    result += "," + append;
+  }
+}
+
+const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_info) {
+  std::string result;
+
+  if (request_info.getResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
+    appendString(result, FAILED_LOCAL_HEALTH_CHECK);
   }
 
-  throw std::invalid_argument("Unknown failure_reason");
+  if (request_info.getResponseFlag(ResponseFlag::NoHealthyUpstream)) {
+    appendString(result, NO_HEALTHY_UPSTREAM);
+  }
+
+  if (request_info.getResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
+    appendString(result, UPSTREAM_REQUEST_TIMEOUT);
+  }
+
+  if (request_info.getResponseFlag(ResponseFlag::LocalReset)) {
+    appendString(result, LOCAL_RESET);
+  }
+
+  if (request_info.getResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
+    appendString(result, UPSTREAM_REMOTE_RESET);
+  }
+
+  if (request_info.getResponseFlag(ResponseFlag::UpstreamConnectionFailure)) {
+    appendString(result, UPSTREAM_CONNECTION_FAILURE);
+  }
+
+  if (request_info.getResponseFlag(ResponseFlag::UpstreamConnectionTermination)) {
+    appendString(result, UPSTREAM_CONNECTION_TERMINATION);
+  }
+
+  if (request_info.getResponseFlag(ResponseFlag::UpstreamOverflow)) {
+    appendString(result, UPSTREAM_OVERFLOW);
+  }
+
+  if (request_info.getResponseFlag(ResponseFlag::NoRouteFound)) {
+    appendString(result, NO_ROUTE_FOUND);
+  }
+
+  if (request_info.getResponseFlag(ResponseFlag::FaultInjected)) {
+    appendString(result, FAULT_INJECTED);
+  }
+
+  return result.empty() ? NONE : result;
+}
+
+bool ResponseFlagUtils::isTraceableFailure(const Http::AccessLog::RequestInfo& request_info) {
+  return request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout) |
+         request_info.getResponseFlag(
+             Http::AccessLog::ResponseFlag::UpstreamConnectionTermination) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound) |
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
 }
 
 const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
     "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
-    "%RESPONSE_CODE% %FAILURE_REASON% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
+    "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
     "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "
     "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
     "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
@@ -210,9 +246,9 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     field_extractor_ = [](const RequestInfo& request_info) {
       return std::to_string(request_info.duration().count());
     };
-  } else if (field_name == "FAILURE_REASON") {
+  } else if (field_name == "RESPONSE_FLAGS") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      return FilterReasonUtils::toShortString(request_info.failureReason());
+      return ResponseFlagUtils::toShortString(request_info);
     };
   } else if (field_name == "UPSTREAM_HOST") {
     field_extractor_ = [](const RequestInfo& request_info) {

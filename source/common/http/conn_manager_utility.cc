@@ -1,5 +1,6 @@
 #include "conn_manager_utility.h"
 
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -148,7 +149,7 @@ bool ConnectionManagerUtility::shouldTraceRequest(
   case Http::TracingType::All:
     return true;
   case Http::TracingType::UpstreamFailure:
-    return request_info.failureReason() != Http::AccessLog::FailureReason::None;
+    return Http::AccessLog::ResponseFlagUtils::isTraceableFailure(request_info);
   }
 
   // Compiler enforces switch above to cover all the cases and it's impossible to be here,

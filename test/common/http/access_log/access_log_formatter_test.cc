@@ -5,28 +5,48 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
+using testing::_;
+using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
 namespace Http {
 namespace AccessLog {
 
-TEST(FailureReasonUtilsTest, toShortStringConversion) {
-  std::vector<std::pair<FailureReason, std::string>> expected = {
-      std::make_pair(FailureReason::None, "-"),
-      std::make_pair(FailureReason::FailedLocalHealthCheck, "LH"),
-      std::make_pair(FailureReason::NoHealthyUpstream, "UH"),
-      std::make_pair(FailureReason::UpstreamRequestTimeout, "UT"),
-      std::make_pair(FailureReason::LocalReset, "LR"),
-      std::make_pair(FailureReason::UpstreamRemoteReset, "UR"),
-      std::make_pair(FailureReason::UpstreamConnectionFailure, "UF"),
-      std::make_pair(FailureReason::UpstreamConnectionTermination, "UC"),
-      std::make_pair(FailureReason::UpstreamOverflow, "UO"),
-      std::make_pair(FailureReason::NoRouteFound, "NR"),
-      std::make_pair(FailureReason::FaultInjected, "FI")};
+TEST(ResponseFlagUtilsTest, toShortStringConversion) {
+  std::vector<std::pair<ResponseFlag, std::string>> expected = {
+      std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
+      std::make_pair(ResponseFlag::NoHealthyUpstream, "UH"),
+      std::make_pair(ResponseFlag::UpstreamRequestTimeout, "UT"),
+      std::make_pair(ResponseFlag::LocalReset, "LR"),
+      std::make_pair(ResponseFlag::UpstreamRemoteReset, "UR"),
+      std::make_pair(ResponseFlag::UpstreamConnectionFailure, "UF"),
+      std::make_pair(ResponseFlag::UpstreamConnectionTermination, "UC"),
+      std::make_pair(ResponseFlag::UpstreamOverflow, "UO"),
+      std::make_pair(ResponseFlag::NoRouteFound, "NR"),
+      std::make_pair(ResponseFlag::FaultInjected, "FI")};
 
   for (const auto& testCase : expected) {
-    EXPECT_EQ(testCase.second, FilterReasonUtils::toShortString(testCase.first));
+    NiceMock<MockRequestInfo> request_info;
+    ON_CALL(request_info, getResponseFlag(testCase.first)).WillByDefault(Return(true));
+    EXPECT_EQ(testCase.second, ResponseFlagUtils::toShortString(request_info));
+  }
+
+  // No flag is set.
+  {
+    NiceMock<MockRequestInfo> request_info;
+    ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(false));
+    EXPECT_EQ("-", ResponseFlagUtils::toShortString(request_info));
+  }
+
+  // Test combinations.
+  // These are not real use cases, but are used to cover multiple response flags case.
+  {
+    NiceMock<MockRequestInfo> request_info;
+    ON_CALL(request_info, getResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
+    ON_CALL(request_info, getResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+        .WillByDefault(Return(true));
+    EXPECT_EQ("UT,FI", ResponseFlagUtils::toShortString(request_info));
   }
 }
 
@@ -47,7 +67,7 @@ TEST(AccessLogFormatterTest, plainStringFormatter) {
 TEST(AccessLogFormatterTest, requestInfoFormatter) {
   EXPECT_THROW(RequestInfoFormatter formatter("unknown_field"), EnvoyException);
 
-  MockRequestInfo requestInfo;
+  NiceMock<MockRequestInfo> requestInfo;
   TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
   {
@@ -98,10 +118,9 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
-    RequestInfoFormatter failure_reason_format("FAILURE_REASON");
-    FailureReason reason = FailureReason::LocalReset;
-    EXPECT_CALL(requestInfo, failureReason()).WillOnce(Return(reason));
-    EXPECT_EQ("LR", failure_reason_format.format(header, header, requestInfo));
+    RequestInfoFormatter response_flags_format("RESPONSE_FLAGS");
+    ON_CALL(requestInfo, getResponseFlag(ResponseFlag::LocalReset)).WillByDefault(Return(true));
+    EXPECT_EQ("LR", response_flags_format.format(header, header, requestInfo));
   }
 
   {

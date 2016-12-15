@@ -6,14 +6,16 @@ namespace Http {
 namespace AccessLog {
 
 /**
- * Util class for FilterReason.
+ * Util class for ResponseFlags.
  */
-class FilterReasonUtils {
+class ResponseFlagUtils {
 public:
-  static const std::string& toShortString(FailureReason failure_reason);
+  static const std::string toShortString(const RequestInfo& request_info);
+  static bool isTraceableFailure(const Http::AccessLog::RequestInfo& request_info);
 
 private:
-  FilterReasonUtils(){};
+  ResponseFlagUtils();
+  static void appendString(std::string& result, const std::string& append);
 
   const static std::string NONE;
   const static std::string FAILED_LOCAL_HEALTH_CHECK;

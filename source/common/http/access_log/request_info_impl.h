@@ -26,11 +26,11 @@ struct RequestInfoImpl : public RequestInfo {
                                                                  start_time_);
   }
 
-  void onFailedResponse(Http::AccessLog::FailureReason failure_reason) override {
-    failure_reason_ = failure_reason;
+  void setResponseFlag(Http::AccessLog::ResponseFlag response_flag) override {
+    response_flags_ |= response_flag;
   }
 
-  Http::AccessLog::FailureReason failureReason() const override { return failure_reason_; }
+  bool getResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
 
   void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override { upstream_host_ = host; }
 
@@ -45,7 +45,7 @@ struct RequestInfoImpl : public RequestInfo {
   uint64_t bytes_received_{};
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};
-  FailureReason failure_reason_{FailureReason::None};
+  uint64_t response_flags_{};
   Upstream::HostDescriptionPtr upstream_host_{};
   bool hc_request_{};
 };
