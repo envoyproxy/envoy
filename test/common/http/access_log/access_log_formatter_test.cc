@@ -24,6 +24,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::UpstreamConnectionTermination, "UC"),
       std::make_pair(ResponseFlag::UpstreamOverflow, "UO"),
       std::make_pair(ResponseFlag::NoRouteFound, "NR"),
+      std::make_pair(ResponseFlag::FaultInjected, "DI"),
       std::make_pair(ResponseFlag::FaultInjected, "FI")};
 
   for (const auto& testCase : expected) {
@@ -43,10 +44,11 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   // These are not real use cases, but are used to cover multiple response flags case.
   {
     NiceMock<MockRequestInfo> request_info;
+    ON_CALL(request_info, getResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
     ON_CALL(request_info, getResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
     ON_CALL(request_info, getResponseFlag(ResponseFlag::UpstreamRequestTimeout))
         .WillByDefault(Return(true));
-    EXPECT_EQ("UT,FI", ResponseFlagUtils::toShortString(request_info));
+    EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(request_info));
   }
 }
 
@@ -228,10 +230,22 @@ TEST(AccessLogFormatterTest, ParserFailures) {
   AccessLogFormatParser parser;
 
   std::vector<std::string> test_cases = {
-      "{{%PROTOCOL%}}   ++ %REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)", "%REQ(FIRST?SECOND)T%",
-      "RESP(FIRST)%", "%REQ(valid)% %NOT_VALID%", "%REQ(FIRST?SECOND%", "%%", "%protocol%",
-      "%REQ(TEST):%", "%REQ(TEST):3q4%", "%RESP(TEST):%", "%RESP(X?Y):%", "%RESP(X?Y):343o24%",
-      "%REQ(TEST):10", "REQ(:TEST):10%", "%REQ(TEST:10%", "%REQ("};
+      "{{%PROTOCOL%}}   ++ %REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)",
+      "%REQ(FIRST?SECOND)T%",
+      "RESP(FIRST)%",
+      "%REQ(valid)% %NOT_VALID%",
+      "%REQ(FIRST?SECOND%",
+      "%%",
+      "%protocol%",
+      "%REQ(TEST):%",
+      "%REQ(TEST):3q4%",
+      "%RESP(TEST):%",
+      "%RESP(X?Y):%",
+      "%RESP(X?Y):343o24%",
+      "%REQ(TEST):10",
+      "REQ(:TEST):10%",
+      "%REQ(TEST:10%",
+      "%REQ("};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_THROW(parser.parse(test_case), EnvoyException);
