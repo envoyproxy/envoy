@@ -84,9 +84,7 @@ bool ResponseFlagUtils::isTraceableFailure(const Http::AccessLog::RequestInfo& r
          request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout) |
          request_info.getResponseFlag(
              Http::AccessLog::ResponseFlag::UpstreamConnectionTermination) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
+         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound);
 }
 
 const std::string AccessLogFormatUtils::DEFAULT_FORMAT =

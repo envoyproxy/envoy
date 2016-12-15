@@ -68,7 +68,6 @@ TEST_F(ConnectionManagerUtilityTest, ShouldTraceRequest) {
         Http::AccessLog::ResponseFlag::NoHealthyUpstream,
         Http::AccessLog::ResponseFlag::UpstreamRequestTimeout,
         Http::AccessLog::ResponseFlag::UpstreamOverflow,
-        Http::AccessLog::ResponseFlag::DelayInjected, Http::AccessLog::ResponseFlag::FaultInjected,
         Http::AccessLog::ResponseFlag::NoRouteFound};
 
     for (Http::AccessLog::ResponseFlag flag : upstream_failed_response_flag) {
