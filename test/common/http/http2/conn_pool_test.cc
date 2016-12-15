@@ -51,11 +51,11 @@ public:
   };
 
   Http2ConnPoolImplTest()
-      : pool_(dispatcher_, host_, cluster_.stats_store_, Upstream::ResourcePriority::Default) {}
+      : pool_(dispatcher_, host_, cluster_->stats_store_, Upstream::ResourcePriority::Default) {}
 
   ~Http2ConnPoolImplTest() {
     // Make sure all gauges are 0.
-    for (Stats::Gauge& gauge : cluster_.stats_store_.gauges()) {
+    for (Stats::Gauge& gauge : cluster_->stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge.value());
     }
   }
@@ -71,7 +71,7 @@ public:
     test_client.codec_client_ = new CodecClientForTest(
         std::move(connection), test_client.codec_, [this](CodecClient*) -> void {
           onClientDestroy();
-        }, CodecClientStats{ALL_CODEC_CLIENT_STATS(POOL_COUNTER(cluster_.stats_store_))});
+        }, CodecClientStats{ALL_CODEC_CLIENT_STATS(POOL_COUNTER(cluster_->stats_store_))});
 
     EXPECT_CALL(dispatcher_, createClientConnection_(_)).WillOnce(Return(test_client.connection_));
     EXPECT_CALL(pool_, createCodecClient_(_))
@@ -88,7 +88,7 @@ public:
   MOCK_METHOD0(onClientDestroy, void());
 
   NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<Upstream::MockCluster> cluster_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostPtr host_{new Upstream::HostImpl(cluster_, "tcp://127.0.0.1:80", false, 1, "")};
   TestConnPoolImpl pool_;
   std::vector<TestCodecClient> test_clients_;
@@ -112,9 +112,9 @@ public:
 
 TEST_F(Http2ConnPoolImplTest, VerifyConectionTimingStats) {
   expectClientCreate();
-  EXPECT_CALL(cluster_.stats_store_,
+  EXPECT_CALL(cluster_->stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.upstream_cx_connect_ms", _));
-  EXPECT_CALL(cluster_.stats_store_,
+  EXPECT_CALL(cluster_->stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.upstream_cx_length_ms", _));
 
   ActiveTestRequest r1(*this, 0);
@@ -164,7 +164,7 @@ TEST_F(Http2ConnPoolImplTest, LocalReset) {
   test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(1U, cluster_.stats_.upstream_rq_tx_reset_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_tx_reset_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, RemoteReset) {
@@ -180,7 +180,7 @@ TEST_F(Http2ConnPoolImplTest, RemoteReset) {
   test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(1U, cluster_.stats_.upstream_rq_rx_reset_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_rx_reset_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
@@ -325,9 +325,9 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_.stats_.upstream_cx_connect_fail_.value());
-  EXPECT_EQ(1U, cluster_.stats_.upstream_cx_connect_timeout_.value());
-  EXPECT_EQ(1U, cluster_.stats_.upstream_rq_pending_failure_eject_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_timeout_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, MaxRequests) {
@@ -352,7 +352,7 @@ TEST_F(Http2ConnPoolImplTest, MaxRequests) {
 
 TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
   InSequence s;
-  cluster_.resource_manager_.reset(
+  cluster_->resource_manager_.reset(
       new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1024, 1024, 1, 1));
 
   expectClientCreate();

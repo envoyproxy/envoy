@@ -15,7 +15,8 @@ namespace Grpc {
 class GrpcRequestImplTest : public testing::Test {
 public:
   GrpcRequestImplTest() : http_async_client_request_(&cm_.async_client_) {
-    ON_CALL(cm_.cluster_, features()).WillByDefault(Return(Upstream::Cluster::Features::HTTP2));
+    ON_CALL(*cm_.cluster_.info_, features())
+        .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
   }
 
   void expectNormalRequest(
@@ -32,7 +33,7 @@ public:
 
   NiceMock<Upstream::MockClusterManager> cm_;
   MockRpcChannelCallbacks grpc_callbacks_;
-  RpcChannelImpl grpc_request_{cm_, "cluster", grpc_callbacks_, cm_.cluster_.stats_store_,
+  RpcChannelImpl grpc_request_{cm_, "cluster", grpc_callbacks_, cm_.cluster_.info_->stats_store_,
                                Optional<std::chrono::milliseconds>()};
   helloworld::Greeter::Stub service_{&grpc_request_};
   Http::MockAsyncClientRequest http_async_client_request_;
@@ -72,10 +73,9 @@ TEST_F(GrpcRequestImplTest, NoError) {
   EXPECT_CALL(grpc_callbacks_, onSuccess());
   http_callbacks_->onSuccess(std::move(response_http_message));
   EXPECT_EQ(response.SerializeAsString(), inner_response.SerializeAsString());
-  EXPECT_EQ(
-      1UL,
-      cm_.cluster_.stats_store_.counter("cluster.cluster.grpc.helloworld.Greeter.SayHello.success")
-          .value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_
+                     .counter("cluster.cluster.grpc.helloworld.Greeter.SayHello.success")
+                     .value());
 }
 
 TEST_F(GrpcRequestImplTest, Non200Response) {
@@ -92,10 +92,9 @@ TEST_F(GrpcRequestImplTest, Non200Response) {
 
   EXPECT_CALL(grpc_callbacks_, onFailure(Optional<uint64_t>(), "non-200 response code"));
   http_callbacks_->onSuccess(std::move(response_http_message));
-  EXPECT_EQ(
-      1UL,
-      cm_.cluster_.stats_store_.counter("cluster.cluster.grpc.helloworld.Greeter.SayHello.failure")
-          .value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_
+                     .counter("cluster.cluster.grpc.helloworld.Greeter.SayHello.failure")
+                     .value());
 }
 
 TEST_F(GrpcRequestImplTest, NoResponseTrailers) {
@@ -268,8 +267,8 @@ TEST_F(GrpcRequestImplTest, Cancel) {
 
 TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
   const Optional<std::chrono::milliseconds> timeout(std::chrono::milliseconds(100));
-  RpcChannelImpl grpc_request_timeout{cm_, "cluster", grpc_callbacks_, cm_.cluster_.stats_store_,
-                                      timeout};
+  RpcChannelImpl grpc_request_timeout{cm_, "cluster", grpc_callbacks_,
+                                      cm_.cluster_.info_->stats_store_, timeout};
   helloworld::Greeter::Stub service_timeout{&grpc_request_timeout};
   expectNormalRequest(timeout);
   helloworld::HelloRequest request;

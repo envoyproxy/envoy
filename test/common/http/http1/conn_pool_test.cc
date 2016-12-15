@@ -29,7 +29,7 @@ namespace Http1 {
  */
 class ConnPoolImplForTest : public ConnPoolImpl {
 public:
-  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::Cluster& cluster)
+  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterInfoPtr cluster)
       : ConnPoolImpl(dispatcher, Upstream::HostPtr{new Upstream::HostImpl(
                                      cluster, "tcp://127.0.0.1:9000", false, 1, "")},
                      stats_store_, Upstream::ResourcePriority::Default),
@@ -97,13 +97,13 @@ public:
 
   ~Http1ConnPoolImplTest() {
     // Make sure all gauges are 0.
-    for (Stats::Gauge& gauge : cluster_.stats_store_.gauges()) {
+    for (Stats::Gauge& gauge : cluster_->stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge.value());
     }
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<Upstream::MockCluster> cluster_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   ConnPoolImplForTest conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
@@ -175,9 +175,9 @@ struct ActiveTestRequest {
  * Test all timing stats are set.
  */
 TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
-  EXPECT_CALL(cluster_.stats_store_,
+  EXPECT_CALL(cluster_->stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.upstream_cx_connect_ms", _));
-  EXPECT_CALL(cluster_.stats_store_,
+  EXPECT_CALL(cluster_->stats_store_,
               deliverTimingToSinks("cluster.fake_cluster.upstream_cx_length_ms", _));
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
@@ -216,7 +216,7 @@ TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
  * Test when we overflow max pending requests.
  */
 TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
-  cluster_.resource_manager_.reset(
+  cluster_->resource_manager_.reset(
       new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1, 1024, 1));
 
   NiceMock<Http::MockStreamDecoder> outer_decoder;
@@ -237,7 +237,7 @@ TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
   conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_.stats_.upstream_rq_pending_overflow_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_overflow_.value());
 }
 
 /**
@@ -260,8 +260,8 @@ TEST_F(Http1ConnPoolImplTest, ConnectFailure) {
   EXPECT_CALL(conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_.stats_.upstream_cx_connect_fail_.value());
-  EXPECT_EQ(1U, cluster_.stats_.upstream_rq_pending_failure_eject_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());
 }
 
 /**
@@ -292,8 +292,8 @@ TEST_F(Http1ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(conn_pool_, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(2U, cluster_.stats_.upstream_cx_connect_fail_.value());
-  EXPECT_EQ(2U, cluster_.stats_.upstream_cx_connect_timeout_.value());
+  EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_fail_.value());
+  EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_timeout_.value());
 }
 
 /**
@@ -368,7 +368,7 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   NiceMock<Http::MockStreamDecoder> outer_decoder2;
   ConnPoolCallbacks callbacks2;
   handle = conn_pool_.newStream(outer_decoder2, callbacks2);
-  EXPECT_EQ(1U, cluster_.stats_.upstream_cx_overflow_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_overflow_.value());
 
   EXPECT_NE(nullptr, handle);
 
@@ -430,7 +430,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseHeader) {
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
 }
 
 /**
@@ -439,7 +439,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseHeader) {
 TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   InSequence s;
 
-  cluster_.max_requests_per_connection_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   // Request 1 should kick off a new connection.
   NiceMock<Http::MockStreamDecoder> outer_decoder;
@@ -464,14 +464,14 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
-  EXPECT_EQ(1U, cluster_.stats_.upstream_cx_max_requests_.value());
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_max_requests_.value());
 }
 
 TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
   InSequence s;
 
-  cluster_.resource_manager_.reset(
+  cluster_->resource_manager_.reset(
       new Upstream::ResourceManagerImpl(runtime_, "fake_key", 2, 1024, 1024, 1));
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();

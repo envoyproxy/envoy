@@ -125,7 +125,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(13UL, cluster_->stats().membership_healthy_.value());
+  EXPECT_EQ(13UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
@@ -135,7 +135,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_TRUE(canary_host->canary());
   EXPECT_EQ("us-east-1d", canary_host->zone());
   EXPECT_EQ(1U, canary_host->weight());
-  EXPECT_EQ(1UL, cluster_->stats().max_host_weight_.value());
+  EXPECT_EQ(1UL, cluster_->info()->stats().max_host_weight_.value());
 
   // Test response with weight change. We should still have the same host.
   setupRequest();
@@ -152,7 +152,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_TRUE(canary_host->canary());
   EXPECT_EQ("us-east-1d", canary_host->zone());
   EXPECT_EQ(50U, canary_host->weight());
-  EXPECT_EQ(50UL, cluster_->stats().max_host_weight_.value());
+  EXPECT_EQ(50UL, cluster_->info()->stats().max_host_weight_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
@@ -166,7 +166,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(50U, canary_host->weight());
-  EXPECT_EQ(50UL, cluster_->stats().max_host_weight_.value());
+  EXPECT_EQ(50UL, cluster_->info()->stats().max_host_weight_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
@@ -182,7 +182,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(50U, canary_host->weight());
-  EXPECT_EQ(50UL, cluster_->stats().max_host_weight_.value());
+  EXPECT_EQ(50UL, cluster_->info()->stats().max_host_weight_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
@@ -210,7 +210,7 @@ TEST_F(SdsTest, HealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(0UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster_->stats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(0UL, numHealthy());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(3UL, cluster_->hostsPerZone().size());
@@ -225,7 +225,7 @@ TEST_F(SdsTest, HealthChecker) {
   }
 
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(12UL, cluster_->stats().membership_healthy_.value());
+  EXPECT_EQ(12UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone()[0].size());
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
@@ -236,7 +236,7 @@ TEST_F(SdsTest, HealthChecker) {
   cluster_->hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster_->hosts()[0], true);
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(13UL, cluster_->stats().membership_healthy_.value());
+  EXPECT_EQ(13UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
@@ -254,7 +254,7 @@ TEST_F(SdsTest, HealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(13UL, cluster_->stats().membership_healthy_.value());
+  EXPECT_EQ(13UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(13UL, numHealthy());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[0].size());
@@ -274,7 +274,7 @@ TEST_F(SdsTest, HealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(12UL, cluster_->hosts().size());
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(12UL, cluster_->stats().membership_healthy_.value());
+  EXPECT_EQ(12UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(12UL, numHealthy());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone()[0].size());
@@ -293,7 +293,7 @@ TEST_F(SdsTest, HealthChecker) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(12UL, cluster_->hosts().size());
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
-  EXPECT_EQ(12UL, cluster_->stats().membership_healthy_.value());
+  EXPECT_EQ(12UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(12UL, numHealthy());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone()[0].size());

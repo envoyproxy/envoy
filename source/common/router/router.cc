@@ -22,7 +22,8 @@
 
 namespace Router {
 
-void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, const Upstream::Cluster& cluster) {
+void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
+                                      const Upstream::ClusterInfo& cluster) {
   if (cluster.sslContext()) {
     headers.insertScheme().value(Http::Headers::get().SchemeValues.Https);
   } else {
@@ -700,7 +701,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
 
 RetryStatePtr
 ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request_headers,
-                             const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                             const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                              Upstream::ResourcePriority priority) {
   return RetryStateImpl::create(policy, request_headers, cluster, runtime, random, dispatcher,

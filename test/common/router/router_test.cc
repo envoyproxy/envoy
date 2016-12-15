@@ -24,7 +24,7 @@ public:
   using Filter::Filter;
 
   // Filter
-  RetryStatePtr createRetryState(const RetryPolicy&, Http::HeaderMap&, const Upstream::Cluster&,
+  RetryStatePtr createRetryState(const RetryPolicy&, Http::HeaderMap&, const Upstream::ClusterInfo&,
                                  Runtime::Loader&, Runtime::RandomGenerator&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
@@ -144,7 +144,7 @@ TEST_F(RouterTest, NoHost) {
 }
 
 TEST_F(RouterTest, MaintenanceMode) {
-  EXPECT_CALL(cm_.cluster_, maintenanceMode()).WillOnce(Return(true));
+  EXPECT_CALL(*cm_.cluster_.info_, maintenanceMode()).WillOnce(Return(true));
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "16"}, {"content-type", "text/plain"}};
@@ -213,8 +213,8 @@ TEST_F(RouterTest, UpstreamTimeout) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   response_timeout_->callback_();
 
-  EXPECT_EQ(1U,
-            cm_.cluster_.stats_store_.counter("cluster.fake_cluster.upstream_rq_timeout").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("cluster.fake_cluster.upstream_rq_timeout")
+                    .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
@@ -252,9 +252,10 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   per_try_timeout_->callback_();
 
-  EXPECT_EQ(1U,
-            cm_.cluster_.stats_store_.counter("cluster.fake_cluster.upstream_rq_per_try_timeout")
-                .value());
+  EXPECT_EQ(
+      1U,
+      cm_.cluster_.info_->stats_store_.counter("cluster.fake_cluster.upstream_rq_per_try_timeout")
+          .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
@@ -710,7 +711,7 @@ TEST(RouterFilterUtilityTest, finalTimeout) {
 
 TEST(RouterFilterUtilityTest, setUpstreamScheme) {
   {
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterInfo cluster;
     Http::TestHeaderMapImpl headers;
     EXPECT_CALL(cluster, sslContext()).WillOnce(Return(nullptr));
     FilterUtility::setUpstreamScheme(headers, cluster);
@@ -718,7 +719,7 @@ TEST(RouterFilterUtilityTest, setUpstreamScheme) {
   }
 
   {
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterInfo cluster;
     Ssl::MockClientContext context;
     Http::TestHeaderMapImpl headers;
     EXPECT_CALL(cluster, sslContext()).WillOnce(Return(&context));

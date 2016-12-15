@@ -42,11 +42,11 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
-DetectorImpl::DetectorImpl(Cluster& cluster, Event::Dispatcher& dispatcher,
+DetectorImpl::DetectorImpl(const Cluster& cluster, Event::Dispatcher& dispatcher,
                            Runtime::Loader& runtime, Stats::Store& stats,
                            SystemTimeSource& time_source, EventLoggerPtr event_logger)
     : dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
-      stats_(generateStats(cluster.name(), stats)),
+      stats_(generateStats(cluster.info()->name(), stats)),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger) {
   for (HostPtr host : cluster.hosts()) {

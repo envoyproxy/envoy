@@ -115,11 +115,12 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 
 Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& response) {
   for (auto& cluster : server_.clusterManager().clusters()) {
-    addCircuitSettings(cluster.second->name(), "default",
-                       cluster.second->resourceManager(Upstream::ResourcePriority::Default),
+    addCircuitSettings(cluster.second->info()->name(), "default",
+                       cluster.second->info()->resourceManager(Upstream::ResourcePriority::Default),
                        response);
-    addCircuitSettings(cluster.second->name(), "high",
-                       cluster.second->resourceManager(Upstream::ResourcePriority::High), response);
+    addCircuitSettings(cluster.second->info()->name(), "high",
+                       cluster.second->info()->resourceManager(Upstream::ResourcePriority::High),
+                       response);
 
     for (auto& host : cluster.second->hosts()) {
       std::map<std::string, uint64_t> all_stats;
@@ -132,18 +133,18 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
       }
 
       for (auto stat : all_stats) {
-        response.add(fmt::format("{}::{}::{}::{}\n", cluster.second->name(), host->url(),
+        response.add(fmt::format("{}::{}::{}::{}\n", cluster.second->info()->name(), host->url(),
                                  stat.first, stat.second));
       }
 
-      response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second->name(), host->url(),
-                               Upstream::HostUtility::healthFlagsToString(*host)));
-      response.add(
-          fmt::format("{}::{}::weight::{}\n", cluster.second->name(), host->url(), host->weight()));
-      response.add(
-          fmt::format("{}::{}::zone::{}\n", cluster.second->name(), host->url(), host->zone()));
-      response.add(
-          fmt::format("{}::{}::canary::{}\n", cluster.second->name(), host->url(), host->canary()));
+      response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second->info()->name(),
+                               host->url(), Upstream::HostUtility::healthFlagsToString(*host)));
+      response.add(fmt::format("{}::{}::weight::{}\n", cluster.second->info()->name(), host->url(),
+                               host->weight()));
+      response.add(fmt::format("{}::{}::zone::{}\n", cluster.second->info()->name(), host->url(),
+                               host->zone()));
+      response.add(fmt::format("{}::{}::canary::{}\n", cluster.second->info()->name(), host->url(),
+                               host->canary()));
     }
   }
 

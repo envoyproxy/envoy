@@ -83,20 +83,21 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver);
-  EXPECT_EQ(43U, cluster.resourceManager(ResourcePriority::Default).connections().max());
-  EXPECT_EQ(57U, cluster.resourceManager(ResourcePriority::Default).pendingRequests().max());
-  EXPECT_EQ(50U, cluster.resourceManager(ResourcePriority::Default).requests().max());
-  EXPECT_EQ(10U, cluster.resourceManager(ResourcePriority::Default).retries().max());
-  EXPECT_EQ(1U, cluster.resourceManager(ResourcePriority::High).connections().max());
-  EXPECT_EQ(2U, cluster.resourceManager(ResourcePriority::High).pendingRequests().max());
-  EXPECT_EQ(3U, cluster.resourceManager(ResourcePriority::High).requests().max());
-  EXPECT_EQ(4U, cluster.resourceManager(ResourcePriority::High).retries().max());
-  EXPECT_EQ(3U, cluster.maxRequestsPerConnection());
-  EXPECT_EQ(Http::CodecOptions::NoCompression, cluster.httpCodecOptions());
-  EXPECT_EQ("cluster.name.", cluster.statPrefix());
+  EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_EQ(57U,
+            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
+  EXPECT_EQ(50U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_EQ(10U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
+  EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
+  EXPECT_EQ(Http::CodecOptions::NoCompression, cluster.info()->httpCodecOptions());
+  EXPECT_EQ("cluster.name.", cluster.info()->statPrefix());
 
   EXPECT_CALL(runtime.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
-  EXPECT_FALSE(cluster.maintenanceMode());
+  EXPECT_FALSE(cluster.info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
   cluster.addMemberUpdateCb([&](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
@@ -141,14 +142,14 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(0UL, cluster.healthyHostsPerZone().size());
 
   for (const HostPtr& host : cluster.hosts()) {
-    EXPECT_EQ(&cluster, &host->cluster());
+    EXPECT_EQ(cluster.info().get(), &host->cluster());
   }
 }
 
 TEST(HostImplTest, HostCluster) {
   MockCluster cluster;
-  HostImpl host(cluster, "tcp://10.0.0.1:1234", false, 1, "");
-  EXPECT_EQ(&cluster, &host.cluster());
+  HostImpl host(cluster.info_, "tcp://10.0.0.1:1234", false, 1, "");
+  EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_FALSE(host.canary());
   EXPECT_EQ("", host.zone());
 }
@@ -157,17 +158,17 @@ TEST(HostImplTest, Weight) {
   MockCluster cluster;
 
   {
-    HostImpl host(cluster, "tcp://10.0.0.1:1234", false, 0, "");
+    HostImpl host(cluster.info_, "tcp://10.0.0.1:1234", false, 0, "");
     EXPECT_EQ(1U, host.weight());
   }
 
   {
-    HostImpl host(cluster, "tcp://10.0.0.1:1234", false, 101, "");
+    HostImpl host(cluster.info_, "tcp://10.0.0.1:1234", false, 101, "");
     EXPECT_EQ(100U, host.weight());
   }
 
   {
-    HostImpl host(cluster, "tcp://10.0.0.1:1234", false, 50, "");
+    HostImpl host(cluster.info_, "tcp://10.0.0.1:1234", false, 50, "");
     EXPECT_EQ(50U, host.weight());
     host.weight(51);
     EXPECT_EQ(51U, host.weight());
@@ -180,15 +181,15 @@ TEST(HostImplTest, Weight) {
 
 TEST(HostImplTest, CanaryAndZone) {
   MockCluster cluster;
-  HostImpl host(cluster, "tcp://10.0.0.1:1234", true, 1, "hello");
-  EXPECT_EQ(&cluster, &host.cluster());
+  HostImpl host(cluster.info_, "tcp://10.0.0.1:1234", true, 1, "hello");
+  EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_TRUE(host.canary());
   EXPECT_EQ("hello", host.zone());
 }
 
 TEST(HostImplTest, MalformedUrl) {
   MockCluster cluster;
-  EXPECT_THROW(HostImpl(cluster, "fake\\10.0.0.1:1234", false, 1, ""), EnvoyException);
+  EXPECT_THROW(HostImpl(cluster.info_, "fake\\10.0.0.1:1234", false, 1, ""), EnvoyException);
 }
 
 TEST(StaticClusterImplTest, OutlierDetector) {
@@ -214,7 +215,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   cluster.setOutlierDetector(Outlier::DetectorPtr{detector});
 
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.stats().membership_healthy_.value());
+  EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
 
   // Set a single host as having failed and fire outlier detector callbacks. This should result
   // in only a single healthy host.
@@ -222,14 +223,14 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   detector->runCallbacks(cluster.hosts()[0]);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.stats().membership_healthy_.value());
+  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
   EXPECT_NE(cluster.healthyHosts()[0], cluster.hosts()[0]);
 
   // Bring the host back online.
   cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   detector->runCallbacks(cluster.hosts()[0]);
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.stats().membership_healthy_.value());
+  EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
 }
 
 TEST(StaticClusterImplTest, HealthyStat) {
@@ -257,37 +258,37 @@ TEST(StaticClusterImplTest, HealthyStat) {
   cluster.setHealthChecker(HealthCheckerPtr{health_checker});
 
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.stats().membership_healthy_.value());
+  EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
 
   cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector->runCallbacks(cluster.hosts()[0]);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.stats().membership_healthy_.value());
+  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
 
   cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster.hosts()[0], true);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.stats().membership_healthy_.value());
+  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
 
   cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector->runCallbacks(cluster.hosts()[0]);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.stats().membership_healthy_.value());
+  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
 
   cluster.hosts()[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster.hosts()[0], true);
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.stats().membership_healthy_.value());
+  EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
 
   cluster.hosts()[0]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector->runCallbacks(cluster.hosts()[0]);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.stats().membership_healthy_.value());
+  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
 
   cluster.hosts()[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster.hosts()[1], true);
   EXPECT_EQ(0UL, cluster.healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.stats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
 }
 
 TEST(StaticClusterImplTest, UrlConfig) {
@@ -307,16 +308,17 @@ TEST(StaticClusterImplTest, UrlConfig) {
 
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
-  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).connections().max());
-  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).pendingRequests().max());
-  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::Default).requests().max());
-  EXPECT_EQ(3U, cluster.resourceManager(ResourcePriority::Default).retries().max());
-  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::High).connections().max());
-  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::High).pendingRequests().max());
-  EXPECT_EQ(1024U, cluster.resourceManager(ResourcePriority::High).requests().max());
-  EXPECT_EQ(3U, cluster.resourceManager(ResourcePriority::High).retries().max());
-  EXPECT_EQ(0U, cluster.maxRequestsPerConnection());
-  EXPECT_EQ(0U, cluster.httpCodecOptions());
+  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_EQ(1024U,
+            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
+  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
+  EXPECT_EQ(0U, cluster.info()->maxRequestsPerConnection());
+  EXPECT_EQ(0U, cluster.info()->httpCodecOptions());
   EXPECT_EQ(LoadBalancerType::Random, cluster.lbType());
   EXPECT_THAT(std::list<std::string>({"tcp://10.0.0.1:11001", "tcp://10.0.0.2:11002"}),
               ContainerEq(hostListToURLs(cluster.hosts())));

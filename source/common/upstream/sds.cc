@@ -39,13 +39,13 @@ void SdsClusterImpl::onSuccess(Http::MessagePtr&& response) {
     return;
   }
 
-  stats_.update_success_.inc();
+  info_->stats().update_success_.inc();
   requestComplete();
 }
 
 void SdsClusterImpl::onFailure(Http::AsyncClient::FailureReason) {
-  log_debug("sds refresh failure for cluster: {}", name_);
-  stats_.update_failure_.inc();
+  log_debug("sds refresh failure for cluster: {}", info_->name());
+  info_->stats().update_failure_.inc();
   requestComplete();
 }
 
@@ -63,7 +63,7 @@ void SdsClusterImpl::parseSdsResponse(Http::Message& response) {
     }
 
     new_hosts.emplace_back(new HostImpl(
-        *this, Network::Utility::urlForTcp(host->getString("ip_address"), host->getInteger("port")),
+        info_, Network::Utility::urlForTcp(host->getString("ip_address"), host->getInteger("port")),
         canary, weight, zone));
   }
 
@@ -72,7 +72,7 @@ void SdsClusterImpl::parseSdsResponse(Http::Message& response) {
   std::vector<HostPtr> hosts_removed;
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
-    log_debug("sds hosts changed for cluster: {} ({})", name_, hosts().size());
+    log_debug("sds hosts changed for cluster: {} ({})", info_->name(), hosts().size());
     HostListsPtr per_zone(new std::vector<std::vector<HostPtr>>());
 
     // If local zone name is not defined then skip populating per zone hosts.
@@ -112,8 +112,8 @@ void SdsClusterImpl::parseSdsResponse(Http::Message& response) {
 }
 
 void SdsClusterImpl::refreshHosts() {
-  log_debug("starting sds refresh for cluster: {}", name_);
-  stats_.update_attempt_.inc();
+  log_debug("starting sds refresh for cluster: {}", info_->name());
+  info_->stats().update_attempt_.inc();
 
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
@@ -125,7 +125,7 @@ void SdsClusterImpl::refreshHosts() {
 }
 
 void SdsClusterImpl::requestComplete() {
-  log_debug("sds refresh complete for cluster: {}", name_);
+  log_debug("sds refresh complete for cluster: {}", info_->name());
   // If we didn't setup to initialize when our first round of health checking is complete, just
   // do it now.
   if (initialize_callback_ && pending_health_checks_ == 0) {

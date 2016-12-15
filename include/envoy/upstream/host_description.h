@@ -25,7 +25,7 @@ struct HostStats {
   ALL_HOST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-class Cluster;
+class ClusterInfo;
 
 /**
  * A description of an upstream host.
@@ -42,7 +42,7 @@ public:
   /**
    * @return the cluster the host is a member of.
    */
-  virtual const Cluster& cluster() const PURE;
+  virtual const ClusterInfo& cluster() const PURE;
 
   /**
    * @return the host's outlier detection sink.

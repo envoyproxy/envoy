@@ -16,7 +16,7 @@ const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
 
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
                                      Http::HeaderMap& request_headers,
-                                     const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                                     const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                      Runtime::RandomGenerator& random,
                                      Event::Dispatcher& dispatcher,
                                      Upstream::ResourcePriority priority) {
@@ -34,7 +34,7 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
 }
 
 RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
-                               const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                               const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
