@@ -19,6 +19,16 @@ void MockRetryState::expectRetry() {
 
 MockRetryState::~MockRetryState() {}
 
+MockRateLimitPolicyEntry::MockRateLimitPolicyEntry() {}
+MockRateLimitPolicyEntry::~MockRateLimitPolicyEntry() {}
+
+MockRateLimitPolicy::MockRateLimitPolicy() {
+  ON_CALL(*this, routeKey()).WillByDefault(ReturnRef(route_key_));
+  ON_CALL(*this, getApplicableRateLimit(_)).WillByDefault(ReturnRef(rate_limit_policy_entry_));
+}
+
+MockRateLimitPolicy::~MockRateLimitPolicy() {}
+
 MockShadowWriter::MockShadowWriter() {}
 MockShadowWriter::~MockShadowWriter() {}
 

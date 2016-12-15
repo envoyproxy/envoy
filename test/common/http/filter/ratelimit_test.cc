@@ -30,7 +30,6 @@ public:
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_key.http_filter_enabled", 100))
         .WillByDefault(Return(true));
-    ON_CALL(filter_callbacks_, downstreamAddress()).WillByDefault(ReturnRef(EMPTY_STRING));
   }
 
   void SetUpTest(const std::string json) {
@@ -40,8 +39,9 @@ public:
     client_ = new ::RateLimit::MockClient();
     filter_.reset(new Filter(config_, ::RateLimit::ClientPtr{client_}));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
-    rate_limit_policies_.clear();
-    rate_limit_policies_.emplace_back(rate_limit_policy_entry_);
+    filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
+    filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.rate_limit_policy_entry_
+        .emplace_back(rate_limit_policy_entry_);
   }
 
   const std::string filter_config = R"EOF(
@@ -59,8 +59,7 @@ public:
   Buffer::OwnedImpl data_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
-  std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>> rate_limit_policies_;
-  Router::TestRateLimitPolicyEntry rate_limit_policy_entry_;
+  Router::MockRateLimitPolicyEntry rate_limit_policy_entry_;
   std::vector<::RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};
 };
 
@@ -77,9 +76,7 @@ TEST_F(HttpRateLimitFilterTest, NoRoute) {
 TEST_F(HttpRateLimitFilterTest, NoApplicableRateLimit) {
   SetUpTest(filter_config);
 
-  rate_limit_policies_.clear();
-  EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
+  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -87,8 +84,6 @@ TEST_F(HttpRateLimitFilterTest, NoApplicableRateLimit) {
 
 TEST_F(HttpRateLimitFilterTest, NoDescriptor) {
   SetUpTest(filter_config);
-  EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
   EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _)).Times(1);
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -111,7 +106,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
+              getApplicableRateLimit(0)).Times(1);
 
   EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
@@ -137,9 +132,6 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
   SetUpTest(filter_config);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
-
   EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
@@ -160,9 +152,6 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
 TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
   SetUpTest(filter_config);
   InSequence s;
-
-  EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
   EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
@@ -185,9 +174,6 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   SetUpTest(filter_config);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
-
   EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _))
@@ -209,9 +195,6 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
 TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
   SetUpTest(filter_config);
   InSequence s;
-
-  EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
   EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
@@ -237,8 +220,6 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
 TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
   SetUpTest(filter_config);
   InSequence s;
-  EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(0)).WillOnce(testing::ReturnRef(rate_limit_policies_));
 
   EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));

@@ -15,8 +15,8 @@ public:
   // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
-                           const std::string& local_service_cluster, const Http::HeaderMap&,
-                           const std::string&) const override;
+                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                           const std::string& remote_address) const override;
 };
 
 /**
@@ -30,8 +30,9 @@ public:
 
   // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors, const std::string&,
-                           const Http::HeaderMap& headers, const std::string&) const override;
+                           std::vector<::RateLimit::Descriptor>& descriptors,
+                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                           const std::string& remote_address) const override;
 
 private:
   const Http::LowerCaseString header_name_;
@@ -45,8 +46,8 @@ class RemoteAddressAction : public RateLimitAction {
 public:
   // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors, const std::string&,
-                           const Http::HeaderMap&,
+                           std::vector<::RateLimit::Descriptor>& descriptors,
+                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
                            const std::string& remote_address) const override;
 };
 

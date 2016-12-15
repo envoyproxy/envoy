@@ -40,13 +40,16 @@ public:
   DoRetryCallback callback_;
 };
 
-class TestRateLimitPolicyEntry : public RateLimitPolicyEntry {
+class MockRateLimitPolicyEntry : public RateLimitPolicyEntry {
 public:
-  // Router::RateLimitPolicyEntry
-  int64_t stage() const override { return stage_; }
+  MockRateLimitPolicyEntry();
+  ~MockRateLimitPolicyEntry();
 
   // Router::RateLimitPolicyEntry
-  const std::string& killSwitchKey() const override { return kill_switch_key_; }
+  MOCK_CONST_METHOD0(stage, int64_t());
+
+  // Router::RateLimitPolicyEntry
+  MOCK_CONST_METHOD0(killSwitchKey, const std::string&());
 
   // Router::RateLimitAction
   MOCK_CONST_METHOD5(populateDescriptors,
@@ -56,20 +59,24 @@ public:
                           const std::string& remote_address));
 
   int64_t stage_{};
-  std::string kill_switch_key_;
+  std::string kill_switch_key_{};
 };
 
-class TestRateLimitPolicy : public RateLimitPolicy {
+class MockRateLimitPolicy : public RateLimitPolicy {
 public:
+  MockRateLimitPolicy();
+  ~MockRateLimitPolicy();
+
   // Router::RateLimitPolicy
-  const std::string& routeKey() const override { return route_key_; }
+  MOCK_CONST_METHOD0(routeKey, const std::string&());
 
   // Router::RateLimitPolicy
   MOCK_CONST_METHOD1(
       getApplicableRateLimit,
       std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(int64_t stage));
 
-  std::string route_key_;
+  std::string route_key_{};
+  std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };
 
 class TestShadowPolicy : public ShadowPolicy {
@@ -127,7 +134,7 @@ public:
   std::string vhost_name_{"fake_vhost"};
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
-  TestRateLimitPolicy rate_limit_policy_;
+  testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestShadowPolicy shadow_policy_;
 };
 
