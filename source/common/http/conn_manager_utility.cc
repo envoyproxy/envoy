@@ -1,5 +1,6 @@
 #include "conn_manager_utility.h"
 
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -148,24 +149,12 @@ bool ConnectionManagerUtility::shouldTraceRequest(
   case Http::TracingType::All:
     return true;
   case Http::TracingType::UpstreamFailure:
-    return isTraceableFailure(request_info);
+    return Http::AccessLog::ResponseFlagUtils::isTraceableFailure(request_info);
   }
 
   // Compiler enforces switch above to cover all the cases and it's impossible to be here,
   // but compiler complains on missing return statement, this is to make compiler happy.
   NOT_IMPLEMENTED;
-}
-
-bool ConnectionManagerUtility::isTraceableFailure(
-    const Http::AccessLog::RequestInfo& request_info) {
-  return request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout) |
-         request_info.getResponseFlag(
-             Http::AccessLog::ResponseFlag::UpstreamConnectionTermination) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
 }
 
 } // Http

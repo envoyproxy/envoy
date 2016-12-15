@@ -41,12 +41,12 @@ public:
   virtual ~RequestInfo() {}
 
   /**
-   * each filter can set independent response flag, flags are accumulated.
+   * Each filter can set independent response flag, flags are accumulated.
    */
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
-   * filter can trigger this callback when an upstream host has been selected.
+   * Filter can trigger this callback when an upstream host has been selected.
    */
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) PURE;
 

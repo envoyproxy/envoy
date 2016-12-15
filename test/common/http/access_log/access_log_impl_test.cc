@@ -44,9 +44,9 @@ public:
     return std::chrono::milliseconds(duration_);
   }
   bool getResponseFlag(ResponseFlag response_flag) const override {
-    return response_flags_ == response_flag;
+    return response_flags_ & response_flag;
   }
-  void setResponseFlag(ResponseFlag response_flag) override { response_flags_ = response_flag; }
+  void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
   void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override { upstream_host_ = host; }
   Upstream::HostDescriptionPtr upstreamHost() const override { return upstream_host_; }
   bool healthCheck() const override { return hc_request_; }
