@@ -68,8 +68,7 @@ TEST_F(ConnectionManagerUtilityTest, ShouldTraceRequest) {
         Http::AccessLog::ResponseFlag::NoHealthyUpstream,
         Http::AccessLog::ResponseFlag::UpstreamRequestTimeout,
         Http::AccessLog::ResponseFlag::UpstreamOverflow,
-        Http::AccessLog::ResponseFlag::DelayInjected,
-        Http::AccessLog::ResponseFlag::FaultInjected,
+        Http::AccessLog::ResponseFlag::DelayInjected, Http::AccessLog::ResponseFlag::FaultInjected,
         Http::AccessLog::ResponseFlag::NoRouteFound};
 
     for (Http::AccessLog::ResponseFlag flag : upstream_failed_response_flag) {
@@ -347,10 +346,12 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
 
   config_.route_config_.internal_only_headers_.push_back(LowerCaseString("custom_header"));
 
-  TestHeaderMapImpl headers{
-      {"x-envoy-downstream-service-cluster", "foo"}, {"x-envoy-retry-on", "foo"},
-      {"x-envoy-upstream-alt-stat-name", "foo"},     {"x-envoy-upstream-rq-timeout-ms", "foo"},
-      {"x-envoy-expected-rq-timeout-ms", "10"},      {"custom_header", "foo"}};
+  TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
+                            {"x-envoy-retry-on", "foo"},
+                            {"x-envoy-upstream-alt-stat-name", "foo"},
+                            {"x-envoy-upstream-rq-timeout-ms", "foo"},
+                            {"x-envoy-expected-rq-timeout-ms", "10"},
+                            {"custom_header", "foo"}};
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, random_, runtime_);
   EXPECT_EQ("50.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_FALSE(headers.has("x-envoy-internal"));

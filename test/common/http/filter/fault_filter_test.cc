@@ -201,8 +201,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected))
-      .Times(0);
+              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected)).Times(0);
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
@@ -287,8 +286,7 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
-      .Times(0);
+              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(1);
   timer_->callback_();
 

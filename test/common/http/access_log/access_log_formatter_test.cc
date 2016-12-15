@@ -230,22 +230,10 @@ TEST(AccessLogFormatterTest, ParserFailures) {
   AccessLogFormatParser parser;
 
   std::vector<std::string> test_cases = {
-      "{{%PROTOCOL%}}   ++ %REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)",
-      "%REQ(FIRST?SECOND)T%",
-      "RESP(FIRST)%",
-      "%REQ(valid)% %NOT_VALID%",
-      "%REQ(FIRST?SECOND%",
-      "%%",
-      "%protocol%",
-      "%REQ(TEST):%",
-      "%REQ(TEST):3q4%",
-      "%RESP(TEST):%",
-      "%RESP(X?Y):%",
-      "%RESP(X?Y):343o24%",
-      "%REQ(TEST):10",
-      "REQ(:TEST):10%",
-      "%REQ(TEST:10%",
-      "%REQ("};
+      "{{%PROTOCOL%}}   ++ %REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)", "%REQ(FIRST?SECOND)T%",
+      "RESP(FIRST)%", "%REQ(valid)% %NOT_VALID%", "%REQ(FIRST?SECOND%", "%%", "%protocol%",
+      "%REQ(TEST):%", "%REQ(TEST):3q4%", "%RESP(TEST):%", "%RESP(X?Y):%", "%RESP(X?Y):343o24%",
+      "%REQ(TEST):10", "REQ(:TEST):10%", "%REQ(TEST:10%", "%REQ("};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_THROW(parser.parse(test_case), EnvoyException);
