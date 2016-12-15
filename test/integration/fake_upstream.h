@@ -5,6 +5,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/thread.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -21,6 +22,7 @@ public:
   FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder);
 
   uint64_t bodyLength() { return body_length_; }
+  Buffer::Instance& body() { return body_; }
   bool complete() { return end_stream_; }
   void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
@@ -51,6 +53,7 @@ private:
   Http::HeaderMapPtr trailers_;
   bool end_stream_{};
   uint64_t body_length_{};
+  Buffer::OwnedImpl body_;
   bool saw_reset_{};
 };
 
