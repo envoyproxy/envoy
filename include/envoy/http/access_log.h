@@ -29,8 +29,10 @@ enum ResponseFlag {
   UpstreamOverflow = 0x80,
   // No route found for a given request.
   NoRouteFound = 0x100,
-  // Abort with error code is injected.
-  FaultInjected = 0x200
+  // Request was delayed before proxying.
+  DelayInjected = 0x200,
+  // Abort with error code was injected.
+  FaultInjected = 0x400
 };
 
 /**
