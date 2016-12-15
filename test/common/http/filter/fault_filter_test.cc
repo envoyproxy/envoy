@@ -200,6 +200,9 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected))
+      .Times(0);
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
@@ -271,6 +274,9 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
   SCOPED_TRACE("FixedDelayNonZeroDuration");
   expectDelayTimer(5000UL);
 
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
@@ -281,7 +287,10 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
   // Delay only case
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
-  EXPECT_CALL(filter_callbacks_.request_info_, setResponseFlag(_)).Times(0);
+
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected))
+      .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(1);
   timer_->callback_();
 
@@ -306,6 +315,9 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 
   SCOPED_TRACE("FixedDelayAndAbort");
   expectDelayTimer(5000UL);
+
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -351,6 +363,9 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 
   SCOPED_TRACE("FixedDelayAndAbortHeaderMatchSuccess");
   expectDelayTimer(5000UL);
+
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
