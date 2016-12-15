@@ -24,7 +24,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::UpstreamConnectionTermination, "UC"),
       std::make_pair(ResponseFlag::UpstreamOverflow, "UO"),
       std::make_pair(ResponseFlag::NoRouteFound, "NR"),
-      std::make_pair(ResponseFlag::FaultInjected, "DI"),
+      std::make_pair(ResponseFlag::DelayInjected, "DI"),
       std::make_pair(ResponseFlag::FaultInjected, "FI")};
 
   for (const auto& testCase : expected) {
