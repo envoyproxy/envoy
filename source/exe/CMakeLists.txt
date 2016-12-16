@@ -5,7 +5,6 @@ if (ENVOY_TCMALLOC)
 endif()
 
 target_link_libraries(envoy event)
-target_link_libraries(envoy event_openssl)
 target_link_libraries(envoy event_pthreads)
 target_link_libraries(envoy http_parser)
 target_link_libraries(envoy ssl)
