@@ -53,7 +53,11 @@ TEST(BadRateLimitConfiguration, BadType) {
           "cluster": "www2",
           "rate_limits": [
             {
-              "actions":[ {"type": "bad_type"}]
+              "actions":[
+                {
+                  "type": "bad_type"
+                }
+              ]
             }
           ]
         }
@@ -82,7 +86,11 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
           "cluster": "www2",
           "rate_limits": [
             {
-              "actions":[ {"type": "request_headers"}]
+              "actions":[
+              {
+                "type": "request_headers"
+              }
+            ]
             }
           ]
         }
@@ -190,7 +198,11 @@ TEST_F(RateLimitConfiguration, NoRateLimit) {
           "cluster": "www2",
           "rate_limits": [
             {
-              "actions":[ {"type": "remote_address"}]
+              "actions":[
+                {
+                  "type": "remote_address"
+                }
+              ]
             }
           ]
         },
@@ -225,7 +237,11 @@ TEST_F(RateLimitConfiguration, RemoteAddress) {
           "cluster": "www2",
           "rate_limits": [
             {
-              "actions":[ {"type": "remote_address"}]
+              "actions":[
+                {
+                  "type": "remote_address"
+                }
+              ]
             }
           ]
         }
@@ -265,7 +281,11 @@ TEST_F(RateLimitConfiguration, RemoteAddressRouteKey) {
           "rate_limits": [
             {
               "route_key": "my_route",
-              "actions":[ {"type": "remote_address"}]
+              "actions":[
+                {
+                  "type": "remote_address"
+                }
+              ]
             }
           ]
         }
@@ -306,7 +326,11 @@ TEST_F(RateLimitConfiguration, NoAddress) {
           "cluster": "www2",
           "rate_limits": [
             {
-              "actions":[ {"type": "remote_address"}]
+              "actions":[
+                {
+                  "type": "remote_address"
+                }
+              ]
             }
           ]
         }
@@ -343,7 +367,11 @@ TEST_F(RateLimitConfiguration, ServiceToService) {
           "cluster": "fake_cluster",
           "rate_limits": [
             {
-              "actions":[ {"type": "service_to_service"}]
+              "actions":[
+                {
+                  "type": "service_to_service"
+                }
+              ]
             }
           ]
         }
