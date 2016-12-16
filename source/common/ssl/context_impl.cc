@@ -62,7 +62,11 @@ ContextImpl::ContextImpl(const std::string& name, Stats::Store& store, ContextCo
 
     // verify that all of the specified ciphers were understood by openssl
     ssize_t num_configured = std::count(cipher_suites.begin(), cipher_suites.end(), ':') + 1;
+#ifdef OPENSSL_IS_BORINGSSL
+    if (sk_SSL_CIPHER_num(ctx_->cipher_list->ciphers) != static_cast<size_t>(num_configured)) {
+#else
     if (sk_SSL_CIPHER_num(ctx_->cipher_list) != num_configured) {
+#endif
       throw EnvoyException(
           fmt::format("Unknown cipher specified in cipher suites {}", config.cipherSuites()));
     }
@@ -128,7 +132,11 @@ ContextImpl::ContextImpl(const std::string& name, Stats::Store& store, ContextCo
   // Initialize DH params - 2048 bits was chosen based on recommendations from:
   // https://www.openssl.org/blog/blog/2015/05/20/logjam-freak-upcoming-changes/
   DH* dh = get_dh2048();
+#ifdef OPENSSL_IS_BORINGSSL
+  long rc = SSL_CTX_set_tmp_dh(ctx_.get(), dh);
+#else
   long rc = SSL_CTX_ctrl(ctx_.get(), SSL_CTRL_SET_TMP_DH, 0, reinterpret_cast<char*>(dh));
+#endif
   DH_free(dh);
 
   // As of openssl 1.0.2f this is on by default and cannot be disabled. Set it here anyway.
@@ -144,7 +152,11 @@ ContextImpl::ContextImpl(const std::string& name, Stats::Store& store, ContextCo
     throw EnvoyException(fmt::format("Failed to initialize elliptic curve"));
   }
 
+#ifdef OPENSSL_IS_BORINGSSL
+  rc = SSL_CTX_set_tmp_ecdh(ctx_.get(), ecdh);
+#else
   rc = SSL_CTX_ctrl(ctx_.get(), SSL_CTRL_SET_TMP_ECDH, 0, reinterpret_cast<char*>(ecdh));
+#endif
   EC_KEY_free(ecdh);
 
   if (1 != rc) {
@@ -343,6 +355,9 @@ std::string ContextImpl::getSerialNumber(X509* cert) {
   if (char_serial_number != nullptr) {
     std::string serial_number(char_serial_number);
     OPENSSL_free(char_serial_number);
+#ifdef OPENSSL_IS_BORINGSSL
+    std::transform(serial_number.begin(), serial_number.end(), serial_number.begin(), ::toupper);
+#endif
     return serial_number;
   }
   return "";
@@ -374,8 +389,12 @@ SslConPtr ClientContextImpl::newSsl() const {
   SslConPtr ssl_con = SslConPtr(ContextImpl::newSsl());
 
   if (!server_name_indication_.empty()) {
+#ifdef OPENSSL_IS_BORINGSSL
+    int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());
+#else
     int rc = SSL_ctrl(ssl_con.get(), SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name,
                       const_cast<char*>(server_name_indication_.c_str()));
+#endif
     RELEASE_ASSERT(rc);
     UNREFERENCED_PARAMETER(rc);
   }
