@@ -240,8 +240,6 @@ TEST_F(HttpRateLimitFilterTest, RateLimitDisabledForRouteKey) {
   ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_key.http_filter_enabled", 100))
       .WillByDefault(Return(false));
 
-  EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(_)).Times(0);
   EXPECT_CALL(*client_, limit(_, _, _, _)).Times(0);
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));

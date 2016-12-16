@@ -18,7 +18,7 @@ void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route
       {{{"to_cluster", route.clusterName()}, {"from_cluster", local_service_cluster}}});
 }
 
-void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
+void RequestHeadersAction::populateDescriptors(const Router::RouteEntry&,
                                                std::vector<::RateLimit::Descriptor>& descriptors,
                                                const std::string&, const Http::HeaderMap& headers,
                                                const std::string&) const {
@@ -29,16 +29,15 @@ void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
 
   descriptors.push_back({{{descriptor_key_, header_value->value().c_str()}}});
 
-  const std::string& route_key = route.rateLimitPolicy().routeKey();
-  if (route_key.empty()) {
+  if (route_key_.empty()) {
     return;
   }
 
   descriptors.push_back(
-      {{{"route_key", route_key}, {descriptor_key_, header_value->value().c_str()}}});
+      {{{"route_key", route_key_}, {descriptor_key_, header_value->value().c_str()}}});
 }
 
-void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
+void RemoteAddressAction::populateDescriptors(const Router::RouteEntry&,
                                               std::vector<::RateLimit::Descriptor>& descriptors,
                                               const std::string&, const Http::HeaderMap&,
                                               const std::string& remote_address) const {
@@ -47,25 +46,25 @@ void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
   }
 
   descriptors.push_back({{{"remote_address", remote_address}}});
-  const std::string& route_key = route.rateLimitPolicy().routeKey();
-  if (route_key.empty()) {
+
+  if (route_key_.empty()) {
     return;
   }
 
-  descriptors.push_back({{{"route_key", route_key}, {"remote_address", remote_address}}});
+  descriptors.push_back({{{"route_key", route_key_}, {"remote_address", remote_address}}});
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
     : kill_switch_key_(config.getString("kill_switch_key", "")),
-      stage_(config.getInteger("stage", 0)) {
+      stage_(config.getInteger("stage", 0)), route_key_(config.getString("route_key", "")) {
   for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
     std::string type = action->getString("type");
     if (type == "service_to_service") {
       actions_.emplace_back(new ServiceToServiceAction());
     } else if (type == "request_headers") {
-      actions_.emplace_back(new RequestHeadersAction(*action));
+      actions_.emplace_back(new RequestHeadersAction(*action, route_key_));
     } else if (type == "remote_address") {
-      actions_.emplace_back(new RemoteAddressAction());
+      actions_.emplace_back(new RemoteAddressAction(route_key_));
     } else {
       throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
     }
@@ -81,8 +80,7 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
   }
 }
 
-RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
-    : route_key_(config.getObject("rate_limit", true)->getString("route_key", "")) {
+RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config) {
   if (config.hasObject("rate_limits")) {
     std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_policy;
     std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limit_policy_reference;

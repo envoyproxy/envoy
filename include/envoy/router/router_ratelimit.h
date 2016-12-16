@@ -43,6 +43,11 @@ public:
    * @return runtime key to be set to disable the configuration.
    */
   virtual const std::string& killSwitchKey() const PURE;
+
+  /**
+   * @return the route key, if it exists.
+   */
+  virtual const std::string& routeKey() const PURE;
 };
 
 /**
@@ -51,11 +56,6 @@ public:
 class RateLimitPolicy {
 public:
   virtual ~RateLimitPolicy() {}
-
-  /**
-   * @return the route key, if it exists.
-   */
-  virtual const std::string& routeKey() const PURE;
 
   /**
    * @param stage the value to for finding applicable rate limit configurations.

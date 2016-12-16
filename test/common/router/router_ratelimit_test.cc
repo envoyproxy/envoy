@@ -26,9 +26,7 @@ TEST(BadRateLimitConfiguration, MissingActions) {
         {
           "prefix": "/",
           "cluster": "www2",
-          "rate_limits": [
-          { }
-          ]
+          "rate_limits": [{}]
         }
       ]
     }
@@ -54,7 +52,9 @@ TEST(BadRateLimitConfiguration, BadType) {
           "prefix": "/",
           "cluster": "www2",
           "rate_limits": [
-          { "actions":[ {"type": "bad_type"}] }
+            {
+              "actions":[ {"type": "bad_type"}]
+            }
           ]
         }
       ]
@@ -81,7 +81,9 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
           "prefix": "/",
           "cluster": "www2",
           "rate_limits": [
-          { "actions":[ {"type": "request_headers"}] }
+            {
+              "actions":[ {"type": "request_headers"}]
+            }
           ]
         }
       ]
@@ -106,9 +108,13 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
           "prefix": "/",
           "cluster": "www2",
           "rate_limits": [
-          { "actions":[
-              {"type": "request_headers",
-                "header_name" : "test"}]
+            {
+              "actions":[
+                {
+                  "type": "request_headers",
+                  "header_name" : "test"
+                }
+              ]
             }
           ]
         }
@@ -132,9 +138,13 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
           "prefix": "/",
           "cluster": "www2",
           "rate_limits": [
-          { "actions":[
-              {"type": "request_headers",
-                "descriptor_key" : "test" }]
+            {
+              "actions":[
+                {
+                  "type": "request_headers",
+                  "descriptor_key" : "test"
+                }
+              ]
             }
           ]
         }
@@ -179,7 +189,9 @@ TEST_F(RateLimitConfiguration, NoRateLimit) {
           "prefix": "/foo",
           "cluster": "www2",
           "rate_limits": [
-          { "actions":[ {"type": "remote_address"}] }
+            {
+              "actions":[ {"type": "remote_address"}]
+            }
           ]
         },
         {
@@ -212,7 +224,9 @@ TEST_F(RateLimitConfiguration, RemoteAddress) {
           "prefix": "/foo",
           "cluster": "www2",
           "rate_limits": [
-          { "actions":[ {"type": "remote_address"}] }
+            {
+              "actions":[ {"type": "remote_address"}]
+            }
           ]
         }
       ]
@@ -248,11 +262,11 @@ TEST_F(RateLimitConfiguration, RemoteAddressRouteKey) {
         {
           "prefix": "/",
           "cluster": "www2",
-          "rate_limit": {
-            "route_key": "my_route"
-          },
           "rate_limits": [
-          { "actions":[ {"type": "remote_address"}] }
+            {
+               "route_key": "my_route"
+              "actions":[ {"type": "remote_address"}]
+            }
           ]
         }
       ]
@@ -291,7 +305,9 @@ TEST_F(RateLimitConfiguration, NoAddress) {
           "prefix": "/",
           "cluster": "www2",
           "rate_limits": [
-          { "actions":[ {"type": "remote_address"}] }
+            {
+              "actions":[ {"type": "remote_address"}]
+            }
           ]
         }
       ]
@@ -326,7 +342,9 @@ TEST_F(RateLimitConfiguration, ServiceToService) {
           "prefix": "/foo",
           "cluster": "fake_cluster",
           "rate_limits": [
-          { "actions":[ {"type": "service_to_service"}] }
+            {
+              "actions":[ {"type": "service_to_service"}]
+            }
           ]
         }
       ]
@@ -364,13 +382,15 @@ TEST_F(RateLimitConfiguration, RequestHeaders) {
           "prefix": "/",
           "cluster": "www2",
           "rate_limits": [
-          { "actions": [
             {
-              "type": "request_headers",
-              "header_name": "x-header-name",
-              "descriptor_key" : "my_header_name"
+              "actions": [
+                {
+                  "type": "request_headers",
+                  "header_name": "x-header-name",
+                  "descriptor_key" : "my_header_name"
+                }
+              ]
             }
-          ]}
           ]
         }
       ]
@@ -406,17 +426,17 @@ TEST_F(RateLimitConfiguration, RequestHeadersRouteKey) {
         {
           "prefix": "/",
           "cluster": "www2",
-          "rate_limit": {
-            "route_key": "my_route"
-          },
           "rate_limits": [
-          { "actions": [
             {
-              "type": "request_headers",
-              "header_name": "x-header-name",
-              "descriptor_key" : "my_header_name"
+              "route_key": "my_route"
+              "actions": [
+                {
+                  "type": "request_headers",
+                  "header_name": "x-header-name",
+                  "descriptor_key" : "my_header_name"
+                }
+              ]
             }
-          ]}
           ]
         }
       ]
@@ -455,13 +475,15 @@ TEST_F(RateLimitConfiguration, RequestHeadersNoMatch) {
           "prefix": "/",
           "cluster": "www2",
           "rate_limits": [
-          { "actions": [
             {
-              "type": "request_headers",
-              "header_name": "x-header",
-              "descriptor_key" : "my_header_name"
+              "actions": [
+                {
+                  "type": "request_headers",
+                  "header_name": "x-header",
+                  "descriptor_key" : "my_header_name"
+                }
+              ]
             }
-          ]}
           ]
         }
       ]
