@@ -197,7 +197,7 @@ public:
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<AccessLog::MockRequestInfo> request_info_;
   testing::NiceMock<Router::MockStableRouteTable> route_table_;
-  std::string downstream_address_{};
+  std::string downstream_address_;
 };
 
 class MockStreamDecoderFilterCallbacks : public StreamDecoderFilterCallbacks,

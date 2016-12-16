@@ -60,8 +60,6 @@ public:
 
   // Router::RateLimitPolicyEntry
   int64_t stage() const override { return stage_; }
-
-  // Router::RateLimitPolicyEntry
   const std::string& killSwitchKey() const override { return kill_switch_key_; }
 
   // Router::RateLimitAction
@@ -85,8 +83,6 @@ public:
 
   // Router::RateLimitPolicy
   const std::string& routeKey() const override { return route_key_; }
-
-  // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
   getApplicableRateLimit(int64_t stage = 0) const override;
 
