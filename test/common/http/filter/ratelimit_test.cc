@@ -59,7 +59,7 @@ public:
   Buffer::OwnedImpl data_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Router::MockRateLimitPolicyEntry rate_limit_policy_entry_;
+  NiceMock<Router::MockRateLimitPolicyEntry> rate_limit_policy_entry_;
   std::vector<::RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};
 };
 
@@ -234,12 +234,13 @@ TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
 }
 
 TEST_F(HttpRateLimitFilterTest, RateLimitDisabledForRouteKey) {
+  rate_limit_policy_entry_.route_key_ = "test_key";
   SetUpTest(filter_config);
 
-  filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.route_key_ = "test_key";
   ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_key.http_filter_enabled", 100))
       .WillByDefault(Return(false));
 
+  EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _)).Times(0);
   EXPECT_CALL(*client_, limit(_, _, _, _)).Times(0);
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));

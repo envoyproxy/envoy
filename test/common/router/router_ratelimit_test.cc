@@ -264,7 +264,7 @@ TEST_F(RateLimitConfiguration, RemoteAddressRouteKey) {
           "cluster": "www2",
           "rate_limits": [
             {
-               "route_key": "my_route"
+              "route_key": "my_route",
               "actions":[ {"type": "remote_address"}]
             }
           ]
@@ -428,7 +428,7 @@ TEST_F(RateLimitConfiguration, RequestHeadersRouteKey) {
           "cluster": "www2",
           "rate_limits": [
             {
-              "route_key": "my_route"
+              "route_key": "my_route",
               "actions": [
                 {
                   "type": "request_headers",

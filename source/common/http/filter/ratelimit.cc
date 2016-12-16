@@ -26,11 +26,12 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
          route->rateLimitPolicy().getApplicableRateLimit(config_->stage())) {
       const std::string& route_key = rate_limit.routeKey();
       if (!route_key.empty() &&
-          config_->runtime().snapshot().featureEnabled(
+          !config_->runtime().snapshot().featureEnabled(
               fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
-        rate_limit.populateDescriptors(*route, descriptors, config_->localServiceCluster(), headers,
-                                       callbacks_->downstreamAddress());
+        continue;
       }
+      rate_limit.populateDescriptors(*route, descriptors, config_->localServiceCluster(), headers,
+                                     callbacks_->downstreamAddress());
     }
 
     if (!descriptors.empty()) {
