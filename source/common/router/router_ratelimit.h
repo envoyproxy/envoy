@@ -46,6 +46,7 @@ private:
 class RemoteAddressAction : public RateLimitAction {
 public:
   RemoteAddressAction(const std::string& route_key) : route_key_(route_key) {}
+
   // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
