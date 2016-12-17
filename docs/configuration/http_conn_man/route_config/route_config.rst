@@ -52,7 +52,7 @@ response_headers_to_remove
 
   vhost
   route
-  rate_limits
   vcluster
+  rate_limits
   route_matching
   traffic_shifting
