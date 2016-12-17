@@ -24,14 +24,14 @@ namespace Http {
 class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
-      : client_(cm_.cluster_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
+      : client_(*cm_.cluster_.info_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
                 Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()},
                 "local_address") {
     message_->headers().insertMethod().value(std::string("GET"));
     message_->headers().insertHost().value(std::string("host"));
     message_->headers().insertPath().value(std::string("/"));
     ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
-    ON_CALL(cm_.cluster_, altStatName()).WillByDefault(ReturnRef(EMPTY_STRING));
+    ON_CALL(*cm_.cluster_.info_, altStatName()).WillByDefault(ReturnRef(EMPTY_STRING));
   }
 
   void expectSuccess(uint64_t code) {
@@ -283,8 +283,9 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
   client_.send(std::move(message_), callbacks_, std::chrono::milliseconds(40));
   timer_->callback_();
 
-  EXPECT_EQ(1UL,
-            cm_.cluster_.stats_store_.counter("cluster.fake_cluster.upstream_rq_timeout").value());
+  EXPECT_EQ(
+      1UL,
+      cm_.cluster_.info_->stats_store_.counter("cluster.fake_cluster.upstream_rq_timeout").value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_504").value());
 }

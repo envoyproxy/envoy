@@ -23,7 +23,7 @@ namespace Upstream {
  */
 class HostDescriptionImpl : virtual public HostDescription {
 public:
-  HostDescriptionImpl(const Cluster& cluster, const std::string& url, bool canary,
+  HostDescriptionImpl(ClusterInfoPtr cluster, const std::string& url, bool canary,
                       const std::string& zone)
       : cluster_(cluster), url_(url), canary_(canary), zone_(zone),
         stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {
@@ -32,7 +32,7 @@ public:
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
-  const Cluster& cluster() const override { return cluster_; }
+  const ClusterInfo& cluster() const override { return *cluster_; }
   Outlier::DetectorHostSink& outlierDetector() const override {
     if (outlier_detector_) {
       return *outlier_detector_;
@@ -45,7 +45,7 @@ public:
   const std::string& zone() const override { return zone_; }
 
 protected:
-  const Cluster& cluster_;
+  ClusterInfoPtr cluster_;
   const std::string url_;
   const bool canary_;
   const std::string zone_;
@@ -66,7 +66,7 @@ class HostImpl : public HostDescriptionImpl,
                  public Host,
                  public std::enable_shared_from_this<HostImpl> {
 public:
-  HostImpl(const Cluster& cluster, const std::string& url, bool canary, uint32_t initial_weight,
+  HostImpl(ClusterInfoPtr cluster, const std::string& url, bool canary, uint32_t initial_weight,
            const std::string& zone)
       : HostDescriptionImpl(cluster, url, canary, zone) {
     weight(initial_weight);
@@ -91,8 +91,9 @@ public:
   void weight(uint32_t new_weight);
 
 protected:
-  static Network::ClientConnectionPtr
-  createConnection(Event::Dispatcher& dispatcher, const Cluster& cluster, const std::string& url);
+  static Network::ClientConnectionPtr createConnection(Event::Dispatcher& dispatcher,
+                                                       const ClusterInfo& cluster,
+                                                       const std::string& url);
 
 private:
   std::atomic<uint64_t> health_flags_{};
@@ -155,6 +156,57 @@ private:
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
 
 /**
+ * Implementation of ClusterInfo that reads from JSON.
+ */
+class ClusterInfoImpl : public ClusterInfo {
+public:
+  ClusterInfoImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
+                  Ssl::ContextManager& ssl_context_manager);
+
+  static ClusterStats generateStats(const std::string& prefix, Stats::Store& stats);
+
+  // Upstream::ClusterInfo
+  const std::string& altStatName() const override { return alt_stat_name_; }
+  std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
+  uint64_t features() const override { return features_; }
+  uint64_t httpCodecOptions() const override { return http_codec_options_; }
+  Ssl::ClientContext* sslContext() const override { return ssl_ctx_; }
+  bool maintenanceMode() const override;
+  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  const std::string& name() const override { return name_; }
+  ResourceManager& resourceManager(ResourcePriority priority) const override;
+  const std::string& statPrefix() const override { return stat_prefix_; }
+  ClusterStats& stats() const override { return stats_; }
+
+private:
+  struct ResourceManagers {
+    ResourceManagers(const Json::Object& config, Runtime::Loader& runtime,
+                     const std::string& cluster_name);
+    ResourceManagerImplPtr load(const Json::Object& config, Runtime::Loader& runtime,
+                                const std::string& cluster_name, const std::string& priority);
+
+    typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
+
+    Managers managers_;
+  };
+
+  static uint64_t parseFeatures(const Json::Object& config);
+
+  Runtime::Loader& runtime_;
+  Ssl::ClientContext* ssl_ctx_;
+  const std::string name_;
+  const uint64_t max_requests_per_connection_;
+  const std::chrono::milliseconds connect_timeout_;
+  const std::string stat_prefix_;
+  mutable ClusterStats stats_;
+  const std::string alt_stat_name_;
+  const uint64_t features_;
+  const uint64_t http_codec_options_;
+  mutable ResourceManagers resource_managers_;
+  const std::string maintenance_mode_runtime_key_;
+};
+
+/**
  * Base class all primary clusters.
  */
 class ClusterImplBase : public Cluster,
@@ -162,8 +214,6 @@ class ClusterImplBase : public Cluster,
                         protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterStats generateStats(const std::string& prefix, Stats::Store& stats);
-
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
    * creation since the health checker assumes that the cluster has already been fully initialized
@@ -178,18 +228,8 @@ public:
   void setOutlierDetector(Outlier::DetectorPtr&& outlier_detector);
 
   // Upstream::Cluster
-  const std::string& altStatName() const override { return alt_stat_name_; }
-  std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
-  uint64_t features() const override { return features_; }
-  uint64_t httpCodecOptions() const override { return http_codec_options_; }
-  Ssl::ClientContext* sslContext() const override { return ssl_ctx_; }
+  ClusterInfoPtr info() const override { return info_; }
   LoadBalancerType lbType() const override { return lb_type_; }
-  bool maintenanceMode() const override;
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
-  const std::string& name() const override { return name_; }
-  ResourceManager& resourceManager(ResourcePriority priority) const override;
-  const std::string& statPrefix() const override { return stat_prefix_; }
-  ClusterStats& stats() const override { return stats_; }
 
 protected:
   ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
@@ -203,35 +243,10 @@ protected:
   static const ConstHostListsPtr empty_host_lists_;
 
   Runtime::Loader& runtime_;
-  Ssl::ClientContext* ssl_ctx_;
-  const std::string name_;
   LoadBalancerType lb_type_;
-  const uint64_t max_requests_per_connection_;
-  const std::chrono::milliseconds connect_timeout_;
-  const std::string stat_prefix_;
-  mutable ClusterStats stats_;
   HealthCheckerPtr health_checker_;
-  const std::string alt_stat_name_;
-  const uint64_t features_;
   Outlier::DetectorPtr outlier_detector_;
-
-private:
-  struct ResourceManagers {
-    ResourceManagers(const Json::Object& config, Runtime::Loader& runtime,
-                     const std::string& cluster_name);
-    ResourceManagerImplPtr load(const Json::Object& config, Runtime::Loader& runtime,
-                                const std::string& cluster_name, const std::string& priority);
-
-    typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
-
-    Managers managers_;
-  };
-
-  uint64_t parseFeatures(const Json::Object& config);
-
-  const uint64_t http_codec_options_;
-  mutable ResourceManagers resource_managers_;
-  const std::string maintenance_mode_runtime_key_;
+  ClusterInfoPtr info_;
 };
 
 typedef std::shared_ptr<ClusterImplBase> ClusterImplBasePtr;
@@ -279,7 +294,6 @@ public:
   StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                        Ssl::ContextManager& ssl_context_manager,
                        Network::DnsResolver& dns_resolver);
-  ~StrictDnsClusterImpl();
 
   // Upstream::Cluster
   void shutdown() override {}

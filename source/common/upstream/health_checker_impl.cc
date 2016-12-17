@@ -44,7 +44,7 @@ void HealthCheckerImplBase::decHealthy() {
 }
 
 HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Store& store) {
-  std::string prefix(fmt::format("cluster.{}.health_check.", cluster_.name()));
+  std::string prefix(fmt::format("cluster.{}.health_check.", cluster_.info()->name()));
   return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(store, prefix),
                                    POOL_GAUGE_PREFIX(store, prefix))};
 }
@@ -60,7 +60,7 @@ std::chrono::milliseconds HealthCheckerImplBase::interval() {
   // start sending traffic to this cluster. In general host updates are rare and this should
   // greatly smooth out needless health checking.
   uint64_t base_time_ms;
-  if (cluster_.stats().upstream_cx_total_.used()) {
+  if (cluster_.info()->stats().upstream_cx_total_.used()) {
     base_time_ms = interval_.count();
   } else {
     base_time_ms = NO_TRAFFIC_INTERVAL.count();
@@ -235,7 +235,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
 
   Http::HeaderMapImpl request_headers{
       {Http::Headers::get().Method, "GET"},
-      {Http::Headers::get().Host, parent_.cluster_.name()},
+      {Http::Headers::get().Host, parent_.cluster_.info()->name()},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
 

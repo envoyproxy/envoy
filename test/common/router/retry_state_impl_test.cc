@@ -31,7 +31,7 @@ public:
   }
 
   TestRetryPolicy policy_;
-  NiceMock<Upstream::MockCluster> cluster_;
+  NiceMock<Upstream::MockClusterInfo> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Event::MockDispatcher dispatcher_;

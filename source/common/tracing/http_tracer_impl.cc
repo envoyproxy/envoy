@@ -204,7 +204,7 @@ LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManage
                                      collector_cluster_));
   }
 
-  if (!(cm_.get(collector_cluster_)->features() & Upstream::Cluster::Features::HTTP2)) {
+  if (!(cm_.get(collector_cluster_)->features() & Upstream::ClusterInfo::Features::HTTP2)) {
     throw EnvoyException(
         fmt::format("{} collector cluster must support http2 for gRPC calls", collector_cluster_));
   }

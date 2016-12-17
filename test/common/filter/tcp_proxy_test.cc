@@ -27,8 +27,9 @@ TEST(TcpProxyConfigTest, NoCluster) {
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   EXPECT_CALL(cluster_manager, get("fake_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(TcpProxyConfig(*config, cluster_manager, cluster_manager.cluster_.stats_store_),
-               EnvoyException);
+  EXPECT_THROW(
+      TcpProxyConfig(*config, cluster_manager, cluster_manager.cluster_.info_->stats_store_),
+      EnvoyException);
 }
 
 class TcpProxyTest : public testing::Test {
@@ -42,8 +43,8 @@ public:
     )EOF";
 
     Json::ObjectPtr config = Json::Factory::LoadFromString(json);
-    config_.reset(
-        new TcpProxyConfig(*config, cluster_manager_, cluster_manager_.cluster_.stats_store_));
+    config_.reset(new TcpProxyConfig(*config, cluster_manager_,
+                                     cluster_manager_.cluster_.info_->stats_store_));
   }
 
   void setup(bool return_connection) {
@@ -54,8 +55,8 @@ public:
       upstream_connection_ = new NiceMock<Network::MockClientConnection>();
       Upstream::MockHost::MockCreateConnectionData conn_info;
       conn_info.connection_ = upstream_connection_;
-      conn_info.host_.reset(
-          new Upstream::HostImpl(cluster_manager_.cluster_, "tcp://127.0.0.1:80", false, 1, ""));
+      conn_info.host_.reset(new Upstream::HostImpl(cluster_manager_.cluster_.info_,
+                                                   "tcp://127.0.0.1:80", false, 1, ""));
       EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
       EXPECT_CALL(*upstream_connection_, addReadFilter(_))
           .WillOnce(SaveArg<0>(&upstream_read_filter_));
@@ -145,7 +146,7 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   connect_timer_->callback_();
-  EXPECT_EQ(1U, cluster_manager_.cluster_.stats_store_
+  EXPECT_EQ(1U, cluster_manager_.cluster_.info_->stats_store_
                     .counter("cluster.fake_cluster.upstream_cx_connect_timeout")
                     .value());
 }
@@ -172,13 +173,13 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*connect_timer_, disableTimer());
   upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(1U, cluster_manager_.cluster_.stats_store_
+  EXPECT_EQ(1U, cluster_manager_.cluster_.info_->stats_store_
                     .counter("cluster.fake_cluster.upstream_cx_connect_fail")
                     .value());
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
-  cluster_manager_.cluster_.resource_manager_.reset(
+  cluster_manager_.cluster_.info_->resource_manager_.reset(
       new Upstream::ResourceManagerImpl(runtime_, "fake_key", 0, 0, 0, 0));
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
@@ -188,10 +189,9 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   filter_->onNewConnection();
 
-  EXPECT_EQ(
-      1U,
-      cluster_manager_.cluster_.stats_store_.counter("cluster.fake_cluster.upstream_cx_overflow")
-          .value());
+  EXPECT_EQ(1U, cluster_manager_.cluster_.info_->stats_store_
+                    .counter("cluster.fake_cluster.upstream_cx_overflow")
+                    .value());
 }
 
 } // Filter

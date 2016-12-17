@@ -15,6 +15,34 @@ using testing::NiceMock;
 
 namespace Upstream {
 
+class MockClusterInfo : public ClusterInfo {
+public:
+  MockClusterInfo();
+  ~MockClusterInfo();
+
+  // Upstream::ClusterInfo
+  MOCK_CONST_METHOD0(altStatName, const std::string&());
+  MOCK_CONST_METHOD0(connectTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(features, uint64_t());
+  MOCK_CONST_METHOD0(httpCodecOptions, uint64_t());
+  MOCK_CONST_METHOD0(maintenanceMode, bool());
+  MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
+  MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
+  MOCK_CONST_METHOD0(sslContext, Ssl::ClientContext*());
+  MOCK_CONST_METHOD0(statPrefix, const std::string&());
+  MOCK_CONST_METHOD0(stats, ClusterStats&());
+
+  const std::string name_{"fake_cluster"};
+  const std::string alt_stat_name_{"fake_alt_cluster"};
+  const std::string stat_prefix_{"cluster.fake_cluster."};
+  uint64_t max_requests_per_connection_{};
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  ClusterStats stats_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  std::unique_ptr<Upstream::ResourceManager> resource_manager_;
+};
+
 class MockCluster : public Cluster {
 public:
   MockCluster();
@@ -34,34 +62,17 @@ public:
   MOCK_CONST_METHOD0(healthyHostsPerZone, const std::vector<std::vector<HostPtr>>&());
 
   // Upstream::Cluster
-  MOCK_CONST_METHOD0(altStatName, const std::string&());
-  MOCK_CONST_METHOD0(connectTimeout, std::chrono::milliseconds());
-  MOCK_CONST_METHOD0(features, uint64_t());
-  MOCK_CONST_METHOD0(httpCodecOptions, uint64_t());
-  MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
-  MOCK_CONST_METHOD0(sslContext, Ssl::ClientContext*());
+  MOCK_CONST_METHOD0(info, ClusterInfoPtr());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
-  MOCK_CONST_METHOD0(maintenanceMode, bool());
-  MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
-  MOCK_CONST_METHOD0(name, const std::string&());
-  MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
+  MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(shutdown, void());
-  MOCK_CONST_METHOD0(statPrefix, const std::string&());
-  MOCK_CONST_METHOD0(stats, ClusterStats&());
 
   std::vector<HostPtr> hosts_;
   std::vector<HostPtr> healthy_hosts_;
   std::vector<std::vector<HostPtr>> hosts_per_zone_;
   std::vector<std::vector<HostPtr>> healthy_hosts_per_zone_;
-  const std::string name_{"fake_cluster"};
-  const std::string alt_stat_name_{"fake_alt_cluster"};
   std::list<MemberUpdateCb> callbacks_;
-  uint64_t max_requests_per_connection_{};
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  const std::string stat_prefix_{"cluster.fake_cluster."};
-  ClusterStats stats_;
-  std::unique_ptr<Upstream::ResourceManager> resource_manager_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };
 
 class MockClusterManager : public ClusterManager {
@@ -77,7 +88,7 @@ public:
   // Upstream::ClusterManager
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, std::unordered_map<std::string, ConstClusterPtr>());
-  MOCK_METHOD1(get, const Cluster*(const std::string& cluster));
+  MOCK_METHOD1(get, ClusterInfoPtr(const std::string& cluster));
   MOCK_METHOD2(httpConnPoolForCluster, Http::ConnectionPool::Instance*(const std::string& cluster,
                                                                        ResourcePriority priority));
   MOCK_METHOD1(tcpConnForCluster_, MockHost::MockCreateConnectionData(const std::string& cluster));

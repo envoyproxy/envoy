@@ -51,7 +51,7 @@ public:
   void putResponseTime(std::chrono::milliseconds) override {}
 
 private:
-  DetectorImpl& detector_;
+  DetectorImpl& detector_; // TODO: This is broken for dynamic cluster remove.
   std::weak_ptr<Host> host_;
   std::atomic<uint32_t> consecutive_5xx_{0};
   SystemTime ejection_time_;
@@ -83,7 +83,7 @@ struct DetectionStats {
  */
 class DetectorImpl : public Detector {
 public:
-  DetectorImpl(Cluster& cluster, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+  DetectorImpl(const Cluster& cluster, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                Stats::Store& stats, SystemTimeSource& time_source, EventLoggerPtr event_logger);
 
   void onConsecutive5xx(HostPtr host);

@@ -42,7 +42,7 @@ public:
     return clusters_map;
   }
 
-  const Cluster* get(const std::string& cluster) override;
+  ClusterInfoPtr get(const std::string& cluster) override;
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                          ResourcePriority priority) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) override;
@@ -72,7 +72,7 @@ private:
     };
 
     struct ClusterEntry {
-      ClusterEntry(ThreadLocalClusterManagerImpl& parent, const Cluster& cluster,
+      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ConstClusterPtr cluster,
                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                    Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                    const std::string& local_zone_name, const std::string& local_address,
@@ -83,7 +83,7 @@ private:
       ThreadLocalClusterManagerImpl& parent_;
       HostSetImpl host_set_;
       LoadBalancerPtr lb_;
-      const Cluster& primary_cluster_;
+      ConstClusterPtr primary_cluster_;
       Http::AsyncClientImpl http_async_client_;
     };
 

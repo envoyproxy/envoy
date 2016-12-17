@@ -35,7 +35,7 @@ public:
 
 private:
   struct LogicalHost : public HostImpl {
-    LogicalHost(const Cluster& cluster, const std::string& url, LogicalDnsCluster& parent)
+    LogicalHost(ClusterInfoPtr cluster, const std::string& url, LogicalDnsCluster& parent)
         : HostImpl(cluster, url, false, 1, ""), parent_(parent) {}
 
     // Upstream::Host
@@ -50,7 +50,7 @@ private:
 
     // Upstream:HostDescription
     bool canary() const override { return false; }
-    const Cluster& cluster() const override { return logical_host_->cluster(); }
+    const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
     Outlier::DetectorHostSink& outlierDetector() const override {
       return logical_host_->outlierDetector();
     }

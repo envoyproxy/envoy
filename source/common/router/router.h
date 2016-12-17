@@ -42,7 +42,7 @@ public:
   /**
    * Set the :scheme header based on the properties of the upstream cluster.
    */
-  static void setUpstreamScheme(Http::HeaderMap& headers, const Upstream::Cluster& cluster);
+  static void setUpstreamScheme(Http::HeaderMap& headers, const Upstream::ClusterInfo& cluster);
 
   /**
    * Determine whether a request should be shadowed.
@@ -178,8 +178,8 @@ private:
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::HeaderMap& request_headers,
-                                         const Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                                         Runtime::RandomGenerator& random,
+                                         const Upstream::ClusterInfo& cluster,
+                                         Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                          Event::Dispatcher& dispatcher,
                                          Upstream::ResourcePriority priority) PURE;
   Upstream::ResourcePriority finalPriority();
@@ -200,7 +200,7 @@ private:
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   const RouteEntry* route_;
-  const Upstream::Cluster* cluster_;
+  Upstream::ClusterInfoPtr cluster_;
   std::list<std::string> alt_stat_prefixes_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
@@ -223,7 +223,7 @@ public:
 private:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::HeaderMap& request_headers,
-                                 const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                                 const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                  Upstream::ResourcePriority priority) override;
 };

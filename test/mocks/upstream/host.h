@@ -50,7 +50,7 @@ public:
   ~MockHostDescription();
 
   MOCK_CONST_METHOD0(canary, bool());
-  MOCK_CONST_METHOD0(cluster, const Cluster&());
+  MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostSink&());
   MOCK_CONST_METHOD0(url, const std::string&());
   MOCK_CONST_METHOD0(stats, HostStats&());
@@ -72,7 +72,7 @@ public:
   MockHost();
   ~MockHost();
 
-  MOCK_CONST_METHOD0(cluster, const Cluster&());
+  MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(url, const std::string&());
   MOCK_CONST_METHOD0(counters, std::list<std::reference_wrapper<Stats::Counter>>());
   MOCK_CONST_METHOD0(gauges, std::list<std::reference_wrapper<Stats::Gauge>>());

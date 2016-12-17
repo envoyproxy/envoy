@@ -7,7 +7,7 @@ const AsyncRequestImpl::NullRateLimitPolicy AsyncRequestImpl::RouteEntryImpl::ra
 const AsyncRequestImpl::NullRetryPolicy AsyncRequestImpl::RouteEntryImpl::retry_policy_;
 const AsyncRequestImpl::NullShadowPolicy AsyncRequestImpl::RouteEntryImpl::shadow_policy_;
 
-AsyncClientImpl::AsyncClientImpl(const Upstream::Cluster& cluster, Stats::Store& stats_store,
+AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
                                  Event::Dispatcher& dispatcher, const std::string& local_zone_name,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random,

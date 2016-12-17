@@ -211,15 +211,16 @@ struct ClusterStats {
 };
 
 /**
- * An upstream cluster (group of hosts). This class is the "primary" singleton cluster used amongst
- * all forwarding threads/workers. Individual HostSets are used on the workers themselves.
+ * Information about a given upstream cluster.
  */
-class Cluster : public virtual HostSet {
+class ClusterInfo {
 public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.
     static const uint64_t HTTP2 = 0x1;
   };
+
+  virtual ~ClusterInfo() {}
 
   /**
    * @return const std::string& the alternate stat name to write cluster stats to. This is useful
@@ -242,23 +243,6 @@ public:
    *         @see Http::CodecOptions.
    */
   virtual uint64_t httpCodecOptions() const PURE;
-
-  /**
-   * Set a callback that will be invoked after the cluster has undergone first time initialization.
-   * E.g., for a dynamic DNS cluster the initialize callback will be called when initial DNS
-   * resolution is complete.
-   */
-  virtual void setInitializedCb(std::function<void()> callback) PURE;
-
-  /**
-   * @return the SSL context to use when communicating with the cluster.
-   */
-  virtual Ssl::ClientContext* sslContext() const PURE;
-
-  /**
-   * @return the type of load balancing that the cluster should use.
-   */
-  virtual LoadBalancerType lbType() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
@@ -287,9 +271,9 @@ public:
   virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
 
   /**
-   * Shutdown the cluster prior to destroying connection pools and other thread local data.
+   * @return the SSL context to use when communicating with the cluster.
    */
-  virtual void shutdown() PURE;
+  virtual Ssl::ClientContext* sslContext() const PURE;
 
   /**
    * @return the stat prefix to use for cluster specific stats.
@@ -300,6 +284,37 @@ public:
    * @return ClusterStats& strongly named stats for this cluster.
    */
   virtual ClusterStats& stats() const PURE;
+};
+
+typedef std::shared_ptr<const ClusterInfo> ClusterInfoPtr;
+
+/**
+ * An upstream cluster (group of hosts). This class is the "primary" singleton cluster used amongst
+ * all forwarding threads/workers. Individual HostSets are used on the workers themselves.
+ */
+class Cluster : public virtual HostSet {
+public:
+  /**
+   * @return the information about this upstream cluster.
+   */
+  virtual ClusterInfoPtr info() const PURE;
+
+  /**
+   * @return the type of load balancing that the cluster should use.
+   */
+  virtual LoadBalancerType lbType() const PURE;
+
+  /**
+   * Set a callback that will be invoked after the cluster has undergone first time initialization.
+   * E.g., for a dynamic DNS cluster the initialize callback will be called when initial DNS
+   * resolution is complete.
+   */
+  virtual void setInitializedCb(std::function<void()> callback) PURE;
+
+  /**
+   * Shutdown the cluster prior to destroying connection pools and other thread local data.
+   */
+  virtual void shutdown() PURE;
 };
 
 typedef std::shared_ptr<Cluster> ClusterPtr;
