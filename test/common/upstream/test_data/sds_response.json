@@ -82,7 +82,8 @@
                 "canary": true,
                 "instance_id": "i-11e726a1",
                 "onebox_name": null,
-                "region": "us-east-1"
+                "region": "us-east-1",
+                "load_balancing_weight": 40
             }
         },
         {
@@ -170,7 +171,7 @@
             }
         },
         {
-            "ip_address": "10.0.5.1",
+            "ip_address": "10.0.5.2",
             "last_check_in": "2015-12-10 22:06:09.036531+00:00",
             "port": 80,
             "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
@@ -180,7 +181,8 @@
                 "canary": false,
                 "instance_id": "i-4e7f7ef9",
                 "onebox_name": null,
-                "region": "us-east-1"
+                "region": "us-east-1",
+                "load_balancing_weight": 90
             }
         }
     ],
