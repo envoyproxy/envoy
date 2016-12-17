@@ -40,7 +40,8 @@ class DetectorImpl;
  */
 class DetectorHostSinkImpl : public DetectorHostSink {
 public:
-  DetectorHostSinkImpl(DetectorImpl& detector, HostPtr host) : detector_(detector), host_(host) {}
+  DetectorHostSinkImpl(std::shared_ptr<DetectorImpl> detector, HostPtr host)
+      : detector_(detector), host_(host) {}
 
   void eject(SystemTime ejection_time);
   SystemTime ejectionTime() { return ejection_time_; }
@@ -51,7 +52,7 @@ public:
   void putResponseTime(std::chrono::milliseconds) override {}
 
 private:
-  DetectorImpl& detector_; // TODO: This is broken for dynamic cluster remove.
+  std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
   std::atomic<uint32_t> consecutive_5xx_{0};
   SystemTime ejection_time_;
@@ -81,10 +82,13 @@ struct DetectionStats {
  * implementations with different configuration. For now, as we iterate everything is contained
  * within this implementation.
  */
-class DetectorImpl : public Detector {
+class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
-  DetectorImpl(const Cluster& cluster, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-               Stats::Store& stats, SystemTimeSource& time_source, EventLoggerPtr event_logger);
+  static std::shared_ptr<DetectorImpl> create(const Cluster& cluster, Event::Dispatcher& dispatcher,
+                                              Runtime::Loader& runtime, Stats::Store& stats,
+                                              SystemTimeSource& time_source,
+                                              EventLoggerPtr event_logger);
+  ~DetectorImpl();
 
   void onConsecutive5xx(HostPtr host);
   Runtime::Loader& runtime() { return runtime_; }
@@ -93,11 +97,15 @@ public:
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
 
 private:
+  DetectorImpl(const Cluster& cluster, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+               Stats::Store& stats, SystemTimeSource& time_source, EventLoggerPtr event_logger);
+
   void addHostSink(HostPtr host);
   void armIntervalTimer();
   void checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink, SystemTime now);
   void ejectHost(HostPtr host, EjectionType type);
   static DetectionStats generateStats(const std::string& name, Stats::Store& store);
+  void initialize(const Cluster& cluster);
   void onConsecutive5xxWorker(HostPtr host);
   void onIntervalTimer();
   void runCallbacks(HostPtr host);

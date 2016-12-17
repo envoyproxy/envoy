@@ -225,7 +225,7 @@ public:
    * Optionally set the outlier detector for the primary cluster. Done for the same reason as
    * documented in setHealthChecker().
    */
-  void setOutlierDetector(Outlier::DetectorPtr&& outlier_detector);
+  void setOutlierDetector(Outlier::DetectorPtr outlier_detector);
 
   // Upstream::Cluster
   ClusterInfoPtr info() const override { return info_; }

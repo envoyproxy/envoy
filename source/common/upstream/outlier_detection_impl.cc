@@ -17,8 +17,8 @@ DetectorPtr DetectorImplFactory::createForCluster(Cluster& cluster,
   // Right now we don't support any configuration but in order to make the config backwards
   // compatible we just look for an empty object.
   if (cluster_config.hasObject("outlier_detection")) {
-    return DetectorPtr{new DetectorImpl(cluster, dispatcher, runtime, stats,
-                                        ProdSystemTimeSource::instance_, event_logger)};
+    return DetectorImpl::create(cluster, dispatcher, runtime, stats,
+                                ProdSystemTimeSource::instance_, event_logger);
   } else {
     return nullptr;
   }
@@ -33,9 +33,15 @@ void DetectorHostSinkImpl::eject(SystemTime ejection_time) {
 
 void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
   if (Http::CodeUtility::is5xx(response_code)) {
+    std::shared_ptr<DetectorImpl> detector = detector_.lock();
+    if (!detector) {
+      // It's possibly for the cluster/detector to go away while we still have a host in use.
+      return;
+    }
+
     if (++consecutive_5xx_ ==
-        detector_.runtime().snapshot().getInteger("outlier_detection.consecutive_5xx", 5)) {
-      detector_.onConsecutive5xx(host_.lock());
+        detector->runtime().snapshot().getInteger("outlier_detection.consecutive_5xx", 5)) {
+      detector->onConsecutive5xx(host_.lock());
     }
   } else {
     consecutive_5xx_ = 0;
@@ -48,7 +54,29 @@ DetectorImpl::DetectorImpl(const Cluster& cluster, Event::Dispatcher& dispatcher
     : dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->name(), stats)),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
-      event_logger_(event_logger) {
+      event_logger_(event_logger) {}
+
+DetectorImpl::~DetectorImpl() {
+  for (auto host : host_sinks_) {
+    if (host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+      ASSERT(stats_.ejections_active_.value() > 0);
+      stats_.ejections_active_.dec();
+    }
+  }
+}
+
+std::shared_ptr<DetectorImpl> DetectorImpl::create(const Cluster& cluster,
+                                                   Event::Dispatcher& dispatcher,
+                                                   Runtime::Loader& runtime, Stats::Store& stats,
+                                                   SystemTimeSource& time_source,
+                                                   EventLoggerPtr event_logger) {
+  std::shared_ptr<DetectorImpl> detector(
+      new DetectorImpl(cluster, dispatcher, runtime, stats, time_source, event_logger));
+  detector->initialize(cluster);
+  return detector;
+}
+
+void DetectorImpl::initialize(const Cluster& cluster) {
   for (HostPtr host : cluster.hosts()) {
     addHostSink(host);
   }
@@ -75,7 +103,7 @@ DetectorImpl::DetectorImpl(const Cluster& cluster, Event::Dispatcher& dispatcher
 
 void DetectorImpl::addHostSink(HostPtr host) {
   ASSERT(host_sinks_.count(host) == 0);
-  DetectorHostSinkImpl* sink = new DetectorHostSinkImpl(*this, host);
+  DetectorHostSinkImpl* sink = new DetectorHostSinkImpl(shared_from_this(), host);
   host_sinks_[host] = sink;
   host->setOutlierDetector(DetectorHostSinkPtr{sink});
 }
@@ -132,7 +160,14 @@ DetectionStats DetectorImpl::generateStats(const std::string& name, Stats::Store
 
 void DetectorImpl::onConsecutive5xx(HostPtr host) {
   // This event will come from all threads, so we synchronize with a post to the main thread.
-  dispatcher_.post([this, host]() -> void { onConsecutive5xxWorker(host); });
+  // TODO: Unfortunately conesecutive 5xx is complicated from a threading perspective because
+  //       we catch consecutive 5xx on worker threads and then post back to the main thread. In
+  //       the future, clusters can get removed, and this means there is a race condition with this
+  //       reverse post. The use of shared_from_this() will prevent the outleir detector from going
+  //       away, but we still need to prevent callbacks from being fired, etc., so will need to add
+  //       some type of shutdown() method when we support cluster remove.
+  std::shared_ptr<DetectorImpl> shared_this = shared_from_this();
+  dispatcher_.post([shared_this, host]() -> void { shared_this->onConsecutive5xxWorker(host); });
 }
 
 void DetectorImpl::onConsecutive5xxWorker(HostPtr host) {
