@@ -163,7 +163,7 @@ void DetectorImpl::onConsecutive5xx(HostPtr host) {
   // TODO: Unfortunately conesecutive 5xx is complicated from a threading perspective because
   //       we catch consecutive 5xx on worker threads and then post back to the main thread. In
   //       the future, clusters can get removed, and this means there is a race condition with this
-  //       reverse post. The use of shared_from_this() will prevent the outleir detector from going
+  //       reverse post. The use of shared_from_this() will prevent the outlier detector from going
   //       away, but we still need to prevent callbacks from being fired, etc., so will need to add
   //       some type of shutdown() method when we support cluster remove.
   std::shared_ptr<DetectorImpl> shared_this = shared_from_this();
