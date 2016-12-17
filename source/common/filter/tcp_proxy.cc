@@ -56,12 +56,9 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
 }
 
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
-  Upstream::ResourceManager& upstream_cluster_resource_manager =
-      cluster_manager_.get(config_->clusterName())
-          ->resourceManager(Upstream::ResourcePriority::Default);
-
-  if (!upstream_cluster_resource_manager.connections().canCreate()) {
-    cluster_manager_.get(config_->clusterName())->stats().upstream_cx_overflow_.inc();
+  Upstream::ClusterInfoPtr cluster = cluster_manager_.get(config_->clusterName());
+  if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
+    cluster->stats().upstream_cx_overflow_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
@@ -74,7 +71,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
-  upstream_cluster_resource_manager.connections().inc();
+  cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
 
   upstream_connection_->addReadFilter(upstream_callbacks_);
   upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
@@ -88,8 +85,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
 
   connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(
       [this]() -> void { onConnectTimeout(); });
-  connect_timeout_timer_->enableTimer(
-      cluster_manager_.get(config_->clusterName())->connectTimeout());
+  connect_timeout_timer_->enableTimer(cluster->connectTimeout());
 
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_total_.inc();
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_active_.inc();

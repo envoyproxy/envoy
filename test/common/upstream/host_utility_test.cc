@@ -6,7 +6,7 @@
 namespace Upstream {
 
 TEST(HostUtilityTest, All) {
-  MockCluster cluster;
+  ClusterInfoPtr cluster{new MockClusterInfo()};
   HostImpl host(cluster, "tcp://127.0.0.1:80", false, 1, "");
   EXPECT_EQ("healthy", HostUtility::healthFlagsToString(host));
 

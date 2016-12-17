@@ -26,10 +26,10 @@ public:
   virtual std::unordered_map<std::string, ConstClusterPtr> clusters() PURE;
 
   /**
-   * @return const Cluster* the primary cluster with the given name or nullptr if it does
-   *         not exist.
+   * @return ClusterInfoPtr the cluster info with the given name or nullptr if it does not
+   * exist. This is thread safe.
    */
-  virtual const Cluster* get(const std::string& cluster) PURE;
+  virtual ClusterInfoPtr get(const std::string& cluster) PURE;
 
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that

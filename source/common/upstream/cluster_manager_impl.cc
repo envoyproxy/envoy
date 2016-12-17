@@ -56,7 +56,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   Optional<std::string> local_cluster_name;
   if (config.hasObject("local_cluster_name")) {
     local_cluster_name.value(config.getString("local_cluster_name"));
-    if (get(local_cluster_name.value()) == nullptr) {
+    if (primary_clusters_.find(local_cluster_name.value()) == primary_clusters_.end()) {
       throw EnvoyException(
           fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
     }
@@ -110,8 +110,8 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, Stats::Store& 
     throw EnvoyException(fmt::format("cluster: unknown cluster type '{}'", string_type));
   }
 
-  if (primary_clusters_.find(new_cluster->name()) != primary_clusters_.end()) {
-    throw EnvoyException(fmt::format("route: duplicate cluster '{}'", new_cluster->name()));
+  if (primary_clusters_.find(new_cluster->info()->name()) != primary_clusters_.end()) {
+    throw EnvoyException(fmt::format("route: duplicate cluster '{}'", new_cluster->info()->name()));
   }
 
   new_cluster->setInitializedCb([this]() -> void {
@@ -153,13 +153,16 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, Stats::Store& 
 
   new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
       *new_cluster, cluster, dns_resolver.dispatcher(), runtime, stats, event_logger));
-  primary_clusters_.emplace(new_cluster->name(), new_cluster);
+  primary_clusters_.emplace(new_cluster->info()->name(), new_cluster);
 }
 
-const Cluster* ClusterManagerImpl::get(const std::string& cluster) {
-  auto entry = primary_clusters_.find(cluster);
-  if (entry != primary_clusters_.end()) {
-    return entry->second.get();
+ClusterInfoPtr ClusterManagerImpl::get(const std::string& cluster) {
+  ThreadLocalClusterManagerImpl& cluster_manager =
+      tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
+
+  auto entry = cluster_manager.thread_local_clusters_.find(cluster);
+  if (entry != cluster_manager.thread_local_clusters_.end()) {
+    return entry->second->primary_cluster_->info();
   } else {
     return nullptr;
   }
@@ -182,7 +185,7 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const ClusterImplBase& primary_cluster,
                                                       const std::vector<HostPtr>& hosts_added,
                                                       const std::vector<HostPtr>& hosts_removed) {
-  const std::string& name = primary_cluster.name();
+  const std::string& name = primary_cluster.info()->name();
   ConstHostVectorPtr hosts_copy = primary_cluster.rawHosts();
   ConstHostVectorPtr healthy_hosts_copy = primary_cluster.rawHealthyHosts();
   ConstHostListsPtr hosts_per_zone_copy = primary_cluster.rawHostsPerZone();
@@ -212,7 +215,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
   if (logical_host) {
     return logical_host->createConnection(cluster_manager.dispatcher_);
   } else {
-    entry->second->primary_cluster_.stats().upstream_cx_none_healthy_.inc();
+    entry->second->primary_cluster_->info()->stats().upstream_cx_none_healthy_.inc();
     return {nullptr, nullptr};
   }
 }
@@ -237,7 +240,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
   if (local_cluster_name.valid()) {
     auto& local_cluster = parent.primary_clusters_[local_cluster_name.value()];
     thread_local_clusters_[local_cluster_name.value()].reset(
-        new ClusterEntry(*this, *local_cluster, runtime, random, parent.stats_, dispatcher,
+        new ClusterEntry(*this, local_cluster, runtime, random, parent.stats_, dispatcher,
                          local_zone_name, local_address, nullptr));
   }
 
@@ -252,7 +255,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     }
 
     thread_local_clusters_[cluster.first].reset(
-        new ClusterEntry(*this, *cluster.second, runtime, random, parent.stats_, dispatcher,
+        new ClusterEntry(*this, cluster.second, runtime, random, parent.stats_, dispatcher,
                          local_zone_name, local_address, local_host_set));
   }
 
@@ -318,28 +321,30 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::shutdown() {
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
-    ThreadLocalClusterManagerImpl& parent, const Cluster& cluster, Runtime::Loader& runtime,
+    ThreadLocalClusterManagerImpl& parent, ConstClusterPtr cluster, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Stats::Store& stats_store, Event::Dispatcher& dispatcher,
     const std::string& local_zone_name, const std::string& local_address,
     const HostSet* local_host_set)
     : parent_(parent), primary_cluster_(cluster),
-      http_async_client_(
-          cluster, stats_store, dispatcher, local_zone_name, parent.parent_, runtime, random,
-          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}, local_address) {
+      http_async_client_(*cluster->info(), stats_store, dispatcher, local_zone_name, parent.parent_,
+                         runtime, random,
+                         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)},
+                         local_address) {
 
-  switch (cluster.lbType()) {
+  switch (cluster->lbType()) {
   case LoadBalancerType::LeastRequest: {
-    lb_.reset(
-        new LeastRequestLoadBalancer(host_set_, local_host_set, cluster.stats(), runtime, random));
+    lb_.reset(new LeastRequestLoadBalancer(host_set_, local_host_set, cluster->info()->stats(),
+                                           runtime, random));
     break;
   }
   case LoadBalancerType::Random: {
-    lb_.reset(new RandomLoadBalancer(host_set_, local_host_set, cluster.stats(), runtime, random));
+    lb_.reset(new RandomLoadBalancer(host_set_, local_host_set, cluster->info()->stats(), runtime,
+                                     random));
     break;
   }
   case LoadBalancerType::RoundRobin: {
-    lb_.reset(
-        new RoundRobinLoadBalancer(host_set_, local_host_set, cluster.stats(), runtime, random));
+    lb_.reset(new RoundRobinLoadBalancer(host_set_, local_host_set, cluster->info()->stats(),
+                                         runtime, random));
     break;
   }
   }
@@ -350,7 +355,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     ResourcePriority priority) {
   ConstHostPtr host = lb_->chooseHost();
   if (!host) {
-    primary_cluster_.stats().upstream_cx_none_healthy_.inc();
+    primary_cluster_->info()->stats().upstream_cx_none_healthy_.inc();
     return nullptr;
   }
 
@@ -367,7 +372,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 Http::ConnectionPool::InstancePtr
 ProdClusterManagerImpl::allocateConnPool(Event::Dispatcher& dispatcher, ConstHostPtr host,
                                          Stats::Store& store, ResourcePriority priority) {
-  if ((host->cluster().features() & Cluster::Features::HTTP2) &&
+  if ((host->cluster().features() & ClusterInfo::Features::HTTP2) &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::ConnectionPool::InstancePtr{
         new Http::Http2::ProdConnPoolImpl(dispatcher, host, store, priority)};

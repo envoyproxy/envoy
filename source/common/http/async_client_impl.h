@@ -21,7 +21,7 @@ class AsyncRequestImpl;
 
 class AsyncClientImpl final : public AsyncClient {
 public:
-  AsyncClientImpl(const Upstream::Cluster& cluster, Stats::Store& stats_store,
+  AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
                   Event::Dispatcher& dispatcher, const std::string& local_zone_name,
                   Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                   Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer,
@@ -33,7 +33,7 @@ public:
                 const Optional<std::chrono::milliseconds>& timeout) override;
 
 private:
-  const Upstream::Cluster& cluster_;
+  const Upstream::ClusterInfo& cluster_;
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncRequestImpl>> active_requests_;

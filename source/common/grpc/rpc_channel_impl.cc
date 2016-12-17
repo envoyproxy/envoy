@@ -28,7 +28,7 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
 
   // This should be caught in configuration, and a request will fail normally anyway, but assert
   // here for clarity.
-  ASSERT(cm_.get(cluster_)->features() & Upstream::Cluster::Features::HTTP2);
+  ASSERT(cm_.get(cluster_)->features() & Upstream::ClusterInfo::Features::HTTP2);
 
   Http::MessagePtr message =
       Common::prepareHeaders(cluster_, method->service()->full_name(), method->name());

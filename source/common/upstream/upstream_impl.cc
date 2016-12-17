@@ -19,11 +19,11 @@ namespace Upstream {
 Outlier::DetectorHostSinkNullImpl HostDescriptionImpl::null_outlier_detector_;
 
 Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, cluster_, url_), shared_from_this()};
+  return {createConnection(dispatcher, *cluster_, url_), shared_from_this()};
 }
 
 Network::ClientConnectionPtr HostImpl::createConnection(Event::Dispatcher& dispatcher,
-                                                        const Cluster& cluster,
+                                                        const ClusterInfo& cluster,
                                                         const std::string& url) {
   if (cluster.sslContext()) {
     return Network::ClientConnectionPtr{
@@ -39,7 +39,7 @@ void HostSetImpl::addMemberUpdateCb(MemberUpdateCb callback) const {
   callbacks_.emplace_back(callback);
 }
 
-ClusterStats ClusterImplBase::generateStats(const std::string& prefix, Stats::Store& stats) {
+ClusterStats ClusterInfoImpl::generateStats(const std::string& prefix, Stats::Store& stats) {
   return {ALL_CLUSTER_STATS(POOL_COUNTER_PREFIX(stats, prefix), POOL_GAUGE_PREFIX(stats, prefix),
                             POOL_TIMER_PREFIX(stats, prefix))};
 }
@@ -51,9 +51,7 @@ void HostSetImpl::runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
   }
 }
 
-const ConstHostListsPtr ClusterImplBase::empty_host_lists_{new std::vector<std::vector<HostPtr>>()};
-
-ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime,
+ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& runtime,
                                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
     : runtime_(runtime), name_(config.getString("name")),
       max_requests_per_connection_(config.getInteger("max_requests_per_connection", 0)),
@@ -64,6 +62,19 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& ru
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)) {
 
+  ssl_ctx_ = nullptr;
+  if (config.hasObject("ssl_context")) {
+    Ssl::ContextConfigImpl context_config(*config.getObject("ssl_context"));
+    ssl_ctx_ = &ssl_context_manager.createSslClientContext(stat_prefix_, stats, context_config);
+  }
+}
+
+const ConstHostListsPtr ClusterImplBase::empty_host_lists_{new std::vector<std::vector<HostPtr>>()};
+
+ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime,
+                                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
+    : runtime_(runtime), info_(new ClusterInfoImpl(config, runtime, stats, ssl_context_manager)) {
+
   std::string string_lb_type = config.getString("lb_type");
   if (string_lb_type == "round_robin") {
     lb_type_ = LoadBalancerType::RoundRobin;
@@ -73,12 +84,6 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& ru
     lb_type_ = LoadBalancerType::Random;
   } else {
     throw EnvoyException(fmt::format("cluster: unknown LB type '{}'", string_lb_type));
-  }
-
-  ssl_ctx_ = nullptr;
-  if (config.hasObject("ssl_context")) {
-    Ssl::ContextConfigImpl context_config(*config.getObject("ssl_context"));
-    ssl_ctx_ = &ssl_context_manager.createSslClientContext(stat_prefix_, stats, context_config);
   }
 }
 
@@ -110,11 +115,11 @@ ClusterImplBase::createHealthyHostLists(const std::vector<std::vector<HostPtr>>&
   return healthy_list;
 }
 
-bool ClusterImplBase::maintenanceMode() const {
+bool ClusterInfoImpl::maintenanceMode() const {
   return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
 }
 
-uint64_t ClusterImplBase::parseFeatures(const Json::Object& config) {
+uint64_t ClusterInfoImpl::parseFeatures(const Json::Object& config) {
   uint64_t features = 0;
   for (const std::string& feature : StringUtil::split(config.getString("features", ""), ',')) {
     if (feature == "http2") {
@@ -127,7 +132,7 @@ uint64_t ClusterImplBase::parseFeatures(const Json::Object& config) {
   return features;
 }
 
-ResourceManager& ClusterImplBase::resourceManager(ResourcePriority priority) const {
+ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) const {
   ASSERT(enumToInt(priority) < resource_managers_.managers_.size());
   return *resource_managers_.managers_[enumToInt(priority)];
 }
@@ -135,11 +140,11 @@ ResourceManager& ClusterImplBase::resourceManager(ResourcePriority priority) con
 void ClusterImplBase::runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
                                          const std::vector<HostPtr>& hosts_removed) {
   if (!hosts_added.empty() || !hosts_removed.empty()) {
-    stats_.membership_change_.inc();
+    info_->stats().membership_change_.inc();
   }
 
-  stats_.membership_healthy_.set(healthyHosts().size());
-  stats_.membership_total_.set(hosts().size());
+  info_->stats().membership_healthy_.set(healthyHosts().size());
+  info_->stats().membership_total_.set(hosts().size());
   HostSetImpl::runUpdateCallbacks(hosts_added, hosts_removed);
 }
 
@@ -169,14 +174,14 @@ void ClusterImplBase::setOutlierDetector(Outlier::DetectorPtr&& outlier_detector
   });
 }
 
-ClusterImplBase::ResourceManagers::ResourceManagers(const Json::Object& config,
+ClusterInfoImpl::ResourceManagers::ResourceManagers(const Json::Object& config,
                                                     Runtime::Loader& runtime,
                                                     const std::string& cluster_name) {
   managers_[enumToInt(ResourcePriority::Default)] = load(config, runtime, cluster_name, "default");
   managers_[enumToInt(ResourcePriority::High)] = load(config, runtime, cluster_name, "high");
 }
 
-ResourceManagerImplPtr ClusterImplBase::ResourceManagers::load(const Json::Object& config,
+ResourceManagerImplPtr ClusterInfoImpl::ResourceManagers::load(const Json::Object& config,
                                                                Runtime::Loader& runtime,
                                                                const std::string& cluster_name,
                                                                const std::string& priority) {
@@ -205,7 +210,7 @@ StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader
     std::string url = host->getString("url");
     // resolve the URL to make sure it's valid
     Network::Utility::resolve(url);
-    new_hosts->emplace_back(HostPtr{new HostImpl(*this, url, false, 1, "")});
+    new_hosts->emplace_back(HostPtr{new HostImpl(info_, url, false, 1, "")});
   }
 
   updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
@@ -273,7 +278,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
     }
   }
 
-  stats_.max_host_weight_.set(max_host_weight);
+  info_->stats().max_host_weight_.set(max_host_weight);
 
   if (!hosts_added.empty() || !current_hosts.empty()) {
     hosts_removed = std::move(current_hosts);
@@ -298,8 +303,6 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
     resolve_targets_.emplace_back(new ResolveTarget(*this, host->getString("url")));
   }
 }
-
-StrictDnsClusterImpl::~StrictDnsClusterImpl() {}
 
 void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostPtr>& hosts_added,
                                           const std::vector<HostPtr>& hosts_removed) {
@@ -327,18 +330,18 @@ StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,
 
 void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   log_debug("starting async DNS resolution for {}", dns_address_);
-  parent_.stats_.update_attempt_.inc();
+  parent_.info_->stats().update_attempt_.inc();
 
   parent_.dns_resolver_.resolve(
       dns_address_, [this](std::list<std::string>&& address_list) -> void {
 
         log_debug("async DNS resolution complete for {}", dns_address_);
-        parent_.stats_.update_success_.inc();
+        parent_.info_->stats().update_success_.inc();
 
         std::vector<HostPtr> new_hosts;
         for (const std::string& address : address_list) {
-          new_hosts.emplace_back(
-              new HostImpl(parent_, Network::Utility::urlForTcp(address, port_), false, 1, ""));
+          new_hosts.emplace_back(new HostImpl(
+              parent_.info_, Network::Utility::urlForTcp(address, port_), false, 1, ""));
         }
 
         std::vector<HostPtr> hosts_added;

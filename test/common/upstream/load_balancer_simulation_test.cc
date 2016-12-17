@@ -10,7 +10,7 @@ using testing::Return;
 
 namespace Upstream {
 
-static HostPtr newTestHost(const Upstream::Cluster& cluster, const std::string& url,
+static HostPtr newTestHost(Upstream::ClusterInfoPtr cluster, const std::string& url,
                            uint32_t weight = 1, const std::string& zone = "") {
   return HostPtr{new HostImpl(cluster, url, false, weight, zone)};
 }
@@ -20,7 +20,7 @@ static HostPtr newTestHost(const Upstream::Cluster& cluster, const std::string& 
  */
 class DISABLED_SimulationTest : public testing::Test {
 public:
-  DISABLED_SimulationTest() : stats_(ClusterImplBase::generateStats("", stats_store_)) {
+  DISABLED_SimulationTest() : stats_(ClusterInfoImpl::generateStats("", stats_store_)) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
         .WillByDefault(Return(50U));
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
@@ -110,7 +110,7 @@ public:
       const std::string zone = std::to_string(i);
       for (uint32_t j = 0; j < hosts[i]; ++j) {
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
-        ret->push_back(newTestHost(cluster_, url, 1, zone));
+        ret->push_back(newTestHost(cluster_.info_, url, 1, zone));
       }
     }
 
@@ -129,7 +129,7 @@ public:
 
       for (uint32_t j = 0; j < hosts[i]; ++j) {
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
-        zone_hosts.push_back(newTestHost(cluster_, url, 1, zone));
+        zone_hosts.push_back(newTestHost(cluster_.info_, url, 1, zone));
       }
 
       ret->push_back(std::move(zone_hosts));

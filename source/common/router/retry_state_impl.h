@@ -16,7 +16,7 @@ namespace Router {
 class RetryStateImpl : public RetryState {
 public:
   static RetryStatePtr create(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
-                              const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                              const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                               Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                               Upstream::ResourcePriority priority);
   ~RetryStateImpl();
@@ -31,7 +31,7 @@ public:
 
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
-                 const Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                 const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                  Upstream::ResourcePriority priority);
 
@@ -40,7 +40,7 @@ private:
   bool wouldRetry(const Http::HeaderMap* response_headers,
                   const Optional<Http::StreamResetReason>& reset_reason);
 
-  const Upstream::Cluster& cluster_;
+  const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;

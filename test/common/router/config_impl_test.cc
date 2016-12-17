@@ -646,7 +646,7 @@ TEST(RouteMatcherTest, ShadowClusterNotFound) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_CALL(cm, get("www2")).WillRepeatedly(Return(&cm.cluster_));
+  EXPECT_CALL(cm, get("www2")).WillRepeatedly(Return(cm.cluster_.info_));
   EXPECT_CALL(cm, get("some_cluster")).WillRepeatedly(Return(nullptr));
 
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
