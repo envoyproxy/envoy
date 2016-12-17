@@ -20,7 +20,6 @@ next (e.g., redirect, forward, rewrite, etc.).
     "timeout_ms": "...",
     "runtime": "{...}",
     "retry_policy": "{...}",
-    "rate_limit": "{...}",
     "shadow": "{...}",
     "priority": "...",
     "headers": [],

@@ -24,7 +24,7 @@ kill_switch_key
 
 route_key
   *(optional, string)* Specifies a descriptor value to be used when rate limiting for a route.
-  This information is used by the actions if it is installed.
+  This information is used by the actions if it is set.
 
 actions
   *(required, array)* A list of actions that are to be applied for this rate limit configuration.
