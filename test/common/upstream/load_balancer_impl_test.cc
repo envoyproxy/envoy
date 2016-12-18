@@ -316,24 +316,55 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost());
 }
 
-TEST_F(RoundRobinLoadBalancerTest, ZoneAwareRoutingNotHealthy) {
+TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
   init(true);
-  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                             newTestHost(cluster_.info_, "tcp://127.0.0.1:82")};
-  cluster_.hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
-                     newTestHost(cluster_.info_, "tcp://127.0.0.1:82")};
-  cluster_.healthy_hosts_per_zone_ = {{}, {}, {}};
+  HostVectorPtr hosts(
+      new std::vector<HostPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                                newTestHost(cluster_.info_, "tcp://127.0.0.2:80")}));
+  HostListsPtr hosts_per_zone(
+      new std::vector<std::vector<HostPtr>>({{},
+                                             {newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                                              newTestHost(cluster_.info_, "tcp://127.0.0.2:80")}}));
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
-      .WillRepeatedly(Return(50));
+  cluster_.healthy_hosts_ = *hosts;
+  cluster_.hosts_ = *hosts;
+  cluster_.healthy_hosts_per_zone_ = *hosts_per_zone;
+  local_cluster_hosts_->updateHosts(hosts, hosts, hosts_per_zone, hosts_per_zone,
+                                    empty_host_vector_, empty_host_vector_);
 
   // local zone has no healthy hosts, take from the all healthy hosts.
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost());
   EXPECT_EQ(cluster_.healthy_hosts_[1], lb_->chooseHost());
+}
+
+TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
+  init(true);
+  HostVectorPtr upstream_hosts(
+      new std::vector<HostPtr>({newTestHost(cluster_.info_, "tcp://127.0.0.1:80"),
+                                newTestHost(cluster_.info_, "tcp://127.0.0.1:81")}));
+  HostVectorPtr local_hosts(new std::vector<HostPtr>({}, {}));
+
+  HostListsPtr upstream_hosts_per_zone(
+      new std::vector<std::vector<HostPtr>>({{newTestHost(cluster_.info_, "tcp://127.0.0.1:80")},
+                                             {newTestHost(cluster_.info_, "tcp://127.0.0.1:81")}}));
+  HostListsPtr local_hosts_per_zone(new std::vector<std::vector<HostPtr>>({{}, {}}));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillOnce(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillOnce(Return(1));
+
+  cluster_.healthy_hosts_ = *upstream_hosts;
+  cluster_.hosts_ = *upstream_hosts;
+  cluster_.healthy_hosts_per_zone_ = *upstream_hosts_per_zone;
+  local_cluster_hosts_->updateHosts(local_hosts, local_hosts, local_hosts_per_zone,
+                                    local_hosts_per_zone, empty_host_vector_, empty_host_vector_);
+
+  // Local cluster is not OK, we'll do regular routing.
+  EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost());
+  EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
 class LeastRequestLoadBalancerTest : public testing::Test {
