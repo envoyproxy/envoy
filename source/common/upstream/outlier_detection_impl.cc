@@ -35,7 +35,7 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
-      // It's possibly for the cluster/detector to go away while we still have a host in use.
+      // It's possible for the cluster/detector to go away while we still have a host in use.
       return;
     }
 
@@ -160,7 +160,7 @@ DetectionStats DetectorImpl::generateStats(const std::string& name, Stats::Store
 
 void DetectorImpl::onConsecutive5xx(HostPtr host) {
   // This event will come from all threads, so we synchronize with a post to the main thread.
-  // TODO: Unfortunately conesecutive 5xx is complicated from a threading perspective because
+  // TODO: Unfortunately consecutive 5xx is complicated from a threading perspective because
   //       we catch consecutive 5xx on worker threads and then post back to the main thread. In
   //       the future, clusters can get removed, and this means there is a race condition with this
   //       reverse post. The use of shared_from_this() will prevent the outlier detector from going
