@@ -162,7 +162,7 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
   });
 }
 
-void ClusterImplBase::setOutlierDetector(Outlier::DetectorPtr&& outlier_detector) {
+void ClusterImplBase::setOutlierDetector(Outlier::DetectorPtr outlier_detector) {
   if (!outlier_detector) {
     return;
   }

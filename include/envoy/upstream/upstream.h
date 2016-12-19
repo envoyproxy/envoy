@@ -123,12 +123,6 @@ public:
   virtual const std::vector<HostPtr>& healthyHosts() const PURE;
 
   /**
-   * @return all hosts that are in the zone local to this node. Required --service-zone to be
-   *         set on the command line and to use a cluster type that supports population such as
-   *         the SDS cluster type.
-   */
-
-  /**
    * @return hosts per zone, index 0 is dedicated to local zone hosts.
    * If there are no hosts in local zone for upstream cluster hostPerZone() will @return
    * empty vector.

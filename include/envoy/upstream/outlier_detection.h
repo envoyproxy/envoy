@@ -83,7 +83,7 @@ public:
   virtual void addChangedStateCb(ChangeStateCb cb) PURE;
 };
 
-typedef std::unique_ptr<Detector> DetectorPtr;
+typedef std::shared_ptr<Detector> DetectorPtr;
 
 } // Outlier
 } // Upstream
