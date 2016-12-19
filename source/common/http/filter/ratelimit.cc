@@ -6,7 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
-#include "common/http/headers.h"
+#include "common/router/config_impl.h"
 
 namespace Http {
 namespace RateLimit {
@@ -14,94 +14,24 @@ namespace RateLimit {
 const Http::HeaderMapPtr Filter::TOO_MANY_REQUESTS_HEADER{new Http::HeaderMapImpl{
     {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}}};
 
-void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route,
-                                                 std::vector<::RateLimit::Descriptor>& descriptors,
-                                                 FilterConfig& config, const HeaderMap&,
-                                                 StreamDecoderFilterCallbacks&) {
-  // We limit on 2 dimensions.
-  // 1) All calls to the given cluster.
-  // 2) Calls to the given cluster and from this cluster.
-  // The service side configuration can choose to limit on 1 or both of the above.
-  descriptors.push_back({{{"to_cluster", route.clusterName()}}});
-  descriptors.push_back(
-      {{{"to_cluster", route.clusterName()}, {"from_cluster", config.localServiceCluster()}}});
-}
-
-void RequestHeadersAction::populateDescriptors(const Router::RouteEntry& route,
-                                               std::vector<::RateLimit::Descriptor>& descriptors,
-                                               FilterConfig&, const HeaderMap& headers,
-                                               StreamDecoderFilterCallbacks&) {
-  const HeaderEntry* header_value = headers.get(header_name_);
-  if (!header_value) {
-    return;
-  }
-
-  descriptors.push_back({{{descriptor_key_, header_value->value().c_str()}}});
-
-  const std::string& route_key = route.rateLimitPolicy().routeKey();
-  if (route_key.empty()) {
-    return;
-  }
-
-  descriptors.push_back(
-      {{{"route_key", route_key}, {descriptor_key_, header_value->value().c_str()}}});
-}
-
-void RemoteAddressAction::populateDescriptors(const Router::RouteEntry& route,
-                                              std::vector<::RateLimit::Descriptor>& descriptors,
-                                              FilterConfig&, const HeaderMap&,
-                                              StreamDecoderFilterCallbacks& callbacks) {
-  const std::string& remote_address = callbacks.downstreamAddress();
-  if (remote_address.empty()) {
-    return;
-  }
-
-  descriptors.push_back({{{"remote_address", remote_address}}});
-
-  const std::string& route_key = route.rateLimitPolicy().routeKey();
-  if (route_key.empty()) {
-    return;
-  }
-
-  descriptors.push_back({{{"route_key", route_key}, {"remote_address", remote_address}}});
-}
-
-FilterConfig::FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
-                           Stats::Store& stats_store, Runtime::Loader& runtime)
-    : domain_(config.getString("domain")), local_service_cluster_(local_service_cluster),
-      stats_store_(stats_store), runtime_(runtime) {
-  for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
-    std::string type = action->getString("type");
-    if (type == "service_to_service") {
-      actions_.emplace_back(new ServiceToServiceAction());
-    } else if (type == "request_headers") {
-      actions_.emplace_back(new RequestHeadersAction(*action));
-    } else if (type == "remote_address") {
-      actions_.emplace_back(new RemoteAddressAction());
-    } else {
-      throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
-    }
-  }
-}
-
 FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   if (!config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enabled", 100)) {
     return FilterHeadersStatus::Continue;
   }
 
   const Router::RouteEntry* route = callbacks_->routeTable().routeForRequest(headers);
-  if (route && route->rateLimitPolicy().doGlobalLimiting()) {
-    // Check if the route_key is enabled for rate limiting.
-    const std::string& route_key = route->rateLimitPolicy().routeKey();
-    if (!route_key.empty() &&
-        !config_->runtime().snapshot().featureEnabled(
-            fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
-      return FilterHeadersStatus::Continue;
-    }
-
+  if (route) {
     std::vector<::RateLimit::Descriptor> descriptors;
-    for (const ActionPtr& action : config_->actions()) {
-      action->populateDescriptors(*route, descriptors, *config_, headers, *callbacks_);
+    for (const Router::RateLimitPolicyEntry& rate_limit :
+         route->rateLimitPolicy().getApplicableRateLimit(config_->stage())) {
+      const std::string& route_key = rate_limit.routeKey();
+      if (!route_key.empty() &&
+          !config_->runtime().snapshot().featureEnabled(
+              fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
+        continue;
+      }
+      rate_limit.populateDescriptors(*route, descriptors, config_->localServiceCluster(), headers,
+                                     callbacks_->downstreamAddress());
     }
 
     if (!descriptors.empty()) {

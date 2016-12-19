@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/router/router.h"
+#include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
 
 namespace Router {
@@ -39,16 +40,40 @@ public:
   DoRetryCallback callback_;
 };
 
-class TestRateLimitPolicy : public RateLimitPolicy {
+class MockRateLimitPolicyEntry : public RateLimitPolicyEntry {
 public:
-  // Router::RateLimitPolicy
-  bool doGlobalLimiting() const override { return do_global_limiting_; }
+  MockRateLimitPolicyEntry();
+  ~MockRateLimitPolicyEntry();
 
-  // Router::RateLimitPolicy
-  const std::string& routeKey() const override { return route_key_; }
+  // Router::RateLimitPolicyEntry
+  MOCK_CONST_METHOD0(stage, int64_t());
+  MOCK_CONST_METHOD0(killSwitchKey, const std::string&());
+  MOCK_CONST_METHOD0(routeKey, const std::string&());
 
-  bool do_global_limiting_{};
+  // Router::RateLimitAction
+  MOCK_CONST_METHOD5(populateDescriptors,
+                     void(const RouteEntry& route,
+                          std::vector<::RateLimit::Descriptor>& descriptors,
+                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& remote_address));
+
+  int64_t stage_{};
+  std::string kill_switch_key_;
   std::string route_key_;
+};
+
+class MockRateLimitPolicy : public RateLimitPolicy {
+public:
+  MockRateLimitPolicy();
+  ~MockRateLimitPolicy();
+
+  // Router::RateLimitPolicy
+  MOCK_CONST_METHOD1(
+      getApplicableRateLimit,
+      std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(int64_t stage));
+
+  std::string route_key_;
+  std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };
 
 class TestShadowPolicy : public ShadowPolicy {
@@ -106,7 +131,7 @@ public:
   std::string vhost_name_{"fake_vhost"};
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
-  TestRateLimitPolicy rate_limit_policy_;
+  testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestShadowPolicy shadow_policy_;
 };
 

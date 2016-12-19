@@ -20,10 +20,10 @@ next (e.g., redirect, forward, rewrite, etc.).
     "timeout_ms": "...",
     "runtime": "{...}",
     "retry_policy": "{...}",
-    "rate_limit": "{...}",
     "shadow": "{...}",
     "priority": "...",
-    "headers": []
+    "headers": [],
+    "rate_limits": []
   }
 
 prefix
@@ -90,9 +90,6 @@ timeout_ms
 :ref:`retry_policy <config_http_conn_man_route_table_route_retry>`
   *(optional, object)* Indicates that the route has a retry policy.
 
-:ref:`rate_limit <config_http_conn_man_route_table_route_rate_limit>`
-  *(optional, object)* Indicates that the route has a rate limit policy.
-
 :ref:`shadow <config_http_conn_man_route_table_route_shadow>`
   *(optional, object)* Indicates that the route has a shadow policy.
 
@@ -102,6 +99,12 @@ priority
 
 :ref:`headers <config_http_conn_man_route_table_route_headers>`
   *(optional, array)* Specifies a set of headers that the route should match on.
+
+.. _config_http_conn_man_route_table_route_rate_limits:
+
+:ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>`
+  *(optional, array)* Specifies a set of rate limit configurations that could be applied to the
+  route.
 
 .. _config_http_conn_man_route_table_route_runtime:
 
@@ -153,30 +156,6 @@ num_retries
   *(optional, integer)* specifies the allowed number of retries. This parameter is optional and
   defaults to 1. These are the same conditions documented for
   :ref:`config_http_filters_router_x-envoy-max-retries`.
-
-.. _config_http_conn_man_route_table_route_rate_limit:
-
-Rate limit
-----------
-
-Global rate limit :ref:`architecture overview <arch_overview_rate_limit>`.
-
-.. code-block:: json
-
-  {
-    "global": "...",
-    "route_key": "..."
-  }
-
-global
-  *(optional, boolean)* Specifies whether the global rate limit service should be called for a
-  request that matches this route. This information is used by the :ref:`rate limit filter
-  <config_http_filters_rate_limit>` if it is installed. Defaults to false if not specified.
-
-route_key
-  *(optional, string)* Specifies a descriptor value to be used when rate limiting for a route.
-  This information is used by the :ref:`rate limit filter
-  <config_http_filters_rate_limit>` if it is installed.
 
 .. _config_http_conn_man_route_table_route_shadow:
 

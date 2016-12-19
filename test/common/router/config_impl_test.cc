@@ -582,46 +582,6 @@ TEST(RouteMatcherTest, Runtime) {
             config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 20)->clusterName());
 }
 
-TEST(RouteMatcherTest, RateLimit) {
-  std::string json = R"EOF(
-{
-  "virtual_hosts": [
-    {
-      "name": "www2",
-      "domains": ["www.lyft.com"],
-      "routes": [
-        {
-          "prefix": "/foo",
-          "cluster": "www2",
-          "rate_limit": {
-            "global": true
-          }
-        },
-        {
-          "prefix": "/bar",
-          "cluster": "www2"
-        }
-      ]
-    }
-  ]
-}
-  )EOF";
-
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(*loader, runtime, cm);
-
-  EXPECT_FALSE(config.usesRuntime());
-
-  EXPECT_TRUE(config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                  ->rateLimitPolicy()
-                  .doGlobalLimiting());
-  EXPECT_FALSE(config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                   ->rateLimitPolicy()
-                   .doGlobalLimiting());
-}
-
 TEST(RouteMatcherTest, ShadowClusterNotFound) {
   std::string json = R"EOF(
 {

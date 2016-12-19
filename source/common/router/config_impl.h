@@ -1,5 +1,7 @@
 #pragma once
 
+#include "router_ratelimit.h"
+
 #include "envoy/common/optional.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
@@ -134,26 +136,6 @@ public:
 private:
   uint32_t num_retries_{};
   uint32_t retry_on_{};
-};
-
-/**
- * Implementation of RateLimitPolicy that reads from the JSON route config.
- */
-class RateLimitPolicyImpl : public RateLimitPolicy {
-public:
-  RateLimitPolicyImpl(const Json::Object& config)
-      : do_global_limiting_(config.getObject("rate_limit", true)->getBoolean("global", false)),
-        route_key_(config.getObject("rate_limit", true)->getString("route_key", "")) {}
-
-  // Router::RateLimitPolicy
-  bool doGlobalLimiting() const override { return do_global_limiting_; }
-
-  // Router::RateLimitPolicy
-  const std::string& routeKey() const override { return route_key_; }
-
-private:
-  const bool do_global_limiting_;
-  const std::string route_key_;
 };
 
 /**

@@ -5,9 +5,10 @@ Rate limit
 
 Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
 
-The HTTP rate limit filter will call the rate limit service when the request's route has the
-*global* property set in the :ref:`rate limit configuration
-<config_http_conn_man_route_table_route_rate_limit>`.
+The HTTP rate limit filter will call the rate limit service when the request's route has one or
+more :ref:`rate limit configurations<config_http_conn_man_route_table_route_rate_limits>` that match the
+filter stage setting. More than one configuration can apply to a request. Each configuration
+results in a descriptor being sent to the rate limit service.
 
 If the rate limit service is called, and the response for any of the descriptors is over limit, a
 429 response is returned.
@@ -19,92 +20,16 @@ If the rate limit service is called, and the response for any of the descriptors
     "name": "rate_limit",
     "config": {
       "domain": "...",
-      "actions": []
+      "stage": "..."
     }
   }
 
 domain
   *(required, string)* The rate limit domain to use when calling the rate limit service.
 
-actions
-  *(required, array)* An array of rate limiting actions to perform. Multiple actions can be
-  specified. The supported action types are documented below.
-
-Actions
--------
-
-.. code-block:: json
-
-  {
-    "type": "..."
-  }
-
-type
-  *(required, string)* The type of rate limit action to perform. The currently supported action
-  types are *service_to_service* , *request_headers* and *remote_address*.
-
-Service to service
-^^^^^^^^^^^^^^^^^^
-
-.. code-block:: json
-
-  {
-    "type": "service_to_service"
-  }
-
-The following descriptors are sent:
-
-  * ("to_cluster", "<:ref:`route target cluster <config_http_conn_man_route_table_route_cluster>`>")
-  * ("to_cluster", "<:ref:`route target cluster <config_http_conn_man_route_table_route_cluster>`>"),
-    ("from_cluster", "<local service cluster>")
-
-<local service cluster> is derived from the :option:`--service-cluster` option.
-
-Request Headers
-^^^^^^^^^^^^^^^
-
-.. code-block:: json
-
-  {
-    "type": "request_headers",
-    "header_name": "...",
-    "descriptor_key" : "..."
-  }
-
-header_name
-  *(required, string)* The header name to be queried from the request headers and used to
-  populate the descriptor value for the *descriptor_key*.
-
-descriptor_key
-  *(required, string)* The key to use in the descriptor.
-
-The following descriptor is sent when a header contains a key that matches the *header_name*:
-
-  * ("<descriptor_key>", "<header_value_queried_from_header>")
-
-If *route_key* is set in the :ref:`route <config_http_conn_man_route_table_route_rate_limit>`, the following
-descriptor is sent as well:
-
-  * ("route_key", "<route_key>"), ("<descriptor_key>", "<header_value_queried_from_header>")
-
-Remote Address
-^^^^^^^^^^^^^^
-
-.. code-block:: json
-
-  {
-    "type": "remote_address"
-  }
-
-The following descriptor is sent using the trusted address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
-
-    * ("remote_address", "<:ref:`trusted address from x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`>")
-
-If *route_key* is set in the :ref:`route <config_http_conn_man_route_table_route_rate_limit>`, the following
-descriptor is sent as well:
-
-      * ("route_key", "<route_key>"),
-        ("remote_address", "<:ref:`trusted address from x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`>")
+stage
+  *(optional, integer)* If set, rate limit configurations will only be applied with the same stage
+  number. If not set, all rate limit configurations will be applied.
 
 Statistics
 ----------
@@ -135,4 +60,4 @@ ratelimit.http_filter_enforcing
 
 ratelimit.<route_key>.http_filter_enabled
   % of requests that will call the rate limit service for a given *route_key* specified in the
-  :ref:`route <config_http_conn_man_route_table_route_rate_limit>`. Defaults to 100.
+  :ref:`rate limit configuration <config_http_conn_man_route_table_rate_limit_config>`. Defaults to 100.

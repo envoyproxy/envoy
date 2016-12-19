@@ -85,6 +85,7 @@ add_library(
   router/config_impl.cc
   router/retry_state_impl.cc
   router/router.cc
+  router/router_ratelimit.cc
   router/shadow_writer_impl.cc
   runtime/runtime_impl.cc
   runtime/uuid_util.cc

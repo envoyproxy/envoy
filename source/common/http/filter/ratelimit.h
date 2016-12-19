@@ -10,89 +10,29 @@
 namespace Http {
 namespace RateLimit {
 
-class FilterConfig;
-
-/**
- * Generic rate limit action that the filter performs.
- */
-class Action {
-public:
-  virtual ~Action() {}
-
-  /**
-   * Potentially populate the descriptor array with new descriptors to query.
-   * @param route supplies the target route for the request.
-   * @param descriptors supplies the descriptor array to optionally fill.
-   * @param config supplies the filter configuration.
-   */
-  virtual void populateDescriptors(const Router::RouteEntry& route,
-                                   std::vector<::RateLimit::Descriptor>& descriptors,
-                                   FilterConfig& config, const HeaderMap& headers,
-                                   StreamDecoderFilterCallbacks& callbacks) PURE;
-};
-
-typedef std::unique_ptr<Action> ActionPtr;
-
-/**
- * Action for service to service rate limiting.
- */
-class ServiceToServiceAction : public Action {
-public:
-  // Action
-  void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors, FilterConfig& config,
-                           const HeaderMap&, StreamDecoderFilterCallbacks&) override;
-};
-
-/**
- * Action for request headers rate limiting.
- */
-class RequestHeadersAction : public Action {
-public:
-  RequestHeadersAction(const Json::Object& action)
-      : header_name_(action.getString("header_name")),
-        descriptor_key_(action.getString("descriptor_key")) {}
-  // Action
-  void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors, FilterConfig& config,
-                           const HeaderMap& headers, StreamDecoderFilterCallbacks&) override;
-
-private:
-  const LowerCaseString header_name_;
-  const std::string descriptor_key_;
-};
-
-/**
- * Action for remote address rate limiting.
- */
-class RemoteAddressAction : public Action {
-public:
-  // Action
-  void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors, FilterConfig&,
-                           const HeaderMap&, StreamDecoderFilterCallbacks& callbacks) override;
-};
-
 /**
  * Global configuration for the HTTP rate limit filter.
  */
 class FilterConfig {
 public:
   FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
-               Stats::Store& stats_store, Runtime::Loader& runtime);
+               Stats::Store& stats_store, Runtime::Loader& runtime)
+      : domain_(config.getString("domain")), stage_(config.getInteger("stage", 0)),
+        local_service_cluster_(local_service_cluster), stats_store_(stats_store),
+        runtime_(runtime) {}
 
-  const std::vector<ActionPtr>& actions() { return actions_; }
-  const std::string& domain() { return domain_; }
-  const std::string& localServiceCluster() { return local_service_cluster_; }
+  const std::string& domain() const { return domain_; }
+  const std::string& localServiceCluster() const { return local_service_cluster_; }
+  int64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Store& stats() { return stats_store_; }
 
 private:
   const std::string domain_;
+  int64_t stage_;
   const std::string local_service_cluster_;
   Stats::Store& stats_store_;
   Runtime::Loader& runtime_;
-  std::vector<ActionPtr> actions_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigPtr;

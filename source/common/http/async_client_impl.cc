@@ -3,6 +3,8 @@
 
 namespace Http {
 
+const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
+    AsyncRequestImpl::NullRateLimitPolicy::rate_limit_policy_entry_;
 const AsyncRequestImpl::NullRateLimitPolicy AsyncRequestImpl::RouteEntryImpl::rate_limit_policy_;
 const AsyncRequestImpl::NullRetryPolicy AsyncRequestImpl::RouteEntryImpl::retry_policy_;
 const AsyncRequestImpl::NullShadowPolicy AsyncRequestImpl::RouteEntryImpl::shadow_policy_;
