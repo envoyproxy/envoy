@@ -259,6 +259,33 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   EXPECT_THROW(cluster_manager_->httpAsyncClientForCluster("hello"), EnvoyException);
 }
 
+TEST_F(ClusterManagerImplTest, ShutdownOrder) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    }]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  create(*loader);
+  ConstClusterPtr cluster = cluster_manager_->clusters().begin()->second;
+  EXPECT_EQ("cluster_1", cluster->info()->name());
+
+  // Local reference, primary reference, thread local reference.
+  EXPECT_EQ(3U, cluster.use_count());
+
+  // Thread local reference should be gone.
+  tls_.shutdownThread();
+  EXPECT_EQ(2U, cluster.use_count());
+}
+
 TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   std::string json = R"EOF(
   {
