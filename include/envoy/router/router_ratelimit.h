@@ -58,7 +58,7 @@ public:
   virtual ~RateLimitPolicy() {}
 
   /**
-   * @param stage the value to for finding applicable rate limit configurations.
+   * @param stage the value for finding applicable rate limit configurations.
    * @return set of RateLimitPolicyEntry that are applicable for a stage.
    */
   virtual const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&

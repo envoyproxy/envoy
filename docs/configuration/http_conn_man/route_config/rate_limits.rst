@@ -17,7 +17,10 @@ Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
 stage
   *(optional, integer)* Refers to the stage set in the filter. If set, the rate limit configuration
   only applies to filters with the same stage number and for filters set to default. If not set,
-  the rate limit configuration will apply for all rate limit filters set to default.
+  the rate limit configuration will apply for all rate limit filters set to default. The default
+  value is 0.
+
+  **NOTE:** This functionality hasn't been implemented yet and stage values are currently ignored.
 
 kill_switch_key
   *(optional, string)* The key to be set in runtime to disable this rate limit configuration.
