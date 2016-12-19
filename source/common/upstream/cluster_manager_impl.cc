@@ -317,7 +317,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::shutdown() {
+  // Clear out connection pools as well as the thread local cluster map so that we release all
+  // primary cluster pointers.
   host_http_conn_pool_map_.clear();
+  thread_local_clusters_.clear();
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
