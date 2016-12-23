@@ -327,7 +327,9 @@ void Filter::onResponseTimeout() {
   // It's possible to timeout during a retry backoff delay when we have no upstream request. In
   // this case we fake a reset since onUpstreamReset() doesn't care.
   if (upstream_request_) {
-    upstream_request_->upstream_host_->stats().rq_timeout_.inc();
+    if (upstream_request_->upstream_host_) {
+      upstream_request_->upstream_host_->stats().rq_timeout_.inc();
+    }
     upstream_request_->resetStream();
   }
 
