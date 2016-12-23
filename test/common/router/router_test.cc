@@ -499,6 +499,50 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
   response_timeout_->callback_();
 }
 
+TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+                             response_decoder = &decoder;
+                             callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // 5xx response.
+  router_.retry_state_->expectRetry();
+  Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+
+  Http::ConnectionPool::MockCancellable cancellable;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks&)
+                           -> Http::ConnectionPool::Cancellable* {
+                             response_decoder = &decoder;
+                             return &cancellable;
+                           }));
+  router_.retry_state_->callback_();
+
+  // Fire timeout.
+  EXPECT_CALL(cancellable, cancel());
+  EXPECT_CALL(callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout));
+
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putResponseTime(_)).Times(0);
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  response_timeout_->callback_();
+}
+
 TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
