@@ -10,6 +10,7 @@ add_library(envoy-server OBJECT
   config/network/http_connection_manager.cc
   config/network/mongo_proxy.cc
   config/network/ratelimit.cc
+  config/network/redis_proxy.cc
   config/network/tcp_proxy.cc
   configuration_impl.cc
   connection_handler.cc

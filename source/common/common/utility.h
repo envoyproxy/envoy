@@ -79,7 +79,7 @@ public:
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
    * @param out supplies the string to fill.
-   * @param out_len supplies the length of the output buffer. Must be >= 32.
+   * @param out_len supplies the length of the output buffer. Must be >= 21.
    * @param i supplies the number to convert.
    * @return the size of the string, not including the null termination.
    */

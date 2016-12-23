@@ -27,7 +27,6 @@ public:
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::list<Network::ConnectionCallbacks*> callbacks_;
-  bool closed_{};
   uint64_t id_{next_id_++};
   std::string remote_address_;
   bool read_enabled_{true};
