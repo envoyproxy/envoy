@@ -63,9 +63,13 @@
                 {
                   "prefix": "/test/long/url",
                   "cluster": "cluster_1",
-                  "rate_limit": {
-                    "global": true
-                  }
+                  "rate_limits": [
+                    {
+                      "actions": [
+                        {"type": "service_to_service"}
+                      ]
+                    }
+                  ]
                 },
                 {
                   "prefix": "/test/",
@@ -83,10 +87,7 @@
           },
           { "type": "decoder", "name": "rate_limit",
             "config": {
-              "domain": "foo",
-              "actions": [
-                {"type": "service_to_service"}
-              ]
+              "domain": "foo"
             }
           },
           { "type": "decoder", "name": "router", "config": {} }
@@ -144,9 +145,12 @@
                 {
                   "prefix": "/test/long/url",
                   "cluster": "cluster_1",
-                  "rate_limit": {
-                    "global": true
-                  }
+                  "rate_limits": [
+                    {
+                      "actions": [
+                        {"type": "service_to_service"}
+                    }
+                  ]
                 },
                 {
                   "prefix": "/test/",
@@ -165,9 +169,6 @@
           { "type": "decoder", "name": "rate_limit",
             "config": {
               "domain": "foo",
-              "actions": [
-                {"type": "service_to_service"}
-              ]
             }
           },
           { "type": "decoder", "name": "buffer",
