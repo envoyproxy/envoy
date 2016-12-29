@@ -23,9 +23,6 @@ public:
                                     const Http::HeaderMap& request_headers,
                                     ConnectionManagerConfig& config);
 
-  static bool shouldTraceRequest(const Http::AccessLog::RequestInfo& request_info,
-                                 const Optional<TracingConnectionManagerConfig>& config);
-
 private:
   static bool isTraceableFailure(const Http::AccessLog::RequestInfo& request_info);
 

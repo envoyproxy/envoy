@@ -2,10 +2,19 @@
 
 namespace Tracing {
 
+MockSpan::MockSpan() {}
+MockSpan::~MockSpan() {}
+
+MockTracingConfig::MockTracingConfig() {}
+MockTracingConfig::~MockTracingConfig() {}
+
+MockTracingContext::MockTracingContext() {}
+MockTracingContext::~MockTracingContext() {}
+
 MockHttpTracer::MockHttpTracer() {}
 MockHttpTracer::~MockHttpTracer() {}
 
-MockHttpSink::MockHttpSink() {}
-MockHttpSink::~MockHttpSink() {}
+MockTracingDriver::MockTracingDriver() {}
+MockTracingDriver::~MockTracingDriver() {}
 
 } // Tracing

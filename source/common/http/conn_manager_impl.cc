@@ -20,6 +20,7 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
 
@@ -280,10 +281,8 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
-  if (ConnectionManagerUtility::shouldTraceRequest(request_info_,
-                                                   connection_manager_.config_.tracingConfig())) {
-    connection_manager_.tracer_.trace(request_headers_.get(), response_headers_.get(),
-                                      request_info_, *this);
+  if (tracing_context_) {
+    tracing_context_->finishSpan(request_info_, response_headers_.get());
   }
 }
 
@@ -404,6 +403,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Set the trusted address for the connection by taking the last address in XFF.
   downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
   decodeHeaders(nullptr, *request_headers_, end_stream);
+
+  // At this point all filters passed, ready to start span and keep it on ActiveStream.
+  Tracing::Decision decision =
+      Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
+  // CHARGE RIGHT STATS
+  if (decision.is_tracing) {
+    tracing_context_.reset(
+        new Tracing::TracingContextImpl("node", connection_manager_.tracer_, *this));
+    tracing_context_->startSpan(request_info_, *request_headers_);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,

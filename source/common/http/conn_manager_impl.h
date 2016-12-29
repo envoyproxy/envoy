@@ -76,13 +76,6 @@ struct ConnectionManagerStats {
   Stats::Store& store_;
 };
 
-enum class TracingType {
-  // Trace all traceable requests.
-  All,
-  // Trace only when there is an upstream failure reason.
-  UpstreamFailure
-};
-
 /**
  * Configuration for tracing which is set on the connection manager level.
  * Http Tracing can be enabled/disabled on a per connection manager basis.
@@ -90,7 +83,6 @@ enum class TracingType {
  */
 struct TracingConnectionManagerConfig {
   std::string operation_name_;
-  TracingType tracing_type_;
 };
 
 /**
@@ -341,7 +333,7 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public Tracing::TracingContext {
+                        public Tracing::TracingConfig {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
 
@@ -371,7 +363,7 @@ private:
     void addStreamEncoderFilter(StreamEncoderFilterPtr filter) override;
     void addStreamFilter(StreamFilterPtr filter) override;
 
-    // Tracing::TracingContext
+    // Tracing::TracingConfig
     virtual const std::string& operationName() const override;
 
     // All state for the stream. Put here for readability. We could move this to a bit field
@@ -385,6 +377,7 @@ private:
     };
 
     ConnectionManagerImpl& connection_manager_;
+    Tracing::TracingContextPtr tracing_context_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
     HeaderMapPtr response_headers_;
