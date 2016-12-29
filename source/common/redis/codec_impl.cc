@@ -84,7 +84,7 @@ void DecoderImpl::decode(Buffer::Instance& data) {
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
   data.getRawSlices(slices, num_slices);
-  for (Buffer::RawSlice& slice : slices) {
+  for (const Buffer::RawSlice& slice : slices) {
     parseSlice(slice);
   }
 
@@ -92,7 +92,7 @@ void DecoderImpl::decode(Buffer::Instance& data) {
 }
 
 void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
-  char* buffer = reinterpret_cast<char*>(slice.mem_);
+  const char* buffer = reinterpret_cast<const char*>(slice.mem_);
   uint64_t remaining = slice.len_;
 
   while (remaining || state_ == State::ValueComplete) {
