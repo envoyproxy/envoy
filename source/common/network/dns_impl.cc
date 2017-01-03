@@ -51,14 +51,20 @@ void DnsResolverImpl::onSignal() {
     }
 
     freeaddrinfo(pending_resolution->async_cb_data_.ar_result);
-    pending_resolution->callback_(std::move(address_list));
+    if (!pending_resolution->cancelled_) {
+      // TODO: There is no good way to cancel a DNS request with the terrible getaddrinfo_a() API.
+      //       We just mark it cancelled and ignore raising a callback. In the future when we switch
+      //       this out for a better library we can actually cancel.
+      pending_resolution->callback_(std::move(address_list));
+    }
     pending_resolution->removeFromList(pending_resolutions_);
   }
 }
 
-void DnsResolverImpl::resolve(const std::string& dns_name, ResolveCb callback) {
+ActiveDnsQuery& DnsResolverImpl::resolve(const std::string& dns_name, ResolveCb callback) {
   // This initializes the getaddrinfo_a callback data.
   PendingResolutionPtr pending_resolution(new PendingResolution());
+  ActiveDnsQuery& ret = *pending_resolution;
   pending_resolution->host_ = dns_name;
   pending_resolution->async_cb_data_.ar_name = pending_resolution->host_.c_str();
   pending_resolution->async_cb_data_.ar_service = nullptr;
@@ -82,6 +88,8 @@ void DnsResolverImpl::resolve(const std::string& dns_name, ResolveCb callback) {
   int rc = getaddrinfo_a(GAI_NOWAIT, list, 1, &signal_info);
   RELEASE_ASSERT(0 == rc);
   UNREFERENCED_PARAMETER(rc);
+
+  return ret;
 }
 
 } // Network

@@ -26,10 +26,13 @@ void FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
 MainImpl::MainImpl(Server::Instance& server) : server_(server) {}
 
 void MainImpl::initialize(const Json::Object& json) {
-  cluster_manager_.reset(new Upstream::ProdClusterManagerImpl(
-      *json.getObject("cluster_manager"), server_.stats(), server_.threadLocal(),
-      server_.dnsResolver(), server_.sslContextManager(), server_.runtime(), server_.random(),
-      server_.options().serviceZone(), server_.getLocalAddress(), server_.accessLogManager()));
+  cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
+      server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
+      server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher()));
+  cluster_manager_.reset(new Upstream::ClusterManagerImpl(
+      *json.getObject("cluster_manager"), *cluster_manager_factory_, server_.stats(),
+      server_.threadLocal(), server_.runtime(), server_.random(), server_.options().serviceZone(),
+      server_.getLocalAddress(), server_.accessLogManager()));
 
   std::vector<Json::ObjectPtr> listeners = json.getObjectArray("listeners");
   log().info("loading {} listener(s)", listeners.size());

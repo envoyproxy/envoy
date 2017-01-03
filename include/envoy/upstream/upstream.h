@@ -239,6 +239,11 @@ public:
   virtual uint64_t httpCodecOptions() const PURE;
 
   /**
+   * @return the type of load balancing that the cluster should use.
+   */
+  virtual LoadBalancerType lbType() const PURE;
+
+  /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
    *         Different filters may handle this situation in different ways. The implementation
    *         of this routine is typically based on randomness and may not return the same answer
@@ -288,15 +293,25 @@ typedef std::shared_ptr<const ClusterInfo> ClusterInfoPtr;
  */
 class Cluster : public virtual HostSet {
 public:
+  enum class InitializePhase { Primary, Secondary };
+
   /**
    * @return the information about this upstream cluster.
    */
   virtual ClusterInfoPtr info() const PURE;
 
   /**
-   * @return the type of load balancing that the cluster should use.
+   * Initialize the cluster. This will be called either immediately at creation or after all primary
+   * clusters have been initialized (determined via initializePhase()).
    */
-  virtual LoadBalancerType lbType() const PURE;
+  virtual void initialize() PURE;
+
+  /**
+   * @return the phase in which the cluster is initialized at boot. This mechanism is used such that
+   *         clusters that depend on other clusters can correctly initialize. (E.g., an SDS cluster
+   *         that depends on resolution of the SDS server itself).
+   */
+  virtual InitializePhase initializePhase() const PURE;
 
   /**
    * Set a callback that will be invoked after the cluster has undergone first time initialization.
@@ -304,14 +319,8 @@ public:
    * resolution is complete.
    */
   virtual void setInitializedCb(std::function<void()> callback) PURE;
-
-  /**
-   * Shutdown the cluster prior to destroying connection pools and other thread local data.
-   */
-  virtual void shutdown() PURE;
 };
 
-typedef std::shared_ptr<Cluster> ClusterPtr;
-typedef std::shared_ptr<const Cluster> ConstClusterPtr;
+typedef std::unique_ptr<Cluster> ClusterPtr;
 
 } // Upstream

@@ -23,7 +23,11 @@ SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runt
       sds_config_(sds_config), service_name_(config.getString("service_name")), random_(random),
       refresh_timer_(dispatcher.createTimer([this]() -> void { refreshHosts(); })) {}
 
-SdsClusterImpl::~SdsClusterImpl() {}
+SdsClusterImpl::~SdsClusterImpl() {
+  if (active_request_) {
+    active_request_->cancel();
+  }
+}
 
 void SdsClusterImpl::onSuccess(Http::MessagePtr&& response) {
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
@@ -141,15 +145,6 @@ void SdsClusterImpl::requestComplete() {
       std::chrono::milliseconds(random_.random() % sds_config_.refresh_delay_.count());
 
   refresh_timer_->enableTimer(final_delay);
-}
-
-void SdsClusterImpl::shutdown() {
-  if (active_request_) {
-    active_request_->cancel();
-    active_request_ = nullptr;
-  }
-
-  refresh_timer_.reset();
 }
 
 } // Upstream

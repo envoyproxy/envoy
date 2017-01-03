@@ -7,6 +7,8 @@
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
@@ -115,10 +117,6 @@ public:
         hosts_per_zone_(new std::vector<std::vector<HostPtr>>()),
         healthy_hosts_per_zone_(new std::vector<std::vector<HostPtr>>()) {}
 
-  ConstHostVectorPtr rawHosts() const { return hosts_; }
-  ConstHostVectorPtr rawHealthyHosts() const { return healthy_hosts_; }
-  ConstHostListsPtr rawHostsPerZone() const { return hosts_per_zone_; }
-  ConstHostListsPtr rawHealthyHostsPerZone() const { return healthy_hosts_per_zone_; }
   void updateHosts(ConstHostVectorPtr hosts, ConstHostVectorPtr healthy_hosts,
                    ConstHostListsPtr hosts_per_zone, ConstHostListsPtr healthy_hosts_per_zone,
                    const std::vector<HostPtr>& hosts_added,
@@ -170,11 +168,12 @@ public:
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
   uint64_t features() const override { return features_; }
   uint64_t httpCodecOptions() const override { return http_codec_options_; }
-  Ssl::ClientContext* sslContext() const override { return ssl_ctx_; }
+  LoadBalancerType lbType() const override { return lb_type_; }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
+  Ssl::ClientContext* sslContext() const override { return ssl_ctx_; }
   const std::string& statPrefix() const override { return stat_prefix_; }
   ClusterStats& stats() const override { return stats_; }
 
@@ -204,6 +203,7 @@ private:
   const uint64_t http_codec_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
+  LoadBalancerType lb_type_;
 };
 
 /**
@@ -214,6 +214,13 @@ class ClusterImplBase : public Cluster,
                         protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
+  static ClusterPtr create(const Json::Object& cluster, ClusterManager& cm, Stats::Store& stats,
+                           ThreadLocal::Instance& tls, Network::DnsResolver& dns_resolver,
+                           Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+                           Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                           const Optional<SdsConfig>& sds_config,
+                           Outlier::EventLoggerPtr outlier_event_logger);
+
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
    * creation since the health checker assumes that the cluster has already been fully initialized
@@ -229,7 +236,6 @@ public:
 
   // Upstream::Cluster
   ClusterInfoPtr info() const override { return info_; }
-  LoadBalancerType lbType() const override { return lb_type_; }
 
 protected:
   ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
@@ -243,13 +249,13 @@ protected:
   static const ConstHostListsPtr empty_host_lists_;
 
   Runtime::Loader& runtime_;
-  LoadBalancerType lb_type_;
   HealthCheckerPtr health_checker_;
   Outlier::DetectorPtr outlier_detector_;
   ClusterInfoPtr info_;
-};
 
-typedef std::shared_ptr<ClusterImplBase> ClusterImplBasePtr;
+private:
+  void reloadHealthyHosts();
+};
 
 /**
  * Implementation of Upstream::Cluster for static clusters (clusters that have a fixed number of
@@ -261,8 +267,9 @@ public:
                     Ssl::ContextManager& ssl_context_manager);
 
   // Upstream::Cluster
+  void initialize() override {}
+  InitializePhase initializePhase() const override { return InitializePhase::Primary; }
   void setInitializedCb(std::function<void()> callback) override { callback(); }
-  void shutdown() override {}
 };
 
 /**
@@ -292,18 +299,22 @@ protected:
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
-                       Ssl::ContextManager& ssl_context_manager,
-                       Network::DnsResolver& dns_resolver);
+                       Ssl::ContextManager& ssl_context_manager, Network::DnsResolver& dns_resolver,
+                       Event::Dispatcher& dispatcher);
 
   // Upstream::Cluster
-  void shutdown() override {}
+  void initialize() override {}
+  InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
   struct ResolveTarget {
-    ResolveTarget(StrictDnsClusterImpl& parent, const std::string& url);
+    ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
+                  const std::string& url);
+    ~ResolveTarget();
     void startResolve();
 
     StrictDnsClusterImpl& parent_;
+    Network::ActiveDnsQuery* active_query_{};
     std::string dns_address_;
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
