@@ -27,6 +27,7 @@ add_executable(envoy-test
   ${ENVOY_TEST_EXTRA_OBJECTS}
   common/access_log/access_log_manager_impl_test.cc
   common/api/api_impl_test.cc
+  common/common/base64_test.cc
   common/common/hex_test.cc
   common/common/optional_test.cc
   common/common/utility_test.cc
