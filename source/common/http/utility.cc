@@ -65,7 +65,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
 
   struct State {
     std::string key_;
-    std::string ret_{};
+    std::string ret_;
   };
 
   State state;
