@@ -61,6 +61,34 @@ Utility::QueryParams Utility::parseQueryString(const std::string& url) {
   return params;
 }
 
+std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
+
+  struct State {
+    std::string key_;
+    std::string ret_{};
+  };
+
+  State state;
+  state.key_ = key;
+
+  headers.iterate([](const HeaderEntry& header, void* context) -> void {
+    if (header.key() == Http::Headers::get().Cookie.get().c_str()) {
+      for (const std::string& s : StringUtil::split(std::string{header.value().c_str()}, ';')) {
+        size_t first_non_space = s.find_first_not_of(" ");
+        size_t equals_index = s.find('=');
+        std::string k = s.substr(first_non_space, equals_index - first_non_space);
+        State* state = static_cast<State*>(context);
+        if (k == state->key_) {
+          state->ret_ = s.substr(equals_index + 1, s.size() - 1);
+          return;
+        }
+      }
+    }
+  }, &state);
+
+  return state.ret_;
+}
+
 uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
