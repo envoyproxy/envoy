@@ -7,7 +7,7 @@
 namespace Tracing {
 
 /*
- * Tracing configuration, it carries additional data needed to populate the trace.
+ * Tracing configuration, it carries additional data needed to populate the span.
  */
 class TracingConfig {
 public:
@@ -16,6 +16,9 @@ public:
   virtual const std::string& operationName() const PURE;
 };
 
+/*
+ * Basic abstraction for span.
+ */
 class Span {
 public:
   virtual ~Span() {}
@@ -27,19 +30,19 @@ public:
 typedef std::unique_ptr<Span> SpanPtr;
 
 /**
- * Tracing context.
+ * Tracing context, it carries currently active span.
  */
 class TracingContext {
 public:
   virtual ~TracingContext() {}
 
   /**
-   * Create span ... FIXFIXFIX
+   * Start span.
    */
   virtual void startSpan(const Http::AccessLog::RequestInfo& request_info,
                          const Http::HeaderMap& request_headers) PURE;
   /**
-   * finish created span.
+   * Finish created span.
    */
   virtual void finishSpan(const Http::AccessLog::RequestInfo& request_info,
                           const Http::HeaderMap* response_headers) PURE;
@@ -48,7 +51,9 @@ public:
 typedef std::unique_ptr<TracingContext> TracingContextPtr;
 
 /**
- * FIXFIXIFX
+ * Tracing driver is responsible for span creation.
+ *
+ * TODO: make tracing driver to be responsible for context extraction/injection.
  */
 class TracingDriver {
 public:
@@ -60,7 +65,8 @@ public:
 typedef std::unique_ptr<TracingDriver> TracingDriverPtr;
 
 /**
- * HttpTracer is responsible for handling traces and delegate actual flush to sinks.
+ * HttpTracer is responsible for handling traces and delegate actions to the
+ * corresponding drivers.
  */
 class HttpTracer {
 public:
