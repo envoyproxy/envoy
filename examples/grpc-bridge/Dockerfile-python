@@ -1,5 +1,7 @@
 FROM lyft/envoy:latest
 
+RUN apt-get update
+
 RUN apt-get install -y python-dev
 RUN pip install grpcio requests
 ADD ./client /client
