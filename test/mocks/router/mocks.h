@@ -115,6 +115,7 @@ class TestVirtualHost : public VirtualHost {
 public:
   // Router::VirtualHost
   const std::string& name() const override { return name_; }
+
   std::string name_{"fake_vhost"};
 };
 

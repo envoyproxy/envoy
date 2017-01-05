@@ -77,15 +77,15 @@ public:
   VirtualHostImpl(const Json::Object& virtual_host, Runtime::Loader& runtime,
                   Upstream::ClusterManager& cm);
 
-  // Router::VirtualHost
-  const std::string& name() const override { return name_; }
-
   const RedirectEntry* redirectFromEntries(const Http::HeaderMap& headers,
                                            uint64_t random_value) const;
   const RouteEntryImplBase* routeFromEntries(const Http::HeaderMap& headers, bool redirect,
                                              uint64_t random_value) const;
   bool usesRuntime() const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
+
+  // Router::VirtualHost
+  const std::string& name() const override { return name_; }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
