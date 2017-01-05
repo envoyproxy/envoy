@@ -111,6 +111,14 @@ public:
   Upstream::ResourcePriority priority_{Upstream::ResourcePriority::Default};
 };
 
+class TestVirtualHost : public VirtualHost {
+public:
+  // Router::VirtualHost
+  const std::string& name() const override { return name_; }
+
+  std::string name_{"fake_vhost"};
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -126,13 +134,14 @@ public:
   MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD1(virtualCluster, const VirtualCluster*(const Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
+  MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
 
   std::string cluster_name_{"fake_cluster"};
-  std::string vhost_name_{"fake_vhost"};
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestShadowPolicy shadow_policy_;
+  TestVirtualHost virtual_host_;
 };
 
 class MockConfig : public Config {

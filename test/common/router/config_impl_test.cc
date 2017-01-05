@@ -182,7 +182,7 @@ TEST(RouteMatcherTest, TestRoutes) {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
     const RouteEntry* route = config.routeForRequest(headers, 0);
     EXPECT_EQ("www2", route->clusterName());
-    EXPECT_EQ("www2", route->virtualHostName());
+    EXPECT_EQ("www2", route->virtualHost().name());
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("/api/new_endpoint/foo", headers.get_(Http::Headers::get().Path));
   }
