@@ -31,10 +31,10 @@ TEST(SslConnectionImplTest, ClientAuth) {
   ServerContextImpl server_ctx("server_ctx", stats_store, server_ctx_config, runtime);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(10000);
+  Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
   Network::ListenerPtr listener =
-      dispatcher.createSslListener(server_ctx, socket, callbacks, stats_store, false);
+      dispatcher.createSslListener(server_ctx, socket, callbacks, stats_store, true, false, false);
 
   std::string client_ctx_json = R"EOF(
   {
@@ -89,10 +89,10 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   ServerContextImpl server_ctx("server_ctx", stats_store, server_ctx_config, runtime);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(10000);
+  Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
   Network::ListenerPtr listener =
-      dispatcher.createSslListener(server_ctx, socket, callbacks, stats_store, false);
+      dispatcher.createSslListener(server_ctx, socket, callbacks, stats_store, true, false, false);
 
   std::string client_ctx_json = R"EOF(
   {
@@ -143,10 +143,10 @@ TEST(SslConnectionImplTest, SslError) {
   ServerContextImpl server_ctx("server_ctx", stats_store, server_ctx_config, runtime);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(10000);
+  Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
   Network::ListenerPtr listener =
-      dispatcher.createSslListener(server_ctx, socket, callbacks, stats_store, false);
+      dispatcher.createSslListener(server_ctx, socket, callbacks, stats_store, true, false, false);
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection("tcp://127.0.0.1:10000");

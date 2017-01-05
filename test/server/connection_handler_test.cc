@@ -25,14 +25,14 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
 
   Network::Listener* listener = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks;
-  EXPECT_CALL(*dispatcher, createListener_(_, _, _, _))
+  EXPECT_CALL(*dispatcher, createListener_(_, _, _, _, _, _))
       .WillOnce(Invoke([&](Network::ListenSocket&, Network::ListenerCallbacks& cb, Stats::Store&,
-                           bool) -> Network::Listener* {
+                           bool, bool, bool) -> Network::Listener* {
         listener_callbacks = &cb;
         return listener;
 
       }));
-  handler.addListener(factory, socket, false);
+  handler.addListener(factory, socket, true, false, false);
 
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
   EXPECT_CALL(factory, createFilterChain(_));

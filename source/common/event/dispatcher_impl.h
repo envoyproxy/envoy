@@ -31,10 +31,12 @@ public:
   FileEventPtr createFileEvent(int fd, FileReadyCb cb) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                      Stats::Store& stats_store, bool use_proxy_proto) override;
+                                      Stats::Store& stats_store, bool bind_to_port,
+                                      bool use_proxy_proto, bool use_orig_dst) override;
   Network::ListenerPtr createSslListener(Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                          Network::ListenerCallbacks& cb, Stats::Store& stats_store,
-                                         bool use_proxy_proto) override;
+                                         bool bind_to_port, bool use_proxy_proto,
+                                         bool use_orig_dst) override;
   TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;

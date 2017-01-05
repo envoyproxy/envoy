@@ -78,19 +78,19 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::ListenSocket& socket,
                                                     Network::ListenerCallbacks& cb,
-                                                    Stats::Store& stats_store,
-                                                    bool use_proxy_proto) {
-  return Network::ListenerPtr{
-      new Network::ListenerImpl(*this, socket, cb, stats_store, use_proxy_proto)};
+                                                    Stats::Store& stats_store, bool bind_to_port,
+                                                    bool use_proxy_proto, bool use_orig_dst) {
+  return Network::ListenerPtr{new Network::ListenerImpl(
+      *this, socket, cb, stats_store, bind_to_port, use_proxy_proto, use_orig_dst)};
 }
 
 Network::ListenerPtr DispatcherImpl::createSslListener(Ssl::ServerContext& ssl_ctx,
                                                        Network::ListenSocket& socket,
                                                        Network::ListenerCallbacks& cb,
-                                                       Stats::Store& stats_store,
-                                                       bool use_proxy_proto) {
-  return Network::ListenerPtr{
-      new Network::SslListenerImpl(*this, ssl_ctx, socket, cb, stats_store, use_proxy_proto)};
+                                                       Stats::Store& stats_store, bool bind_to_port,
+                                                       bool use_proxy_proto, bool use_orig_dst) {
+  return Network::ListenerPtr{new Network::SslListenerImpl(
+      *this, ssl_ctx, socket, cb, stats_store, bind_to_port, use_proxy_proto, use_orig_dst)};
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return TimerPtr{new TimerImpl(*this, cb)}; }

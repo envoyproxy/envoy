@@ -44,21 +44,40 @@ public:
    * Adds listener to the handler.
    * @param factory supplies the configuration factory for new connections.
    * @param socket supplies the already bound socket to listen on.
+   * @param bind_to_port specifies if the listener should actually bind to the port.
+   *        a listener that doesn't bind can only receive connections redirected from
+   *        other listeners that use the use_orig_dst
    * @param use_proxy_proto whether to use the PROXY Protocol V1
    * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
+   * @param use_orig_dst if a connection was redirected to this port using iptables,
+   *        allow the listener to hand it off to the listener associated to the original port
    */
   void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                   bool use_proxy_proto);
+                   bool bind_to_port, bool use_proxy_proto, bool use_orig_dst);
 
   /**
    * Adds listener to the handler.
    * @param factory supplies the configuration factory for new connections.
    * @param socket supplies the already bound socket to listen on.
+   * @param bind_to_port specifies if the listener should actually bind to the port.
+   *        a listener that doesn't bind can only receive connections redirected from
+   *        other listeners that use the use_orig_dst
    * @param use_proxy_proto whether to use the PROXY Protocol V1
    * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
+   * @param use_orig_dst if a connection was redirected to this port using iptables,
+   *        allow the listener to hand it off to the listener associated to the original port
    */
   void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                      Network::ListenSocket& socket, bool use_proxy_proto);
+                      Network::ListenSocket& socket, bool bind_to_port, bool use_proxy_proto,
+                      bool use_orig_dst);
+
+  /**
+   * Find a listener based on the provided socket name
+   * @param name supplies the name of the socket
+   * @return a pointer to the listener or nullptr if not found.
+   * Ownership of the listener is NOT transferred
+   */
+  Network::Listener* findListener(const std::string& socket_name);
 
   /**
    * Close and destroy all connections. This must be called from the same thread that is running
@@ -84,7 +103,8 @@ private:
    */
   struct ActiveListener : public Network::ListenerCallbacks {
     ActiveListener(ConnectionHandler& parent, Network::ListenSocket& socket,
-                   Network::FilterChainFactory& factory, bool use_proxy_proto);
+                   Network::FilterChainFactory& factory, bool use_proxy_proto, bool bind_to_port,
+                   bool use_orig_dst);
 
     ActiveListener(ConnectionHandler& parent, Network::ListenerPtr&& listener,
                    Network::FilterChainFactory& factory, const std::string& stats_prefix);
@@ -104,7 +124,7 @@ private:
   struct SslActiveListener : public ActiveListener {
     SslActiveListener(ConnectionHandler& parent, Ssl::ServerContext& ssl_ctx,
                       Network::ListenSocket& socket, Network::FilterChainFactory& factory,
-                      bool use_proxy_proto);
+                      bool use_proxy_proto, bool bind_to_port, bool use_orig_dst);
   };
 
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;
@@ -148,7 +168,7 @@ private:
   spdlog::logger& logger_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::list<ActiveListenerPtr> listeners_;
+  std::map<std::string, ActiveListenerPtr> listeners_;
   std::list<ActiveConnectionPtr> connections_;
   std::atomic<uint64_t> num_connections_{};
   Stats::Counter& watchdog_miss_counter_;

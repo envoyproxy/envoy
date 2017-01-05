@@ -39,15 +39,18 @@ public:
   }
 
   Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                      Stats::Store& stats_store, bool use_proxy_proto) override {
-    return Network::ListenerPtr{createListener_(socket, cb, stats_store, use_proxy_proto)};
+                                      Stats::Store& stats_store, bool bind_to_port,
+                                      bool use_proxy_proto, bool use_original_dst) override {
+    return Network::ListenerPtr{
+        createListener_(socket, cb, stats_store, bind_to_port, use_proxy_proto, use_original_dst)};
   }
 
   Network::ListenerPtr createSslListener(Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                          Network::ListenerCallbacks& cb, Stats::Store& stats_store,
-                                         bool use_proxy_proto) override {
-    return Network::ListenerPtr{
-        createSslListener_(ssl_ctx, socket, cb, stats_store, use_proxy_proto)};
+                                         bool bind_to_port, bool use_proxy_proto,
+                                         bool use_original_dst) override {
+    return Network::ListenerPtr{createSslListener_(ssl_ctx, socket, cb, stats_store, bind_to_port,
+                                                   use_proxy_proto, use_original_dst)};
   }
 
   TimerPtr createTimer(TimerCb cb) override { return TimerPtr{createTimer_(cb)}; }
@@ -71,13 +74,14 @@ public:
   MOCK_METHOD0(createDnsResolver_, Network::DnsResolver*());
   MOCK_METHOD2(createFileEvent_, FileEvent*(int fd, FileReadyCb cb));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
-  MOCK_METHOD4(createListener_,
+  MOCK_METHOD6(createListener_,
                Network::Listener*(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                  Stats::Store& stats_store, bool use_proxy_proto));
-  MOCK_METHOD5(createSslListener_,
+                                  Stats::Store& stats_store, bool bind_to_port,
+                                  bool use_proxy_proto, bool use_original_dst));
+  MOCK_METHOD7(createSslListener_,
                Network::Listener*(Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                   Network::ListenerCallbacks& cb, Stats::Store& stats_store,
-                                  bool use_proxy_proto));
+                                  bool bind_to_port, bool use_proxy_proto, bool use_original_dst));
   MOCK_METHOD1(createTimer_, Timer*(TimerCb cb));
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletablePtr& to_delete));
   MOCK_METHOD0(exit, void());

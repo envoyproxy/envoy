@@ -27,11 +27,11 @@ protected:
 };
 
 /**
- * Wraps a bound unix socket.
+ * Wraps a unix socket.
  */
 class TcpListenSocket : public ListenSocketImpl {
 public:
-  TcpListenSocket(uint32_t port);
+  TcpListenSocket(uint32_t port, bool bindToPort);
   TcpListenSocket(int fd, uint32_t port) : ListenSocketImpl(fd), port_(port) {}
 
   uint32_t port() { return port_; }

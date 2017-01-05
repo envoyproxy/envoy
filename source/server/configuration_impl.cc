@@ -123,8 +123,18 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
         fmt::format("listener.{}.", port_), parent_.server_.stats(), context_config);
   }
 
+  if (json.hasObject("bind_to_port")) {
+    bind_to_port_ = json.getBoolean("bind_to_port");
+  } else {
+    bind_to_port_ = true;
+  }
+
   if (json.hasObject("use_proxy_proto")) {
     use_proxy_proto_ = json.getBoolean("use_proxy_proto");
+  }
+
+  if (json.hasObject("use_original_dst")) {
+    use_original_dst_ = json.getBoolean("use_original_dst");
   }
 
   std::vector<Json::ObjectPtr> filters = json.getObjectArray("filters");

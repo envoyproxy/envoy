@@ -59,10 +59,10 @@ struct MockBufferStats {
 TEST(ConnectionImplTest, BufferStats) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(10000);
+  Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::ListenerPtr listener =
-      dispatcher.createListener(socket, listener_callbacks, stats_store, false);
+      dispatcher.createListener(socket, listener_callbacks, stats_store, true, false, false);
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection("tcp://127.0.0.1:10000");

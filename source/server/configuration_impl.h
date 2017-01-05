@@ -92,7 +92,9 @@ private:
     Network::FilterChainFactory& filterChainFactory() override { return *this; }
     uint64_t port() override { return port_; }
     Ssl::ServerContext* sslContext() override { return ssl_context_; }
+    bool bindToPort() override { return bind_to_port_; }
     bool useProxyProto() override { return use_proxy_proto_; }
+    bool useOriginalDst() override { return use_original_dst_; }
 
     // Network::FilterChainFactory
     void createFilterChain(Network::Connection& connection) override;
@@ -101,7 +103,9 @@ private:
     MainImpl& parent_;
     uint64_t port_;
     Ssl::ServerContext* ssl_context_{};
+    bool bind_to_port_{};
     bool use_proxy_proto_{};
+    bool use_original_dst_{};
     std::list<NetworkFilterFactoryCb> filter_factories_;
   };
 
