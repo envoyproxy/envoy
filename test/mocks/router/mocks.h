@@ -115,8 +115,10 @@ class TestVirtualHost : public VirtualHost {
 public:
   // Router::VirtualHost
   const std::string& name() const override { return name_; }
+  const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
   std::string name_{"fake_vhost"};
+  testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
 };
 
 class MockRouteEntry : public RouteEntry {
