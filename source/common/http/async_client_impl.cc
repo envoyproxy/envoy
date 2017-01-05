@@ -19,7 +19,11 @@ AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::St
                                  random, std::move(shadow_writer), true),
       dispatcher_(dispatcher), local_address_(local_address) {}
 
-AsyncClientImpl::~AsyncClientImpl() { ASSERT(active_requests_.empty()); }
+AsyncClientImpl::~AsyncClientImpl() {
+  while (!active_requests_.empty()) {
+    active_requests_.front()->failDueToClientDestroy();
+  }
+}
 
 AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
                                             const Optional<std::chrono::milliseconds>& timeout) {
@@ -120,6 +124,14 @@ void AsyncRequestImpl::cleanup() {
 
 void AsyncRequestImpl::resetStream() {
   // In this case we don't have a valid response so we do need to raise a failure.
+  callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+  cleanup();
+}
+
+void AsyncRequestImpl::failDueToClientDestroy() {
+  // In this case we are going away because the client is being destroyed. We need to both reset
+  // the stream as well as raise a failure callback.
+  reset_callback_();
   callbacks_.onFailure(AsyncClient::FailureReason::Reset);
   cleanup();
 }

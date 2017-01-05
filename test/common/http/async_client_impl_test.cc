@@ -252,6 +252,20 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
   request->cancel();
 }
 
+TEST_F(AsyncClientImplTest, DestroyWithActive) {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder&, ConnectionPool::Callbacks& callbacks)
+                           -> ConnectionPool::Cancellable* {
+                             callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
+  EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+  EXPECT_CALL(callbacks_, onFailure(_));
+  client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+}
+
 TEST_F(AsyncClientImplTest, PoolFailure) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,
