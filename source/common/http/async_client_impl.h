@@ -119,6 +119,7 @@ private:
   };
 
   void cleanup();
+  void failDueToClientDestroy();
   void onComplete();
 
   // Http::StreamDecoderFilterCallbacks
