@@ -22,7 +22,7 @@ TEST(BadRateLimitConfiguration, MissingActions) {
 }
 )EOF";
 
-  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::LoadFromString(json)), EnvoyException);
+  EXPECT_THROW(RateLimitPolicyImpl(*Json::Factory::LoadFromString(json)), EnvoyException);
 }
 
 TEST(BadRateLimitConfiguration, BadType) {
@@ -208,6 +208,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitPolicyEntryMembers) {
   ]
 }
 )EOF";
+
   SetUpTest(json);
 
   EXPECT_EQ(2, rate_limit_entry_->stage());
@@ -225,6 +226,7 @@ TEST_F(RateLimitPolicyEntryTest, RemoteAddress) {
   ]
 }
 )EOF";
+
   SetUpTest(json);
   std::string address = "10.0.0.1";
 
@@ -244,6 +246,7 @@ TEST_F(RateLimitPolicyEntryTest, RemoteAddressRouteKey) {
   ]
 }
 )EOF";
+
   SetUpTest(json);
   std::string address = "10.0.1";
 
