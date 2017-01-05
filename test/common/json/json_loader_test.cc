@@ -31,6 +31,7 @@ TEST(JsonLoaderTest, Basic) {
   {
     ObjectPtr json = Factory::LoadFromString("{\"hello\": [\"a\", \"b\", 3]}");
     EXPECT_THROW(json->getStringArray("hello"), Exception);
+    EXPECT_THROW(json->getStringArray("world"), Exception);
   }
 
   {
@@ -146,6 +147,14 @@ TEST(JsonLoaderTest, Double) {
     ObjectPtr json = Factory::LoadFromString("{\"foo\": \"bar\"}");
     EXPECT_THROW(json->getDouble("foo"), Exception);
   }
+}
+
+TEST(JsonLoaderTest, Hash) {
+  ObjectPtr json1 = Factory::LoadFromString("{\"value1\": 10.5, \"value2\": -12.3}");
+  ObjectPtr json2 = Factory::LoadFromString("{\"value2\": -12.3, \"value1\": 10.5}");
+  ObjectPtr json3 = Factory::LoadFromString("  {  \"value2\":  -12.3, \"value1\":  10.5} ");
+  EXPECT_NE(json1->hash(), json2->hash());
+  EXPECT_EQ(json2->hash(), json3->hash());
 }
 
 } // Json

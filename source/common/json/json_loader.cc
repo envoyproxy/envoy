@@ -1,12 +1,11 @@
 #include "json_loader.h"
 
 // Do not let RapidJson leak outside of this file.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/istreamwrapper.h"
-#pragma GCC diagnostic pop
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 namespace Json {
 
@@ -134,6 +133,13 @@ public:
     } else {
       return getDouble(name);
     }
+  }
+
+  uint64_t hash() const override {
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    value_.Accept(writer);
+    return std::hash<std::string>{}(buffer.GetString());
   }
 
   void iterate(const ObjectCallback& callback) const override {
