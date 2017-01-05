@@ -160,14 +160,22 @@ DetectionStats DetectorImpl::generateStats(const std::string& name, Stats::Store
 
 void DetectorImpl::onConsecutive5xx(HostPtr host) {
   // This event will come from all threads, so we synchronize with a post to the main thread.
-  // TODO: Unfortunately consecutive 5xx is complicated from a threading perspective because
-  //       we catch consecutive 5xx on worker threads and then post back to the main thread. In
-  //       the future, clusters can get removed, and this means there is a race condition with this
-  //       reverse post. The use of shared_from_this() will prevent the outlier detector from going
-  //       away, but we still need to prevent callbacks from being fired, etc., so will need to add
-  //       some type of shutdown() method when we support cluster remove.
-  std::shared_ptr<DetectorImpl> shared_this = shared_from_this();
-  dispatcher_.post([shared_this, host]() -> void { shared_this->onConsecutive5xxWorker(host); });
+  // NOTE: Unfortunately consecutive 5xx is complicated from a threading perspective because
+  //       we catch consecutive 5xx on worker threads and then post back to the main thread.
+  //       Clusters can get removed, and this means there is a race condition with this
+  //       reverse post. The way we handle this is as follows:
+  //       1) The only strong pointer to the detector is owned by the cluster.
+  //       2) We post a weak pointer to the main thread.
+  //       3) If when running on the main thread the weak pointer can be converted to a strong
+  //          pointer, the detector/cluster must still exist so we can safely fire callbacks.
+  //          Otherwise we do nothing since the detector/cluster is already gone.
+  std::weak_ptr<DetectorImpl> weak_this = shared_from_this();
+  dispatcher_.post([weak_this, host]() -> void {
+    std::shared_ptr<DetectorImpl> shared_this = weak_this.lock();
+    if (shared_this) {
+      shared_this->onConsecutive5xxWorker(host);
+    }
+  });
 }
 
 void DetectorImpl::onConsecutive5xxWorker(HostPtr host) {
