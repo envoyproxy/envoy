@@ -300,6 +300,33 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
             stats_store_.gauge("cluster.fake_cluster.outlier_detection.ejections_active").value());
 }
 
+TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
+  EXPECT_CALL(cluster_, addMemberUpdateCb(_));
+  cluster_.hosts_ = {HostPtr{new HostImpl(cluster_.info_, "tcp://127.0.0.1:80", false, 1, "")}};
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, dispatcher_, runtime_, stats_store_, time_source_, event_logger_));
+  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+
+  Event::PostCb post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+
+  // Destroy before the cross thread event comes in.
+  std::weak_ptr<DetectorImpl> weak_detector = detector;
+  detector.reset();
+  EXPECT_EQ(nullptr, weak_detector.lock());
+  post_cb();
+
+  EXPECT_EQ(0UL,
+            stats_store_.gauge("cluster.fake_cluster.outlier_detection.ejections_active").value());
+}
+
 TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   cluster_.hosts_ = {HostPtr{new HostImpl(cluster_.info_, "tcp://127.0.0.1:80", false, 1, "")}};
