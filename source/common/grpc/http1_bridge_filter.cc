@@ -20,7 +20,7 @@ void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
   bool success = StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) &&
                  grpc_status_code == 0;
 
-  Common::chargeStat(stats_store_, cluster_, grpc_service_, grpc_method_, success);
+  Common::chargeStat(*cluster_, grpc_service_, grpc_method_, success);
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
@@ -105,7 +105,8 @@ void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
     return;
   }
 
-  cluster_ = route->clusterName();
+  // TODO: Cluster may not exist.
+  cluster_ = cm_.get(route->clusterName());
   grpc_service_ = parts[0];
   grpc_method_ = parts[1];
   do_stat_tracking_ = true;

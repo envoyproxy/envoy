@@ -387,10 +387,10 @@ ProdClusterManagerFactory::allocateConnPool(Event::Dispatcher& dispatcher, Const
   if ((host->cluster().features() & ClusterInfo::Features::HTTP2) &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::ConnectionPool::InstancePtr{
-        new Http::Http2::ProdConnPoolImpl(dispatcher, host, stats_, priority)};
+        new Http::Http2::ProdConnPoolImpl(dispatcher, host, priority)};
   } else {
     return Http::ConnectionPool::InstancePtr{
-        new Http::Http1::ConnPoolImplProd(dispatcher, host, stats_, priority)};
+        new Http::Http1::ConnPoolImplProd(dispatcher, host, priority)};
   }
 }
 

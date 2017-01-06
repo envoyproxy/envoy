@@ -24,10 +24,8 @@ namespace Grpc {
 class RpcChannelImpl : public RpcChannel, public Http::AsyncClient::Callbacks {
 public:
   RpcChannelImpl(Upstream::ClusterManager& cm, const std::string& cluster,
-                 RpcChannelCallbacks& callbacks, Stats::Store& stats_store,
-                 const Optional<std::chrono::milliseconds>& timeout)
-      : cm_(cm), cluster_(cluster), callbacks_(callbacks), stats_store_(stats_store),
-        timeout_(timeout) {}
+                 RpcChannelCallbacks& callbacks, const Optional<std::chrono::milliseconds>& timeout)
+      : cm_(cm), cluster_(cm.get(cluster)), callbacks_(callbacks), timeout_(timeout) {}
 
   ~RpcChannelImpl() { ASSERT(!http_request_ && !grpc_method_ && !grpc_response_); }
 
@@ -52,12 +50,11 @@ private:
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
   Upstream::ClusterManager& cm_;
-  const std::string cluster_;
+  Upstream::ClusterInfoPtr cluster_;
   Http::AsyncClient::Request* http_request_{};
   const proto::MethodDescriptor* grpc_method_{};
   proto::Message* grpc_response_{};
   RpcChannelCallbacks& callbacks_;
-  Stats::Store& stats_store_;
   Optional<std::chrono::milliseconds> timeout_;
 };
 

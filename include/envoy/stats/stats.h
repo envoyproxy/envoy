@@ -103,16 +103,12 @@ public:
 typedef std::unique_ptr<Sink> SinkPtr;
 
 /**
- * A store for all known counters, gauges, and timers.
+ * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
+ * (for example to free/delete all of them).
  */
-class Store {
+class Scope {
 public:
-  virtual ~Store() {}
-
-  /**
-   * Add a sink that is used for stat flushing.
-   */
-  virtual void addSink(Sink& sink) PURE;
+  virtual ~Scope() {}
 
   /**
    * Deliver an individual histogram value to all registered sinks.
@@ -125,10 +121,24 @@ public:
   virtual void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) PURE;
 
   virtual Counter& counter(const std::string& name) PURE;
-  virtual std::list<std::reference_wrapper<Counter>> counters() const PURE;
   virtual Gauge& gauge(const std::string& name) PURE;
-  virtual std::list<std::reference_wrapper<Gauge>> gauges() const PURE;
   virtual Timer& timer(const std::string& name) PURE;
+};
+
+/**
+ * A store for all known counters, gauges, and timers.
+ */
+class Store : public Scope {
+public:
+  virtual ~Store() {}
+
+  /**
+   * Add a sink that is used for stat flushing.
+   */
+  virtual void addSink(Sink& sink) PURE;
+
+  virtual std::list<std::reference_wrapper<Counter>> counters() const PURE;
+  virtual std::list<std::reference_wrapper<Gauge>> gauges() const PURE;
 };
 
 } // Stats

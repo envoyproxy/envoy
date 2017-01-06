@@ -17,6 +17,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
+#include "common/stats/stats_scope_impl.h"
 #include "common/stats/stats_impl.h"
 
 namespace Upstream {
@@ -162,10 +163,9 @@ public:
   ClusterInfoImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                   Ssl::ContextManager& ssl_context_manager);
 
-  static ClusterStats generateStats(const std::string& prefix, Stats::Store& stats);
+  static ClusterStats generateStats(Stats::Scope& scope);
 
   // Upstream::ClusterInfo
-  const std::string& altStatName() const override { return alt_stat_name_; }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
   uint64_t features() const override { return features_; }
   uint64_t httpCodecOptions() const override { return http_codec_options_; }
@@ -175,8 +175,8 @@ public:
   const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   Ssl::ClientContext* sslContext() const override { return ssl_ctx_; }
-  const std::string& statPrefix() const override { return stat_prefix_; }
   ClusterStats& stats() const override { return stats_; }
+  Stats::Scope& statsScope() const override { return stats_scope_; }
 
 private:
   struct ResourceManagers {
@@ -193,13 +193,12 @@ private:
   static uint64_t parseFeatures(const Json::Object& config);
 
   Runtime::Loader& runtime_;
-  Ssl::ClientContext* ssl_ctx_;
+  Ssl::ClientContext* ssl_ctx_; // TODO: For dynamic cluster remove we need to delete the context.
   const std::string name_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
-  const std::string stat_prefix_;
+  mutable Stats::ScopeImpl stats_scope_;
   mutable ClusterStats stats_;
-  const std::string alt_stat_name_;
   const uint64_t features_;
   const uint64_t http_codec_options_;
   mutable ResourceManagers resource_managers_;
@@ -251,9 +250,10 @@ protected:
   static const ConstHostListsPtr empty_host_lists_;
 
   Runtime::Loader& runtime_;
+  ClusterInfoPtr info_; // This cluster info stores the stats scope so it must be initialized first
+                        // and destroyed last.
   HealthCheckerPtr health_checker_;
   Outlier::DetectorPtr outlier_detector_;
-  ClusterInfoPtr info_;
 
 private:
   void reloadHealthyHosts();

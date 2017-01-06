@@ -6,7 +6,6 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/stats/stats_macros.h"
 
 #include "common/common/assert.h"
 #include "common/common/linked_object.h"
@@ -14,18 +13,6 @@
 #include "common/network/filter_impl.h"
 
 namespace Http {
-
-/**
- * All stats for the codec client. @see stats_macros.h
- */
-#define ALL_CODEC_CLIENT_STATS(COUNTER) COUNTER(upstream_cx_protocol_error)
-
-/**
- * Definition of all stats for the codec client. @see stats_macros.h
- */
-struct CodecClientStats {
-  ALL_CODEC_CLIENT_STATS(GENERATE_COUNTER_STRUCT)
-};
 
 /**
  * Callbacks specific to a codec client.
@@ -116,9 +103,10 @@ protected:
    * Create a codec client and connect to a remote host/port.
    * @param type supplies the codec type.
    * @param connection supplies the connection to communicate on.
-   * @param stats supplies stats to use for this client.
+   * @param host supplies the owning host.
    */
-  CodecClient(Type type, Network::ClientConnectionPtr&& connection, const CodecClientStats& stats);
+  CodecClient(Type type, Network::ClientConnectionPtr&& connection,
+              Upstream::HostDescriptionPtr host);
 
   // Http::ConnectionCallbacks
   void onGoAway() override {
@@ -130,6 +118,7 @@ protected:
   const Type type_;
   ClientConnectionPtr codec_;
   Network::ClientConnectionPtr connection_;
+  Upstream::HostDescriptionPtr host_;
 
 private:
   /**
@@ -187,7 +176,6 @@ private:
   void onEvent(uint32_t events) override;
 
   std::list<ActiveRequestPtr> active_requests_;
-  CodecClientStats stats_;
   Http::ConnectionCallbacks* codec_callbacks_{};
   CodecClientCallbacks* codec_client_callbacks_{};
   bool connected_{};
@@ -201,7 +189,7 @@ typedef std::unique_ptr<CodecClient> CodecClientPtr;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  const CodecClientStats& stats, Stats::Store& store, uint64_t codec_options);
+                  Upstream::HostDescriptionPtr host);
 };
 
 } // Http

@@ -65,7 +65,7 @@ void MainImpl::initialize(const Json::Object& json) {
     std::string type = rate_limit_service_config->getString("type");
     if (type == "grpc_service") {
       ratelimit_client_factory_.reset(new RateLimit::GrpcFactoryImpl(
-          *rate_limit_service_config->getObject("config"), *cluster_manager_, server_.stats()));
+          *rate_limit_service_config->getObject("config"), *cluster_manager_));
     } else {
       throw EnvoyException(fmt::format("unknown rate limit service type '{}'", type));
     }
@@ -116,13 +116,14 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { return listeners_; }
 
 MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
-    : parent_(parent), port_(json.getInteger("port")) {
+    : parent_(parent), port_(json.getInteger("port")),
+      scope_(parent_.server_.stats(), fmt::format("listener.{}.", port_)) {
   log().info("  port={}", port_);
 
   if (json.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*json.getObject("ssl_context"));
-    ssl_context_ = &parent_.server_.sslContextManager().createSslServerContext(
-        fmt::format("listener.{}.", port_), parent_.server_.stats(), context_config);
+    ssl_context_ =
+        &parent_.server_.sslContextManager().createSslServerContext(scope_, context_config);
   }
 
   if (json.hasObject("use_proxy_proto")) {

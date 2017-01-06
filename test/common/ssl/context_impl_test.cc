@@ -29,7 +29,7 @@ TEST(SslContextImplTest, TestCipherSuites) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW(ClientContextImpl("", store, cfg), EnvoyException);
+  EXPECT_THROW(ClientContextImpl(store, cfg), EnvoyException);
 }
 
 TEST(SslContextImplTest, TestExpiringCert) {
@@ -43,7 +43,7 @@ TEST(SslContextImplTest, TestExpiringCert) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Stats::IsolatedStoreImpl store;
-  ClientContextImpl context("", store, cfg);
+  ClientContextImpl context(store, cfg);
 
   // This is a total hack, but right now we generate the cert and it expires in 15 days only in the
   // first second that it's valid. This can become invalid and then cause slower tests to fail.
@@ -64,7 +64,7 @@ TEST(SslContextImplTest, TestExpiredCert) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Stats::IsolatedStoreImpl store;
-  ClientContextImpl context("", store, cfg);
+  ClientContextImpl context(store, cfg);
   EXPECT_EQ(0U, context.daysUntilFirstCertExpires());
 }
 
@@ -81,7 +81,7 @@ TEST(SslContextImplTest, TestGetCertInformation) {
   ContextConfigImpl cfg(*loader);
   Stats::IsolatedStoreImpl store;
 
-  ClientContextImpl context("", store, cfg);
+  ClientContextImpl context(store, cfg);
   // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
   // days only in the first second that it's valid. We will partially match for up until Days until
   // Expiration: 1.
@@ -102,7 +102,7 @@ TEST(SslContextImplTest, TestNoCert) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString("{}");
   ContextConfigImpl cfg(*loader);
   Stats::IsolatedStoreImpl store;
-  ClientContextImpl context("", store, cfg);
+  ClientContextImpl context(store, cfg);
   EXPECT_EQ("", context.getCaCertInformation());
   EXPECT_EQ("", context.getCertChainInformation());
 }

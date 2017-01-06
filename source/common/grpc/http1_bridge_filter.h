@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/upstream/cluster_manager.h"
 
 namespace Grpc {
 
@@ -9,7 +10,7 @@ namespace Grpc {
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
-  Http1BridgeFilter(Stats::Store& stats_store) : stats_store_(stats_store) {}
+  Http1BridgeFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -35,13 +36,13 @@ private:
   void chargeStat(const Http::HeaderMap& headers);
   void setupStatTracking(const Http::HeaderMap& headers);
 
-  Stats::Store& stats_store_;
+  Upstream::ClusterManager& cm_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::HeaderMap* response_headers_{};
   bool do_bridging_{};
   bool do_stat_tracking_{};
-  std::string cluster_;
+  Upstream::ClusterInfoPtr cluster_;
   std::string grpc_service_;
   std::string grpc_method_;
 };

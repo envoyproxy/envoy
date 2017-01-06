@@ -30,7 +30,7 @@ class DetectorImplFactory {
 public:
   static DetectorPtr createForCluster(Cluster& cluster, const Json::Object& cluster_config,
                                       Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                                      Stats::Store& stats, EventLoggerPtr event_logger);
+                                      EventLoggerPtr event_logger);
 };
 
 class DetectorImpl;
@@ -85,7 +85,7 @@ struct DetectionStats {
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
   static std::shared_ptr<DetectorImpl> create(const Cluster& cluster, Event::Dispatcher& dispatcher,
-                                              Runtime::Loader& runtime, Stats::Store& stats,
+                                              Runtime::Loader& runtime,
                                               SystemTimeSource& time_source,
                                               EventLoggerPtr event_logger);
   ~DetectorImpl();
@@ -98,13 +98,13 @@ public:
 
 private:
   DetectorImpl(const Cluster& cluster, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-               Stats::Store& stats, SystemTimeSource& time_source, EventLoggerPtr event_logger);
+               SystemTimeSource& time_source, EventLoggerPtr event_logger);
 
   void addHostSink(HostPtr host);
   void armIntervalTimer();
   void checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink, SystemTime now);
   void ejectHost(HostPtr host, EjectionType type);
-  static DetectionStats generateStats(const std::string& name, Stats::Store& store);
+  static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(const Cluster& cluster);
   void onConsecutive5xxWorker(HostPtr host);
   void onIntervalTimer();

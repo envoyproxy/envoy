@@ -12,8 +12,7 @@ ServerContextPtr SslIntegrationTest::upstream_ssl_ctx_;
 ClientContextPtr SslIntegrationTest::client_ssl_ctx_alpn_;
 ClientContextPtr SslIntegrationTest::client_ssl_ctx_no_alpn_;
 
-ServerContextPtr SslIntegrationTest::createUpstreamSslContext(const std::string& name,
-                                                              Stats::Store& store) {
+ServerContextPtr SslIntegrationTest::createUpstreamSslContext(Stats::Scope& scope) {
   std::string json = R"EOF(
 {
   "cert_chain_file": "test/config/integration/certs/upstreamcert.pem",
@@ -23,11 +22,10 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext(const std::string&
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
-  return ServerContextPtr(new TestServerContextImpl(name, store, cfg));
+  return ServerContextPtr(new TestServerContextImpl(scope, cfg));
 }
 
-ClientContextPtr SslIntegrationTest::createClientSslContext(const std::string& name,
-                                                            Stats::Store& store, bool alpn) {
+ClientContextPtr SslIntegrationTest::createClientSslContext(Stats::Scope& scope, bool alpn) {
   std::string json_no_alpn = R"EOF(
 {
   "ca_cert_file": "test/config/integration/certs/cacert.pem",
@@ -47,7 +45,7 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(const std::string& n
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(alpn ? json_alpn : json_no_alpn);
   ContextConfigImpl cfg(*loader);
-  return ClientContextPtr(new ClientContextImpl(name, store, cfg));
+  return ClientContextPtr(new ClientContextImpl(scope, cfg));
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn) {

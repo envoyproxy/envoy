@@ -48,9 +48,8 @@ DH* get_dh2048() {
 
 const unsigned char ContextImpl::SERVER_SESSION_ID_CONTEXT = 1;
 
-ContextImpl::ContextImpl(const std::string& name, Stats::Store& store, ContextConfig& config)
-    : ctx_(SSL_CTX_new(SSLv23_method())), store_(store), stats_prefix_(fmt::format("{}ssl.", name)),
-      stats_(generateStats(stats_prefix_, store)) {
+ContextImpl::ContextImpl(Stats::Scope& scope, ContextConfig& config)
+    : ctx_(SSL_CTX_new(SSLv23_method())), scope_(scope), stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_);
   // the list of ciphers that will be supported
   if (!config.cipherSuites().empty()) {
@@ -223,7 +222,7 @@ bool ContextImpl::verifyPeer(SSL* ssl) const {
   stats_.handshake_.inc();
 
   const char* cipher = SSL_get_cipher_name(ssl);
-  store_.counter(fmt::format("{}ciphers.{}", stats_prefix_, std::string{cipher})).inc();
+  scope_.counter(fmt::format("ciphers.{}", std::string{cipher})).inc();
 
   X509Ptr cert = X509Ptr(SSL_get_peer_certificate(ssl));
 
@@ -300,7 +299,8 @@ bool ContextImpl::verifyCertificateHash(X509* cert, const std::vector<uint8_t>& 
   return computed_hash == expected_hash;
 }
 
-SslStats ContextImpl::generateStats(const std::string& prefix, Stats::Store& store) {
+SslStats ContextImpl::generateStats(Stats::Scope& store) {
+  std::string prefix("ssl.");
   return {ALL_SSL_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix),
                         POOL_TIMER_PREFIX(store, prefix))};
 }
@@ -372,9 +372,8 @@ X509Ptr ContextImpl::loadCert(const std::string& cert_file) {
   return X509Ptr{cert};
 };
 
-ClientContextImpl::ClientContextImpl(const std::string& name, Stats::Store& stats,
-                                     ContextConfig& config)
-    : ContextImpl(name, stats, config) {
+ClientContextImpl::ClientContextImpl(Stats::Scope& scope, ContextConfig& config)
+    : ContextImpl(scope, config) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
@@ -402,9 +401,9 @@ SslConPtr ClientContextImpl::newSsl() const {
   return ssl_con;
 }
 
-ServerContextImpl::ServerContextImpl(const std::string& name, Stats::Store& stats,
-                                     ContextConfig& config, Runtime::Loader& runtime)
-    : ContextImpl(name, stats, config), runtime_(runtime) {
+ServerContextImpl::ServerContextImpl(Stats::Scope& scope, ContextConfig& config,
+                                     Runtime::Loader& runtime)
+    : ContextImpl(scope, config), runtime_(runtime) {
   parsed_alt_alpn_protocols_ = parseAlpnProtocols(config.altAlpnProtocols());
 
   if (!parsed_alpn_protocols_.empty()) {

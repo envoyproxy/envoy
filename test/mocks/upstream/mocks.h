@@ -21,7 +21,6 @@ public:
   ~MockClusterInfo();
 
   // Upstream::ClusterInfo
-  MOCK_CONST_METHOD0(altStatName, const std::string&());
   MOCK_CONST_METHOD0(connectTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(httpCodecOptions, uint64_t());
@@ -31,12 +30,10 @@ public:
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
   MOCK_CONST_METHOD0(sslContext, Ssl::ClientContext*());
-  MOCK_CONST_METHOD0(statPrefix, const std::string&());
   MOCK_CONST_METHOD0(stats, ClusterStats&());
+  MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
 
   std::string name_{"fake_cluster"};
-  std::string alt_stat_name_{"fake_alt_cluster"};
-  std::string stat_prefix_{"cluster.fake_cluster."};
   uint64_t max_requests_per_connection_{};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterStats stats_;

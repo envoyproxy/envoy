@@ -9,8 +9,8 @@
 namespace Http {
 
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
-                         const CodecClientStats& stats)
-    : type_(type), connection_(std::move(connection)), stats_(stats) {
+                         Upstream::HostDescriptionPtr host)
+    : type_(type), connection_(std::move(connection)), host_(host) {
 
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterPtr{new CodecReadFilter(*this)});
@@ -107,21 +107,21 @@ void CodecClient::onData(Buffer::Instance& data) {
   }
 
   if (protocol_error) {
-    stats_.upstream_cx_protocol_error_.inc();
+    host_->cluster().stats().upstream_cx_protocol_error_.inc();
   }
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                                 const CodecClientStats& stats, Stats::Store& store,
-                                 uint64_t codec_options)
-    : CodecClient(type, std::move(connection), stats) {
+                                 Upstream::HostDescriptionPtr host)
+    : CodecClient(type, std::move(connection), host) {
   switch (type) {
   case Type::HTTP1: {
     codec_.reset(new Http1::ClientConnectionImpl(*connection_, *this));
     break;
   }
   case Type::HTTP2: {
-    codec_.reset(new Http2::ClientConnectionImpl(*connection_, *this, store, codec_options));
+    codec_.reset(new Http2::ClientConnectionImpl(*connection_, *this, host->cluster().statsScope(),
+                                                 host->cluster().httpCodecOptions()));
     break;
   }
   }

@@ -16,13 +16,13 @@ public:
   /**
    * Builds an Ssl::ClientContext from an Ssl::ContextConfig
    */
-  virtual Ssl::ClientContext& createSslClientContext(const std::string& name, Stats::Store& stats,
+  virtual Ssl::ClientContext& createSslClientContext(Stats::Scope& scope,
                                                      ContextConfig& config) PURE;
 
   /**
    * Builds an Ssl::ServerContext from an Ssl::ContextConfig
    */
-  virtual Ssl::ServerContext& createSslServerContext(const std::string& name, Stats::Store& stats,
+  virtual Ssl::ServerContext& createSslServerContext(Stats::Scope& stats,
                                                      ContextConfig& config) PURE;
 
   /**

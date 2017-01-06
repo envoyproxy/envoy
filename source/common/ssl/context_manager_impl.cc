@@ -2,19 +2,17 @@
 
 namespace Ssl {
 
-Ssl::ClientContext& ContextManagerImpl::createSslClientContext(const std::string& name,
-                                                               Stats::Store& stats,
+Ssl::ClientContext& ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
                                                                ContextConfig& config) {
 
-  Ssl::ClientContext* context = new ClientContextImpl(name, stats, config);
+  Ssl::ClientContext* context = new ClientContextImpl(scope, config);
   contexts_.emplace_back(context);
   return *context;
 }
 
-Ssl::ServerContext& ContextManagerImpl::createSslServerContext(const std::string& name,
-                                                               Stats::Store& stats,
+Ssl::ServerContext& ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
                                                                ContextConfig& config) {
-  Ssl::ServerContext* context = new ServerContextImpl(name, stats, config, runtime_);
+  Ssl::ServerContext* context = new ServerContextImpl(scope, config, runtime_);
   contexts_.emplace_back(context);
   return *context;
 }

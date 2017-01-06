@@ -100,7 +100,9 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(Http::CodecOptions::NoCompression, cluster.info()->httpCodecOptions());
-  EXPECT_EQ("cluster.name.", cluster.info()->statPrefix());
+
+  cluster.info()->stats().upstream_rq_total_.inc();
+  EXPECT_EQ(1UL, stats.counter("cluster.name.upstream_rq_total").value());
 
   EXPECT_CALL(runtime.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
   EXPECT_FALSE(cluster.info()->maintenanceMode());

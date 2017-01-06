@@ -2,12 +2,12 @@
 #include "common/common/empty_string.h"
 #include "common/http/filter/ratelimit.h"
 #include "common/http/headers.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
@@ -35,7 +35,7 @@ public:
 
   void SetUpTest(const std::string json) {
     Json::ObjectPtr config = Json::Factory::LoadFromString(json);
-    config_.reset(new FilterConfig(*config, local_info_, stats_store_, runtime_));
+    config_.reset(new FilterConfig(*config, local_info_, stats_store_, runtime_, cm_));
 
     client_ = new ::RateLimit::MockClient();
     filter_.reset(new Filter(config_, ::RateLimit::ClientPtr{client_}));
@@ -60,6 +60,7 @@ public:
   Buffer::OwnedImpl data_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Router::MockRateLimitPolicyEntry> rate_limit_policy_entry_;
   std::vector<::RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -127,7 +128,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   request_callbacks_->complete(::RateLimit::LimitStatus::OK);
 
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.ratelimit.ok").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
@@ -148,7 +149,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.ratelimit.ok").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
@@ -169,7 +170,7 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.ratelimit.error").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("ratelimit.error").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponse) {
@@ -189,9 +190,9 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   request_callbacks_->complete(::RateLimit::LimitStatus::OverLimit);
 
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.ratelimit.over_limit").value());
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.upstream_rq_4xx").value());
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.upstream_rq_429").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("ratelimit.over_limit").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_429").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
@@ -214,9 +215,9 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.ratelimit.over_limit").value());
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.upstream_rq_4xx").value());
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.upstream_rq_429").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("ratelimit.over_limit").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_429").value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {

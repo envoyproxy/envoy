@@ -20,7 +20,7 @@ static HostPtr newTestHost(Upstream::ClusterInfoPtr cluster, const std::string& 
  */
 class DISABLED_SimulationTest : public testing::Test {
 public:
-  DISABLED_SimulationTest() : stats_(ClusterInfoImpl::generateStats("", stats_store_)) {
+  DISABLED_SimulationTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
         .WillByDefault(Return(50U));
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))

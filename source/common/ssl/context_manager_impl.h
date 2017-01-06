@@ -13,11 +13,9 @@ public:
   ContextManagerImpl(Runtime::Loader& runtime) : runtime_(runtime) {}
 
   // Ssl::ContextManager
-  Ssl::ClientContext& createSslClientContext(const std::string& name, Stats::Store& stats,
-                                             ContextConfig& config) override;
+  Ssl::ClientContext& createSslClientContext(Stats::Scope& scope, ContextConfig& config) override;
 
-  Ssl::ServerContext& createSslServerContext(const std::string& name, Stats::Store& stats,
-                                             ContextConfig& config) override;
+  Ssl::ServerContext& createSslServerContext(Stats::Scope& scope, ContextConfig& config) override;
 
   size_t daysUntilFirstCertExpires() override;
 
