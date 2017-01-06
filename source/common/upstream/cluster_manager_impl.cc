@@ -102,7 +102,6 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const Json::Object& new_confi
 
     cluster_manager.thread_local_clusters_[new_cluster->name()].reset(
         new ThreadLocalClusterManagerImpl::ClusterEntry(cluster_manager, new_cluster));
-
   });
 
   postInitializeCluster(*primary_clusters_.at(cluster_name).cluster_);
@@ -152,8 +151,7 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, bool added_via
           initialized_callback_();
         }
       } else if (pending_cluster_init_ == secondary_init_clusters_.size()) {
-        // All other clusters have initialized. Now we start up the SDS clusters since they will
-        // depend on DNS resolution for the SDS cluster itself.
+        // All primary clusters have initialized. Now we start up the secondary clusters.
         for (Cluster* cluster : secondary_init_clusters_) {
           cluster->initialize();
         }
