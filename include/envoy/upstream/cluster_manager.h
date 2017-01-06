@@ -33,8 +33,8 @@ public:
   typedef std::unordered_map<std::string, std::reference_wrapper<const Cluster>> ClusterInfoMap;
 
   /**
-   * @return ClusterInfoMap all current clusters. These are are the primary (not thread local)
-   * clusters so should just be used for stats/admin.
+   * @return ClusterInfoMap all current clusters. These are the primary (not thread local)
+   * clusters which should only be used for stats/admin.
    */
   virtual ClusterInfoMap clusters() PURE;
 
@@ -102,10 +102,16 @@ class ClusterManagerFactory {
 public:
   virtual ~ClusterManagerFactory() {}
 
+  /**
+   * Allocate an HTTP connection pool.
+   */
   virtual Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
                                                              ConstHostPtr host,
                                                              ResourcePriority priority) PURE;
 
+  /**
+   * Allocate a cluster from configuration JSON.
+   */
   virtual ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
                                      const Optional<SdsConfig>& sds_config,
                                      Outlier::EventLoggerPtr outlier_event_logger) PURE;
