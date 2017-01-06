@@ -361,6 +361,6 @@ Http::Code AdminImpl::runCallback(const std::string& path, Buffer::Instance& res
   return code;
 }
 
-const std::string& AdminImpl::localAddress() { return server_.getLocalAddress(); }
+const std::string& AdminImpl::localAddress() { return server_.localInfo().address(); }
 
 } // Server

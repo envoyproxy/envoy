@@ -4,15 +4,11 @@ using testing::_;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
-using testing::ReturnRefOfCopy;
 using testing::SaveArg;
 
 namespace Server {
 
-MockOptions::MockOptions() {
-  ON_CALL(*this, serviceZone()).WillByDefault(ReturnRef(service_zone_));
-}
-
+MockOptions::MockOptions() {}
 MockOptions::~MockOptions() {}
 
 MockAdmin::MockAdmin() {}
@@ -38,7 +34,7 @@ MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, hotRestart()).WillByDefault(ReturnRef(hot_restart_));
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
-  ON_CALL(*this, getLocalAddress()).WillByDefault(ReturnRefOfCopy(std::string("127.0.0.1")));
+  ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
 }
 

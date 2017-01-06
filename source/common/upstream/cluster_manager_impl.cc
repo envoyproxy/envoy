@@ -17,12 +17,10 @@ namespace Upstream {
 ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
                                        Stats::Store& stats, ThreadLocal::Instance& tls,
                                        Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                       const std::string& local_zone_name,
-                                       const std::string& local_address,
+                                       const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls), random_(random),
-      thread_local_slot_(tls.allocateSlot()), local_zone_name_(local_zone_name),
-      local_address_(local_address) {
+      thread_local_slot_(tls.allocateSlot()), local_info_(local_info) {
 
   std::vector<Json::ObjectPtr> clusters = config.getObjectArray("clusters");
   pending_cluster_init_ = clusters.size();
@@ -41,7 +39,7 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
     loadCluster(*config.getObject("sds")->getObject("cluster"), false);
 
     SdsConfig sds_config{
-        local_zone_name, config.getObject("sds")->getObject("cluster")->getString("name"),
+        config.getObject("sds")->getObject("cluster")->getString("name"),
         std::chrono::milliseconds(config.getObject("sds")->getInteger("refresh_delay_ms"))};
 
     sds_config_.value(sds_config);
@@ -328,10 +326,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoPtr cluster)
     : parent_(parent), cluster_info_(cluster),
       http_async_client_(*cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
-                         parent.parent_.local_zone_name_, parent.parent_, parent.parent_.runtime_,
+                         parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
-                         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)},
-                         parent.parent_.local_address_) {
+                         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
 
   switch (cluster->lbType()) {
   case LoadBalancerType::LeastRequest: {
@@ -402,7 +399,7 @@ ProdClusterManagerFactory::clusterFromJson(const Json::Object& cluster, ClusterM
                                            const Optional<SdsConfig>& sds_config,
                                            Outlier::EventLoggerPtr outlier_event_logger) {
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
-                                 runtime_, random_, primary_dispatcher_, sds_config,
+                                 runtime_, random_, primary_dispatcher_, sds_config, local_info_,
                                  outlier_event_logger);
 }
 

@@ -30,8 +30,8 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
               fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
         continue;
       }
-      rate_limit.populateDescriptors(*route, descriptors, config_->localServiceCluster(), headers,
-                                     callbacks_->downstreamAddress());
+      rate_limit.populateDescriptors(*route, descriptors, config_->localInfo().clusterName(),
+                                     headers, callbacks_->downstreamAddress());
     }
 
     if (!descriptors.empty()) {

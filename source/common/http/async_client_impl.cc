@@ -11,14 +11,14 @@ const AsyncRequestImpl::NullShadowPolicy AsyncRequestImpl::RouteEntryImpl::shado
 const AsyncRequestImpl::NullVirtualHost AsyncRequestImpl::RouteEntryImpl::virtual_host_;
 
 AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
-                                 Event::Dispatcher& dispatcher, const std::string& local_zone_name,
+                                 Event::Dispatcher& dispatcher,
+                                 const LocalInfo::LocalInfo& local_info,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random,
-                                 Router::ShadowWriterPtr&& shadow_writer,
-                                 const std::string& local_address)
-    : cluster_(cluster), config_("http.async-client.", local_zone_name, stats_store, cm, runtime,
-                                 random, std::move(shadow_writer), true),
-      dispatcher_(dispatcher), local_address_(local_address) {}
+                                 Router::ShadowWriterPtr&& shadow_writer)
+    : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
+                                 std::move(shadow_writer), true),
+      dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_requests_.empty()) {
@@ -50,7 +50,7 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
   router_.setDecoderFilterCallbacks(*this);
   request_->headers().insertEnvoyInternalRequest().value(
       Headers::get().EnvoyInternalRequestValues.True);
-  request_->headers().insertForwardedFor().value(parent_.local_address_);
+  request_->headers().insertForwardedFor().value(parent_.config_.local_info_.address());
   router_.decodeHeaders(request_->headers(), !request_->body());
   if (!complete_ && request_->body()) {
     router_.decodeData(*request_->body(), true);

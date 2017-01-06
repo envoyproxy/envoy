@@ -4,6 +4,7 @@
 #include "resource_manager_impl.h"
 
 #include "envoy/event/timer.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context_manager.h"
@@ -219,6 +220,7 @@ public:
                            Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                            const Optional<SdsConfig>& sds_config,
+                           const LocalInfo::LocalInfo& local_info,
                            Outlier::EventLoggerPtr outlier_event_logger);
 
   /**

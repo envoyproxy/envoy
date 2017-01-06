@@ -19,8 +19,8 @@ public:
     }
 
     Router::FilterConfigPtr config(new Router::FilterConfig(
-        stat_prefix, server.options().serviceZone(), server.stats(), server.clusterManager(),
-        server.runtime(), server.random(),
+        stat_prefix, server.localInfo(), server.stats(), server.clusterManager(), server.runtime(),
+        server.random(),
         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(server.clusterManager())},
         json_config.getBoolean("dynamic_stats", true)));
 

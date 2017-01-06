@@ -84,7 +84,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("add_user_agent") && config.getBoolean("add_user_agent")) {
-    user_agent_.value(server.options().serviceClusterName());
+    user_agent_.value(server.localInfo().clusterName());
   }
 
   if (config.hasObject("tracing")) {
@@ -199,7 +199,9 @@ HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type
   }
 }
 
-const std::string& HttpConnectionManagerConfig::localAddress() { return server_.getLocalAddress(); }
+const std::string& HttpConnectionManagerConfig::localAddress() {
+  return server_.localInfo().address();
+}
 
 } // Configuration
 } // Server
