@@ -20,7 +20,7 @@ public:
   void body(Buffer::InstancePtr&& body) override { body_ = std::move(body); }
   HeaderMap* trailers() override { return trailers_.get(); }
   void trailers(HeaderMapPtr&& trailers) override { trailers_ = std::move(trailers); }
-  std::string bodyAsString() override;
+  std::string bodyAsString() const override;
 
 protected:
   MessageImpl(HeaderMapPtr&& headers) : headers_(std::move(headers)) {}
