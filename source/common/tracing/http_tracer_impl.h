@@ -12,22 +12,6 @@
 
 namespace Tracing {
 
-#define HTTP_TRACER_STATS(COUNTER)                                                                 \
-  COUNTER(global_switch_off)                                                                       \
-  COUNTER(invalid_request_id)                                                                      \
-  COUNTER(random_sampling)                                                                         \
-  COUNTER(service_forced)                                                                          \
-  COUNTER(client_enabled)                                                                          \
-  COUNTER(doing_tracing)                                                                           \
-  COUNTER(flush)                                                                                   \
-  COUNTER(not_traceable)                                                                           \
-  COUNTER(health_check)                                                                            \
-  COUNTER(traceable)
-
-struct HttpTracerStats {
-  HTTP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
 #define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
   COUNTER(spans_sent)                                                                              \
   COUNTER(timer_flushed)
@@ -38,8 +22,7 @@ struct LightstepTracerStats {
 
 class TracingContextImpl : public TracingContext {
 public:
-  TracingContextImpl(const std::string& service_node, HttpTracer& http_tracer,
-                     const TracingConfig& config);
+  TracingContextImpl(HttpTracer& http_tracer, const TracingConfig& config);
 
   void startSpan(const Http::AccessLog::RequestInfo& request_info,
                  const Http::HeaderMap& request_headers) override;
@@ -48,7 +31,6 @@ public:
                   const Http::HeaderMap* response_headers) override;
 
 private:
-  const std::string service_node_;
   HttpTracer& http_tracer_;
   const TracingConfig& tracing_config_;
   SpanPtr active_span_;
@@ -112,10 +94,7 @@ public:
   SpanPtr startSpan(const std::string& operation_name, SystemTime start_time) override;
 
 private:
-  void populateStats(const Decision& decision);
-
   Runtime::Loader& runtime_;
-  HttpTracerStats stats_;
   TracingDriverPtr driver_;
 };
 
@@ -128,8 +107,8 @@ private:
 class LightStepDriver : public TracingDriver {
 public:
   LightStepDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                  Stats::Store& stats, const std::string& service_node, ThreadLocal::Instance& tls,
-                  Runtime::Loader& runtime, std::unique_ptr<lightstep::TracerOptions> options);
+                  Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                  std::unique_ptr<lightstep::TracerOptions> options);
 
   // Tracer::TracingDriver
   SpanPtr startSpan(const std::string& operation_name, SystemTime start_time) override;
@@ -154,7 +133,6 @@ private:
   Upstream::ClusterManager& cm_;
   Stats::Store& stats_store_;
   LightstepTracerStats tracer_stats_;
-  const std::string service_node_;
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;
   std::unique_ptr<lightstep::TracerOptions> options_;

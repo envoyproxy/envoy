@@ -17,6 +17,7 @@
 
 #include "common/common/linked_object.h"
 #include "common/http/access_log/request_info_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
 
@@ -60,7 +61,12 @@ namespace Http {
   COUNTER(downstream_rq_4xx)                                                                       \
   COUNTER(downstream_rq_5xx)                                                                       \
   TIMER  (downstream_rq_time)                                                                      \
-  COUNTER(failed_generate_uuid)
+  COUNTER(failed_generate_uuid)                                                                    \
+  COUNTER(tracing_random_sampling)                                                                 \
+  COUNTER(tracing_service_forced)                                                                  \
+  COUNTER(tracing_client_enabled)                                                                  \
+  COUNTER(tracing_not_traceable)                                                                   \
+  COUNTER(tracing_health_check)
 // clang-format on
 
 /**
@@ -83,6 +89,7 @@ struct ConnectionManagerStats {
  */
 struct TracingConnectionManagerConfig {
   std::string operation_name_;
+  std::string service_node_;
 };
 
 /**
@@ -338,6 +345,7 @@ private:
     ~ActiveStream();
 
     void chargeStats(HeaderMap& headers);
+    void chargeTracingStats(const Tracing::Decision& tracing_decision);
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     uint64_t connectionId();
@@ -365,6 +373,7 @@ private:
 
     // Tracing::TracingConfig
     virtual const std::string& operationName() const override;
+    virtual const std::string& serviceNode() const override;
 
     // All state for the stream. Put here for readability. We could move this to a bit field
     // eventually if we want.

@@ -20,7 +20,6 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
-#include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
 
@@ -322,6 +321,27 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
   }
 }
 
+void ConnectionManagerImpl::ActiveStream::chargeTracingStats(
+    const Tracing::Decision& tracing_decision) {
+  switch (tracing_decision.reason) {
+  case Tracing::Reason::ClientForced:
+    connection_manager_.stats_.named_.tracing_client_enabled_.inc();
+    break;
+  case Tracing::Reason::HealthCheck:
+    connection_manager_.stats_.named_.tracing_health_check_.inc();
+    break;
+  case Tracing::Reason::NotTraceableRequestId:
+    connection_manager_.stats_.named_.tracing_not_traceable_.inc();
+    break;
+  case Tracing::Reason::Sampling:
+    connection_manager_.stats_.named_.tracing_random_sampling_.inc();
+    break;
+  case Tracing::Reason::ServiceForced:
+    connection_manager_.stats_.named_.tracing_service_forced_.inc();
+    break;
+  }
+}
+
 uint64_t ConnectionManagerImpl::ActiveStream::connectionId() {
   return connection_manager_.read_callbacks_->connection().id();
 }
@@ -404,13 +424,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
   decodeHeaders(nullptr, *request_headers_, end_stream);
 
-  // At this point all filters passed, ready to start span and keep it on ActiveStream.
-  Tracing::Decision decision =
+  Tracing::Decision tracing_decision =
       Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
-  // CHARGE RIGHT STATS
-  if (decision.is_tracing) {
-    tracing_context_.reset(
-        new Tracing::TracingContextImpl("node", connection_manager_.tracer_, *this));
+  chargeTracingStats(tracing_decision);
+
+  if (tracing_decision.is_tracing) {
+    tracing_context_.reset(new Tracing::TracingContextImpl(connection_manager_.tracer_, *this));
     tracing_context_->startSpan(request_info_, *request_headers_);
   }
 }
@@ -663,6 +682,10 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
 
 const std::string& ConnectionManagerImpl::ActiveStream::operationName() const {
   return connection_manager_.config_.tracingConfig().value().operation_name_;
+}
+
+const std::string& ConnectionManagerImpl::ActiveStream::serviceNode() const {
+  return connection_manager_.config_.tracingConfig().value().service_node_;
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::addResetStreamCallback(

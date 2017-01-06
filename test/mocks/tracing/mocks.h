@@ -10,6 +10,7 @@ public:
   ~MockTracingConfig();
 
   MOCK_CONST_METHOD0(operationName, const std::string&());
+  MOCK_CONST_METHOD0(serviceNode, const std::string&());
 };
 
 class MockSpan : public Span {

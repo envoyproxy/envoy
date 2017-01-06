@@ -98,9 +98,8 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
           opts->guid_generator = [&rand]() { return rand.random(); };
 
           http_tracer_->initializeDriver(Tracing::TracingDriverPtr{new Tracing::LightStepDriver(
-              *sink->getObject("config"), *cluster_manager_, server_.stats(),
-              server_.options().serviceNodeName(), server_.threadLocal(), server_.runtime(),
-              std::move(opts))});
+              *sink->getObject("config"), *cluster_manager_, server_.stats(), server_.threadLocal(),
+              server_.runtime(), std::move(opts))});
         } else {
           throw EnvoyException(fmt::format("unsupported sink type: '{}'", type));
         }

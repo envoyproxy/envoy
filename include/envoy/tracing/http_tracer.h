@@ -14,6 +14,7 @@ public:
   virtual ~TracingConfig() {}
 
   virtual const std::string& operationName() const PURE;
+  virtual const std::string& serviceNode() const PURE;
 };
 
 /*

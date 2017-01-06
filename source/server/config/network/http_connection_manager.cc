@@ -89,7 +89,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
 
   if (config.hasObject("tracing")) {
     const std::string operation_name = config.getObject("tracing")->getString("operation_name");
-    tracing_config_.value({operation_name});
+    tracing_config_.value({operation_name, server_.options().serviceNodeName()});
   }
 
   if (config.hasObject("idle_timeout_s")) {

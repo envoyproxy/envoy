@@ -98,9 +98,7 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
   throw std::invalid_argument("Unknown trace_status");
 }
 
-HttpTracerImpl::HttpTracerImpl(Runtime::Loader& runtime, Stats::Store& stats)
-    : runtime_(runtime),
-      stats_{HTTP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.http_tracer."))} {}
+HttpTracerImpl::HttpTracerImpl(Runtime::Loader& runtime, Stats::Store&) : runtime_(runtime) {}
 
 void HttpTracerImpl::initializeDriver(TracingDriverPtr&& driver) { driver_ = std::move(driver); }
 
@@ -108,29 +106,8 @@ SpanPtr HttpTracerImpl::startSpan(const std::string& operation_name, SystemTime 
   return driver_->startSpan(operation_name, start_time);
 }
 
-void HttpTracerImpl::populateStats(const Decision& decision) {
-  switch (decision.reason) {
-  case Reason::ClientForced:
-    stats_.client_enabled_.inc();
-    break;
-  case Reason::HealthCheck:
-    stats_.health_check_.inc();
-    break;
-  case Reason::NotTraceableRequestId:
-    stats_.not_traceable_.inc();
-    break;
-  case Reason::Sampling:
-    stats_.random_sampling_.inc();
-    break;
-  case Reason::ServiceForced:
-    stats_.service_forced_.inc();
-    break;
-  }
-}
-
-TracingContextImpl::TracingContextImpl(const std::string& service_node, HttpTracer& http_tracer,
-                                       const TracingConfig& config)
-    : service_node_(service_node), http_tracer_(http_tracer), tracing_config_(config) {}
+TracingContextImpl::TracingContextImpl(HttpTracer& http_tracer, const TracingConfig& config)
+    : http_tracer_(http_tracer), tracing_config_(config) {}
 
 void TracingContextImpl::startSpan(const Http::AccessLog::RequestInfo& request_info,
                                    const Http::HeaderMap& request_headers) {
@@ -145,7 +122,7 @@ void TracingContextImpl::startSpan(const Http::AccessLog::RequestInfo& request_i
     active_span_->setTag("downstream cluster",
                          valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-"));
     active_span_->setTag("user_agent", valueOrDefault(request_headers.UserAgent(), "-"));
-    active_span_->setTag("node_id", service_node_);
+    active_span_->setTag("node_id", tracing_config_.serviceNode());
 
     if (request_headers.ClientTraceId()) {
       active_span_->setTag("guid:x-client-trace-id",
@@ -251,14 +228,12 @@ LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer
 
 LightStepDriver::LightStepDriver(const Json::Object& config,
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
-                                 const std::string& service_node, ThreadLocal::Instance& tls,
-                                 Runtime::Loader& runtime,
+                                 ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                                  std::unique_ptr<lightstep::TracerOptions> options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
       stats_store_(stats),
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
-      service_node_(service_node), tls_(tls), runtime_(runtime), options_(std::move(options)),
-      tls_slot_(tls.allocateSlot()) {
+      tls_(tls), runtime_(runtime), options_(std::move(options)), tls_slot_(tls.allocateSlot()) {
   if (!cm_.get(collector_cluster_)) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
                                      collector_cluster_));
