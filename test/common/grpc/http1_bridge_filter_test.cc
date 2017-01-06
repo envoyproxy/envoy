@@ -7,6 +7,7 @@
 #include "test/test_common/utility.h"
 
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnPointee;
 
 namespace Grpc {
@@ -117,6 +118,9 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingNormalResponse) {
   Http::TestHeaderMapImpl request_trailers{{"hello", "world"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 
+  Buffer::OwnedImpl buffer("hello");
+  ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer));
+
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.encodeHeaders(response_headers, false));
@@ -124,6 +128,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingNormalResponse) {
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   EXPECT_EQ("200", response_headers.get_(":status"));
+  EXPECT_EQ("5", response_headers.get_("content-length"));
   EXPECT_EQ("0", response_headers.get_("grpc-status"));
 }
 
@@ -143,6 +148,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "1"}, {"grpc-message", "foo"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   EXPECT_EQ("503", response_headers.get_(":status"));
+  EXPECT_EQ("0", response_headers.get_("content-length"));
   EXPECT_EQ("1", response_headers.get_("grpc-status"));
   EXPECT_EQ("foo", response_headers.get_("grpc-message"));
 }
