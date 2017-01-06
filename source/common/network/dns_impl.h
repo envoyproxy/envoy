@@ -20,15 +20,18 @@ public:
   ~DnsResolverImpl();
 
   // Network::DnsResolver
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  void resolve(const std::string& dns_name, ResolveCb callback) override;
+  ActiveDnsQuery& resolve(const std::string& dns_name, ResolveCb callback) override;
 
 private:
-  struct PendingResolution : LinkedObject<PendingResolution> {
+  struct PendingResolution : LinkedObject<PendingResolution>, public ActiveDnsQuery {
+    // Network::ActiveDnsQuery
+    void cancel() override { cancelled_ = true; }
+
     std::string host_;
     addrinfo hints_;
     gaicb async_cb_data_;
     ResolveCb callback_;
+    bool cancelled_{};
   };
 
   typedef std::unique_ptr<PendingResolution> PendingResolutionPtr;

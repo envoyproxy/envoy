@@ -16,9 +16,9 @@ class LogicalDnsClusterTest : public testing::Test {
 public:
   void setup(const std::string& json) {
     Json::ObjectPtr config = Json::Factory::LoadFromString(json);
-    resolve_timer_ = new Event::MockTimer(&dns_resolver_.dispatcher_);
+    resolve_timer_ = new Event::MockTimer(&dispatcher_);
     cluster_.reset(new LogicalDnsCluster(*config, runtime_, stats_store_, ssl_context_manager_,
-                                         dns_resolver_, tls_));
+                                         dns_resolver_, tls_, dispatcher_));
     cluster_->addMemberUpdateCb([&](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
                                     -> void { membership_updated_.ready(); });
     cluster_->setInitializedCb([&]() -> void { initialized_.ready(); });
@@ -27,12 +27,16 @@ public:
   void expectResolve() {
     EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", _))
         .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                             -> void { dns_callback_ = cb; }));
+                             -> Network::ActiveDnsQuery& {
+                               dns_callback_ = cb;
+                               return active_dns_query_;
+                             }));
   }
 
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Network::MockDnsResolver> dns_resolver_;
+  Network::MockActiveDnsQuery active_dns_query_;
   Network::DnsResolver::ResolveCb dns_callback_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;
@@ -40,6 +44,7 @@ public:
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 TEST_F(LogicalDnsClusterTest, BadConfig) {
@@ -83,8 +88,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ(cluster_->hosts()[0], cluster_->healthyHosts()[0]);
   HostPtr logical_host = cluster_->hosts()[0];
 
-  EXPECT_CALL(dns_resolver_.dispatcher_, createClientConnection_("tcp://127.0.0.1:443"));
-  logical_host->createConnection(dns_resolver_.dispatcher_);
+  EXPECT_CALL(dispatcher_, createClientConnection_("tcp://127.0.0.1:443"));
+  logical_host->createConnection(dispatcher_);
   logical_host->outlierDetector().putHttpResponseCode(200);
 
   expectResolve();
@@ -95,8 +100,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   dns_callback_({"127.0.0.1", "127.0.0.2", "127.0.0.3"});
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
-  EXPECT_CALL(dns_resolver_.dispatcher_, createClientConnection_("tcp://127.0.0.1:443"));
-  Host::CreateConnectionData data = logical_host->createConnection(dns_resolver_.dispatcher_);
+  EXPECT_CALL(dispatcher_, createClientConnection_("tcp://127.0.0.1:443"));
+  Host::CreateConnectionData data = logical_host->createConnection(dispatcher_);
   EXPECT_FALSE(data.host_description_->canary());
   EXPECT_EQ(&cluster_->hosts()[0]->cluster(), &data.host_description_->cluster());
   EXPECT_EQ(&cluster_->hosts()[0]->stats(), &data.host_description_->stats());
@@ -112,8 +117,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   dns_callback_({"127.0.0.3", "127.0.0.1", "127.0.0.2"});
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
-  EXPECT_CALL(dns_resolver_.dispatcher_, createClientConnection_("tcp://127.0.0.3:443"));
-  logical_host->createConnection(dns_resolver_.dispatcher_);
+  EXPECT_CALL(dispatcher_, createClientConnection_("tcp://127.0.0.3:443"));
+  logical_host->createConnection(dispatcher_);
 
   expectResolve();
   resolve_timer_->callback_();
@@ -123,10 +128,14 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   dns_callback_({});
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
-  EXPECT_CALL(dns_resolver_.dispatcher_, createClientConnection_("tcp://127.0.0.3:443"));
-  logical_host->createConnection(dns_resolver_.dispatcher_);
+  EXPECT_CALL(dispatcher_, createClientConnection_("tcp://127.0.0.3:443"));
+  logical_host->createConnection(dispatcher_);
 
-  cluster_->shutdown();
+  // Make sure we cancel.
+  EXPECT_CALL(active_dns_query_, cancel());
+  expectResolve();
+  resolve_timer_->callback_();
+
   tls_.shutdownThread();
 }
 

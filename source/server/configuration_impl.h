@@ -111,6 +111,7 @@ private:
   }
 
   Server::Instance& server_;
+  std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   Tracing::HttpTracerPtr http_tracer_;
   std::list<Server::Configuration::ListenerPtr> listeners_;

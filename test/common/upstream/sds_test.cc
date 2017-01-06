@@ -38,6 +38,7 @@ protected:
     timer_ = new Event::MockTimer(&dispatcher_);
     cluster_.reset(new SdsClusterImpl(*config, runtime_, stats_, ssl_context_manager_, sds_config_,
                                       cm_, dispatcher_, random_));
+    EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
   HostPtr findHost(const std::string& address) {
@@ -98,7 +99,7 @@ TEST_F(SdsTest, Shutdown) {
   setupRequest();
   cluster_->initialize();
   EXPECT_CALL(request_, cancel());
-  cluster_->shutdown();
+  cluster_.reset();
 }
 
 TEST_F(SdsTest, PoolFailure) {
