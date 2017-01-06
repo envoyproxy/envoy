@@ -22,6 +22,7 @@ MockRetryState::~MockRetryState() {}
 MockRateLimitPolicyEntry::MockRateLimitPolicyEntry() {
   ON_CALL(*this, routeKey()).WillByDefault(ReturnRef(route_key_));
 }
+
 MockRateLimitPolicyEntry::~MockRateLimitPolicyEntry() {}
 
 MockRateLimitPolicy::MockRateLimitPolicy() {
@@ -32,6 +33,12 @@ MockRateLimitPolicy::~MockRateLimitPolicy() {}
 
 MockShadowWriter::MockShadowWriter() {}
 MockShadowWriter::~MockShadowWriter() {}
+
+MockVirtualHost::MockVirtualHost() {
+  ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
+}
+
+MockVirtualHost::~MockVirtualHost() {}
 
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));

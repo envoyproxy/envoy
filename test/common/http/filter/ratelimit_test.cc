@@ -42,7 +42,11 @@ public:
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
     filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.rate_limit_policy_entry_
-        .emplace_back(rate_limit_policy_entry_);
+        .emplace_back(route_rate_limit_policy_entry_);
+    filter_callbacks_.route_table_.route_entry_.virtual_host_.rate_limit_policy_
+        .rate_limit_policy_entry_.clear();
+    filter_callbacks_.route_table_.route_entry_.virtual_host_.rate_limit_policy_
+        .rate_limit_policy_entry_.emplace_back(vh_rate_limit_policy_entry_);
   }
 
   const std::string filter_config = R"EOF(
@@ -61,7 +65,8 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Router::MockRateLimitPolicyEntry> rate_limit_policy_entry_;
+  NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit_policy_entry_;
+  NiceMock<Router::MockRateLimitPolicyEntry> vh_rate_limit_policy_entry_;
   std::vector<::RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
@@ -114,6 +119,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_CALL(rate_limit_policy_entry_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
+  EXPECT_CALL(filter_callbacks_.route_table_.)
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                             {{{"descriptor_key", "descriptor_value"}}}}),
                               "requestid"))
