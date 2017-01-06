@@ -84,7 +84,7 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
     }
 
     // Since we are buffering, set content-length so that HTTP/1.1 callers can better determine
-    // if this is a complete request.
+    // if this is a complete response.
     response_headers_->insertContentLength().value(
         encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
   }
