@@ -2,6 +2,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
@@ -160,9 +161,9 @@ public:
   virtual ThreadLocal::Instance& threadLocal() PURE;
 
   /**
-   * @return the local IP address of the server
+   * @return information about the local environment the server is running in.
    */
-  virtual const std::string& getLocalAddress() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() PURE;
 };
 
 } // Server

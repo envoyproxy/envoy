@@ -82,6 +82,11 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
     if (grpc_message_header) {
       response_headers_->insertGrpcMessage().value(*grpc_message_header);
     }
+
+    // Since we are buffering, set content-length so that HTTP/1.1 callers can better determine
+    // if this is a complete response.
+    response_headers_->insertContentLength().value(
+        encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
   }
 
   // NOTE: We will still write the trailers, but the HTTP/1.1 codec will just eat them and end

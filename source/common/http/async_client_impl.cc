@@ -8,18 +8,23 @@ const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
 const AsyncRequestImpl::NullRateLimitPolicy AsyncRequestImpl::RouteEntryImpl::rate_limit_policy_;
 const AsyncRequestImpl::NullRetryPolicy AsyncRequestImpl::RouteEntryImpl::retry_policy_;
 const AsyncRequestImpl::NullShadowPolicy AsyncRequestImpl::RouteEntryImpl::shadow_policy_;
+const AsyncRequestImpl::NullVirtualHost AsyncRequestImpl::RouteEntryImpl::virtual_host_;
 
 AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
-                                 Event::Dispatcher& dispatcher, const std::string& local_zone_name,
+                                 Event::Dispatcher& dispatcher,
+                                 const LocalInfo::LocalInfo& local_info,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random,
-                                 Router::ShadowWriterPtr&& shadow_writer,
-                                 const std::string& local_address)
-    : cluster_(cluster), config_("http.async-client.", local_zone_name, stats_store, cm, runtime,
-                                 random, std::move(shadow_writer), true),
-      dispatcher_(dispatcher), local_address_(local_address) {}
+                                 Router::ShadowWriterPtr&& shadow_writer)
+    : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
+                                 std::move(shadow_writer), true),
+      dispatcher_(dispatcher) {}
 
-AsyncClientImpl::~AsyncClientImpl() { ASSERT(active_requests_.empty()); }
+AsyncClientImpl::~AsyncClientImpl() {
+  while (!active_requests_.empty()) {
+    active_requests_.front()->failDueToClientDestroy();
+  }
+}
 
 AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
                                             const Optional<std::chrono::milliseconds>& timeout) {
@@ -45,7 +50,7 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
   router_.setDecoderFilterCallbacks(*this);
   request_->headers().insertEnvoyInternalRequest().value(
       Headers::get().EnvoyInternalRequestValues.True);
-  request_->headers().insertForwardedFor().value(parent_.local_address_);
+  request_->headers().insertForwardedFor().value(parent_.config_.local_info_.address());
   router_.decodeHeaders(request_->headers(), !request_->body());
   if (!complete_ && request_->body()) {
     router_.decodeData(*request_->body(), true);
@@ -120,6 +125,14 @@ void AsyncRequestImpl::cleanup() {
 
 void AsyncRequestImpl::resetStream() {
   // In this case we don't have a valid response so we do need to raise a failure.
+  callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+  cleanup();
+}
+
+void AsyncRequestImpl::failDueToClientDestroy() {
+  // In this case we are going away because the client is being destroyed. We need to both reset
+  // the stream as well as raise a failure callback.
+  reset_callback_();
   callbacks_.onFailure(AsyncClient::FailureReason::Reset);
   cleanup();
 }

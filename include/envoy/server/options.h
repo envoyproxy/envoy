@@ -51,21 +51,6 @@ public:
   virtual uint64_t restartEpoch() PURE;
 
   /**
-   * @return const std::string& the service cluster name where the server is running.
-   */
-  virtual const std::string& serviceClusterName() PURE;
-
-  /**
-   * @return const std::string& the service node name where the server is running.
-   */
-  virtual const std::string& serviceNodeName() PURE;
-
-  /**
-   * @return const std::string& the service zone where the server is running.
-   */
-  virtual const std::string& serviceZone() PURE;
-
-  /**
     * @return std::chrono::milliseconds the duration in msec between log flushes.
     */
   virtual std::chrono::milliseconds fileFlushIntervalMsec() PURE;

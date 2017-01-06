@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
 
@@ -15,14 +16,13 @@ namespace RateLimit {
  */
 class FilterConfig {
 public:
-  FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
+  FilterConfig(const Json::Object& config, const LocalInfo::LocalInfo& local_info,
                Stats::Store& stats_store, Runtime::Loader& runtime)
       : domain_(config.getString("domain")), stage_(config.getInteger("stage", 0)),
-        local_service_cluster_(local_service_cluster), stats_store_(stats_store),
-        runtime_(runtime) {}
+        local_info_(local_info), stats_store_(stats_store), runtime_(runtime) {}
 
   const std::string& domain() const { return domain_; }
-  const std::string& localServiceCluster() const { return local_service_cluster_; }
+  const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   int64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Store& stats() { return stats_store_; }
@@ -30,7 +30,7 @@ public:
 private:
   const std::string domain_;
   int64_t stage_;
-  const std::string local_service_cluster_;
+  const LocalInfo::LocalInfo& local_info_;
   Stats::Store& stats_store_;
   Runtime::Loader& runtime_;
 };

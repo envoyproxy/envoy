@@ -3,6 +3,7 @@
 
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -39,7 +40,7 @@ class RouterTest : public testing::Test {
 public:
   RouterTest()
       : shadow_writer_(new MockShadowWriter()),
-        config_("test.", "from_az", stats_store_, cm_, runtime_, random_,
+        config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
@@ -67,6 +68,7 @@ public:
   Http::ConnectionPool::MockCancellable cancellable_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   MockShadowWriter* shadow_writer_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   FilterConfig config_;
   TestFilter router_;
   Event::MockTimer* response_timeout_{};
@@ -597,10 +599,10 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.retry.upstream_rq_503").value());
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.upstream_rq_200").value());
-  EXPECT_EQ(
-      1U, stats_store_.counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_200").value());
-  EXPECT_EQ(
-      1U, stats_store_.counter("cluster.fake_cluster.zone.from_az.to_az.upstream_rq_2xx").value());
+  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.zone.zone_name.to_az.upstream_rq_200")
+                    .value());
+  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.zone.zone_name.to_az.upstream_rq_2xx")
+                    .value());
 }
 
 TEST_F(RouterTest, Shadow) {
@@ -678,12 +680,12 @@ TEST_F(RouterTest, AltStatName) {
                 .value());
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
   EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.alt_stat.upstream_rq_200").value());
-  EXPECT_EQ(1U,
-            stats_store_.counter("cluster.fake_cluster.alt_stat.zone.from_az.to_az.upstream_rq_200")
-                .value());
-  EXPECT_EQ(1U,
-            stats_store_.counter("cluster.fake_cluster.alt_stat.zone.from_az.to_az.upstream_rq_200")
-                .value());
+  EXPECT_EQ(
+      1U, stats_store_.counter("cluster.fake_cluster.alt_stat.zone.zone_name.to_az.upstream_rq_200")
+              .value());
+  EXPECT_EQ(
+      1U, stats_store_.counter("cluster.fake_cluster.alt_stat.zone.zone_name.to_az.upstream_rq_200")
+              .value());
 }
 
 TEST_F(RouterTest, Redirect) {

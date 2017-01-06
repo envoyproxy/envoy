@@ -2,11 +2,20 @@
 
 #include "envoy/common/pure.h"
 
-namespace Event {
-class Dispatcher;
-}
-
 namespace Network {
+
+/**
+ * An active async DNS query.
+ */
+class ActiveDnsQuery {
+public:
+  virtual ~ActiveDnsQuery() {}
+
+  /**
+   * Cancel an outstanding DNS request.
+   */
+  virtual void cancel() PURE;
+};
 
 /**
  * An asynchronous DNS resolver.
@@ -14,11 +23,6 @@ namespace Network {
 class DnsResolver {
 public:
   virtual ~DnsResolver() {}
-
-  /**
-   * @return Event::Dispatcher& the dispatcher backing the resolver.
-   */
-  virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
    * Called when a resolution attempt is complete.
@@ -31,8 +35,9 @@ public:
    * Initiate an async DNS resolution.
    * @param dns_name supplies the DNS name to lookup.
    * @param callback supplies the callback to invoke when the resolution is complete.
+   * @return a handle that can be used to cancel the resolution.
    */
-  virtual void resolve(const std::string& dns_name, ResolveCb callback) PURE;
+  virtual ActiveDnsQuery& resolve(const std::string& dns_name, ResolveCb callback) PURE;
 };
 
 typedef std::unique_ptr<DnsResolver> DnsResolverPtr;

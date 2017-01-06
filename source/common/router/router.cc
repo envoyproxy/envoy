@@ -108,15 +108,15 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
 
     Http::CodeUtility::ResponseStatInfo info{
         config_.stats_store_, cluster_->statPrefix(), response_headers, internal_request,
-        route_->virtualHostName(), request_vcluster_ ? request_vcluster_->name() : "",
-        config_.service_zone_, upstreamZone(upstream_host), is_canary};
+        route_->virtualHost().name(), request_vcluster_ ? request_vcluster_->name() : "",
+        config_.local_info_.zoneName(), upstreamZone(upstream_host), is_canary};
 
     Http::CodeUtility::chargeResponseStat(info);
 
     for (const std::string& alt_prefix : alt_stat_prefixes_) {
-      Http::CodeUtility::ResponseStatInfo info{config_.stats_store_, alt_prefix, response_headers,
-                                               internal_request, "", "", config_.service_zone_,
-                                               upstreamZone(upstream_host), is_canary};
+      Http::CodeUtility::ResponseStatInfo info{
+          config_.stats_store_, alt_prefix, response_headers, internal_request, "", "",
+          config_.local_info_.zoneName(), upstreamZone(upstream_host), is_canary};
 
       Http::CodeUtility::chargeResponseStat(info);
     }
@@ -480,17 +480,17 @@ void Filter::onUpstreamComplete() {
 
     Http::CodeUtility::ResponseTimingInfo info{
         config_.stats_store_, cluster_->statPrefix(), response_time,
-        upstream_request_->upstream_canary_, internal_request, route_->virtualHostName(),
-        request_vcluster_ ? request_vcluster_->name() : "", config_.service_zone_,
+        upstream_request_->upstream_canary_, internal_request, route_->virtualHost().name(),
+        request_vcluster_ ? request_vcluster_->name() : "", config_.local_info_.zoneName(),
         upstreamZone(upstream_request_->upstream_host_)};
 
     Http::CodeUtility::chargeResponseTiming(info);
 
     for (const std::string& alt_prefix : alt_stat_prefixes_) {
-      Http::CodeUtility::ResponseTimingInfo info{config_.stats_store_, alt_prefix, response_time,
-                                                 upstream_request_->upstream_canary_,
-                                                 internal_request, "", "", config_.service_zone_,
-                                                 upstreamZone(upstream_request_->upstream_host_)};
+      Http::CodeUtility::ResponseTimingInfo info{
+          config_.stats_store_, alt_prefix, response_time, upstream_request_->upstream_canary_,
+          internal_request, "", "", config_.local_info_.zoneName(),
+          upstreamZone(upstream_request_->upstream_host_)};
 
       Http::CodeUtility::chargeResponseTiming(info);
     }

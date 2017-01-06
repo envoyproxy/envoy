@@ -1,3 +1,6 @@
+#include "health_checker_impl.h"
+#include "logical_dns_cluster.h"
+#include "sds.h"
 #include "upstream_impl.h"
 
 #include "envoy/event/dispatcher.h"
@@ -67,13 +70,6 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
     Ssl::ContextConfigImpl context_config(*config.getObject("ssl_context"));
     ssl_ctx_ = &ssl_context_manager.createSslClientContext(stat_prefix_, stats, context_config);
   }
-}
-
-const ConstHostListsPtr ClusterImplBase::empty_host_lists_{new std::vector<std::vector<HostPtr>>()};
-
-ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime,
-                                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
-    : runtime_(runtime), info_(new ClusterInfoImpl(config, runtime, stats, ssl_context_manager)) {
 
   std::string string_lb_type = config.getString("lb_type");
   if (string_lb_type == "round_robin") {
@@ -86,6 +82,61 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& ru
     throw EnvoyException(fmt::format("cluster: unknown LB type '{}'", string_lb_type));
   }
 }
+
+const ConstHostListsPtr ClusterImplBase::empty_host_lists_{new std::vector<std::vector<HostPtr>>()};
+
+ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& cm,
+                                   Stats::Store& stats, ThreadLocal::Instance& tls,
+                                   Network::DnsResolver& dns_resolver,
+                                   Ssl::ContextManager& ssl_context_manager,
+                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                   Event::Dispatcher& dispatcher,
+                                   const Optional<SdsConfig>& sds_config,
+                                   const LocalInfo::LocalInfo& local_info,
+                                   Outlier::EventLoggerPtr outlier_event_logger) {
+  std::unique_ptr<ClusterImplBase> new_cluster;
+  std::string string_type = cluster.getString("type");
+  if (string_type == "static") {
+    new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager));
+  } else if (string_type == "strict_dns") {
+    new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
+                                               dns_resolver, dispatcher));
+  } else if (string_type == "logical_dns") {
+    new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager,
+                                            dns_resolver, tls, dispatcher));
+  } else if (string_type == "sds") {
+    if (!sds_config.valid()) {
+      throw EnvoyException("cannot create an sds cluster without an sds config");
+    }
+
+    new_cluster.reset(new SdsClusterImpl(cluster, runtime, stats, ssl_context_manager,
+                                         sds_config.value(), local_info, cm, dispatcher, random));
+  } else {
+    throw EnvoyException(fmt::format("cluster: unknown cluster type '{}'", string_type));
+  }
+
+  if (cluster.hasObject("health_check")) {
+    Json::ObjectPtr health_check_config = cluster.getObject("health_check");
+    std::string hc_type = health_check_config->getString("type");
+    if (hc_type == "http") {
+      new_cluster->setHealthChecker(HealthCheckerPtr{new ProdHttpHealthCheckerImpl(
+          *new_cluster, *health_check_config, dispatcher, stats, runtime, random)});
+    } else if (hc_type == "tcp") {
+      new_cluster->setHealthChecker(HealthCheckerPtr{new TcpHealthCheckerImpl(
+          *new_cluster, *health_check_config, dispatcher, stats, runtime, random)});
+    } else {
+      throw EnvoyException(fmt::format("cluster: unknown health check type '{}'", hc_type));
+    }
+  }
+
+  new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
+      *new_cluster, cluster, dispatcher, runtime, stats, outlier_event_logger));
+  return std::move(new_cluster);
+}
+
+ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime,
+                                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
+    : runtime_(runtime), info_(new ClusterInfoImpl(config, runtime, stats, ssl_context_manager)) {}
 
 ConstHostVectorPtr ClusterImplBase::createHealthyHostList(const std::vector<HostPtr>& hosts) {
   HostVectorPtr healthy_list(new std::vector<HostPtr>());
@@ -156,8 +207,7 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
     // If we get a health check completion that resulted in a state change, signal to
     // update the host sets on all threads.
     if (changed_state) {
-      updateHosts(rawHosts(), createHealthyHostList(*rawHosts()), rawHostsPerZone(),
-                  createHealthyHostLists(*rawHostsPerZone()), {}, {});
+      reloadHealthyHosts();
     }
   });
 }
@@ -168,10 +218,14 @@ void ClusterImplBase::setOutlierDetector(Outlier::DetectorPtr outlier_detector) 
   }
 
   outlier_detector_ = std::move(outlier_detector);
-  outlier_detector_->addChangedStateCb([this](HostPtr) -> void {
-    updateHosts(rawHosts(), createHealthyHostList(*rawHosts()), rawHostsPerZone(),
-                createHealthyHostLists(*rawHostsPerZone()), {}, {});
-  });
+  outlier_detector_->addChangedStateCb([this](HostPtr) -> void { reloadHealthyHosts(); });
+}
+
+void ClusterImplBase::reloadHealthyHosts() {
+  ConstHostVectorPtr hosts_copy(new std::vector<HostPtr>(hosts()));
+  ConstHostListsPtr hosts_per_zone_copy(new std::vector<std::vector<HostPtr>>(hostsPerZone()));
+  updateHosts(hosts_copy, createHealthyHostList(hosts()), hosts_per_zone_copy,
+              createHealthyHostLists(hostsPerZone()), {}, {});
 }
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(const Json::Object& config,
@@ -295,12 +349,13 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
 StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
                                            Stats::Store& stats,
                                            Ssl::ContextManager& ssl_context_manager,
-                                           Network::DnsResolver& dns_resolver)
+                                           Network::DnsResolver& dns_resolver,
+                                           Event::Dispatcher& dispatcher)
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
       dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
                                        config.getInteger("dns_refresh_rate_ms", 5000))) {
   for (Json::ObjectPtr& host : config.getObjectArray("hosts")) {
-    resolve_targets_.emplace_back(new ResolveTarget(*this, host->getString("url")));
+    resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, host->getString("url")));
   }
 }
 
@@ -319,22 +374,28 @@ void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostPtr>& hosts_adde
 }
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,
+                                                   Event::Dispatcher& dispatcher,
                                                    const std::string& url)
     : parent_(parent), dns_address_(Network::Utility::hostFromUrl(url)),
       port_(Network::Utility::portFromUrl(url)),
-      resolve_timer_(
-          parent_.dns_resolver_.dispatcher().createTimer([this]() -> void { startResolve(); })) {
+      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
 
   startResolve();
+}
+
+StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
+  if (active_query_) {
+    active_query_->cancel();
+  }
 }
 
 void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   log_debug("starting async DNS resolution for {}", dns_address_);
   parent_.info_->stats().update_attempt_.inc();
 
-  parent_.dns_resolver_.resolve(
+  active_query_ = &parent_.dns_resolver_.resolve(
       dns_address_, [this](std::list<std::string>&& address_list) -> void {
-
+        active_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 

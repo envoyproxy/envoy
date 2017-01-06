@@ -53,6 +53,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke([this](ResourcePriority)
                                 -> Upstream::ResourceManager& { return *resource_manager_; }));
+  ON_CALL(*this, lbType()).WillByDefault(Return(Upstream::LoadBalancerType::RoundRobin));
 }
 
 MockClusterInfo::~MockClusterInfo() {}
@@ -65,7 +66,11 @@ MockCluster::MockCluster() {
   ON_CALL(*this, hostsPerZone()).WillByDefault(ReturnRef(hosts_per_zone_));
   ON_CALL(*this, healthyHostsPerZone()).WillByDefault(ReturnRef(healthy_hosts_per_zone_));
   ON_CALL(*this, info()).WillByDefault(Return(info_));
-  ON_CALL(*this, lbType()).WillByDefault(Return(Upstream::LoadBalancerType::RoundRobin));
+  ON_CALL(*this, setInitializedCb(_))
+      .WillByDefault(Invoke([this](std::function<void()> callback) -> void {
+        EXPECT_EQ(nullptr, initialize_callback_);
+        initialize_callback_ = callback;
+      }));
 }
 
 MockCluster::~MockCluster() {}

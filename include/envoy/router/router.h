@@ -120,6 +120,19 @@ public:
   virtual Upstream::ResourcePriority priority() const PURE;
 };
 
+/**
+ * Virtual host defintion.
+ */
+class VirtualHost {
+public:
+  virtual ~VirtualHost() {}
+
+  /**
+   * @return const std::string& the name of the virtual host.
+   */
+  virtual const std::string& name() const PURE;
+};
+
 class RateLimitPolicy;
 
 /**
@@ -177,9 +190,9 @@ public:
   virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
 
   /**
-   * @return const std::string& the virtual host that owns the route.
+   * @return const VirtualHost& the virtual host that owns the route.
    */
-  virtual const std::string& virtualHostName() const PURE;
+  virtual const VirtualHost& virtualHost() const PURE;
 };
 
 /**

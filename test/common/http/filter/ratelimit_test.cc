@@ -5,6 +5,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
@@ -34,7 +35,7 @@ public:
 
   void SetUpTest(const std::string json) {
     Json::ObjectPtr config = Json::Factory::LoadFromString(json);
-    config_.reset(new FilterConfig(*config, "service_cluster", stats_store_, runtime_));
+    config_.reset(new FilterConfig(*config, local_info_, stats_store_, runtime_));
 
     client_ = new ::RateLimit::MockClient();
     filter_.reset(new Filter(config_, ::RateLimit::ClientPtr{client_}));
@@ -61,6 +62,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Router::MockRateLimitPolicyEntry> rate_limit_policy_entry_;
   std::vector<::RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 TEST_F(HttpRateLimitFilterTest, NoRoute) {

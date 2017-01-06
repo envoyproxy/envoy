@@ -84,12 +84,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("add_user_agent") && config.getBoolean("add_user_agent")) {
-    user_agent_.value(server.options().serviceClusterName());
+    user_agent_.value(server.localInfo().clusterName());
   }
 
   if (config.hasObject("tracing")) {
     const std::string operation_name = config.getObject("tracing")->getString("operation_name");
-    tracing_config_.value({operation_name, server_.options().serviceNodeName()});
+    tracing_config_.value({operation_name, server_.localInfo().serviceNode()});
   }
 
   if (config.hasObject("idle_timeout_s")) {
@@ -188,7 +188,9 @@ HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type
   }
 }
 
-const std::string& HttpConnectionManagerConfig::localAddress() { return server_.getLocalAddress(); }
+const std::string& HttpConnectionManagerConfig::localAddress() {
+  return server_.localInfo().address();
+}
 
 } // Configuration
 } // Server

@@ -12,7 +12,6 @@
 #include "common/network/listener_impl.h"
 #include "common/ssl/connection_impl.h"
 
-#include "event2/bufferevent_ssl.h"
 #include "event2/event.h"
 
 namespace Event {
