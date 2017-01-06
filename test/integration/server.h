@@ -26,18 +26,12 @@ public:
   spdlog::level::level_enum logLevel() override { NOT_IMPLEMENTED; }
   std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(0); }
   uint64_t restartEpoch() override { return 0; }
-  const std::string& serviceClusterName() override { return cluster_name_; }
-  const std::string& serviceNodeName() override { return node_name_; }
-  const std::string& serviceZone() override { return zone_name_; }
   std::chrono::milliseconds fileFlushIntervalMsec() override {
     return std::chrono::milliseconds(10000);
   }
 
 private:
   const std::string config_path_;
-  const std::string cluster_name_{"cluster_name"};
-  const std::string node_name_{"node_name"};
-  const std::string zone_name_{"zone_name"};
 };
 
 class TestDrainManager : public DrainManager {

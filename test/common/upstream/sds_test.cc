@@ -3,6 +3,7 @@
 #include "common/network/utility.h"
 #include "common/upstream/sds.h"
 
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -20,9 +21,7 @@ namespace Upstream {
 
 class SdsTest : public testing::Test {
 protected:
-  SdsTest()
-      : sds_config_{"us-east-1a", "sds", std::chrono::milliseconds(30000)},
-        request_(&cm_.async_client_) {
+  SdsTest() : sds_config_{"sds", std::chrono::milliseconds(30000)}, request_(&cm_.async_client_) {
     std::string raw_config = R"EOF(
     {
       "name": "name",
@@ -36,8 +35,9 @@ protected:
     Json::ObjectPtr config = Json::Factory::LoadFromString(raw_config);
 
     timer_ = new Event::MockTimer(&dispatcher_);
+    local_info_.zone_name_ = "us-east-1a";
     cluster_.reset(new SdsClusterImpl(*config, runtime_, stats_, ssl_context_manager_, sds_config_,
-                                      cm_, dispatcher_, random_));
+                                      local_info_, cm_, dispatcher_, random_));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
@@ -93,6 +93,7 @@ protected:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::MockAsyncClientRequest request_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 TEST_F(SdsTest, Shutdown) {

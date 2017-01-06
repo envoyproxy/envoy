@@ -191,13 +191,13 @@ LightStepSink::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer, 
     : tracer_(tracer), sink_(sink) {}
 
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                             Stats::Store& stats, const std::string& service_node,
+                             Stats::Store& stats, const LocalInfo::LocalInfo& local_info,
                              ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                              std::unique_ptr<lightstep::TracerOptions> options)
     : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
       stats_store_(stats),
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
-      service_node_(service_node), tls_(tls), runtime_(runtime), options_(std::move(options)),
+      local_info_(local_info), tls_(tls), runtime_(runtime), options_(std::move(options)),
       tls_slot_(tls.allocateSlot()) {
   if (!cm_.get(collector_cluster_)) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
@@ -257,7 +257,7 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag("downstream cluster",
                          valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-")),
        lightstep::SetTag("user agent", valueOrDefault(request_headers.UserAgent(), "-")),
-       lightstep::SetTag("node id", service_node_)});
+       lightstep::SetTag("node id", local_info_.nodeName())});
 
   if (request_info.responseCode().valid() &&
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {

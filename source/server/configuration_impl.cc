@@ -28,11 +28,12 @@ MainImpl::MainImpl(Server::Instance& server) : server_(server) {}
 void MainImpl::initialize(const Json::Object& json) {
   cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
       server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
-      server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher()));
+      server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
+      server_.localInfo()));
   cluster_manager_.reset(new Upstream::ClusterManagerImpl(
       *json.getObject("cluster_manager"), *cluster_manager_factory_, server_.stats(),
-      server_.threadLocal(), server_.runtime(), server_.random(), server_.options().serviceZone(),
-      server_.getLocalAddress(), server_.accessLogManager()));
+      server_.threadLocal(), server_.runtime(), server_.random(), server_.localInfo(),
+      server_.accessLogManager()));
 
   std::vector<Json::ObjectPtr> listeners = json.getObjectArray("listeners");
   log().info("loading {} listener(s)", listeners.size());
@@ -96,14 +97,12 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
           opts->access_token = server_.api().fileReadToEnd(sink->getString("access_token_file"));
           StringUtil::rtrim(opts->access_token);
 
-          opts->tracer_attributes["lightstep.component_name"] =
-              server_.options().serviceClusterName();
+          opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
           opts->guid_generator = [&rand]() { return rand.random(); };
 
           http_tracer_->addSink(Tracing::HttpSinkPtr{new Tracing::LightStepSink(
-              *sink->getObject("config"), *cluster_manager_, server_.stats(),
-              server_.options().serviceNodeName(), server_.threadLocal(), server_.runtime(),
-              std::move(opts))});
+              *sink->getObject("config"), *cluster_manager_, server_.stats(), server_.localInfo(),
+              server_.threadLocal(), server_.runtime(), std::move(opts))});
         } else {
           throw EnvoyException(fmt::format("unsupported sink type: '{}'", type));
         }

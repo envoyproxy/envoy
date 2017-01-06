@@ -5,6 +5,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/server/hot_restart.h"
 
+#include "common/local_info/local_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Server {
@@ -53,7 +54,9 @@ void IntegrationTestServer::threadRoutine() {
   Thread::MutexBasicLockable lock;
   Stats::HeapRawStatDataAllocator stat_allocator;
   Stats::ThreadLocalStoreImpl stats_store(lock, stat_allocator);
-  server_.reset(new Server::InstanceImpl(options, *this, restarter, stats_store, lock, *this));
+  LocalInfo::LocalInfoImpl local_info("127.0.0.1", "zone_name", "cluster_name", "node_name");
+  server_.reset(
+      new Server::InstanceImpl(options, *this, restarter, stats_store, lock, *this, local_info));
   server_->run();
   server_.reset();
 }

@@ -6,6 +6,7 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -34,7 +35,7 @@ public:
                                   Outlier::EventLoggerPtr outlier_event_logger) -> Cluster* {
           return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
                                          ssl_context_manager_, runtime_, random_, dispatcher_,
-                                         sds_config, outlier_event_logger).release();
+                                         sds_config, local_info_, outlier_event_logger).release();
         }));
   }
 
@@ -61,14 +62,15 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   NiceMock<Event::MockDispatcher> dispatcher_;
+  LocalInfo::MockLocalInfo local_info_;
 };
 
 class ClusterManagerImplTest : public testing::Test {
 public:
   void create(const Json::Object& config) {
     cluster_manager_.reset(new ClusterManagerImpl(config, factory_, factory_.stats_, factory_.tls_,
-                                                  factory_.runtime_, factory_.random_, "us-east-1d",
-                                                  "local_address", log_manager_));
+                                                  factory_.runtime_, factory_.random_,
+                                                  factory_.local_info_, log_manager_));
   }
 
   NiceMock<TestClusterManagerFactory> factory_;

@@ -13,6 +13,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -35,12 +36,7 @@ public:
   MOCK_METHOD0(logLevel, spdlog::level::level_enum());
   MOCK_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_METHOD0(restartEpoch, uint64_t());
-  MOCK_METHOD0(serviceClusterName, const std::string&());
-  MOCK_METHOD0(serviceNodeName, const std::string&());
-  MOCK_METHOD0(serviceZone, const std::string&());
   MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
-
-  std::string service_zone_;
 };
 
 class MockAdmin : public Admin {
@@ -116,7 +112,7 @@ public:
   MOCK_METHOD0(stats, Stats::Store&());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
-  MOCK_METHOD0(getLocalAddress, const std::string&());
+  MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -134,6 +130,7 @@ public:
   testing::NiceMock<MockHotRestart> hot_restart_;
   testing::NiceMock<MockOptions> options_;
   testing::NiceMock<Runtime::MockRandomGenerator> random_;
+  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 } // Server

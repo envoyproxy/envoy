@@ -7,6 +7,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -24,13 +25,12 @@ namespace Http {
 class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
-      : client_(*cm_.cluster_.info_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()},
-                "local_address") {
+      : client_(*cm_.cluster_.info_, stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
+                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}) {
     message_->headers().insertMethod().value(std::string("GET"));
     message_->headers().insertHost().value(std::string("host"));
     message_->headers().insertPath().value(std::string("/"));
-    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
+    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(local_info_.zoneName()));
     ON_CALL(*cm_.cluster_.info_, altStatName()).WillByDefault(ReturnRef(EMPTY_STRING));
   }
 
@@ -41,7 +41,6 @@ public:
         }));
   }
 
-  std::string upstream_zone_{"to_az"};
   MessagePtr message_{new RequestMessageImpl()};
   MockAsyncClientCallbacks callbacks_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -52,6 +51,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   AsyncClientImpl client_;
 };
 
@@ -69,7 +69,7 @@ TEST_F(AsyncClientImplTest, Basic) {
 
   TestHeaderMapImpl copy(message_->headers());
   copy.addViaCopy("x-envoy-internal", "true");
-  copy.addViaCopy("x-forwarded-for", "local_address");
+  copy.addViaCopy("x-forwarded-for", "127.0.0.1");
   copy.addViaCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));

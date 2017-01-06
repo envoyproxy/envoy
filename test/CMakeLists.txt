@@ -118,6 +118,7 @@ add_executable(envoy-test
   mocks/filesystem/mocks.cc
   mocks/grpc/mocks.cc
   mocks/http/mocks.cc
+  mocks/local_info/mocks.cc
   mocks/network/mocks.cc
   mocks/ratelimit/mocks.cc
   mocks/router/mocks.cc

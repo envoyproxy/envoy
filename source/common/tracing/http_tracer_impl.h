@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -101,8 +102,9 @@ private:
 class LightStepSink : public HttpSink {
 public:
   LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                Stats::Store& stats, const std::string& service_node, ThreadLocal::Instance& tls,
-                Runtime::Loader& runtime, std::unique_ptr<lightstep::TracerOptions> options);
+                Stats::Store& stats, const LocalInfo::LocalInfo& local_info,
+                ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                std::unique_ptr<lightstep::TracerOptions> options);
 
   // Tracer::HttpSink
   void flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
@@ -133,7 +135,7 @@ private:
   Upstream::ClusterManager& cm_;
   Stats::Store& stats_store_;
   LightstepTracerStats tracer_stats_;
-  const std::string service_node_;
+  const LocalInfo::LocalInfo& local_info_;
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;
   std::unique_ptr<lightstep::TracerOptions> options_;

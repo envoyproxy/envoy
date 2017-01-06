@@ -74,7 +74,8 @@ public:
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
   InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::Store& store,
-               Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory);
+               Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
+               const LocalInfo::LocalInfo& local_info);
   ~InstanceImpl();
 
   void run();
@@ -109,7 +110,7 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const std::string& getLocalAddress() override { return local_address_; }
+  const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
 
 private:
   void flushStats();
@@ -138,7 +139,7 @@ private:
   Event::SignalEventPtr sig_hup_;
   Network::DnsResolverPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
-  const std::string local_address_;
+  const LocalInfo::LocalInfo& local_info_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;

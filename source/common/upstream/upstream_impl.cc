@@ -92,6 +92,7 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
                                    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                    Event::Dispatcher& dispatcher,
                                    const Optional<SdsConfig>& sds_config,
+                                   const LocalInfo::LocalInfo& local_info,
                                    Outlier::EventLoggerPtr outlier_event_logger) {
   std::unique_ptr<ClusterImplBase> new_cluster;
   std::string string_type = cluster.getString("type");
@@ -109,7 +110,7 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
     }
 
     new_cluster.reset(new SdsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                         sds_config.value(), cm, dispatcher, random));
+                                         sds_config.value(), local_info, cm, dispatcher, random));
   } else {
     throw EnvoyException(fmt::format("cluster: unknown cluster type '{}'", string_type));
   }

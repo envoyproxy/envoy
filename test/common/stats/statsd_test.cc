@@ -2,6 +2,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -17,12 +18,13 @@ class TcpStatsdSinkTest : public testing::Test {
 public:
   TcpStatsdSinkTest() {
     EXPECT_CALL(cluster_manager_, get("statsd"));
-    sink_.reset(new TcpStatsdSink("cluster", "host", "statsd", tls_, cluster_manager_));
+    sink_.reset(new TcpStatsdSink(local_info_, "statsd", tls_, cluster_manager_));
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Upstream::MockClusterManager cluster_manager_;
   std::unique_ptr<TcpStatsdSink> sink_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 TEST_F(TcpStatsdSinkTest, All) {

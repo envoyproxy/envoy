@@ -17,10 +17,12 @@ namespace Upstream {
 
 SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
                                Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                               const SdsConfig& sds_config, ClusterManager& cm,
-                               Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random)
+                               const SdsConfig& sds_config, const LocalInfo::LocalInfo& local_info,
+                               ClusterManager& cm, Event::Dispatcher& dispatcher,
+                               Runtime::RandomGenerator& random)
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager), cm_(cm),
-      sds_config_(sds_config), service_name_(config.getString("service_name")), random_(random),
+      sds_config_(sds_config), local_info_(local_info),
+      service_name_(config.getString("service_name")), random_(random),
       refresh_timer_(dispatcher.createTimer([this]() -> void { refreshHosts(); })) {}
 
 SdsClusterImpl::~SdsClusterImpl() {
@@ -80,7 +82,7 @@ void SdsClusterImpl::parseSdsResponse(Http::Message& response) {
     HostListsPtr per_zone(new std::vector<std::vector<HostPtr>>());
 
     // If local zone name is not defined then skip populating per zone hosts.
-    if (!sds_config_.local_zone_name_.empty()) {
+    if (!local_info_.zoneName().empty()) {
       std::map<std::string, std::vector<HostPtr>> hosts_per_zone;
 
       for (HostPtr host : *current_hosts_copy) {
@@ -88,11 +90,11 @@ void SdsClusterImpl::parseSdsResponse(Http::Message& response) {
       }
 
       // Populate per_zone hosts only if upstream cluster has hosts in the same zone.
-      if (hosts_per_zone.find(sds_config_.local_zone_name_) != hosts_per_zone.end()) {
-        per_zone->push_back(hosts_per_zone[sds_config_.local_zone_name_]);
+      if (hosts_per_zone.find(local_info_.zoneName()) != hosts_per_zone.end()) {
+        per_zone->push_back(hosts_per_zone[local_info_.zoneName()]);
 
         for (auto& entry : hosts_per_zone) {
-          if (sds_config_.local_zone_name_ != entry.first) {
+          if (local_info_.zoneName() != entry.first) {
             per_zone->push_back(entry.second);
           }
         }

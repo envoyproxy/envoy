@@ -5,6 +5,7 @@
 #include "common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -318,7 +319,7 @@ public:
     }
 
     sink_.reset(
-        new LightStepSink(config, cm_, stats_, "service_node", tls_, runtime_, std::move(opts)));
+        new LightStepSink(config, cm_, stats_, local_info_, tls_, runtime_, std::move(opts)));
   }
 
   void setupValidSink() {
@@ -347,6 +348,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<MockTracingContext> context_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 TEST_F(LightStepSinkTest, InitializeSink) {

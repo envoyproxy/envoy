@@ -3,6 +3,7 @@
 #include "upstream_impl.h"
 
 #include "envoy/http/async_client.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -15,8 +16,8 @@ class SdsClusterImpl : public BaseDynamicClusterImpl, public Http::AsyncClient::
 public:
   SdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                  Ssl::ContextManager& ssl_context_manager, const SdsConfig& sds_config,
-                 ClusterManager& cm, Event::Dispatcher& dispatcher,
-                 Runtime::RandomGenerator& random);
+                 const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
+                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random);
 
   ~SdsClusterImpl();
 
@@ -35,6 +36,7 @@ private:
 
   ClusterManager& cm_;
   const SdsConfig& sds_config_;
+  const LocalInfo::LocalInfo& local_info_;
   const std::string service_name_;
   Runtime::RandomGenerator& random_;
   Event::TimerPtr refresh_timer_;
