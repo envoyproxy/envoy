@@ -50,10 +50,15 @@ public:
     return ClusterPtr{clusterFromJson_(cluster, cm, sds_config, outlier_event_logger)};
   }
 
+  CdsApiPtr createCds(const Json::Object&, ClusterManager&) override {
+    return CdsApiPtr{createCds_()};
+  }
+
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(ConstHostPtr host));
   MOCK_METHOD4(clusterFromJson_, Cluster*(const Json::Object& cluster, ClusterManager& cm,
                                           const Optional<SdsConfig>& sds_config,
                                           Outlier::EventLoggerPtr outlier_event_logger));
+  MOCK_METHOD0(createCds_, CdsApi*());
 
   Stats::IsolatedStoreImpl stats_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -184,6 +189,9 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   create(*loader);
+
+  EXPECT_EQ(3UL, factory_.stats_.counter("cluster_manager.cluster_added").value());
+  EXPECT_EQ(3UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
 }
 
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
@@ -319,6 +327,11 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
   std::string json = R"EOF(
   {
+    "cds": {
+      "cluster": {
+        "fake": ""
+      }
+    },
     "clusters": [
     {
       "fake": ""
@@ -329,16 +342,24 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   }
   )EOF";
 
+  MockCluster* cds_cluster = new NiceMock<MockCluster>();
+  cds_cluster->info_->name_ = "cds_cluster";
   MockCluster* cluster1 = new NiceMock<MockCluster>();
   MockCluster* cluster2 = new NiceMock<MockCluster>();
   cluster2->info_->name_ = "fake_cluster2";
 
   InSequence s;
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cds_cluster));
+  ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*cds_cluster, initialize());
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster2));
   ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  MockCdsApi* cds = new MockCdsApi();
+  EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
+  EXPECT_CALL(*cds, initialize());
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   create(*loader);
 
@@ -346,6 +367,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
   EXPECT_CALL(*cluster2, initialize());
+  cds_cluster->initialize_callback_();
   cluster1->initialize_callback_();
 
   EXPECT_CALL(initialized, ready());
@@ -381,6 +403,7 @@ TEST_F(ClusterManagerImplTest, dynamicAddRemove) {
   EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
 
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(1UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
 
   // Now try to update again but with the same hash (different white space).
   std::string json_api_2 = R"EOF(
@@ -422,6 +445,11 @@ TEST_F(ClusterManagerImplTest, dynamicAddRemove) {
 
   // Remove an unknown cluster.
   EXPECT_FALSE(cluster_manager_->removePrimaryCluster("foo"));
+
+  EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_added").value());
+  EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_modified").value());
+  EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_removed").value());
+  EXPECT_EQ(0UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
 }
 
 TEST_F(ClusterManagerImplTest, addOrUpdatePrimaryClusterStaticExists) {

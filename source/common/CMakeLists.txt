@@ -103,6 +103,7 @@ add_library(
   stats/thread_local_store.cc
   thread_local/thread_local_impl.cc
   tracing/http_tracer_impl.cc
+  upstream/cds_api_impl.cc
   upstream/cluster_manager_impl.cc
   upstream/health_checker_impl.cc
   upstream/host_utility.cc

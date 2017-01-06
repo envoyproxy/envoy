@@ -41,11 +41,13 @@ protected:
 
   /**
    * This will be called if the fetch fails (either due to non-200 response, network error, etc.).
+   * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
-  virtual void onFetchFailure(AsyncClient::FailureReason reason) PURE;
+  virtual void onFetchFailure(EnvoyException* e) PURE;
 
 protected:
   const std::string remote_cluster_name_;
+  Upstream::ClusterManager& cm_;
 
 private:
   void refresh();
@@ -55,7 +57,6 @@ private:
   void onSuccess(Http::MessagePtr&& response) override;
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
-  Upstream::ClusterManager& cm_;
   Runtime::RandomGenerator& random_;
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr refresh_timer_;
