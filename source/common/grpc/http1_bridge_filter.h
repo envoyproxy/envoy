@@ -27,7 +27,9 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
+    encoder_callbacks_ = &callbacks;
+  }
 
 private:
   void chargeStat(const Http::HeaderMap& headers);
@@ -35,6 +37,7 @@ private:
 
   Stats::Store& stats_store_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::HeaderMap* response_headers_{};
   bool do_bridging_{};
   bool do_stat_tracking_{};
