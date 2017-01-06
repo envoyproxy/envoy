@@ -1,5 +1,6 @@
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/message_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
