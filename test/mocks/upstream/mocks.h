@@ -1,10 +1,10 @@
 #pragma once
 
+#include "envoy/http/async_client.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/async_client_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/http/mocks.h"

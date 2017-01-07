@@ -1,5 +1,6 @@
 #include "common/grpc/common.h"
 #include "common/grpc/rpc_channel_impl.h"
+#include "common/http/message_impl.h"
 
 #include "test/generated/helloworld.pb.h"
 #include "test/mocks/grpc/mocks.h"
