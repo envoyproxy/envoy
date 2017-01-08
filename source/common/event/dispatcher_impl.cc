@@ -16,10 +16,16 @@
 
 namespace Event {
 
-DispatcherImpl::DispatcherImpl()
-    : base_(event_base_new()),
-      deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
-      current_to_delete_(&to_delete_1_) {}
+DispatcherImpl::DispatcherImpl() : current_to_delete_(&to_delete_1_) {
+
+  event_config* config = event_config_new();
+  event_config_set_flag(config, EVENT_BASE_FLAG_NOLOCK);
+  base_.reset(event_base_new_with_config(config));
+  event_config_free(config);
+
+  deferred_delete_timer_ = createTimer([this]() -> void { clearDeferredDeleteList(); });
+  post_timer_ = createTimer([this]() -> void { runPostCallbacks(); });
+}
 
 DispatcherImpl::~DispatcherImpl() {}
 
@@ -109,20 +115,8 @@ SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
 }
 
 void DispatcherImpl::post(std::function<void()> callback) {
-  bool do_post;
-  {
-    std::unique_lock<std::mutex> lock(post_lock_);
-    do_post = post_callbacks_.empty();
-    post_callbacks_.push_back(callback);
-  }
-
-  if (do_post) {
-    // If the dispatcher shuts down before this runs, we will leak. This never happens during
-    // normal operation so its not a big deal.
-    event_base_once(base_.get(), -1, EV_TIMEOUT, [](evutil_socket_t, short, void* arg) -> void {
-      static_cast<DispatcherImpl*>(arg)->runPostCallbacks();
-    }, this, nullptr);
-  }
+  std::unique_lock<std::mutex> lock(post_lock_);
+  post_callbacks_.push_back(callback);
 }
 
 void DispatcherImpl::run(RunType type) {
@@ -145,6 +139,8 @@ void DispatcherImpl::runPostCallbacks() {
     callback();
     lock.lock();
   }
+
+  post_timer_->enableTimer(std::chrono::milliseconds(100));
 }
 
 } // Event
