@@ -34,7 +34,7 @@ public:
 private:
   HttpTracer& http_tracer_;
   const TracingConfig& tracing_config_;
-  SpanPtr active_span_;
+  SpanPtr active_span_{};
 };
 
 class LightStepSpan : public Span {

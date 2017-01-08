@@ -119,7 +119,7 @@ void TracingContextImpl::startSpan(const Http::AccessLog::RequestInfo& request_i
     active_span_->setTag("request_line", buildRequestLine(request_headers, request_info));
     active_span_->setTag("request_size", std::to_string(request_info.bytesReceived()));
     active_span_->setTag("host_header", valueOrDefault(request_headers.Host(), "-"));
-    active_span_->setTag("downstream cluster",
+    active_span_->setTag("downstream_cluster",
                          valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-"));
     active_span_->setTag("user_agent", valueOrDefault(request_headers.UserAgent(), "-"));
     active_span_->setTag("node_id", tracing_config_.serviceNode());

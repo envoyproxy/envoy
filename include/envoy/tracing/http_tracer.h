@@ -28,7 +28,7 @@ public:
   virtual void finishSpan() PURE;
 };
 
-typedef std::unique_ptr<Span> SpanPtr;
+typedef std::shared_ptr<Span> SpanPtr;
 
 /**
  * Tracing context, it carries currently active span.
