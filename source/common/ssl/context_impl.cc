@@ -222,7 +222,7 @@ bool ContextImpl::verifyPeer(SSL* ssl) const {
   stats_.handshake_.inc();
 
   const char* cipher = SSL_get_cipher_name(ssl);
-  scope_.counter(fmt::format("ciphers.{}", std::string{cipher})).inc();
+  scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
 
   X509Ptr cert = X509Ptr(SSL_get_peer_certificate(ssl));
 
