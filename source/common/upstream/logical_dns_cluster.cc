@@ -6,12 +6,13 @@ namespace Upstream {
 
 LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime,
                                      Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                                     Network::DnsResolver& dns_resolver, ThreadLocal::Instance& tls)
+                                     Network::DnsResolver& dns_resolver, ThreadLocal::Instance& tls,
+                                     Event::Dispatcher& dispatcher)
     : ClusterImplBase(config, runtime, stats, ssl_context_manager), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(config.getInteger("dns_refresh_rate_ms", 5000))),
       tls_(tls), tls_slot_(tls.allocateSlot()),
-      resolve_timer_(dns_resolver.dispatcher().createTimer([this]() -> void { startResolve(); })) {
+      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
 
   std::vector<Json::ObjectPtr> hosts_json = config.getObjectArray("hosts");
   if (hosts_json.size() != 1) {
@@ -28,13 +29,20 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
   });
 }
 
+LogicalDnsCluster::~LogicalDnsCluster() {
+  if (active_dns_query_) {
+    active_dns_query_->cancel();
+  }
+}
+
 void LogicalDnsCluster::startResolve() {
   std::string dns_address = Network::Utility::hostFromUrl(dns_url_);
   log_debug("starting async DNS resolution for {}", dns_address);
   info_->stats().update_attempt_.inc();
 
-  dns_resolver_.resolve(
+  active_dns_query_ = &dns_resolver_.resolve(
       dns_address, [this, dns_address](std::list<std::string>&& address_list) -> void {
+        active_dns_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
 

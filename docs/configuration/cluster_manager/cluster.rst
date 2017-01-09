@@ -18,7 +18,6 @@ Cluster
     "ssl_context": "{...}",
     "features": "...",
     "http_codec_options": "...",
-    "alt_stat_name": "...",
     "dns_refresh_rate_ms": "...",
     "outlier_detection": "..."
   }
@@ -126,11 +125,6 @@ http_codec_options
   manager :ref:`http_codec_options <config_http_conn_man_http_codec_options>` option. When building
   an HTTP/2 mesh, if it's desired to disable HTTP/2 header compression the *no_compression*
   option should be specified both here as well as in the HTTP connection manager.
-
-alt_stat_name
-  *(optional, string)* If an alternate stat name is specified, some :ref:`statistics
-  <config_cluster_manager_cluster_stats>` will be duplicated between the standard statistics and a
-  tree specified by this parameter (e.g., *cluster.<alt_stat_name>.*).
 
 .. _config_cluster_manager_cluster_dns_refresh_rate_ms:
 

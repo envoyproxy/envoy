@@ -6,6 +6,7 @@
 #include "test/mocks/upstream/mocks.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::Return;
 using testing::WithArg;
@@ -120,10 +121,9 @@ TEST(RateLimitGrpcFactoryTest, NoCluster) {
 
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   Upstream::MockClusterManager cm;
-  Stats::IsolatedStoreImpl stats_store;
 
   EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
-  EXPECT_THROW(GrpcFactoryImpl(*config, cm, stats_store), EnvoyException);
+  EXPECT_THROW(GrpcFactoryImpl(*config, cm), EnvoyException);
 }
 
 TEST(RateLimitGrpcFactoryTest, Create) {
@@ -135,10 +135,9 @@ TEST(RateLimitGrpcFactoryTest, Create) {
 
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   Upstream::MockClusterManager cm;
-  Stats::IsolatedStoreImpl stats_store;
 
-  EXPECT_CALL(cm, get("foo"));
-  GrpcFactoryImpl factory(*config, cm, stats_store);
+  EXPECT_CALL(cm, get("foo")).Times(AtLeast(1));
+  GrpcFactoryImpl factory(*config, cm);
   factory.create(Optional<std::chrono::milliseconds>());
 }
 

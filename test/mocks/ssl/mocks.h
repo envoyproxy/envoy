@@ -13,12 +13,10 @@ public:
   MockContextManager();
   ~MockContextManager();
 
-  MOCK_METHOD3(createSslClientContext,
-               Ssl::ClientContext&(const std::string& name, Stats::Store& stats,
-                                   ContextConfig& config));
-  MOCK_METHOD3(createSslServerContext,
-               Ssl::ServerContext&(const std::string& name, Stats::Store& stats,
-                                   ContextConfig& config));
+  MOCK_METHOD2(createSslClientContext,
+               Ssl::ClientContext&(Stats::Scope& scope, ContextConfig& config));
+  MOCK_METHOD2(createSslServerContext,
+               Ssl::ServerContext&(Stats::Scope& stats, ContextConfig& config));
   MOCK_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_METHOD0(getContexts, std::vector<std::reference_wrapper<Ssl::Context>>());
 };

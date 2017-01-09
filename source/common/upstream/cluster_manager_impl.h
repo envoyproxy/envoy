@@ -3,6 +3,7 @@
 #include "sds.h"
 
 #include "envoy/http/codes.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -13,18 +14,52 @@
 namespace Upstream {
 
 /**
+ * Production implementation of ClusterManagerFactory.
+ */
+class ProdClusterManagerFactory : public ClusterManagerFactory {
+public:
+  ProdClusterManagerFactory(Runtime::Loader& runtime, Stats::Store& stats,
+                            ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
+                            Network::DnsResolver& dns_resolver,
+                            Ssl::ContextManager& ssl_context_manager,
+                            Event::Dispatcher& primary_dispatcher,
+                            const LocalInfo::LocalInfo& local_info)
+      : runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
+        ssl_context_manager_(ssl_context_manager), primary_dispatcher_(primary_dispatcher),
+        local_info_(local_info) {}
+
+  // Upstream::ClusterManagerFactory
+  Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
+                                                     ConstHostPtr host,
+                                                     ResourcePriority priority) override;
+  ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
+                             const Optional<SdsConfig>& sds_config,
+                             Outlier::EventLoggerPtr outlier_event_logger) override;
+
+private:
+  Runtime::Loader& runtime_;
+  Stats::Store& stats_;
+  ThreadLocal::Instance& tls_;
+  Runtime::RandomGenerator& random_;
+  Network::DnsResolver& dns_resolver_;
+  Ssl::ContextManager& ssl_context_manager_;
+  Event::Dispatcher& primary_dispatcher_;
+  const LocalInfo::LocalInfo& local_info_;
+};
+
+/**
  * Implementation of ClusterManager that reads from a JSON configuration, maintains a central
  * cluster list, as well as thread local caches of each cluster and associated connection pools.
  */
 class ClusterManagerImpl : public ClusterManager {
 public:
-  ClusterManagerImpl(const Json::Object& config, Stats::Store& stats, ThreadLocal::Instance& tls,
-                     Network::DnsResolver& dns_resolver, Ssl::ContextManager& ssl_context_manager,
-                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                     const std::string& local_zone_name, const std::string& local_address,
+  ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
+                     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager);
 
   // Upstream::ClusterManager
+  bool addOrUpdatePrimaryCluster(const Json::Object& config) override;
   void setInitializedCb(std::function<void()> callback) override {
     if (pending_cluster_init_ == 0) {
       callback();
@@ -32,30 +67,21 @@ public:
       initialized_callback_ = callback;
     }
   }
-
-  std::unordered_map<std::string, ConstClusterPtr> clusters() override {
-    std::unordered_map<std::string, ConstClusterPtr> clusters_map;
+  ClusterInfoMap clusters() override {
+    ClusterInfoMap clusters_map;
     for (auto& cluster : primary_clusters_) {
-      clusters_map[cluster.first] = cluster.second;
+      clusters_map.emplace(cluster.first, *cluster.second.cluster_);
     }
 
     return clusters_map;
   }
-
   ClusterInfoPtr get(const std::string& cluster) override;
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                          ResourcePriority priority) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
-
-  void shutdown() override {
-    for (auto& cluster : primary_clusters_) {
-      cluster.second->shutdown();
-    }
-  }
-
-protected:
-  Runtime::Loader& runtime_;
+  bool removePrimaryCluster(const std::string& cluster) override;
+  void shutdown() override { primary_clusters_.clear(); }
 
 private:
   /**
@@ -72,27 +98,20 @@ private:
     };
 
     struct ClusterEntry {
-      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ConstClusterPtr cluster,
-                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                   Stats::Store& stats_store, Event::Dispatcher& dispatcher,
-                   const std::string& local_zone_name, const std::string& local_address,
-                   const HostSet* local_host_set);
+      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoPtr cluster);
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority);
 
       ThreadLocalClusterManagerImpl& parent_;
       HostSetImpl host_set_;
       LoadBalancerPtr lb_;
-      ConstClusterPtr primary_cluster_;
+      ClusterInfoPtr cluster_info_;
       Http::AsyncClientImpl http_async_client_;
     };
 
     typedef std::unique_ptr<ClusterEntry> ClusterEntryPtr;
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
-                                  Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                  const std::string& local_zone_name,
-                                  const std::string& local_address,
                                   const Optional<std::string>& local_cluster_name);
     void drainConnPools(HostPtr old_host, ConnPoolsContainer& container);
     static void updateClusterMembership(const std::string& name, ConstHostVectorPtr hosts,
@@ -107,44 +126,40 @@ private:
     void shutdown() override;
 
     ClusterManagerImpl& parent_;
-    Event::Dispatcher& dispatcher_;
+    Event::Dispatcher& thread_local_dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
     std::unordered_map<ConstHostPtr, ConnPoolsContainer> host_http_conn_pool_map_;
+    const HostSet* local_host_set_{};
   };
 
-  virtual Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
-                                                             ConstHostPtr host, Stats::Store& store,
-                                                             ResourcePriority priority) PURE;
-  void loadCluster(const Json::Object& cluster, Stats::Store& stats,
-                   Network::DnsResolver& dns_resolver, Ssl::ContextManager& ssl_context_manager,
-                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                   Outlier::EventLoggerPtr event_logger);
-  void postThreadLocalClusterUpdate(const ClusterImplBase& primary_cluster,
+  struct PrimaryClusterData {
+    PrimaryClusterData(uint64_t config_hash, bool added_via_api, ClusterPtr&& cluster)
+        : config_hash_(config_hash), added_via_api_(added_via_api), cluster_(std::move(cluster)) {}
+
+    const uint64_t config_hash_;
+    const bool added_via_api_;
+    ClusterPtr cluster_;
+  };
+
+  void loadCluster(const Json::Object& cluster, bool added_via_api);
+  void postInitializeCluster(Cluster& cluster);
+  void postThreadLocalClusterUpdate(const Cluster& primary_cluster,
                                     const std::vector<HostPtr>& hosts_added,
                                     const std::vector<HostPtr>& hosts_removed);
 
-  ThreadLocal::Instance& tls_;
+  ClusterManagerFactory& factory_;
+  Runtime::Loader& runtime_;
   Stats::Store& stats_;
+  ThreadLocal::Instance& tls_;
+  Runtime::RandomGenerator& random_;
   uint32_t thread_local_slot_;
-  std::unordered_map<std::string, ClusterImplBasePtr> primary_clusters_;
+  std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
   std::function<void()> initialized_callback_;
   uint32_t pending_cluster_init_;
   Optional<SdsConfig> sds_config_;
-  std::list<SdsClusterImpl*> sds_clusters_;
-};
-
-/**
- * Prod implementation of ClusterManagerImpl that allocates real connection pools.
- */
-class ProdClusterManagerImpl : public ClusterManagerImpl {
-public:
-  using ClusterManagerImpl::ClusterManagerImpl;
-
-private:
-  // ClusterManagerImpl
-  Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
-                                                     ConstHostPtr host, Stats::Store& store,
-                                                     ResourcePriority priority) override;
+  std::list<Cluster*> secondary_init_clusters_;
+  Outlier::EventLoggerPtr outlier_event_logger_;
+  const LocalInfo::LocalInfo& local_info_;
 };
 
 } // Upstream

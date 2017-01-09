@@ -61,8 +61,11 @@ MockClientConnection::MockClientConnection() {
 
 MockClientConnection::~MockClientConnection() {}
 
+MockActiveDnsQuery::MockActiveDnsQuery() {}
+MockActiveDnsQuery::~MockActiveDnsQuery() {}
+
 MockDnsResolver::MockDnsResolver() {
-  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  ON_CALL(*this, resolve(_, _)).WillByDefault(ReturnRef(active_query_));
 }
 
 MockDnsResolver::~MockDnsResolver() {}

@@ -1,5 +1,4 @@
 #include "common/http/http2/conn_pool.h"
-#include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -50,8 +49,7 @@ public:
     Event::MockTimer* connect_timer_;
   };
 
-  Http2ConnPoolImplTest()
-      : pool_(dispatcher_, host_, cluster_->stats_store_, Upstream::ResourcePriority::Default) {}
+  Http2ConnPoolImplTest() : pool_(dispatcher_, host_, Upstream::ResourcePriority::Default) {}
 
   ~Http2ConnPoolImplTest() {
     // Make sure all gauges are 0.
@@ -68,10 +66,9 @@ public:
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     Network::ClientConnectionPtr connection{test_client.connection_};
-    test_client.codec_client_ = new CodecClientForTest(
-        std::move(connection), test_client.codec_, [this](CodecClient*) -> void {
-          onClientDestroy();
-        }, CodecClientStats{ALL_CODEC_CLIENT_STATS(POOL_COUNTER(cluster_->stats_store_))});
+    test_client.codec_client_ =
+        new CodecClientForTest(std::move(connection), test_client.codec_,
+                               [this](CodecClient*) -> void { onClientDestroy(); }, nullptr);
 
     EXPECT_CALL(dispatcher_, createClientConnection_(_)).WillOnce(Return(test_client.connection_));
     EXPECT_CALL(pool_, createCodecClient_(_))
@@ -110,12 +107,10 @@ public:
   NiceMock<Http::MockStreamEncoder> inner_encoder_;
 };
 
-TEST_F(Http2ConnPoolImplTest, VerifyConectionTimingStats) {
+TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   expectClientCreate();
-  EXPECT_CALL(cluster_->stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.upstream_cx_connect_ms", _));
-  EXPECT_CALL(cluster_->stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.upstream_cx_length_ms", _));
+  EXPECT_CALL(cluster_->stats_store_, deliverTimingToSinks("upstream_cx_connect_ms", _));
+  EXPECT_CALL(cluster_->stats_store_, deliverTimingToSinks("upstream_cx_length_ms", _));
 
   ActiveTestRequest r1(*this, 0);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));

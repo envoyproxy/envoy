@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/buffer/buffer_impl.h"
+
 #include "test/test_common/utility.h"
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {

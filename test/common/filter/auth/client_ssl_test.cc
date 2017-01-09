@@ -1,5 +1,6 @@
 #include "common/filesystem/filesystem_impl.h"
 #include "common/filter/auth/client_ssl.h"
+#include "common/http/message_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"

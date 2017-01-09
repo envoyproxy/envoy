@@ -7,6 +7,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -24,14 +25,12 @@ namespace Http {
 class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
-      : client_(*cm_.cluster_.info_, stats_store_, dispatcher_, "from_az", cm_, runtime_, random_,
-                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()},
-                "local_address") {
+      : client_(*cm_.cluster_.info_, stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
+                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}) {
     message_->headers().insertMethod().value(std::string("GET"));
     message_->headers().insertHost().value(std::string("host"));
     message_->headers().insertPath().value(std::string("/"));
-    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
-    ON_CALL(*cm_.cluster_.info_, altStatName()).WillByDefault(ReturnRef(EMPTY_STRING));
+    ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(local_info_.zoneName()));
   }
 
   void expectSuccess(uint64_t code) {
@@ -41,7 +40,6 @@ public:
         }));
   }
 
-  std::string upstream_zone_{"to_az"};
   MessagePtr message_{new RequestMessageImpl()};
   MockAsyncClientCallbacks callbacks_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -52,6 +50,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   AsyncClientImpl client_;
 };
 
@@ -69,7 +68,7 @@ TEST_F(AsyncClientImplTest, Basic) {
 
   TestHeaderMapImpl copy(message_->headers());
   copy.addViaCopy("x-envoy-internal", "true");
-  copy.addViaCopy("x-forwarded-for", "local_address");
+  copy.addViaCopy("x-forwarded-for", "127.0.0.1");
   copy.addViaCopy(":scheme", "http");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
@@ -82,8 +81,8 @@ TEST_F(AsyncClientImplTest, Basic) {
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
 
-  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_200").value());
-  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.internal.upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("internal.upstream_rq_200").value());
 }
 
 TEST_F(AsyncClientImplTest, Retry) {
@@ -215,7 +214,7 @@ TEST_F(AsyncClientImplTest, ImmediateReset) {
   client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 
-  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_503").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
 }
 
 TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
@@ -252,6 +251,20 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
   request->cancel();
 }
 
+TEST_F(AsyncClientImplTest, DestroyWithActive) {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder&, ConnectionPool::Callbacks& callbacks)
+                           -> ConnectionPool::Cancellable* {
+                             callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
+  EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+  EXPECT_CALL(callbacks_, onFailure(_));
+  client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
+}
+
 TEST_F(AsyncClientImplTest, PoolFailure) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,
@@ -264,7 +277,7 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
   EXPECT_EQ(nullptr,
             client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>()));
 
-  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_503").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
 }
 
 TEST_F(AsyncClientImplTest, RequestTimeout) {
@@ -283,11 +296,9 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
   client_.send(std::move(message_), callbacks_, std::chrono::milliseconds(40));
   timer_->callback_();
 
-  EXPECT_EQ(
-      1UL,
-      cm_.cluster_.info_->stats_store_.counter("cluster.fake_cluster.upstream_rq_timeout").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_timeout").value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
-  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_504").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
 }
 
 TEST_F(AsyncClientImplTest, DisableTimer) {

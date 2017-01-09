@@ -26,10 +26,14 @@ void FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
 MainImpl::MainImpl(Server::Instance& server) : server_(server) {}
 
 void MainImpl::initialize(const Json::Object& json) {
-  cluster_manager_.reset(new Upstream::ProdClusterManagerImpl(
-      *json.getObject("cluster_manager"), server_.stats(), server_.threadLocal(),
-      server_.dnsResolver(), server_.sslContextManager(), server_.runtime(), server_.random(),
-      server_.options().serviceZone(), server_.getLocalAddress(), server_.accessLogManager()));
+  cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
+      server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
+      server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
+      server_.localInfo()));
+  cluster_manager_.reset(new Upstream::ClusterManagerImpl(
+      *json.getObject("cluster_manager"), *cluster_manager_factory_, server_.stats(),
+      server_.threadLocal(), server_.runtime(), server_.random(), server_.localInfo(),
+      server_.accessLogManager()));
 
   std::vector<Json::ObjectPtr> listeners = json.getObjectArray("listeners");
   log().info("loading {} listener(s)", listeners.size());
@@ -61,7 +65,7 @@ void MainImpl::initialize(const Json::Object& json) {
     std::string type = rate_limit_service_config->getString("type");
     if (type == "grpc_service") {
       ratelimit_client_factory_.reset(new RateLimit::GrpcFactoryImpl(
-          *rate_limit_service_config->getObject("config"), *cluster_manager_, server_.stats()));
+          *rate_limit_service_config->getObject("config"), *cluster_manager_));
     } else {
       throw EnvoyException(fmt::format("unknown rate limit service type '{}'", type));
     }
@@ -93,14 +97,12 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
           opts->access_token = server_.api().fileReadToEnd(sink->getString("access_token_file"));
           StringUtil::rtrim(opts->access_token);
 
-          opts->tracer_attributes["lightstep.component_name"] =
-              server_.options().serviceClusterName();
+          opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
           opts->guid_generator = [&rand]() { return rand.random(); };
 
           http_tracer_->addSink(Tracing::HttpSinkPtr{new Tracing::LightStepSink(
-              *sink->getObject("config"), *cluster_manager_, server_.stats(),
-              server_.options().serviceNodeName(), server_.threadLocal(), server_.runtime(),
-              std::move(opts))});
+              *sink->getObject("config"), *cluster_manager_, server_.stats(), server_.localInfo(),
+              server_.threadLocal(), server_.runtime(), std::move(opts))});
         } else {
           throw EnvoyException(fmt::format("unsupported sink type: '{}'", type));
         }
@@ -114,13 +116,14 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { return listeners_; }
 
 MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
-    : parent_(parent), port_(json.getInteger("port")) {
+    : parent_(parent), port_(json.getInteger("port")),
+      scope_(parent_.server_.stats(), fmt::format("listener.{}.", port_)) {
   log().info("  port={}", port_);
 
   if (json.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*json.getObject("ssl_context"));
-    ssl_context_ = &parent_.server_.sslContextManager().createSslServerContext(
-        fmt::format("listener.{}.", port_), parent_.server_.stats(), context_config);
+    ssl_context_ =
+        &parent_.server_.sslContextManager().createSslServerContext(scope_, context_config);
   }
 
   if (json.hasObject("use_proxy_proto")) {

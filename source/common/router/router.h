@@ -3,6 +3,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
@@ -69,18 +70,18 @@ public:
  */
 class FilterConfig {
 public:
-  FilterConfig(const std::string& stat_prefix, const std::string& service_zone, Stats::Store& stats,
-               Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+  FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
+               Stats::Store& stats, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats)
-      : stats_store_(stats), service_zone_(service_zone), cm_(cm), runtime_(runtime),
-        random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))},
+      : global_store_(stats), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
+        stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), shadow_writer_(std::move(shadow_writer)) {}
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
 
-  Stats::Store& stats_store_;
-  const std::string service_zone_;
+  Stats::Store& global_store_;
+  const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
@@ -201,7 +202,7 @@ private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   const RouteEntry* route_;
   Upstream::ClusterInfoPtr cluster_;
-  std::list<std::string> alt_stat_prefixes_;
+  std::string alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;

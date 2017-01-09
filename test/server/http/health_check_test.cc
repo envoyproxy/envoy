@@ -1,3 +1,4 @@
+#include "common/buffer/buffer_impl.h"
 #include "server/http/health_check.h"
 
 #include "test/mocks/server/mocks.h"
@@ -16,7 +17,6 @@ public:
   HealthCheckFilterTest(bool pass_through, bool caching)
       : request_headers_{{":path", "/healthcheck"}}, request_headers_no_hc_{{":path", "/foo"}} {
 
-    ON_CALL(server_.options_, serviceClusterName()).WillByDefault(ReturnRef(cluster_name_));
     if (caching) {
       cache_timer_ = new Event::MockTimer(&dispatcher_);
       EXPECT_CALL(*cache_timer_, enableTimer(_));
@@ -39,7 +39,6 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestHeaderMapImpl request_headers_;
   Http::TestHeaderMapImpl request_headers_no_hc_;
-  std::string cluster_name_{"cluster_name"};
 };
 
 class HealthCheckFilterNoPassThroughTest : public HealthCheckFilterTest {

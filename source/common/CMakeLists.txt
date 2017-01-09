@@ -98,6 +98,7 @@ add_library(
   ssl/context_manager_impl.cc
   ssl/openssl.cc
   stats/stats_impl.cc
+  stats/stats_scope_impl.cc
   stats/statsd.cc
   thread_local/thread_local_impl.cc
   tracing/http_tracer_impl.cc

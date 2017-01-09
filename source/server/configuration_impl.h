@@ -7,6 +7,7 @@
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
+#include "common/stats/stats_scope_impl.h"
 
 namespace Server {
 namespace Configuration {
@@ -100,6 +101,7 @@ private:
   private:
     MainImpl& parent_;
     uint64_t port_;
+    Stats::ScopeImpl scope_;
     Ssl::ServerContext* ssl_context_{};
     bool use_proxy_proto_{};
     std::list<NetworkFilterFactoryCb> filter_factories_;
@@ -111,6 +113,7 @@ private:
   }
 
   Server::Instance& server_;
+  std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   Tracing::HttpTracerPtr http_tracer_;
   std::list<Server::Configuration::ListenerPtr> listeners_;

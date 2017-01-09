@@ -16,8 +16,7 @@ namespace Ssl {
 
 class TestServerContextImpl : public ContextImpl, public ServerContext {
 public:
-  TestServerContextImpl(const std::string& name, Stats::Store& stats, ContextConfig& config)
-      : ContextImpl(name, stats, config) {}
+  TestServerContextImpl(Stats::Scope& scope, ContextConfig& config) : ContextImpl(scope, config) {}
 };
 
 class MockRuntimeIntegrationTestServer : public IntegrationTestServer {
@@ -49,9 +48,9 @@ public:
   static void SetUpTestCase() {
     test_server_ =
         MockRuntimeIntegrationTestServer::create("test/config/integration/server_ssl.json");
-    upstream_ssl_ctx_ = createUpstreamSslContext("upstream", store());
-    client_ssl_ctx_alpn_ = createClientSslContext("client", store(), true);
-    client_ssl_ctx_no_alpn_ = createClientSslContext("client", store(), false);
+    upstream_ssl_ctx_ = createUpstreamSslContext(store());
+    client_ssl_ctx_alpn_ = createClientSslContext(store(), true);
+    client_ssl_ctx_no_alpn_ = createClientSslContext(store(), false);
     fake_upstreams_.emplace_back(
         new FakeUpstream(upstream_ssl_ctx_.get(), 11000, FakeHttpConnection::Type::HTTP1));
     fake_upstreams_.emplace_back(
@@ -71,9 +70,8 @@ public:
 
   Network::ClientConnectionPtr makeSslClientConnection(bool alpn);
 
-  static ServerContextPtr createUpstreamSslContext(const std::string& name, Stats::Store& store);
-  static ClientContextPtr createClientSslContext(const std::string& name, Stats::Store& store,
-                                                 bool alpn);
+  static ServerContextPtr createUpstreamSslContext(Stats::Scope& store);
+  static ClientContextPtr createClientSslContext(Stats::Scope& scope, bool alpn);
 
   static Stats::Store& store() { return test_server_->server().stats(); }
 

@@ -118,6 +118,12 @@ public:
   virtual double getDouble(const std::string& name, double default_value) const PURE;
 
   /**
+   * @return a hash of the JSON object. This is a hash of each nested element in stable order.
+   *         It does not consider white space that was originally in the parsed JSON.
+   */
+  virtual uint64_t hash() const PURE;
+
+  /**
    * Iterate over key-value pairs in an Object and call callback on each pair.
    */
   virtual void iterate(const ObjectCallback& callback) const PURE;

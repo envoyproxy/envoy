@@ -23,10 +23,9 @@ class AsyncRequestImpl;
 class AsyncClientImpl final : public AsyncClient {
 public:
   AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
-                  Event::Dispatcher& dispatcher, const std::string& local_zone_name,
+                  Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info,
                   Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                  Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer,
-                  const std::string& local_address);
+                  Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer);
   ~AsyncClientImpl();
 
   // Http::AsyncClient
@@ -38,7 +37,6 @@ private:
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncRequestImpl>> active_requests_;
-  const std::string local_address_;
 
   friend class AsyncRequestImpl;
 };
@@ -84,6 +82,11 @@ private:
     const std::string& runtimeKey() const override { return EMPTY_STRING; }
   };
 
+  struct NullVirtualHost : public Router::VirtualHost {
+    // Router::VirtualHost
+    const std::string& name() const override { return EMPTY_STRING; }
+  };
+
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(const std::string& cluster_name,
                    const Optional<std::chrono::milliseconds>& timeout)
@@ -108,17 +111,19 @@ private:
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
       return nullptr;
     }
-    const std::string& virtualHostName() const { return EMPTY_STRING; }
+    const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
+    static const NullVirtualHost virtual_host_;
 
     const std::string& cluster_name_;
     Optional<std::chrono::milliseconds> timeout_;
   };
 
   void cleanup();
+  void failDueToClientDestroy();
   void onComplete();
 
   // Http::StreamDecoderFilterCallbacks

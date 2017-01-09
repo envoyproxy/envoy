@@ -107,16 +107,18 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
     bool internal_request = internal_request_header && internal_request_header->value() == "true";
 
     Http::CodeUtility::ResponseStatInfo info{
-        config_.stats_store_, cluster_->statPrefix(), response_headers, internal_request,
-        route_->virtualHostName(), request_vcluster_ ? request_vcluster_->name() : "",
-        config_.service_zone_, upstreamZone(upstream_host), is_canary};
+        config_.global_store_, cluster_->statsScope(), EMPTY_STRING, response_headers,
+        internal_request, route_->virtualHost().name(),
+        request_vcluster_ ? request_vcluster_->name() : EMPTY_STRING,
+        config_.local_info_.zoneName(), upstreamZone(upstream_host), is_canary};
 
     Http::CodeUtility::chargeResponseStat(info);
 
-    for (const std::string& alt_prefix : alt_stat_prefixes_) {
-      Http::CodeUtility::ResponseStatInfo info{config_.stats_store_, alt_prefix, response_headers,
-                                               internal_request, "", "", config_.service_zone_,
-                                               upstreamZone(upstream_host), is_canary};
+    if (!alt_stat_prefix_.empty()) {
+      Http::CodeUtility::ResponseStatInfo info{
+          config_.global_store_, cluster_->statsScope(), alt_stat_prefix_, response_headers,
+          internal_request, EMPTY_STRING, EMPTY_STRING, config_.local_info_.zoneName(),
+          upstreamZone(upstream_host), is_canary};
 
       Http::CodeUtility::chargeResponseStat(info);
     }
@@ -163,15 +165,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                    headers.Path()->value().c_str());
 
   cluster_ = config_.cm_.get(route_->clusterName());
-  const std::string& cluster_alt_name = cluster_->altStatName();
-  if (!cluster_alt_name.empty()) {
-    alt_stat_prefixes_.push_back(fmt::format("cluster.{}.", cluster_alt_name));
-  }
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
-    alt_stat_prefixes_.push_back(
-        fmt::format("cluster.{}.{}.", route_->clusterName(), request_alt_name->value().c_str()));
+    alt_stat_prefix_ = std::string(request_alt_name->value().c_str()) + ".";
     headers.removeEnvoyUpstreamAltStatName();
   }
 
@@ -420,7 +417,7 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
                                 [this]() -> void { doRetry(); }) &&
       setupRetry(end_stream)) {
     Http::CodeUtility::chargeBasicResponseStat(
-        config_.stats_store_, cluster_->statPrefix() + "retry.",
+        cluster_->statsScope(), "retry.",
         static_cast<Http::Code>(Http::Utility::getResponseStatus(*headers)));
     return;
   } else {
@@ -479,18 +476,18 @@ void Filter::onUpstreamComplete() {
     bool internal_request = internal_request_header && internal_request_header->value() == "true";
 
     Http::CodeUtility::ResponseTimingInfo info{
-        config_.stats_store_, cluster_->statPrefix(), response_time,
-        upstream_request_->upstream_canary_, internal_request, route_->virtualHostName(),
-        request_vcluster_ ? request_vcluster_->name() : "", config_.service_zone_,
-        upstreamZone(upstream_request_->upstream_host_)};
+        config_.global_store_, cluster_->statsScope(), EMPTY_STRING, response_time,
+        upstream_request_->upstream_canary_, internal_request, route_->virtualHost().name(),
+        request_vcluster_ ? request_vcluster_->name() : EMPTY_STRING,
+        config_.local_info_.zoneName(), upstreamZone(upstream_request_->upstream_host_)};
 
     Http::CodeUtility::chargeResponseTiming(info);
 
-    for (const std::string& alt_prefix : alt_stat_prefixes_) {
-      Http::CodeUtility::ResponseTimingInfo info{config_.stats_store_, alt_prefix, response_time,
-                                                 upstream_request_->upstream_canary_,
-                                                 internal_request, "", "", config_.service_zone_,
-                                                 upstreamZone(upstream_request_->upstream_host_)};
+    if (!alt_stat_prefix_.empty()) {
+      Http::CodeUtility::ResponseTimingInfo info{
+          config_.global_store_, cluster_->statsScope(), alt_stat_prefix_, response_time,
+          upstream_request_->upstream_canary_, internal_request, EMPTY_STRING, EMPTY_STRING,
+          config_.local_info_.zoneName(), upstreamZone(upstream_request_->upstream_host_)};
 
       Http::CodeUtility::chargeResponseTiming(info);
     }

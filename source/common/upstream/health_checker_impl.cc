@@ -23,13 +23,13 @@ namespace Upstream {
 const std::chrono::milliseconds HealthCheckerImplBase::NO_TRAFFIC_INTERVAL{60000};
 
 HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster, const Json::Object& config,
-                                             Event::Dispatcher& dispatcher, Stats::Store& store,
+                                             Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
     : cluster_(cluster), dispatcher_(dispatcher), timeout_(config.getInteger("timeout_ms")),
       unhealthy_threshold_(config.getInteger("unhealthy_threshold")),
-      healthy_threshold_(config.getInteger("healthy_threshold")), stats_(generateStats(store)),
-      stat_store_(store), runtime_(runtime), random_(random),
+      healthy_threshold_(config.getInteger("healthy_threshold")),
+      stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
       interval_(config.getInteger("interval_ms")),
       interval_jitter_(config.getInteger("interval_jitter_ms", 0)) {
   cluster_.addMemberUpdateCb(
@@ -43,10 +43,10 @@ void HealthCheckerImplBase::decHealthy() {
   refreshHealthyStat();
 }
 
-HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Store& store) {
-  std::string prefix(fmt::format("cluster.{}.health_check.", cluster_.info()->name()));
-  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(store, prefix),
-                                   POOL_GAUGE_PREFIX(store, prefix))};
+HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
+  std::string prefix("health_check.");
+  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                   POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
 void HealthCheckerImplBase::incHealthy() {
@@ -158,10 +158,10 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(bool timeout
 }
 
 HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
-                                             Event::Dispatcher& dispatcher, Stats::Store& store,
+                                             Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
-    : HealthCheckerImplBase(cluster, config, dispatcher, store, runtime, random),
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
       path_(config.getString("path")) {
   if (config.hasObject("service_name")) {
     service_name_.value(config.getString("service_name"));
@@ -319,8 +319,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return new Http::CodecClientProd(Http::CodecClient::Type::HTTP1, std::move(data.connection_),
-                                   Http::CodecClientStats{stats_.protocol_error_}, stat_store_,
-                                   data.host_description_->cluster().httpCodecOptions());
+                                   data.host_description_);
 }
 
 TcpHealthCheckMatcher::MatchSegments
@@ -350,10 +349,9 @@ bool TcpHealthCheckMatcher::match(const MatchSegments& expected, const Buffer::I
 }
 
 TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
-                                           Event::Dispatcher& dispatcher, Stats::Store& store,
-                                           Runtime::Loader& runtime,
+                                           Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                                            Runtime::RandomGenerator& random)
-    : HealthCheckerImplBase(cluster, config, dispatcher, store, runtime, random),
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
       send_bytes_(TcpHealthCheckMatcher::loadJsonBytes(config.getObjectArray("send"))),
       receive_bytes_(TcpHealthCheckMatcher::loadJsonBytes(config.getObjectArray("receive"))) {}
 

@@ -1,8 +1,10 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
@@ -15,24 +17,25 @@ namespace RateLimit {
  */
 class FilterConfig {
 public:
-  FilterConfig(const Json::Object& config, const std::string& local_service_cluster,
-               Stats::Store& stats_store, Runtime::Loader& runtime)
+  FilterConfig(const Json::Object& config, const LocalInfo::LocalInfo& local_info,
+               Stats::Store& global_store, Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : domain_(config.getString("domain")), stage_(config.getInteger("stage", 0)),
-        local_service_cluster_(local_service_cluster), stats_store_(stats_store),
-        runtime_(runtime) {}
+        local_info_(local_info), global_store_(global_store), runtime_(runtime), cm_(cm) {}
 
   const std::string& domain() const { return domain_; }
-  const std::string& localServiceCluster() const { return local_service_cluster_; }
+  const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   int64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
-  Stats::Store& stats() { return stats_store_; }
+  Stats::Store& globalStore() { return global_store_; }
+  Upstream::ClusterManager& cm() { return cm_; }
 
 private:
   const std::string domain_;
   int64_t stage_;
-  const std::string local_service_cluster_;
-  Stats::Store& stats_store_;
+  const LocalInfo::LocalInfo& local_info_;
+  Stats::Store& global_store_;
   Runtime::Loader& runtime_;
+  Upstream::ClusterManager& cm_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigPtr;
@@ -65,8 +68,7 @@ private:
   StreamDecoderFilterCallbacks* callbacks_{};
   bool initiating_call_{};
   State state_{State::NotStarted};
-  std::string cluster_ratelimit_stat_prefix_;
-  std::string cluster_stat_prefix_;
+  Upstream::ClusterInfoPtr cluster_;
 };
 
 } // RateLimit

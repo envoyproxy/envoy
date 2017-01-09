@@ -61,7 +61,7 @@ public:
  */
 class ConnectionImpl : public virtual Connection, Logger::Loggable<Logger::Id::http2> {
 public:
-  ConnectionImpl(Network::Connection& connection, Stats::Store& stats)
+  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats)
       : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))},
         connection_(connection) {}
 
@@ -206,7 +206,7 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Store& stats, uint64_t codec_options);
+                       Stats::Scope& stats, uint64_t codec_options);
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
