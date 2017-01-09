@@ -14,16 +14,14 @@ public:
   virtual ~ContextManager() {}
 
   /**
-   * Builds an Ssl::ClientContext from an Ssl::ContextConfig
+   * Builds an ClientContext from an ContextConfig
    */
-  virtual Ssl::ClientContext& createSslClientContext(Stats::Scope& scope,
-                                                     ContextConfig& config) PURE;
+  virtual ClientContextPtr createSslClientContext(Stats::Scope& scope, ContextConfig& config) PURE;
 
   /**
-   * Builds an Ssl::ServerContext from an Ssl::ContextConfig
+   * Builds an ServerContext from an ContextConfig
    */
-  virtual Ssl::ServerContext& createSslServerContext(Stats::Scope& stats,
-                                                     ContextConfig& config) PURE;
+  virtual ServerContextPtr createSslServerContext(Stats::Scope& scope, ContextConfig& config) PURE;
 
   /**
    * @return the number of days until the next certificate being managed will expire
@@ -31,9 +29,9 @@ public:
   virtual size_t daysUntilFirstCertExpires() PURE;
 
   /**
-   * @return a set of all contexts being managed
+   * Iterate through all currently allocated contexts.
    */
-  virtual std::vector<std::reference_wrapper<Ssl::Context>> getContexts() PURE;
+  virtual void iterateContexts(std::function<void(Context&)> callback) PURE;
 };
 
 } // Ssl

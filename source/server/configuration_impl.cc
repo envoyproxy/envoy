@@ -123,7 +123,7 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
   if (json.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*json.getObject("ssl_context"));
     ssl_context_ =
-        &parent_.server_.sslContextManager().createSslServerContext(scope_, context_config);
+        parent_.server_.sslContextManager().createSslServerContext(scope_, context_config);
   }
 
   if (json.hasObject("use_proxy_proto")) {

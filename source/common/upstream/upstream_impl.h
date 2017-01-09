@@ -174,7 +174,7 @@ public:
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
-  Ssl::ClientContext* sslContext() const override { return ssl_ctx_; }
+  Ssl::ClientContext* sslContext() const override { return ssl_ctx_.get(); }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return stats_scope_; }
 
@@ -193,12 +193,12 @@ private:
   static uint64_t parseFeatures(const Json::Object& config);
 
   Runtime::Loader& runtime_;
-  Ssl::ClientContext* ssl_ctx_; // TODO: For dynamic cluster remove we need to delete the context.
   const std::string name_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
   mutable Stats::ScopeImpl stats_scope_;
   mutable ClusterStats stats_;
+  Ssl::ClientContextPtr ssl_ctx_;
   const uint64_t features_;
   const uint64_t http_codec_options_;
   mutable ResourceManagers resource_managers_;
