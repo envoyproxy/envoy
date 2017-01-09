@@ -35,7 +35,7 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
               fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
         continue;
       }
-      route_rate_limit.populateDescriptors(*route, descriptors, localInfo().clusterName(),
+      route_rate_limit.populateDescriptors(*route, descriptors, config_->localInfo().clusterName(),
                                            headers, callbacks_->downstreamAddress());
     }
 

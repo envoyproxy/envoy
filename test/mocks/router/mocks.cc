@@ -35,6 +35,7 @@ MockShadowWriter::MockShadowWriter() {}
 MockShadowWriter::~MockShadowWriter() {}
 
 MockVirtualHost::MockVirtualHost() {
+  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
 }
 

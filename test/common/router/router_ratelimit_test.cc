@@ -239,6 +239,7 @@ TEST_F(RateLimitConfiguration, TestVirtualHost) {
   route_ = config_->routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0);
   rate_limits = route_->virtualHost().rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(1U, rate_limits.size());
+
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, address);
   }

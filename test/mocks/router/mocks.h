@@ -113,9 +113,12 @@ public:
 
 class MockVirtualHost : public VirtualHost {
 public:
+  MockVirtualHost();
+  ~MockVirtualHost();
+
   // Router::VirtualHost
-  const std::string& name() const override { return name_; }
-  const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+  MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
 
   std::string name_{"fake_vhost"};
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
