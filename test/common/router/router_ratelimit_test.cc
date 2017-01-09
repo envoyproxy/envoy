@@ -190,19 +190,6 @@ TEST_F(RateLimitConfiguration, TestVirtualHost) {
       "domains": ["www.lyft.com"],
       "routes": [
         {
-          "prefix": "/foo",
-          "cluster": "www2",
-          "rate_limits": [
-            {
-              "actions": [
-                {
-                  "type": "remote_address"
-                }
-              ]
-            }
-          ]
-        },
-        {
           "prefix": "/",
           "cluster": "www2test"
         }
@@ -222,24 +209,65 @@ TEST_F(RateLimitConfiguration, TestVirtualHost) {
 )EOF";
 
   SetUpTest(json);
+
+  route_ = config_->routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0);
+  std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
+      route_->virtualHost().rateLimitPolicy().getApplicableRateLimit(0);
+  EXPECT_EQ(1U, rate_limits.size());
+
+  std::vector<::RateLimit::Descriptor> descriptors;
+  for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
+    rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, "");
+  }
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>(
+                  {{{{"to_cluster", "www2test"}}},
+                   {{{"to_cluster", "www2test"}, {"from_cluster", "service_cluster"}}}}),
+              testing::ContainerEq(descriptors));
+}
+
+TEST_F(RateLimitConfiguration, TestMultipleRateLimits) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "cluster": "www2test",
+          "rate_limits": [
+            {
+              "actions":[
+                {
+                  "type": "remote_address"
+                }
+              ]
+            },
+            {
+              "actions": [
+                {
+                  "type": "service_to_service"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+
+  SetUpTest(json);
   std::string address = "10.0.0.1";
 
   route_ = config_->routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0);
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route_->rateLimitPolicy().getApplicableRateLimit(0);
-  EXPECT_EQ(1U, rate_limits.size());
+  EXPECT_EQ(2U, rate_limits.size());
 
   std::vector<::RateLimit::Descriptor> descriptors;
-  for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
-    rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, address);
-  }
-  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
-              testing::ContainerEq(descriptors));
-
-  route_ = config_->routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0);
-  rate_limits = route_->virtualHost().rateLimitPolicy().getApplicableRateLimit(0);
-  EXPECT_EQ(1U, rate_limits.size());
-
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, address);
   }
