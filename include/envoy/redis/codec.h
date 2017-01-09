@@ -19,6 +19,10 @@ public:
   RespValue() : type_(RespType::Null) {}
   ~RespValue() { cleanup(); }
 
+  /**
+   * The following are getters and setters for the internal value. A RespValue start as null,
+   * and much change type via type() before the following methods can be used.
+   */
   std::vector<RespValue>& asArray();
   const std::vector<RespValue>& asArray() const;
   std::string& asString();
@@ -26,6 +30,10 @@ public:
   int64_t& asInteger();
   int64_t asInteger() const;
 
+  /**
+   * Get/set the type of the RespValue. A RespValue can only be a single type at a time. Each time
+   * type() is called the type is changed and then the type specific as* methods can be used.
+   */
   RespType type() const { return type_; }
   void type(RespType type);
 
