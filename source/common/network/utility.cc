@@ -228,7 +228,7 @@ bool Utility::getOriginalDst(int fd, sockaddr_storage* orig_addr) {
   socklen_t addr_len = sizeof(sockaddr_storage);
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, orig_addr, &addr_len);
 
-  return (status == 0) ? true : false;
+  return (status == 0);
 }
 
 } // Network

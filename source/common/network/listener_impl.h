@@ -8,9 +8,9 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 
-#include "server/connection_handler.h"
-
 #include "event2/event.h"
+
+class ConnectionHandler;
 
 namespace Network {
 
@@ -40,7 +40,7 @@ public:
   /**
    * @return the socket supplied to the listener at construction time
    */
-  ListenSocket& socket(void) { return socket_; }
+  ListenSocket& socket() { return socket_; }
 
   /**
    * Set a pointer to the connection handler that handles connections for this listener

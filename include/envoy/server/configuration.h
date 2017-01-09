@@ -40,8 +40,8 @@ public:
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.
-   *        a listener that doesn't listen on a port can only receive connections
-   *        redirected from other listeners
+   *         A listener that doesn't listen on a port can only receive connections
+   *         redirected from other listeners.
    */
   virtual bool bindToPort() PURE;
 

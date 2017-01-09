@@ -20,7 +20,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
   if (listener->use_original_dst_ && listener->connection_handler_ != nullptr) {
-    struct sockaddr_storage orig_dst_addr;
+    sockaddr_storage orig_dst_addr;
     memset(&orig_dst_addr, 0, sizeof(orig_dst_addr));
 
     bool success = Utility::getOriginalDst(fd, &orig_dst_addr);
@@ -29,6 +29,10 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       std::string orig_sock_name = std::to_string(
           listener->getAddressPort(reinterpret_cast<struct sockaddr*>(&orig_dst_addr)));
 
+      // A listener that has the use_original_dst flag set to true can still receive connections
+      // that are NOT redirected using iptables. If a connection was not redirected,
+      // the address and port returned by getOriginalDst() match the listener port.
+      // In this case the listener handles the connection directly and does not hand it off.
       if (listener->socket_.name() != orig_sock_name) {
         ListenerImpl* new_listener =
             static_cast<ListenerImpl*>(listener->connection_handler_->findListener(orig_sock_name));
@@ -48,20 +52,18 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& sock
                            bool use_proxy_proto, bool use_orig_dst)
     : dispatcher_(dispatcher), socket_(socket), cb_(cb), bind_to_port_(bind_to_port),
       use_proxy_proto_(use_proxy_proto), proxy_protocol_(stats_store),
-      use_original_dst_(use_orig_dst), connection_handler_(nullptr) {
+      use_original_dst_(use_orig_dst), connection_handler_(nullptr), listener_(nullptr) {
 
   if (bind_to_port_) {
     listener_.reset(
         evconnlistener_new(&dispatcher_.base(), listenCallback, this, 0, -1, socket.fd()));
-  } else {
-    listener_.reset(evconnlistener_new(&dispatcher_.base(), nullptr, this, 0, -1, socket.fd()));
-  }
 
-  if (!listener_) {
-    throw CreateListenerException(fmt::format("cannot listen on socket: {}", socket.name()));
-  }
+    if (!listener_) {
+      throw CreateListenerException(fmt::format("cannot listen on socket: {}", socket.name()));
+    }
 
-  evconnlistener_set_error_cb(listener_.get(), errorCallback);
+    evconnlistener_set_error_cb(listener_.get(), errorCallback);
+  }
 }
 
 void ListenerImpl::errorCallback(evconnlistener*, void*) {

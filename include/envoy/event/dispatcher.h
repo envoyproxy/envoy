@@ -71,11 +71,11 @@ public:
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
    * @param stats_store supplies the Stats::Store to use.
-   * @param use_proxy_proto whether to use the PROXY Protocol V1
-   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
    * @param bind_to_port specifies if the listener should actually bind to the port.
    *        a listener that doesn't bind can only receive connections redirected from
-   *        other listeners that use the use_orig_dst
+   *        other listeners that that set use_origin_dst to true
+   * @param use_proxy_proto whether to use the PROXY Protocol V1
+   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
    * @param use_orig_dst if a connection was redirected to this port using iptables,
    *        allow the listener to hand it off to the listener associated to the original port
    * @return Network::ListenerPtr a new listener that is owned by the caller.
@@ -93,7 +93,9 @@ public:
    * @param stats_store supplies the Stats::Store to use.
    * @param bind_to_port specifies if the listener should actually bind to the port.
    *        a listener that doesn't bind can only receive connections redirected from
-   *        other listeners that use the use_orig_dst
+   *        other listeners that set use_origin_dst to true
+   * @param use_proxy_proto whether to use the PROXY Protocol V1
+   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
    * @param use_orig_dst if a connection was redirected to this port using iptables,
    *        allow the listener to hand it off to the listener associated to the original port
    * @return Network::ListenerPtr a new listener that is owned by the caller.

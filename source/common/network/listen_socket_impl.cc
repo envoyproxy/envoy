@@ -7,7 +7,7 @@
 
 namespace Network {
 
-TcpListenSocket::TcpListenSocket(uint32_t port, bool bindToPort) : port_(port) {
+TcpListenSocket::TcpListenSocket(uint32_t port, bool bind_to_port) : port_(port) {
 
   AddrInfoPtr address = Utility::resolveTCP("", port);
   fd_ = socket(address->ai_addr->sa_family, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -17,7 +17,7 @@ TcpListenSocket::TcpListenSocket(uint32_t port, bool bindToPort) : port_(port) {
   int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   RELEASE_ASSERT(rc != -1);
 
-  if (bindToPort) {
+  if (bind_to_port) {
     rc = bind(fd_, address->ai_addr, address->ai_addrlen);
     if (rc == -1) {
       close();

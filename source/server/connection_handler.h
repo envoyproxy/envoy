@@ -46,7 +46,7 @@ public:
    * @param socket supplies the already bound socket to listen on.
    * @param bind_to_port specifies if the listener should actually bind to the port.
    *        a listener that doesn't bind can only receive connections redirected from
-   *        other listeners that use the use_orig_dst
+   *        other listeners that set use_origin_dst to true
    * @param use_proxy_proto whether to use the PROXY Protocol V1
    * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
    * @param use_orig_dst if a connection was redirected to this port using iptables,
@@ -61,7 +61,7 @@ public:
    * @param socket supplies the already bound socket to listen on.
    * @param bind_to_port specifies if the listener should actually bind to the port.
    *        a listener that doesn't bind can only receive connections redirected from
-   *        other listeners that use the use_orig_dst
+   *        other listeners that set use_origin_dst to true
    * @param use_proxy_proto whether to use the PROXY Protocol V1
    * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
    * @param use_orig_dst if a connection was redirected to this port using iptables,

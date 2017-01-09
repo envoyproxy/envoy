@@ -31,7 +31,7 @@ protected:
  */
 class TcpListenSocket : public ListenSocketImpl {
 public:
-  TcpListenSocket(uint32_t port, bool bindToPort);
+  TcpListenSocket(uint32_t port, bool bind_to_port);
   TcpListenSocket(int fd, uint32_t port) : ListenSocketImpl(fd), port_(port) {}
 
   uint32_t port() { return port_; }
