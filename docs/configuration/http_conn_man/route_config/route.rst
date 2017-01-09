@@ -198,7 +198,7 @@ The router can match a request to a route based on headers specified in the rout
 .. code-block:: json
 
   [
-    {"name": "...", "value": "..."}
+    {"name": "...", "value": "...", "regex": "..."}
   ]
 
 name
@@ -207,6 +207,10 @@ name
 value
   *(optional, string)* Specifies the value of the header. If the value is absent a request that has
   the *name* header will match, regardless of the header's value.
+
+regex
+  *(optional, boolean)* Specifies whether the header value is a regular
+  expression or not. Defaults to false.
 
 The router will check the request's headers against all the specified
 headers in the route config. A match will happen if all the headers in the route are present in

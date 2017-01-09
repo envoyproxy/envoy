@@ -119,7 +119,7 @@ actual fault injection further depend on the values of *abort_percent* and
 .. code-block:: json
 
   [
-    {"name": "...", "value": "..."}
+    {"name": "...", "value": "...", "regex": "..."}
   ]
 
 name
@@ -129,6 +129,10 @@ value
   *(optional, string)* Specifies the value of the header. If the value is
   absent a request that has the *name* header will match, regardless of the
   header's value.
+
+regex
+  *(optional, boolean)* Specifies whether the header value is a regular expression
+  or not. Defaults to false.
 
 The filter will check the request's headers against all the specified
 headers in the filter config. A match will happen if all the headers in the
