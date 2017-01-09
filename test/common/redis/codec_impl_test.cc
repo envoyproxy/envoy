@@ -57,9 +57,20 @@ TEST_F(RedisEncoderDecoderImplTest, SimpleString) {
 TEST_F(RedisEncoderDecoderImplTest, Integer) {
   RespValue value;
   value.type(RespType::Integer);
-  value.asInteger() = 100;
+  value.asInteger() = std::numeric_limits<int64_t>::max();
   encoder_.encode(value, buffer_);
-  EXPECT_EQ(":100\r\n", TestUtility::bufferToString(buffer_));
+  EXPECT_EQ(":9223372036854775807\r\n", TestUtility::bufferToString(buffer_));
+  decoder_.decode(buffer_);
+  EXPECT_EQ(value, *decoded_values_[0]);
+  EXPECT_EQ(0UL, buffer_.length());
+}
+
+TEST_F(RedisEncoderDecoderImplTest, NegativeInteger) {
+  RespValue value;
+  value.type(RespType::Integer);
+  value.asInteger() = std::numeric_limits<int64_t>::min();
+  encoder_.encode(value, buffer_);
+  EXPECT_EQ(":-9223372036854775808\r\n", TestUtility::bufferToString(buffer_));
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());

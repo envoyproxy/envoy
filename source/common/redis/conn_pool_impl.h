@@ -103,7 +103,7 @@ private:
     void onEvent(uint32_t events) override { parent_.onEvent(*this, events); }
 
     ThreadLocalPool& parent_;
-    ClientPtr client_;
+    ClientPtr redis_client_;
   };
 
   typedef std::unique_ptr<ThreadLocalActiveClient> ThreadLocalActiveClientPtr;

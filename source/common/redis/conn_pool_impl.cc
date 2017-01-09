@@ -99,9 +99,9 @@ ActiveRequest* InstanceImpl::ThreadLocalPool::makeRequest(const RespValue& reque
                                                           ActiveRequestCallbacks& callbacks) {
   if (!client_) {
     client_.reset(new ThreadLocalActiveClient(*this));
-    client_->client_ = parent_.client_factory_.create(parent_.cluster_name_, parent_.cm_);
-    if (client_->client_) {
-      client_->client_->addConnectionCallbacks(*client_);
+    client_->redis_client_ = parent_.client_factory_.create(parent_.cluster_name_, parent_.cm_);
+    if (client_->redis_client_) {
+      client_->redis_client_->addConnectionCallbacks(*client_);
     } else {
       client_.reset();
     }
@@ -111,7 +111,7 @@ ActiveRequest* InstanceImpl::ThreadLocalPool::makeRequest(const RespValue& reque
     // TODO: In the case of retry, this is broken. This client could be in the process of being
     //       shut down. Since the entire pool implementation is going to get reworked to support
     //       real pooling we won't worry about this now.
-    return client_->client_->makeRequest(request, callbacks);
+    return client_->redis_client_->makeRequest(request, callbacks);
   } else {
     return nullptr;
   }
@@ -126,7 +126,7 @@ void InstanceImpl::ThreadLocalPool::onEvent(ThreadLocalActiveClient&, uint32_t e
 
 void InstanceImpl::ThreadLocalPool::shutdown() {
   if (client_) {
-    client_->client_->close();
+    client_->redis_client_->close();
   }
 }
 
