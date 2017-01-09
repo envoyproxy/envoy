@@ -29,7 +29,7 @@ public:
   virtual size_t daysUntilFirstCertExpires() PURE;
 
   /**
-   * Iterate through all currently allocated contests.
+   * Iterate through all currently allocated contexts.
    */
   virtual void iterateContexts(std::function<void(Context&)> callback) PURE;
 };
