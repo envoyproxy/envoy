@@ -1,6 +1,7 @@
 #pragma once
 
 #include "context_impl.h"
+#include "context_manager_impl.h"
 #include "openssl.h"
 
 #include "envoy/runtime/runtime.h"
@@ -31,6 +32,8 @@ typedef CSmartPtr<SSL, SSL_free> SslConPtr;
 
 class ContextImpl : public virtual Context {
 public:
+  ~ContextImpl() { parent_.releaseContext(this); }
+
   virtual SslConPtr newSsl() const;
 
   /**
@@ -57,7 +60,7 @@ public:
   std::string getCertChainInformation() override;
 
 protected:
-  ContextImpl(Stats::Scope& scope, ContextConfig& config);
+  ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config);
 
   /**
    * Specifies the context for which the session can be reused.  Any data is acceptable here.
@@ -95,6 +98,7 @@ protected:
   std::string getCaFileName() { return ca_file_path_; };
   std::string getCertChainFileName() { return cert_chain_file_path_; };
 
+  ContextManagerImpl& parent_;
   SslCtxPtr ctx_;
   std::string verify_subject_alt_name_;
   std::vector<uint8_t> verify_certificate_hash_;
@@ -109,7 +113,7 @@ protected:
 
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
-  ClientContextImpl(Stats::Scope& scope, ContextConfig& config);
+  ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config);
 
   SslConPtr newSsl() const override;
 
@@ -119,7 +123,8 @@ private:
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
-  ServerContextImpl(Stats::Scope& scope, ContextConfig& config, Runtime::Loader& runtime);
+  ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config,
+                    Runtime::Loader& runtime);
 
 private:
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,

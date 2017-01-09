@@ -92,7 +92,7 @@ private:
     // Server::Configuration::Listener
     Network::FilterChainFactory& filterChainFactory() override { return *this; }
     uint64_t port() override { return port_; }
-    Ssl::ServerContext* sslContext() override { return ssl_context_; }
+    Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
     bool useProxyProto() override { return use_proxy_proto_; }
 
     // Network::FilterChainFactory
@@ -102,7 +102,7 @@ private:
     MainImpl& parent_;
     uint64_t port_;
     Stats::ScopeImpl scope_;
-    Ssl::ServerContext* ssl_context_{};
+    Ssl::ServerContextPtr ssl_context_;
     bool use_proxy_proto_{};
     std::list<NetworkFilterFactoryCb> filter_factories_;
   };

@@ -1,23 +1,13 @@
 #pragma once
 
-#include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/server.h"
-
-#include "common/http/codec_client.h"
-#include "common/stats/stats_impl.h"
-#include "common/ssl/openssl.h"
 
 #include "test/mocks/runtime/mocks.h"
 
 using testing::NiceMock;
 
 namespace Ssl {
-
-class TestServerContextImpl : public ContextImpl, public ServerContext {
-public:
-  TestServerContextImpl(Stats::Scope& scope, ContextConfig& config) : ContextImpl(scope, config) {}
-};
 
 class MockRuntimeIntegrationTestServer : public IntegrationTestServer {
 public:
@@ -45,39 +35,22 @@ public:
   /**
    * Global initializer for all integration tests.
    */
-  static void SetUpTestCase() {
-    test_server_ =
-        MockRuntimeIntegrationTestServer::create("test/config/integration/server_ssl.json");
-    upstream_ssl_ctx_ = createUpstreamSslContext(store());
-    client_ssl_ctx_alpn_ = createClientSslContext(store(), true);
-    client_ssl_ctx_no_alpn_ = createClientSslContext(store(), false);
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(upstream_ssl_ctx_.get(), 11000, FakeHttpConnection::Type::HTTP1));
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(upstream_ssl_ctx_.get(), 11001, FakeHttpConnection::Type::HTTP1));
-  }
+  static void SetUpTestCase();
 
   /**
    * Global destructor for all integration tests.
    */
-  static void TearDownTestCase() {
-    test_server_.reset();
-    fake_upstreams_.clear();
-    upstream_ssl_ctx_.reset();
-    client_ssl_ctx_alpn_.reset();
-    client_ssl_ctx_no_alpn_.reset();
-  }
+  static void TearDownTestCase();
 
   Network::ClientConnectionPtr makeSslClientConnection(bool alpn);
-
-  static ServerContextPtr createUpstreamSslContext(Stats::Scope& store);
-  static ClientContextPtr createClientSslContext(Stats::Scope& scope, bool alpn);
-
+  static ServerContextPtr createUpstreamSslContext();
+  static ClientContextPtr createClientSslContext(bool alpn);
   static Stats::Store& store() { return test_server_->server().stats(); }
-
   void checkStats();
 
 private:
+  static std::unique_ptr<Runtime::Loader> runtime_;
+  static std::unique_ptr<ContextManager> context_manager_;
   static ServerContextPtr upstream_ssl_ctx_;
   static ClientContextPtr client_ssl_ctx_alpn_;
   static ClientContextPtr client_ssl_ctx_no_alpn_;
