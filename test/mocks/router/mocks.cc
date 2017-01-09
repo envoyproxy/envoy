@@ -61,8 +61,12 @@ MockConfig::MockConfig() {
 
 MockConfig::~MockConfig() {}
 
+MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_)); }
+
+MockRoute::~MockRoute() {}
+
 MockStableRouteTable::MockStableRouteTable() {
-  ON_CALL(*this, routeForRequest(_)).WillByDefault(Return(&route_entry_));
+  ON_CALL(*this, route(_)).WillByDefault(Return(&route_));
 }
 
 MockStableRouteTable::~MockStableRouteTable() {}

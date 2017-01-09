@@ -19,18 +19,20 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
     return FilterHeadersStatus::Continue;
   }
 
-  const Router::RouteEntry* route = callbacks_->routeTable().routeForRequest(headers);
-  if (route) {
+  const Router::Route* route = callbacks_->routeTable().route(headers);
+  if (route && route->routeEntry()) {
+    const Router::RouteEntry* route_entry = route->routeEntry();
+
     // TODO: Cluster may not exist.
-    cluster_ = config_->cm().get(route->clusterName());
+    cluster_ = config_->cm().get(route_entry->clusterName());
 
     std::vector<::RateLimit::Descriptor> descriptors;
 
     // Get all applicable rate limit policy entries for the route.
-    populateRateLimitDescriptors(route->rateLimitPolicy(), descriptors, route, headers);
+    populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route, headers);
 
     // Get all applicable rate limit policy entries for the virtual host.
-    populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, route,
+    populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors, route,
                                  headers);
 
     if (!descriptors.empty()) {

@@ -152,35 +152,47 @@ TEST(RouteMatcherTest, TestRoutes) {
   EXPECT_FALSE(config.usesRuntime());
 
   // Base routing testing.
-  EXPECT_EQ("instant-server",
-            config.routeForRequest(genHeaders("api.lyft.com", "/", "GET"), 0)->clusterName());
-  EXPECT_EQ("ats", config.routeForRequest(genHeaders("api.lyft.com", "/api/leads/me", "GET"), 0)
+  EXPECT_EQ("instant-server", config.getRouteForRequest(genHeaders("api.lyft.com", "/", "GET"), 0)
+                                  ->routeEntry()
+                                  ->clusterName());
+  EXPECT_EQ("ats", config.getRouteForRequest(genHeaders("api.lyft.com", "/api/leads/me", "GET"), 0)
+                       ->routeEntry()
                        ->clusterName());
   EXPECT_EQ("ats",
-            config.routeForRequest(genHeaders("api.lyft.com", "/api/application_data", "GET"), 0)
+            config.getRouteForRequest(genHeaders("api.lyft.com", "/api/application_data", "GET"), 0)
+                ->routeEntry()
                 ->clusterName());
 
+  EXPECT_EQ(
+      "locations",
+      config.getRouteForRequest(genHeaders("api.lyft.com", "/api/locations?works=true", "GET"), 0)
+          ->routeEntry()
+          ->clusterName());
   EXPECT_EQ("locations",
-            config.routeForRequest(genHeaders("api.lyft.com", "/api/locations?works=true", "GET"),
-                                   0)->clusterName());
-  EXPECT_EQ("locations", config.routeForRequest(genHeaders("api.lyft.com", "/api/locations", "GET"),
-                                                0)->clusterName());
-  EXPECT_EQ("www2",
-            config.routeForRequest(genHeaders("lyft.com", "/foo", "GET"), 0)->clusterName());
-  EXPECT_EQ("root_www2",
-            config.routeForRequest(genHeaders("wwww.lyft.com", "/", "GET"), 0)->clusterName());
+            config.getRouteForRequest(genHeaders("api.lyft.com", "/api/locations", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("www2", config.getRouteForRequest(genHeaders("lyft.com", "/foo", "GET"), 0)
+                        ->routeEntry()
+                        ->clusterName());
+  EXPECT_EQ("root_www2", config.getRouteForRequest(genHeaders("wwww.lyft.com", "/", "GET"), 0)
+                             ->routeEntry()
+                             ->clusterName());
 
   // Timeout testing.
   EXPECT_EQ(std::chrono::milliseconds(30000),
-            config.routeForRequest(genHeaders("api.lyft.com", "/", "GET"), 0)->timeout());
-  EXPECT_EQ(
-      std::chrono::milliseconds(15000),
-      config.routeForRequest(genHeaders("api.lyft.com", "/api/leads/me", "GET"), 0)->timeout());
+            config.getRouteForRequest(genHeaders("api.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->timeout());
+  EXPECT_EQ(std::chrono::milliseconds(15000),
+            config.getRouteForRequest(genHeaders("api.lyft.com", "/api/leads/me", "GET"), 0)
+                ->routeEntry()
+                ->timeout());
 
   // Prefix rewrite testing.
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     EXPECT_EQ("www2", route->clusterName());
     EXPECT_EQ("www2", route->virtualHost().name());
     route->finalizeRequestHeaders(headers);
@@ -191,14 +203,14 @@ TEST(RouteMatcherTest, TestRoutes) {
   {
     Http::TestHeaderMapImpl headers =
         genHeaders("api.lyft.com", "/api/locations?works=true", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/foo", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("/bar", headers.get_(Http::Headers::get().Path));
   }
@@ -206,7 +218,7 @@ TEST(RouteMatcherTest, TestRoutes) {
   // Host rewrite testing.
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/host/rewrite/me", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("new_host", headers.get_(Http::Headers::get().Host));
   }
@@ -215,14 +227,14 @@ TEST(RouteMatcherTest, TestRoutes) {
   {
     Http::TestHeaderMapImpl headers =
         genHeaders("api.lyft.com", "/API/locations?works=true", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("/rewrote?works=true", headers.get_(Http::Headers::get().Path));
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/fooD", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("/cAndy", headers.get_(Http::Headers::get().Path));
   }
@@ -230,14 +242,14 @@ TEST(RouteMatcherTest, TestRoutes) {
   // Case sensitive is set to true and will not rewrite
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/FOO", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("/FOO", headers.get_(Http::Headers::get().Path));
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/ApPles", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("/ApPles", headers.get_(Http::Headers::get().Path));
   }
@@ -245,7 +257,7 @@ TEST(RouteMatcherTest, TestRoutes) {
   // Case insensitive set to false so there is no rewrite
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/oLDhost/rewrite/me", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().Host));
   }
@@ -253,7 +265,7 @@ TEST(RouteMatcherTest, TestRoutes) {
   // Case sensitive is set to false and will not rewrite
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/Tart", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("/Tart", headers.get_(Http::Headers::get().Path));
   }
@@ -261,7 +273,7 @@ TEST(RouteMatcherTest, TestRoutes) {
   // Case sensitive is set to false and will not rewrite
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/newhost/rewrite/me", "GET");
-    const RouteEntry* route = config.routeForRequest(headers, 0);
+    const RouteEntry* route = config.getRouteForRequest(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers);
     EXPECT_EQ("new_host", headers.get_(Http::Headers::get().Host));
   }
@@ -279,55 +291,66 @@ TEST(RouteMatcherTest, TestRoutes) {
   // Virtual cluster testing.
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides", "GET");
-    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("other",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/blah", "POST");
-    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("other",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides", "POST");
-    EXPECT_EQ("ride_request", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("ride_request",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides/123", "PUT");
-    EXPECT_EQ("update_ride", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("update_ride",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers =
         genHeaders("api.lyft.com", "/users/123/chargeaccounts", "POST");
-    EXPECT_EQ("cc_add", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("cc_add",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers =
         genHeaders("api.lyft.com", "/users/123/chargeaccounts/hello123", "PUT");
-    EXPECT_EQ("cc_add", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("cc_add",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers =
         genHeaders("api.lyft.com", "/users/123/chargeaccounts/validate", "PUT");
-    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("other",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/foo/bar", "PUT");
-    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("other",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/users", "POST");
     EXPECT_EQ("create_user_login",
-              config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/users/123", "PUT");
-    EXPECT_EQ("update_user", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("update_user",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/users/123/location", "POST");
-    EXPECT_EQ("ulu", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("ulu",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/something/else", "GET");
-    EXPECT_EQ("other", config.routeForRequest(headers, 0)->virtualCluster(headers)->name());
+    EXPECT_EQ("other",
+              config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
 }
 
@@ -389,20 +412,26 @@ TEST(RouteMatcherTest, Priority) {
   EXPECT_FALSE(config.usesRuntime());
 
   EXPECT_EQ(Upstream::ResourcePriority::High,
-            config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)->priority());
+            config.getRouteForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->priority());
   EXPECT_EQ(Upstream::ResourcePriority::Default,
-            config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)->priority());
+            config.getRouteForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->priority());
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "POST");
-    EXPECT_EQ(Upstream::ResourcePriority::High,
-              config.routeForRequest(headers, 0)->virtualCluster(headers)->priority());
+    EXPECT_EQ(
+        Upstream::ResourcePriority::High,
+        config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->priority());
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
-    EXPECT_EQ(Upstream::ResourcePriority::Default,
-              config.routeForRequest(headers, 0)->virtualCluster(headers)->priority());
+    EXPECT_EQ(
+        Upstream::ResourcePriority::Default,
+        config.getRouteForRequest(headers, 0)->routeEntry()->virtualCluster(headers)->priority());
   }
 }
 
@@ -469,13 +498,16 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
 
   {
     EXPECT_EQ("local_service_without_headers",
-              config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 0)->clusterName());
+              config.getRouteForRequest(genHeaders("www.lyft.com", "/", "GET"), 0)
+                  ->routeEntry()
+                  ->clusterName());
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addViaCopy("test_header", "test");
-    EXPECT_EQ("local_service_with_headers", config.routeForRequest(headers, 0)->clusterName());
+    EXPECT_EQ("local_service_with_headers",
+              config.getRouteForRequest(headers, 0)->routeEntry()->clusterName());
   }
 
   {
@@ -483,20 +515,21 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
     headers.addViaCopy("test_header_multiple1", "test1");
     headers.addViaCopy("test_header_multiple2", "test2");
     EXPECT_EQ("local_service_with_multiple_headers",
-              config.routeForRequest(headers, 0)->clusterName());
+              config.getRouteForRequest(headers, 0)->routeEntry()->clusterName());
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addViaCopy("non_existent_header", "foo");
-    EXPECT_EQ("local_service_without_headers", config.routeForRequest(headers, 0)->clusterName());
+    EXPECT_EQ("local_service_without_headers",
+              config.getRouteForRequest(headers, 0)->routeEntry()->clusterName());
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addViaCopy("test_header_presence", "test");
     EXPECT_EQ("local_service_with_empty_headers",
-              config.routeForRequest(headers, 0)->clusterName());
+              config.getRouteForRequest(headers, 0)->routeEntry()->clusterName());
   }
 
   {
@@ -546,20 +579,22 @@ TEST(RouteMatcherTest, ContentType) {
   EXPECT_FALSE(config.usesRuntime());
 
   {
-    EXPECT_EQ("local_service",
-              config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 0)->clusterName());
+    EXPECT_EQ("local_service", config.getRouteForRequest(genHeaders("www.lyft.com", "/", "GET"), 0)
+                                   ->routeEntry()
+                                   ->clusterName());
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addViaCopy("content-type", "application/grpc");
-    EXPECT_EQ("local_service_grpc", config.routeForRequest(headers, 0)->clusterName());
+    EXPECT_EQ("local_service_grpc",
+              config.getRouteForRequest(headers, 0)->routeEntry()->clusterName());
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addViaCopy("content-type", "foo");
-    EXPECT_EQ("local_service", config.routeForRequest(headers, 0)->clusterName());
+    EXPECT_EQ("local_service", config.getRouteForRequest(headers, 0)->routeEntry()->clusterName());
   }
 }
 
@@ -601,12 +636,14 @@ TEST(RouteMatcherTest, Runtime) {
   EXPECT_TRUE(config.usesRuntime());
 
   EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 10)).WillOnce(Return(true));
-  EXPECT_EQ("something_else",
-            config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 10)->clusterName());
+  EXPECT_EQ("something_else", config.getRouteForRequest(genHeaders("www.lyft.com", "/", "GET"), 10)
+                                  ->routeEntry()
+                                  ->clusterName());
 
   EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 20)).WillOnce(Return(false));
-  EXPECT_EQ("www2",
-            config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 20)->clusterName());
+  EXPECT_EQ("www2", config.getRouteForRequest(genHeaders("www.lyft.com", "/", "GET"), 20)
+                        ->routeEntry()
+                        ->clusterName());
 }
 
 TEST(RouteMatcherTest, ShadowClusterNotFound) {
@@ -679,24 +716,30 @@ TEST(RouteMatcherTest, Shadow) {
 
   EXPECT_TRUE(config.usesRuntime());
 
-  EXPECT_EQ("some_cluster", config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+  EXPECT_EQ("some_cluster", config.getRouteForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                                ->routeEntry()
                                 ->shadowPolicy()
                                 .cluster());
-  EXPECT_EQ("", config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+  EXPECT_EQ("", config.getRouteForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->routeEntry()
                     ->shadowPolicy()
                     .runtimeKey());
 
-  EXPECT_EQ("some_cluster2", config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+  EXPECT_EQ("some_cluster2", config.getRouteForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                                 ->routeEntry()
                                  ->shadowPolicy()
                                  .cluster());
-  EXPECT_EQ("foo", config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+  EXPECT_EQ("foo", config.getRouteForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                       ->routeEntry()
                        ->shadowPolicy()
                        .runtimeKey());
 
-  EXPECT_EQ("", config.routeForRequest(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+  EXPECT_EQ("", config.getRouteForRequest(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+                    ->routeEntry()
                     ->shadowPolicy()
                     .cluster());
-  EXPECT_EQ("", config.routeForRequest(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+  EXPECT_EQ("", config.getRouteForRequest(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+                    ->routeEntry()
                     ->shadowPolicy()
                     .runtimeKey());
 }
@@ -741,27 +784,34 @@ TEST(RouteMatcherTest, Retry) {
 
   EXPECT_FALSE(config.usesRuntime());
 
-  EXPECT_EQ(1U, config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+  EXPECT_EQ(1U, config.getRouteForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->routeEntry()
                     ->retryPolicy()
                     .numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE,
-            config.routeForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+            config.getRouteForRequest(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
 
-  EXPECT_EQ(0U, config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+  EXPECT_EQ(0U, config.getRouteForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
                     ->retryPolicy()
                     .numRetries());
-  EXPECT_EQ(0U, config.routeForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+  EXPECT_EQ(0U, config.getRouteForRequest(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
                     ->retryPolicy()
                     .retryOn());
 
-  EXPECT_EQ(3U, config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 0)
+  EXPECT_EQ(3U, config.getRouteForRequest(genHeaders("www.lyft.com", "/", "GET"), 0)
+                    ->routeEntry()
                     ->retryPolicy()
                     .numRetries());
-  EXPECT_EQ(
-      RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX,
-      config.routeForRequest(genHeaders("www.lyft.com", "/", "GET"), 0)->retryPolicy().retryOn());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX,
+            config.getRouteForRequest(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .retryOn());
 }
 
 TEST(RouteMatcherTest, TestBadDefaultConfig) {
@@ -904,46 +954,48 @@ TEST(RouteMatcherTest, Redirect) {
   EXPECT_FALSE(config.usesRuntime());
 
   EXPECT_EQ(nullptr,
-            config.redirectRequest(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
-  EXPECT_EQ(nullptr,
-            config.routeForRequest(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
-
+            config.getRouteForRequest(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
+  // TODO: test one or the other for route or redirect.
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
-    EXPECT_EQ(nullptr, config.redirectRequest(headers, 0));
+    EXPECT_EQ(nullptr, config.getRouteForRequest(headers, 0)->redirectEntry());
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", false, false);
-    EXPECT_EQ("https://www.lyft.com/foo", config.redirectRequest(headers, 0)->newPath(headers));
+    const Route* route = config.getRouteForRequest(headers, 0);
+    EXPECT_EQ("https://www.lyft.com/foo", route->redirectEntry()->newPath(headers));
+    EXPECT_EQ(nullptr, route->routeEntry());
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, true);
-    EXPECT_EQ(nullptr, config.redirectRequest(headers, 0));
+    EXPECT_EQ(nullptr, config.getRouteForRequest(headers, 0)->redirectEntry());
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, false);
-    EXPECT_EQ("https://api.lyft.com/foo", config.redirectRequest(headers, 0)->newPath(headers));
+    EXPECT_EQ("https://api.lyft.com/foo",
+              config.getRouteForRequest(headers, 0)->redirectEntry()->newPath(headers));
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
-    EXPECT_EQ("http://new.lyft.com/foo", config.redirectRequest(headers, 0)->newPath(headers));
+    EXPECT_EQ("http://new.lyft.com/foo",
+              config.getRouteForRequest(headers, 0)->redirectEntry()->newPath(headers));
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/bar", true, false);
     EXPECT_EQ("https://redirect.lyft.com/new_bar",
-              config.redirectRequest(headers, 0)->newPath(headers));
+              config.getRouteForRequest(headers, 0)->redirectEntry()->newPath(headers));
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
-    EXPECT_EQ("https://new.lyft.com/new_baz", config.redirectRequest(headers, 0)->newPath(headers));
+    EXPECT_EQ("https://new.lyft.com/new_baz",
+              config.getRouteForRequest(headers, 0)->redirectEntry()->newPath(headers));
   }
 }
 
 TEST(NullConfigImplTest, All) {
   NullConfigImpl config;
   Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
-  EXPECT_EQ(nullptr, config.redirectRequest(headers, 0));
-  EXPECT_EQ(nullptr, config.routeForRequest(headers, 0));
+  EXPECT_EQ(nullptr, config.getRouteForRequest(headers, 0));
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
   EXPECT_EQ(0UL, config.responseHeadersToAdd().size());
   EXPECT_EQ(0UL, config.responseHeadersToRemove().size());

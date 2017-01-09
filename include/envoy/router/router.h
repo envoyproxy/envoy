@@ -201,6 +201,24 @@ public:
 };
 
 /**
+ * An interface that holds a RedirectEntry or a RouteEntry for a request.
+ */
+class Route {
+public:
+  virtual ~Route() {}
+
+  /**
+   * @return the redirect entry or nullptr if there is no redirect needed for the request.
+   */
+  virtual const RedirectEntry* redirectEntry() const PURE;
+
+  /**
+   * @return the route entry or nullptr if there is no matching route for the request.
+   */
+  virtual const RouteEntry* routeEntry() const PURE;
+};
+
+/**
  * The router configuration.
  */
 class Config {
@@ -208,25 +226,15 @@ public:
   virtual ~Config() {}
 
   /**
-   * Based on the incoming HTTP request headers, determine whether a redirect should take place.
-   * @param headers supplies the request headers.
-   * @param random_value supplies the random seed to use if a runtime choice is required. This
-   *        allows stable choices between calls if desired.
-   * @return the redirect entry or nullptr if there is no redirect needed for the request.
-   */
-  virtual const RedirectEntry* redirectRequest(const Http::HeaderMap& headers,
-                                               uint64_t random_value) const PURE;
-
-  /**
-   * Based on the incoming HTTP request headers, choose the target route to send the remainder
-   * of the request to.
+   * Based on the incoming HTTP request headers, determine the target route (containing either a
+   * route entry or a redirect entry) for the request.
    * @param headers supplies the request headers.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual const RouteEntry* routeForRequest(const Http::HeaderMap& headers,
-                                            uint64_t random_value) const PURE;
+  virtual const Route* getRouteForRequest(const Http::HeaderMap& headers,
+                                          uint64_t random_value) const PURE;
 
   /**
    * Return a list of headers that will be cleaned from any requests that are not from an internal
@@ -266,19 +274,12 @@ public:
   virtual ~StableRouteTable() {}
 
   /**
-   * Based on the incoming HTTP request headers, determine whether a redirect should take place.
-   * @param headers supplies the request headers.
-   * @return the redirect entry or nullptr if there is no redirect needed for the request.
-   */
-  virtual const RedirectEntry* redirectRequest(const Http::HeaderMap& headers) const PURE;
-
-  /**
-   * Based on the incoming HTTP request headers, choose the target route to send the remainder
-   * of the request to.
+   * Based on the incoming HTTP request headers, determine the target route (containing either a
+   * route entry or a redirect entry) for the request.
    * @param headers supplies the request headers.
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual const RouteEntry* routeForRequest(const Http::HeaderMap& headers) const PURE;
+  virtual const Route* route(const Http::HeaderMap& headers) const PURE;
 };
 
 } // Router
