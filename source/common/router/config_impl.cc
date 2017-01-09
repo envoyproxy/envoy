@@ -57,9 +57,11 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
       const Http::HeaderEntry* header = request_headers.get(cfg_header_data.name_);
       if (cfg_header_data.value_ == EMPTY_STRING) {
         matches &= (header != nullptr);
-      } else {
+      } else if (cfg_header_data.isregex_) {
         matches &= (header != nullptr) &&
                    std::regex_match(header->value().c_str(), cfg_header_data.pattern_);
+      } else {
+        matches &= (header != nullptr) && (header->value() == cfg_header_data.value_.c_str());
       }
       if (!matches) {
         break;
@@ -92,8 +94,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
     std::vector<Json::ObjectPtr> config_headers = route.getObjectArray("headers");
     for (const Json::ObjectPtr& header_map : config_headers) {
       // allow header value to be empty, allows matching to be only based on header presence.
+      // Regex is an opt-in. Unless explicitly mentioned, we will use header values for exact string
+      // matches.
       config_headers_.emplace_back(Http::LowerCaseString(header_map->getString("name")),
-                                   header_map->getString("value", EMPTY_STRING));
+                                   header_map->getString("value", EMPTY_STRING),
+                                   header_map->getBoolean("regex", false));
     }
   }
 }

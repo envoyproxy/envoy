@@ -438,9 +438,16 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
         },
         {
           "prefix": "/",
-          "cluster": "local_service_with_header_pattern",
+          "cluster": "local_service_with_header_pattern_set_regex",
           "headers" : [
-            {"name": "test_header_pattern", "value": "^user=test-\\d+$"}
+            {"name": "test_header_pattern", "value": "^user=test-\\d+$", "regex": true}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_header_pattern_unset_regex",
+          "headers" : [
+            {"name": "test_header_pattern", "value": "^customer=test-\\d+$"}
           ]
         },
         {
@@ -495,8 +502,14 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addViaCopy("test_header_pattern", "user=test-1223");
-    EXPECT_EQ("local_service_with_header_pattern",
+    EXPECT_EQ("local_service_with_header_pattern_set_regex",
               config.routeForRequest(headers, 0)->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addViaCopy("test_header_pattern", "customer=test-1223");
+    EXPECT_EQ("local_service_without_headers", config.routeForRequest(headers, 0)->clusterName());
   }
 }
 
