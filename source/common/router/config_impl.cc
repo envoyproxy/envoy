@@ -58,7 +58,8 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
       if (cfg_header_data.value_ == EMPTY_STRING) {
         matches &= (header != nullptr);
       } else {
-        matches &= (header != nullptr) && (header->value() == cfg_header_data.value_.c_str());
+        matches &= (header != nullptr) &&
+                   std::regex_match(header->value().c_str(), cfg_header_data.pattern_);
       }
       if (!matches) {
         break;
