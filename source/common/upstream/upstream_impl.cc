@@ -15,7 +15,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
-#include "common/ssl/context_manager_impl.h"
+#include "common/ssl/context_config_impl.h"
 
 namespace Upstream {
 
@@ -67,7 +67,7 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
   ssl_ctx_ = nullptr;
   if (config.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*config.getObject("ssl_context"));
-    ssl_ctx_ = &ssl_context_manager.createSslClientContext(stats_scope_, context_config);
+    ssl_ctx_ = ssl_context_manager.createSslClientContext(stats_scope_, context_config);
   }
 
   std::string string_lb_type = config.getString("lb_type");

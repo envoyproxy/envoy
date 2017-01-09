@@ -13,12 +13,18 @@ public:
   MockContextManager();
   ~MockContextManager();
 
-  MOCK_METHOD2(createSslClientContext,
-               Ssl::ClientContext&(Stats::Scope& scope, ContextConfig& config));
-  MOCK_METHOD2(createSslServerContext,
-               Ssl::ServerContext&(Stats::Scope& stats, ContextConfig& config));
+  ClientContextPtr createSslClientContext(Stats::Scope& scope, ContextConfig& config) override {
+    return ClientContextPtr{createSslClientContext_(scope, config)};
+  }
+
+  ServerContextPtr createSslServerContext(Stats::Scope& scope, ContextConfig& config) override {
+    return ServerContextPtr{createSslServerContext_(scope, config)};
+  }
+
+  MOCK_METHOD2(createSslClientContext_, ClientContext*(Stats::Scope& scope, ContextConfig& config));
+  MOCK_METHOD2(createSslServerContext_, ServerContext*(Stats::Scope& stats, ContextConfig& config));
   MOCK_METHOD0(daysUntilFirstCertExpires, size_t());
-  MOCK_METHOD0(getContexts, std::vector<std::reference_wrapper<Ssl::Context>>());
+  MOCK_METHOD0(getContexts, std::vector<std::reference_wrapper<Context>>());
 };
 
 class MockConnection : public Connection {

@@ -48,8 +48,9 @@ DH* get_dh2048() {
 
 const unsigned char ContextImpl::SERVER_SESSION_ID_CONTEXT = 1;
 
-ContextImpl::ContextImpl(Stats::Scope& scope, ContextConfig& config)
-    : ctx_(SSL_CTX_new(SSLv23_method())), scope_(scope), stats_(generateStats(scope)) {
+ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
+    : parent_(parent), ctx_(SSL_CTX_new(SSLv23_method())), scope_(scope),
+      stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_);
   // the list of ciphers that will be supported
   if (!config.cipherSuites().empty()) {
@@ -372,8 +373,9 @@ X509Ptr ContextImpl::loadCert(const std::string& cert_file) {
   return X509Ptr{cert};
 };
 
-ClientContextImpl::ClientContextImpl(Stats::Scope& scope, ContextConfig& config)
-    : ContextImpl(scope, config) {
+ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
+                                     ContextConfig& config)
+    : ContextImpl(parent, scope, config) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
@@ -401,9 +403,9 @@ SslConPtr ClientContextImpl::newSsl() const {
   return ssl_con;
 }
 
-ServerContextImpl::ServerContextImpl(Stats::Scope& scope, ContextConfig& config,
-                                     Runtime::Loader& runtime)
-    : ContextImpl(scope, config), runtime_(runtime) {
+ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
+                                     ContextConfig& config, Runtime::Loader& runtime)
+    : ContextImpl(parent, scope, config), runtime_(runtime) {
   parsed_alt_alpn_protocols_ = parseAlpnProtocols(config.altAlpnProtocols());
 
   if (!parsed_alpn_protocols_.empty()) {
