@@ -2,6 +2,14 @@
 
 #include "envoy/common/pure.h"
 
+namespace Event {
+class Dispatcher;
+}
+
+namespace ThreadLocal {
+class Instance;
+}
+
 namespace Stats {
 
 /**
@@ -21,6 +29,8 @@ public:
   virtual uint64_t value() PURE;
 };
 
+typedef std::shared_ptr<Counter> CounterPtr;
+
 /**
  * A gauge that can both increment and decrement.
  */
@@ -37,6 +47,8 @@ public:
   virtual bool used() PURE;
   virtual uint64_t value() PURE;
 };
+
+typedef std::shared_ptr<Gauge> GaugePtr;
 
 /**
  * An individual timespan that is owned by a timer. The initial time is captured on construction.
@@ -71,6 +83,8 @@ public:
   virtual TimespanPtr allocateSpan() PURE;
   virtual std::string name() PURE;
 };
+
+typedef std::shared_ptr<Timer> TimerPtr;
 
 /**
  * A sink for stats. Each sink is responsible for writing stats to a backing store.
@@ -120,25 +134,66 @@ public:
    */
   virtual void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) PURE;
 
+  /**
+   * @return a counter within the scope's namespace.
+   */
   virtual Counter& counter(const std::string& name) PURE;
+
+  /**
+   * @return a gauge within the scope's namespace.
+   */
   virtual Gauge& gauge(const std::string& name) PURE;
+
+  /**
+   * @return a timer within the scope's namespace.
+   */
   virtual Timer& timer(const std::string& name) PURE;
 };
+
+typedef std::unique_ptr<Scope> ScopePtr;
 
 /**
  * A store for all known counters, gauges, and timers.
  */
 class Store : public Scope {
 public:
-  virtual ~Store() {}
+  /**
+   * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
+   * that point to the same reference counted backing stats. This allows a new scope to be
+   * gracefully swapped in while an old scope with the same name is being destroyed.
+   * @param name supplies the scope's namespace prefix.
+   */
+  virtual ScopePtr createScope(const std::string& name) PURE;
 
+  /**
+   * @return a list of all known counters.
+   */
+  virtual std::list<CounterPtr> counters() const PURE;
+
+  /**
+   * @return a list of all known gauges.
+   */
+  virtual std::list<GaugePtr> gauges() const PURE;
+};
+
+/**
+ * The root of the stat store.
+ */
+class StoreRoot : public Store {
+public:
   /**
    * Add a sink that is used for stat flushing.
    */
   virtual void addSink(Sink& sink) PURE;
 
-  virtual std::list<std::reference_wrapper<Counter>> counters() const PURE;
-  virtual std::list<std::reference_wrapper<Gauge>> gauges() const PURE;
+  /**
+   * Initialize the store for threading. This will be called once after all worker threads have
+   * been initialized. At this point the store can initialize itself for multi-threaded operation.
+   */
+  virtual void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
+                                   ThreadLocal::Instance& tls) PURE;
 };
+
+typedef std::unique_ptr<StoreRoot> StoreRootPtr;
 
 } // Stats

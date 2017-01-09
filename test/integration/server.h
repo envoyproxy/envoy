@@ -72,8 +72,6 @@ public:
     drain_manager_ = new Server::TestDrainManager();
     return Server::DrainManagerPtr{drain_manager_};
   }
-
-  // Server::ComponentFactory
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
     return Server::InstanceUtil::createRuntime(server, config);

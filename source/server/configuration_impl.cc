@@ -117,13 +117,13 @@ const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { ret
 
 MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
     : parent_(parent), port_(json.getInteger("port")),
-      scope_(parent_.server_.stats(), fmt::format("listener.{}.", port_)) {
+      scope_(parent_.server_.stats().createScope(fmt::format("listener.{}.", port_))) {
   log().info("  port={}", port_);
 
   if (json.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*json.getObject("ssl_context"));
     ssl_context_ =
-        parent_.server_.sslContextManager().createSslServerContext(scope_, context_config);
+        parent_.server_.sslContextManager().createSslServerContext(*scope_, context_config);
   }
 
   if (json.hasObject("use_proxy_proto")) {

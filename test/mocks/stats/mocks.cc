@@ -13,6 +13,9 @@ MockGauge::~MockGauge() {}
 MockTimespan::MockTimespan() {}
 MockTimespan::~MockTimespan() {}
 
+MockSink::MockSink() {}
+MockSink::~MockSink() {}
+
 MockStore::MockStore() { ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_)); }
 MockStore::~MockStore() {}
 

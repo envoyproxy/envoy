@@ -125,12 +125,12 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
 
     for (auto& host : cluster.second.get().hosts()) {
       std::map<std::string, uint64_t> all_stats;
-      for (Stats::Counter& counter : host->counters()) {
-        all_stats[counter.name()] = counter.value();
+      for (Stats::CounterPtr counter : host->counters()) {
+        all_stats[counter->name()] = counter->value();
       }
 
-      for (Stats::Gauge& gauge : host->gauges()) {
-        all_stats[gauge.name()] = gauge.value();
+      for (Stats::GaugePtr gauge : host->gauges()) {
+        all_stats[gauge->name()] = gauge->value();
       }
 
       for (auto stat : all_stats) {
@@ -214,8 +214,8 @@ Http::Code AdminImpl::handlerLogging(const std::string& url, Buffer::Instance& r
 }
 
 Http::Code AdminImpl::handlerResetCounters(const std::string&, Buffer::Instance& response) {
-  for (Stats::Counter& counter : server_.stats().counters()) {
-    counter.reset();
+  for (Stats::CounterPtr counter : server_.stats().counters()) {
+    counter->reset();
   }
 
   response.add("OK\n");
@@ -236,12 +236,12 @@ Http::Code AdminImpl::handlerStats(const std::string&, Buffer::Instance& respons
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   std::map<std::string, uint64_t> all_stats;
-  for (Stats::Counter& counter : server_.stats().counters()) {
-    all_stats.emplace(counter.name(), counter.value());
+  for (Stats::CounterPtr counter : server_.stats().counters()) {
+    all_stats.emplace(counter->name(), counter->value());
   }
 
-  for (Stats::Gauge& gauge : server_.stats().gauges()) {
-    all_stats.emplace(gauge.name(), gauge.value());
+  for (Stats::GaugePtr gauge : server_.stats().gauges()) {
+    all_stats.emplace(gauge->name(), gauge->value());
   }
 
   for (auto stat : all_stats) {

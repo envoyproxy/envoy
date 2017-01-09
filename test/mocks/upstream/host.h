@@ -74,8 +74,8 @@ public:
 
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(url, const std::string&());
-  MOCK_CONST_METHOD0(counters, std::list<std::reference_wrapper<Stats::Counter>>());
-  MOCK_CONST_METHOD0(gauges, std::list<std::reference_wrapper<Stats::Gauge>>());
+  MOCK_CONST_METHOD0(counters, std::list<Stats::CounterPtr>());
+  MOCK_CONST_METHOD0(gauges, std::list<Stats::GaugePtr>());
   MOCK_CONST_METHOD0(healthy, bool());
   MOCK_METHOD1(healthy, void(bool));
   MOCK_CONST_METHOD0(stats, HostStats&());

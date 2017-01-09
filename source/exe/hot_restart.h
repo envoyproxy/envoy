@@ -81,11 +81,9 @@ class HotRestartImpl : public HotRestart,
                        Logger::Loggable<Logger::Id::main> {
 public:
   HotRestartImpl(Options& options);
-  ~HotRestartImpl();
 
   Thread::BasicLockable& logLock() { return log_lock_; }
   Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
-  Thread::BasicLockable& statLock() { return stat_lock_; }
 
   // Server::HotRestart
   void drainParentListeners() override;
@@ -98,6 +96,7 @@ public:
 
   // RawStatDataAllocator
   Stats::RawStatData* alloc(const std::string& name) override;
+  void free(Stats::RawStatData& data) override;
 
 private:
   enum class RpcMessageType {

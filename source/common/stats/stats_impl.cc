@@ -11,14 +11,22 @@ void TimerImpl::TimespanImpl::complete(const std::string& dynamic_name) {
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  raw_data_list_.emplace_back(new RawStatData());
-  raw_data_list_.back()->initialize(name);
-  return raw_data_list_.back().get();
+  RawStatData* data = new RawStatData();
+  memset(data, 0, sizeof(RawStatData));
+  data->initialize(name);
+  return data;
+}
+
+void HeapRawStatDataAllocator::free(RawStatData& data) {
+  // This allocator does not ever have concurrent access to the raw data.
+  ASSERT(data.ref_count_ == 1);
+  delete &data;
 }
 
 void RawStatData::initialize(const std::string& name) {
   ASSERT(!initialized());
   ASSERT(name.size() <= MAX_NAME_SIZE);
+  ref_count_ = 1;
   StringUtil::strlcpy(name_, name.substr(0, MAX_NAME_SIZE).c_str(), MAX_NAME_SIZE + 1);
 }
 
