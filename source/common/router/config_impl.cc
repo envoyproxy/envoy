@@ -48,17 +48,17 @@ Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& conf
   }
 }
 
-bool ConfigUtility::matchHeaders(const Http::HeaderMap& headers,
-                                 const std::vector<HeaderData> request_headers) {
+bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
+                                 const std::vector<HeaderData> config_headers) {
   bool matches = true;
 
-  if (!request_headers.empty()) {
-    for (const HeaderData& header_data : request_headers) {
-      const Http::HeaderEntry* header = headers.get(header_data.name_);
-      if (header_data.value_ == EMPTY_STRING) {
+  if (!config_headers.empty()) {
+    for (const HeaderData& cfg_header_data : config_headers) {
+      const Http::HeaderEntry* header = request_headers.get(cfg_header_data.name_);
+      if (cfg_header_data.value_ == EMPTY_STRING) {
         matches &= (header != nullptr);
       } else {
-        matches &= (header != nullptr) && (header->value() == header_data.value_.c_str());
+        matches &= (header != nullptr) && (header->value() == cfg_header_data.value_.c_str());
       }
       if (!matches) {
         break;
