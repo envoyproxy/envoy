@@ -22,9 +22,9 @@ namespace Http1 {
  */
 class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::Instance {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host, Stats::Store& store,
+  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host,
                Upstream::ResourcePriority priority)
-      : dispatcher_(dispatcher), host_(host), store_(store), priority_(priority) {}
+      : dispatcher_(dispatcher), host_(host), priority_(priority) {}
 
   ~ConnPoolImpl();
 
@@ -115,7 +115,6 @@ protected:
   std::list<ActiveClientPtr> ready_clients_;
   std::list<ActiveClientPtr> busy_clients_;
   std::list<PendingRequestPtr> pending_requests_;
-  Stats::Store& store_;
   std::list<DrainedCb> drained_callbacks_;
   Upstream::ResourcePriority priority_;
 };
@@ -125,9 +124,9 @@ protected:
  */
 class ConnPoolImplProd : public ConnPoolImpl {
 public:
-  ConnPoolImplProd(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host, Stats::Store& store,
+  ConnPoolImplProd(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host,
                    Upstream::ResourcePriority priority)
-      : ConnPoolImpl(dispatcher, host, store, priority) {}
+      : ConnPoolImpl(dispatcher, host, priority) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;

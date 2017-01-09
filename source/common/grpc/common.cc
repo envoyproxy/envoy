@@ -12,13 +12,13 @@ namespace Grpc {
 
 const std::string Common::GRPC_CONTENT_TYPE{"application/grpc"};
 
-void Common::chargeStat(Stats::Store& store, const std::string& cluster,
-                        const std::string& grpc_service, const std::string& grpc_method,
-                        bool success) {
-  store.counter(fmt::format("cluster.{}.grpc.{}.{}.{}", cluster, grpc_service, grpc_method,
-                            success ? "success" : "failure")).inc();
-  store.counter(fmt::format("cluster.{}.grpc.{}.{}.total", cluster, grpc_service, grpc_method))
+void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
+                        const std::string& grpc_method, bool success) {
+  cluster.statsScope()
+      .counter(
+           fmt::format("grpc.{}.{}.{}", grpc_service, grpc_method, success ? "success" : "failure"))
       .inc();
+  cluster.statsScope().counter(fmt::format("grpc.{}.{}.total", grpc_service, grpc_method)).inc();
 }
 
 Buffer::InstancePtr Common::serializeBody(const google::protobuf::Message& message) {

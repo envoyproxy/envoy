@@ -15,12 +15,10 @@ class NullSslContextManager : public Ssl::ContextManager,
                               public Ssl::ServerContext,
                               public Ssl::ClientContext {
 public:
-  Ssl::ClientContext& createSslClientContext(const std::string&, Stats::Store&,
-                                             Ssl::ContextConfig&) override {
+  Ssl::ClientContext& createSslClientContext(Stats::Scope&, Ssl::ContextConfig&) override {
     return *this;
   }
-  Ssl::ServerContext& createSslServerContext(const std::string&, Stats::Store&,
-                                             Ssl::ContextConfig&) override {
+  Ssl::ServerContext& createSslServerContext(Stats::Scope&, Ssl::ContextConfig&) override {
     return *this;
   }
   size_t daysUntilFirstCertExpires() override { return 0; }

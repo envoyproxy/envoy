@@ -19,14 +19,15 @@ public:
                    const std::string& to_az = EMPTY_STRING) {
     TestHeaderMapImpl headers{{":status", std::to_string(code)}};
 
-    CodeUtility::ResponseStatInfo info{store_, "prefix.", headers, internal_request,
-                                       request_vhost_name, request_vcluster_name, from_az, to_az,
-                                       canary};
+    CodeUtility::ResponseStatInfo info{global_store_, cluster_scope_, "prefix.", headers,
+                                       internal_request, request_vhost_name, request_vcluster_name,
+                                       from_az, to_az, canary};
 
     CodeUtility::chargeResponseStat(info);
   }
 
-  Stats::IsolatedStoreImpl store_;
+  Stats::IsolatedStoreImpl global_store_;
+  Stats::IsolatedStoreImpl cluster_scope_;
 };
 
 TEST_F(CodeUtilityTest, NoCanary) {
@@ -35,24 +36,24 @@ TEST_F(CodeUtilityTest, NoCanary) {
   addResponse(401, false, false);
   addResponse(501, false, true);
 
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_2xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_201").value());
-  EXPECT_EQ(1U, store_.counter("prefix.external.upstream_rq_2xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.external.upstream_rq_201").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_3xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_301").value());
-  EXPECT_EQ(1U, store_.counter("prefix.internal.upstream_rq_3xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.internal.upstream_rq_301").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_4xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_401").value());
-  EXPECT_EQ(1U, store_.counter("prefix.external.upstream_rq_4xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.external.upstream_rq_401").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_5xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_501").value());
-  EXPECT_EQ(1U, store_.counter("prefix.internal.upstream_rq_5xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.internal.upstream_rq_501").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_2xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_201").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.external.upstream_rq_2xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.external.upstream_rq_201").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_3xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_301").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_3xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_301").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_4xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_401").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.external.upstream_rq_4xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.external.upstream_rq_401").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_5xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_501").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_5xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_501").value());
 
-  EXPECT_EQ(16U, store_.counters().size());
+  EXPECT_EQ(16U, cluster_scope_.counters().size());
 }
 
 TEST_F(CodeUtilityTest, Canary) {
@@ -60,24 +61,24 @@ TEST_F(CodeUtilityTest, Canary) {
   addResponse(300, false, false);
   addResponse(500, true, false);
 
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_2xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_200").value());
-  EXPECT_EQ(1U, store_.counter("prefix.internal.upstream_rq_2xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.internal.upstream_rq_200").value());
-  EXPECT_EQ(1U, store_.counter("prefix.canary.upstream_rq_2xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.canary.upstream_rq_200").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_3xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_300").value());
-  EXPECT_EQ(1U, store_.counter("prefix.external.upstream_rq_3xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.external.upstream_rq_300").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_5xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.upstream_rq_500").value());
-  EXPECT_EQ(1U, store_.counter("prefix.external.upstream_rq_5xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.external.upstream_rq_500").value());
-  EXPECT_EQ(1U, store_.counter("prefix.canary.upstream_rq_5xx").value());
-  EXPECT_EQ(1U, store_.counter("prefix.canary.upstream_rq_500").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_2xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_200").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_2xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_200").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_2xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_200").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_3xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_300").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.external.upstream_rq_3xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.external.upstream_rq_300").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_5xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.upstream_rq_500").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.external.upstream_rq_5xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.external.upstream_rq_500").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_5xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_500").value());
 
-  EXPECT_EQ(16U, store_.counters().size());
+  EXPECT_EQ(16U, cluster_scope_.counters().size());
 }
 
 TEST_F(CodeUtilityTest, All) {
@@ -144,33 +145,38 @@ TEST_F(CodeUtilityTest, All) {
 TEST_F(CodeUtilityTest, RequestVirtualCluster) {
   addResponse(200, false, false, "test-vhost", "test-cluster");
 
-  EXPECT_EQ(1U, store_.counter("vhost.test-vhost.vcluster.test-cluster.upstream_rq_2xx").value());
-  EXPECT_EQ(1U, store_.counter("vhost.test-vhost.vcluster.test-cluster.upstream_rq_200").value());
+  EXPECT_EQ(
+      1U, global_store_.counter("vhost.test-vhost.vcluster.test-cluster.upstream_rq_2xx").value());
+  EXPECT_EQ(
+      1U, global_store_.counter("vhost.test-vhost.vcluster.test-cluster.upstream_rq_200").value());
 }
 
 TEST_F(CodeUtilityTest, PerZoneStats) {
   addResponse(200, false, false, "", "", "from_az", "to_az");
 
-  EXPECT_EQ(1U, store_.counter("prefix.zone.from_az.to_az.upstream_rq_200").value());
-  EXPECT_EQ(1U, store_.counter("prefix.zone.from_az.to_az.upstream_rq_2xx").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.zone.from_az.to_az.upstream_rq_200").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.zone.from_az.to_az.upstream_rq_2xx").value());
 }
 
 TEST(CodeUtilityResponseTimingTest, All) {
-  Stats::MockStore store;
+  Stats::MockStore global_store;
+  Stats::MockStore cluster_scope;
 
-  CodeUtility::ResponseTimingInfo info{store, "prefix.", std::chrono::milliseconds(5), true, true,
-                                       "vhost_name", "req_vcluster_name", "from_az", "to_az"};
+  CodeUtility::ResponseTimingInfo info{global_store, cluster_scope, "prefix.",
+                                       std::chrono::milliseconds(5), true, true, "vhost_name",
+                                       "req_vcluster_name", "from_az", "to_az"};
 
-  EXPECT_CALL(store, deliverTimingToSinks("prefix.upstream_rq_time", std::chrono::milliseconds(5)));
-  EXPECT_CALL(store,
+  EXPECT_CALL(cluster_scope,
+              deliverTimingToSinks("prefix.upstream_rq_time", std::chrono::milliseconds(5)));
+  EXPECT_CALL(cluster_scope,
               deliverTimingToSinks("prefix.canary.upstream_rq_time", std::chrono::milliseconds(5)));
-  EXPECT_CALL(store, deliverTimingToSinks("prefix.internal.upstream_rq_time",
-                                          std::chrono::milliseconds(5)));
-  EXPECT_CALL(store,
+  EXPECT_CALL(cluster_scope, deliverTimingToSinks("prefix.internal.upstream_rq_time",
+                                                  std::chrono::milliseconds(5)));
+  EXPECT_CALL(global_store,
               deliverTimingToSinks("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time",
                                    std::chrono::milliseconds(5)));
-  EXPECT_CALL(store, deliverTimingToSinks("prefix.zone.from_az.to_az.upstream_rq_time",
-                                          std::chrono::milliseconds(5)));
+  EXPECT_CALL(cluster_scope, deliverTimingToSinks("prefix.zone.from_az.to_az.upstream_rq_time",
+                                                  std::chrono::milliseconds(5)));
   CodeUtility::chargeResponseTiming(info);
 }
 

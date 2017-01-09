@@ -19,7 +19,8 @@ public:
     }
 
     return [&server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(Http::StreamFilterPtr{new Grpc::Http1BridgeFilter(server.stats())});
+      callbacks.addStreamFilter(
+          Http::StreamFilterPtr{new Grpc::Http1BridgeFilter(server.clusterManager())});
     };
   }
 };

@@ -31,7 +31,6 @@ public:
     message_->headers().insertHost().value(std::string("host"));
     message_->headers().insertPath().value(std::string("/"));
     ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(local_info_.zoneName()));
-    ON_CALL(*cm_.cluster_.info_, altStatName()).WillByDefault(ReturnRef(EMPTY_STRING));
   }
 
   void expectSuccess(uint64_t code) {
@@ -82,8 +81,8 @@ TEST_F(AsyncClientImplTest, Basic) {
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
 
-  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_200").value());
-  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.internal.upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("internal.upstream_rq_200").value());
 }
 
 TEST_F(AsyncClientImplTest, Retry) {
@@ -215,7 +214,7 @@ TEST_F(AsyncClientImplTest, ImmediateReset) {
   client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 
-  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_503").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
 }
 
 TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
@@ -278,7 +277,7 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
   EXPECT_EQ(nullptr,
             client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>()));
 
-  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_503").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
 }
 
 TEST_F(AsyncClientImplTest, RequestTimeout) {
@@ -297,11 +296,9 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
   client_.send(std::move(message_), callbacks_, std::chrono::milliseconds(40));
   timer_->callback_();
 
-  EXPECT_EQ(
-      1UL,
-      cm_.cluster_.info_->stats_store_.counter("cluster.fake_cluster.upstream_rq_timeout").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_timeout").value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
-  EXPECT_EQ(1UL, stats_store_.counter("cluster.fake_cluster.upstream_rq_504").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
 }
 
 TEST_F(AsyncClientImplTest, DisableTimer) {

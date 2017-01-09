@@ -3,7 +3,6 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
-#include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/network/utility.h"
@@ -13,8 +12,8 @@ namespace Http {
 namespace Http2 {
 
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host,
-                           Stats::Store& store, Upstream::ResourcePriority priority)
-    : dispatcher_(dispatcher), host_(host), stats_store_(store), priority_(priority) {}
+                           Upstream::ResourcePriority priority)
+    : dispatcher_(dispatcher), host_(host), priority_(priority) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
   if (primary_client_) {
@@ -240,10 +239,8 @@ ConnPoolImpl::ActiveClient::~ActiveClient() {
 }
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  CodecClientStats stats{host_->cluster().stats().upstream_cx_protocol_error_};
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP2, std::move(data.connection_),
-                                           stats, stats_store_,
-                                           data.host_description_->cluster().httpCodecOptions())};
+                                           data.host_description_)};
   return codec;
 }
 

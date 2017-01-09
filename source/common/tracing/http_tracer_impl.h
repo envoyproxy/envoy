@@ -112,9 +112,8 @@ public:
                   const TracingContext& tracing_context) override;
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
-  const std::string& collectorCluster() { return collector_cluster_; }
+  Upstream::ClusterInfoPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
-  Stats::Store& statsStore() { return stats_store_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
 private:
@@ -131,9 +130,8 @@ private:
                                const Http::AccessLog::RequestInfo& info);
   std::string buildResponseCode(const Http::AccessLog::RequestInfo& info);
 
-  const std::string collector_cluster_;
   Upstream::ClusterManager& cm_;
-  Stats::Store& stats_store_;
+  Upstream::ClusterInfoPtr cluster_;
   LightstepTracerStats tracer_stats_;
   const LocalInfo::LocalInfo& local_info_;
   ThreadLocal::Instance& tls_;

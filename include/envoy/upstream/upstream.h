@@ -217,12 +217,6 @@ public:
   virtual ~ClusterInfo() {}
 
   /**
-   * @return const std::string& the alternate stat name to write cluster stats to. This is useful
-   *         during parallel rollouts.
-   */
-  virtual const std::string& altStatName() const PURE;
-
-  /**
    * @return the connect timeout for upstream hosts that belong to this cluster.
    */
   virtual std::chrono::milliseconds connectTimeout() const PURE;
@@ -275,14 +269,15 @@ public:
   virtual Ssl::ClientContext* sslContext() const PURE;
 
   /**
-   * @return the stat prefix to use for cluster specific stats.
-   */
-  virtual const std::string& statPrefix() const PURE;
-
-  /**
    * @return ClusterStats& strongly named stats for this cluster.
    */
   virtual ClusterStats& stats() const PURE;
+
+  /**
+   * @return the stats scope that contains all cluster stats. This can be used to produce dynamic
+   *         stats that will be freed when the cluster is removed.
+   */
+  virtual Stats::Scope& statsScope() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoPtr;
