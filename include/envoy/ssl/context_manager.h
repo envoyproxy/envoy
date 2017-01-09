@@ -29,9 +29,9 @@ public:
   virtual size_t daysUntilFirstCertExpires() PURE;
 
   /**
-   * @return a set of all contexts being managed
+   * Iterate through all currently allocated contests.
    */
-  virtual std::vector<std::reference_wrapper<Context>> getContexts() PURE;
+  virtual void iterateContexts(std::function<void(Context&)> callback) PURE;
 };
 
 } // Ssl

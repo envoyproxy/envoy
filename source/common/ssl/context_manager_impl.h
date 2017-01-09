@@ -28,7 +28,7 @@ public:
   Ssl::ClientContextPtr createSslClientContext(Stats::Scope& scope, ContextConfig& config) override;
   Ssl::ServerContextPtr createSslServerContext(Stats::Scope& scope, ContextConfig& config) override;
   size_t daysUntilFirstCertExpires() override;
-  std::vector<std::reference_wrapper<Context>> getContexts() override;
+  void iterateContexts(std::function<void(Context&)> callback) override;
 
 private:
   Runtime::Loader& runtime_;

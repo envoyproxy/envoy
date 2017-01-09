@@ -39,14 +39,11 @@ size_t ContextManagerImpl::daysUntilFirstCertExpires() {
   return ret;
 }
 
-std::vector<std::reference_wrapper<Context>> ContextManagerImpl::getContexts() {
+void ContextManagerImpl::iterateContexts(std::function<void(Context&)> callback) {
   std::unique_lock<std::mutex> lock(contexts_lock_);
-  std::vector<std::reference_wrapper<Context>> return_contexts;
   for (Context* context : contexts_) {
-    return_contexts.push_back(*context);
+    callback(*context);
   }
-
-  return return_contexts;
 }
 
 } // Ssl

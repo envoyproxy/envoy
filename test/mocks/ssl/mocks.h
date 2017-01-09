@@ -24,7 +24,7 @@ public:
   MOCK_METHOD2(createSslClientContext_, ClientContext*(Stats::Scope& scope, ContextConfig& config));
   MOCK_METHOD2(createSslServerContext_, ServerContext*(Stats::Scope& stats, ContextConfig& config));
   MOCK_METHOD0(daysUntilFirstCertExpires, size_t());
-  MOCK_METHOD0(getContexts, std::vector<std::reference_wrapper<Context>>());
+  MOCK_METHOD1(iterateContexts, void(std::function<void(Context&)> callback));
 };
 
 class MockConnection : public Connection {
