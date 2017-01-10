@@ -10,7 +10,7 @@
 
 Worker::Worker(Stats::Store& stats_store, ThreadLocal::Instance& tls,
                std::chrono::milliseconds file_flush_interval_msec)
-    : tls_(tls), handler_(new ConnectionHandler(
+    : tls_(tls), handler_(new Server::ConnectionHandlerImpl(
                      stats_store, log(), Api::ApiPtr{new Api::Impl(file_flush_interval_msec)})) {
   tls_.registerThread(handler_->dispatcher(), false);
 }

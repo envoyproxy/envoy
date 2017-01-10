@@ -4,6 +4,7 @@
 
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/connection_handler.h"
 
 #include "common/common/logger.h"
 
@@ -30,10 +31,12 @@ public:
   Network::DnsResolverPtr createDnsResolver() override;
   FileEventPtr createFileEvent(int fd, FileReadyCb cb) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
-  Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+  Network::ListenerPtr createListener(Server::ConnectionHandler& conn_handler,
+                                      Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
                                       Stats::Store& stats_store, bool bind_to_port,
                                       bool use_proxy_proto, bool use_orig_dst) override;
-  Network::ListenerPtr createSslListener(Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
+  Network::ListenerPtr createSslListener(Server::ConnectionHandler& conn_handler,
+                                         Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                          Network::ListenerCallbacks& cb, Stats::Store& stats_store,
                                          bool bind_to_port, bool use_proxy_proto,
                                          bool use_orig_dst) override;

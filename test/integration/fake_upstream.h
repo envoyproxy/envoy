@@ -10,7 +10,7 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/stats_impl.h"
-#include "server/connection_handler.h"
+#include "server/connection_handler_impl.h"
 
 class FakeHttpConnection;
 
@@ -171,7 +171,7 @@ private:
   std::mutex lock_;
   std::condition_variable new_connection_event_;
   Stats::IsolatedStoreImpl stats_store_;
-  ConnectionHandler handler_;
+  Server::ConnectionHandlerImpl handler_;
   std::list<Network::Connection*> new_connections_;
   FakeHttpConnection::Type http_type_;
 };

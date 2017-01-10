@@ -76,21 +76,24 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
 }
 
-Network::ListenerPtr DispatcherImpl::createListener(Network::ListenSocket& socket,
+Network::ListenerPtr DispatcherImpl::createListener(Server::ConnectionHandler& conn_handler,
+                                                    Network::ListenSocket& socket,
                                                     Network::ListenerCallbacks& cb,
                                                     Stats::Store& stats_store, bool bind_to_port,
                                                     bool use_proxy_proto, bool use_orig_dst) {
   return Network::ListenerPtr{new Network::ListenerImpl(
-      *this, socket, cb, stats_store, bind_to_port, use_proxy_proto, use_orig_dst)};
+      conn_handler, *this, socket, cb, stats_store, bind_to_port, use_proxy_proto, use_orig_dst)};
 }
 
-Network::ListenerPtr DispatcherImpl::createSslListener(Ssl::ServerContext& ssl_ctx,
+Network::ListenerPtr DispatcherImpl::createSslListener(Server::ConnectionHandler& conn_handler,
+                                                       Ssl::ServerContext& ssl_ctx,
                                                        Network::ListenSocket& socket,
                                                        Network::ListenerCallbacks& cb,
                                                        Stats::Store& stats_store, bool bind_to_port,
                                                        bool use_proxy_proto, bool use_orig_dst) {
-  return Network::ListenerPtr{new Network::SslListenerImpl(
-      *this, ssl_ctx, socket, cb, stats_store, bind_to_port, use_proxy_proto, use_orig_dst)};
+  return Network::ListenerPtr{new Network::SslListenerImpl(conn_handler, *this, ssl_ctx, socket, cb,
+                                                           stats_store, bind_to_port,
+                                                           use_proxy_proto, use_orig_dst)};
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return TimerPtr{new TimerImpl(*this, cb)}; }

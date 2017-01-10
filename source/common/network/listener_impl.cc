@@ -9,7 +9,7 @@
 #include "common/network/connection_impl.h"
 #include "common/ssl/connection_impl.h"
 
-#include "server/connection_handler.h"
+#include "envoy/server/connection_handler.h"
 
 #include "event2/listener.h"
 
@@ -19,7 +19,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
                                   void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
-  if (listener->use_original_dst_ && listener->connection_handler_ != nullptr) {
+  if (listener->use_original_dst_) {
     sockaddr_storage orig_dst_addr;
     memset(&orig_dst_addr, 0, sizeof(orig_dst_addr));
 
@@ -34,11 +34,11 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       // the address and port returned by getOriginalDst() match the listener port.
       // In this case the listener handles the connection directly and does not hand it off.
       if (listener->socket_.name() != orig_sock_name) {
-        ListenerImpl* new_listener =
-            static_cast<ListenerImpl*>(listener->connection_handler_->findListener(orig_sock_name));
+        Listener* new_listener = listener->connection_handler_.findListener(orig_sock_name);
 
         if (new_listener != nullptr) {
-          listener = new_listener;
+          listener->newConnection(fd, addr);
+          return;
         }
       }
     }
@@ -47,12 +47,13 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   listener->newConnection(fd, addr);
 }
 
-ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& socket,
+ListenerImpl::ListenerImpl(Server::ConnectionHandler& conn_handler,
+                           Event::DispatcherImpl& dispatcher, ListenSocket& socket,
                            ListenerCallbacks& cb, Stats::Store& stats_store, bool bind_to_port,
                            bool use_proxy_proto, bool use_orig_dst)
-    : dispatcher_(dispatcher), socket_(socket), cb_(cb), bind_to_port_(bind_to_port),
-      use_proxy_proto_(use_proxy_proto), proxy_protocol_(stats_store),
-      use_original_dst_(use_orig_dst), connection_handler_(nullptr), listener_(nullptr) {
+    : connection_handler_(conn_handler), dispatcher_(dispatcher), socket_(socket), cb_(cb),
+      bind_to_port_(bind_to_port), use_proxy_proto_(use_proxy_proto), proxy_protocol_(stats_store),
+      use_original_dst_(use_orig_dst), listener_(nullptr) {
 
   if (bind_to_port_) {
     listener_.reset(

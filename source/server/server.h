@@ -1,7 +1,7 @@
 #pragma once
 
-#include "connection_handler.h"
 #include "worker.h"
+#include "connection_handler_impl.h"
 
 #include "envoy/common/optional.h"
 #include "envoy/server/drain_manager.h"
@@ -127,7 +127,7 @@ private:
   ServerStats server_stats_;
   ThreadLocal::InstanceImpl thread_local_;
   SocketMap socket_map_;
-  ConnectionHandler handler_;
+  ConnectionHandlerImpl handler_;
   Runtime::RandomGeneratorImpl random_generator_;
   Runtime::LoaderPtr runtime_loader_;
   std::unique_ptr<Configuration::Main> config_;

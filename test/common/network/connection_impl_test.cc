@@ -6,6 +6,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/server/mocks.h"
 
 using testing::_;
 using testing::Sequence;
@@ -61,8 +62,9 @@ TEST(ConnectionImplTest, BufferStats) {
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener =
-      dispatcher.createListener(socket, listener_callbacks, stats_store, true, false, false);
+  Server::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener = dispatcher.createListener(
+      connection_handler, socket, listener_callbacks, stats_store, true, false, false);
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection("tcp://127.0.0.1:10000");

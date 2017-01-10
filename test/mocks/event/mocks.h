@@ -9,6 +9,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
+#include "envoy/server/connection_handler.h"
 
 namespace Event {
 
@@ -38,19 +39,22 @@ public:
     return Filesystem::WatcherPtr{createFilesystemWatcher_()};
   }
 
-  Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+  Network::ListenerPtr createListener(Server::ConnectionHandler& conn_handler,
+                                      Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
                                       Stats::Store& stats_store, bool bind_to_port,
                                       bool use_proxy_proto, bool use_original_dst) override {
-    return Network::ListenerPtr{
-        createListener_(socket, cb, stats_store, bind_to_port, use_proxy_proto, use_original_dst)};
+    return Network::ListenerPtr{createListener_(conn_handler, socket, cb, stats_store, bind_to_port,
+                                                use_proxy_proto, use_original_dst)};
   }
 
-  Network::ListenerPtr createSslListener(Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
+  Network::ListenerPtr createSslListener(Server::ConnectionHandler& conn_handler,
+                                         Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                          Network::ListenerCallbacks& cb, Stats::Store& stats_store,
                                          bool bind_to_port, bool use_proxy_proto,
                                          bool use_original_dst) override {
-    return Network::ListenerPtr{createSslListener_(ssl_ctx, socket, cb, stats_store, bind_to_port,
-                                                   use_proxy_proto, use_original_dst)};
+    return Network::ListenerPtr{createSslListener_(conn_handler, ssl_ctx, socket, cb, stats_store,
+                                                   bind_to_port, use_proxy_proto,
+                                                   use_original_dst)};
   }
 
   TimerPtr createTimer(TimerCb cb) override { return TimerPtr{createTimer_(cb)}; }
@@ -74,12 +78,14 @@ public:
   MOCK_METHOD0(createDnsResolver_, Network::DnsResolver*());
   MOCK_METHOD2(createFileEvent_, FileEvent*(int fd, FileReadyCb cb));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
-  MOCK_METHOD6(createListener_,
-               Network::Listener*(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+  MOCK_METHOD7(createListener_,
+               Network::Listener*(Server::ConnectionHandler& conn_handler,
+                                  Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
                                   Stats::Store& stats_store, bool bind_to_port,
                                   bool use_proxy_proto, bool use_original_dst));
-  MOCK_METHOD7(createSslListener_,
-               Network::Listener*(Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
+  MOCK_METHOD8(createSslListener_,
+               Network::Listener*(Server::ConnectionHandler& conn_handler,
+                                  Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                   Network::ListenerCallbacks& cb, Stats::Store& stats_store,
                                   bool bind_to_port, bool use_proxy_proto, bool use_original_dst));
   MOCK_METHOD1(createTimer_, Timer*(TimerCb cb));

@@ -1,8 +1,9 @@
 #include "common/stats/stats_impl.h"
-#include "server/connection_handler.h"
+#include "server/connection_handler_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/mocks.h"
 
 using testing::_;
 using testing::InSequence;
@@ -19,19 +20,21 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
   Api::MockApi* api = new Api::MockApi();
   Event::MockDispatcher* dispatcher = new NiceMock<Event::MockDispatcher>();
   EXPECT_CALL(*api, allocateDispatcher_()).WillOnce(Return(dispatcher));
-  ConnectionHandler handler(stats_store, log(), Api::ApiPtr{api});
+  Server::ConnectionHandlerImpl handler(stats_store, log(), Api::ApiPtr{api});
   Network::MockFilterChainFactory factory;
+  Server::MockConnectionHandler connection_handler;
   NiceMock<Network::MockListenSocket> socket;
 
   Network::Listener* listener = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks;
-  EXPECT_CALL(*dispatcher, createListener_(_, _, _, _, _, _))
-      .WillOnce(Invoke([&](Network::ListenSocket&, Network::ListenerCallbacks& cb, Stats::Store&,
-                           bool, bool, bool) -> Network::Listener* {
-        listener_callbacks = &cb;
-        return listener;
+  EXPECT_CALL(*dispatcher, createListener_(_, _, _, _, _, _, _))
+      .WillOnce(Invoke([&](Server::ConnectionHandler&, Network::ListenSocket&,
+                           Network::ListenerCallbacks& cb, Stats::Store&, bool, bool, bool)
+                           -> Network::Listener* {
+                             listener_callbacks = &cb;
+                             return listener;
 
-      }));
+                           }));
   handler.addListener(factory, socket, true, false, false);
 
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
