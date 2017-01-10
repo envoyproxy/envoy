@@ -1013,15 +1013,6 @@ TEST(RouteMatcherTest, ExclusiveRouteEntryOrRedirectEntry) {
         {
           "prefix": "/foo",
           "host_redirect": "new.lyft.com"
-        },
-        {
-          "prefix": "/bar",
-          "path_redirect": "/new_bar"
-        },
-        {
-          "prefix": "/baz",
-          "host_redirect": "new.lyft.com",
-          "path_redirect": "/new_baz"
         }
       ]
     }
