@@ -27,7 +27,6 @@ public:
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::list<Network::ConnectionCallbacks*> callbacks_;
-  bool closed_{};
   uint64_t id_{next_id_++};
   std::string remote_address_;
   bool read_enabled_{true};
@@ -91,16 +90,24 @@ public:
   MOCK_METHOD0(connect, void());
 };
 
+class MockActiveDnsQuery : public ActiveDnsQuery {
+public:
+  MockActiveDnsQuery();
+  ~MockActiveDnsQuery();
+
+  // Network::ActiveDnsQuery
+  MOCK_METHOD0(cancel, void());
+};
+
 class MockDnsResolver : public DnsResolver {
 public:
   MockDnsResolver();
   ~MockDnsResolver();
 
   // Network::DnsResolver
-  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
-  MOCK_METHOD2(resolve, void(const std::string& dns_name, ResolveCb callback));
+  MOCK_METHOD2(resolve, ActiveDnsQuery&(const std::string& dns_name, ResolveCb callback));
 
-  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  testing::NiceMock<MockActiveDnsQuery> active_query_;
 };
 
 class MockReadFilterCallbacks : public ReadFilterCallbacks {

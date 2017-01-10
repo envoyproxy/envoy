@@ -173,16 +173,16 @@ void LightStepRecorder::flushSpans() {
     lightstep::collector::ReportRequest request;
     std::swap(request, builder_.pending());
 
-    Http::MessagePtr message = Grpc::Common::prepareHeaders(sink_.collectorCluster(),
-                                                            lightstep::CollectorServiceFullName(),
-                                                            lightstep::CollectorMethodName());
+    Http::MessagePtr message =
+        Grpc::Common::prepareHeaders(sink_.cluster()->name(), lightstep::CollectorServiceFullName(),
+                                     lightstep::CollectorMethodName());
 
     message->body(Grpc::Common::serializeBody(std::move(request)));
 
     uint64_t timeout =
         sink_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
     sink_.clusterManager()
-        .httpAsyncClientForCluster(sink_.collectorCluster())
+        .httpAsyncClientForCluster(sink_.cluster()->name())
         .send(std::move(message), *this, std::chrono::milliseconds(timeout));
   }
 }
@@ -191,22 +191,21 @@ LightStepSink::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer, 
     : tracer_(tracer), sink_(sink) {}
 
 LightStepSink::LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                             Stats::Store& stats, const std::string& service_node,
+                             Stats::Store& stats, const LocalInfo::LocalInfo& local_info,
                              ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                              std::unique_ptr<lightstep::TracerOptions> options)
-    : collector_cluster_(config.getString("collector_cluster")), cm_(cluster_manager),
-      stats_store_(stats),
+    : cm_(cluster_manager), cluster_(cm_.get(config.getString("collector_cluster"))),
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
-      service_node_(service_node), tls_(tls), runtime_(runtime), options_(std::move(options)),
+      local_info_(local_info), tls_(tls), runtime_(runtime), options_(std::move(options)),
       tls_slot_(tls.allocateSlot()) {
-  if (!cm_.get(collector_cluster_)) {
+  if (!cluster_) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
-                                     collector_cluster_));
+                                     config.getString("collector_cluster")));
   }
 
-  if (!(cm_.get(collector_cluster_)->features() & Upstream::ClusterInfo::Features::HTTP2)) {
+  if (!(cluster_->features() & Upstream::ClusterInfo::Features::HTTP2)) {
     throw EnvoyException(
-        fmt::format("{} collector cluster must support http2 for gRPC calls", collector_cluster_));
+        fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_->name()));
   }
 
   tls_.set(tls_slot_, [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
@@ -257,7 +256,7 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
        lightstep::SetTag("downstream cluster",
                          valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-")),
        lightstep::SetTag("user agent", valueOrDefault(request_headers.UserAgent(), "-")),
-       lightstep::SetTag("node id", service_node_)});
+       lightstep::SetTag("node id", local_info_.nodeName())});
 
   if (request_info.responseCode().valid() &&
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {
@@ -275,21 +274,18 @@ void LightStepSink::flushTrace(const Http::HeaderMap& request_headers, const Htt
 }
 
 void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
-  Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                           lightstep::CollectorServiceFullName(), lightstep::CollectorMethodName(),
-                           false);
+  Grpc::Common::chargeStat(*sink_.cluster(), lightstep::CollectorServiceFullName(),
+                           lightstep::CollectorMethodName(), false);
 }
 
 void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
   try {
     Grpc::Common::validateResponse(*msg);
 
-    Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                             lightstep::CollectorServiceFullName(),
+    Grpc::Common::chargeStat(*sink_.cluster(), lightstep::CollectorServiceFullName(),
                              lightstep::CollectorMethodName(), true);
   } catch (const Grpc::Exception& ex) {
-    Grpc::Common::chargeStat(sink_.statsStore(), sink_.collectorCluster(),
-                             lightstep::CollectorServiceFullName(),
+    Grpc::Common::chargeStat(*sink_.cluster(), lightstep::CollectorServiceFullName(),
                              lightstep::CollectorMethodName(), false);
   }
 }

@@ -7,6 +7,7 @@
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
+#include "common/stats/stats_scope_impl.h"
 
 namespace Server {
 namespace Configuration {
@@ -91,8 +92,8 @@ private:
     // Server::Configuration::Listener
     Network::FilterChainFactory& filterChainFactory() override { return *this; }
     uint64_t port() override { return port_; }
-    Ssl::ServerContext* sslContext() override { return ssl_context_; }
     bool bindToPort() override { return bind_to_port_; }
+    Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
     bool useProxyProto() override { return use_proxy_proto_; }
     bool useOriginalDst() override { return use_original_dst_; }
 
@@ -102,8 +103,9 @@ private:
   private:
     MainImpl& parent_;
     uint64_t port_;
-    Ssl::ServerContext* ssl_context_{};
     bool bind_to_port_{};
+    Stats::ScopeImpl scope_;
+    Ssl::ServerContextPtr ssl_context_;
     bool use_proxy_proto_{};
     bool use_original_dst_{};
     std::list<NetworkFilterFactoryCb> filter_factories_;
@@ -115,6 +117,7 @@ private:
   }
 
   Server::Instance& server_;
+  std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   Tracing::HttpTracerPtr http_tracer_;
   std::list<Server::Configuration::ListenerPtr> listeners_;

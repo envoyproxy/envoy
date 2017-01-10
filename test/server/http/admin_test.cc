@@ -1,3 +1,4 @@
+#include "common/http/message_impl.h"
 #include "server/http/admin.h"
 
 #include "test/mocks/server/mocks.h"

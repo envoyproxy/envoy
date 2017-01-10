@@ -19,7 +19,7 @@ public:
     }
 
     Http::RateLimit::FilterConfigPtr filter_config(new Http::RateLimit::FilterConfig(
-        config, server.options().serviceClusterName(), server.stats(), server.runtime()));
+        config, server.localInfo(), server.stats(), server.runtime(), server.clusterManager()));
     return [filter_config, &server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{new Http::RateLimit::Filter(
           filter_config, server.rateLimitClient(std::chrono::milliseconds(20)))});

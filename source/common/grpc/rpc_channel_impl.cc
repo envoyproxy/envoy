@@ -28,19 +28,20 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
 
   // This should be caught in configuration, and a request will fail normally anyway, but assert
   // here for clarity.
-  ASSERT(cm_.get(cluster_)->features() & Upstream::ClusterInfo::Features::HTTP2);
+  ASSERT(cluster_->features() & Upstream::ClusterInfo::Features::HTTP2);
 
   Http::MessagePtr message =
-      Common::prepareHeaders(cluster_, method->service()->full_name(), method->name());
+      Common::prepareHeaders(cluster_->name(), method->service()->full_name(), method->name());
   message->body(Common::serializeBody(*grpc_request));
 
   callbacks_.onPreRequestCustomizeHeaders(message->headers());
-  http_request_ = cm_.httpAsyncClientForCluster(cluster_).send(std::move(message), *this, timeout_);
+  http_request_ =
+      cm_.httpAsyncClientForCluster(cluster_->name()).send(std::move(message), *this, timeout_);
 }
 
 void RpcChannelImpl::incStat(bool success) {
-  Common::chargeStat(stats_store_, cluster_, grpc_method_->service()->full_name(),
-                     grpc_method_->name(), success);
+  Common::chargeStat(*cluster_, grpc_method_->service()->full_name(), grpc_method_->name(),
+                     success);
 }
 
 void RpcChannelImpl::onSuccess(Http::MessagePtr&& http_response) {

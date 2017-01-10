@@ -1,10 +1,12 @@
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/message_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -308,7 +310,7 @@ public:
     opts->access_token = "sample_token";
     opts->tracer_attributes["lightstep.component_name"] = "component";
 
-    ON_CALL(cm_, httpAsyncClientForCluster("lightstep_saas"))
+    ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
     ON_CALL(context_, operationName()).WillByDefault(ReturnRef(operation_name_));
 
@@ -318,16 +320,16 @@ public:
     }
 
     sink_.reset(
-        new LightStepSink(config, cm_, stats_, "service_node", tls_, runtime_, std::move(opts)));
+        new LightStepSink(config, cm_, stats_, local_info_, tls_, runtime_, std::move(opts)));
   }
 
   void setupValidSink() {
-    EXPECT_CALL(cm_, get("lightstep_saas")).WillRepeatedly(Return(cm_.cluster_.info_));
+    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(cm_.cluster_.info_));
     ON_CALL(*cm_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
     std::string valid_config = R"EOF(
-      {"collector_cluster": "lightstep_saas"}
+      {"collector_cluster": "fake_cluster"}
     )EOF";
     Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
 
@@ -347,6 +349,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<MockTracingContext> context_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 TEST_F(LightStepSinkTest, InitializeSink) {
@@ -368,10 +371,10 @@ TEST_F(LightStepSinkTest, InitializeSink) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get("lightstep_saas")).WillOnce(Return(nullptr));
+    EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
 
     std::string valid_config = R"EOF(
-      {"collector_cluster": "lightstep_saas"}
+      {"collector_cluster": "fake_cluster"}
     )EOF";
     Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
 
@@ -380,11 +383,11 @@ TEST_F(LightStepSinkTest, InitializeSink) {
 
   {
     // Valid config, but upstream cluster does not support http2.
-    EXPECT_CALL(cm_, get("lightstep_saas")).WillRepeatedly(Return(cm_.cluster_.info_));
+    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(cm_.cluster_.info_));
     ON_CALL(*cm_.cluster_.info_, features()).WillByDefault(Return(0));
 
     std::string valid_config = R"EOF(
-      {"collector_cluster": "lightstep_saas"}
+      {"collector_cluster": "fake_cluster"}
     )EOF";
     Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
 
@@ -392,12 +395,12 @@ TEST_F(LightStepSinkTest, InitializeSink) {
   }
 
   {
-    EXPECT_CALL(cm_, get("lightstep_saas")).WillRepeatedly(Return(cm_.cluster_.info_));
+    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(cm_.cluster_.info_));
     ON_CALL(*cm_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
     std::string valid_config = R"EOF(
-      {"collector_cluster": "lightstep_saas"}
+      {"collector_cluster": "fake_cluster"}
     )EOF";
     Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
 
@@ -422,7 +425,7 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
                          message->headers().Path()->value().c_str());
-            EXPECT_STREQ("lightstep_saas", message->headers().Host()->value().c_str());
+            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 
             return &request;
@@ -452,26 +455,18 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
 
   callback->onSuccess(std::move(msg));
 
-  EXPECT_EQ(
-      1U,
-      stats_.counter(
-                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.success")
-          .value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_
+                    .counter("grpc.lightstep.collector.CollectorService.Report.success")
+                    .value());
 
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
 
-  EXPECT_EQ(
-      1U,
-      stats_.counter(
-                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.failure")
-          .value());
-
-  EXPECT_EQ(
-      2U,
-      stats_.counter(
-                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.total")
-          .value());
-
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_
+                    .counter("grpc.lightstep.collector.CollectorService.Report.failure")
+                    .value());
+  EXPECT_EQ(2U, cm_.cluster_.info_->stats_store_
+                    .counter("grpc.lightstep.collector.CollectorService.Report.total")
+                    .value());
   EXPECT_EQ(2U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
@@ -528,7 +523,7 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
                          message->headers().Path()->value().c_str());
-            EXPECT_STREQ("lightstep_saas", message->headers().Host()->value().c_str());
+            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 
             return &request;
@@ -555,17 +550,12 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
   // No trailers, gRPC is considered failed.
   callback->onSuccess(std::move(msg));
 
-  EXPECT_EQ(
-      1U,
-      stats_.counter(
-                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.failure")
-          .value());
-
-  EXPECT_EQ(
-      1U,
-      stats_.counter(
-                 "cluster.lightstep_saas.grpc.lightstep.collector.CollectorService.Report.total")
-          .value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_
+                    .counter("grpc.lightstep.collector.CollectorService.Report.failure")
+                    .value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_
+                    .counter("grpc.lightstep.collector.CollectorService.Report.total")
+                    .value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 

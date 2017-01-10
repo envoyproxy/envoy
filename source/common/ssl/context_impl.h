@@ -1,6 +1,7 @@
 #pragma once
 
 #include "context_impl.h"
+#include "context_manager_impl.h"
 #include "openssl.h"
 
 #include "envoy/runtime/runtime.h"
@@ -31,6 +32,8 @@ typedef CSmartPtr<SSL, SSL_free> SslConPtr;
 
 class ContextImpl : public virtual Context {
 public:
+  ~ContextImpl() { parent_.releaseContext(this); }
+
   virtual SslConPtr newSsl() const;
 
   /**
@@ -57,7 +60,7 @@ public:
   std::string getCertChainInformation() override;
 
 protected:
-  ContextImpl(const std::string& name, Stats::Store& stats, ContextConfig& config);
+  ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config);
 
   /**
    * Specifies the context for which the session can be reused.  Any data is acceptable here.
@@ -88,18 +91,18 @@ protected:
   static bool verifyCertificateHash(X509* cert, const std::vector<uint8_t>& certificate_hash);
 
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
-  static SslStats generateStats(const std::string& prefix, Stats::Store& store);
+  static SslStats generateStats(Stats::Scope& scope);
   int32_t getDaysUntilExpiration(const X509* cert);
   X509Ptr loadCert(const std::string& cert_file);
   static std::string getSerialNumber(X509* cert);
   std::string getCaFileName() { return ca_file_path_; };
   std::string getCertChainFileName() { return cert_chain_file_path_; };
 
+  ContextManagerImpl& parent_;
   SslCtxPtr ctx_;
   std::string verify_subject_alt_name_;
   std::vector<uint8_t> verify_certificate_hash_;
-  Stats::Store& store_;
-  const std::string stats_prefix_;
+  Stats::Scope& scope_;
   SslStats stats_;
   std::vector<uint8_t> parsed_alpn_protocols_;
   X509Ptr ca_cert_;
@@ -110,7 +113,7 @@ protected:
 
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
-  ClientContextImpl(const std::string& name, Stats::Store& stats, ContextConfig& config);
+  ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config);
 
   SslConPtr newSsl() const override;
 
@@ -120,7 +123,7 @@ private:
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
-  ServerContextImpl(const std::string& name, Stats::Store& stats, ContextConfig& config,
+  ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config,
                     Runtime::Loader& runtime);
 
 private:

@@ -1,27 +1,25 @@
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/generated/helloworld.pb.h"
-#include "test/mocks/stats/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 
 namespace Grpc {
 
-TEST(CommonTest, chargeStats) {
-  Stats::IsolatedStoreImpl stats;
+TEST(GrpcCommonTest, chargeStats) {
+  NiceMock<Upstream::MockClusterInfo> cluster;
+  Common::chargeStat(cluster, "service", "method", true);
+  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
+  EXPECT_EQ(0U, cluster.stats_store_.counter("grpc.service.method.failure").value());
+  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.total").value());
 
-  Common::chargeStat(stats, "cluster", "service", "method", true);
-  EXPECT_EQ(1U, stats.counter("cluster.cluster.grpc.service.method.success").value());
-  EXPECT_EQ(0U, stats.counter("cluster.cluster.grpc.service.method.failure").value());
-  EXPECT_EQ(1U, stats.counter("cluster.cluster.grpc.service.method.total").value());
-
-  Common::chargeStat(stats, "cluster", "service", "method", false);
-  EXPECT_EQ(1U, stats.counter("cluster.cluster.grpc.service.method.success").value());
-  EXPECT_EQ(1U, stats.counter("cluster.cluster.grpc.service.method.failure").value());
-  EXPECT_EQ(2U, stats.counter("cluster.cluster.grpc.service.method.total").value());
+  Common::chargeStat(cluster, "service", "method", false);
+  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
+  EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
+  EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.total").value());
 }
 
-TEST(CommonTest, prepareHeaders) {
+TEST(GrpcCommonTest, prepareHeaders) {
   Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name");
 
   EXPECT_STREQ("POST", message->headers().Method()->value().c_str());

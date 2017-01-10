@@ -515,7 +515,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
-                                           ConnectionCallbacks& callbacks, Stats::Store& stats,
+                                           ConnectionCallbacks& callbacks, Stats::Scope& stats,
                                            uint64_t codec_options)
     : ConnectionImpl(connection, stats), callbacks_(callbacks) {
   nghttp2_session_client_new(&session_, http2_callbacks_.callbacks(), base());

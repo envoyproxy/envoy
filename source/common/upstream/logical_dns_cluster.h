@@ -25,13 +25,16 @@ class LogicalDnsCluster : public ClusterImplBase {
 public:
   LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                     Ssl::ContextManager& ssl_context_manager, Network::DnsResolver& dns_resolver,
-                    ThreadLocal::Instance& tls);
+                    ThreadLocal::Instance& tls, Event::Dispatcher& dispatcher);
+
+  ~LogicalDnsCluster();
 
   // Upstream::Cluster
+  void initialize() override {}
+  InitializePhase initializePhase() const override { return InitializePhase::Primary; }
   void setInitializedCb(std::function<void()> callback) override {
     initialize_callback_ = callback;
   }
-  void shutdown() override {}
 
 private:
   struct LogicalHost : public HostImpl {
@@ -80,6 +83,7 @@ private:
   std::string dns_url_;
   std::string current_resolved_url_;
   HostPtr logical_host_;
+  Network::ActiveDnsQuery* active_dns_query_{};
 };
 
 } // Upstream

@@ -115,14 +115,15 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 
 Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& response) {
   for (auto& cluster : server_.clusterManager().clusters()) {
-    addCircuitSettings(cluster.second->info()->name(), "default",
-                       cluster.second->info()->resourceManager(Upstream::ResourcePriority::Default),
-                       response);
-    addCircuitSettings(cluster.second->info()->name(), "high",
-                       cluster.second->info()->resourceManager(Upstream::ResourcePriority::High),
-                       response);
+    addCircuitSettings(
+        cluster.second.get().info()->name(), "default",
+        cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::Default),
+        response);
+    addCircuitSettings(
+        cluster.second.get().info()->name(), "high",
+        cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::High), response);
 
-    for (auto& host : cluster.second->hosts()) {
+    for (auto& host : cluster.second.get().hosts()) {
       std::map<std::string, uint64_t> all_stats;
       for (Stats::Counter& counter : host->counters()) {
         all_stats[counter.name()] = counter.value();
@@ -133,18 +134,18 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
       }
 
       for (auto stat : all_stats) {
-        response.add(fmt::format("{}::{}::{}::{}\n", cluster.second->info()->name(), host->url(),
-                                 stat.first, stat.second));
+        response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
+                                 host->url(), stat.first, stat.second));
       }
 
-      response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second->info()->name(),
+      response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
                                host->url(), Upstream::HostUtility::healthFlagsToString(*host)));
-      response.add(fmt::format("{}::{}::weight::{}\n", cluster.second->info()->name(), host->url(),
-                               host->weight()));
-      response.add(fmt::format("{}::{}::zone::{}\n", cluster.second->info()->name(), host->url(),
-                               host->zone()));
-      response.add(fmt::format("{}::{}::canary::{}\n", cluster.second->info()->name(), host->url(),
-                               host->canary()));
+      response.add(fmt::format("{}::{}::weight::{}\n", cluster.second.get().info()->name(),
+                               host->url(), host->weight()));
+      response.add(fmt::format("{}::{}::zone::{}\n", cluster.second.get().info()->name(),
+                               host->url(), host->zone()));
+      response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
+                               host->url(), host->canary()));
     }
   }
 
@@ -261,10 +262,10 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& respons
   // using the same cert.
   std::unordered_set<std::string> context_info_set;
   std::string context_format = "{{\n\t\"ca_cert\": \"{}\"\n\t\"cert_chain\": \"{}\"\n}}\n";
-  for (Ssl::Context& context : server_.sslContextManager().getContexts()) {
+  server_.sslContextManager().iterateContexts([&](Ssl::Context& context) -> void {
     context_info_set.insert(fmt::format(context_format, context.getCaCertInformation(),
                                         context.getCertChainInformation()));
-  }
+  });
 
   std::string cert_result_string;
   for (const std::string& context_info : context_info_set) {
@@ -360,6 +361,6 @@ Http::Code AdminImpl::runCallback(const std::string& path, Buffer::Instance& res
   return code;
 }
 
-const std::string& AdminImpl::localAddress() { return server_.getLocalAddress(); }
+const std::string& AdminImpl::localAddress() { return server_.localInfo().address(); }
 
 } // Server

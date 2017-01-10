@@ -36,6 +36,14 @@ public:
   static QueryParams parseQueryString(const std::string& url);
 
   /**
+   * Parse a particular value out of a cookie
+   * @param headers supplies the headers to get the cookie from.
+   * @param key the key for the particular cookie value to return
+   * @return std::string the parsed cookie value, or "" if none exists
+   **/
+  static std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
+
+  /**
    * Get the response status from the response headers.
    * @param headers supplies the headers to get the status from.
    * @return uint64_t the response code or throws an exception if the headers are invalid.

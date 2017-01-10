@@ -69,9 +69,8 @@ void GrpcClientImpl::onFailure(const Optional<uint64_t>&, const std::string&) {
   request_id_.clear();
 }
 
-GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm,
-                                 Stats::Store& stats_store)
-    : cluster_name_(config.getString("cluster_name")), cm_(cm), stats_store_(stats_store) {
+GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm)
+    : cluster_name_(config.getString("cluster_name")), cm_(cm) {
   if (!cm_.get(cluster_name_)) {
     throw EnvoyException(fmt::format("unknown rate limit service cluster '{}'", cluster_name_));
   }
@@ -83,8 +82,7 @@ ClientPtr GrpcFactoryImpl::create(const Optional<std::chrono::milliseconds>& tim
 
 Grpc::RpcChannelPtr GrpcFactoryImpl::create(Grpc::RpcChannelCallbacks& callbacks,
                                             const Optional<std::chrono::milliseconds>& timeout) {
-  return Grpc::RpcChannelPtr{
-      new Grpc::RpcChannelImpl(cm_, cluster_name_, callbacks, stats_store_, timeout)};
+  return Grpc::RpcChannelPtr{new Grpc::RpcChannelImpl(cm_, cluster_name_, callbacks, timeout)};
 }
 
 } // RateLimit

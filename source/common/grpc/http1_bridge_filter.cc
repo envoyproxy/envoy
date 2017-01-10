@@ -20,7 +20,7 @@ void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
   bool success = StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) &&
                  grpc_status_code == 0;
 
-  Common::chargeStat(stats_store_, cluster_, grpc_service_, grpc_method_, success);
+  Common::chargeStat(*cluster_, grpc_service_, grpc_method_, success);
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
@@ -82,6 +82,11 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
     if (grpc_message_header) {
       response_headers_->insertGrpcMessage().value(*grpc_message_header);
     }
+
+    // Since we are buffering, set content-length so that HTTP/1.1 callers can better determine
+    // if this is a complete response.
+    response_headers_->insertContentLength().value(
+        encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
   }
 
   // NOTE: We will still write the trailers, but the HTTP/1.1 codec will just eat them and end
@@ -100,7 +105,8 @@ void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
     return;
   }
 
-  cluster_ = route->clusterName();
+  // TODO: Cluster may not exist.
+  cluster_ = cm_.get(route->clusterName());
   grpc_service_ = parts[0];
   grpc_method_ = parts[1];
   do_stat_tracking_ = true;

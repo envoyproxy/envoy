@@ -1,6 +1,8 @@
 #include "hot_restart.h"
 
 #include "common/event/libevent.h"
+#include "common/local_info/local_info_impl.h"
+#include "common/network/utility.h"
 #include "common/ssl/openssl.h"
 #include "server/drain_manager_impl.h"
 #include "server/options_impl.h"
@@ -41,8 +43,10 @@ int main(int argc, char** argv) {
   DefaultTestHooks default_test_hooks;
   Stats::ThreadLocalStoreImpl stats_store(restarter->statLock(), *restarter);
   Server::ProdComponentFactory component_factory;
+  LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(), options.serviceZone(),
+                                      options.serviceClusterName(), options.serviceNodeName());
   Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
-                              restarter->accessLogLock(), component_factory);
+                              restarter->accessLogLock(), component_factory, local_info);
   server.run();
   return 0;
 }

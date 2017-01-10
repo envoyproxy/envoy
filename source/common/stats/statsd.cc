@@ -54,17 +54,17 @@ void UdpStatsdSink::onTimespanComplete(const std::string& name, std::chrono::mil
   writer().writeTimer(name, ms);
 }
 
-TcpStatsdSink::TcpStatsdSink(const std::string& stat_cluster, const std::string& stat_host,
+TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::Instance& tls,
                              Upstream::ClusterManager& cluster_manager)
-    : stat_cluster_(stat_cluster), stat_host_(stat_host), cluster_name_(cluster_name), tls_(tls),
+    : local_info_(local_info), cluster_name_(cluster_name), tls_(tls),
       tls_slot_(tls.allocateSlot()), cluster_manager_(cluster_manager) {
 
   if (!cluster_manager.get(cluster_name)) {
     throw EnvoyException(fmt::format("unknown TCP statsd upstream cluster: {}", cluster_name));
   }
 
-  if (stat_cluster.empty() || stat_host.empty()) {
+  if (local_info_.clusterName().empty() || local_info_.nodeName().empty()) {
     throw EnvoyException(
         fmt::format("TCP statsd requires setting --service-cluster and --service-node"));
   }

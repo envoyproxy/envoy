@@ -63,8 +63,8 @@ protected:
   };
 
   HealthCheckerImplBase(const Cluster& cluster, const Json::Object& config,
-                        Event::Dispatcher& dispatcher, Stats::Store& store,
-                        Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                        Runtime::RandomGenerator& random);
 
   std::chrono::milliseconds interval();
 
@@ -77,14 +77,13 @@ protected:
   const uint32_t unhealthy_threshold_;
   const uint32_t healthy_threshold_;
   HealthCheckerStats stats_;
-  Stats::Store& stat_store_;
   uint64_t local_process_healthy_{};
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
 
 private:
   void decHealthy();
-  HealthCheckerStats generateStats(Stats::Store& store);
+  HealthCheckerStats generateStats(Stats::Scope& scope);
   void incHealthy();
   void refreshHealthyStat();
   void runCallbacks(HostPtr host, bool changed_state);
@@ -102,8 +101,8 @@ private:
 class HttpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   HttpHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
-                        Event::Dispatcher& dispatcher, Stats::Store& store,
-                        Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                        Runtime::RandomGenerator& random);
 
   // Upstream::HealthChecker
   void start() override;
@@ -226,7 +225,7 @@ public:
 class TcpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   TcpHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
-                       Event::Dispatcher& dispatcher, Stats::Store& store, Runtime::Loader& runtime,
+                       Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random);
 
   // Upstream::HealthChecker

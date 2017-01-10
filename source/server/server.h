@@ -74,7 +74,8 @@ public:
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
   InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::Store& store,
-               Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory);
+               Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
+               const LocalInfo::LocalInfo& local_info);
   ~InstanceImpl();
 
   void run();
@@ -109,7 +110,7 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const std::string& getLocalAddress() override { return local_address_; }
+  const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
 
 private:
   void flushStats();
@@ -130,6 +131,7 @@ private:
   ConnectionHandlerImpl handler_;
   Runtime::RandomGeneratorImpl random_generator_;
   Runtime::LoaderPtr runtime_loader_;
+  std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   std::unique_ptr<Configuration::Main> config_;
   std::list<WorkerPtr> workers_;
   std::unique_ptr<AdminImpl> admin_;
@@ -138,8 +140,7 @@ private:
   Event::SignalEventPtr sig_hup_;
   Network::DnsResolverPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
-  const std::string local_address_;
-  std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
+  const LocalInfo::LocalInfo& local_info_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
 };

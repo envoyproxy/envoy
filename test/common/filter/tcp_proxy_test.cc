@@ -146,8 +146,7 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   connect_timer_->callback_();
-  EXPECT_EQ(1U, cluster_manager_.cluster_.info_->stats_store_
-                    .counter("cluster.fake_cluster.upstream_cx_connect_timeout")
+  EXPECT_EQ(1U, cluster_manager_.cluster_.info_->stats_store_.counter("upstream_cx_connect_timeout")
                     .value());
 }
 
@@ -173,8 +172,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*connect_timer_, disableTimer());
   upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(1U, cluster_manager_.cluster_.info_->stats_store_
-                    .counter("cluster.fake_cluster.upstream_cx_connect_fail")
+  EXPECT_EQ(1U, cluster_manager_.cluster_.info_->stats_store_.counter("upstream_cx_connect_fail")
                     .value());
 }
 
@@ -189,9 +187,8 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   filter_->onNewConnection();
 
-  EXPECT_EQ(1U, cluster_manager_.cluster_.info_->stats_store_
-                    .counter("cluster.fake_cluster.upstream_cx_overflow")
-                    .value());
+  EXPECT_EQ(1U,
+            cluster_manager_.cluster_.info_->stats_store_.counter("upstream_cx_overflow").value());
 }
 
 } // Filter

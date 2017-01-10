@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
@@ -56,9 +57,8 @@ private:
  */
 class TcpStatsdSink : public Sink {
 public:
-  TcpStatsdSink(const std::string& stat_cluster, const std::string& stat_host,
-                const std::string& cluster_name, ThreadLocal::Instance& tls,
-                Upstream::ClusterManager& cluster_manager);
+  TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+                ThreadLocal::Instance& tls, Upstream::ClusterManager& cluster_manager);
 
   // Stats::Sink
   void flushCounter(const std::string& name, uint64_t delta) override {
@@ -100,8 +100,7 @@ private:
     bool shutdown_{};
   };
 
-  std::string stat_cluster_;
-  std::string stat_host_;
+  const LocalInfo::LocalInfo& local_info_;
   std::string cluster_name_;
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;

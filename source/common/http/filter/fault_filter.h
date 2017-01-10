@@ -13,7 +13,7 @@ namespace Http {
  * All stats for the fault filter. @see stats_macros.h
  */
 // clang-format off
-#define ALL_FAULT_FILTER_STATS(COUNTER)                                                           \
+#define ALL_FAULT_FILTER_STATS(COUNTER)                                                            \
   COUNTER(delays_injected)                                                                         \
   COUNTER(aborts_injected)
 // clang-format on
