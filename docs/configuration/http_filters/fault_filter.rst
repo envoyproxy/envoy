@@ -132,7 +132,8 @@ value
 
 regex
   *(optional, boolean)* Specifies whether the header value is a regular expression
-  or not. Defaults to false.
+  or not. Defaults to false. The regex grammar used in the value field
+  is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
 
 The filter will check the request's headers against all the specified
 headers in the filter config. A match will happen if all the headers in the
