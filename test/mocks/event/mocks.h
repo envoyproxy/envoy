@@ -9,7 +9,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
-#include "envoy/server/connection_handler.h"
+#include "envoy/network/connection_handler.h"
 
 namespace Event {
 
@@ -39,7 +39,7 @@ public:
     return Filesystem::WatcherPtr{createFilesystemWatcher_()};
   }
 
-  Network::ListenerPtr createListener(Server::ConnectionHandler& conn_handler,
+  Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
                                       Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
                                       Stats::Store& stats_store, bool bind_to_port,
                                       bool use_proxy_proto, bool use_original_dst) override {
@@ -47,7 +47,7 @@ public:
                                                 use_proxy_proto, use_original_dst)};
   }
 
-  Network::ListenerPtr createSslListener(Server::ConnectionHandler& conn_handler,
+  Network::ListenerPtr createSslListener(Network::ConnectionHandler& conn_handler,
                                          Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                          Network::ListenerCallbacks& cb, Stats::Store& stats_store,
                                          bool bind_to_port, bool use_proxy_proto,
@@ -79,12 +79,12 @@ public:
   MOCK_METHOD2(createFileEvent_, FileEvent*(int fd, FileReadyCb cb));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
   MOCK_METHOD7(createListener_,
-               Network::Listener*(Server::ConnectionHandler& conn_handler,
+               Network::Listener*(Network::ConnectionHandler& conn_handler,
                                   Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
                                   Stats::Store& stats_store, bool bind_to_port,
                                   bool use_proxy_proto, bool use_original_dst));
   MOCK_METHOD8(createSslListener_,
-               Network::Listener*(Server::ConnectionHandler& conn_handler,
+               Network::Listener*(Network::ConnectionHandler& conn_handler,
                                   Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                   Network::ListenerCallbacks& cb, Stats::Store& stats_store,
                                   bool bind_to_port, bool use_proxy_proto, bool use_original_dst));

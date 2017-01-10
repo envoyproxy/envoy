@@ -224,7 +224,6 @@ bool Utility::isLoopbackAddress(const char* address) {
 }
 
 bool Utility::getOriginalDst(int fd, sockaddr_storage* orig_addr) {
-
   socklen_t addr_len = sizeof(sockaddr_storage);
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, orig_addr, &addr_len);
 

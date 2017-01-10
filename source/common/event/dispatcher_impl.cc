@@ -75,7 +75,7 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
 }
 
-Network::ListenerPtr DispatcherImpl::createListener(Server::ConnectionHandler& conn_handler,
+Network::ListenerPtr DispatcherImpl::createListener(Network::ConnectionHandler& conn_handler,
                                                     Network::ListenSocket& socket,
                                                     Network::ListenerCallbacks& cb,
                                                     Stats::Store& stats_store, bool bind_to_port,
@@ -84,7 +84,7 @@ Network::ListenerPtr DispatcherImpl::createListener(Server::ConnectionHandler& c
       conn_handler, *this, socket, cb, stats_store, bind_to_port, use_proxy_proto, use_orig_dst)};
 }
 
-Network::ListenerPtr DispatcherImpl::createSslListener(Server::ConnectionHandler& conn_handler,
+Network::ListenerPtr DispatcherImpl::createSslListener(Network::ConnectionHandler& conn_handler,
                                                        Ssl::ServerContext& ssl_ctx,
                                                        Network::ListenSocket& socket,
                                                        Network::ListenerCallbacks& cb,

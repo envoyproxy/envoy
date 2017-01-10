@@ -20,7 +20,7 @@ public:
   ~Worker();
 
   Event::Dispatcher& dispatcher() { return handler_->dispatcher(); }
-  Server::ConnectionHandler* handler() { return handler_.get(); }
+  Network::ConnectionHandler* handler() { return handler_.get(); }
   void initializeConfiguration(Server::Configuration::Main& config, const SocketMap& socket_map);
 
   /**

@@ -8,8 +8,8 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/ssl/context.h"
-#include "envoy/server/connection_handler.h"
 #include "envoy/stats/stats.h"
 
 namespace Event {
@@ -82,7 +82,7 @@ public:
    *        allow the listener to hand it off to the listener associated to the original port
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::ListenerPtr createListener(Server::ConnectionHandler& conn_handler,
+  virtual Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
                                               Network::ListenSocket& socket,
                                               Network::ListenerCallbacks& cb,
                                               Stats::Store& stats_store, bool bind_to_port,
@@ -104,7 +104,7 @@ public:
    *        allow the listener to hand it off to the listener associated to the original port
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::ListenerPtr createSslListener(Server::ConnectionHandler& conn_handler,
+  virtual Network::ListenerPtr createSslListener(Network::ConnectionHandler& conn_handler,
                                                  Ssl::ServerContext& ssl_ctx,
                                                  Network::ListenSocket& socket,
                                                  Network::ListenerCallbacks& cb,

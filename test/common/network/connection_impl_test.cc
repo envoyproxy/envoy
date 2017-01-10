@@ -62,7 +62,7 @@ TEST(ConnectionImplTest, BufferStats) {
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks listener_callbacks;
-  Server::MockConnectionHandler connection_handler;
+  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(
       connection_handler, socket, listener_callbacks, stats_store, true, false, false);
 

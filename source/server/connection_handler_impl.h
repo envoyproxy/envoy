@@ -1,10 +1,10 @@
 #pragma once
 
-#include "envoy/server/connection_handler.h"
 #include "envoy/api/api.h"
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/listen_socket.h"
@@ -34,28 +34,13 @@ struct ListenerStats {
  * Server side connection handler. This is used both by workers as well as the
  * main thread for non-threaded listeners.
  */
-class ConnectionHandlerImpl : public ConnectionHandler, NonCopyable {
+class ConnectionHandlerImpl : public Network::ConnectionHandler, NonCopyable {
 public:
   ConnectionHandlerImpl(Stats::Store& stats_store, spdlog::logger& logger, Api::ApiPtr&& api);
   ~ConnectionHandlerImpl();
 
   Api::Api& api() { return *api_; }
   Event::Dispatcher& dispatcher() { return *dispatcher_; }
-  uint64_t numConnections() { return num_connections_; }
-
-  void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                   bool bind_to_port, bool use_proxy_proto, bool use_orig_dst) override;
-
-  void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                      Network::ListenSocket& socket, bool bind_to_port, bool use_proxy_proto,
-                      bool use_orig_dst) override;
-
-  Network::Listener* findListener(const std::string& socket_name) override;
-
-  /**
-   * Close and destroy all listeners.
-   */
-  void closeListeners() override;
 
   /**
    * Close and destroy all connections.
@@ -67,6 +52,20 @@ public:
    * more than 200ms in real time.
    */
   void startWatchdog();
+
+  // Network::ConnectionHandler
+  uint64_t numConnections() override { return num_connections_; }
+
+  void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
+                   bool bind_to_port, bool use_proxy_proto, bool use_orig_dst) override;
+
+  void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
+                      Network::ListenSocket& socket, bool bind_to_port, bool use_proxy_proto,
+                      bool use_orig_dst) override;
+
+  Network::Listener* findListener(const std::string& socket_name) override;
+
+  void closeListeners() override;
 
 private:
   /**

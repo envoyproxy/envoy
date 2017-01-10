@@ -40,6 +40,4 @@ MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
 
 MockInstance::~MockInstance() {}
 
-MockConnectionHandler::MockConnectionHandler() {}
-MockConnectionHandler::~MockConnectionHandler() {}
 } // Server

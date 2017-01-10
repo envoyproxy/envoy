@@ -4,7 +4,6 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
-#include "envoy/server/connection_handler.h"
 #include "envoy/ssl/context_manager.h"
 
 #include "common/ssl/context_manager_impl.h"
@@ -132,22 +131,6 @@ public:
   testing::NiceMock<MockOptions> options_;
   testing::NiceMock<Runtime::MockRandomGenerator> random_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
-};
-
-class MockConnectionHandler : public ConnectionHandler {
-public:
-  MockConnectionHandler();
-  ~MockConnectionHandler();
-
-  MOCK_METHOD0(numConnections, uint64_t());
-  MOCK_METHOD5(addListener,
-               void(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                    bool bind_to_port, bool use_proxy_proto, bool use_orig_dst));
-  MOCK_METHOD6(addSslListener, void(Network::FilterChainFactory& factory,
-                                    Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-                                    bool bind_to_port, bool use_proxy_proto, bool use_orig_dst));
-  MOCK_METHOD1(findListener, Network::Listener*(const std::string& socket_name));
-  MOCK_METHOD0(closeListeners, void());
 };
 
 } // Server

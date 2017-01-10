@@ -8,7 +8,6 @@
 namespace Network {
 
 TcpListenSocket::TcpListenSocket(uint32_t port, bool bind_to_port) : port_(port) {
-
   AddrInfoPtr address = Utility::resolveTCP("", port);
   fd_ = socket(address->ai_addr->sa_family, SOCK_STREAM | SOCK_NONBLOCK, 0);
   RELEASE_ASSERT(fd_ != -1);

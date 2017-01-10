@@ -1,7 +1,7 @@
 #pragma once
 
-#include "worker.h"
 #include "connection_handler_impl.h"
+#include "worker.h"
 
 #include "envoy/common/optional.h"
 #include "envoy/server/drain_manager.h"

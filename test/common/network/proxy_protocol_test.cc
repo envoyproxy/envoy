@@ -32,7 +32,7 @@ public:
   TcpListenSocket socket_;
   Stats::IsolatedStoreImpl stats_store_;
   MockListenerCallbacks callbacks_;
-  Server::MockConnectionHandler connection_handler_;
+  Network::MockConnectionHandler connection_handler_;
   ListenerImpl listener_;
   ClientConnectionPtr conn_;
   NiceMock<MockConnectionCallbacks> connection_callbacks_;

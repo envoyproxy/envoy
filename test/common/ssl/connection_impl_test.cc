@@ -35,7 +35,7 @@ TEST(SslConnectionImplTest, ClientAuth) {
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
-  Server::MockConnectionHandler connection_handler;
+  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createSslListener(
       connection_handler, *server_ctx, socket, callbacks, stats_store, true, false, false);
 
@@ -95,7 +95,7 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
-  Server::MockConnectionHandler connection_handler;
+  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createSslListener(
       connection_handler, *server_ctx, socket, callbacks, stats_store, true, false, false);
 
@@ -151,7 +151,7 @@ TEST(SslConnectionImplTest, SslError) {
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
-  Server::MockConnectionHandler connection_handler;
+  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createSslListener(
       connection_handler, *server_ctx, socket, callbacks, stats_store, true, false, false);
 

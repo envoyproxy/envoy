@@ -22,13 +22,13 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
   EXPECT_CALL(*api, allocateDispatcher_()).WillOnce(Return(dispatcher));
   Server::ConnectionHandlerImpl handler(stats_store, log(), Api::ApiPtr{api});
   Network::MockFilterChainFactory factory;
-  Server::MockConnectionHandler connection_handler;
+  Network::MockConnectionHandler connection_handler;
   NiceMock<Network::MockListenSocket> socket;
 
   Network::Listener* listener = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks;
   EXPECT_CALL(*dispatcher, createListener_(_, _, _, _, _, _, _))
-      .WillOnce(Invoke([&](Server::ConnectionHandler&, Network::ListenSocket&,
+      .WillOnce(Invoke([&](Network::ConnectionHandler&, Network::ListenSocket&,
                            Network::ListenerCallbacks& cb, Stats::Store&, bool, bool, bool)
                            -> Network::Listener* {
                              listener_callbacks = &cb;

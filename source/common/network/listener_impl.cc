@@ -9,7 +9,7 @@
 #include "common/network/connection_impl.h"
 #include "common/ssl/connection_impl.h"
 
-#include "envoy/server/connection_handler.h"
+#include "envoy/network/connection_handler.h"
 
 #include "event2/listener.h"
 
@@ -47,7 +47,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   listener->newConnection(fd, addr);
 }
 
-ListenerImpl::ListenerImpl(Server::ConnectionHandler& conn_handler,
+ListenerImpl::ListenerImpl(Network::ConnectionHandler& conn_handler,
                            Event::DispatcherImpl& dispatcher, ListenSocket& socket,
                            ListenerCallbacks& cb, Stats::Store& stats_store, bool bind_to_port,
                            bool use_proxy_proto, bool use_orig_dst)

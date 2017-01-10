@@ -4,7 +4,7 @@
 #include "proxy_protocol.h"
 
 #include "envoy/network/listener.h"
-#include "envoy/server/connection_handler.h"
+#include "envoy/network/connection_handler.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
@@ -18,7 +18,7 @@ namespace Network {
  */
 class ListenerImpl : public Listener {
 public:
-  ListenerImpl(Server::ConnectionHandler& conn_handler, Event::DispatcherImpl& dispatcher,
+  ListenerImpl(Network::ConnectionHandler& conn_handler, Event::DispatcherImpl& dispatcher,
                ListenSocket& socket, ListenerCallbacks& cb, Stats::Store& stats_store,
                bool bind_to_port, bool use_proxy_proto, bool use_orig_dst);
 
@@ -45,14 +45,14 @@ protected:
   const std::string getAddressName(sockaddr* addr);
   uint16_t getAddressPort(sockaddr* addr);
 
-  Server::ConnectionHandler& connection_handler_;
+  Network::ConnectionHandler& connection_handler_;
   Event::DispatcherImpl& dispatcher_;
   ListenSocket& socket_;
   ListenerCallbacks& cb_;
-  bool bind_to_port_;
-  bool use_proxy_proto_;
+  const bool bind_to_port_;
+  const bool use_proxy_proto_;
   ProxyProtocol proxy_protocol_;
-  bool use_original_dst_;
+  const bool use_original_dst_;
 
 private:
   static void errorCallback(evconnlistener* listener, void* context);
@@ -63,7 +63,7 @@ private:
 
 class SslListenerImpl : public ListenerImpl {
 public:
-  SslListenerImpl(Server::ConnectionHandler& conn_handler, Event::DispatcherImpl& dispatcher,
+  SslListenerImpl(Network::ConnectionHandler& conn_handler, Event::DispatcherImpl& dispatcher,
                   Ssl::Context& ssl_ctx, ListenSocket& socket, ListenerCallbacks& cb,
                   Stats::Store& stats_store, bool bind_to_port, bool use_proxy_proto,
                   bool use_orig_dst)

@@ -6,12 +6,11 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/ssl/context.h"
 
-namespace Server {
+namespace Network {
 
 /**
  * Abstract connection handler.
  */
-
 class ConnectionHandler {
 public:
   virtual ~ConnectionHandler(){};
@@ -65,4 +64,4 @@ public:
 
 typedef std::unique_ptr<ConnectionHandler> ConnectionHandlerPtr;
 
-} // Server
+} // Network
