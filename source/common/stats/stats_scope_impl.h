@@ -10,10 +10,10 @@ public:
 
   // Stats::Scope
   void deliverHistogramToSinks(const std::string& name, uint64_t value) override {
-    parent_.deliverHistogramToSinks(name, value);
+    parent_.deliverHistogramToSinks(prefix_ + name, value);
   }
   void deliverTimingToSinks(const std::string& name, std::chrono::milliseconds ms) {
-    parent_.deliverTimingToSinks(name, ms);
+    parent_.deliverTimingToSinks(prefix_ + name, ms);
   }
 
   Counter& counter(const std::string& name) override;
