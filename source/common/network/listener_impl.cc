@@ -34,11 +34,11 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       // the address and port returned by getOriginalDst() match the listener port.
       // In this case the listener handles the connection directly and does not hand it off.
       if (listener->socket_.name() != orig_sock_name) {
-        Listener* new_listener = listener->connection_handler_.findListener(orig_sock_name);
+        ListenerImpl* new_listener =
+            dynamic_cast<ListenerImpl*>(listener->connection_handler_.findListener(orig_sock_name));
 
         if (new_listener != nullptr) {
-          listener->newConnection(fd, addr);
-          return;
+          new_listener = listener;
         }
       }
     }

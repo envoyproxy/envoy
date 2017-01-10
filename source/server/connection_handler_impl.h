@@ -151,4 +151,3 @@ private:
 typedef std::unique_ptr<ConnectionHandlerImpl> ConnectionHandlerImplPtr;
 
 } // Server
-
