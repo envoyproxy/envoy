@@ -5,6 +5,7 @@ set -e
 # Setup basic requirements and install them.
 apt-get update
 apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc
+apt-get install -y golang
 add-apt-repository -y ppa:ubuntu-toolchain-r/test
 apt-get update
 apt-get install -y g++-4.9
@@ -25,15 +26,6 @@ cd thirdparty
 export CC=gcc-4.9
 export CXX=g++-4.9
 
-# openssl
-wget https://www.openssl.org/source/openssl-1.0.2i.tar.gz
-tar xf openssl-1.0.2i.tar.gz
-cd openssl-1.0.2i
-./config --prefix=$THIRDPARTY_BUILD -DPURIFY no-shared
-make install
-cd ..
-rm -fr openssl*
-
 # libevent
 wget https://github.com/libevent/libevent/releases/download/release-2.0.22-stable/libevent-2.0.22-stable.tar.gz
 tar xf libevent-2.0.22-stable.tar.gz
@@ -42,6 +34,18 @@ cd libevent-2.0.22-stable
 make install
 cd ..
 rm -fr libevent*
+
+# BoringSSL
+git clone https://boringssl.googlesource.com/boringssl
+cd boringssl
+git reset --hard 78684e5b222645828ca302e56b40b9daff2b2d27
+cmake .
+make
+cp -r include/* $THIRDPARTY_BUILD/include
+cp ssl/libssl.a $THIRDPARTY_BUILD/lib
+cp crypto/libcrypto.a $THIRDPARTY_BUILD/lib
+cd ..
+rm -rf boringssl
 
 # gperftools
 wget https://github.com/gperftools/gperftools/releases/download/gperftools-2.5/gperftools-2.5.tar.gz
