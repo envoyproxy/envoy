@@ -19,11 +19,11 @@ uint64_t MockConnectionBase::next_id_;
 void MockConnectionBase::raiseEvents(uint32_t events) {
   if ((events & Network::ConnectionEvent::RemoteClose) ||
       (events & Network::ConnectionEvent::LocalClose)) {
-    if (closed_) {
+    if (state_ == Connection::State::Closed) {
       return;
     }
 
-    closed_ = true;
+    state_ = Connection::State::Closed;
   }
 
   for (Network::ConnectionCallbacks* callbacks : callbacks_) {
