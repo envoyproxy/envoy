@@ -3,8 +3,8 @@
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
 
-#include "test/mocks/upstream/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
@@ -438,6 +438,20 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
         },
         {
           "prefix": "/",
+          "cluster": "local_service_with_header_pattern_set_regex",
+          "headers" : [
+            {"name": "test_header_pattern", "value": "^user=test-\\d+$", "regex": true}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "local_service_with_header_pattern_unset_regex",
+          "headers" : [
+            {"name": "test_header_pattern", "value": "^customer=test-\\d+$"}
+          ]
+        },
+        {
+          "prefix": "/",
           "cluster": "local_service_without_headers"
         }
       ]
@@ -483,6 +497,19 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
     headers.addViaCopy("test_header_presence", "test");
     EXPECT_EQ("local_service_with_empty_headers",
               config.routeForRequest(headers, 0)->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addViaCopy("test_header_pattern", "user=test-1223");
+    EXPECT_EQ("local_service_with_header_pattern_set_regex",
+              config.routeForRequest(headers, 0)->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addViaCopy("test_header_pattern", "customer=test-1223");
+    EXPECT_EQ("local_service_without_headers", config.routeForRequest(headers, 0)->clusterName());
   }
 }
 

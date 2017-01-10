@@ -48,17 +48,20 @@ Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& conf
   }
 }
 
-bool ConfigUtility::matchHeaders(const Http::HeaderMap& headers,
-                                 const std::vector<HeaderData> request_headers) {
+bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
+                                 const std::vector<HeaderData> config_headers) {
   bool matches = true;
 
-  if (!request_headers.empty()) {
-    for (const HeaderData& header_data : request_headers) {
-      const Http::HeaderEntry* header = headers.get(header_data.name_);
-      if (header_data.value_ == EMPTY_STRING) {
+  if (!config_headers.empty()) {
+    for (const HeaderData& cfg_header_data : config_headers) {
+      const Http::HeaderEntry* header = request_headers.get(cfg_header_data.name_);
+      if (cfg_header_data.value_.empty()) {
         matches &= (header != nullptr);
+      } else if (!cfg_header_data.is_regex_) {
+        matches &= (header != nullptr) && (header->value() == cfg_header_data.value_.c_str());
       } else {
-        matches &= (header != nullptr) && (header->value() == header_data.value_.c_str());
+        matches &= (header != nullptr) &&
+                   std::regex_match(header->value().c_str(), cfg_header_data.regex_pattern_);
       }
       if (!matches) {
         break;
@@ -91,8 +94,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
     std::vector<Json::ObjectPtr> config_headers = route.getObjectArray("headers");
     for (const Json::ObjectPtr& header_map : config_headers) {
       // allow header value to be empty, allows matching to be only based on header presence.
+      // Regex is an opt-in. Unless explicitly mentioned, we will use header values for exact string
+      // matches.
       config_headers_.emplace_back(Http::LowerCaseString(header_map->getString("name")),
-                                   header_map->getString("value", EMPTY_STRING));
+                                   header_map->getString("value", EMPTY_STRING),
+                                   header_map->getBoolean("regex", false));
     }
   }
 }
