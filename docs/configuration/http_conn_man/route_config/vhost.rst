@@ -56,5 +56,5 @@ require_ssl
   are used for additional statistics gathering.
 
 :ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>`
-  *(optional, array)* Specifies a set of rate limit configurations that could be applied to the
+  *(optional, array)* Specifies a set of rate limit configurations that will be applied to the
   virtual host.
