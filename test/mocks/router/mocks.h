@@ -155,10 +155,6 @@ public:
   ~MockConfig();
 
   // Router::Config
-  MOCK_CONST_METHOD2(redirectRequest,
-                     const RedirectEntry*(const Http::HeaderMap& headers, uint64_t random_value));
-  MOCK_CONST_METHOD2(routeForRequest,
-                     const RouteEntry*(const Http::HeaderMap&, uint64_t random_value));
   MOCK_CONST_METHOD2(getRouteForRequest,
                      const Route*(const Http::HeaderMap&, uint64_t random_value));
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());

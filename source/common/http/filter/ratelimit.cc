@@ -29,11 +29,11 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
     std::vector<::RateLimit::Descriptor> descriptors;
 
     // Get all applicable rate limit policy entries for the route.
-    populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route, headers);
+    populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
 
     // Get all applicable rate limit policy entries for the virtual host.
-    populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors, route,
-                                 headers);
+    populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
+                                 route_entry, headers);
 
     if (!descriptors.empty()) {
       state_ = State::Calling;

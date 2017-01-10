@@ -140,8 +140,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // Determine if there is a route entry or a redirect for the request.
   const Route* route = callbacks_->routeTable().route(headers);
-
-  // There doesn't exist a redirect or route entry for the request.
   if (!route) {
     config_.stats_.no_route_.inc();
     stream_log_debug("no cluster match for URL '{}'", *callbacks_, headers.Path()->value().c_str());

@@ -278,8 +278,8 @@ class RouteMatcher {
 public:
   RouteMatcher(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
-  bool usesRuntime() const { return uses_runtime_; }
   const Route* getRouteForRequest(const Http::HeaderMap& headers, uint64_t random_value) const;
+  bool usesRuntime() const { return uses_runtime_; }
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;

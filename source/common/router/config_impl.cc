@@ -176,7 +176,7 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
 }
 
 const RedirectEntry* RouteEntryImplBase::redirectEntry() const {
-  // TODO: remove isRedirect()
+  // A route for a request can exclusively be a route entry or a redirect entry.
   if (isRedirect()) {
     return this;
   } else {
@@ -184,8 +184,14 @@ const RedirectEntry* RouteEntryImplBase::redirectEntry() const {
   }
 }
 
-// TODO: Since redirect is xor, if there is redirect return nullptr;
-const RouteEntry* RouteEntryImplBase::routeEntry() const { return this; }
+const RouteEntry* RouteEntryImplBase::routeEntry() const {
+  // A route for a request can exclusively be a route entry or a redirect entry.
+  if (isRedirect()) {
+    return nullptr;
+  } else {
+    return this;
+  }
+}
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const Json::Object& route,
                                            Runtime::Loader& loader)
@@ -321,7 +327,7 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
 
 const Route* VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
                                                   uint64_t random_value) const {
-  // First check for ssl redirect
+  // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto()->value() != "https") {
     return &SSL_ROUTE;
   } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
@@ -329,7 +335,7 @@ const Route* VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers
     return &SSL_ROUTE;
   }
 
-  //
+  // Check for a route that matches the request.
   for (const RouteEntryImplBasePtr& route : routes_) {
     if (route->matches(headers, random_value)) {
       return route.get();

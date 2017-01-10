@@ -40,12 +40,13 @@ public:
     client_ = new ::RateLimit::MockClient();
     filter_.reset(new Filter(config_, ::RateLimit::ClientPtr{client_}));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
-    filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
-    filter_callbacks_.route_table_.route_entry_.rate_limit_policy_.rate_limit_policy_entry_
+    filter_callbacks_.route_table_.route_.route_entry_.rate_limit_policy_.rate_limit_policy_entry_
+        .clear();
+    filter_callbacks_.route_table_.route_.route_entry_.rate_limit_policy_.rate_limit_policy_entry_
         .emplace_back(route_rate_limit_);
-    filter_callbacks_.route_table_.route_entry_.virtual_host_.rate_limit_policy_
+    filter_callbacks_.route_table_.route_.route_entry_.virtual_host_.rate_limit_policy_
         .rate_limit_policy_entry_.clear();
-    filter_callbacks_.route_table_.route_entry_.virtual_host_.rate_limit_policy_
+    filter_callbacks_.route_table_.route_.route_entry_.virtual_host_.rate_limit_policy_
         .rate_limit_policy_entry_.emplace_back(vh_rate_limit_);
   }
 
@@ -121,7 +122,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_table_.route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_table_.route_.route_entry_.virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0)).Times(1);
 
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{

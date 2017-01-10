@@ -110,7 +110,7 @@ void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
     return;
   }
 
-gg  // TODO: Cluster may not exist.
+  // TODO: Cluster may not exist.
   cluster_ = cm_.get(route_entry->clusterName());
   grpc_service_ = parts[0];
   grpc_method_ = parts[1];

@@ -536,13 +536,14 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addViaCopy("test_header_pattern", "user=test-1223");
     EXPECT_EQ("local_service_with_header_pattern_set_regex",
-              config.routeForRequest(headers, 0)->clusterName());
+              config.getRouteForRequest(headers, 0)->routeEntry()->clusterName());
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addViaCopy("test_header_pattern", "customer=test-1223");
-    EXPECT_EQ("local_service_without_headers", config.routeForRequest(headers, 0)->clusterName());
+    EXPECT_EQ("local_service_without_headers",
+              config.getRouteForRequest(headers, 0)->routeEntry()->clusterName());
   }
 }
 
@@ -955,7 +956,7 @@ TEST(RouteMatcherTest, Redirect) {
 
   EXPECT_EQ(nullptr,
             config.getRouteForRequest(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
-  // TODO: test one or the other for route or redirect.
+
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
     EXPECT_EQ(nullptr, config.getRouteForRequest(headers, 0)->redirectEntry());
@@ -964,7 +965,6 @@ TEST(RouteMatcherTest, Redirect) {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", false, false);
     const Route* route = config.getRouteForRequest(headers, 0);
     EXPECT_EQ("https://www.lyft.com/foo", route->redirectEntry()->newPath(headers));
-    EXPECT_EQ(nullptr, route->routeEntry());
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, true);
@@ -989,6 +989,61 @@ TEST(RouteMatcherTest, Redirect) {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
     EXPECT_EQ("https://new.lyft.com/new_baz",
               config.getRouteForRequest(headers, 0)->redirectEntry()->newPath(headers));
+  }
+}
+
+TEST(RouteMatcherTest, ExclusiveRouteEntryOrRedirectEntry) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2"
+        }
+      ]
+    },
+    {
+      "name": "redirect",
+      "domains": ["redirect.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "host_redirect": "new.lyft.com"
+        },
+        {
+          "prefix": "/bar",
+          "path_redirect": "/new_bar"
+        },
+        {
+          "prefix": "/baz",
+          "host_redirect": "new.lyft.com",
+          "path_redirect": "/new_baz"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(*loader, runtime, cm);
+
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
+    EXPECT_EQ(nullptr, config.getRouteForRequest(headers, 0)->redirectEntry());
+    EXPECT_EQ("www2", config.getRouteForRequest(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
+    EXPECT_EQ("http://new.lyft.com/foo",
+              config.getRouteForRequest(headers, 0)->redirectEntry()->newPath(headers));
+    EXPECT_EQ(nullptr, config.getRouteForRequest(headers, 0)->routeEntry());
   }
 }
 
