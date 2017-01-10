@@ -46,11 +46,14 @@ public:
 class ConfigUtility {
 public:
   struct HeaderData {
-    HeaderData(const Http::LowerCaseString& name, const std::string& value)
-        : name_(name), value_(value) {}
+    HeaderData(const Http::LowerCaseString& name, const std::string& value, const bool is_regex)
+        : name_(name), value_(value), regex_pattern_(value_, std::regex::optimize),
+          is_regex_(is_regex) {}
 
     const Http::LowerCaseString name_;
     const std::string value_;
+    const std::regex regex_pattern_;
+    const bool is_regex_;
   };
 
   /**
