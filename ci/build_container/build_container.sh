@@ -35,11 +35,11 @@ make install
 cd ..
 rm -fr libevent*
 
-# boring ssl
+# BoringSSL
 git clone https://boringssl.googlesource.com/boringssl
 cd boringssl
 git reset --hard 78684e5b222645828ca302e56b40b9daff2b2d27
-cmake -DCMAKE_INSTALL_PREFIX:PATH=$THIRDPARTY_BUILD .
+cmake .
 make
 cp -r include/* $THIRDPARTY_BUILD/include
 cp ssl/libssl.a $THIRDPARTY_BUILD/lib
