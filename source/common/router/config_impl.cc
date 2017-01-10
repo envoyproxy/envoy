@@ -219,7 +219,7 @@ bool PathRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random
 
 VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Loader& runtime,
                                  Upstream::ClusterManager& cm)
-    : name_(virtual_host.getString("name")) {
+    : name_(virtual_host.getString("name")), rate_limit_policy_(virtual_host) {
 
   std::string require_ssl = virtual_host.getString("require_ssl", "");
   if (require_ssl == "") {

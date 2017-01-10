@@ -89,6 +89,7 @@ public:
 
   // Router::VirtualHost
   const std::string& name() const override { return name_; }
+  const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -123,6 +124,7 @@ private:
   std::vector<RouteEntryImplBasePtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
+  const RateLimitPolicyImpl rate_limit_policy_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostPtr;

@@ -111,12 +111,17 @@ public:
   Upstream::ResourcePriority priority_{Upstream::ResourcePriority::Default};
 };
 
-class TestVirtualHost : public VirtualHost {
+class MockVirtualHost : public VirtualHost {
 public:
+  MockVirtualHost();
+  ~MockVirtualHost();
+
   // Router::VirtualHost
-  const std::string& name() const override { return name_; }
+  MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
 
   std::string name_{"fake_vhost"};
+  testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
 };
 
 class MockRouteEntry : public RouteEntry {
@@ -141,7 +146,7 @@ public:
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestShadowPolicy shadow_policy_;
-  TestVirtualHost virtual_host_;
+  testing::NiceMock<MockVirtualHost> virtual_host_;
 };
 
 class MockConfig : public Config {

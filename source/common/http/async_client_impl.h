@@ -85,6 +85,9 @@ private:
   struct NullVirtualHost : public Router::VirtualHost {
     // Router::VirtualHost
     const std::string& name() const override { return EMPTY_STRING; }
+    const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+
+    static const NullRateLimitPolicy rate_limit_policy_;
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {

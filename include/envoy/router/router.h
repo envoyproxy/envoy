@@ -120,6 +120,8 @@ public:
   virtual Upstream::ResourcePriority priority() const PURE;
 };
 
+class RateLimitPolicy;
+
 /**
  * Virtual host defintion.
  */
@@ -131,9 +133,12 @@ public:
    * @return const std::string& the name of the virtual host.
    */
   virtual const std::string& name() const PURE;
-};
 
-class RateLimitPolicy;
+  /**
+   * @return const RateLimitPolicy& the rate limit policy for the virtual host.
+   */
+  virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
+};
 
 /**
  * An individual resolved route entry.
