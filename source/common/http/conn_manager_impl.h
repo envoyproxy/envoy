@@ -251,13 +251,8 @@ private:
     const std::string& downstreamAddress() override;
 
     // Router::StableRouteTable
-    const Router::RedirectEntry* redirectRequest(const HeaderMap& headers) const {
-      return parent_.connection_manager_.config_.routeConfig().redirectRequest(headers,
-                                                                               parent_.stream_id_);
-    }
-    const Router::RouteEntry* routeForRequest(const HeaderMap& headers) const {
-      return parent_.connection_manager_.config_.routeConfig().routeForRequest(headers,
-                                                                               parent_.stream_id_);
+    const Router::Route* route(const HeaderMap& headers) const {
+      return parent_.connection_manager_.config_.routeConfig().route(headers, parent_.stream_id_);
     }
 
     ActiveStream& parent_;

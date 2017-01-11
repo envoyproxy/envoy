@@ -5,11 +5,6 @@
   "retry_policy": {
     "retry_on": "{{ options.get('retry_on', 'connect-failure') }}"
   },
-  {% if 'global_rate_limit' in options %}
-  "rate_limit": {
-    "global": true
-  },
-  {% endif %}
   "cluster": "{{ cluster }}"
 {% endmacro %}
 

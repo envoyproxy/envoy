@@ -59,6 +59,11 @@ public:
   void complete(::RateLimit::LimitStatus status) override;
 
 private:
+  void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
+                                    std::vector<::RateLimit::Descriptor>& descriptors,
+                                    const Router::RouteEntry* route_entry,
+                                    const HeaderMap& headers) const;
+
   enum class State { NotStarted, Calling, Complete, Responded };
 
   static const Http::HeaderMapPtr TOO_MANY_REQUESTS_HEADER;

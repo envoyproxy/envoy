@@ -16,7 +16,8 @@ upstream cluster to route to or whether to perform a redirect.
     "domains": [],
     "routes": [],
     "require_ssl": "...",
-    "virtual_clusters": []
+    "virtual_clusters": [],
+    "rate_limits": []
   }
 
 name
@@ -53,3 +54,7 @@ require_ssl
 :ref:`virtual_clusters <config_http_conn_man_route_table_vcluster>`
   *(optional, array)* A list of virtual clusters defined for this virtual host. Virtual clusters
   are used for additional statistics gathering.
+
+:ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>`
+  *(optional, array)* Specifies a set of rate limit configurations that will be applied to the
+  virtual host.

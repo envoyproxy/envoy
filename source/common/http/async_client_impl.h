@@ -85,6 +85,9 @@ private:
   struct NullVirtualHost : public Router::VirtualHost {
     // Router::VirtualHost
     const std::string& name() const override { return EMPTY_STRING; }
+    const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+
+    static const NullRateLimitPolicy rate_limit_policy_;
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {
@@ -122,6 +125,17 @@ private:
     Optional<std::chrono::milliseconds> timeout_;
   };
 
+  struct RouteImpl : public Router::Route {
+    RouteImpl(const std::string& cluster_name, const Optional<std::chrono::milliseconds>& timeout)
+        : route_entry_(cluster_name, timeout) {}
+
+    // Router::Route
+    const Router::RedirectEntry* redirectEntry() const override { return nullptr; }
+    const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
+
+    RouteEntryImpl route_entry_;
+  };
+
   void cleanup();
   void failDueToClientDestroy();
   void onComplete();
@@ -144,12 +158,7 @@ private:
   void encodeTrailers(HeaderMapPtr&& trailers) override;
 
   // Router::StableRouteTable
-  const Router::RedirectEntry* redirectRequest(const Http::HeaderMap&) const override {
-    return nullptr;
-  }
-  const Router::RouteEntry* routeForRequest(const Http::HeaderMap&) const override {
-    return &route_;
-  }
+  const Router::Route* route(const Http::HeaderMap&) const override { return &route_; }
 
   MessagePtr request_;
   AsyncClientImpl& parent_;
@@ -159,7 +168,7 @@ private:
   Router::ProdFilter router_;
   std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
-  RouteEntryImpl route_;
+  RouteImpl route_;
   bool complete_{};
 
   friend class AsyncClientImpl;
