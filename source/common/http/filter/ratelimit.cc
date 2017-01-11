@@ -94,6 +94,7 @@ void Filter::complete(::RateLimit::LimitStatus status) {
     state_ = State::Responded;
     Http::HeaderMapPtr response_headers{new HeaderMapImpl(*TOO_MANY_REQUESTS_HEADER)};
     callbacks_->encodeHeaders(std::move(response_headers), true);
+    callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited);
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();
   }

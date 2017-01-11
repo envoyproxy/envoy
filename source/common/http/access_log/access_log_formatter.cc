@@ -18,6 +18,7 @@ const std::string ResponseFlagUtils::UPSTREAM_OVERFLOW = "UO";
 const std::string ResponseFlagUtils::NO_ROUTE_FOUND = "NR";
 const std::string ResponseFlagUtils::DELAY_INJECTED = "DI";
 const std::string ResponseFlagUtils::FAULT_INJECTED = "FI";
+const std::string ResponseFlagUtils::RATE_LIMITED = "RL";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {
@@ -72,6 +73,10 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
 
   if (request_info.getResponseFlag(ResponseFlag::FaultInjected)) {
     appendString(result, FAULT_INJECTED);
+  }
+
+  if (request_info.getResponseFlag(ResponseFlag::RateLimited)) {
+    appendString(result, RATE_LIMITED);
   }
 
   return result.empty() ? NONE : result;

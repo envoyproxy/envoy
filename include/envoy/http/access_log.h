@@ -32,7 +32,9 @@ enum ResponseFlag {
   // Request was delayed before proxying.
   DelayInjected = 0x200,
   // Abort with error code was injected.
-  FaultInjected = 0x400
+  FaultInjected = 0x400,
+  // Request was ratelimited.
+  RateLimited = 0x800
 };
 
 /**
