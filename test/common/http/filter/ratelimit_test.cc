@@ -204,7 +204,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited)).Times(1);
+              setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited));
 
   request_callbacks_->complete(::RateLimit::LimitStatus::OverLimit);
 

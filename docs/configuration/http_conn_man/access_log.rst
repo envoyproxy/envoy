@@ -85,7 +85,7 @@ The following command operators are supported:
   * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
   * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
   * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-  * **RL**: The request was ratelimited in addition to 429 response code.
+  * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
 
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
