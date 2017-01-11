@@ -233,8 +233,7 @@ public:
    *        allows stable choices between calls if desired.
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual const Route* getRouteForRequest(const Http::HeaderMap& headers,
-                                          uint64_t random_value) const PURE;
+  virtual const Route* route(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
 
   /**
    * Return a list of headers that will be cleaned from any requests that are not from an internal

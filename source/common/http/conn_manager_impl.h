@@ -252,8 +252,7 @@ private:
 
     // Router::StableRouteTable
     const Router::Route* route(const HeaderMap& headers) const {
-      return parent_.connection_manager_.config_.routeConfig().getRouteForRequest(
-          headers, parent_.stream_id_);
+      return parent_.connection_manager_.config_.routeConfig().route(headers, parent_.stream_id_);
     }
 
     ActiveStream& parent_;

@@ -40,7 +40,7 @@ public:
   std::string newPath(const Http::HeaderMap& headers) const override;
 };
 
-class SslRoute : public Route {
+class SslRedirectRoute : public Route {
 public:
   // Router::Route
   const RedirectEntry* redirectEntry() const override { return &SSL_REDIRECTOR; }
@@ -125,7 +125,7 @@ private:
   };
 
   static const CatchAllVirtualCluster VIRTUAL_CLUSTER_CATCH_ALL;
-  static const SslRoute SSL_ROUTE;
+  static const SslRedirectRoute SSL_REDIRECT_ROUTE;
 
   const std::string name_;
   std::vector<RouteEntryImplBasePtr> routes_;
@@ -278,7 +278,7 @@ class RouteMatcher {
 public:
   RouteMatcher(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
-  const Route* getRouteForRequest(const Http::HeaderMap& headers, uint64_t random_value) const;
+  const Route* route(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const { return uses_runtime_; }
 
 private:
@@ -297,9 +297,8 @@ public:
   ConfigImpl(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
   // Router::Config
-  const Route* getRouteForRequest(const Http::HeaderMap& headers,
-                                  uint64_t random_value) const override {
-    return route_matcher_->getRouteForRequest(headers, random_value);
+  const Route* route(const Http::HeaderMap& headers, uint64_t random_value) const override {
+    return route_matcher_->route(headers, random_value);
   }
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
@@ -330,9 +329,7 @@ private:
 class NullConfigImpl : public Config {
 public:
   // Router::Config
-  const Route* getRouteForRequest(const Http::HeaderMap&, uint64_t) const override {
-    return nullptr;
-  }
+  const Route* route(const Http::HeaderMap&, uint64_t) const override { return nullptr; }
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;

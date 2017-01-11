@@ -329,10 +329,10 @@ const Route* VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers
                                                   uint64_t random_value) const {
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto()->value() != "https") {
-    return &SSL_ROUTE;
+    return &SSL_REDIRECT_ROUTE;
   } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
              headers.ForwardedProto()->value() != "https" && !headers.EnvoyInternalRequest()) {
-    return &SSL_ROUTE;
+    return &SSL_REDIRECT_ROUTE;
   }
 
   // Check for a route that matches the request.
@@ -361,8 +361,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   return nullptr;
 }
 
-const Route* RouteMatcher::getRouteForRequest(const Http::HeaderMap& headers,
-                                              uint64_t random_value) const {
+const Route* RouteMatcher::route(const Http::HeaderMap& headers, uint64_t random_value) const {
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
     return virtual_host->getRouteFromEntries(headers, random_value);
@@ -372,8 +371,8 @@ const Route* RouteMatcher::getRouteForRequest(const Http::HeaderMap& headers,
 }
 
 const VirtualHostImpl::CatchAllVirtualCluster VirtualHostImpl::VIRTUAL_CLUSTER_CATCH_ALL;
-const SslRedirector SslRoute::SSL_REDIRECTOR;
-const SslRoute VirtualHostImpl::SSL_ROUTE;
+const SslRedirector SslRedirectRoute::SSL_REDIRECTOR;
+const SslRedirectRoute VirtualHostImpl::SSL_REDIRECT_ROUTE;
 
 const VirtualCluster*
 VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
