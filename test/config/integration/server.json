@@ -149,6 +149,7 @@
                     {
                       "actions": [
                         {"type": "service_to_service"}
+                      ]
                     }
                   ]
                 },
@@ -168,7 +169,7 @@
           },
           { "type": "decoder", "name": "rate_limit",
             "config": {
-              "domain": "foo",
+              "domain": "foo"
             }
           },
           { "type": "decoder", "name": "buffer",
