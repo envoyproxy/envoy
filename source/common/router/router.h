@@ -200,7 +200,7 @@ private:
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  const RouteEntry* route_;
+  const RouteEntry* route_entry_;
   Upstream::ClusterInfoPtr cluster_;
   std::string alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;

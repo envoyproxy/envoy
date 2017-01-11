@@ -108,7 +108,7 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
 
     Http::CodeUtility::ResponseStatInfo info{
         config_.global_store_, cluster_->statsScope(), EMPTY_STRING, response_headers,
-        internal_request, route_->virtualHost().name(),
+        internal_request, route_entry_->virtualHost().name(),
         request_vcluster_ ? request_vcluster_->name() : EMPTY_STRING,
         config_.local_info_.zoneName(), upstreamZone(upstream_host), is_canary};
 
@@ -138,17 +138,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // that get handled by earlier filters.
   config_.stats_.rq_total_.inc();
 
-  // First determine if we need to do a redirect before we do anything else.
-  const RedirectEntry* redirect = callbacks_->routeTable().redirectRequest(headers);
-  if (redirect) {
-    config_.stats_.rq_redirect_.inc();
-    Http::Utility::sendRedirect(*callbacks_, redirect->newPath(headers));
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-
-  // Determine if there is a route match.
-  route_ = callbacks_->routeTable().routeForRequest(headers);
-  if (!route_) {
+  // Determine if there is a route entry or a redirect for the request.
+  const Route* route = callbacks_->routeTable().route(headers);
+  if (!route) {
     config_.stats_.no_route_.inc();
     stream_log_debug("no cluster match for URL '{}'", *callbacks_, headers.Path()->value().c_str());
 
@@ -159,12 +151,22 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // Determine if there is a redirect for the request.
+  if (route->redirectEntry()) {
+    config_.stats_.rq_redirect_.inc();
+    Http::Utility::sendRedirect(*callbacks_, route->redirectEntry()->newPath(headers));
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  // A route entry matches for the request.
+  route_entry_ = route->routeEntry();
+
   // Set up stat prefixes, etc.
-  request_vcluster_ = route_->virtualCluster(headers);
-  stream_log_debug("cluster '{}' match for URL '{}'", *callbacks_, route_->clusterName(),
+  request_vcluster_ = route_entry_->virtualCluster(headers);
+  stream_log_debug("cluster '{}' match for URL '{}'", *callbacks_, route_entry_->clusterName(),
                    headers.Path()->value().c_str());
 
-  cluster_ = config_.cm_.get(route_->clusterName());
+  cluster_ = config_.cm_.get(route_entry_->clusterName());
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
@@ -182,19 +184,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // Fetch a connection pool for the upstream cluster.
   Http::ConnectionPool::Instance* conn_pool =
-      config_.cm_.httpConnPoolForCluster(route_->clusterName(), finalPriority());
+      config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), finalPriority());
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  timeout_ = FilterUtility::finalTimeout(*route_, headers);
-  route_->finalizeRequestHeaders(headers);
+  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers);
+  route_entry_->finalizeRequestHeaders(headers);
   FilterUtility::setUpstreamScheme(headers, *cluster_);
-  retry_state_ = createRetryState(route_->retryPolicy(), headers, *cluster_, config_.runtime_,
+  retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
                                   config_.random_, callbacks_->dispatcher(), finalPriority());
-  do_shadowing_ =
-      FilterUtility::shouldShadow(route_->shadowPolicy(), config_.runtime_, callbacks_->streamId());
+  do_shadowing_ = FilterUtility::shouldShadow(route_entry_->shadowPolicy(), config_.runtime_,
+                                              callbacks_->streamId());
 
 #ifndef NDEBUG
   headers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
@@ -267,7 +269,7 @@ Upstream::ResourcePriority Filter::finalPriority() {
   if (request_vcluster_) {
     return request_vcluster_->priority();
   } else {
-    return route_->priority();
+    return route_entry_->priority();
   }
 }
 
@@ -276,7 +278,7 @@ void Filter::maybeDoShadowing() {
     return;
   }
 
-  ASSERT(!route_->shadowPolicy().cluster().empty());
+  ASSERT(!route_entry_->shadowPolicy().cluster().empty());
   Http::MessagePtr request(new Http::RequestMessageImpl(
       Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
   if (callbacks_->decodingBuffer()) {
@@ -286,7 +288,7 @@ void Filter::maybeDoShadowing() {
     request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
   }
 
-  config_.shadowWriter().shadow(route_->shadowPolicy().cluster(), std::move(request),
+  config_.shadowWriter().shadow(route_entry_->shadowPolicy().cluster(), std::move(request),
                                 timeout_.global_timeout_);
 }
 
@@ -319,7 +321,7 @@ void Filter::onResetStream() {
 
 void Filter::onResponseTimeout() {
   stream_log_debug("upstream timeout", *callbacks_);
-  config_.cm_.get(route_->clusterName())->stats().upstream_rq_timeout_.inc();
+  config_.cm_.get(route_entry_->clusterName())->stats().upstream_rq_timeout_.inc();
 
   // It's possible to timeout during a retry backoff delay when we have no upstream request. In
   // this case we fake a reset since onUpstreamReset() doesn't care.
@@ -477,7 +479,7 @@ void Filter::onUpstreamComplete() {
 
     Http::CodeUtility::ResponseTimingInfo info{
         config_.global_store_, cluster_->statsScope(), EMPTY_STRING, response_time,
-        upstream_request_->upstream_canary_, internal_request, route_->virtualHost().name(),
+        upstream_request_->upstream_canary_, internal_request, route_entry_->virtualHost().name(),
         request_vcluster_ ? request_vcluster_->name() : EMPTY_STRING,
         config_.local_info_.zoneName(), upstreamZone(upstream_request_->upstream_host_)};
 
@@ -517,7 +519,7 @@ bool Filter::setupRetry(bool end_stream) {
 
 void Filter::doRetry() {
   Http::ConnectionPool::Instance* conn_pool =
-      config_.cm_.httpConnPoolForCluster(route_->clusterName(), finalPriority());
+      config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), finalPriority());
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();
@@ -641,7 +643,7 @@ void Filter::UpstreamRequest::setupPerTryTimeout() {
 
 void Filter::UpstreamRequest::onPerTryTimeout() {
   stream_log_debug("upstream per try timeout", *parent_.callbacks_);
-  parent_.config_.cm_.get(parent_.route_->clusterName())
+  parent_.config_.cm_.get(parent_.route_entry_->clusterName())
       ->stats()
       .upstream_rq_per_try_timeout_.inc();
   upstream_host_->stats().rq_timeout_.inc();
