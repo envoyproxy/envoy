@@ -130,6 +130,16 @@
                 {
                   "prefix": "/",
                   {{ helper.make_route_internal(service, options) }}
+                  {% if options.get('service_to_service_rate_limit', False) %}
+                  ,
+                  "rate_limits":[
+                    {
+                      "actions": [
+                        {"type": "service_to_service"}
+                      ]
+                    }
+                  ]
+                  {% endif %}
                 }
               ]
             }{% if not loop.last %},{% endif -%}
@@ -139,10 +149,7 @@
         "filters": [
           {"type": "decoder", "name": "rate_limit",
             "config": {
-              "domain": "envoy_service_to_service",
-              "actions": [
-                {"type": "service_to_service"}
-              ]
+              "domain": "envoy_service_to_service"
             }
           },
           {"type": "both", "name": "grpc_http1_bridge", "config": {}},
