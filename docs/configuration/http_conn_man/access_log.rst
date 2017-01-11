@@ -147,7 +147,7 @@ Status code
 Filters on HTTP response/status code.
 
 op
-  *(required, string)* Comparison operator. Currently *>=* is the only supported operator.
+  *(required, string)* Comparison operator. Currently *>=*  and *=* are the only supported operators.
 
 value
   *(required, integer)* Default value to compare against if runtime value is not available.
