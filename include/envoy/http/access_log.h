@@ -33,7 +33,7 @@ enum ResponseFlag {
   DelayInjected = 0x200,
   // Abort with error code was injected.
   FaultInjected = 0x400,
-  // Request was ratelimited.
+  // Request was ratelimited locally by rate limit filter.
   RateLimited = 0x800
 };
 
