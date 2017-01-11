@@ -137,6 +137,8 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited)).Times(0);
   request_callbacks_->complete(::RateLimit::LimitStatus::OK);
 
   EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
@@ -180,6 +182,8 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited)).Times(0);
 
   EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("ratelimit.error").value());
 }
@@ -199,6 +203,9 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   Http::TestHeaderMapImpl response_headers{{":status", "429"}};
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited));
+
   request_callbacks_->complete(::RateLimit::LimitStatus::OverLimit);
 
   EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("ratelimit.over_limit").value());

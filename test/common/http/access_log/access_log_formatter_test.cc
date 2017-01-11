@@ -25,7 +25,8 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::UpstreamOverflow, "UO"),
       std::make_pair(ResponseFlag::NoRouteFound, "NR"),
       std::make_pair(ResponseFlag::DelayInjected, "DI"),
-      std::make_pair(ResponseFlag::FaultInjected, "FI")};
+      std::make_pair(ResponseFlag::FaultInjected, "FI"),
+      std::make_pair(ResponseFlag::RateLimited, "RL")};
 
   for (const auto& testCase : expected) {
     NiceMock<MockRequestInfo> request_info;
