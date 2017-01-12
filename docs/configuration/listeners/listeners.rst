@@ -12,7 +12,9 @@ Each individual listener configuration has the following format:
     "port": "...",
     "filters": [],
     "ssl_context": "{...}",
-    "use_proxy_proto": "..."
+    "bind_to_port": "...",
+    "use_proxy_proto": "...",
+    "use_original_dst": "..."
   }
 
 port
@@ -28,6 +30,11 @@ port
   *(optional, object)* The :ref:`TLS <arch_overview_ssl>` context configuration for a TLS listener.
   If no TLS context block is defined, the listener is a plain text listener.
 
+bind_to_port 
+  *(optional, boolean)* Whether the listener should bind to the port. A listener that doesn't bind
+  can only receive connections redirected from other listeners that set use_origin_dst parameter to
+  true. Default is true.
+
 use_proxy_proto
   *(optional, boolean)* Whether the listener should expect a
   `PROXY protocol V1 <http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt>`_ header on new
@@ -35,6 +42,13 @@ use_proxy_proto
   connection is the one specified in the header. Some load balancers including the AWS ELB support
   this option. If the option is absent or set to false, Envoy will use the physical peer address
   of the connection as the remote address.
+
+use_original_dst
+  *(optional, boolean)* If a connection is redirected using *iptables*, the port on which the proxy
+  receives it might be different from the original destination port. When this flag is set to true,
+  the listener hands off redirected connections to the listener associated with the original
+  destination port. If there is no listener associated with the original destination port, the
+  connection is handled by the listener that receives it. Default is false.
 
 .. toctree::
   :hidden:

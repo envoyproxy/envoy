@@ -1,6 +1,6 @@
 #pragma once
 
-#include "connection_handler.h"
+#include "connection_handler_impl.h"
 
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
@@ -20,7 +20,7 @@ public:
   ~Worker();
 
   Event::Dispatcher& dispatcher() { return handler_->dispatcher(); }
-  ConnectionHandler* handler() { return handler_.get(); }
+  Network::ConnectionHandler* handler() { return handler_.get(); }
   void initializeConfiguration(Server::Configuration::Main& config, const SocketMap& socket_map);
 
   /**
@@ -33,7 +33,7 @@ private:
   void threadRoutine();
 
   ThreadLocal::Instance& tls_;
-  std::unique_ptr<ConnectionHandler> handler_;
+  Server::ConnectionHandlerImplPtr handler_;
   Event::TimerPtr no_exit_timer_;
   Thread::ThreadPtr thread_;
 };

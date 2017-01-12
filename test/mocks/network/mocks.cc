@@ -113,4 +113,7 @@ MockListenSocket::~MockListenSocket() {}
 MockListener::MockListener() {}
 MockListener::~MockListener() {}
 
+MockConnectionHandler::MockConnectionHandler() {}
+MockConnectionHandler::~MockConnectionHandler() {}
+
 } // Network

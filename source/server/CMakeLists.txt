@@ -13,7 +13,7 @@ add_library(envoy-server OBJECT
   config/network/redis_proxy.cc
   config/network/tcp_proxy.cc
   configuration_impl.cc
-  connection_handler.cc
+  connection_handler_impl.cc
   drain_manager_impl.cc
   http/admin.cc
   http/health_check.cc

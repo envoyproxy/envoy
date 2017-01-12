@@ -10,7 +10,7 @@
 
 Worker::Worker(Stats::Store& stats_store, ThreadLocal::Instance& tls,
                std::chrono::milliseconds file_flush_interval_msec)
-    : tls_(tls), handler_(new ConnectionHandler(
+    : tls_(tls), handler_(new Server::ConnectionHandlerImpl(
                      stats_store, log(), Api::ApiPtr{new Api::Impl(file_flush_interval_msec)})) {
   tls_.registerThread(handler_->dispatcher(), false);
 }
@@ -20,13 +20,16 @@ Worker::~Worker() {}
 void Worker::initializeConfiguration(Server::Configuration::Main& config,
                                      const SocketMap& socket_map) {
   for (const Server::Configuration::ListenerPtr& listener : config.listeners()) {
+    bool bind_to_port = listener->bindToPort();
     bool use_proxy_proto = listener->useProxyProto();
+    bool use_orig_dst = listener->useOriginalDst();
     if (listener->sslContext()) {
       handler_->addSslListener(listener->filterChainFactory(), *listener->sslContext(),
-                               *socket_map.at(listener.get()), use_proxy_proto);
+                               *socket_map.at(listener.get()), bind_to_port, use_proxy_proto,
+                               use_orig_dst);
     } else {
       handler_->addListener(listener->filterChainFactory(), *socket_map.at(listener.get()),
-                            use_proxy_proto);
+                            bind_to_port, use_proxy_proto, use_orig_dst);
     }
   }
 

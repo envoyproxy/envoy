@@ -4,6 +4,7 @@
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/listen_socket.h"
@@ -20,6 +21,8 @@
   TIMER  (downstream_cx_length_ms)
 // clang-format on
 
+namespace Server {
+
 /**
  * Wrapper struct for listener stats. @see stats_macros.h
  */
@@ -31,46 +34,18 @@ struct ListenerStats {
  * Server side connection handler. This is used both by workers as well as the
  * main thread for non-threaded listeners.
  */
-class ConnectionHandler final : NonCopyable {
+class ConnectionHandlerImpl : public Network::ConnectionHandler, NonCopyable {
 public:
-  ConnectionHandler(Stats::Store& stats_store, spdlog::logger& logger, Api::ApiPtr&& api);
-  ~ConnectionHandler();
+  ConnectionHandlerImpl(Stats::Store& stats_store, spdlog::logger& logger, Api::ApiPtr&& api);
+  ~ConnectionHandlerImpl();
 
   Api::Api& api() { return *api_; }
   Event::Dispatcher& dispatcher() { return *dispatcher_; }
-  uint64_t numConnections() { return num_connections_; }
 
   /**
-   * Adds listener to the handler.
-   * @param factory supplies the configuration factory for new connections.
-   * @param socket supplies the already bound socket to listen on.
-   * @param use_proxy_proto whether to use the PROXY Protocol V1
-   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
-   */
-  void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                   bool use_proxy_proto);
-
-  /**
-   * Adds listener to the handler.
-   * @param factory supplies the configuration factory for new connections.
-   * @param socket supplies the already bound socket to listen on.
-   * @param use_proxy_proto whether to use the PROXY Protocol V1
-   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
-   */
-  void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                      Network::ListenSocket& socket, bool use_proxy_proto);
-
-  /**
-   * Close and destroy all connections. This must be called from the same thread that is running
-   * the dispatch loop.
+   * Close and destroy all connections.
    */
   void closeConnections();
-
-  /**
-   * Close and destroy all listeners. Existing connections will not be effected. This must be
-   * called from the same thread that is running the dispatch loop.
-   */
-  void closeListeners();
 
   /**
    * Start a watchdog that attempts to tick every 100ms and will increment a stat if a tick takes
@@ -78,15 +53,30 @@ public:
    */
   void startWatchdog();
 
+  // Network::ConnectionHandler
+  uint64_t numConnections() override { return num_connections_; }
+
+  void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
+                   bool bind_to_port, bool use_proxy_proto, bool use_orig_dst) override;
+
+  void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
+                      Network::ListenSocket& socket, bool bind_to_port, bool use_proxy_proto,
+                      bool use_orig_dst) override;
+
+  Network::Listener* findListener(const std::string& socket_name) override;
+
+  void closeListeners() override;
+
 private:
   /**
    * Wrapper for an active listener owned by this worker.
    */
   struct ActiveListener : public Network::ListenerCallbacks {
-    ActiveListener(ConnectionHandler& parent, Network::ListenSocket& socket,
-                   Network::FilterChainFactory& factory, bool use_proxy_proto);
+    ActiveListener(ConnectionHandlerImpl& parent, Network::ListenSocket& socket,
+                   Network::FilterChainFactory& factory, bool use_proxy_proto, bool bind_to_port,
+                   bool use_orig_dst);
 
-    ActiveListener(ConnectionHandler& parent, Network::ListenerPtr&& listener,
+    ActiveListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                    Network::FilterChainFactory& factory, const std::string& stats_prefix);
 
     /**
@@ -95,16 +85,16 @@ private:
      */
     void onNewConnection(Network::ConnectionPtr&& new_connection) override;
 
-    ConnectionHandler& parent_;
+    ConnectionHandlerImpl& parent_;
     Network::FilterChainFactory& factory_;
     Network::ListenerPtr listener_;
     ListenerStats stats_;
   };
 
   struct SslActiveListener : public ActiveListener {
-    SslActiveListener(ConnectionHandler& parent, Ssl::ServerContext& ssl_ctx,
+    SslActiveListener(ConnectionHandlerImpl& parent, Ssl::ServerContext& ssl_ctx,
                       Network::ListenSocket& socket, Network::FilterChainFactory& factory,
-                      bool use_proxy_proto);
+                      bool use_proxy_proto, bool bind_to_port, bool use_orig_dst);
   };
 
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;
@@ -115,7 +105,7 @@ private:
   struct ActiveConnection : LinkedObject<ActiveConnection>,
                             public Event::DeferredDeletable,
                             public Network::ConnectionCallbacks {
-    ActiveConnection(ConnectionHandler& parent, Network::ConnectionPtr&& new_connection,
+    ActiveConnection(ConnectionHandlerImpl& parent, Network::ConnectionPtr&& new_connection,
                      ListenerStats& stats);
     ~ActiveConnection();
 
@@ -128,7 +118,7 @@ private:
       }
     }
 
-    ConnectionHandler& parent_;
+    ConnectionHandlerImpl& parent_;
     Network::ConnectionPtr connection_;
     ListenerStats& stats_;
     Stats::TimespanPtr conn_length_;
@@ -148,7 +138,7 @@ private:
   spdlog::logger& logger_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::list<ActiveListenerPtr> listeners_;
+  std::map<std::string, ActiveListenerPtr> listeners_;
   std::list<ActiveConnectionPtr> connections_;
   std::atomic<uint64_t> num_connections_{};
   Stats::Counter& watchdog_miss_counter_;
@@ -156,3 +146,7 @@ private:
   Event::TimerPtr watchdog_timer_;
   SystemTime last_watchdog_time_;
 };
+
+typedef std::unique_ptr<ConnectionHandlerImpl> ConnectionHandlerImplPtr;
+
+} // Server

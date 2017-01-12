@@ -140,7 +140,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   original_start_time_ = info.original_start_time_;
   admin_.reset(
       new AdminImpl(initial_config.admin().accessLogPath(), initial_config.admin().port(), *this));
-  handler_.addListener(*admin_, admin_->socket(), false);
+  handler_.addListener(*admin_, admin_->socket(), true, false, false);
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -177,7 +177,8 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
       log().info("obtained socket for port {} from parent", listener->port());
       socket_map_[listener.get()].reset(new Network::TcpListenSocket(fd, listener->port()));
     } else {
-      socket_map_[listener.get()].reset(new Network::TcpListenSocket(listener->port()));
+      socket_map_[listener.get()].reset(
+          new Network::TcpListenSocket(listener->port(), listener->bindToPort()));
     }
   }
 
