@@ -2,14 +2,13 @@
 #include "utility.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/network/connection_handler.h"
 
 #include "common/common/empty_string.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/file_event_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/ssl/connection_impl.h"
-
-#include "envoy/network/connection_handler.h"
 
 #include "event2/listener.h"
 
