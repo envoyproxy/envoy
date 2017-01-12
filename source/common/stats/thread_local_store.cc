@@ -7,7 +7,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(RawStatDataAllocator& alloc)
       num_last_resort_stats_(default_scope_->counter("stats.overflow")) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
-  destroying_ = true;
+  ASSERT(shutting_down_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
 }
@@ -61,6 +61,11 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
   });
 }
 
+void ThreadLocalStoreImpl::shutdownThreading() {
+  // This will block both future cache fills as well as cache flushes.
+  shutting_down_ = true;
+}
+
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   std::unique_lock<std::mutex> lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
@@ -68,15 +73,19 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
 
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
-  if (!destroying_ && main_thread_dispatcher_) {
+  if (main_thread_dispatcher_) {
     main_thread_dispatcher_->post([this, scope]() -> void { clearScopeFromCaches(scope); });
   }
 }
 
 void ThreadLocalStoreImpl::clearScopeFromCaches(ScopeImpl* scope) {
-  // Perform a cache flush on all threads.
-  tls_->runOnAllThreads(
-      [this, scope]() -> void { tls_->getTyped<TlsCache>(tls_slot_).scope_cache_.erase(scope); });
+  // If we are shutting down we no longer perform cache flushes as workers may be shutting down
+  // at the same time.
+  if (!shutting_down_) {
+    // Perform a cache flush on all threads.
+    tls_->runOnAllThreads(
+        [this, scope]() -> void { tls_->getTyped<TlsCache>(tls_slot_).scope_cache_.erase(scope); });
+  }
 }
 
 ThreadLocalStoreImpl::SafeAllocData ThreadLocalStoreImpl::safeAlloc(const std::string& name) {
@@ -102,7 +111,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // if we don't have TLS initialized currently. The de-referenced pointer might be null if there
   // is no cache entry.
   CounterPtr* tls_ref = nullptr;
-  if (parent_.tls_) {
+  if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>(parent_.tls_slot_)
                    .scope_cache_[this]
                    .counters_[final_name];
@@ -152,7 +161,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
   GaugePtr* tls_ref = nullptr;
-  if (parent_.tls_) {
+  if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref =
         &parent_.tls_->getTyped<TlsCache>(parent_.tls_slot_).scope_cache_[this].gauges_[final_name];
   }
@@ -180,7 +189,7 @@ Timer& ThreadLocalStoreImpl::ScopeImpl::timer(const std::string& name) {
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
   TimerPtr* tls_ref = nullptr;
-  if (parent_.tls_) {
+  if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref =
         &parent_.tls_->getTyped<TlsCache>(parent_.tls_slot_).scope_cache_[this].timers_[final_name];
   }

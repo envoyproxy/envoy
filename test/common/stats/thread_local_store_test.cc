@@ -67,6 +67,24 @@ public:
     store_->addSink(sink_);
   }
 
+  CounterPtr findCounter(const std::string& name) {
+    for (auto counter : store_->counters()) {
+      if (counter->name() == name) {
+        return counter;
+      }
+    }
+    return nullptr;
+  }
+
+  GaugePtr findGauge(const std::string& name) {
+    for (auto gauge : store_->gauges()) {
+      if (gauge->name() == name) {
+        return gauge;
+      }
+    }
+    return nullptr;
+  }
+
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
   MOCK_METHOD1(free, void(RawStatData& data));
 
@@ -105,6 +123,8 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   // Includes overflow stat.
   EXPECT_CALL(*this, free(_)).Times(3);
+
+  store_->shutdownThreading();
 }
 
 TEST_F(StatsThreadLocalStoreTest, Tls) {
@@ -129,6 +149,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(&g1, store_->gauges().front().get());
   EXPECT_EQ(3L, store_->gauges().front().use_count());
 
+  store_->shutdownThreading();
   tls_.shutdownThread();
 
   EXPECT_EQ(2UL, store_->counters().size());
@@ -169,6 +190,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_CALL(sink_, onTimespanComplete("scope1.t", std::chrono::milliseconds(200)));
   scope1->deliverTimingToSinks("t", std::chrono::milliseconds(200));
 
+  store_->shutdownThreading();
   tls_.shutdownThread();
 
   // Includes overflow stat.
@@ -195,9 +217,11 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
 
+  store_->shutdownThreading();
   tls_.shutdownThread();
 
   // Includes overflow stat.
+  EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(*this, free(_));
 }
 
@@ -248,6 +272,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(10UL, g2.value());
   EXPECT_EQ(1UL, store_->gauges().size());
 
+  store_->shutdownThreading();
   tls_.shutdownThread();
 
   // Includes overflow stat.
@@ -265,10 +290,34 @@ TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   c1.inc();
   EXPECT_EQ(1UL, c1.value());
 
+  store_->shutdownThreading();
   tls_.shutdownThread();
 
   // Includes overflow but not the failsafe stat which we allocated from the heap.
   EXPECT_CALL(*this, free(_));
+}
+
+TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  EXPECT_CALL(*this, alloc(_)).Times(4);
+  store_->counter("c1");
+  store_->gauge("g1");
+  store_->shutdownThreading();
+  store_->counter("c2");
+  store_->gauge("g2");
+
+  // c1, g1 should have a thread local ref, but c2, g2 should not.
+  EXPECT_EQ(3L, findCounter("c1").use_count());
+  EXPECT_EQ(3L, findGauge("g1").use_count());
+  EXPECT_EQ(2L, findCounter("c2").use_count());
+  EXPECT_EQ(2L, findGauge("g2").use_count());
+
+  tls_.shutdownThread();
+
+  // Includes overflow stat.
+  EXPECT_CALL(*this, free(_)).Times(5);
 }
 
 } // Stats

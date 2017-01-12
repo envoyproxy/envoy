@@ -297,6 +297,9 @@ void InstanceImpl::run() {
   handler_.dispatcher().run(Event::Dispatcher::RunType::Block);
   log().warn("main dispatch loop exited");
 
+  // Before the workers start exiting we should disable stat threading.
+  stats_store_.shutdownThreading();
+
   // Shutdown all the listeners now that the main dispatch loop is done.
   for (const WorkerPtr& worker : workers_) {
     worker->exit();

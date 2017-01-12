@@ -60,6 +60,7 @@ public:
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
+  void shutdownThreading() override;
 
 private:
   struct TlsCacheEntry {
@@ -109,7 +110,7 @@ private:
   std::unordered_set<ScopeImpl*> scopes_;
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
-  bool destroying_{};
+  std::atomic<bool> shutting_down_{};
   Counter& num_last_resort_stats_;
   HeapRawStatDataAllocator heap_allocator_;
 };

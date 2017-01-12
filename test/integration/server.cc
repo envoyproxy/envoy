@@ -64,6 +64,7 @@ public:
   // Stats::StoreRoot
   void addSink(Sink&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
+  void shutdownThreading() override {}
 
 private:
   mutable std::mutex lock_;

@@ -192,6 +192,12 @@ public:
    */
   virtual void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                                    ThreadLocal::Instance& tls) PURE;
+
+  /**
+   * Shutdown threading support in the store. This is called once when the server is about to shut
+   * down.
+   */
+  virtual void shutdownThreading() PURE;
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;
