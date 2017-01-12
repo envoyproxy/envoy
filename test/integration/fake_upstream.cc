@@ -186,13 +186,15 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type)
-    : FakeUpstream(nullptr, Network::ListenSocketPtr{new Network::TcpListenSocket(port)}, type) {
+    : FakeUpstream(nullptr, Network::ListenSocketPtr{new Network::TcpListenSocket(port, true)},
+                   type) {
   log().info("starting fake server on port {}", port);
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
                            FakeHttpConnection::Type type)
-    : FakeUpstream(ssl_ctx, Network::ListenSocketPtr{new Network::TcpListenSocket(port)}, type) {
+    : FakeUpstream(ssl_ctx, Network::ListenSocketPtr{new Network::TcpListenSocket(port, true)},
+                   type) {
   log().info("starting fake SSL server on port {}", port);
 }
 
@@ -219,9 +221,9 @@ void FakeUpstream::createFilterChain(Network::Connection& connection) {
 
 void FakeUpstream::threadRoutine() {
   if (ssl_ctx_) {
-    handler_.addSslListener(*this, *ssl_ctx_, *socket_, false);
+    handler_.addSslListener(*this, *ssl_ctx_, *socket_, true, false, false);
   } else {
-    handler_.addListener(*this, *socket_, false);
+    handler_.addListener(*this, *socket_, true, false, false);
   }
 
   server_initialized_.setReady();

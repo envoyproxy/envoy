@@ -7,7 +7,7 @@
 
 namespace Network {
 
-TcpListenSocket::TcpListenSocket(uint32_t port) : port_(port) {
+TcpListenSocket::TcpListenSocket(uint32_t port, bool bind_to_port) : port_(port) {
   AddrInfoPtr address = Utility::resolveTCP("", port);
   fd_ = socket(address->ai_addr->sa_family, SOCK_STREAM | SOCK_NONBLOCK, 0);
   RELEASE_ASSERT(fd_ != -1);
@@ -16,10 +16,12 @@ TcpListenSocket::TcpListenSocket(uint32_t port) : port_(port) {
   int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   RELEASE_ASSERT(rc != -1);
 
-  rc = bind(fd_, address->ai_addr, address->ai_addrlen);
-  if (rc == -1) {
-    close();
-    throw EnvoyException(fmt::format("cannot bind on port {}: {}", port, strerror(errno)));
+  if (bind_to_port) {
+    rc = bind(fd_, address->ai_addr, address->ai_addrlen);
+    if (rc == -1) {
+      close();
+      throw EnvoyException(fmt::format("cannot bind on port {}: {}", port, strerror(errno)));
+    }
   }
 }
 

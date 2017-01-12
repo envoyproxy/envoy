@@ -37,6 +37,19 @@ public:
    * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
    */
   virtual bool useProxyProto() PURE;
+
+  /**
+   * @return bool specifies whether the listener should actually listen on the port.
+   *         A listener that doesn't listen on a port can only receive connections
+   *         redirected from other listeners.
+   */
+  virtual bool bindToPort() PURE;
+
+  /**
+   * @return bool if a connection was redirected to this listener port using iptables,
+   *         allow the listener to hand it off to the listener associated to the original port
+   */
+  virtual bool useOriginalDst() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;

@@ -4,6 +4,7 @@
 
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/network/connection_handler.h"
 
 #include "common/common/logger.h"
 
@@ -30,11 +31,15 @@ public:
   Network::DnsResolverPtr createDnsResolver() override;
   FileEventPtr createFileEvent(int fd, FileReadyCb cb) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
-  Network::ListenerPtr createListener(Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                      Stats::Store& stats_store, bool use_proxy_proto) override;
-  Network::ListenerPtr createSslListener(Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
+  Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
+                                      Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+                                      Stats::Store& stats_store, bool bind_to_port,
+                                      bool use_proxy_proto, bool use_orig_dst) override;
+  Network::ListenerPtr createSslListener(Network::ConnectionHandler& conn_handler,
+                                         Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                          Network::ListenerCallbacks& cb, Stats::Store& stats_store,
-                                         bool use_proxy_proto) override;
+                                         bool bind_to_port, bool use_proxy_proto,
+                                         bool use_orig_dst) override;
   TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;

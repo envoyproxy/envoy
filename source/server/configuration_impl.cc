@@ -126,9 +126,9 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
         parent_.server_.sslContextManager().createSslServerContext(*scope_, context_config);
   }
 
-  if (json.hasObject("use_proxy_proto")) {
-    use_proxy_proto_ = json.getBoolean("use_proxy_proto");
-  }
+  bind_to_port_ = json.getBoolean("bind_to_port", true);
+  use_proxy_proto_ = json.getBoolean("use_proxy_proto", false);
+  use_original_dst_ = json.getBoolean("use_original_dst", false);
 
   std::vector<Json::ObjectPtr> filters = json.getObjectArray("filters");
   for (size_t i = 0; i < filters.size(); i++) {

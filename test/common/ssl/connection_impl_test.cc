@@ -8,6 +8,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 
 using testing::_;
 using testing::Invoke;
@@ -32,10 +33,11 @@ TEST(SslConnectionImplTest, ClientAuth) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(10000);
+  Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
-  Network::ListenerPtr listener =
-      dispatcher.createSslListener(*server_ctx, socket, callbacks, stats_store, false);
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener = dispatcher.createSslListener(
+      connection_handler, *server_ctx, socket, callbacks, stats_store, true, false, false);
 
   std::string client_ctx_json = R"EOF(
   {
@@ -91,10 +93,11 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(10000);
+  Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
-  Network::ListenerPtr listener =
-      dispatcher.createSslListener(*server_ctx, socket, callbacks, stats_store, false);
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener = dispatcher.createSslListener(
+      connection_handler, *server_ctx, socket, callbacks, stats_store, true, false, false);
 
   std::string client_ctx_json = R"EOF(
   {
@@ -146,10 +149,11 @@ TEST(SslConnectionImplTest, SslError) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(10000);
+  Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
-  Network::ListenerPtr listener =
-      dispatcher.createSslListener(*server_ctx, socket, callbacks, stats_store, false);
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener = dispatcher.createSslListener(
+      connection_handler, *server_ctx, socket, callbacks, stats_store, true, false, false);
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection("tcp://127.0.0.1:10000");

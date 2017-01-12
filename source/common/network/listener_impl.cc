@@ -2,6 +2,7 @@
 #include "utility.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/network/connection_handler.h"
 
 #include "common/common/empty_string.h"
 #include "common/event/dispatcher_impl.h"
@@ -13,21 +14,56 @@
 
 namespace Network {
 
-ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, ListenSocket& socket,
-                           ListenerCallbacks& cb, Stats::Store& stats_store, bool use_proxy_proto)
-    : dispatcher_(dispatcher), cb_(cb), use_proxy_proto_(use_proxy_proto),
-      proxy_protocol_(stats_store) {
-  listener_.reset(
-      evconnlistener_new(&dispatcher_.base(),
-                         [](evconnlistener*, evutil_socket_t fd, sockaddr* addr, int, void* arg)
-                             -> void { static_cast<ListenerImpl*>(arg)->newConnection(fd, addr); },
-                         this, 0, -1, socket.fd()));
+void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* addr, int,
+                                  void* arg) {
+  ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
-  if (!listener_) {
-    throw CreateListenerException(fmt::format("cannot listen on socket: {}", socket.name()));
+  if (listener->use_original_dst_) {
+    sockaddr_storage orig_dst_addr;
+    memset(&orig_dst_addr, 0, sizeof(orig_dst_addr));
+
+    bool success = Utility::getOriginalDst(fd, &orig_dst_addr);
+
+    if (success) {
+      std::string orig_sock_name = std::to_string(
+          listener->getAddressPort(reinterpret_cast<struct sockaddr*>(&orig_dst_addr)));
+
+      // A listener that has the use_original_dst flag set to true can still receive connections
+      // that are NOT redirected using iptables. If a connection was not redirected,
+      // the address and port returned by getOriginalDst() match the listener port.
+      // In this case the listener handles the connection directly and does not hand it off.
+      if (listener->socket_.name() != orig_sock_name) {
+        ListenerImpl* new_listener =
+            dynamic_cast<ListenerImpl*>(listener->connection_handler_.findListener(orig_sock_name));
+
+        if (new_listener != nullptr) {
+          new_listener = listener;
+        }
+      }
+    }
   }
 
-  evconnlistener_set_error_cb(listener_.get(), errorCallback);
+  listener->newConnection(fd, addr);
+}
+
+ListenerImpl::ListenerImpl(Network::ConnectionHandler& conn_handler,
+                           Event::DispatcherImpl& dispatcher, ListenSocket& socket,
+                           ListenerCallbacks& cb, Stats::Store& stats_store, bool bind_to_port,
+                           bool use_proxy_proto, bool use_orig_dst)
+    : connection_handler_(conn_handler), dispatcher_(dispatcher), socket_(socket), cb_(cb),
+      bind_to_port_(bind_to_port), use_proxy_proto_(use_proxy_proto), proxy_protocol_(stats_store),
+      use_original_dst_(use_orig_dst), listener_(nullptr) {
+
+  if (bind_to_port_) {
+    listener_.reset(
+        evconnlistener_new(&dispatcher_.base(), listenCallback, this, 0, -1, socket.fd()));
+
+    if (!listener_) {
+      throw CreateListenerException(fmt::format("cannot listen on socket: {}", socket.name()));
+    }
+
+    evconnlistener_set_error_cb(listener_.get(), errorCallback);
+  }
 }
 
 void ListenerImpl::errorCallback(evconnlistener*, void*) {
@@ -68,6 +104,10 @@ const std::string ListenerImpl::getAddressName(sockaddr* addr) {
   return (addr->sa_family == AF_INET)
              ? Utility::getAddressName(reinterpret_cast<sockaddr_in*>(addr))
              : EMPTY_STRING;
+}
+
+uint16_t ListenerImpl::getAddressPort(sockaddr* addr) {
+  return (addr->sa_family == AF_INET) ? ntohs(reinterpret_cast<sockaddr_in*>(addr)->sin_port) : 0;
 }
 
 } // Network

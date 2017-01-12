@@ -2,6 +2,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/mocks.h"
 
 using testing::_;
 using testing::Invoke;
@@ -13,10 +14,11 @@ static void errorCallbackTest() {
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(10000);
+  Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener =
-      dispatcher.createListener(socket, listener_callbacks, stats_store, false);
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener = dispatcher.createListener(
+      connection_handler, socket, listener_callbacks, stats_store, true, false, false);
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection("tcp://127.0.0.1:10000");
