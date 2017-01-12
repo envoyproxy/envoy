@@ -39,6 +39,7 @@ private:
   std::string body_;
   uint64_t body_data_waiting_length_{};
   bool waiting_for_reset_{};
+  bool saw_reset_{};
 };
 
 typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;

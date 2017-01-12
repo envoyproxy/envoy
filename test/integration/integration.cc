@@ -33,8 +33,10 @@ void IntegrationStreamDecoder::waitForEndStream() {
 }
 
 void IntegrationStreamDecoder::waitForReset() {
-  waiting_for_reset_ = true;
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  if (!saw_reset_) {
+    waiting_for_reset_ = true;
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -73,6 +75,7 @@ void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
 }
 
 void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason) {
+  saw_reset_ = true;
   if (waiting_for_reset_) {
     dispatcher_.exit();
   }
