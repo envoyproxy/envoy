@@ -221,7 +221,6 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(*this, free(_));
 }
 
