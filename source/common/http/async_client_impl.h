@@ -1,5 +1,5 @@
 #pragma once
-
+#include "precompiled/precompiled.h"
 #include "message_impl.h"
 
 #include "envoy/event/dispatcher.h"
@@ -18,6 +18,7 @@
 
 namespace Http {
 
+class AsyncStreamImpl;
 class AsyncRequestImpl;
 
 class AsyncClientImpl final : public AsyncClient {
@@ -32,12 +33,16 @@ public:
   Request* send(MessagePtr&& request, Callbacks& callbacks,
                 const Optional<std::chrono::milliseconds>& timeout) override;
 
+  Stream* start(StreamCallbacks& callbacks,
+                const Optional<std::chrono::milliseconds>& timeout) override;
+
 private:
   const Upstream::ClusterInfo& cluster_;
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
-  std::list<std::unique_ptr<AsyncRequestImpl>> active_requests_;
+  std::list<std::unique_ptr<AsyncStreamImpl>> active_requests_;
 
+  friend class AsyncStreamImpl;
   friend class AsyncRequestImpl;
 };
 
@@ -45,18 +50,26 @@ private:
  * Implementation of AsyncRequest. This implementation is capable of sending HTTP requests to a
  * ConnectionPool asynchronously.
  */
-class AsyncRequestImpl final : public AsyncClient::Request,
-                               StreamDecoderFilterCallbacks,
-                               Router::StableRouteTable,
-                               Logger::Loggable<Logger::Id::http>,
-                               LinkedObject<AsyncRequestImpl> {
+class AsyncStreamImpl : public AsyncClient::Stream,
+                        StreamDecoderFilterCallbacks,
+                        Router::StableRouteTable,
+                        Logger::Loggable<Logger::Id::http>,
+                        LinkedObject<AsyncStreamImpl> {
 public:
-  AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                   const Optional<std::chrono::milliseconds>& timeout);
-  ~AsyncRequestImpl();
+  AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
+                  const Optional<std::chrono::milliseconds>& timeout);
+  virtual ~AsyncStreamImpl();
 
-  // Http::AsyncHttpRequest
-  void cancel() override;
+  // Http::AsyncClient::Stream
+  void sendHeaders(HeaderMap& headers, bool end_stream) override;
+  void sendData(Buffer::Instance& data, bool end_stream) override;
+  void sendTrailers(HeaderMap& trailers) override;
+  void close() override;
+
+protected:
+  bool complete_{};
+  AsyncClientImpl& parent_;
+  void cleanup();
 
 private:
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {
@@ -136,9 +149,7 @@ private:
     RouteEntryImpl route_entry_;
   };
 
-  void cleanup();
   void failDueToClientDestroy();
-  void onComplete();
 
   // Http::StreamDecoderFilterCallbacks
   void addResetStreamCallback(std::function<void()> callback) override {
@@ -152,7 +163,7 @@ private:
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
-  const Buffer::Instance* decodingBuffer() override { return request_->body(); }
+  const Buffer::Instance* decodingBuffer() override { return decoding_buffer_; }
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;
@@ -160,16 +171,37 @@ private:
   // Router::StableRouteTable
   const Router::Route* route(const Http::HeaderMap&) const override { return &route_; }
 
-  MessagePtr request_;
-  AsyncClientImpl& parent_;
-  AsyncClient::Callbacks& callbacks_;
+  AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
-  std::unique_ptr<MessageImpl> response_;
   Router::ProdFilter router_;
   std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
   RouteImpl route_;
-  bool complete_{};
+  Buffer::Instance* decoding_buffer_{nullptr};
+  bool internal_header_inserted_{false};
+  friend class AsyncClientImpl;
+};
+
+class AsyncRequestImpl final : public AsyncClient::Request,
+                               AsyncStreamImpl,
+                               AsyncClient::StreamCallbacks {
+public:
+  AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
+                   const Optional<std::chrono::milliseconds>& timeout);
+  virtual ~AsyncRequestImpl();
+
+  // AsyncClient::Request
+  virtual void cancel() override;
+
+private:
+  void onHeaders(HeaderMapPtr&& headers, bool end_stream) override;
+  void onData(Buffer::Instance& data, bool end_stream) override;
+  void onTrailers(HeaderMapPtr&& trailers) override;
+  void onResetStream() override;
+  void onComplete();
+  MessagePtr request_;
+  AsyncClient::Callbacks& callbacks_;
+  std::unique_ptr<MessageImpl> response_;
 
   friend class AsyncClientImpl;
 };
