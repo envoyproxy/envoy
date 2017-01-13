@@ -129,6 +129,13 @@ public:
   virtual Request* send(MessagePtr&& request, Callbacks& callbacks,
                         const Optional<std::chrono::milliseconds>& timeout) PURE;
 
+  /**
+   * Start an HTTP stream asynchronously
+   * @param callbacks the callbacks to be notified of stream status.
+   * @return a stream handle or nullptr if no stream could be started. NOTE: In this case
+   *         onResetStream() has already been called inline. The client owns the stream and
+   *         the handle can be used to send more messages or close the stream.
+   */
   virtual Stream* start(StreamCallbacks& callbacks,
                         const Optional<std::chrono::milliseconds>& timeout) PURE;
 };

@@ -1,5 +1,5 @@
 #pragma once
-#include "precompiled/precompiled.h"
+
 #include "message_impl.h"
 
 #include "envoy/event/dispatcher.h"
