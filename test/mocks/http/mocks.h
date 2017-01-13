@@ -316,12 +316,41 @@ public:
   MOCK_METHOD1(onFailure, void(Http::AsyncClient::FailureReason reason));
 };
 
+class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {
+ public:
+  MockAsyncClientStreamCallbacks();
+  ~MockAsyncClientStreamCallbacks();
+
+  void onHeaders(HeaderMapPtr &&headers, bool end_stream) override { onHeaders_(headers.get(), end_stream); }
+  void onData(Buffer::Instance &data, bool end_stream) override { onData_(data, end_stream); }
+  void onTrailers(HeaderMapPtr &&trailers) override { onTrailers_(trailers.get()); }
+  void onResetStream() override { onResetStream_(); }
+
+  MOCK_METHOD2(onHeaders_, void(HeaderMap* headers, bool end_stream));
+  MOCK_METHOD2(onData_, void(Buffer::Instance &data, bool end_stream));
+  MOCK_METHOD1(onTrailers_, void(HeaderMap* headers));
+  MOCK_METHOD0(onResetStream_, void());
+};
+
 class MockAsyncClientRequest : public AsyncClient::Request {
 public:
   MockAsyncClientRequest(MockAsyncClient* client);
   ~MockAsyncClientRequest();
 
   MOCK_METHOD0(cancel, void());
+
+  MockAsyncClient* client_;
+};
+
+class MockAsyncClientStream : public AsyncClient::Stream {
+ public:
+  MockAsyncClientStream(MockAsyncClient* client);
+  ~MockAsyncClientStream();
+
+  MOCK_METHOD2(sendHeaders, void(HeaderMap& headers, bool end_stream));
+  MOCK_METHOD2(sendData, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD1(sendTrailers, void(HeaderMap& trailers));
+  MOCK_METHOD0(close, void());
 
   MockAsyncClient* client_;
 };
