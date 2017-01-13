@@ -85,6 +85,7 @@ static void useOriginalDst() {
       .WillOnce(Invoke([&](int, sockaddr*) -> void {
         client_connection->close(ConnectionCloseType::NoFlush);
         socket.close();
+        socketDst.close();
       }));
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
