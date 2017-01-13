@@ -60,7 +60,7 @@ protected:
   uint16_t getAddressPort(sockaddr* sock) override { return getAddressPort_(sock); }
 };
 
-static void useOriginalDst() {
+TEST(ListenerImplTest, UseOriginalDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(uint32_t(10000), true);
@@ -84,15 +84,10 @@ static void useOriginalDst() {
       .Times(1)
       .WillOnce(Invoke([&](int, sockaddr*) -> void {
         client_connection->close(ConnectionCloseType::NoFlush);
-        socket.close();
-        socketDst.close();
+        dispatcher.exit();
       }));
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
-}
-
-TEST(ListenerImpl, UseOriginalDst) {
-  EXPECT_DEATH(useOriginalDst(), ".*listener accept failure.*");
 }
 
 } // Network
