@@ -43,7 +43,7 @@ public:
 
 protected:
   const std::string getAddressName(sockaddr* addr);
-  uint16_t getAddressPort(sockaddr* addr);
+  virtual uint16_t getAddressPort(sockaddr* addr);
 
   Network::ConnectionHandler& connection_handler_;
   Event::DispatcherImpl& dispatcher_;
