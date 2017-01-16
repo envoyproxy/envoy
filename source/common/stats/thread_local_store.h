@@ -28,8 +28,8 @@ namespace Stats {
  *         with the same address, and a cache flush operation could race and delete cache data
  *         for the new scope. This is extremely unlikely, and if it happens the cache will be
  *         repopulated on the next access.
- * - Since it's possibly to have overlapping scopes, we de-dup stats when counters() or gauges()
- *   is called since these are very uncommon operations.
+ * - Since it's possible to have overlapping scopes, we de-dup stats when counters() or gauges() is
+ *   called since these are very uncommon operations.
  * - Though this implementation is designed to work with a fixed shared memory space, it will fall
  *   back to heap allocated stats if needed. NOTE: In this case, overlapping scopes will not share
  *   the same backing store. This is to keep things simple, it could be done in the future if
