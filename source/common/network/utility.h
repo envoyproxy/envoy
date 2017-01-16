@@ -8,6 +8,8 @@
 
 #include <sys/un.h>
 
+#include <linux/netfilter_ipv4.h>
+
 namespace Network {
 
 /**
@@ -101,6 +103,13 @@ public:
   static std::string getAddressName(sockaddr_in* addr);
 
   /**
+   * Extract port information from a sockaddr_in.
+   * @param addr the address from which to extract the port number
+   * @return the port number
+   */
+  static uint16_t getAddressPort(sockaddr_in* addr);
+
+  /**
    * Determine whether this is an internal (RFC1918) address.
    * @return bool the address is an RFC1918 address.
    */
@@ -111,6 +120,16 @@ public:
    * @return true if so, otherwise false
    */
   static bool isLoopbackAddress(const char* address);
+
+  /**
+   * Retrieve the original destination address from an accepted fd.
+   * The address (IP and port) may be not local and the port may differ from
+   * the listener port if the packets were redirected using iptables
+   * @param fd is the descriptor returned by accept()
+   * @param orig_addr is the data structure that contains the original address
+   * @return true if the operation succeeded, false otherwise
+   */
+  static bool getOriginalDst(int fd, sockaddr_storage* orig_addr);
 };
 
 } // Network

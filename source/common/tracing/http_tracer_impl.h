@@ -115,9 +115,8 @@ public:
   SpanPtr startSpan(const std::string& operation_name, SystemTime start_time) override;
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
-  const std::string& collectorCluster() { return collector_cluster_; }
+  Upstream::ClusterInfoPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
-  Stats::Store& statsStore() { return stats_store_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
 private:
@@ -130,9 +129,8 @@ private:
     LightStepDriver& driver_;
   };
 
-  const std::string collector_cluster_;
   Upstream::ClusterManager& cm_;
-  Stats::Store& stats_store_;
+  Upstream::ClusterInfoPtr cluster_;
   LightstepTracerStats tracer_stats_;
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;

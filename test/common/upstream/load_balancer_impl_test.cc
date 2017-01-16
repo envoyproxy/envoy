@@ -16,7 +16,7 @@ static HostPtr newTestHost(Upstream::ClusterInfoPtr cluster, const std::string& 
 
 class RoundRobinLoadBalancerTest : public testing::Test {
 public:
-  RoundRobinLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats("", stats_store_)) {}
+  RoundRobinLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
   void init(bool need_local_cluster) {
     if (need_local_cluster) {
@@ -369,7 +369,7 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
 
 class LeastRequestLoadBalancerTest : public testing::Test {
 public:
-  LeastRequestLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats("", stats_store_)) {}
+  LeastRequestLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
   NiceMock<MockCluster> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -527,7 +527,7 @@ TEST_F(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
 
 class RandomLoadBalancerTest : public testing::Test {
 public:
-  RandomLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats("", stats_store_)) {}
+  RandomLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
   NiceMock<MockCluster> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;

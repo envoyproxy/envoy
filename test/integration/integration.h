@@ -39,6 +39,7 @@ private:
   std::string body_;
   uint64_t body_data_waiting_length_{};
   bool waiting_for_reset_{};
+  bool saw_reset_{};
 };
 
 typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
@@ -49,7 +50,7 @@ typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
 class IntegrationCodecClient : public Http::CodecClientProd {
 public:
   IntegrationCodecClient(Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
-                         const Http::CodecClientStats& stats, Stats::Store& store,
+                         Upstream::HostDescriptionPtr host_description,
                          Http::CodecClient::Type type);
 
   void makeHeaderOnlyRequest(const Http::HeaderMap& headers, IntegrationStreamDecoder& response);

@@ -1,4 +1,5 @@
 #include "common/filesystem/filesystem_impl.h"
+#include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/upstream/sds.h"

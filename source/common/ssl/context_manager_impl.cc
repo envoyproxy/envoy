@@ -1,39 +1,49 @@
+#include "context_impl.h"
 #include "context_manager_impl.h"
+
+#include "common/common/assert.h"
 
 namespace Ssl {
 
-Ssl::ClientContext& ContextManagerImpl::createSslClientContext(const std::string& name,
-                                                               Stats::Store& stats,
-                                                               ContextConfig& config) {
+ContextManagerImpl::~ContextManagerImpl() { ASSERT(contexts_.empty()); }
 
-  Ssl::ClientContext* context = new ClientContextImpl(name, stats, config);
-  contexts_.emplace_back(context);
-  return *context;
+void ContextManagerImpl::releaseContext(Context* context) {
+  std::unique_lock<std::mutex> lock(contexts_lock_);
+  ASSERT(std::find(contexts_.begin(), contexts_.end(), context) != contexts_.end());
+  contexts_.remove(context);
 }
 
-Ssl::ServerContext& ContextManagerImpl::createSslServerContext(const std::string& name,
-                                                               Stats::Store& stats,
-                                                               ContextConfig& config) {
-  Ssl::ServerContext* context = new ServerContextImpl(name, stats, config, runtime_);
-  contexts_.emplace_back(context);
-  return *context;
+ClientContextPtr ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
+                                                            ContextConfig& config) {
+
+  ClientContextPtr context(new ClientContextImpl(*this, scope, config));
+  std::unique_lock<std::mutex> lock(contexts_lock_);
+  contexts_.emplace_back(context.get());
+  return context;
+}
+
+ServerContextPtr ContextManagerImpl::createSslServerContext(Stats::Scope& scope,
+                                                            ContextConfig& config) {
+  ServerContextPtr context(new ServerContextImpl(*this, scope, config, runtime_));
+  std::unique_lock<std::mutex> lock(contexts_lock_);
+  contexts_.emplace_back(context.get());
+  return context;
 }
 
 size_t ContextManagerImpl::daysUntilFirstCertExpires() {
+  std::unique_lock<std::mutex> lock(contexts_lock_);
   size_t ret = std::numeric_limits<int>::max();
-  for (std::unique_ptr<Context>& context : contexts_) {
+  for (Context* context : contexts_) {
     ret = std::min<size_t>(context->daysUntilFirstCertExpires(), ret);
   }
   return ret;
 }
 
-std::vector<std::reference_wrapper<Context>> ContextManagerImpl::getContexts() {
-  std::vector<std::reference_wrapper<Context>> return_contexts;
-  for (std::unique_ptr<Context>& context : contexts_) {
-    return_contexts.push_back(*context);
+void ContextManagerImpl::iterateContexts(std::function<void(Context&)> callback) {
+  std::unique_lock<std::mutex> lock(contexts_lock_);
+  for (Context* context : contexts_) {
+    callback(*context);
   }
-
-  return return_contexts;
 }
 
 } // Ssl

@@ -299,10 +299,8 @@ void ConnPoolImpl::ActiveClient::onConnectTimeout() {
 }
 
 CodecClientPtr ConnPoolImplProd::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  CodecClientStats stats{host_->cluster().stats().upstream_cx_protocol_error_};
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
-                                           stats, store_,
-                                           data.host_description_->cluster().httpCodecOptions())};
+                                           data.host_description_)};
   return codec;
 }
 

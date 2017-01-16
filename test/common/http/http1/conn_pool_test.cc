@@ -1,7 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/codec_client.h"
 #include "common/http/http1/conn_pool.h"
-#include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -32,7 +31,7 @@ public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterInfoPtr cluster)
       : ConnPoolImpl(dispatcher, Upstream::HostPtr{new Upstream::HostImpl(
                                      cluster, "tcp://127.0.0.1:9000", false, 1, "")},
-                     stats_store_, Upstream::ResourcePriority::Default),
+                     Upstream::ResourcePriority::Default),
         mock_dispatcher_(dispatcher) {}
 
   ~ConnPoolImplForTest() {
@@ -75,7 +74,7 @@ public:
               return;
             }
           }
-        }, CodecClientStats{ALL_CODEC_CLIENT_STATS(POOL_COUNTER(stats_store_))});
+        }, nullptr);
 
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_))
         .WillOnce(Return(test_client.connection_));
@@ -85,7 +84,6 @@ public:
 
   Event::MockDispatcher& mock_dispatcher_;
   std::vector<TestCodecClient> test_clients_;
-  Stats::IsolatedStoreImpl stats_store_;
 };
 
 /**
@@ -175,10 +173,8 @@ struct ActiveTestRequest {
  * Test all timing stats are set.
  */
 TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
-  EXPECT_CALL(cluster_->stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.upstream_cx_connect_ms", _));
-  EXPECT_CALL(cluster_->stats_store_,
-              deliverTimingToSinks("cluster.fake_cluster.upstream_cx_length_ms", _));
+  EXPECT_CALL(cluster_->stats_store_, deliverTimingToSinks("upstream_cx_connect_ms", _));
+  EXPECT_CALL(cluster_->stats_store_, deliverTimingToSinks("upstream_cx_length_ms", _));
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();

@@ -15,8 +15,8 @@ public:
   typedef std::function<void(CodecClient*)> DestroyCb;
 
   CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
-                     DestroyCb destroy_cb, const Http::CodecClientStats& stats)
-      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), stats),
+                     DestroyCb destroy_cb, Upstream::HostDescriptionPtr host)
+      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host),
         destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }

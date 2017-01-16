@@ -2,6 +2,7 @@
 
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 
 #include <dirent.h>
 
@@ -10,24 +11,6 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-
-class NullSslContextManager : public Ssl::ContextManager,
-                              public Ssl::ServerContext,
-                              public Ssl::ClientContext {
-public:
-  Ssl::ClientContext& createSslClientContext(const std::string&, Stats::Store&,
-                                             Ssl::ContextConfig&) override {
-    return *this;
-  }
-  Ssl::ServerContext& createSslServerContext(const std::string&, Stats::Store&,
-                                             Ssl::ContextConfig&) override {
-    return *this;
-  }
-  size_t daysUntilFirstCertExpires() override { return 0; }
-  std::string getCaCertInformation() override { return ""; }
-  std::string getCertChainInformation() override { return ""; }
-  std::vector<std::reference_wrapper<Ssl::Context>> getContexts() override { return {}; };
-};
 
 class ConfigTest {
 public:
@@ -53,7 +36,7 @@ public:
   }
 
   NiceMock<Server::MockInstance> server_;
-  NullSslContextManager ssl_context_manager_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   Server::TestOptionsImpl options_;
 };
 

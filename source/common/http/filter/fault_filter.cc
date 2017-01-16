@@ -60,7 +60,8 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
     for (const Json::ObjectPtr& header_map : config_headers) {
       // allow header value to be empty, allows matching to be only based on header presence.
       fault_filter_headers_.emplace_back(Http::LowerCaseString(header_map->getString("name")),
-                                         header_map->getString("value", EMPTY_STRING));
+                                         header_map->getString("value", EMPTY_STRING),
+                                         header_map->getBoolean("regex", false));
     }
   }
 }

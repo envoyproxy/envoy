@@ -29,6 +29,7 @@ private:
   const static std::string NO_ROUTE_FOUND;
   const static std::string DELAY_INJECTED;
   const static std::string FAULT_INJECTED;
+  const static std::string RATE_LIMITED;
 };
 
 /**

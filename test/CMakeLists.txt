@@ -20,6 +20,7 @@ include_directories(${PROJECT_BINARY_DIR})
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 include_directories(${ENVOY_NGHTTP2_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
+include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 
 add_executable(envoy-test
   $<TARGET_OBJECTS:envoy-server>
@@ -76,6 +77,9 @@ add_executable(envoy-test
   common/network/proxy_protocol_test.cc
   common/network/utility_test.cc
   common/ratelimit/ratelimit_impl_test.cc
+  common/redis/codec_impl_test.cc
+  common/redis/conn_pool_impl_test.cc
+  common/redis/proxy_filter_test.cc
   common/router/config_impl_test.cc
   common/router/retry_state_impl_test.cc
   common/router/router_test.cc
@@ -121,6 +125,7 @@ add_executable(envoy-test
   mocks/local_info/mocks.cc
   mocks/network/mocks.cc
   mocks/ratelimit/mocks.cc
+  mocks/redis/mocks.cc
   mocks/router/mocks.cc
   mocks/runtime/mocks.cc
   mocks/server/mocks.cc
@@ -129,6 +134,7 @@ add_executable(envoy-test
   mocks/thread_local/mocks.cc
   mocks/tracing/mocks.cc
   mocks/upstream/mocks.cc
+  server/config/network/config_test.cc
   server/config/network/http_connection_manager_test.cc
   server/configuration_impl_test.cc
   server/connection_handler_test.cc

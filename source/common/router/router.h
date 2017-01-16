@@ -74,13 +74,13 @@ public:
                Stats::Store& stats, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats)
-      : stats_store_(stats), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
+      : global_store_(stats), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
         stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), shadow_writer_(std::move(shadow_writer)) {}
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
 
-  Stats::Store& stats_store_;
+  Stats::Store& global_store_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
@@ -200,9 +200,9 @@ private:
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  const RouteEntry* route_;
+  const RouteEntry* route_entry_;
   Upstream::ClusterInfoPtr cluster_;
-  std::list<std::string> alt_stat_prefixes_;
+  std::string alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;

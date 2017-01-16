@@ -30,8 +30,8 @@ set(ENVOY_TCLAP_INCLUDE_DIR "" CACHE FILEPATH "location of tclap includes")
 # Last tested with 2.5.0
 set(ENVOY_GPERFTOOLS_INCLUDE_DIR "" CACHE FILEPATH "location of gperftools includes")
 
-# https://www.openssl.org/
-# Last tested with 1.0.2i
+# https://boringssl.googlesource.com/boringssl/+/chromium-stable
+# Last tested with sha 78684e5b222645828ca302e56b40b9daff2b2d27
 set(ENVOY_OPENSSL_INCLUDE_DIR "" CACHE FILEPATH "location of openssl includes")
 
 # https://github.com/google/protobuf

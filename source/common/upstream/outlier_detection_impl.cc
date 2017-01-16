@@ -12,13 +12,13 @@ namespace Outlier {
 DetectorPtr DetectorImplFactory::createForCluster(Cluster& cluster,
                                                   const Json::Object& cluster_config,
                                                   Event::Dispatcher& dispatcher,
-                                                  Runtime::Loader& runtime, Stats::Store& stats,
+                                                  Runtime::Loader& runtime,
                                                   EventLoggerPtr event_logger) {
   // Right now we don't support any configuration but in order to make the config backwards
   // compatible we just look for an empty object.
   if (cluster_config.hasObject("outlier_detection")) {
-    return DetectorImpl::create(cluster, dispatcher, runtime, stats,
-                                ProdSystemTimeSource::instance_, event_logger);
+    return DetectorImpl::create(cluster, dispatcher, runtime, ProdSystemTimeSource::instance_,
+                                event_logger);
   } else {
     return nullptr;
   }
@@ -49,10 +49,10 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
 }
 
 DetectorImpl::DetectorImpl(const Cluster& cluster, Event::Dispatcher& dispatcher,
-                           Runtime::Loader& runtime, Stats::Store& stats,
-                           SystemTimeSource& time_source, EventLoggerPtr event_logger)
+                           Runtime::Loader& runtime, SystemTimeSource& time_source,
+                           EventLoggerPtr event_logger)
     : dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
-      stats_(generateStats(cluster.info()->name(), stats)),
+      stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger) {}
 
@@ -67,11 +67,11 @@ DetectorImpl::~DetectorImpl() {
 
 std::shared_ptr<DetectorImpl> DetectorImpl::create(const Cluster& cluster,
                                                    Event::Dispatcher& dispatcher,
-                                                   Runtime::Loader& runtime, Stats::Store& stats,
+                                                   Runtime::Loader& runtime,
                                                    SystemTimeSource& time_source,
                                                    EventLoggerPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
-      new DetectorImpl(cluster, dispatcher, runtime, stats, time_source, event_logger));
+      new DetectorImpl(cluster, dispatcher, runtime, time_source, event_logger));
   detector->initialize(cluster);
   return detector;
 }
@@ -152,10 +152,10 @@ void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
   }
 }
 
-DetectionStats DetectorImpl::generateStats(const std::string& name, Stats::Store& store) {
-  std::string prefix(fmt::format("cluster.{}.outlier_detection.", name));
-  return {ALL_OUTLIER_DETECTION_STATS(POOL_COUNTER_PREFIX(store, prefix),
-                                      POOL_GAUGE_PREFIX(store, prefix))};
+DetectionStats DetectorImpl::generateStats(Stats::Scope& scope) {
+  std::string prefix("outlier_detection.");
+  return {ALL_OUTLIER_DETECTION_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                      POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
 void DetectorImpl::onConsecutive5xx(HostPtr host) {

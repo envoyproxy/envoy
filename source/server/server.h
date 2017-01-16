@@ -1,6 +1,6 @@
 #pragma once
 
-#include "connection_handler.h"
+#include "connection_handler_impl.h"
 #include "worker.h"
 
 #include "envoy/common/optional.h"
@@ -128,9 +128,10 @@ private:
   ServerStats server_stats_;
   ThreadLocal::InstanceImpl thread_local_;
   SocketMap socket_map_;
-  ConnectionHandler handler_;
+  ConnectionHandlerImpl handler_;
   Runtime::RandomGeneratorImpl random_generator_;
   Runtime::LoaderPtr runtime_loader_;
+  std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   std::unique_ptr<Configuration::Main> config_;
   std::list<WorkerPtr> workers_;
   std::unique_ptr<AdminImpl> admin_;
@@ -140,7 +141,6 @@ private:
   Network::DnsResolverPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
   const LocalInfo::LocalInfo& local_info_;
-  std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
 };

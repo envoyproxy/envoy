@@ -36,7 +36,7 @@ public:
 };
 
 /**
- * Static registration for the tcp_proxy filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the mongo filter. @see RegisterNetworkFilterConfigFactory.
  */
 static RegisterNetworkFilterConfigFactory<MongoProxyFilterConfigFactory> registered_;
 

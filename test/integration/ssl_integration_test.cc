@@ -3,17 +3,42 @@
 #include "utility.h"
 
 #include "common/event/dispatcher_impl.h"
+#include "common/ssl/context_config_impl.h"
+#include "common/ssl/context_manager_impl.h"
 
 using testing::Return;
 
 namespace Ssl {
 
+std::unique_ptr<Runtime::Loader> SslIntegrationTest::runtime_;
+std::unique_ptr<ContextManager> SslIntegrationTest::context_manager_;
 ServerContextPtr SslIntegrationTest::upstream_ssl_ctx_;
 ClientContextPtr SslIntegrationTest::client_ssl_ctx_alpn_;
 ClientContextPtr SslIntegrationTest::client_ssl_ctx_no_alpn_;
 
-ServerContextPtr SslIntegrationTest::createUpstreamSslContext(const std::string& name,
-                                                              Stats::Store& store) {
+void SslIntegrationTest::SetUpTestCase() {
+  test_server_ =
+      MockRuntimeIntegrationTestServer::create("test/config/integration/server_ssl.json");
+  context_manager_.reset(new ContextManagerImpl(*runtime_));
+  upstream_ssl_ctx_ = createUpstreamSslContext();
+  client_ssl_ctx_alpn_ = createClientSslContext(true);
+  client_ssl_ctx_no_alpn_ = createClientSslContext(false);
+  fake_upstreams_.emplace_back(
+      new FakeUpstream(upstream_ssl_ctx_.get(), 11000, FakeHttpConnection::Type::HTTP1));
+  fake_upstreams_.emplace_back(
+      new FakeUpstream(upstream_ssl_ctx_.get(), 11001, FakeHttpConnection::Type::HTTP1));
+}
+
+void SslIntegrationTest::TearDownTestCase() {
+  test_server_.reset();
+  fake_upstreams_.clear();
+  upstream_ssl_ctx_.reset();
+  client_ssl_ctx_alpn_.reset();
+  client_ssl_ctx_no_alpn_.reset();
+  context_manager_.reset();
+}
+
+ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
   std::string json = R"EOF(
 {
   "cert_chain_file": "test/config/integration/certs/upstreamcert.pem",
@@ -23,11 +48,10 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext(const std::string&
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
-  return ServerContextPtr(new TestServerContextImpl(name, store, cfg));
+  return context_manager_->createSslServerContext(store(), cfg);
 }
 
-ClientContextPtr SslIntegrationTest::createClientSslContext(const std::string& name,
-                                                            Stats::Store& store, bool alpn) {
+ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {
   std::string json_no_alpn = R"EOF(
 {
   "ca_cert_file": "test/config/integration/certs/cacert.pem",
@@ -47,7 +71,7 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(const std::string& n
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(alpn ? json_alpn : json_no_alpn);
   ContextConfigImpl cfg(*loader);
-  return ClientContextPtr(new ClientContextImpl(name, store, cfg));
+  return context_manager_->createSslClientContext(store(), cfg);
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn) {

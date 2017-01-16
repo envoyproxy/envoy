@@ -193,6 +193,8 @@ std::string Utility::getAddressName(sockaddr_in* addr) {
   return std::string(str);
 }
 
+uint16_t Utility::getAddressPort(sockaddr_in* addr) { return ntohs(addr->sin_port); }
+
 bool Utility::isInternalAddress(const char* address) {
   in_addr addr;
   int rc = inet_pton(AF_INET, address, &addr);
@@ -219,6 +221,13 @@ bool Utility::isLoopbackAddress(const char* address) {
   }
 
   return addr.s_addr == htonl(INADDR_LOOPBACK);
+}
+
+bool Utility::getOriginalDst(int fd, sockaddr_storage* orig_addr) {
+  socklen_t addr_len = sizeof(sockaddr_storage);
+  int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, orig_addr, &addr_len);
+
+  return (status == 0);
 }
 
 } // Network

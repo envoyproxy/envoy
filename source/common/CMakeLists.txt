@@ -82,6 +82,9 @@ add_library(
   network/utility.cc
   profiler/profiler.cc
   ratelimit/ratelimit_impl.cc
+  redis/codec_impl.cc
+  redis/conn_pool_impl.cc
+  redis/proxy_filter.cc
   router/config_impl.cc
   router/retry_state_impl.cc
   router/router.cc
@@ -95,6 +98,7 @@ add_library(
   ssl/context_manager_impl.cc
   ssl/openssl.cc
   stats/stats_impl.cc
+  stats/stats_scope_impl.cc
   stats/statsd.cc
   thread_local/thread_local_impl.cc
   tracing/http_tracer_impl.cc

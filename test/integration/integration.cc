@@ -7,7 +7,9 @@
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/upstream/upstream_impl.h"
 
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 IntegrationTestServerPtr BaseIntegrationTest::test_server_;
@@ -31,8 +33,10 @@ void IntegrationStreamDecoder::waitForEndStream() {
 }
 
 void IntegrationStreamDecoder::waitForReset() {
-  waiting_for_reset_ = true;
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  if (!saw_reset_) {
+    waiting_for_reset_ = true;
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -71,6 +75,7 @@ void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
 }
 
 void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason) {
+  saw_reset_ = true;
   if (waiting_for_reset_) {
     dispatcher_.exit();
   }
@@ -78,9 +83,9 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason) {
 
 IntegrationCodecClient::IntegrationCodecClient(Event::Dispatcher& dispatcher,
                                                Network::ClientConnectionPtr&& conn,
-                                               const Http::CodecClientStats& stats,
-                                               Stats::Store& store, CodecClient::Type type)
-    : CodecClientProd(type, std::move(conn), stats, store, 0), callbacks_(*this),
+                                               Upstream::HostDescriptionPtr host_description,
+                                               CodecClient::Type type)
+    : CodecClientProd(type, std::move(conn), host_description), callbacks_(*this),
       codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
@@ -229,10 +234,11 @@ IntegrationCodecClientPtr BaseIntegrationTest::makeHttpConnection(uint32_t port,
 IntegrationCodecClientPtr
 BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
                                         Http::CodecClient::Type type) {
-  return IntegrationCodecClientPtr{new IntegrationCodecClient(
-      *dispatcher_, std::move(conn),
-      Http::CodecClientStats{ALL_CODEC_CLIENT_STATS(POOL_COUNTER(stats_store_))}, stats_store_,
-      type)};
+  std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
+  Upstream::HostDescriptionPtr host_description{
+      new Upstream::HostDescriptionImpl(cluster, "tcp://127.0.0.1:80", false, "")};
+  return IntegrationCodecClientPtr{
+      new IntegrationCodecClient(*dispatcher_, std::move(conn), host_description, type)};
 }
 
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {

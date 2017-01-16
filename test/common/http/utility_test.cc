@@ -109,4 +109,16 @@ TEST(HttpUtility, OneAddressInXFF) {
   EXPECT_EQ(first_address, Utility::getLastAddressFromXFF(request_headers));
 }
 
+TEST(HttpUtility, TestParseCookie) {
+  TestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "somekey=somevalue; someotherkey=someothervalue"},
+      {"cookie", "abc=def; token=abc123; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
+      {"cookie", "key2=value2; key3=value3"}};
+
+  std::string key{"token"};
+  std::string value = Utility::parseCookieValue(headers, key);
+  EXPECT_EQ(value, "abc123");
+}
+
 } // Http

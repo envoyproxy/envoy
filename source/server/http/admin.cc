@@ -262,10 +262,10 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& respons
   // using the same cert.
   std::unordered_set<std::string> context_info_set;
   std::string context_format = "{{\n\t\"ca_cert\": \"{}\"\n\t\"cert_chain\": \"{}\"\n}}\n";
-  for (Ssl::Context& context : server_.sslContextManager().getContexts()) {
+  server_.sslContextManager().iterateContexts([&](Ssl::Context& context) -> void {
     context_info_set.insert(fmt::format(context_format, context.getCaCertInformation(),
                                         context.getCertChainInformation()));
-  }
+  });
 
   std::string cert_result_string;
   for (const std::string& context_info : context_info_set) {
@@ -292,7 +292,7 @@ void AdminFilter::onComplete() {
 }
 
 AdminImpl::AdminImpl(const std::string& access_log_path, uint32_t port, Server::Instance& server)
-    : server_(server), socket_(new Network::TcpListenSocket(port)),
+    : server_(server), socket_(new Network::TcpListenSocket(port, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       route_config_(new Router::NullConfigImpl()),
       handlers_{

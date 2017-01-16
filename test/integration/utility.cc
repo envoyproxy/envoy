@@ -8,8 +8,9 @@
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/stats/stats_impl.h"
+#include "common/upstream/upstream_impl.h"
 
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -45,11 +46,12 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
                                    const std::string& host) {
   Api::Impl api(std::chrono::milliseconds(9000));
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
-  Stats::IsolatedStoreImpl stats_store;
-  Http::CodecClientStats stats{ALL_CODEC_CLIENT_STATS(POOL_COUNTER(stats_store))};
+  std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
+  Upstream::HostDescriptionPtr host_description{
+      new Upstream::HostDescriptionImpl(cluster, "tcp://127.0.0.1:80", false, "")};
   Http::CodecClientProd client(
-      type, dispatcher->createClientConnection(fmt::format("tcp://127.0.0.1:{}", port)), stats,
-      stats_store, 0);
+      type, dispatcher->createClientConnection(fmt::format("tcp://127.0.0.1:{}", port)),
+      host_description);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void { client.close(); }));
   Http::StreamEncoder& encoder = client.newStream(*response);
   encoder.getStream().addCallbacks(*response);

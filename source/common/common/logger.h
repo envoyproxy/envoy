@@ -21,6 +21,7 @@ namespace Logger {
   FUNCTION(main)                 \
   FUNCTION(mongo)                \
   FUNCTION(pool)                 \
+  FUNCTION(redis)                \
   FUNCTION(router)               \
   FUNCTION(runtime)              \
   FUNCTION(testing)              \

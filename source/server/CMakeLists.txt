@@ -10,9 +10,10 @@ add_library(envoy-server OBJECT
   config/network/http_connection_manager.cc
   config/network/mongo_proxy.cc
   config/network/ratelimit.cc
+  config/network/redis_proxy.cc
   config/network/tcp_proxy.cc
   configuration_impl.cc
-  connection_handler.cc
+  connection_handler_impl.cc
   drain_manager_impl.cc
   http/admin.cc
   http/health_check.cc
@@ -25,6 +26,7 @@ include_directories(SYSTEM ${ENVOY_HTTP_PARSER_INCLUDE_DIR})
 include_directories(${ENVOY_NGHTTP2_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
+include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 
 set_target_properties(envoy-server PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT
                       "../precompiled/precompiled.h")

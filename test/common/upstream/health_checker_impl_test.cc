@@ -33,13 +33,12 @@ public:
 class HttpHealthCheckerImplTest : public testing::Test {
 public:
   struct TestSession {
-    TestSession() : stats_{ALL_CODEC_CLIENT_STATS(POOL_COUNTER(stats_store_))} {}
+    TestSession() {}
 
     Event::MockTimer* interval_timer_{};
     Event::MockTimer* timeout_timer_{};
     Http::MockClientConnection* codec_{};
     Stats::IsolatedStoreImpl stats_store_;
-    Http::CodecClientStats stats_;
     Network::MockClientConnection* client_connection_{};
     Http::CodecClient* codec_client_{};
     NiceMock<Http::MockStreamEncoder> request_encoder_;
@@ -65,7 +64,7 @@ public:
 
     Json::ObjectPtr config = Json::Factory::LoadFromString(json);
     health_checker_.reset(
-        new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, stats_, runtime_, random_));
+        new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostPtr host, bool changed_state)
                                                 -> void { onHostStatus(host, changed_state); });
   }
@@ -86,7 +85,7 @@ public:
 
     Json::ObjectPtr config = Json::Factory::LoadFromString(json);
     health_checker_.reset(
-        new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, stats_, runtime_, random_));
+        new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostPtr host, bool changed_state)
                                                 -> void { onHostStatus(host, changed_state); });
   }
@@ -108,8 +107,8 @@ public:
     test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
 
     Network::ClientConnectionPtr connection{test_session.client_connection_};
-    test_session.codec_client_ = new CodecClientForTest(std::move(connection), test_session.codec_,
-                                                        nullptr, test_session.stats_);
+    test_session.codec_client_ =
+        new CodecClientForTest(std::move(connection), test_session.codec_, nullptr, nullptr);
     EXPECT_CALL(*health_checker_, createCodecClient_())
         .WillOnce(Return(test_session.codec_client_));
   }
@@ -151,7 +150,6 @@ public:
 
   std::shared_ptr<MockCluster> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  Stats::IsolatedStoreImpl stats_;
   std::vector<TestSessionPtr> test_sessions_;
   std::unique_ptr<TestHttpHealthCheckerImpl> health_checker_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -587,7 +585,7 @@ public:
 
     Json::ObjectPtr config = Json::Factory::LoadFromString(json);
     health_checker_.reset(
-        new TcpHealthCheckerImpl(*cluster_, *config, dispatcher_, stats_, runtime_, random_));
+        new TcpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
   }
 
   void expectSessionCreate() {
@@ -603,7 +601,6 @@ public:
 
   std::shared_ptr<MockCluster> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  Stats::IsolatedStoreImpl stats_;
   std::unique_ptr<TcpHealthCheckerImpl> health_checker_;
   Network::MockClientConnection* connection_{};
   Event::MockTimer* timeout_timer_{};

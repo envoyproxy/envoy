@@ -8,6 +8,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/ssl/context.h"
 #include "envoy/stats/stats.h"
 
@@ -68,30 +69,47 @@ public:
 
   /**
    * Create a listener on a specific port.
+   * @param conn_handler supplies the handler for connections received by the listener
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
    * @param stats_store supplies the Stats::Store to use.
+   * @param bind_to_port specifies if the listener should actually bind to the port.
+   *        a listener that doesn't bind can only receive connections redirected from
+   *        other listeners that that set use_origin_dst to true
    * @param use_proxy_proto whether to use the PROXY Protocol V1
    * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
+   * @param use_orig_dst if a connection was redirected to this port using iptables,
+   *        allow the listener to hand it off to the listener associated to the original port
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::ListenerPtr createListener(Network::ListenSocket& socket,
+  virtual Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
+                                              Network::ListenSocket& socket,
                                               Network::ListenerCallbacks& cb,
-                                              Stats::Store& stats_store, bool use_proxy_proto) PURE;
+                                              Stats::Store& stats_store, bool bind_to_port,
+                                              bool use_proxy_proto, bool use_orig_dst) PURE;
 
   /**
    * Create a listener on a specific port.
+   * @param conn_handler supplies the handler for connections received by the listener
    * @param ssl_ctx supplies the SSL context to use.
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
    * @param stats_store supplies the Stats::Store to use.
+   * @param bind_to_port specifies if the listener should actually bind to the port.
+   *        a listener that doesn't bind can only receive connections redirected from
+   *        other listeners that set use_origin_dst to true
+   * @param use_proxy_proto whether to use the PROXY Protocol V1
+   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
+   * @param use_orig_dst if a connection was redirected to this port using iptables,
+   *        allow the listener to hand it off to the listener associated to the original port
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::ListenerPtr createSslListener(Ssl::ServerContext& ssl_ctx,
+  virtual Network::ListenerPtr createSslListener(Network::ConnectionHandler& conn_handler,
+                                                 Ssl::ServerContext& ssl_ctx,
                                                  Network::ListenSocket& socket,
                                                  Network::ListenerCallbacks& cb,
-                                                 Stats::Store& stats_store,
-                                                 bool use_proxy_proto) PURE;
+                                                 Stats::Store& stats_store, bool bind_to_port,
+                                                 bool use_proxy_proto, bool use_orig_dst) PURE;
 
   /**
    * Allocate a timer. @see Event::Timer for docs on how to use the timer.

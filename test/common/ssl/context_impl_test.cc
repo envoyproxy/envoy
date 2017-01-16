@@ -1,8 +1,9 @@
 #include "common/json/json_loader.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
-#include "common/ssl/openssl.h"
 #include "common/stats/stats_impl.h"
+
+#include "test/mocks/runtime/mocks.h"
 
 namespace Ssl {
 
@@ -28,8 +29,10 @@ TEST(SslContextImplTest, TestCipherSuites) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW(ClientContextImpl("", store, cfg), EnvoyException);
+  EXPECT_THROW(manager.createSslClientContext(store, cfg), EnvoyException);
 }
 
 TEST(SslContextImplTest, TestExpiringCert) {
@@ -42,15 +45,17 @@ TEST(SslContextImplTest, TestExpiringCert) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
-  ClientContextImpl context("", store, cfg);
+  ClientContextPtr context(manager.createSslClientContext(store, cfg));
 
   // This is a total hack, but right now we generate the cert and it expires in 15 days only in the
   // first second that it's valid. This can become invalid and then cause slower tests to fail.
   // Optimally we would make the cert valid for 15 days and 23 hours, but that is not easy to do
   // with the command line so we have this for now. Good enough.
-  EXPECT_TRUE(15 == context.daysUntilFirstCertExpires() ||
-              14 == context.daysUntilFirstCertExpires());
+  EXPECT_TRUE(15 == context->daysUntilFirstCertExpires() ||
+              14 == context->daysUntilFirstCertExpires());
 }
 
 TEST(SslContextImplTest, TestExpiredCert) {
@@ -63,9 +68,11 @@ TEST(SslContextImplTest, TestExpiredCert) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
-  ClientContextImpl context("", store, cfg);
-  EXPECT_EQ(0U, context.daysUntilFirstCertExpires());
+  ClientContextPtr context(manager.createSslClientContext(store, cfg));
+  EXPECT_EQ(0U, context->daysUntilFirstCertExpires());
 }
 
 TEST(SslContextImplTest, TestGetCertInformation) {
@@ -79,9 +86,11 @@ TEST(SslContextImplTest, TestGetCertInformation) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
 
-  ClientContextImpl context("", store, cfg);
+  ClientContextPtr context(manager.createSslClientContext(store, cfg));
   // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
   // days only in the first second that it's valid. We will partially match for up until Days until
   // Expiration: 1.
@@ -93,18 +102,20 @@ TEST(SslContextImplTest, TestGetCertInformation) {
       "Days until Expiration: ");
   std::string cert_chain_partial_output("Certificate Path: /tmp/envoy_test/unittestcert.pem");
 
-  EXPECT_TRUE(context.getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
-  EXPECT_TRUE(context.getCertChainInformation().find(cert_chain_partial_output) !=
+  EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
+  EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
               std::string::npos);
 }
 
 TEST(SslContextImplTest, TestNoCert) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString("{}");
   ContextConfigImpl cfg(*loader);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
-  ClientContextImpl context("", store, cfg);
-  EXPECT_EQ("", context.getCaCertInformation());
-  EXPECT_EQ("", context.getCertChainInformation());
+  ClientContextPtr context(manager.createSslClientContext(store, cfg));
+  EXPECT_EQ("", context->getCaCertInformation());
+  EXPECT_EQ("", context->getCertChainInformation());
 }
 
 } // Ssl

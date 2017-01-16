@@ -1,3 +1,4 @@
+#include "common/buffer/buffer_impl.h"
 #include "common/router/router.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -82,14 +83,14 @@ TEST_F(RouterTest, RouteNotFound) {
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.route_table_, routeForRequest(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(callbacks_.route_table_, route(_)).WillOnce(Return(nullptr));
 
   router_.decodeHeaders(headers, true);
 }
 
 TEST_F(RouterTest, PoolFailureWithPriority) {
   NiceMock<MockRouteEntry> route_entry;
-  EXPECT_CALL(callbacks_.route_table_, routeForRequest(_)).WillOnce(Return(&route_entry));
+  EXPECT_CALL(callbacks_.route_table_.route_, routeEntry()).WillOnce(Return(&route_entry));
   route_entry.virtual_cluster_.priority_ = Upstream::ResourcePriority::High;
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High));
 
@@ -215,8 +216,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   response_timeout_->callback_();
 
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("cluster.fake_cluster.upstream_rq_timeout")
-                    .value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_timeout").value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
@@ -254,10 +254,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   per_try_timeout_->callback_();
 
-  EXPECT_EQ(
-      1U,
-      cm_.cluster_.info_->stats_store_.counter("cluster.fake_cluster.upstream_rq_per_try_timeout")
-          .value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_per_try_timeout").value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
@@ -597,17 +594,17 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   Http::HeaderMapPtr response_headers2(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers2), true);
 
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.retry.upstream_rq_503").value());
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.upstream_rq_200").value());
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.zone.zone_name.to_az.upstream_rq_200")
-                    .value());
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.zone.zone_name.to_az.upstream_rq_2xx")
-                    .value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("retry.upstream_rq_503").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(
+      1U, cm_.cluster_.info_->stats_store_.counter("zone.zone_name.to_az.upstream_rq_200").value());
+  EXPECT_EQ(
+      1U, cm_.cluster_.info_->stats_store_.counter("zone.zone_name.to_az.upstream_rq_2xx").value());
 }
 
 TEST_F(RouterTest, Shadow) {
-  callbacks_.route_table_.route_entry_.shadow_policy_.cluster_ = "foo";
-  callbacks_.route_table_.route_entry_.shadow_policy_.runtime_key_ = "bar";
+  callbacks_.route_table_.route_.route_entry_.shadow_policy_.cluster_ = "foo";
+  callbacks_.route_table_.route_.route_entry_.shadow_policy_.runtime_key_ = "bar";
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -647,7 +644,7 @@ TEST_F(RouterTest, Shadow) {
 TEST_F(RouterTest, AltStatName) {
   // Also test no upstream timeout here.
   NiceMock<MockRouteEntry> route_entry;
-  EXPECT_CALL(callbacks_.route_table_, routeForRequest(_)).WillOnce(Return(&route_entry));
+  EXPECT_CALL(callbacks_.route_table_.route_, routeEntry()).WillOnce(Return(&route_entry));
   EXPECT_CALL(route_entry, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
 
@@ -678,20 +675,20 @@ TEST_F(RouterTest, AltStatName) {
   EXPECT_EQ(1U,
             stats_store_.counter("vhost.fake_vhost.vcluster.fake_virtual_cluster.upstream_rq_200")
                 .value());
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.alt_stat.upstream_rq_200").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("alt_stat.upstream_rq_200").value());
   EXPECT_EQ(
-      1U, stats_store_.counter("cluster.fake_cluster.alt_stat.zone.zone_name.to_az.upstream_rq_200")
+      1U, cm_.cluster_.info_->stats_store_.counter("alt_stat.zone.zone_name.to_az.upstream_rq_200")
               .value());
   EXPECT_EQ(
-      1U, stats_store_.counter("cluster.fake_cluster.alt_stat.zone.zone_name.to_az.upstream_rq_200")
+      1U, cm_.cluster_.info_->stats_store_.counter("alt_stat.zone.zone_name.to_az.upstream_rq_200")
               .value());
 }
 
 TEST_F(RouterTest, Redirect) {
   MockRedirectEntry redirect;
   EXPECT_CALL(redirect, newPath(_)).WillOnce(Return("hello"));
-  EXPECT_CALL(callbacks_.route_table_, redirectRequest(_)).WillOnce(Return(&redirect));
+  EXPECT_CALL(callbacks_.route_table_.route_, redirectEntry()).WillRepeatedly(Return(&redirect));
 
   Http::TestHeaderMapImpl response_headers{{":status", "301"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -808,7 +805,7 @@ TEST(RouterFilterUtilityTest, shouldShadow) {
 
 TEST_F(RouterTest, CanaryStatusTrue) {
   NiceMock<MockRouteEntry> route_entry;
-  EXPECT_CALL(callbacks_.route_table_, routeForRequest(_)).WillOnce(Return(&route_entry));
+  EXPECT_CALL(callbacks_.route_table_.route_, routeEntry()).WillOnce(Return(&route_entry));
   EXPECT_CALL(route_entry, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
 
@@ -834,12 +831,12 @@ TEST_F(RouterTest, CanaryStatusTrue) {
   ON_CALL(*cm_.conn_pool_.host_, canary()).WillByDefault(Return(true));
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
-  EXPECT_EQ(1U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
+  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200").value());
 }
 
 TEST_F(RouterTest, CanaryStatusFalse) {
   NiceMock<MockRouteEntry> route_entry;
-  EXPECT_CALL(callbacks_.route_table_, routeForRequest(_)).WillOnce(Return(&route_entry));
+  EXPECT_CALL(callbacks_.route_table_.route_, routeEntry()).WillOnce(Return(&route_entry));
   EXPECT_CALL(route_entry, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
 
@@ -864,7 +861,7 @@ TEST_F(RouterTest, CanaryStatusFalse) {
                                   {"x-envoy-virtual-cluster", "hello"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
-  EXPECT_EQ(0U, stats_store_.counter("cluster.fake_cluster.canary.upstream_rq_200").value());
+  EXPECT_EQ(0U, cm_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200").value());
 }
 
 } // Router

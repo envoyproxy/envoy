@@ -15,7 +15,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
-#include "common/ssl/context_manager_impl.h"
+#include "common/ssl/context_config_impl.h"
 
 namespace Upstream {
 
@@ -42,9 +42,8 @@ void HostSetImpl::addMemberUpdateCb(MemberUpdateCb callback) const {
   callbacks_.emplace_back(callback);
 }
 
-ClusterStats ClusterInfoImpl::generateStats(const std::string& prefix, Stats::Store& stats) {
-  return {ALL_CLUSTER_STATS(POOL_COUNTER_PREFIX(stats, prefix), POOL_GAUGE_PREFIX(stats, prefix),
-                            POOL_TIMER_PREFIX(stats, prefix))};
+ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
+  return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TIMER(scope))};
 }
 
 void HostSetImpl::runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
@@ -59,8 +58,8 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
     : runtime_(runtime), name_(config.getString("name")),
       max_requests_per_connection_(config.getInteger("max_requests_per_connection", 0)),
       connect_timeout_(std::chrono::milliseconds(config.getInteger("connect_timeout_ms"))),
-      stat_prefix_(fmt::format("cluster.{}.", name_)), stats_(generateStats(stat_prefix_, stats)),
-      alt_stat_name_(config.getString("alt_stat_name", "")), features_(parseFeatures(config)),
+      stats_scope_(stats, fmt::format("cluster.{}.", name_)), stats_(generateStats(stats_scope_)),
+      features_(parseFeatures(config)),
       http_codec_options_(Http::Utility::parseCodecOptions(config)),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)) {
@@ -68,7 +67,7 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
   ssl_ctx_ = nullptr;
   if (config.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*config.getObject("ssl_context"));
-    ssl_ctx_ = &ssl_context_manager.createSslClientContext(stat_prefix_, stats, context_config);
+    ssl_ctx_ = ssl_context_manager.createSslClientContext(stats_scope_, context_config);
   }
 
   std::string string_lb_type = config.getString("lb_type");
@@ -120,17 +119,17 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
     std::string hc_type = health_check_config->getString("type");
     if (hc_type == "http") {
       new_cluster->setHealthChecker(HealthCheckerPtr{new ProdHttpHealthCheckerImpl(
-          *new_cluster, *health_check_config, dispatcher, stats, runtime, random)});
+          *new_cluster, *health_check_config, dispatcher, runtime, random)});
     } else if (hc_type == "tcp") {
       new_cluster->setHealthChecker(HealthCheckerPtr{new TcpHealthCheckerImpl(
-          *new_cluster, *health_check_config, dispatcher, stats, runtime, random)});
+          *new_cluster, *health_check_config, dispatcher, runtime, random)});
     } else {
       throw EnvoyException(fmt::format("cluster: unknown health check type '{}'", hc_type));
     }
   }
 
   new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster, cluster, dispatcher, runtime, stats, outlier_event_logger));
+      *new_cluster, cluster, dispatcher, runtime, outlier_event_logger));
   return std::move(new_cluster);
 }
 

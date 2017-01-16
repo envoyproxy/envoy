@@ -40,16 +40,15 @@ MockHost::MockHost() {}
 MockHost::~MockHost() {}
 
 MockClusterInfo::MockClusterInfo()
-    : stats_(ClusterInfoImpl::generateStats(stat_prefix_, stats_store_)),
+    : stats_(ClusterInfoImpl::generateStats(stats_store_)),
       resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1)) {
 
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, altStatName()).WillByDefault(ReturnRef(alt_stat_name_));
   ON_CALL(*this, maxRequestsPerConnection())
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
-  ON_CALL(*this, statPrefix()).WillByDefault(ReturnRef(stat_prefix_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
+  ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke([this](ResourcePriority)
                                 -> Upstream::ResourceManager& { return *resource_manager_; }));
