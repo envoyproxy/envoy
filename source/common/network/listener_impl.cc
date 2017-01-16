@@ -37,7 +37,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
             dynamic_cast<ListenerImpl*>(listener->connection_handler_.findListener(orig_sock_name));
 
         if (new_listener != nullptr) {
-          new_listener = listener;
+          listener = new_listener;
         }
       }
     }
