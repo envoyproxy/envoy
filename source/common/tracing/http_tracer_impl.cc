@@ -231,7 +231,6 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                                  std::unique_ptr<lightstep::TracerOptions> options)
     : cm_(cluster_manager), cluster_(cm_.get(config.getString("collector_cluster"))),
-      stats_store_(stats),
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       tls_(tls), runtime_(runtime), options_(std::move(options)), tls_slot_(tls.allocateSlot()) {
   if (!cluster_) {
@@ -261,21 +260,18 @@ SpanPtr LightStepDriver::startSpan(const std::string& operation_name, SystemTime
 }
 
 void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
-  Grpc::Common::chargeStat(*driver_.cluster(),
-                           lightstep::CollectorServiceFullName(), lightstep::CollectorMethodName(),
-                           false);
+  Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
+                           lightstep::CollectorMethodName(), false);
 }
 
 void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
   try {
     Grpc::Common::validateResponse(*msg);
 
-    Grpc::Common::chargeStat(*driver_.cluster(),
-                             lightstep::CollectorServiceFullName(),
+    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
                              lightstep::CollectorMethodName(), true);
   } catch (const Grpc::Exception& ex) {
-    Grpc::Common::chargeStat(*driver_.cluster(),
-                             lightstep::CollectorServiceFullName(),
+    Grpc::Common::chargeStat(*driver_.cluster(), lightstep::CollectorServiceFullName(),
                              lightstep::CollectorMethodName(), false);
   }
 }
