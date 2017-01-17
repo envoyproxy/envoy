@@ -40,7 +40,7 @@ private:
   const Upstream::ClusterInfo& cluster_;
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
-  std::list<std::unique_ptr<AsyncStreamImpl>> active_requests_;
+  std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
 
   friend class AsyncStreamImpl;
   friend class AsyncRequestImpl;
@@ -178,7 +178,7 @@ private:
   AccessLog::RequestInfoImpl request_info_;
   RouteImpl route_;
   Buffer::Instance* decoding_buffer_{nullptr};
-  bool internal_header_inserted_{false};
+
   friend class AsyncClientImpl;
 };
 
@@ -188,7 +188,6 @@ class AsyncRequestImpl final : public AsyncClient::Request,
 public:
   AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
                    const Optional<std::chrono::milliseconds>& timeout);
-  virtual ~AsyncRequestImpl();
 
   // AsyncClient::Request
   virtual void cancel() override;

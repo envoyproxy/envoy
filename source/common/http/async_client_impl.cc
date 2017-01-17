@@ -21,8 +21,8 @@ AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::St
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
-  while (!active_requests_.empty()) {
-    active_requests_.front()->failDueToClientDestroy();
+  while (!active_streams_.empty()) {
+    active_streams_.front()->failDueToClientDestroy();
   }
 }
 
@@ -34,7 +34,7 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 
   // The request may get immediately failed. If so, we will return nullptr.
   if (!new_request->complete_) {
-    new_request->moveIntoList(std::move(new_request), active_requests_);
+    new_request->moveIntoList(std::move(new_request), active_streams_);
     return async_request;
   } else {
     return nullptr;
@@ -43,13 +43,12 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
                                             const Optional<std::chrono::milliseconds>& timeout) {
-  AsyncStreamImpl* async_request = new AsyncStreamImpl(*this, callbacks, timeout);
-  std::unique_ptr<AsyncStreamImpl> new_request{async_request};
+  std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, timeout)};
 
   // The request may get immediately failed. If so, we will return nullptr.
-  if (!new_request->complete_) {
-    new_request->moveIntoList(std::move(new_request), active_requests_);
-    return async_request;
+  if (!new_stream->complete_) {
+    new_stream->moveIntoList(std::move(new_stream), active_streams_);
+    return active_streams_.front().get();
   } else {
     return nullptr;
   }
@@ -100,6 +99,7 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
   headers.insertForwardedFor().value(parent_.config_.local_info_.address());
   router_.decodeHeaders(headers, end_stream);
 }
+
 void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
   router_.decodeData(data, end_stream);
   decoding_buffer_ = &data;
@@ -119,7 +119,7 @@ void AsyncStreamImpl::cleanup() {
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.
   if (inserted()) {
-    removeFromList(parent_.active_requests_);
+    removeFromList(parent_.active_streams_);
   }
 }
 
@@ -146,8 +146,6 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
   }
   // TODO: Support request trailers.
 }
-
-AsyncRequestImpl::~AsyncRequestImpl() {}
 
 void AsyncRequestImpl::onComplete() {
   complete_ = true;

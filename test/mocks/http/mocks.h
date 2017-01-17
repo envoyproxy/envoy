@@ -295,13 +295,8 @@ public:
   MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks,
                                const Optional<std::chrono::milliseconds>& timeout));
 
-  Stream* start(StreamCallbacks& callbacks,
-                const Optional<std::chrono::milliseconds>& timeout) override {
-    return start_(callbacks, timeout);
-  }
-
-  MOCK_METHOD2(start_, Stream*(StreamCallbacks& callbacks,
-                               const Optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks,
+                              const Optional<std::chrono::milliseconds>& timeout));
 };
 
 class MockAsyncClientCallbacks : public AsyncClient::Callbacks {
@@ -317,17 +312,19 @@ public:
 };
 
 class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {
- public:
+public:
   MockAsyncClientStreamCallbacks();
   ~MockAsyncClientStreamCallbacks();
 
-  void onHeaders(HeaderMapPtr &&headers, bool end_stream) override { onHeaders_(headers.get(), end_stream); }
-  void onData(Buffer::Instance &data, bool end_stream) override { onData_(data, end_stream); }
-  void onTrailers(HeaderMapPtr &&trailers) override { onTrailers_(trailers.get()); }
+  void onHeaders(HeaderMapPtr&& headers, bool end_stream) override {
+    onHeaders_(headers.get(), end_stream);
+  }
+  void onData(Buffer::Instance& data, bool end_stream) override { onData_(data, end_stream); }
+  void onTrailers(HeaderMapPtr&& trailers) override { onTrailers_(trailers.get()); }
   void onResetStream() override { onResetStream_(); }
 
   MOCK_METHOD2(onHeaders_, void(HeaderMap* headers, bool end_stream));
-  MOCK_METHOD2(onData_, void(Buffer::Instance &data, bool end_stream));
+  MOCK_METHOD2(onData_, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(onTrailers_, void(HeaderMap* headers));
   MOCK_METHOD0(onResetStream_, void());
 };
@@ -343,7 +340,7 @@ public:
 };
 
 class MockAsyncClientStream : public AsyncClient::Stream {
- public:
+public:
   MockAsyncClientStream(MockAsyncClient* client);
   ~MockAsyncClientStream();
 
