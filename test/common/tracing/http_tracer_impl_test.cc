@@ -229,11 +229,18 @@ public:
     ON_CALL(config_, operationName()).WillByDefault(ReturnRef(operation_));
     ON_CALL(config_, serviceNode()).WillByDefault(ReturnRef(node_));
     ON_CALL(request_info_, startTime()).WillByDefault(Return(start_time_));
+  }
 
-    context_.reset(new TracingContextImpl(tracer_, config_));
+  void setup(bool is_null_tracer) {
+    if (is_null_tracer) {
+      context_.reset(new TracingContextImpl(null_tracer_, config_));
+    } else {
+      context_.reset(new TracingContextImpl(tracer_, config_));
+    }
   }
 
   NiceMock<MockHttpTracer> tracer_;
+  HttpNullTracer null_tracer_;
   NiceMock<MockTracingConfig> config_;
   NiceMock<Http::AccessLog::MockRequestInfo> request_info_;
   Http::TestHeaderMapImpl request_headers_{
@@ -247,6 +254,7 @@ public:
 };
 
 TEST_F(TracingContextImplTest, NullSpanFromTracer) {
+  setup(false);
   EXPECT_CALL(config_, operationName());
   EXPECT_CALL(request_info_, startTime());
   EXPECT_CALL(tracer_, startSpan(operation_, start_time_)).WillOnce(Return(nullptr));
@@ -257,6 +265,7 @@ TEST_F(TracingContextImplTest, NullSpanFromTracer) {
 }
 
 TEST_F(TracingContextImplTest, NullResponseHeaders) {
+  setup(false);
   EXPECT_CALL(config_, operationName());
   EXPECT_CALL(request_info_, startTime());
   EXPECT_CALL(tracer_, startSpan(operation_, start_time_)).WillOnce(Return(nullptr));
@@ -267,6 +276,7 @@ TEST_F(TracingContextImplTest, NullResponseHeaders) {
 }
 
 TEST_F(TracingContextImplTest, SpanPopulatedOptionalHeaders) {
+  setup(false);
   MockSpan* span = new MockSpan();
 
   EXPECT_CALL(config_, operationName());
@@ -293,10 +303,12 @@ TEST_F(TracingContextImplTest, SpanPopulatedOptionalHeaders) {
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
+  EXPECT_CALL(*span, finishSpan());
   context_->finishSpan(request_info_, &response_headers_);
 }
 
 TEST_F(TracingContextImplTest, SpanPopulatedFailureResponse) {
+  setup(false);
   MockSpan* span = new MockSpan();
 
   request_headers_.insertHost().value(std::string("api"));
@@ -330,60 +342,20 @@ TEST_F(TracingContextImplTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
+  EXPECT_CALL(*span, finishSpan());
   context_->finishSpan(request_info_, &response_headers_);
 }
 
-/*
-  // HC request.
-  {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _, _)).Times(0);
-    EXPECT_CALL(*sink2, flushTrace(_, _, _, _)).Times(0);
+TEST_F(TracingContextImplTest, NullHttpTracer) {
+  setup(true);
+  EXPECT_CALL(config_, operationName());
+  EXPECT_CALL(request_info_, startTime());
 
-    Http::TestHeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
-    NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-    EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(true));
-    tracer.trace(&traceable_header_hc, &empty_header, request_info, context);
-  }
-
-  // x-request-id is not traceable.
-  {
-    EXPECT_CALL(*sink1, flushTrace(_, _, _, _)).Times(0);
-    EXPECT_CALL(*sink2, flushTrace(_, _, _, _)).Times(0);
-
-    tracer.trace(&not_traceable_header, &empty_header, request_info, context);
-  }
+  context_->startSpan(request_info_, request_headers_);
+  context_->finishSpan(request_info_, &response_headers_);
 }
 
-TEST(HttpTracerImplTest, ZeroSinksRunsFine) {
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Stats::MockStore> stats;
-  HttpTracerImpl tracer(runtime, stats);
-  Runtime::RandomGeneratorImpl random;
-  std::string not_traceable_guid = random.uuid();
-
-  Http::TestHeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
-
-  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  NiceMock<MockTracingContext> context;
-  tracer.trace(&not_traceable, &not_traceable, request_info, context);
-}
-
-TEST(HttpNullTracerTest, NoFailures) {
-  HttpNullTracer tracer;
-  NiceMock<Stats::MockStore> store;
-  HttpSink* sink = new NiceMock<Tracing::MockHttpSink>();
-
-  tracer.addSink(HttpSinkPtr{sink});
-
-  Http::TestHeaderMapImpl empty_header{};
-  Http::AccessLog::MockRequestInfo request_info;
-  NiceMock<MockTracingContext> context;
-
-  tracer.trace(&empty_header, &empty_header, request_info, context);
-}
-
-
-class LightStepSinkTest : public Test {
+class LightStepDriverTest : public Test {
 public:
   void setup(Json::Object& config, bool init_timer) {
     std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
@@ -392,18 +364,16 @@ public:
 
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
-    ON_CALL(context_, operationName()).WillByDefault(ReturnRef(operation_name_));
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
     }
 
-    sink_.reset(
-        new LightStepSink(config, cm_, stats_, local_info_, tls_, runtime_, std::move(opts)));
+    driver_.reset(new LightStepDriver(config, cm_, stats_, tls_, runtime_, std::move(opts)));
   }
 
-  void setupValidSink() {
+  void setupValidDriver() {
     EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(cm_.cluster_.info_));
     ON_CALL(*cm_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
@@ -421,18 +391,17 @@ public:
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
 
-  std::unique_ptr<LightStepSink> sink_;
+  std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  NiceMock<MockTracingContext> context_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
-TEST_F(LightStepSinkTest, InitializeSink) {
+TEST_F(LightStepDriverTest, InitializeDriver) {
   {
     std::string invalid_config = R"EOF(
       {"fake" : "fake"}
@@ -488,11 +457,9 @@ TEST_F(LightStepSinkTest, InitializeSink) {
   }
 }
 
-TEST_F(LightStepSinkTest, FlushSeveralSpans) {
-  setupValidSink();
+TEST_F(LightStepDriverTest, FlushSeveralSpans) {
+  setupValidDriver();
 
-  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(true));
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
   const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
@@ -512,21 +479,16 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
           }));
 
   SystemTime start_time;
-  EXPECT_CALL(request_info, startTime()).Times(2).WillRepeatedly(Return(start_time));
-  Optional<uint32_t> code(200);
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
-
-  Http::Protocol protocol = Http::Protocol::Http11;
-  EXPECT_CALL(request_info, protocol()).Times(2).WillRepeatedly(Return(protocol));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .Times(2)
       .WillRepeatedly(Return(2));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
-  EXPECT_CALL(context_, operationName()).Times(2).WillRepeatedly(ReturnRef(operation_name_));
 
-  sink_->flushTrace(request_headers_, response_headers_, request_info, context_);
-  sink_->flushTrace(request_headers_, response_headers_, request_info, context_);
+  SpanPtr first_span = driver_->startSpan(operation_name_, start_time);
+  first_span->finishSpan();
+  SpanPtr second_span = driver_->startSpan(operation_name_, start_time);
+  second_span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
@@ -550,29 +512,19 @@ TEST_F(LightStepSinkTest, FlushSeveralSpans) {
   EXPECT_EQ(2U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
-TEST_F(LightStepSinkTest, FlushSpansTimer) {
-  setupValidSink();
-
-  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(true));
+TEST_F(LightStepDriverTest, FlushSpansTimer) {
+  setupValidDriver();
 
   const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout));
 
   SystemTime start_time;
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
-  Optional<uint32_t> code(200);
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
-  EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10UL));
-  EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100UL));
-
-  Http::Protocol protocol = Http::Protocol::Http11;
-  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(5));
-  EXPECT_CALL(context_, operationName()).WillOnce(ReturnRef(operation_name_));
 
-  sink_->flushTrace(request_headers_, response_headers_, request_info, context_);
+  SpanPtr span = driver_->startSpan(operation_name_, start_time);
+  span->finishSpan();
+
   // Timer should be re-enabled.
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
@@ -586,11 +538,9 @@ TEST_F(LightStepSinkTest, FlushSpansTimer) {
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
-TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
-  setupValidSink();
+TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
+  setupValidDriver();
 
-  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(true));
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
   const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
@@ -610,19 +560,14 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
           }));
 
   SystemTime start_time;
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
-  Optional<uint32_t> code(200);
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(code));
 
-  Http::Protocol protocol = Http::Protocol::Http11;
-  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
-  EXPECT_CALL(context_, operationName()).WillOnce(ReturnRef(operation_name_));
 
-  sink_->flushTrace(request_headers_, response_headers_, request_info, context_);
+  SpanPtr span = driver_->startSpan(operation_name_, start_time);
+  span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
@@ -638,5 +583,4 @@ TEST_F(LightStepSinkTest, FlushOneSpanGrpcFailure) {
                     .value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
-*/
 } // Tracing
