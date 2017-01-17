@@ -19,6 +19,7 @@ namespace Event {
 DispatcherImpl::DispatcherImpl()
     : base_(event_base_new()),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
+      post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {}
 
 DispatcherImpl::~DispatcherImpl() {}
@@ -120,11 +121,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 
   if (do_post) {
-    // If the dispatcher shuts down before this runs, we will leak. This never happens during
-    // normal operation so its not a big deal.
-    event_base_once(base_.get(), -1, EV_TIMEOUT, [](evutil_socket_t, short, void* arg) -> void {
-      static_cast<DispatcherImpl*>(arg)->runPostCallbacks();
-    }, this, nullptr);
+    post_timer_->enableTimer(std::chrono::milliseconds(0));
   }
 }
 

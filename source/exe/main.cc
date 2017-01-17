@@ -4,6 +4,7 @@
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/openssl.h"
+#include "common/stats/thread_local_store.h"
 #include "server/drain_manager_impl.h"
 #include "server/options_impl.h"
 #include "server/server.h"
@@ -41,7 +42,7 @@ int main(int argc, char** argv) {
 
   Logger::Registry::initialize(options.logLevel(), restarter->logLock());
   DefaultTestHooks default_test_hooks;
-  Stats::ThreadLocalStoreImpl stats_store(restarter->statLock(), *restarter);
+  Stats::ThreadLocalStoreImpl stats_store(*restarter);
   Server::ProdComponentFactory component_factory;
   LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(), options.serviceZone(),
                                       options.serviceClusterName(), options.serviceNodeName());

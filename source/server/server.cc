@@ -15,13 +15,12 @@
 #include "common/common/version.h"
 #include "common/memory/stats.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/stats/stats_impl.h"
 #include "common/stats/statsd.h"
 
 namespace Server {
 
 InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter,
-                           Stats::Store& store, Thread::BasicLockable& access_log_lock,
+                           Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            const LocalInfo::LocalInfo& local_info)
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
@@ -86,19 +85,19 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  for (Stats::Counter& counter : stats_store_.counters()) {
-    uint64_t delta = counter.latch();
-    if (counter.used()) {
+  for (Stats::CounterPtr counter : stats_store_.counters()) {
+    uint64_t delta = counter->latch();
+    if (counter->used()) {
       for (const auto& sink : stat_sinks_) {
-        sink->flushCounter(counter.name(), delta);
+        sink->flushCounter(counter->name(), delta);
       }
     }
   }
 
-  for (Stats::Gauge& gauge : stats_store_.gauges()) {
-    if (gauge.used()) {
+  for (Stats::GaugePtr gauge : stats_store_.gauges()) {
+    if (gauge->used()) {
       for (const auto& sink : stat_sinks_) {
-        sink->flushGauge(gauge.name(), gauge.value());
+        sink->flushGauge(gauge->name(), gauge->value());
       }
     }
   }
@@ -152,6 +151,9 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
   thread_local_.registerThread(handler_.dispatcher(), true);
+
+  // We can now initialize stats for threading.
+  stats_store_.initializeThreading(handler_.dispatcher(), thread_local_);
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
@@ -294,6 +296,9 @@ void InstanceImpl::run() {
   handler_.startWatchdog();
   handler_.dispatcher().run(Event::Dispatcher::RunType::Block);
   log().warn("main dispatch loop exited");
+
+  // Before the workers start exiting we should disable stat threading.
+  stats_store_.shutdownThreading();
 
   // Shutdown all the listeners now that the main dispatch loop is done.
   for (const WorkerPtr& worker : workers_) {

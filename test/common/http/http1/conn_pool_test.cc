@@ -95,8 +95,8 @@ public:
 
   ~Http1ConnPoolImplTest() {
     // Make sure all gauges are 0.
-    for (Stats::Gauge& gauge : cluster_->stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge.value());
+    for (Stats::GaugePtr gauge : cluster_->stats_store_.gauges()) {
+      EXPECT_EQ(0U, gauge->value());
     }
   }
 
