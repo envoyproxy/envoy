@@ -173,7 +173,6 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
 
 TEST_F(HttpConnectionManagerImplTest, InvalidPath) {
   setup(false, "");
-  // EXPECT_CALL(tracer_, startSpan(_, _, _, _));
 
   Http::StreamDecoder* decoder = nullptr;
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -196,7 +195,6 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPath) {
 
 TEST_F(HttpConnectionManagerImplTest, NoPath) {
   setup(false, "");
-  // EXPECT_CALL(tracer_, trace(_, _, _, _));
 
   Http::StreamDecoder* decoder = nullptr;
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -219,7 +217,6 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
 
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   setup(true, "");
-  // EXPECT_CALL(tracer_, trace(_, _, _, _));
 
   Http::MockStreamDecoderFilter* filter = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -264,9 +261,6 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
   setup(false, "envoy-server-test");
-  // Make tracing off.
-  tracing_config_ = Optional<Http::TracingConnectionManagerConfig>();
-  // EXPECT_CALL(tracer_, trace(_, _, _, _)).Times(0);
 
   Http::MockStreamDecoderFilter* filter = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
