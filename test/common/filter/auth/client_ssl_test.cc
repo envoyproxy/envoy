@@ -30,7 +30,7 @@ TEST(ClientSslAuthAllowedPrincipalsTest, EmptyString) {
 class ClientSslAuthFilterTest : public testing::Test {
 public:
   ClientSslAuthFilterTest()
-      : interval_timer_(new Event::MockTimer(&dispatcher_)), request_(&cm_.async_client_) {}
+      : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)) {}
   ~ClientSslAuthFilterTest() { tls_.shutdownThread(); }
 
   void setup() {
@@ -45,7 +45,7 @@ public:
     Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
     EXPECT_CALL(cm_, get("vpn"));
     setupRequest();
-    config_.reset(new Config(*loader, tls_, cm_, dispatcher_, stats_store_, runtime_));
+    config_ = Config::create(*loader, tls_, cm_, dispatcher_, stats_store_, random_);
 
     createAuthFilter();
   }
@@ -70,6 +70,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
+  Http::MockAsyncClientRequest request_;
   ConfigPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Instance> instance_;
@@ -77,8 +78,7 @@ public:
   Http::AsyncClient::Callbacks* callbacks_;
   Ssl::MockConnection ssl_;
   Stats::IsolatedStoreImpl stats_store_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  Http::MockAsyncClientRequest request_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
 };
 
 TEST_F(ClientSslAuthFilterTest, NoCluster) {
@@ -91,7 +91,8 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(new Config(*loader, tls_, cm_, dispatcher_, stats_store_, runtime_), EnvoyException);
+  EXPECT_THROW(Config::create(*loader, tls_, cm_, dispatcher_, stats_store_, random_),
+               EnvoyException);
 }
 
 TEST_F(ClientSslAuthFilterTest, NoSsl) {
@@ -106,6 +107,8 @@ TEST_F(ClientSslAuthFilterTest, NoSsl) {
   filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_no_ssl").value());
+
+  EXPECT_CALL(request_, cancel());
 }
 
 TEST_F(ClientSslAuthFilterTest, Ssl) {

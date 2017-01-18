@@ -42,7 +42,7 @@ public:
   /**
    * @return std::string the message body as a std::string.
    */
-  virtual std::string bodyAsString() PURE;
+  virtual std::string bodyAsString() const PURE;
 };
 
 typedef std::unique_ptr<Message> MessagePtr;

@@ -6,6 +6,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/rest_api_fetcher.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
@@ -58,41 +59,42 @@ private:
 
 typedef std::shared_ptr<AllowedPrincipals> AllowedPrincipalsPtr;
 
+class Config;
+typedef std::shared_ptr<Config> ConfigPtr;
+
 /**
  * Global configuration for client SSL authentication. The config contacts a JSON API to fetch the
  * list of allowed principals, caches it, then makes auth decisions on it and any associated IP
  * white list.
  */
-class Config : public Http::AsyncClient::Callbacks {
+class Config : public Http::RestApiFetcher {
 public:
-  Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
-         Event::Dispatcher& dispatcher, Stats::Store& stats_store, Runtime::Loader& runtime);
+  static ConfigPtr create(const Json::Object& config, ThreadLocal::Instance& tls,
+                          Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+                          Stats::Store& stats_store, Runtime::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
   const Network::IpWhiteList& ipWhiteList() { return ip_white_list_; }
   GlobalStats& stats() { return stats_; }
 
-  // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&& response) override;
-  void onFailure(Http::AsyncClient::FailureReason reason) override;
-
 private:
+  Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
+         Event::Dispatcher& dispatcher, Stats::Store& stats_store,
+         Runtime::RandomGenerator& random);
+
   static GlobalStats generateStats(Stats::Store& store, const std::string& prefix);
-  AllowedPrincipalsPtr parseAuthResponse(Http::Message& message);
-  void refreshPrincipals();
-  void requestComplete();
+
+  // Http::RestApiFetcher
+  void createRequest(Http::Message& request) override;
+  void parseResponse(const Http::Message& response) override;
+  void onFetchComplete() override {}
+  void onFetchFailure(Http::AsyncClient::FailureReason reason) override;
 
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;
-  Upstream::ClusterManager& cm_;
-  const std::string auth_api_cluster_;
-  Event::TimerPtr interval_timer_;
   Network::IpWhiteList ip_white_list_;
   GlobalStats stats_;
-  Runtime::Loader& runtime_;
 };
-
-typedef std::shared_ptr<Config> ConfigPtr;
 
 /**
  * A client SSL auth filter instance. One per connection.
