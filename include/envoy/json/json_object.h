@@ -19,6 +19,10 @@ public:
   Exception(const std::string& message) : EnvoyException(message) {}
 };
 
+// TBD - still need to completely define the class
+class Schema;
+typedef std::unique_ptr<Schema> SchemaPtr;
+
 /**
  * Wraps an individual JSON node.
  */
@@ -133,6 +137,13 @@ public:
    * @param name supplies the key name to lookup.
    */
   virtual bool hasObject(const std::string& name) const PURE;
+
+  /**
+   * This will throw an std::invalid_argument if the schema provided isn't valid JSON.
+   * Will throw an exception if the json object isn't valid based on the schema.
+   * @param schema supplies the string format of the schema to validate the json object against.
+   */
+  virtual void validateSchema(const std::string& schema) const PURE;
 };
 
 } // Json

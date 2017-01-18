@@ -239,6 +239,8 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Load
                                  Upstream::ClusterManager& cm)
     : name_(virtual_host.getString("name")), rate_limit_policy_(virtual_host) {
 
+  // if(!virtual_host.validateSchema(VIRTUAL_HOST_SCHEMA))
+  // { throw EnvoyException(fmt::format("invalid virtual host schema for '{}", name_)); }
   std::string require_ssl = virtual_host.getString("require_ssl", "");
   if (require_ssl == "") {
     ssl_requirements_ = SslRequirements::NONE;
@@ -373,6 +375,8 @@ const Route* RouteMatcher::route(const Http::HeaderMap& headers, uint64_t random
 const VirtualHostImpl::CatchAllVirtualCluster VirtualHostImpl::VIRTUAL_CLUSTER_CATCH_ALL;
 const SslRedirector SslRedirectRoute::SSL_REDIRECTOR;
 const SslRedirectRoute VirtualHostImpl::SSL_REDIRECT_ROUTE;
+const Json::SchemaPtr
+    VirtualHostImpl::VIRTUAL_HOST_SCHEMA(Json::Factory::LoadSchemaFromFile("pathto schema"));
 
 const VirtualCluster*
 VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {

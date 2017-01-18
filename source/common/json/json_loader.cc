@@ -4,16 +4,28 @@
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/istreamwrapper.h"
+#include "rapidjson/schema.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
 namespace Json {
+
+class SchemaImpl : public Schema {
+public:
+  SchemaImpl(rapidjson::SchemaDocument&& schema_document)
+      : schema_document_(std::move(schema_document)) {}
+
+private:
+  rapidjson::SchemaDocument schema_document_;
+};
 
 /**
  * Implementation of Object.
  */
 class ObjectImplBase : public Object {
 public:
+  // just for compiling will put in right place
+  friend class Schema;
   ObjectImplBase(const rapidjson::Value& value, const std::string& name)
       : name_(name), value_(value) {}
 
@@ -154,6 +166,23 @@ public:
 
   bool hasObject(const std::string& name) const override { return value_.HasMember(name.c_str()); }
 
+  bool validateSchema(const std::string& schema_string) const override {
+    rapidjson::Document document;
+    if (document.Parse<0>(json.c_str()).HasParseError()) {
+      // invalid schema string
+      // throw std::invalid_ar
+      // TODO: Provide better erorr for when this happens
+      throw std::invalid_argument("invalid schema");
+    }
+    rapidjson::SchemaDocument schema_document(document);
+    rapidjson::SchemaValidator schema_validator(schema_document);
+    if (!value_.Accept(schema_validator)) {
+
+      throw Exception(fmt::format("object isn't valid schema"));
+    }
+    return true;
+  }
+
 private:
   const std::string name_;
   const rapidjson::Value& value_;
@@ -193,6 +222,19 @@ ObjectPtr Factory::LoadFromString(const std::string& json) {
                                 GetParseError_En(document.GetParseError())));
   }
   return ObjectPtr{new ObjectImplRoot(std::move(document))};
+}
+
+SchemaPtr Factory::LoadSchemaFromFile(const std::string& file_path) {
+  rapidjson::Document document;
+  std::fstream file_stream(file_path);
+  rapidjson::IStreamWrapper stream_wrapper(file_stream);
+  if (document.ParseStream(stream_wrapper).HasParseError()) {
+    throw Exception(fmt::format("Error(offset {}): {}\n", document.GetErrorOffset(),
+                                GetParseError_En(document.GetParseError())));
+  }
+  rapidjson::SchemaDocument schema_document(document);
+  // dynamic cast it to SchemaImpl
+  return SchemaPtr{new SchemaImpl(std::move(schema_document))};
 }
 
 } // Json
