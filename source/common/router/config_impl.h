@@ -25,7 +25,7 @@ public:
    *        allows stable choices between calls if desired.
    * @return true if input headers match this object.
    */
-  virtual bool matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
+  virtual RouteEntry* matches(const Http::HeaderMap &headers, uint64_t random_value) const PURE;
 };
 
 class RouteEntryImplBase;
@@ -196,11 +196,14 @@ public:
   std::string newPath(const Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  bool matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  RouteEntry* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
   // Router::Route
   const RedirectEntry* redirectEntry() const override;
   const RouteEntry* routeEntry() const override;
+
+  // gets the route object associated with this entry (choose based on Weighted Clusters)
+  const Route* getRoute(uint64_t random_value) const;
 
 protected:
   const bool case_sensitive_;
@@ -222,6 +225,7 @@ private:
 
   const VirtualHostImpl& vhost_;
   const std::string cluster_name_;
+  const uint64_t cluster_weight_;
   const std::chrono::milliseconds timeout_;
   const Optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;
@@ -232,6 +236,7 @@ private:
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
   std::vector<ConfigUtility::HeaderData> config_headers_;
+  std::vector<RouteEntryImplBasePtr> weighted_clusters_;
 };
 
 /**
