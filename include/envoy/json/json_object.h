@@ -19,10 +19,6 @@ public:
   Exception(const std::string& message) : EnvoyException(message) {}
 };
 
-// TBD - still need to completely define the class
-class Schema;
-typedef std::unique_ptr<Schema> SchemaPtr;
-
 /**
  * Wraps an individual JSON node.
  */

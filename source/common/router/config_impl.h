@@ -127,8 +127,6 @@ private:
   static const CatchAllVirtualCluster VIRTUAL_CLUSTER_CATCH_ALL;
   static const SslRedirectRoute SSL_REDIRECT_ROUTE;
 
-  static const Json::SchemaPtr VIRTUAL_HOST_SCHEMA;
-
   const std::string name_;
   std::vector<RouteEntryImplBasePtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;

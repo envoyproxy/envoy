@@ -10,22 +10,11 @@
 
 namespace Json {
 
-class SchemaImpl : public Schema {
-public:
-  SchemaImpl(rapidjson::SchemaDocument&& schema_document)
-      : schema_document_(std::move(schema_document)) {}
-
-private:
-  rapidjson::SchemaDocument schema_document_;
-};
-
 /**
  * Implementation of Object.
  */
 class ObjectImplBase : public Object {
 public:
-  // just for compiling will put in right place
-  friend class Schema;
   ObjectImplBase(const rapidjson::Value& value, const std::string& name)
       : name_(name), value_(value) {}
 
@@ -172,12 +161,13 @@ public:
       // invalid schema string
       // throw std::invalid_ar
       // TODO: Provide better erorr for when this happens
+      std::cout << "invalid schema" << std::endl;
       throw std::invalid_argument("invalid schema");
     }
     rapidjson::SchemaDocument schema_document(document);
     rapidjson::SchemaValidator schema_validator(schema_document);
     if (!value_.Accept(schema_validator)) {
-
+      std::cout << "invalid json" << std::endl;
       throw Exception(fmt::format("object isn't valid schema"));
     }
     return true;
@@ -222,19 +212,6 @@ ObjectPtr Factory::LoadFromString(const std::string& json) {
                                 GetParseError_En(document.GetParseError())));
   }
   return ObjectPtr{new ObjectImplRoot(std::move(document))};
-}
-
-SchemaPtr Factory::LoadSchemaFromFile(const std::string& file_path) {
-  rapidjson::Document document;
-  std::fstream file_stream(file_path);
-  rapidjson::IStreamWrapper stream_wrapper(file_stream);
-  if (document.ParseStream(stream_wrapper).HasParseError()) {
-    throw Exception(fmt::format("Error(offset {}): {}\n", document.GetErrorOffset(),
-                                GetParseError_En(document.GetParseError())));
-  }
-  rapidjson::SchemaDocument schema_document(document);
-  // dynamic cast it to SchemaImpl
-  return SchemaPtr{new SchemaImpl(std::move(schema_document))};
 }
 
 } // Json
