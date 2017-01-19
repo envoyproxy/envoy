@@ -64,7 +64,7 @@ public:
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
   void sendData(Buffer::Instance& data, bool end_stream) override;
   void sendTrailers(HeaderMap& trailers) override;
-  void close() override;
+  void reset() override;
 
 protected:
   bool complete() { return local_closed_ && remote_closed_; }

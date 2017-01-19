@@ -127,7 +127,7 @@ void AsyncStreamImpl::closeRemote(bool end_stream) {
     cleanup();
 }
 
-void AsyncStreamImpl::close() {
+void AsyncStreamImpl::reset() {
   reset_callback_();
   cleanup();
 }
@@ -197,6 +197,6 @@ void AsyncRequestImpl::onResetStream() {
   callbacks_.onFailure(AsyncClient::FailureReason::Reset);
 }
 
-void AsyncRequestImpl::cancel() { close(); }
+void AsyncRequestImpl::cancel() { reset(); }
 
 } // Http

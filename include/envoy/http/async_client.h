@@ -111,9 +111,9 @@ public:
     virtual void sendTrailers(HeaderMap& trailers) PURE;
 
     /***
-     * Close the stream.
+     * Reset the stream.
      */
-    virtual void close() PURE;
+    virtual void reset() PURE;
   };
 
   virtual ~AsyncClient() {}
