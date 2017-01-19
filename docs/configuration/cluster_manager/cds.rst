@@ -10,7 +10,7 @@ clusters depending on what is required.
 .. code-block:: json
 
   {
-    "cluster_name": "{...}",
+    "cluster": "{...}",
     "refresh_delay_ms": "{...}"
   }
 
