@@ -34,6 +34,42 @@
           }
         }
       ]
+    },
+    {
+      "port": 443,
+      "filters": [
+        {
+          "type": "read",
+          "name": "client_ssl_auth",
+          "config": {
+            "auth_api_cluster": "local_service",
+            "stat_prefix": "ingress_http",
+            "ip_white_list": [],
+            "route_config": {
+              "virtual_hosts": [
+                {
+                  "name": "service",
+                  "domains": ["*"],
+                  "routes": [
+                    {
+                      "timeout_ms": 0,
+                      "prefix": "/service",
+                      "cluster": "local_service"
+                    }
+                  ]
+                }
+              ]
+            },
+            "filters": [
+              {
+                "type": "decoder",
+                "name": "router",
+                "config": {}
+              }
+            ]
+	  }
+	}
+      ]
     }
   ],
   "admin": {
