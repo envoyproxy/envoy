@@ -42,6 +42,7 @@ public:
 
   MessagePtr message_{new RequestMessageImpl()};
   MockAsyncClientCallbacks callbacks_;
+  MockAsyncClientStreamCallbacks stream_callbacks_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<MockStreamEncoder> stream_encoder_;
   StreamDecoder* response_decoder_{};
@@ -53,6 +54,40 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   AsyncClientImpl client_;
 };
+
+TEST_F(AsyncClientImplTest, BasicStream) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks)
+                           -> ConnectionPool::Cancellable* {
+                             callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_);
+                             response_decoder_ = &decoder;
+                             return nullptr;
+                           }));
+
+  TestHeaderMapImpl headers(message_->headers());
+  headers.addViaCopy("x-envoy-internal", "true");
+  headers.addViaCopy("x-forwarded-for", "127.0.0.1");
+  headers.addViaCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
+
+  TestHeaderMapImpl response_headers{{":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
+  EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(stream_callbacks_, onData_(BufferEqual(body.get()), true));
+
+  auto stream = client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
+  stream->sendHeaders(headers, false);
+  stream->sendData(*body, true);
+
+  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeData(*body, true);
+
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("internal.upstream_rq_200").value());
+}
 
 TEST_F(AsyncClientImplTest, Basic) {
   message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("test body")});
