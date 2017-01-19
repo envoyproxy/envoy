@@ -67,9 +67,8 @@ public:
   void close() override;
 
 protected:
-  bool complete_{};
+  bool complete() { return local_closed_ && remote_closed_; }
   AsyncClientImpl& parent_;
-  void cleanup();
 
 private:
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {
@@ -149,7 +148,11 @@ private:
     RouteEntryImpl route_entry_;
   };
 
+  void cleanup();
   void failDueToClientDestroy();
+
+  void closeLocal(bool end_stream);
+  void closeRemote(bool end_stream);
 
   // Http::StreamDecoderFilterCallbacks
   void addResetStreamCallback(std::function<void()> callback) override {
@@ -178,6 +181,8 @@ private:
   AccessLog::RequestInfoImpl request_info_;
   RouteImpl route_;
   Buffer::Instance* decoding_buffer_{nullptr};
+  bool local_closed_{};
+  bool remote_closed_{};
 
   friend class AsyncClientImpl;
 };

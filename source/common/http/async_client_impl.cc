@@ -33,7 +33,7 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
   std::unique_ptr<AsyncStreamImpl> new_request{async_request};
 
   // The request may get immediately failed. If so, we will return nullptr.
-  if (!new_request->complete_) {
+  if (!new_request->complete()) {
     new_request->moveIntoList(std::move(new_request), active_streams_);
     return async_request;
   } else {
@@ -46,7 +46,7 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
   std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, timeout)};
 
   // The request may get immediately failed. If so, we will return nullptr.
-  if (!new_stream->complete_) {
+  if (!new_stream->complete()) {
     new_stream->moveIntoList(std::move(new_stream), active_streams_);
     return active_streams_.front().get();
   } else {
@@ -75,12 +75,14 @@ void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
 #endif
 
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
+  closeRemote(end_stream);
 }
 
 void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   log_trace("async http request response data (length={} end_stream={})", data.length(),
             end_stream);
   stream_callbacks_.onData(data, end_stream);
+  closeRemote(end_stream);
 }
 
 void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
@@ -92,20 +94,38 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
 #endif
 
   stream_callbacks_.onTrailers(std::move(trailers));
+  closeRemote(true);
 }
 
 void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
   headers.insertEnvoyInternalRequest().value(Headers::get().EnvoyInternalRequestValues.True);
   headers.insertForwardedFor().value(parent_.config_.local_info_.address());
   router_.decodeHeaders(headers, end_stream);
+  closeLocal(end_stream);
 }
 
 void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
   router_.decodeData(data, end_stream);
   decoding_buffer_ = &data;
+  closeLocal(end_stream);
 }
 
-void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) { router_.decodeTrailers(trailers); }
+void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) {
+  router_.decodeTrailers(trailers);
+  closeLocal(true);
+}
+
+void AsyncStreamImpl::closeLocal(bool end_stream) {
+  local_closed_ |= end_stream;
+  if (complete())
+    cleanup();
+}
+
+void AsyncStreamImpl::closeRemote(bool end_stream) {
+  remote_closed_ |= end_stream;
+  if (complete())
+    cleanup();
+}
 
 void AsyncStreamImpl::close() {
   reset_callback_();
@@ -113,7 +133,6 @@ void AsyncStreamImpl::close() {
 }
 
 void AsyncStreamImpl::cleanup() {
-  // response_.reset();
   reset_callback_ = nullptr;
 
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
@@ -141,17 +160,13 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
     : AsyncStreamImpl(parent, *this, timeout), request_(std::move(request)), callbacks_(callbacks) {
 
   sendHeaders(request_->headers(), !request_->body());
-  if (!complete_ && request_->body()) {
+  if (!complete() && request_->body()) {
     sendData(*request_->body(), true);
   }
   // TODO: Support request trailers.
 }
 
-void AsyncRequestImpl::onComplete() {
-  complete_ = true;
-  callbacks_.onSuccess(std::move(response_));
-  cleanup();
-}
+void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_)); }
 
 void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
   response_.reset(new ResponseMessageImpl(std::move(headers)));
