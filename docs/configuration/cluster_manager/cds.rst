@@ -21,7 +21,7 @@ clusters depending on what is required.
 
 refresh_delay_ms
   *(required, integer)* The delay, in milliseconds, between fetches to the CDS API for each
-  configured SDS cluster. Envoy will add an additional random jitter to the delay that is between
+  configured CDS cluster. Envoy will add an additional random jitter to the delay that is between
   zero and *refresh_delay_ms* milliseconds. Thus the longest possible refresh delay is
   2 \* *refresh_delay_ms*.
 
