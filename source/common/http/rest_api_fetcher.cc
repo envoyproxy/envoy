@@ -32,8 +32,6 @@ void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
     parseResponse(*response);
   } catch (EnvoyException& e) {
     onFetchFailure(&e);
-    requestComplete();
-    return;
   }
 
   requestComplete();
