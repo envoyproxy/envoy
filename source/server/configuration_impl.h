@@ -7,7 +7,6 @@
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
-#include "common/stats/stats_scope_impl.h"
 
 namespace Server {
 namespace Configuration {
@@ -104,7 +103,7 @@ private:
     MainImpl& parent_;
     uint64_t port_;
     bool bind_to_port_{};
-    Stats::ScopeImpl scope_;
+    Stats::ScopePtr scope_;
     Ssl::ServerContextPtr ssl_context_;
     bool use_proxy_proto_{};
     bool use_original_dst_{};

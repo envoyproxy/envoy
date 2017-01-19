@@ -52,6 +52,7 @@ private:
 
   Libevent::BasePtr base_;
   TimerPtr deferred_delete_timer_;
+  TimerPtr post_timer_;
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;

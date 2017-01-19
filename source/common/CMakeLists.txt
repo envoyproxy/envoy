@@ -65,6 +65,7 @@ add_library(
   http/filter/buffer_filter.cc
   http/filter/fault_filter.cc
   http/filter/ratelimit.cc
+  http/rest_api_fetcher.cc
   http/user_agent.cc
   http/utility.cc
   json/json_loader.cc
@@ -98,8 +99,8 @@ add_library(
   ssl/context_manager_impl.cc
   ssl/openssl.cc
   stats/stats_impl.cc
-  stats/stats_scope_impl.cc
   stats/statsd.cc
+  stats/thread_local_store.cc
   thread_local/thread_local_impl.cc
   tracing/http_tracer_impl.cc
   upstream/cluster_manager_impl.cc

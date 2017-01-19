@@ -17,7 +17,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
-#include "common/stats/stats_scope_impl.h"
 #include "common/stats/stats_impl.h"
 
 namespace Upstream {
@@ -77,13 +76,9 @@ public:
   }
 
   // Upstream::Host
-  std::list<std::reference_wrapper<Stats::Counter>> counters() const override {
-    return stats_store_.counters();
-  }
+  std::list<Stats::CounterPtr> counters() const override { return stats_store_.counters(); }
   CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override;
-  std::list<std::reference_wrapper<Stats::Gauge>> gauges() const override {
-    return stats_store_.gauges();
-  }
+  std::list<Stats::GaugePtr> gauges() const override { return stats_store_.gauges(); }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
@@ -176,7 +171,7 @@ public:
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   Ssl::ClientContext* sslContext() const override { return ssl_ctx_.get(); }
   ClusterStats& stats() const override { return stats_; }
-  Stats::Scope& statsScope() const override { return stats_scope_; }
+  Stats::Scope& statsScope() const override { return *stats_scope_; }
 
 private:
   struct ResourceManagers {
@@ -196,7 +191,7 @@ private:
   const std::string name_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
-  mutable Stats::ScopeImpl stats_scope_;
+  Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
   Ssl::ClientContextPtr ssl_ctx_;
   const uint64_t features_;
