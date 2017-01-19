@@ -38,7 +38,7 @@ public:
 
   void expectAdd(const std::string& cluster_name) {
     EXPECT_CALL(cm_, addOrUpdatePrimaryCluster(_))
-        .WillOnce(Invoke([&](const Json::Object& config) -> bool {
+        .WillOnce(Invoke([cluster_name](const Json::Object& config) -> bool {
           EXPECT_EQ(cluster_name, config.getString("name"));
           return true;
         }));
