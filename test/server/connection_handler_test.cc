@@ -44,3 +44,34 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
   listener_callbacks->onNewConnection(Network::ConnectionPtr{connection});
   EXPECT_EQ(0UL, handler.numConnections());
 }
+
+TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
+  InSequence s;
+
+  Stats::IsolatedStoreImpl stats_store;
+  Api::MockApi* api = new Api::MockApi();
+  Event::MockDispatcher* dispatcher = new NiceMock<Event::MockDispatcher>();
+  EXPECT_CALL(*api, allocateDispatcher_()).WillOnce(Return(dispatcher));
+  Server::ConnectionHandlerImpl handler(stats_store, log(), Api::ApiPtr{api});
+  Network::MockFilterChainFactory factory;
+  Network::MockConnectionHandler connection_handler;
+  NiceMock<Network::MockListenSocket> socket;
+
+  Network::Listener* listener = new Network::MockListener();
+  Network::ListenerCallbacks* listener_callbacks;
+  EXPECT_CALL(*dispatcher, createListener_(_, _, _, _, _, _, _))
+      .WillOnce(Invoke([&](Network::ConnectionHandler&, Network::ListenSocket&,
+                           Network::ListenerCallbacks& cb, Stats::Store&, bool, bool, bool)
+                           -> Network::Listener* {
+                             listener_callbacks = &cb;
+                             return listener;
+
+                           }));
+  handler.addListener(factory, socket, true, false, false);
+
+  Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
+  EXPECT_CALL(factory, createFilterChain(_)).WillOnce(Return(false));
+  EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush));
+  listener_callbacks->onNewConnection(Network::ConnectionPtr{connection});
+  EXPECT_EQ(0UL, handler.numConnections());
+}

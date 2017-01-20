@@ -180,7 +180,7 @@ public:
   MockFilterChainFactory();
   ~MockFilterChainFactory();
 
-  MOCK_METHOD1(createFilterChain, void(Connection& connection));
+  MOCK_METHOD1(createFilterChain, bool(Connection& connection));
 };
 
 class MockListenSocket : public ListenSocket {

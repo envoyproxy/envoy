@@ -323,9 +323,10 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
   return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(connection, callbacks)};
 }
 
-void AdminImpl::createFilterChain(Network::Connection& connection) {
+bool AdminImpl::createFilterChain(Network::Connection& connection) {
   connection.addReadFilter(Network::ReadFilterPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime())});
+  return true;
 }
 
 void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {

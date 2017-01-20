@@ -153,8 +153,10 @@ public:
   /**
    * Called to create the filter chain.
    * @param connection supplies the connection to create the chain on.
+   * @return true if filter chain was created successfully. Otherwise
+   *   false, e.g. filter chain is empty.
    */
-  virtual void createFilterChain(Connection& connection) PURE;
+  virtual bool createFilterChain(Connection& connection) PURE;
 };
 
 } // Network

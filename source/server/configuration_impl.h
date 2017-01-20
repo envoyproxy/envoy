@@ -43,7 +43,7 @@ public:
    * Given a connection and a list of factories, create a new filter chain. Chain creation will
    * exit early if any filters immediately close the connection.
    */
-  static void buildFilterChain(Network::FilterManager& filter_manager,
+  static bool buildFilterChain(Network::FilterManager& filter_manager,
                                const std::list<NetworkFilterFactoryCb>& factories);
 };
 
@@ -97,7 +97,7 @@ private:
     bool useOriginalDst() override { return use_original_dst_; }
 
     // Network::FilterChainFactory
-    void createFilterChain(Network::Connection& connection) override;
+    bool createFilterChain(Network::Connection& connection) override;
 
   private:
     MainImpl& parent_;

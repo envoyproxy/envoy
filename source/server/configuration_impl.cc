@@ -14,13 +14,14 @@
 namespace Server {
 namespace Configuration {
 
-void FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
+bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
                                           const std::list<NetworkFilterFactoryCb>& factories) {
   for (const NetworkFilterFactoryCb& factory : factories) {
     factory(filter_manager);
   }
 
   filter_manager.initializeReadFilters();
+  return factories.size() > 0;
 }
 
 MainImpl::MainImpl(Server::Instance& server) : server_(server) {}
@@ -170,8 +171,8 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
   }
 }
 
-void MainImpl::ListenerConfig::createFilterChain(Network::Connection& connection) {
-  FilterChainUtility::buildFilterChain(connection, filter_factories_);
+bool MainImpl::ListenerConfig::createFilterChain(Network::Connection& connection) {
+  return FilterChainUtility::buildFilterChain(connection, filter_factories_);
 }
 
 InitialImpl::InitialImpl(const Json::Object& json) {

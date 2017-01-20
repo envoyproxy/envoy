@@ -212,11 +212,12 @@ FakeUpstream::~FakeUpstream() {
   thread_->join();
 }
 
-void FakeUpstream::createFilterChain(Network::Connection& connection) {
+bool FakeUpstream::createFilterChain(Network::Connection& connection) {
   std::unique_lock<std::mutex> lock(lock_);
   connection.readDisable(true);
   new_connections_.push_back(&connection);
   new_connection_event_.notify_one();
+  return true;
 }
 
 void FakeUpstream::threadRoutine() {
