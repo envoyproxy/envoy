@@ -114,11 +114,56 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 }
 
 const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { return listeners_; }
+const std::string MainImpl::ListenerConfig::LISTENER_SCHEMA(
+    "{\n"
+    "\t\"$schema\": \"http://json-schema.org/schema#\", \n"
+    "\t\"definitions\": {\n"
+    "\t \t\"ssl_context\" : {\n"
+    "\t\t \t\"type\" : \"object\",\n"
+    "\t\t \t\"properties\" : {\n"
+    "\t\t \t\t\"cert_chain_file\" : { \"type\" : \"string\" },\n"
+    "\t\t \t\t\"private_key_file\": { \"type\" : \"string\" },\n"
+    "\t\t \t\t\"alpn_protocols\" : { \"type\" : \"string\" },\n"
+    "\t\t \t\t\"alt_alpn_protocols\": { \"type\" : \"string\" },\n"
+    "\t\t \t\t\"ca_cert_file\" : { \"type\" : \"string\" }, \n"
+    "\t\t \t\t\"verify_certificate_hash\" : { \"type\" : \"string\" },\n"
+    "\t\t \t\t\"verify_subject_alt_name\" : { \"type\" : \"string\" },\n"
+    "\t\t \t\t\"cipher_suites\" : { \"type\" : \"string\" } \n"
+    "\t\t \t},\n"
+    "\t\t \t\"required\": [\"cert_chain_file\", \"private_key_file\"],\n"
+    "\t\t \t\"additionalProperties\": false\n"
+    "\t \t},\n"
+    "\t \t\"filters\" : {\n"
+    "\t \t\t\"type\" : \"object\", \n"
+    "\t \t\t\"properties\" : {\n"
+    "\t\t \t\t\"type\": {\"type\" : \"string\", \"enum\" :[\"read\", \"write\", \"both\"] },\n"
+    "\t\t \t\t\"name\" : {\"type\": \"string\", \"enum\" : [\"client_ssl_auth\", \"echo\", "
+    "\"mongo_proxy\", \"ratelimit\", \"tcp_proxy\", \"http_connection_manager\"] },\n"
+    "\t\t \t\t\"config\": { \"type\" : \"object\"} \n"
+    "\t \t\t},\n"
+    "\t \t\t\"required\": [\"type\", \"name\", \"config\"],\n"
+    "\t \t\t\"additionalProperties\": false\n"
+    "\t \t}\n"
+    "\t},\n"
+    "\t\"properties\": {\n"
+    "\t\t \"port\": { \"type\": \"number\" },\n"
+    "\t\t \"filters\" : { \"type\" : \"array\", \"minItems\" : 1, \"items\": { \"type\": "
+    "\"object\", \"properties\": { \"$ref\" : \"#/definitions/filters\"}} },\n"
+    "\t\t \"ssl_context\" : { \"$ref\" : \"#/definitions/ssl_context\" },\n"
+    "\t\t \"bind_to_port\" : { \"type\": \"boolean\"},\n"
+    "\t\t \"use_proxy_proto\" : { \"type\" : \"boolean\" },\n"
+    "\t\t \"use_original_dst\" : { \"type\" : \"boolean\" }\n"
+    "\t},\n"
+    "\t\"required\": [\"port\", \"filters\"],\n"
+    "\t\"additionalProperties\": false\n"
+    "}");
 
 MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
     : parent_(parent), port_(json.getInteger("port")),
       scope_(parent_.server_.stats().createScope(fmt::format("listener.{}.", port_))) {
   log().info("  port={}", port_);
+
+  json.validateSchema(LISTENER_SCHEMA);
 
   if (json.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*json.getObject("ssl_context"));

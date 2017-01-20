@@ -7,12 +7,24 @@
 namespace Server {
 namespace Configuration {
 
+const std::string RedisProxyFilterConfigFactory::REDIS_PROXY_SCHEMA(
+    "{\n"
+    "\t\"$schema\": \"http://json-schema.org/schema#\", \n"
+    "\t\"properties\":{\n"
+    "\t\t\"cluster_name\" : {\"type\" : \"string\"}\n"
+    "\t},\n"
+    "\t\"required\": [\"cluster_name\"],\n"
+    "\t\"additionalProperties\": false\n"
+    "}");
+
 NetworkFilterFactoryCb RedisProxyFilterConfigFactory::tryCreateFilterFactory(
     NetworkFilterType type, const std::string& name, const Json::Object& config,
     Server::Instance& server) {
   if (type != NetworkFilterType::Read || name != "redis_proxy") {
     return nullptr;
   }
+
+  config.validateSchema(REDIS_PROXY_SCHEMA);
 
   Redis::ProxyFilterConfig filter_config(config, server.clusterManager());
   std::shared_ptr<Redis::ConnPool::Instance> conn_pool(new Redis::ConnPool::InstanceImpl(

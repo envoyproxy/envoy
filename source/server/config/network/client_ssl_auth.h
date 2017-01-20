@@ -6,17 +6,17 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the redis proxy filter. @see NetworkFilterConfigFactory.
+ * Config registration for the client SSL auth filter. @see NetworkFilterConfigFactory.
  */
-class RedisProxyFilterConfigFactory : public NetworkFilterConfigFactory {
+class ClientSslAuthConfigFactory : public NetworkFilterConfigFactory {
 public:
   // NetworkFilterConfigFactory
   NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                                const Json::Object& config,
+                                                const Json::Object& json_config,
                                                 Server::Instance& server);
 
 private:
-  static const std::string REDIS_PROXY_SCHEMA;
+  static const std::string CLIENT_SSL_SCHEMA;
 };
 
 } // Configuration

@@ -135,9 +135,9 @@ public:
   virtual bool hasObject(const std::string& name) const PURE;
 
   /**
-   * This will throw an std::invalid_argument if the schema provided isn't valid JSON.
-   * Will throw an exception if the json object isn't valid based on the schema.
-   * @param schema supplies the string format of the schema to validate the json object against.
+   * Validates JSON object against passed in schema.
+   * @param schema supplies the string format of the schema. A Json::Exception will be thrown, if
+   *        the JSON object doesn't conform to the supplied schema.
    */
   virtual void validateSchema(const std::string& schema) const PURE;
 };

@@ -6,9 +6,9 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the redis proxy filter. @see NetworkFilterConfigFactory.
+ * Config registration for the mongo proxy filter. @see NetworkFilterConfigFactory.
  */
-class RedisProxyFilterConfigFactory : public NetworkFilterConfigFactory {
+class MongoProxyFilterConfigFactory : public NetworkFilterConfigFactory {
 public:
   // NetworkFilterConfigFactory
   NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
@@ -16,7 +16,7 @@ public:
                                                 Server::Instance& server);
 
 private:
-  static const std::string REDIS_PROXY_SCHEMA;
+  static const std::string MONGO_PROXY_SCHEMA;
 };
 
 } // Configuration
