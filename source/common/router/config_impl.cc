@@ -86,49 +86,54 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       priority_(ConfigUtility::parsePriority(route)) {
 
   bool have_weighted_clusters = route.hasObject("weighted_clusters");
-  bool have_cluster = !cluster_name_.empty()  || have_weighted_clusters;
+  bool have_cluster = !cluster_name_.empty() || have_weighted_clusters;
   // Check to make sure that we are either a redirect route or we have a cluster.
   if (!(isRedirect() ^ have_cluster)) {
     throw EnvoyException("routes must be either redirects or cluster targets");
   }
 
-  if (have_cluster)  {
-      if (!cluster_name_.empty() && have_weighted_clusters) {
-          throw EnvoyException("routes must have either single or weighted_clusters as target");
-      }
+  if (have_cluster) {
+    if (!cluster_name_.empty() && have_weighted_clusters) {
+      throw EnvoyException("routes must have either single or weighted_clusters as target");
+    }
+  }
+
+  // If this is a weighted_cluster, we create N internal route entries
+  // (called WeightedClusterEntry), such that each object is a simple
+  // single cluster, pointing back to the parent.
+  if (have_weighted_clusters) {
+    uint64_t w = 0UL, max_weight = 100UL; // TODO: move this constant to a header file
+    const std::vector<Json::ObjectPtr> clusters = route.getObjectArray("weighted_clusters");
+    for (const Json::ObjectPtr& c : clusters) {
+      // Internal route entry objects, one per weighted cluster entry in the config
+      weighted_clusters_.emplace_back(std::make_shared<WeightedClusterEntry>(
+          this, c->getString("name"), c->getInteger("weight")));
+    }
+
+    // Make sure that sum of weights is <= max weight
+    for (const WeightedClusterEntryPtr& wentry : weighted_clusters_) {
+      w += wentry->cluster_weight();
+    }
+    if (w > max_weight) {
+      throw EnvoyException("Sum of weights in the weighted cluster should not exceed 100");
+    }
   }
 
   if (route.hasObject("headers")) {
-      std::vector<Json::ObjectPtr> config_headers = route.getObjectArray("headers");
-      for (const Json::ObjectPtr& header_map : config_headers) {
-          // allow header value to be empty, allows matching to be only based on header presence.
-          // Regex is an opt-in. Unless explicitly mentioned, we will use header values for exact string
-          // matches.
-          config_headers_.emplace_back(Http::LowerCaseString(header_map->getString("name")),
-                                       header_map->getString("value", EMPTY_STRING),
-                                       header_map->getBoolean("regex", false));
-      }
-  }
-
-  // If this is a weighted_cluster, we create N copies of RouteEntryImplBase objects, such that
-  // each object is a simple single cluster, with a runtime configured for it.
-  if (have_weighted_clusters) {
-      Json::ObjectPtr weighted_clusters = route.getObjectArray("weighted_clusters");
-      //const std::string runtime_key_prefix = weighted_clusters->getString("runtime_key_prefix", EMPTY_STRING);
-      if (!weighted_clusters->hasObject("clusters")) {
-          throw EnvoyException("weighted_cluster object has no target clusters defined");
-      }
-      const std::vector<Json::ObjectPtr> clusters = weighted_clusters->getObjectArray("clusters");
-      for (const Json::ObjectPtr& c: clusters) {
-          std::string c_name = c->getString("name");
-          uint64_t c_weight = c->getInteger("weight");
-          //create additional RouteEntryImplBase objects here? What about Prefix and Path ?
-          //TODO
-      }
+    std::vector<Json::ObjectPtr> config_headers = route.getObjectArray("headers");
+    for (const Json::ObjectPtr& header_map : config_headers) {
+      // allow header value to be empty, allows matching to be only based on header presence.
+      // Regex is an opt-in. Unless explicitly mentioned, we will use header values for exact string
+      // matches.
+      config_headers_.emplace_back(Http::LowerCaseString(header_map->getString("name")),
+                                   header_map->getString("value", EMPTY_STRING),
+                                   header_map->getBoolean("regex", false));
+    }
   }
 }
 
-RouteEntry* RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
+const Route* RouteEntryImplBase::matches(const Http::HeaderMap& headers,
+                                         uint64_t random_value) const {
   bool matches = true;
 
   if (runtime_.valid()) {
@@ -221,27 +226,33 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
-const Route *RouteEntryImplBase::getRoute(uint64_t random_value) const {
-    if (weighted_clusters_.empty()) {
-        return this;
-    }
+const Route* RouteEntryImplBase::getEntry(uint64_t random_value) const {
+  if (weighted_clusters_.empty()) {
+    return this;
+  }
 
-    uint64_t selected_value = random_value % static_cast<uint64_t>(100);
-    uint64_t weight = 0UL;
-    // Find the right cluster to route to.
-    for(const RouteEntryImplBasePtr& cluster: weighted_clusters_) {
-      if ((selected_value >= weight) && (selected_value < (weight + cluster->cluster_weight_))) {
-        return cluster.get();
-      }
-      weight += cluster->cluster_weight_;
-      if (weight >=100) {
-          break;
-      }
+  // Find the right cluster to route to based on the interval in which
+  // the selected value falls.  The intervals are determined as
+  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight), ...
+
+  // TODO: Get rid of the hard coded 100
+  uint64_t max_weight = 100UL;
+  uint64_t selected_value = random_value % max_weight;
+  uint64_t summed_weight = 0UL;
+  for (const WeightedClusterEntryPtr& cluster : weighted_clusters_) {
+    if ((selected_value >= summed_weight) &&
+        (selected_value < (summed_weight + cluster->cluster_weight()))) {
+      return cluster.get();
     }
-    return nullptr;
+    summed_weight += cluster->cluster_weight();
+    if (summed_weight >= max_weight) {
+      break;
+    }
+  }
+  return nullptr;
 }
 
-    PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const Json::Object& route,
+PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const Json::Object& route,
                                            Runtime::Loader& loader)
     : RouteEntryImplBase(vhost, route, loader), prefix_(route.getString("prefix")) {}
 
@@ -251,9 +262,10 @@ void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) cons
   finalizePathHeader(headers, prefix_);
 }
 
-bool PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
+const Route* PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                           uint64_t random_value) const {
   if ((RouteEntryImplBase::matches(headers, random_value) != nullptr) &&
-         StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_)) {
+      StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_)) {
     return this;
   }
   return nullptr;
@@ -269,7 +281,8 @@ void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const 
   finalizePathHeader(headers, path_);
 }
 
-bool PathRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
+const Route* PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                         uint64_t random_value) const {
   if (RouteEntryImplBase::matches(headers, random_value) != nullptr) {
     // TODO PERF: Avoid copy.
     std::string path = headers.Path()->value().c_str();
@@ -281,7 +294,7 @@ bool PathRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random
       }
     } else {
       if (StringUtil::caseInsensitiveCompare(path.substr(0, query_string_start).c_str(),
-                                                path_.c_str()) == 0) {
+                                             path_.c_str()) == 0) {
         return this;
       }
     }
@@ -315,9 +328,21 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Load
     }
 
     if (!routes_.back()->isRedirect()) {
-      if (!cm.get(routes_.back()->clusterName())) {
-        throw EnvoyException(
-            fmt::format("route: unknown cluster '{}'", routes_.back()->clusterName()));
+      // We could have either a normal cluster or weighted cluster
+      const std::vector<WeightedClusterEntryPtr>& weighted_clusters =
+          routes_.back()->weightedClusters();
+      if (weighted_clusters.empty()) {
+        if (!cm.get(routes_.back()->clusterName())) {
+          throw EnvoyException(
+              fmt::format("route: unknown cluster '{}'", routes_.back()->clusterName()));
+        }
+      } else {
+        for (const WeightedClusterEntryPtr& w : weighted_clusters) {
+          if (!cm.get(w->clusterName())) {
+            throw EnvoyException(
+                fmt::format("route: unknown weighted cluster '{}'", w->clusterName()));
+          }
+        }
       }
     }
 
