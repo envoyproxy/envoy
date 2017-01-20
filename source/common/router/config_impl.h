@@ -210,9 +210,11 @@ public:
   // the vector.
   void validateClusters(Upstream::ClusterManager& cm) const;
 
-  // gets the route object associated with this entry (choose based on
-  // Weighted Clusters)
-  const Route* getEntry(uint64_t random_value) const;
+  // Check if this Route Entry has a weighted cluster
+  bool isWeightedCluster() const { return !weighted_clusters_.empty(); }
+
+  // gets the route object chosen from the list of weighted clusters
+  const Route* weightedClusterEntry(uint64_t random_value) const;
 
 protected:
   const bool case_sensitive_;

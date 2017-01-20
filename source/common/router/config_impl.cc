@@ -231,16 +231,12 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
-const Route* RouteEntryImplBase::getEntry(uint64_t random_value) const {
-  if (weighted_clusters_.empty()) {
-    return this;
-  }
+// Find the right cluster to route to based on the interval in which
+// the selected value falls.  The intervals are determined as
+// [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
 
-  // Find the right cluster to route to based on the interval in which
-  // the selected value falls.  The intervals are determined as
-  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight), ...
-
-  // TODO: Get rid of the hard coded 100
+// TODO: Get rid of the hard coded 100
+const Route* RouteEntryImplBase::weightedClusterEntry(uint64_t random_value) const {
   uint64_t max_weight = 100UL;
   uint64_t selected_value = random_value % max_weight;
   uint64_t summed_weight = 0UL;
@@ -425,7 +421,14 @@ const Route* VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers
   // Check for a route that matches the request.
   for (const RouteEntryImplBasePtr& route : routes_) {
     if (route->matches(headers, random_value) != nullptr) {
-      return route->getEntry(random_value);
+      // Cannot push this logic into the RouteEntryImplBase object,
+      // because it leads to leaking the raw pointer to the object,
+      // instead of obtaining the pointer via the shared_ptr.
+      if (!route->isWeightedCluster()) {
+        return route.get();
+      } else {
+        return route->weightedClusterEntry(random_value);
+      }
     }
   }
 
