@@ -8,7 +8,6 @@
 namespace Server {
 namespace Configuration {
 
-
 const std::string ClientSslAuthConfigFactory::CLIENT_SSL_SCHEMA(
     "{\n"
     "\t\"$schema\": \"http://json-schema.org/schema#\", \n"
@@ -33,11 +32,11 @@ ClientSslAuthConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const
   json_config.validateSchema(CLIENT_SSL_SCHEMA);
 
   Filter::Auth::ClientSsl::ConfigPtr config(Filter::Auth::ClientSsl::Config::create(
-    json_config, server.threadLocal(), server.clusterManager(), server.dispatcher(),
-    server.stats(), server.random()));
+      json_config, server.threadLocal(), server.clusterManager(), server.dispatcher(),
+      server.stats(), server.random()));
   return [config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
-      Network::ReadFilterPtr{new Filter::Auth::ClientSsl::Instance(config)});
+        Network::ReadFilterPtr{new Filter::Auth::ClientSsl::Instance(config)});
   };
 }
 
