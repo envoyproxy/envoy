@@ -3,6 +3,15 @@
 Cluster manager
 ===============
 
+.. toctree::
+  :hidden:
+
+  cluster
+  sds
+  sds_api
+  outlier
+  cds
+
 Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
 
 .. code-block:: json
@@ -11,7 +20,8 @@ Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
     "clusters": [],
     "sds": "{...}",
     "local_cluster_name": "...",
-    "outlier_detection": "{...}"
+    "outlier_detection": "{...}",
+    "cds": "{...}"
   }
 
 .. _config_cluster_manager_clusters:
@@ -36,10 +46,20 @@ local_cluster_name
 :ref:`outlier_detection <config_cluster_manager_outlier_detection>`
   *(optional, object)* Optional global configuration for outlier detection.
 
-.. toctree::
-  :hidden:
+:ref:`cds <config_cluster_manager_cds>`
+  *(optional, object)* Optional configuration for the cluster discovery service (CDS) API.
 
-  cluster
-  sds
-  sds_api
-  outlier
+Statistics
+----------
+
+The cluster manager has a statistics tree rooted at *cluster_manager.* with the following
+statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  cluster_added, Counter, Total clusters added (either via static config or CDS)
+  cluster_modified, Counter, Total clusters modified (via CDS)
+  cluster_removed, Counter, Total clusters removed (via CDS)
+  total_clusters, Gauge, Number of currently loaded clusters

@@ -95,6 +95,21 @@ struct SdsConfig {
 };
 
 /**
+ * Abstract interface for a CDS API provider.
+ */
+class CdsApi {
+public:
+  virtual ~CdsApi() {}
+
+  /**
+   * Start the first fetch of CDS data.
+   */
+  virtual void initialize() PURE;
+};
+
+typedef std::unique_ptr<CdsApi> CdsApiPtr;
+
+/**
  * Factory for objects needed during cluster manager operation.
  */
 class ClusterManagerFactory {
@@ -114,6 +129,11 @@ public:
   virtual ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
                                      const Optional<SdsConfig>& sds_config,
                                      Outlier::EventLoggerPtr outlier_event_logger) PURE;
+
+  /**
+   * Create a CDS API provider from configuration JSON.
+   */
+  virtual CdsApiPtr createCds(const Json::Object& config, ClusterManager& cm) PURE;
 };
 
 } // Upstream

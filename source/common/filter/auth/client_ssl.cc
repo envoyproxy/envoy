@@ -63,7 +63,7 @@ void Config::parseResponse(const Http::Message& message) {
   stats_.total_principals_.set(new_principals->size());
 }
 
-void Config::onFetchFailure(Http::AsyncClient::FailureReason) { stats_.update_failure_.inc(); }
+void Config::onFetchFailure(EnvoyException*) { stats_.update_failure_.inc(); }
 
 static const std::string Path = "/v1/certs/list/approved";
 

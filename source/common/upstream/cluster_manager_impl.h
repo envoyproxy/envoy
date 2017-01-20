@@ -35,6 +35,7 @@ public:
   ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
                              const Optional<SdsConfig>& sds_config,
                              Outlier::EventLoggerPtr outlier_event_logger) override;
+  CdsApiPtr createCds(const Json::Object& config, ClusterManager& cm) override;
 
 private:
   Runtime::Loader& runtime_;
@@ -45,6 +46,24 @@ private:
   Ssl::ContextManager& ssl_context_manager_;
   Event::Dispatcher& primary_dispatcher_;
   const LocalInfo::LocalInfo& local_info_;
+};
+
+/**
+ * All cluster manager stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE)                                                  \
+  COUNTER(cluster_added)                                                                           \
+  COUNTER(cluster_modified)                                                                        \
+  COUNTER(cluster_removed)                                                                         \
+  GAUGE  (total_clusters)
+// clang-format on
+
+/**
+ * Struct definition for all cluster manager stats. @see stats_macros.h
+ */
+struct ClusterManagerStats {
+  ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -81,7 +100,10 @@ public:
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removePrimaryCluster(const std::string& cluster) override;
-  void shutdown() override { primary_clusters_.clear(); }
+  void shutdown() override {
+    cds_api_.reset();
+    primary_clusters_.clear();
+  }
 
 private:
   /**
@@ -141,6 +163,7 @@ private:
     ClusterPtr cluster_;
   };
 
+  static ClusterManagerStats generateStats(Stats::Scope& scope);
   void loadCluster(const Json::Object& cluster, bool added_via_api);
   void postInitializeCluster(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& primary_cluster,
@@ -160,6 +183,8 @@ private:
   std::list<Cluster*> secondary_init_clusters_;
   Outlier::EventLoggerPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
+  CdsApiPtr cds_api_;
+  ClusterManagerStats cm_stats_;
 };
 
 } // Upstream

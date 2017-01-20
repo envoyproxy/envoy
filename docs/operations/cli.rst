@@ -50,13 +50,15 @@ following are the command line options that Envoy supports.
   <config_cluster_manager_cluster_hc_service_name>`, :ref:`runtime override directory
   <config_runtime_override_subdirectory>`, :ref:`user agent addition
   <config_http_conn_man_add_user_agent>`, :ref:`HTTP global rate limiting
-  <config_http_filters_rate_limit>`, and :ref:`HTTP tracing <arch_overview_tracing>`.
+  <config_http_filters_rate_limit>`, :ref:`CDS <config_cluster_manager_cds>`, and
+  :ref:`HTTP tracing <arch_overview_tracing>`.
 
 .. option:: --service-node <string>
 
   *(optional)* Defines the local service node name where Envoy is running. Though optional,
   it should be set if any of the following features are used: :ref:`statsd
-  <arch_overview_statistics>`, and :ref:`HTTP tracing <arch_overview_tracing>`.
+  <arch_overview_statistics>`, :ref:`CDS <config_cluster_manager_cds>`, and
+  :ref:`HTTP tracing <arch_overview_tracing>`.
 
 .. option:: --service-zone <string>
 

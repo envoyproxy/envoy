@@ -88,7 +88,7 @@ private:
   void createRequest(Http::Message& request) override;
   void parseResponse(const Http::Message& response) override;
   void onFetchComplete() override {}
-  void onFetchFailure(Http::AsyncClient::FailureReason reason) override;
+  void onFetchFailure(EnvoyException* e) override;
 
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;

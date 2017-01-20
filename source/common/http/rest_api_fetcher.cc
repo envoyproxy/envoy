@@ -31,15 +31,14 @@ void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
   try {
     parseResponse(*response);
   } catch (EnvoyException& e) {
-    onFailure(Http::AsyncClient::FailureReason::Reset);
-    return;
+    onFetchFailure(&e);
   }
 
   requestComplete();
 }
 
-void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
-  onFetchFailure(reason);
+void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason) {
+  onFetchFailure(nullptr);
   requestComplete();
 }
 

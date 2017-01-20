@@ -118,4 +118,12 @@ public:
   std::list<HostStatusCb> callbacks_;
 };
 
+class MockCdsApi : public CdsApi {
+public:
+  MockCdsApi();
+  ~MockCdsApi();
+
+  MOCK_METHOD0(initialize, void());
+};
+
 } // Upstream
