@@ -7,15 +7,16 @@
 namespace Server {
 namespace Configuration {
 
-const std::string RedisProxyFilterConfigFactory::REDIS_PROXY_SCHEMA(
-    "{\n"
-    "\t\"$schema\": \"http://json-schema.org/schema#\", \n"
-    "\t\"properties\":{\n"
-    "\t\t\"cluster_name\" : {\"type\" : \"string\"}\n"
-    "\t},\n"
-    "\t\"required\": [\"cluster_name\"],\n"
-    "\t\"additionalProperties\": false\n"
-    "}");
+const std::string RedisProxyFilterConfigFactory::REDIS_PROXY_SCHEMA(R"EOF(
+  {
+      "$schema": "http://json-schema.org/schema#",
+      "properties":{
+        "cluster_name" : {"type" : "string"}
+      },
+      "required": ["cluster_name"],
+      "additionalProperties": false
+  }
+  )EOF");
 
 NetworkFilterFactoryCb RedisProxyFilterConfigFactory::tryCreateFilterFactory(
     NetworkFilterType type, const std::string& name, const Json::Object& config,

@@ -32,6 +32,7 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
 TEST(NetworkFilterConfigTest, BadRedisProxyConfig) {
   std::string json_string = R"EOF(
   {
+    "cluster_name": "fake_cluster",
     "cluster": "fake_cluster"
   }
   )EOF";
@@ -65,10 +66,10 @@ TEST(NetworkFilterConfigTest, MongoProxy) {
 TEST(NetworkFilterConfigTest, BadMongoProxyConfig) {
   std::string json_string = R"EOF(
   {
-    "stat_prefix": 1,
-    "access_logs" : "path/to/access/log",
-    "test": "test"
-   }
+    "stat_prefix": "my_stat_prefix",
+    "access_log" : "path/to/access/log",
+    "test" : "a"
+  }
   )EOF";
 
   Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
@@ -84,7 +85,7 @@ TEST(NetworkFilterConfigTest, TcpProxy) {
   {
     "stat_prefix": "my_stat_prefix",
     "cluster" : "fake_cluster"
-   }
+  }
   )EOF";
 
   Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
@@ -119,7 +120,7 @@ TEST(NetworkFilterConfigTest, ClientSslAuth) {
     "stat_prefix": "my_stat_prefix",
     "auth_api_cluster" : "fake_cluster",
     "ip_white_list": ["192.168.3.0/24"]
-   }
+  }
   )EOF";
 
   Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
@@ -135,10 +136,11 @@ TEST(NetworkFilterConfigTest, ClientSslAuth) {
 TEST(NetworkFilterConfigTest, BadClientSslAuthConfig) {
   std::string json_string = R"EOF(
   {
-    "stat_prefixs": "my_stat_prefix",
-    "auth_api_cluster" : 2,
-    "ip_white_list": "12"
-   }
+    "stat_prefix": "my_stat_prefix",
+    "auth_api_cluster" : "fake_cluster",
+    "ip_white_list": ["192.168.3.0/24"],
+    "test" : "a"
+  }
   )EOF";
 
   Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
@@ -155,7 +157,7 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
     "stat_prefix": "my_stat_prefix",
     "domain" : "fake_domain",
     "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]]
-   }
+  }
   )EOF";
 
   Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
@@ -171,10 +173,11 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
 TEST(NetworkFilterConfigTest, BadRatelimitConfig) {
   std::string json_string = R"EOF(
   {
-    "stat_prefixs": "my_stat_prefix",
-    "domain" : 2,
+    "stat_prefix": "my_stat_prefix",
+    "domain" : "fake_domain",
+    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
     "ip_white_list": "12"
-   }
+  }
   )EOF";
 
   Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);

@@ -7,30 +7,31 @@
 namespace Server {
 namespace Configuration {
 
-const std::string RateLimitConfigFactory::RATELIMIT_SCHEMA(
-    "{\n"
-    "\t\"$schema\": \"http://json-schema.org/schema#\",\n"
-    "  \"properties\":{\n"
-    "    \"stat_prefix\" : {\"type\" : \"string\"},\n"
-    "    \"domain\" : {\"type\" : \"string\"},\n"
-    "    \"descriptors\": {\n"
-    "    \t\"type\": \"array\", \n"
-    "    \t\"items\" : { \n"
-    "    \t\t\"type\" : \"array\" ,\n"
-    "    \t\t\"items\": { \n"
-    "    \t\t\t\"type\": \"object\", \n"
-    "    \t\t\t\"properties\": { \n"
-    "    \t\t\t\t\"key\" : { \"type\" : \"string\" }, \n"
-    "    \t\t\t\t\"value\" : { \"type\" : \"string\" }\n"
-    "    \t\t\t},\n"
-    "          \"additionalProperties\": false\n"
-    "\t\t\t\t}\n"
-    "\t\t\t}\n"
-    "\t\t}\n"
-    "  },\n"
-    "  \"required\": [\"stat_prefix\", \"descriptors\", \"domain\"],\n"
-    "  \"additionalProperties\": false\n"
-    "}\t");
+const std::string RateLimitConfigFactory::RATELIMIT_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties":{
+      "stat_prefix" : {"type" : "string"},
+      "domain" : {"type" : "string"},
+      "descriptors": {
+        "type": "array",
+        "items" : {
+          "type" : "array" ,
+          "items": {
+            "type": "object",
+            "properties": {
+              "key" : {"type" : "string"},
+              "value" : {"type" : "string"}
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "required": ["stat_prefix", "descriptors", "domain"],
+    "additionalProperties": false
+  }
+  )EOF");
 
 NetworkFilterFactoryCb
 RateLimitConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const std::string& name,

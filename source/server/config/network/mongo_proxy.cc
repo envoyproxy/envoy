@@ -9,16 +9,17 @@
 namespace Server {
 namespace Configuration {
 
-const std::string MongoProxyFilterConfigFactory::MONGO_PROXY_SCHEMA(
-    "{\n"
-    "\t\"$schema\": \"http://json-schema.org/schema#\", \n"
-    "\t\"properties\":{\n"
-    "\t\t\"stat_prefix\" : {\"type\" : \"string\"},\n"
-    "\t\t\"access_log\" : {\"type\" : \"string\"}\n"
-    "\t},\n"
-    "\t\"required\": [\"stat_prefix\"],\n"
-    "\t\"additionalProperties\": false\n"
-    "}");
+const std::string MongoProxyFilterConfigFactory::MONGO_PROXY_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties":{
+      "stat_prefix" : {"type" : "string"},
+      "access_log" : {"type" : "string"}
+    },
+    "required": ["stat_prefix"],
+    "additionalProperties": false
+  }
+  )EOF");
 
 NetworkFilterFactoryCb MongoProxyFilterConfigFactory::tryCreateFilterFactory(
     NetworkFilterType type, const std::string& name, const Json::Object& config,

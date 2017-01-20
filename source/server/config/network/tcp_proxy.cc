@@ -8,16 +8,17 @@
 namespace Server {
 namespace Configuration {
 
-const std::string
-    TcpProxyConfigFactory::TCP_PROXY_SCHEMA("{\n"
-                                            "\t\"$schema\": \"http://json-schema.org/schema#\", \n"
-                                            "\t\"properties\":{\n"
-                                            "\t\t\"stat_prefix\" : {\"type\" : \"string\"},\n"
-                                            "\t\t\"cluster\" : {\"type\" : \"string\"}\n"
-                                            "\t},\n"
-                                            "\t\"required\": [\"stat_prefix\", \"cluster\"],\n"
-                                            "\t\"additionalProperties\": false\n"
-                                            "}");
+const std::string TcpProxyConfigFactory::TCP_PROXY_SCHEMA(R"EOF(
+  {
+      "$schema": "http://json-schema.org/schema#",
+      "properties":{
+        "stat_prefix" : {"type" : "string"},
+        "cluster" : {"type" : "string"}
+      },
+      "required": ["stat_prefix", "cluster"],
+      "additionalProperties": false
+  }
+  )EOF");
 
 NetworkFilterFactoryCb TcpProxyConfigFactory::tryCreateFilterFactory(NetworkFilterType type,
                                                                      const std::string& name,

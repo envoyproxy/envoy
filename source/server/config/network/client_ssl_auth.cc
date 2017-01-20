@@ -8,18 +8,24 @@
 namespace Server {
 namespace Configuration {
 
-const std::string ClientSslAuthConfigFactory::CLIENT_SSL_SCHEMA(
-    "{\n"
-    "\t\"$schema\": \"http://json-schema.org/schema#\", \n"
-    "\t\"properties\":{\n"
-    "\t\t\"auth_api_cluster\" : { \"type\" : \"string\" },\n"
-    "\t\t\"stat_prefix\" : {\"type\" : \"string\"},\n"
-    "\t\t\"ip_white_list\" : {\"type\" : \"array\", \"items\" : { \"type\": \"string\", \"format\" "
-    ": \"ipv4\" } }\n"
-    "\t},\n"
-    "\t\"required\": [\"auth_api_cluster\", \"stat_prefix\"],\n"
-    "\t\"additionalProperties\": false\n"
-    "}");
+const std::string ClientSslAuthConfigFactory::CLIENT_SSL_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+      "auth_api_cluster" : {"type" : "string"},
+      "stat_prefix" : {"type" : "string"},
+      "ip_white_list" : {
+        "type" : "array",
+        "items" : {
+          "type": "string",
+          "format" : "ipv4"
+        }
+      }
+    },
+    "required": ["auth_api_cluster", "stat_prefix"],
+    "additionalProperties": false
+  }
+  )EOF");
 
 NetworkFilterFactoryCb
 ClientSslAuthConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
