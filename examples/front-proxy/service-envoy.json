@@ -18,7 +18,7 @@
                     {
                       "timeout_ms": 0,
                       "prefix": "/service",
-                      "cluster": "local_service"
+                      "cluster": "local_service2"
                     }
                   ]
                 }
@@ -36,15 +36,20 @@
       ]
     },
     {
-      "port": 443,
+      "port": 9400,
+      "ssl_context": {
+        "alpn_protocols": "h2,http/1.1",
+        "alt_alpn_protocols": "http/1.1",
+	"cert_chain_file": "/etc/cert.pem",
+        "private_key_file": "/etc/key.pem"
+      },
       "filters": [
         {
           "type": "read",
-          "name": "client_ssl_auth",
+          "name": "http_connection_manager",
           "config": {
-            "auth_api_cluster": "local_service",
+            "codec_type": "auto",
             "stat_prefix": "ingress_http",
-            "ip_white_list": [],
             "route_config": {
               "virtual_hosts": [
                 {
@@ -79,7 +84,7 @@
   "cluster_manager": {
     "clusters": [
       {
-        "name": "local_service",
+        "name": "local_service2",
         "connect_timeout_ms": 250,
         "type": "strict_dns",
         "lb_type": "round_robin",
@@ -88,8 +93,23 @@
             "url": "tcp://127.0.0.1:8080"
           }
         ]
+      },
+      {
+	"name": "local_service",
+	"connect_timeout_ms": 10000,
+	"type": "strict_dns",
+	"lb_type": "round_robin",
+        "features": "http2",
+	"ssl_context": {
+	  "cert_chain_file": "/etc/cert.pem",
+          "private_key_file": "/etc/key.pem"
+	},
+        "hosts": [
+          {
+            "url": "tcp://127.0.0.1:9400"
+          }
+        ]
       }
     ]
   }
 }
-

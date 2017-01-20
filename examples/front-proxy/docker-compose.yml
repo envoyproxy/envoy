@@ -7,6 +7,8 @@ services:
       dockerfile: Dockerfile-service
     volumes:
       - ./service-envoy.json:/etc/service-envoy.json
+      - ./key.pem:/etc/key.pem
+      - ./cert.pem:/etc/cert.pem
     networks:
       envoymesh:
         aliases:
@@ -15,7 +17,7 @@ services:
       - SERVICE_NAME=1
     expose:
       - "80"
-      - "443"
+      - "9400"
 
   service2:
     build:
@@ -23,6 +25,8 @@ services:
       dockerfile: Dockerfile-service
     volumes:
       - ./service-envoy.json:/etc/service-envoy.json
+      - ./key.pem:/etc/key.pem
+      - ./cert.pem:/etc/cert.pem
     networks:
       envoymesh:
         aliases:
@@ -31,7 +35,7 @@ services:
       - SERVICE_NAME=2
     expose:
       - "80"
-      - "443"
+      - "9400"
 
 networks:
   envoymesh: {}
