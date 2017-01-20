@@ -3,8 +3,16 @@
 #include "common/common/base64.h"
 
 TEST(Base64, EmptyBufferEncode) {
-  Buffer::OwnedImpl buffer;
-  EXPECT_EQ("", Base64::encode(buffer, 0));
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_EQ("", Base64::encode(buffer, 0));
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add("\0\0");
+    EXPECT_EQ("", Base64::encode(buffer, 2));
+  }
 }
 
 TEST(Base64, SingleSliceBufferEncode) {
