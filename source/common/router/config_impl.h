@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-#include <chrono>
 #include "router_ratelimit.h"
 
 #include "envoy/common/optional.h"
@@ -33,9 +31,6 @@ public:
 
 class RouteEntryImplBase;
 typedef std::shared_ptr<RouteEntryImplBase> RouteEntryImplBasePtr;
-
-class WeightedClusterEntry;
-typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
 
 /**
  * Redirect entry that does an SSL redirect.
@@ -208,9 +203,16 @@ public:
   const RedirectEntry* redirectEntry() const override;
   const RouteEntry* routeEntry() const override;
 
-  const std::vector<WeightedClusterEntryPtr>& weightedClusters() const {
-    return weighted_clusters_;
-  }
+  // Throws an error if any of the clusters held by this Route are
+  // invalid.  Otherwise returns without an error. Its a bit
+  // clunky. The alternative is to export the list of cluster names as
+  // a vector to VirtualHostImpl and deal with allocation/deletion of
+  // the vector.
+  void validateClusters(Upstream::ClusterManager& cm) const;
+
+  // gets the route object associated with this entry (choose based on
+  // Weighted Clusters)
+  const Route* getEntry(uint64_t random_value) const;
 
 protected:
   const bool case_sensitive_;
@@ -225,10 +227,56 @@ private:
     uint64_t default_;
   };
 
+  /**
+   * Route entry implementation for weighted clusters.
+   * RouteEntryImplBase holds one or more weighted cluster objects,
+   * where each object has a back pointer to the parent
+   * RouteEntryImplBase object. Almost all functions in this class
+   * forward calls back to the parent, with the exception of clusterName
+   * and routeEntry.
+   */
+  struct WeightedClusterEntry : public RouteEntry, public Route {
+  public:
+    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string name, uint64_t weight)
+        : parent_(parent), cluster_name_(name), cluster_weight_(weight) {}
+
+    const std::string& clusterName() const override { return cluster_name_; }
+
+    void finalizeRequestHeaders(Http::HeaderMap& headers) const override {
+      return parent_->finalizeRequestHeaders(headers);
+    }
+
+    Upstream::ResourcePriority priority() const override { return parent_->priority(); }
+    const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
+    const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
+    const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
+    std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
+
+    const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
+      return parent_->virtualCluster(headers);
+    }
+
+    const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
+    const RedirectEntry* redirectEntry() const override { return parent_->redirectEntry(); }
+    const RouteEntry* routeEntry() const override {
+      if (parent_->isRedirect()) {
+        return nullptr;
+      } else {
+        return this;
+      }
+    }
+
+    uint64_t clusterWeight() const { return cluster_weight_; }
+
+  private:
+    const RouteEntryImplBase* parent_;
+    const std::string cluster_name_;
+    uint64_t cluster_weight_;
+  };
+  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
+
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
 
-  // gets the route object associated with this entry (choose based on Weighted Clusters)
-  const Route* getEntry(uint64_t random_value) const;
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
@@ -283,56 +331,6 @@ private:
   const std::string path_;
 };
 
-/**
- * Route entry implementation for weighted clusters.
- * RouteEntryImplBase holds one or more weighted cluster objects, where each object has a back
- * pointer to the parent RouteEntryImplBase object. Almost all functions in this class forward calls
- * back to the parent, with the exception of clusterName and routeEntry.
- */
-class WeightedClusterEntry : public RouteEntry, public Route {
-public:
-  WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string name, uint64_t weight)
-      : parent_(parent), cluster_name_(name), cluster_weight_(weight) {}
-
-  const std::string& clusterName() const override { return cluster_name_; }
-
-  void finalizeRequestHeaders(Http::HeaderMap& headers) const override {
-    return parent_->finalizeRequestHeaders(headers);
-  }
-
-  Upstream::ResourcePriority priority() const override { return parent_->priority(); }
-
-  const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
-
-  const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
-
-  const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
-
-  std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
-
-  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
-    return parent_->virtualCluster(headers);
-  }
-
-  const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
-
-  const RedirectEntry* redirectEntry() const override { return parent_->redirectEntry(); }
-
-  const RouteEntry* routeEntry() const override {
-    if (parent_->isRedirect()) {
-      return nullptr;
-    } else {
-      return this;
-    }
-  }
-
-  uint64_t cluster_weight() const { return cluster_weight_; }
-
-private:
-  const RouteEntryImplBase* parent_;
-  const std::string cluster_name_;
-  uint64_t cluster_weight_;
-};
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
  * This is split out mainly to help with unit testing.
