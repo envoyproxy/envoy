@@ -1207,6 +1207,33 @@ TEST(RouteMatcherTest, WeightedClustersMissingClusterList) {
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
 }
 
+TEST(RouteMatcherTest, WeightedClustersEmptyClustersList) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "weighted_clusters": {
+            "runtime_key_prefix" : "www2",
+            "clusters" : []
+          }
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+}
+
 TEST(RouteMatcherTest, WeightedClustersSumOFWeightsNotEqualToMax) {
   std::string json = R"EOF(
 {

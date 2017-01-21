@@ -104,7 +104,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent.
   if (have_weighted_clusters) {
-    static const uint64_t max_weight = 100UL; // TODO: move this constant to a header file
     uint64_t total_weight = 0UL;
 
     const Json::ObjectPtr weighted_clusters_json = route.getObject("weighted_clusters");
@@ -118,6 +117,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
     const std::string runtime_key_prefix =
         weighted_clusters_json->getString("runtime_key_prefix", EMPTY_STRING);
 
+    if (cluster_list.empty()) {
+      throw EnvoyException("weighted_clusters specification has empty list of clusters");
+    }
+
     for (const Json::ObjectPtr& cluster : cluster_list) {
       const std::string cluster_name = cluster->getString("name");
       std::unique_ptr<WeightedClusterEntry> cluster_entry(
@@ -127,9 +130,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
 
-    if (total_weight != max_weight) {
-      throw EnvoyException(
-          fmt::format("Sum of weights in the weighted_cluster should add up to {}", max_weight));
+    if (total_weight != WeightedClusterEntry::MAX_CLUSTER_WEIGHT) {
+      throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
+                                       WeightedClusterEntry::MAX_CLUSTER_WEIGHT));
     }
   }
 
@@ -243,9 +246,7 @@ const Route* RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
     return this;
   }
 
-  // TODO: Get rid of the hard coded 100
-  static const uint64_t max_weight = 100UL;
-  uint64_t selected_value = random_value % max_weight;
+  uint64_t selected_value = random_value % WeightedClusterEntry::MAX_CLUSTER_WEIGHT;
   uint64_t begin = 0UL;
   uint64_t end = 0UL;
 
@@ -254,10 +255,13 @@ const Route* RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
   for (const WeightedClusterEntryPtr& cluster : weighted_clusters_) {
     end = begin + cluster->clusterWeight();
-    if (((selected_value >= begin) && (selected_value < end)) || (end >= max_weight)) {
-      // end > max_weight : This case can only occur with Runtimes, if
-      // the user specifies invalid weights, such that sum(weights) >
-      // max_weight. We will just return the current cluster.
+    if (((selected_value >= begin) && (selected_value < end)) ||
+        (end >= WeightedClusterEntry::MAX_CLUSTER_WEIGHT)) {
+      // end > WeightedClusterEntry::MAX_CLUSTER_WEIGHT : This case can only occur
+      // with Runtimes, when the user specifies invalid weights such that
+      // sum(weights) > WeightedClusterEntry::MAX_CLUSTER_WEIGHT.
+      // In this case, terminate the search and just return the cluster
+      // whose weight cased the overflow
       return cluster.get();
     }
     begin = end;
