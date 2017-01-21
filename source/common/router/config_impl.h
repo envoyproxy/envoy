@@ -23,10 +23,9 @@ public:
    * @param headers supplies the headers to match.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
-   * @return Pointer to object implementing Route interface if input headers match this object,
-   *         else nullptr.
+   * @return true if input headers match this object.
    */
-  virtual const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
+  virtual bool matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
 };
 
 class RouteEntryImplBase;
@@ -193,28 +192,19 @@ public:
   std::chrono::milliseconds timeout() const override { return timeout_; }
   const VirtualHost& virtualHost() const override { return vhost_; }
 
+  void validateClusters(Upstream::ClusterManager& cm) const;
+  bool isWeightedCluster() const { return !weighted_clusters_.empty(); }
+  const Route* weightedClusterEntry(uint64_t random_value) const;
+
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  bool matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
   // Router::Route
   const RedirectEntry* redirectEntry() const override;
   const RouteEntry* routeEntry() const override;
-
-  // Throws an error if any of the clusters held by this Route are
-  // invalid.  Otherwise returns without an error. Its a bit
-  // clunky. The alternative is to export the list of cluster names as
-  // a vector to VirtualHostImpl and deal with allocation/deletion of
-  // the vector.
-  void validateClusters(Upstream::ClusterManager& cm) const;
-
-  // Check if this Route Entry has a weighted cluster
-  bool isWeightedCluster() const { return !weighted_clusters_.empty(); }
-
-  // gets the route object chosen from the list of weighted clusters
-  const Route* weightedClusterEntry(uint64_t random_value) const;
 
 protected:
   const bool case_sensitive_;
@@ -234,8 +224,8 @@ private:
    * RouteEntryImplBase holds one or more weighted cluster objects,
    * where each object has a back pointer to the parent
    * RouteEntryImplBase object. Almost all functions in this class
-   * forward calls back to the parent, with the exception of clusterName
-   * and routeEntry.
+   * forward calls back to the parent, with the exception of
+   * clusterName and routeEntry.
    */
   struct WeightedClusterEntry : public RouteEntry, public Route {
   public:
@@ -244,6 +234,11 @@ private:
         : parent_(parent), runtime_key_(runtime_key), loader_(loader), cluster_name_(name),
           cluster_weight_(weight) {}
 
+    uint64_t clusterWeight() const {
+      return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
+    }
+
+    // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
 
     void finalizeRequestHeaders(Http::HeaderMap& headers) const override {
@@ -261,24 +256,15 @@ private:
     }
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
-    const RedirectEntry* redirectEntry() const override { return parent_->redirectEntry(); }
-    const RouteEntry* routeEntry() const override {
-      if (parent_->isRedirect()) {
-        return nullptr;
-      } else {
-        return this;
-      }
-    }
 
-    uint64_t clusterWeight() const {
-      return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
-    }
+    // Router::Route
+    const RedirectEntry* redirectEntry() const override { return nullptr; }
+    const RouteEntry* routeEntry() const override { return this; }
 
   private:
     const RouteEntryImplBase* parent_;
     const std::string runtime_key_;
     Runtime::Loader& loader_;
-
     const std::string cluster_name_;
     uint64_t cluster_weight_;
   };
@@ -316,7 +302,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  bool matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string prefix_;
@@ -334,7 +320,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  bool matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string path_;

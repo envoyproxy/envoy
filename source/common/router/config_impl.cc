@@ -149,8 +149,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   }
 }
 
-const Route* RouteEntryImplBase::matches(const Http::HeaderMap& headers,
-                                         uint64_t random_value) const {
+bool RouteEntryImplBase::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
   bool matches = true;
 
   if (runtime_.valid()) {
@@ -159,11 +158,7 @@ const Route* RouteEntryImplBase::matches(const Http::HeaderMap& headers,
   }
 
   matches &= ConfigUtility::matchHeaders(headers, config_headers_);
-
-  if (matches) {
-    return this;
-  }
-  return nullptr;
+  return matches;
 }
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
@@ -243,16 +238,17 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
-// Find the right cluster to route to based on the interval in which
-// the selected value falls.  The intervals are determined as
-// [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
-
-// TODO: Get rid of the hard coded 100
 const Route* RouteEntryImplBase::weightedClusterEntry(uint64_t random_value) const {
-  uint64_t max_weight = 100UL;
+  // Gets the route object chosen from the list of weighted clusters.
+  // TODO: Get rid of the hard coded 100
+  static const uint64_t max_weight = 100UL;
   uint64_t selected_value = random_value % max_weight;
   uint64_t begin = 0UL;
   uint64_t end = 0UL;
+
+  // Find the right cluster to route to based on the interval in which
+  // the selected value falls.  The intervals are determined as
+  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
   for (const WeightedClusterEntryPtr& cluster : weighted_clusters_) {
     end = begin + cluster->clusterWeight();
     if (((selected_value >= begin) && (selected_value < end)) || (end >= max_weight)) {
@@ -267,10 +263,11 @@ const Route* RouteEntryImplBase::weightedClusterEntry(uint64_t random_value) con
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
-
+  // Throws an error if any of the clusters held by this Route or the
+  // internal weighted clusters are invalid.
   if (!isRedirect()) {
     // We could have either a normal cluster or weighted cluster
-    if (weighted_clusters_.empty()) { // single cluster
+    if (weighted_clusters_.empty()) {
       if (!cm.get(this->clusterName())) {
         throw EnvoyException(fmt::format("route: unknown cluster '{}'", this->clusterName()));
       }
@@ -295,13 +292,12 @@ void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) cons
   finalizePathHeader(headers, prefix_);
 }
 
-const Route* PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
-                                           uint64_t random_value) const {
-  if ((RouteEntryImplBase::matches(headers, random_value) != nullptr) &&
+bool PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
+  if (RouteEntryImplBase::matches(headers, random_value) &&
       StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_)) {
-    return this;
+    return true;
   }
-  return nullptr;
+  return false;
 }
 
 PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost, const Json::Object& route,
@@ -314,26 +310,25 @@ void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const 
   finalizePathHeader(headers, path_);
 }
 
-const Route* PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
-                                         uint64_t random_value) const {
-  if (RouteEntryImplBase::matches(headers, random_value) != nullptr) {
+bool PathRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
+  if (RouteEntryImplBase::matches(headers, random_value)) {
     // TODO PERF: Avoid copy.
     std::string path = headers.Path()->value().c_str();
     size_t query_string_start = path.find("?");
 
     if (case_sensitive_) {
       if (path.substr(0, query_string_start) == path_) {
-        return this;
+        return true;
       }
     } else {
       if (StringUtil::caseInsensitiveCompare(path.substr(0, query_string_start).c_str(),
                                              path_.c_str()) == 0) {
-        return this;
+        return true;
       }
     }
   }
 
-  return nullptr;
+  return false;
 }
 
 VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Loader& runtime,
@@ -433,7 +428,7 @@ const Route* VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers
 
   // Check for a route that matches the request.
   for (const RouteEntryImplBasePtr& route : routes_) {
-    if (route->matches(headers, random_value) != nullptr) {
+    if (route->matches(headers, random_value)) {
       // Cannot push this logic into the RouteEntryImplBase object,
       // because it leads to leaking the raw pointer to the object,
       // instead of obtaining the pointer via the shared_ptr.
