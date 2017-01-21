@@ -25,11 +25,11 @@ public:
    *        allows stable choices between calls if desired.
    * @return true if input headers match this object.
    */
-  virtual bool matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
+  virtual const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
 };
 
 class RouteEntryImplBase;
-typedef std::shared_ptr<RouteEntryImplBase> RouteEntryImplBasePtr;
+typedef std::unique_ptr<RouteEntryImplBase> RouteEntryImplBasePtr;
 
 /**
  * Redirect entry that does an SSL redirect.
@@ -179,6 +179,10 @@ public:
   bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
   bool usesRuntime() const { return runtime_.valid(); }
 
+  bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
+  void validateClusters(Upstream::ClusterManager& cm) const;
+  const Route* clusterEntry(uint64_t random_value) const;
+
   // Router::RouteEntry
   const std::string& clusterName() const override;
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
@@ -192,15 +196,8 @@ public:
   std::chrono::milliseconds timeout() const override { return timeout_; }
   const VirtualHost& virtualHost() const override { return vhost_; }
 
-  void validateClusters(Upstream::ClusterManager& cm) const;
-  bool isWeightedCluster() const { return !weighted_clusters_.empty(); }
-  const Route* weightedClusterEntry(uint64_t random_value) const;
-
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
-
-  // Router::Matchable
-  bool matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
   // Router::Route
   const RedirectEntry* redirectEntry() const override;
@@ -268,7 +265,7 @@ private:
     const std::string cluster_name_;
     uint64_t cluster_weight_;
   };
-  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
+  typedef std::unique_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
 
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
 
@@ -302,7 +299,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  bool matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string prefix_;
@@ -320,7 +317,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  bool matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string path_;

@@ -1017,9 +1017,9 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrRedirectEntry) {
       "routes": [
         {
           "prefix": "/",
-          "weighted_clusters": [
-           { "name" : "www2", "weight" : 100 }
-          ]
+          "weighted_clusters": {
+           "clusters" : [{ "name" : "www2", "weight" : 100 }]
+          }
         }
       ]
     },
@@ -1065,11 +1065,13 @@ TEST(RouteMatcherTest, WeightedClusters) {
       "routes": [
         {
           "prefix": "/",
-          "weighted_clusters": [
-           { "name" : "cluster1", "weight" : 30 },
-           { "name" : "cluster2", "weight" : 30 },
-           { "name" : "cluster3", "weight" : 40 }
-          ]
+          "weighted_clusters": {
+            "clusters" : [
+              { "name" : "cluster1", "weight" : 30 },
+              { "name" : "cluster2", "weight" : 30 },
+              { "name" : "cluster3", "weight" : 40 }
+            ]
+          }
         }
       ]
     },
@@ -1079,15 +1081,14 @@ TEST(RouteMatcherTest, WeightedClusters) {
       "routes": [
         {
           "prefix": "/",
-          "runtime": {
-            "key": "www2",
-            "default": 100
-          },
-          "weighted_clusters": [
-           { "name" : "cluster1", "weight" : 30 },
-           { "name" : "cluster2", "weight" : 30 },
-           { "name" : "cluster3", "weight" : 40 }
-          ]
+          "weighted_clusters": {
+            "runtime_key_prefix" : "www2_weights",
+            "clusters" : [
+              { "name" : "cluster1", "weight" : 30 },
+              { "name" : "cluster2", "weight" : 30 },
+              { "name" : "cluster3", "weight" : 40 }
+            ]
+          }
         }
       ]
     }
@@ -1099,8 +1100,6 @@ TEST(RouteMatcherTest, WeightedClusters) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm);
-
-  EXPECT_TRUE(config.usesRuntime());
 
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www1.lyft.com", "/foo", true, true);
@@ -1119,11 +1118,11 @@ TEST(RouteMatcherTest, WeightedClusters) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www2.lyft.com", "/foo", "GET");
     EXPECT_CALL(runtime.snapshot_, featureEnabled("www2", 100, _)).WillRepeatedly(Return(true));
-    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster1", 30))
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2_weights.cluster1", 30))
         .WillRepeatedly(Return(80));
-    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster2", 30))
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2_weights.cluster2", 30))
         .WillRepeatedly(Return(10));
-    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster3", 40))
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2_weights.cluster3", 40))
         .WillRepeatedly(Return(10));
 
     EXPECT_EQ("cluster1", config.route(headers, 45)->routeEntry()->clusterName());
@@ -1135,14 +1134,14 @@ TEST(RouteMatcherTest, WeightedClusters) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www2.lyft.com", "/foo", "GET");
     EXPECT_CALL(runtime.snapshot_, featureEnabled("www2", 100, _)).WillRepeatedly(Return(true));
-    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster1", 30))
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2_weights.cluster1", 30))
         .WillRepeatedly(Return(10));
 
     // We return an invalid value here, one that is greater than 100
     // Expect any random value > 10 to always land in cluster2.
-    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster2", 30))
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2_weights.cluster2", 30))
         .WillRepeatedly(Return(120));
-    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster3", 40))
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2_weights.cluster3", 40))
         .WillRepeatedly(Return(10));
 
     EXPECT_EQ("cluster1", config.route(headers, 5)->routeEntry()->clusterName());
@@ -1161,10 +1160,40 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersOrClusterConfig) {
       "routes": [
         {
           "prefix": "/",
-          "weighted_clusters": [
-           { "name" : "www2", "weight" : 100 }
-          ],
+          "weighted_clusters": {
+            "clusters" : [
+              { "name" : "cluster1", "weight" : 30 },
+              { "name" : "cluster2", "weight" : 30 },
+              { "name" : "cluster3", "weight" : 40 }
+            ]
+          },
           "cluster" : "www2"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+}
+
+TEST(RouteMatcherTest, WeightedClustersMissingClusterList) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "weighted_clusters": {
+            "runtime_key_prefix" : "www2"
+          }
         }
       ]
     }
@@ -1188,11 +1217,13 @@ TEST(RouteMatcherTest, WeightedClustersSumOFWeightsNotEqualToMax) {
       "routes": [
         {
           "prefix": "/",
-          "weighted_clusters": [
-           { "name" : "cluster1", "weight" : 3 },
-           { "name" : "cluster2", "weight" : 3 },
-           { "name" : "cluster3", "weight" : 3 }
-          ]
+          "weighted_clusters": {
+            "clusters" : [
+              { "name" : "cluster1", "weight" : 3 },
+              { "name" : "cluster2", "weight" : 3 },
+              { "name" : "cluster3", "weight" : 3 }
+            ]
+          }
         }
       ]
     }
@@ -1216,10 +1247,13 @@ TEST(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
       "routes": [
         {
           "prefix": "/",
-          "weighted_clusters": [
-           { "name" : "cluster1", "weight" : 33 },
-           { "name" : "cluster2" }
-          ]
+          "weighted_clusters": {
+            "clusters" : [
+              { "name" : "cluster1", "weight" : 50 },
+              { "name" : "cluster2", "weight" : 50 },
+              { "name" : "cluster3"}
+            ]
+          }
         }
       ]
     }
@@ -1243,11 +1277,13 @@ TEST(RouteMatcherTest, TestWeightedClusterInvalidClusterName) {
       "routes": [
         {
           "prefix": "/foo",
-          "weighted_clusters": [
-           { "name" : "cluster1", "weight" : 33 },
-           { "name" : "cluster2", "weight" : 33 },
-           { "name" : "cluster3-invalid", "weight" : 34 }
-          ]
+          "weighted_clusters": {
+            "clusters" : [
+              { "name" : "cluster1", "weight" : 33 },
+              { "name" : "cluster2", "weight" : 33 },
+              { "name" : "cluster3-invalid", "weight": 34}
+            ]
+          }
         }
       ]
     }
