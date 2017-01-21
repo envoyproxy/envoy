@@ -239,8 +239,10 @@ private:
    */
   struct WeightedClusterEntry : public RouteEntry, public Route {
   public:
-    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string name, uint64_t weight)
-        : parent_(parent), cluster_name_(name), cluster_weight_(weight) {}
+    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string runtime_key,
+                         Runtime::Loader& loader, const std::string name, uint64_t weight)
+        : parent_(parent), runtime_key_(runtime_key), loader_(loader), cluster_name_(name),
+          cluster_weight_(weight) {}
 
     const std::string& clusterName() const override { return cluster_name_; }
 
@@ -268,10 +270,15 @@ private:
       }
     }
 
-    uint64_t clusterWeight() const { return cluster_weight_; }
+    uint64_t clusterWeight() const {
+      return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
+    }
 
   private:
     const RouteEntryImplBase* parent_;
+    const std::string runtime_key_;
+    Runtime::Loader& loader_;
+
     const std::string cluster_name_;
     uint64_t cluster_weight_;
   };

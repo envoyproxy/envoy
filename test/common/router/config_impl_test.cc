@@ -1007,39 +1007,6 @@ TEST(RouteMatcherTest, ExclusiveRouteEntryOrRedirectEntry) {
   }
 }
 
-TEST(RouteMatcherTest, TestWeightedClustersRouting) {
-  std::string json = R"EOF(
-{
-  "virtual_hosts": [
-    {
-      "name": "www2",
-      "domains": ["www.lyft.com"],
-      "routes": [
-        {
-          "prefix": "/",
-          "weighted_clusters": [
-           { "name" : "cluster1", "weight" : 30 },
-           { "name" : "cluster2", "weight" : 30 },
-           { "name" : "cluster3", "weight" : 40 }
-          ]
-        }
-      ]
-    }
-  ]
-}
-  )EOF";
-
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Upstream::MockClusterManager> cm;
-  ConfigImpl config(*loader, runtime, cm);
-  Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
-  EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
-  EXPECT_EQ("cluster1", config.route(headers, 15)->routeEntry()->clusterName());
-  EXPECT_EQ("cluster2", config.route(headers, 45)->routeEntry()->clusterName());
-  EXPECT_EQ("cluster3", config.route(headers, 60)->routeEntry()->clusterName());
-}
-
 TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrRedirectEntry) {
   std::string json = R"EOF(
 {
@@ -1088,6 +1055,102 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrRedirectEntry) {
   }
 }
 
+TEST(RouteMatcherTest, WeightedClusters) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www1",
+      "domains": ["www1.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "weighted_clusters": [
+           { "name" : "cluster1", "weight" : 30 },
+           { "name" : "cluster2", "weight" : 30 },
+           { "name" : "cluster3", "weight" : 40 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "www2",
+      "domains": ["www2.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "runtime": {
+            "key": "www2",
+            "default": 100
+          },
+          "weighted_clusters": [
+           { "name" : "cluster1", "weight" : 30 },
+           { "name" : "cluster2", "weight" : 30 },
+           { "name" : "cluster3", "weight" : 40 }
+          ]
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(*loader, runtime, cm);
+
+  EXPECT_TRUE(config.usesRuntime());
+
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("www1.lyft.com", "/foo", true, true);
+    EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
+  }
+
+  // Weighted Cluster with no runtime
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+    EXPECT_EQ("cluster1", config.route(headers, 15)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster2", config.route(headers, 45)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster3", config.route(headers, 60)->routeEntry()->clusterName());
+  }
+
+  // Weighted Cluster with valid runtime values
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www2.lyft.com", "/foo", "GET");
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("www2", 100, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster1", 30))
+        .WillRepeatedly(Return(80));
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster2", 30))
+        .WillRepeatedly(Return(10));
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster3", 40))
+        .WillRepeatedly(Return(10));
+
+    EXPECT_EQ("cluster1", config.route(headers, 45)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster2", config.route(headers, 82)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster3", config.route(headers, 92)->routeEntry()->clusterName());
+  }
+
+  // Weighted Cluster with invalid runtime values
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www2.lyft.com", "/foo", "GET");
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("www2", 100, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster1", 30))
+        .WillRepeatedly(Return(10));
+
+    // We return an invalid value here, one that is greater than 100
+    // Expect any random value > 10 to always land in cluster2.
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster2", 30))
+        .WillRepeatedly(Return(120));
+    EXPECT_CALL(runtime.snapshot_, getInteger("www2.weighted_clusters.cluster3", 40))
+        .WillRepeatedly(Return(10));
+
+    EXPECT_EQ("cluster1", config.route(headers, 5)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster2", config.route(headers, 82)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster2", config.route(headers, 92)->routeEntry()->clusterName());
+  }
+}
+
 TEST(RouteMatcherTest, ExclusiveWeightedClustersOrClusterConfig) {
   std::string json = R"EOF(
 {
@@ -1126,9 +1189,9 @@ TEST(RouteMatcherTest, WeightedClustersSumOFWeightsNotEqualToMax) {
         {
           "prefix": "/",
           "weighted_clusters": [
-           { "name" : "cluster1", "weight" : 33 },
-           { "name" : "cluster2", "weight" : 33 },
-           { "name" : "cluster3", "weight" : 33 }
+           { "name" : "cluster1", "weight" : 3 },
+           { "name" : "cluster2", "weight" : 3 },
+           { "name" : "cluster3", "weight" : 3 }
           ]
         }
       ]

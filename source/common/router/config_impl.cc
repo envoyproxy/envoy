@@ -72,6 +72,8 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
   return matches;
 }
 
+static const std::string WEIGHTED_CLUSTERS_RUNTIME_KEY = "weighted_clusters";
+
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
                                        Runtime::Loader& loader)
     : case_sensitive_(route.getBoolean("case_sensitive", true)),
@@ -108,9 +110,19 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
         route.getObjectArray("weighted_clusters");
 
     for (const Json::ObjectPtr& cluster : weighted_clusters_json) {
-      // Internal route entry objects, one per weighted cluster entry in the config
+      // The runtime key for each weighted_cluster entry
+      // is derived as
+      // parent.RuntimeKey + "." + "weighted_clusters" + "." + name
+      // where parent is the RouteEntryImplBase object.
+      std::string runtime_key_prefix = EMPTY_STRING;
+      if (runtime_.valid()) {
+        runtime_key_prefix = runtime_.value().key_ + "." + WEIGHTED_CLUSTERS_RUNTIME_KEY + "." +
+                             cluster->getString("name");
+      }
+
       weighted_clusters_.emplace_back(std::make_shared<WeightedClusterEntry>(
-          this, cluster->getString("name"), cluster->getInteger("weight")));
+          this, runtime_key_prefix, loader_, cluster->getString("name"),
+          cluster->getInteger("weight")));
 
       total_weight += weighted_clusters_.back()->clusterWeight();
       if (total_weight > max_weight) {
@@ -239,16 +251,17 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
 const Route* RouteEntryImplBase::weightedClusterEntry(uint64_t random_value) const {
   uint64_t max_weight = 100UL;
   uint64_t selected_value = random_value % max_weight;
-  uint64_t summed_weight = 0UL;
+  uint64_t begin = 0UL;
+  uint64_t end = 0UL;
   for (const WeightedClusterEntryPtr& cluster : weighted_clusters_) {
-    if ((selected_value >= summed_weight) &&
-        (selected_value < (summed_weight + cluster->clusterWeight()))) {
+    end = begin + cluster->clusterWeight();
+    if (((selected_value >= begin) && (selected_value < end)) || (end >= max_weight)) {
+      // end > max_weight : This case can only occur with Runtimes, if
+      // the user specifies invalid weights, such that sum(weights) >
+      // max_weight. We will just return the current cluster.
       return cluster.get();
     }
-    summed_weight += cluster->clusterWeight();
-    if (summed_weight >= max_weight) {
-      break;
-    }
+    begin = end;
   }
   return nullptr;
 }
