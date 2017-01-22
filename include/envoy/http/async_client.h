@@ -71,7 +71,7 @@ public:
   };
 
   /**
-   * An in-flight HTTP request
+   * An in-flight HTTP request.
    */
   class Request {
   public:
@@ -84,29 +84,29 @@ public:
   };
 
   /**
-   * An in-flight HTTP stream
+   * An in-flight HTTP stream.
    */
   class Stream {
   public:
     virtual ~Stream() {}
 
     /***
-     * Send headers to the stream
-     * @param headers supplies the headers to send
-     * @param end_stream supplies whether this is a header only request
+     * Send headers to the stream.
+     * @param headers supplies the headers to send.
+     * @param end_stream supplies whether this is a header only request.
      */
     virtual void sendHeaders(HeaderMap& headers, bool end_stream) PURE;
 
     /***
-     * Send data to the stream
-     * @param data supplies the data to send
-     * @param end_stream supplies whether this is the last data
+     * Send data to the stream.
+     * @param data supplies the data to send.
+     * @param end_stream supplies whether this is the last data.
      */
     virtual void sendData(Buffer::Instance& data, bool end_stream) PURE;
 
     /***
      * Send trailers. This implicitly ends the stream.
-     * @param trailers supplies the trailers to send
+     * @param trailers supplies the trailers to send.
      */
     virtual void sendTrailers(HeaderMap& trailers) PURE;
 
@@ -131,7 +131,7 @@ public:
                         const Optional<std::chrono::milliseconds>& timeout) PURE;
 
   /**
-   * Start an HTTP stream asynchronously
+   * Start an HTTP stream asynchronously.
    * @param callbacks the callbacks to be notified of stream status.
    * @param timeout supplies the stream timeout, measured since when the frame with end_stream
    *        flag is sent until when the first frame is received.
