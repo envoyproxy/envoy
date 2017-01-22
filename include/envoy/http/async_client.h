@@ -122,6 +122,7 @@ public:
    * Send an HTTP request asynchronously
    * @param request the request to send.
    * @param callbacks the callbacks to be notified of request status.
+   * @param timeout supplies the request timeout
    * @return a request handle or nullptr if no request could be created. NOTE: In this case
    *         onFailure() has already been called inline. The client owns the request and the
    *         handle should just be used to cancel.
@@ -132,6 +133,8 @@ public:
   /**
    * Start an HTTP stream asynchronously
    * @param callbacks the callbacks to be notified of stream status.
+   * @param timeout supplies the stream timeout, measured since when the frame with end_stream
+   *        flag is sent until when the first frame is received.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case
    *         onResetStream() has already been called inline. The client owns the stream and
    *         the handle can be used to send more messages or close the stream.
