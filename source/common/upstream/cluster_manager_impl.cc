@@ -1,3 +1,4 @@
+#include "cds_api_impl.h"
 #include "cluster_manager_impl.h"
 #include "load_balancer_impl.h"
 
@@ -20,7 +21,8 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls), random_(random),
-      thread_local_slot_(tls.allocateSlot()), local_info_(local_info) {
+      thread_local_slot_(tls.allocateSlot()), local_info_(local_info),
+      cm_stats_(generateStats(stats)) {
 
   std::vector<Json::ObjectPtr> clusters = config.getObjectArray("clusters");
   pending_cluster_init_ = clusters.size();
@@ -43,6 +45,11 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
         std::chrono::milliseconds(config.getObject("sds")->getInteger("refresh_delay_ms"))};
 
     sds_config_.value(sds_config);
+  }
+
+  if (config.hasObject("cds")) {
+    pending_cluster_init_++;
+    loadCluster(*config.getObject("cds")->getObject("cluster"), false);
   }
 
   for (const Json::ObjectPtr& cluster : clusters) {
@@ -70,6 +77,19 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
   for (auto& cluster : primary_clusters_) {
     postInitializeCluster(*cluster.second.cluster_);
   }
+
+  // Once all clusters are initiailized we can attempt to initialize the CDS API if configured.
+  // TODO: Graceful initialize of CDS on initial load.
+  cds_api_ = factory_.createCds(config, *this);
+  if (cds_api_) {
+    cds_api_->initialize();
+  }
+}
+
+ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
+  std::string final_prefix = "cluster_manager.";
+  return {ALL_CLUSTER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                    POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
 void ClusterManagerImpl::postInitializeCluster(Cluster& cluster) {
@@ -83,7 +103,6 @@ void ClusterManagerImpl::postInitializeCluster(Cluster& cluster) {
 bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const Json::Object& new_config) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration.
-  // TODO: Stats
   std::string cluster_name = new_config.getString("name");
   auto existing_cluster = primary_clusters_.find(cluster_name);
   if (existing_cluster != primary_clusters_.end() &&
@@ -107,13 +126,14 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const Json::Object& new_confi
 }
 
 bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
-  // TODO: Stats
   auto existing_cluster = primary_clusters_.find(cluster_name);
   if (existing_cluster == primary_clusters_.end() || !existing_cluster->second.added_via_api_) {
     return false;
   }
 
   primary_clusters_.erase(cluster_name);
+  cm_stats_.cluster_removed_.inc();
+  cm_stats_.total_clusters_.set(primary_clusters_.size());
   tls_.runOnAllThreads([this, cluster_name]() -> void {
     ThreadLocalClusterManagerImpl& cluster_manager =
         tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
@@ -168,10 +188,17 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, bool added_via
   });
 
   // emplace() will do nothing if the key already exists. Always erase first.
-  primary_clusters_.erase(primary_cluster_reference.info()->name());
+  size_t num_erased = primary_clusters_.erase(primary_cluster_reference.info()->name());
   primary_clusters_.emplace(
       primary_cluster_reference.info()->name(),
       PrimaryClusterData{cluster.hash(), added_via_api, std::move(new_cluster)});
+
+  cm_stats_.total_clusters_.set(primary_clusters_.size());
+  if (num_erased) {
+    cm_stats_.cluster_modified_.inc();
+  } else {
+    cm_stats_.cluster_added_.inc();
+  }
 }
 
 ClusterInfoPtr ClusterManagerImpl::get(const std::string& cluster) {
@@ -401,6 +428,10 @@ ProdClusterManagerFactory::clusterFromJson(const Json::Object& cluster, ClusterM
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
                                  runtime_, random_, primary_dispatcher_, sds_config, local_info_,
                                  outlier_event_logger);
+}
+
+CdsApiPtr ProdClusterManagerFactory::createCds(const Json::Object& config, ClusterManager& cm) {
+  return CdsApiImpl::create(config, cm, primary_dispatcher_, random_, local_info_, stats_);
 }
 
 } // Upstream

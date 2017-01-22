@@ -79,9 +79,12 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
   info_->stats().update_success_.inc();
 }
 
-void SdsClusterImpl::onFetchFailure(Http::AsyncClient::FailureReason) {
+void SdsClusterImpl::onFetchFailure(EnvoyException* e) {
   log_debug("sds refresh failure for cluster: {}", info_->name());
   info_->stats().update_failure_.inc();
+  if (e) {
+    log().warn("sds parsing error: {}", e->what());
+  }
 }
 
 void SdsClusterImpl::createRequest(Http::Message& message) {
