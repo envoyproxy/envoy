@@ -139,8 +139,9 @@ public:
   /**
    * Initialize all of the installed read filters. This effectively calls onNewConnection() on
    * each of them.
+   * @return true if read filters were initialized successfully, otherwise false.
    */
-  virtual void initializeReadFilters() PURE;
+  virtual bool initializeReadFilters() PURE;
 };
 
 /**

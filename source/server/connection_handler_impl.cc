@@ -93,13 +93,13 @@ Network::Listener* ConnectionHandlerImpl::findListener(const std::string& socket
 void ConnectionHandlerImpl::ActiveListener::onNewConnection(
     Network::ConnectionPtr&& new_connection) {
   conn_log(parent_.logger_, info, "new connection", *new_connection);
-  auto badFilterChain = !factory_.createFilterChain(*new_connection);
+  bool empty_filter_chain = !factory_.createFilterChain(*new_connection);
 
   // If the connection is already closed, we can just let this connection immediately die.
   if (new_connection->state() != Network::Connection::State::Closed) {
-    // Close the connection if the filter chain is bad (e.g. empty) to avoid
+    // Close the connection if the filter chain is empty to avoid
     // leaving open connections with nothing to do.
-    if (badFilterChain) {
+    if (empty_filter_chain) {
       conn_log(parent_.logger_, info, "closing connection - no filters", *new_connection);
       new_connection->close(Network::ConnectionCloseType::NoFlush);
     } else {

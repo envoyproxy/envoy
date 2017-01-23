@@ -20,8 +20,7 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
     factory(filter_manager);
   }
 
-  filter_manager.initializeReadFilters();
-  return factories.size() > 0;
+  return filter_manager.initializeReadFilters();
 }
 
 MainImpl::MainImpl(Server::Instance& server) : server_(server) {}
