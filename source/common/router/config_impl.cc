@@ -72,7 +72,7 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
   return matches;
 }
 
-static const std::string WEIGHTED_CLUSTERS_RUNTIME_KEY = "weighted_clusters";
+const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
                                        Runtime::Loader& loader)
@@ -89,6 +89,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
 
   bool have_weighted_clusters = route.hasObject("weighted_clusters");
   bool have_cluster = !cluster_name_.empty() || have_weighted_clusters;
+
   // Check to make sure that we are either a redirect route or we have a cluster.
   if (!(isRedirect() ^ have_cluster)) {
     throw EnvoyException("routes must be either redirects or cluster targets");

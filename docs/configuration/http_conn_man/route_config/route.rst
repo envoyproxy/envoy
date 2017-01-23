@@ -45,7 +45,7 @@ cluster
   should be forwarded to.
 
 :ref:`weighted_clusters <config_http_conn_man_route_table_route_weighted_clusters>`
-  *(sometimes required, string)* If the route is not a redirect (i.e., *host_redirect* and/or
+  *(sometimes required, string)* If the route is not a redirect (*host_redirect* and/or
   *path_redirect* is not specified), one of *cluster* or *weighted_clusters* must be specified. 
   With the *weighted_clusters*, multiple upstream clusters can be specified for a given route.
   The request is forwarded to one of the upstream clusters based on weights assigned

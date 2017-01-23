@@ -235,7 +235,7 @@ private:
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
     }
 
-    static const uint64_t MAX_CLUSTER_WEIGHT = 100;
+    static const uint64_t MAX_CLUSTER_WEIGHT;
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
