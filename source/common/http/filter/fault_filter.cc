@@ -10,6 +10,7 @@
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/router/config_impl.h"
 
 namespace Http {
 
@@ -64,6 +65,8 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
                                          header_map->getBoolean("regex", false));
     }
   }
+
+  target_cluster_ = json_config.getString("upstream_cluster", EMPTY_STRING);
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigPtr config) : config_(config) {}
@@ -75,7 +78,13 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 // if we inject a delay, then we will inject the abort in the delay timer
 // callback.
 FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
-  // Check for header matches first
+
+  if (!matchesTargetCluster(headers)) {
+    std::cerr << "in decodeHeaders got false, continuing filter\n";
+    return FilterHeadersStatus::Continue;
+  }
+
+  // Check for header matches
   if (!Router::ConfigUtility::matchHeaders(headers, config_->filterHeaders())) {
     return FilterHeadersStatus::Continue;
   }
@@ -140,6 +149,27 @@ void FaultFilter::abortWithHTTPStatus() {
   callbacks_->encodeHeaders(std::move(response_headers), true);
   config_->stats().aborts_injected_.inc();
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
+}
+
+bool FaultFilter::matchesTargetCluster(HeaderMap& headers) {
+  bool matches = true;
+
+  if (!config_->targetCluster().empty()) {
+    std::cerr << "in matchesTargetCluster with targetCluster " << config_->targetCluster() << "\n";
+    // TODO PERF Eliminate repeated route matching
+    const Router::Route* route = callbacks_->routeTable().route(headers);
+
+    matches &= ((nullptr != route) && (nullptr != route->routeEntry()));
+    std::cerr << "in matchesTargetCluster after route match, matches= " << matches << "\n";
+    if (matches) {
+      std::cerr << "in matchesTargetCluster with routeEntry->clusterName "
+                << route->routeEntry()->clusterName() << "\n";
+      matches &= (route->routeEntry()->clusterName() == config_->targetCluster());
+      std::cerr << "in matchesTargetCluster with after string compare, matches "
+                << matches << "\n";
+    }
+  }
+  return matches;
 }
 
 void FaultFilter::resetTimerState() {

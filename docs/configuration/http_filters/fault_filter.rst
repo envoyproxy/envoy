@@ -9,7 +9,8 @@ inject delays and abort requests with user-specified error codes, thereby
 providing the ability to stage different failure scenarios such as service
 failures, service overloads, high network latency, network partitions,
 etc. Faults injection can be limited to a specific set of requests based on
-a set of pre-defined request headers.
+the (destination) upstream cluster of a request and/or a set of pre-defined
+request headers. 
 
 The scope of failures is restricted to those that are observable by an
 application communicating over the network. CPU and disk failures on the
@@ -17,7 +18,6 @@ local host cannot be emulated.
 
 Currently, the fault injection filter has the following limitations:
 
-* Faults will be injected on all configured routes in the Envoy instance
 * Abort codes are restricted to HTTP status codes only
 * Delays are restricted to fixed duration.
 
@@ -46,6 +46,7 @@ including the router filter.*
           "fixed_delay_percent" : "...",
           "fixed_duration_ms" : "..."
         },
+        "upstream_cluster" : "...",
         "headers" : []
       }
     }
@@ -71,6 +72,11 @@ delay.fixed_delay_percent:
 delay.fixed_duration_ms:
   *(required, integer)* The delay duration in
   milliseconds. Must be greater than 0.
+
+upstream_cluster:
+  *(optional, string)* Specifies the name of the (destination) upstream
+  cluster that the filter should match on. Fault injection will be
+  restricted to requests bound to the specific upstream cluster.
 
 :ref:`headers <config_http_filters_fault_injection_headers>`
   *(optional, array)* Specifies a set of headers that the filter should match on.
