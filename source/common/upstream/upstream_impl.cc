@@ -58,8 +58,8 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
     : runtime_(runtime), name_(config.getString("name")),
       max_requests_per_connection_(config.getInteger("max_requests_per_connection", 0)),
       connect_timeout_(std::chrono::milliseconds(config.getInteger("connect_timeout_ms"))),
-      stats_scope_(stats, fmt::format("cluster.{}.", name_)), stats_(generateStats(stats_scope_)),
-      features_(parseFeatures(config)),
+      stats_scope_(stats.createScope(fmt::format("cluster.{}.", name_))),
+      stats_(generateStats(*stats_scope_)), features_(parseFeatures(config)),
       http_codec_options_(Http::Utility::parseCodecOptions(config)),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)) {
@@ -67,7 +67,7 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
   ssl_ctx_ = nullptr;
   if (config.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*config.getObject("ssl_context"));
-    ssl_ctx_ = ssl_context_manager.createSslClientContext(stats_scope_, context_config);
+    ssl_ctx_ = ssl_context_manager.createSslClientContext(*stats_scope_, context_config);
   }
 
   std::string string_lb_type = config.getString("lb_type");

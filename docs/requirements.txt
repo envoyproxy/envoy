@@ -1,5 +1,7 @@
 docutils==0.12
 sphinx==1.5.0
-sphinx_rtd_theme==0.1.9
 sphinxcontrib-httpdomain==1.5.0
 GitPython==2.0.8
+
+# Includes fix for https://github.com/snide/sphinx_rtd_theme/issues/348
+git+https://github.com/snide/sphinx_rtd_theme@abfa98539a2bfc44198a9ca8c2f16efe84cc4d26

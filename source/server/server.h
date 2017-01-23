@@ -73,7 +73,7 @@ public:
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
-  InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::Store& store,
+  InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                const LocalInfo::LocalInfo& local_info);
   ~InstanceImpl();
@@ -123,7 +123,7 @@ private:
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
-  Stats::Store& stats_store_;
+  Stats::StoreRoot& stats_store_;
   std::list<Stats::SinkPtr> stat_sinks_;
   ServerStats server_stats_;
   ThreadLocal::InstanceImpl thread_local_;

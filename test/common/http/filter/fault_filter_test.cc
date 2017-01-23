@@ -195,7 +195,6 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 
   // Delay related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 0))
-      .Times(1)
       .WillOnce(Return(false));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
@@ -205,11 +204,9 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
-      .Times(1)
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
-      .Times(1)
       .WillOnce(Return(429));
 
   Http::TestHeaderMapImpl response_headers{{":status", "429"}};
@@ -231,17 +228,14 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
 
   // Delay related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
-      .Times(1)
       .WillOnce(Return(true));
 
   // Return 0ms delay
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
-      .Times(1)
       .WillOnce(Return(0));
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
-      .Times(1)
       .WillOnce(Return(false));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
@@ -263,11 +257,9 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
 
   // Delay related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
-      .Times(1)
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
-      .Times(1)
       .WillOnce(Return(5000UL));
 
   SCOPED_TRACE("FixedDelayNonZeroDuration");
@@ -279,7 +271,6 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
-      .Times(1)
       .WillOnce(Return(false));
 
   // Delay only case
@@ -287,7 +278,7 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(0);
-  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(1);
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
   timer_->callback_();
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -302,11 +293,9 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 
   // Delay related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
-      .Times(1)
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
-      .Times(1)
       .WillOnce(Return(5000UL));
 
   SCOPED_TRACE("FixedDelayAndAbort");
@@ -319,11 +308,9 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
-      .Times(1)
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
-      .Times(1)
       .WillOnce(Return(503));
 
   Http::TestHeaderMapImpl response_headers{{":status", "503"}};
@@ -350,11 +337,9 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 
   // Delay related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
-      .Times(1)
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
-      .Times(1)
       .WillOnce(Return(5000UL));
 
   SCOPED_TRACE("FixedDelayAndAbortHeaderMatchSuccess");
@@ -367,11 +352,9 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
-      .Times(1)
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
-      .Times(1)
       .WillOnce(Return(503));
 
   Http::TestHeaderMapImpl response_headers{{":status", "503"}};
@@ -411,6 +394,45 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+}
+
+TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
+  SetUpTest(fixed_delay_only_json);
+
+  // Prep up with a 5s delay
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
+      .WillOnce(Return(5000UL));
+
+  SCOPED_TRACE("FixedDelayWithStreamReset");
+  timer_ = new Event::MockTimer(&filter_callbacks_.dispatcher_);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000UL)));
+
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
+
+  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // delay timer should have been fired by now. If caller resets the stream while we are waiting
+  // on the delay timer, check if timers are cancelled
+  EXPECT_CALL(*timer_, disableTimer());
+
+  // The timer callback should never be called.
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", _)).Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected)).Times(0);
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
+
+  filter_callbacks_.reset_callback_();
 }
 
 } // Http

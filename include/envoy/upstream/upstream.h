@@ -28,7 +28,7 @@ public:
   /**
    * @return host specific counters.
    */
-  virtual std::list<std::reference_wrapper<Stats::Counter>> counters() const PURE;
+  virtual std::list<Stats::CounterPtr> counters() const PURE;
 
   /**
    * Create a connection for this host.
@@ -44,7 +44,7 @@ public:
   /**
    * @return host specific gauges.
    */
-  virtual std::list<std::reference_wrapper<Stats::Gauge>> gauges() const PURE;
+  virtual std::list<Stats::GaugePtr> gauges() const PURE;
 
   /**
    * Atomically clear a health flag for a host. Flags are specified in HealthFlags.

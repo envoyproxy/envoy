@@ -13,23 +13,29 @@ namespace Auth {
 namespace ClientSsl {
 
 Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream::ClusterManager& cm,
-               Event::Dispatcher& dispatcher, Stats::Store& stats_store, Runtime::Loader& runtime)
-    : tls_(tls), tls_slot_(tls.allocateSlot()), cm_(cm),
-      auth_api_cluster_(config.getString("auth_api_cluster")),
-      interval_timer_(dispatcher.createTimer([this]() -> void { refreshPrincipals(); })),
-      ip_white_list_(config), stats_(generateStats(stats_store, config.getString("stat_prefix"))),
-      runtime_(runtime) {
+               Event::Dispatcher& dispatcher, Stats::Store& stats_store,
+               Runtime::RandomGenerator& random)
+    : RestApiFetcher(cm, config.getString("auth_api_cluster"), dispatcher, random,
+                     std::chrono::milliseconds(config.getInteger("refresh_interval_ms", 60000))),
+      tls_(tls), tls_slot_(tls.allocateSlot()), ip_white_list_(config),
+      stats_(generateStats(stats_store, config.getString("stat_prefix"))) {
 
-  if (!cm_.get(auth_api_cluster_)) {
+  if (!cm.get(remote_cluster_name_)) {
     throw EnvoyException(
-        fmt::format("unknown cluster '{}' in client ssl auth config", auth_api_cluster_));
+        fmt::format("unknown cluster '{}' in client ssl auth config", remote_cluster_name_));
   }
 
   AllowedPrincipalsPtr empty(new AllowedPrincipals());
   tls_.set(tls_slot_,
            [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr { return empty; });
+}
 
-  refreshPrincipals();
+ConfigPtr Config::create(const Json::Object& config, ThreadLocal::Instance& tls,
+                         Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+                         Stats::Store& stats_store, Runtime::RandomGenerator& random) {
+  ConfigPtr new_config(new Config(config, tls, cm, dispatcher, stats_store, random));
+  new_config->initialize();
+  return new_config;
 }
 
 const AllowedPrincipals& Config::allowedPrincipals() {
@@ -43,29 +49,11 @@ GlobalStats Config::generateStats(Stats::Store& store, const std::string& prefix
   return stats;
 }
 
-AllowedPrincipalsPtr Config::parseAuthResponse(Http::Message& message) {
+void Config::parseResponse(const Http::Message& message) {
   AllowedPrincipalsPtr new_principals(new AllowedPrincipals());
   Json::ObjectPtr loader = Json::Factory::LoadFromString(message.bodyAsString());
   for (const Json::ObjectPtr& certificate : loader->getObjectArray("certificates")) {
     new_principals->add(certificate->getString("fingerprint_sha256"));
-  }
-
-  return new_principals;
-}
-
-void Config::onSuccess(Http::MessagePtr&& response) {
-  uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
-  if (response_code != enumToInt(Http::Code::OK)) {
-    onFailure(Http::AsyncClient::FailureReason::Reset);
-    return;
-  }
-
-  AllowedPrincipalsPtr new_principals;
-  try {
-    new_principals = parseAuthResponse(*response);
-  } catch (EnvoyException& e) {
-    onFailure(Http::AsyncClient::FailureReason::Reset);
-    return;
   }
 
   tls_.set(tls_slot_, [new_principals](Event::Dispatcher&)
@@ -73,29 +61,15 @@ void Config::onSuccess(Http::MessagePtr&& response) {
 
   stats_.update_success_.inc();
   stats_.total_principals_.set(new_principals->size());
-  requestComplete();
 }
 
-void Config::onFailure(Http::AsyncClient::FailureReason) {
-  stats_.update_failure_.inc();
-  requestComplete();
-}
+void Config::onFetchFailure(EnvoyException*) { stats_.update_failure_.inc(); }
 
 static const std::string Path = "/v1/certs/list/approved";
 
-void Config::refreshPrincipals() {
-  Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
-  message->headers().insertPath().value(Path);
-  message->headers().insertHost().value(auth_api_cluster_);
-  cm_.httpAsyncClientForCluster(auth_api_cluster_)
-      .send(std::move(message), *this, Optional<std::chrono::milliseconds>());
-}
-
-void Config::requestComplete() {
-  std::chrono::milliseconds interval(
-      runtime_.snapshot().getInteger("auth.clientssl.refresh_interval_ms", 60000));
-  interval_timer_->enableTimer(interval);
+void Config::createRequest(Http::Message& request) {
+  request.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
+  request.headers().insertPath().value(Path);
 }
 
 Network::FilterStatus Instance::onData(Buffer::Instance&) {

@@ -43,8 +43,8 @@ public:
   }
 
   ~RateLimitFilterTest() {
-    for (Stats::Gauge& gauge : stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge.value());
+    for (Stats::GaugePtr gauge : stats_store_.gauges()) {
+      EXPECT_EQ(0U, gauge->value());
     }
   }
 

@@ -14,7 +14,7 @@ namespace Server {
 
 // Increment this whenever there is a shared memory / RPC change that will prevent a hot restart
 // from working. Operations code can then cope with this and do a full restart.
-const uint64_t SharedMemory::VERSION = 3;
+const uint64_t SharedMemory::VERSION = 4;
 
 SharedMemory& SharedMemory::initialize(Options& options) {
   int flags = O_RDWR;
@@ -83,21 +83,31 @@ HotRestartImpl::HotRestartImpl(Options& options)
   UNREFERENCED_PARAMETER(rc);
 }
 
-HotRestartImpl::~HotRestartImpl() {}
-
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
-  // We assume that we are under appropriate locking at the current time. Try to find the existing
-  // slot in shared memory, otherwise allocate a new one.
+  // Try to find the existing slot in shared memory, otherwise allocate a new one.
+  std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
   for (Stats::RawStatData& data : shmem_.stats_slots_) {
     if (!data.initialized()) {
       data.initialize(name);
       return &data;
     } else if (data.matches(name)) {
+      data.ref_count_++;
       return &data;
     }
   }
 
   return nullptr;
+}
+
+void HotRestartImpl::free(Stats::RawStatData& data) {
+  // We must hold the lock since the reference decrement can race with an initialize above.
+  std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+
+  memset(&data, 0, sizeof(Stats::RawStatData));
 }
 
 int HotRestartImpl::bindDomainSocket(uint64_t id) {

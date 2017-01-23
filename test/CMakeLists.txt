@@ -89,8 +89,11 @@ add_executable(envoy-test
   common/runtime/uuid_util_test.cc
   common/ssl/connection_impl_test.cc
   common/ssl/context_impl_test.cc
+  common/stats/stats_impl_test.cc
   common/stats/statsd_test.cc
+  common/stats/thread_local_store_test.cc
   common/tracing/http_tracer_impl_test.cc
+  common/upstream/cds_api_impl_test.cc
   common/upstream/cluster_manager_impl_test.cc
   common/upstream/health_checker_impl_test.cc
   common/upstream/host_utility_test.cc
