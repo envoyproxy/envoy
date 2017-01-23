@@ -37,7 +37,7 @@ IpWhiteList::IpWhiteList(const Json::Object& config) {
 
     Ipv4Entry white_list_entry;
     white_list_entry.ipv4_address_ = ntohl(addr.s_addr);
-    white_list_entry.ipv4_mask_ = ~((1 << (32 - mask)) - 1);
+    white_list_entry.ipv4_mask_ = ~((1ULL << (32 - mask)) - 1);
 
     // Check to make sure applying the mask to the address equals the address. This can prevent
     // user error.
