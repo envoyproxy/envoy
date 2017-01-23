@@ -80,7 +80,6 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
 
   if (!matchesTargetCluster(headers)) {
-    std::cerr << "in decodeHeaders got false, continuing filter\n";
     return FilterHeadersStatus::Continue;
   }
 
@@ -155,18 +154,12 @@ bool FaultFilter::matchesTargetCluster(HeaderMap& headers) {
   bool matches = true;
 
   if (!config_->targetCluster().empty()) {
-    std::cerr << "in matchesTargetCluster with targetCluster " << config_->targetCluster() << "\n";
     // TODO PERF Eliminate repeated route matching
     const Router::Route* route = callbacks_->routeTable().route(headers);
 
     matches &= ((nullptr != route) && (nullptr != route->routeEntry()));
-    std::cerr << "in matchesTargetCluster after route match, matches= " << matches << "\n";
     if (matches) {
-      std::cerr << "in matchesTargetCluster with routeEntry->clusterName "
-                << route->routeEntry()->clusterName() << "\n";
       matches &= (route->routeEntry()->clusterName() == config_->targetCluster());
-      std::cerr << "in matchesTargetCluster with after string compare, matches "
-                << matches << "\n";
     }
   }
   return matches;

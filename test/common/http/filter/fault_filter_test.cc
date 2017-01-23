@@ -5,13 +5,11 @@
 #include "common/http/filter/fault_filter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/router/config_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/router/mocks.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
@@ -108,9 +106,6 @@ public:
   Buffer::OwnedImpl data_;
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Router::MockRoute> route_;
-  NiceMock<Router::MockRouteEntry> route_entry_;
-
   Event::MockTimer* timer_{};
 };
 
@@ -456,22 +451,17 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(filter_callbacks_.route_table_.route_.route_entry_, clusterName())
-      .WillRepeatedly(ReturnRef(upstream_cluster));
+      .WillOnce(ReturnRef(upstream_cluster));
 
   // Delay related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
-      .WillRepeatedly(Return(true));
+      .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(5000UL));
 
   SCOPED_TRACE("FaultWithTargetClusterMatchSuccess");
   expectDelayTimer(5000UL);
-
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
-
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected));
@@ -501,7 +491,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
   const std::string upstream_cluster("mismatch");
 
   EXPECT_CALL(filter_callbacks_.route_table_.route_.route_entry_, clusterName())
-      .WillRepeatedly(ReturnRef(upstream_cluster));
+      .WillOnce(ReturnRef(upstream_cluster));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
@@ -523,8 +513,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   SetUpTest(fault_with_target_cluster_json);
   const std::string upstream_cluster("www1");
 
-  EXPECT_CALL(filter_callbacks_.route_table_.route_.route_entry_, clusterName())
-      .WillRepeatedly(ReturnRef(upstream_cluster));
+  EXPECT_CALL(filter_callbacks_.route_table_.route_, routeEntry()).WillOnce(Return(nullptr));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
