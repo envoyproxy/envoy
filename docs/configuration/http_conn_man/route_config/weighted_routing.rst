@@ -59,7 +59,7 @@ The second option is to use **multiple** :ref:`routes <config_http_conn_man_rout
 with :ref:`runtimes <config_http_conn_man_route_table_route_runtime>` that specify the
 **probability** of selecting a route.
 Since Envoy matches routes with a :ref:`first match <config_http_conn_man_route_table_route_matching>`
-policy, the related routes (one for each upstream cluster) are placed back-to-back,
+policy, the related routes (one for each upstream cluster) must be placed back-to-back,
 along with a runtime in all but the last route.
 
 .. code-block:: json

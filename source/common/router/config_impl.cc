@@ -108,11 +108,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
     uint64_t total_weight = 0UL;
 
     const Json::ObjectPtr weighted_clusters_json = route.getObject("weighted_clusters");
-
-    if (!weighted_clusters_json->hasObject("clusters")) {
-      throw EnvoyException("weighted_clusters specification has no clusters defined");
-    }
-
     const std::vector<Json::ObjectPtr> cluster_list =
         weighted_clusters_json->getObjectArray("clusters");
     const std::string runtime_key_prefix =
@@ -267,24 +262,26 @@ const Route* RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
     }
     begin = end;
   }
-  return nullptr;
+  NOT_IMPLEMENTED;
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
   // Throws an error if any of the clusters held by this Route or the
   // internal weighted clusters are invalid.
-  if (!isRedirect()) {
-    // We could have either a normal cluster or weighted cluster
-    if (weighted_clusters_.empty()) {
-      if (!cm.get(this->clusterName())) {
-        throw EnvoyException(fmt::format("route: unknown cluster '{}'", this->clusterName()));
-      }
-    } else {
-      for (const WeightedClusterEntryPtr& cluster : weighted_clusters_) {
-        if (!cm.get(cluster->clusterName())) {
-          throw EnvoyException(
-              fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
-        }
+  if (isRedirect()) {
+    return;
+  }
+
+  // We could have either a normal cluster or weighted cluster
+  if (weighted_clusters_.empty()) {
+    if (!cm.get(this->clusterName())) {
+      throw EnvoyException(fmt::format("route: unknown cluster '{}'", this->clusterName()));
+    }
+  } else {
+    for (const WeightedClusterEntryPtr& cluster : weighted_clusters_) {
+      if (!cm.get(cluster->clusterName())) {
+        throw EnvoyException(
+            fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
       }
     }
   }
@@ -438,9 +435,9 @@ const Route* VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers
 
   // Check for a route that matches the request.
   for (const RouteEntryImplBasePtr& route : routes_) {
-    const Route* cEntry = route->matches(headers, random_value);
-    if (nullptr != cEntry) {
-      return cEntry;
+    const Route* route_entry = route->matches(headers, random_value);
+    if (nullptr != route_entry) {
+      return route_entry;
     }
   }
 

@@ -47,7 +47,7 @@ cluster
 :ref:`weighted_clusters <config_http_conn_man_route_table_route_weighted_clusters>`
   *(sometimes required, string)* If the route is not a redirect (*host_redirect* and/or
   *path_redirect* is not specified), one of *cluster* or *weighted_clusters* must be specified. 
-  With the *weighted_clusters*, multiple upstream clusters can be specified for a given route.
+  With the *weighted_clusters* option, multiple upstream clusters can be specified for a given route.
   The request is forwarded to one of the upstream clusters based on weights assigned
   to each cluster. See :ref:`traffic splitting <config_http_conn_man_route_table_weighted_routing>`
   for additional documentation.
@@ -233,7 +233,7 @@ Weighted Clusters
 -----------------
 
 Compared to the ``cluster`` field that specifies a single upstream cluster as the target
-of a request, the ``weighted_clusters`` allows for specification of multiple upstream clusters
+of a request, the ``weighted_clusters`` option allows for specification of multiple upstream clusters
 along with weights that indicate the **percentage** of traffic to be forwarded to each cluster.
 The router selects an upstream cluster based on the weights.
 
@@ -260,8 +260,8 @@ clusters
 
   weight
     *(required, integer)* An integer between 0-100. When a request matches the route,
-    choice of an upstream cluster is determined by its weight. The sum of
-    weights across all entries in the ``clusters`` array should add up to 100.
+    the choice of an upstream cluster is determined by its weight. The sum of
+    weights across all entries in the ``clusters`` array must add up to 100.
 
 runtime_key_prefix
   *(optional, string)* Specifies the runtime key prefix that should be used to construct the runtime

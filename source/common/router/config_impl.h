@@ -217,12 +217,10 @@ private:
   };
 
   /**
-   * Route entry implementation for weighted clusters.
-   * RouteEntryImplBase holds one or more weighted cluster objects,
-   * where each object has a back pointer to the parent
-   * RouteEntryImplBase object. Almost all functions in this class
-   * forward calls back to the parent, with the exception of
-   * clusterName and routeEntry.
+   * Route entry implementation for weighted clusters. The RouteEntryImplBase object holds
+   * one or more weighted cluster objects, where each object has a back pointer to the parent
+   * RouteEntryImplBase object. Almost all functions in this class forward calls back to the
+   * parent, with the exception of clusterName and routeEntry.
    */
   struct WeightedClusterEntry : public RouteEntry, public Route {
   public:
@@ -234,8 +232,6 @@ private:
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
     }
-
-    static const uint64_t MAX_CLUSTER_WEIGHT;
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
@@ -260,13 +256,16 @@ private:
     const RedirectEntry* redirectEntry() const override { return nullptr; }
     const RouteEntry* routeEntry() const override { return this; }
 
+    static const uint64_t MAX_CLUSTER_WEIGHT;
+
   private:
     const RouteEntryImplBase* parent_;
     const std::string runtime_key_;
     Runtime::Loader& loader_;
     const std::string cluster_name_;
-    uint64_t cluster_weight_;
+    const uint64_t cluster_weight_;
   };
+
   typedef std::unique_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
 
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
