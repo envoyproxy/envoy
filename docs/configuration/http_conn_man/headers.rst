@@ -49,7 +49,7 @@ that in the current implementation, this should be considered a hint as it is se
 could be easily spoofed by any internal entity. In the future Envoy will support a mutual
 authentication TLS mesh which will make this header fully secure. Like *user-agent*, the value
 is determined by the :option:`--service-cluster` command line option. In order to enable this
-feature you need to set :ref:`user_agent <config_http_conn_man_add_user_agent>` option to true.
+feature you need to set the :ref:`user_agent <config_http_conn_man_add_user_agent>` option to true.
 
 .. _config_http_conn_man_headers_x-envoy-external-address:
 
