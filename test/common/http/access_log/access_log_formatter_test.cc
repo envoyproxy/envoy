@@ -3,6 +3,7 @@
 #include "common/http/header_map_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
@@ -137,6 +138,23 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter upstream_format("UPSTREAM_HOST");
+    EXPECT_CALL(requestInfo, upstreamHost()).WillOnce(Return(nullptr));
+    EXPECT_EQ("-", upstream_format.format(header, header, requestInfo));
+  }
+
+  {
+    RequestInfoFormatter upstream_format("UPSTREAM_CLUSTER");
+    std::shared_ptr<Upstream::MockHostDescription> host(new Upstream::MockHostDescription());
+    Upstream::MockClusterInfo cluster;
+    EXPECT_CALL(requestInfo, upstreamHost()).WillRepeatedly(Return(host));
+    EXPECT_CALL(*host, cluster()).WillRepeatedly(ReturnRef(cluster));
+    const std::string upstream_cluster_name = "cluster_name";
+    EXPECT_CALL(cluster, name()).WillOnce(ReturnRef(upstream_cluster_name));
+    EXPECT_EQ("cluster_name", upstream_format.format(header, header, requestInfo));
+  }
+
+  {
+    RequestInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     EXPECT_CALL(requestInfo, upstreamHost()).WillOnce(Return(nullptr));
     EXPECT_EQ("-", upstream_format.format(header, header, requestInfo));
   }
