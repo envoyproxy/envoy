@@ -66,7 +66,7 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
     }
   }
 
-  target_cluster_ = json_config.getString("upstream_cluster", EMPTY_STRING);
+  upstream_cluster_ = json_config.getString("upstream_cluster", EMPTY_STRING);
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigPtr config) : config_(config) {}
@@ -150,18 +150,15 @@ void FaultFilter::abortWithHTTPStatus() {
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
 }
 
-bool FaultFilter::matchesTargetCluster(HeaderMap& headers) {
+bool FaultFilter::matchesTargetCluster(const HeaderMap& headers) {
   bool matches = true;
 
-  if (!config_->targetCluster().empty()) {
-    // TODO PERF Eliminate repeated route matching
+  if (!config_->upstreamCluster().empty()) {
     const Router::Route* route = callbacks_->routeTable().route(headers);
-
-    matches &= ((nullptr != route) && (nullptr != route->routeEntry()));
-    if (matches) {
-      matches &= (route->routeEntry()->clusterName() == config_->targetCluster());
-    }
+    matches = route && route->routeEntry() &&
+              (route->routeEntry()->clusterName() == config_->upstreamCluster());
   }
+
   return matches;
 }
 
