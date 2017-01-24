@@ -223,107 +223,62 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   }
 }
 
-class TracingContextImplTest : public Test {
-public:
-  TracingContextImplTest() {
-    ON_CALL(config_, operationName()).WillByDefault(ReturnRef(operation_));
-    ON_CALL(config_, serviceNode()).WillByDefault(ReturnRef(node_));
-    ON_CALL(request_info_, startTime()).WillByDefault(Return(start_time_));
-  }
+TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
+  NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
+  SpanPtr span_ptr(span);
 
-  void setup(bool is_null_tracer) {
-    if (is_null_tracer) {
-      context_.reset(new TracingContextImpl(null_tracer_, config_));
-    } else {
-      context_.reset(new TracingContextImpl(tracer_, config_));
-    }
-  }
-
-  NiceMock<MockHttpTracer> tracer_;
-  HttpNullTracer null_tracer_;
-  NiceMock<MockTracingConfig> config_;
-  NiceMock<Http::AccessLog::MockRequestInfo> request_info_;
-  Http::TestHeaderMapImpl request_headers_{
+  Http::TestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
-  Http::TestHeaderMapImpl response_headers_{};
-  SystemTime start_time_;
-  TracingContextPtr context_;
+  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
 
-  const std::string operation_{"operation"};
-  const std::string node_{"i-453"};
-};
-
-TEST_F(TracingContextImplTest, NullSpanFromTracer) {
-  setup(false);
-  EXPECT_CALL(config_, operationName());
-  EXPECT_CALL(request_info_, startTime());
-  EXPECT_CALL(tracer_, startSpan(operation_, start_time_)).WillOnce(Return(nullptr));
-
-  // null span should work fine.
-  context_->startSpan(request_info_, request_headers_);
-  context_->finishSpan(request_info_, &response_headers_);
-}
-
-TEST_F(TracingContextImplTest, NullResponseHeaders) {
-  setup(false);
-  EXPECT_CALL(config_, operationName());
-  EXPECT_CALL(request_info_, startTime());
-  EXPECT_CALL(tracer_, startSpan(operation_, start_time_)).WillOnce(Return(nullptr));
-
-  // No response headers.
-  context_->startSpan(request_info_, request_headers_);
-  context_->finishSpan(request_info_, nullptr);
-}
-
-TEST_F(TracingContextImplTest, SpanPopulatedOptionalHeaders) {
-  setup(false);
-  MockSpan* span = new MockSpan();
-
-  EXPECT_CALL(config_, operationName());
-  EXPECT_CALL(request_info_, startTime());
-  EXPECT_CALL(request_info_, bytesReceived()).WillOnce(Return(10));
-  EXPECT_CALL(tracer_, startSpan(operation_, start_time_)).WillOnce(Return(SpanPtr{span}));
+  Http::Protocol protocol = Http::Protocol::Http10;
+  EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
+  const std::string service_node = "i-453";
 
   // Check that span is populated correctly.
   EXPECT_CALL(*span, setTag("guid:x-request-id", "id"));
-  EXPECT_CALL(*span, setTag("node_id", "i-453"));
+  EXPECT_CALL(*span, setTag("node_id", service_node));
   EXPECT_CALL(*span, setTag("request_line", "GET /test HTTP/1.0"));
   EXPECT_CALL(*span, setTag("host_header", "-"));
   EXPECT_CALL(*span, setTag("user_agent", "-"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "-"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
 
-  context_->startSpan(request_info_, request_headers_);
+  HttpTracerUtility::populateSpan(span_ptr, service_node, request_headers, request_info);
 
   Optional<uint32_t> response_code;
-  EXPECT_CALL(request_info_, responseCode()).WillRepeatedly(ReturnRef(response_code));
-  EXPECT_CALL(request_info_, bytesSent()).WillOnce(Return(100));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
 
   EXPECT_CALL(*span, setTag("response_code", "0"));
   EXPECT_CALL(*span, setTag("response_size", "100"));
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
   EXPECT_CALL(*span, finishSpan());
-  context_->finishSpan(request_info_, &response_headers_);
+  HttpTracerUtility::finalizeSpan(span_ptr, request_info);
 }
 
-TEST_F(TracingContextImplTest, SpanPopulatedFailureResponse) {
-  setup(false);
-  MockSpan* span = new MockSpan();
+TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
+  NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
+  SpanPtr span_ptr(span);
+  Http::TestHeaderMapImpl request_headers{
+      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
+  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+  Http::Protocol protocol = Http::Protocol::Http10;
+  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
 
-  request_headers_.insertHost().value(std::string("api"));
-  request_headers_.insertUserAgent().value(std::string("agent"));
-  request_headers_.insertEnvoyDownstreamServiceCluster().value(std::string("downstream_cluster"));
-  request_headers_.insertClientTraceId().value(std::string("client_trace_id"));
+  request_headers.insertHost().value(std::string("api"));
+  request_headers.insertUserAgent().value(std::string("agent"));
+  request_headers.insertEnvoyDownstreamServiceCluster().value(std::string("downstream_cluster"));
+  request_headers.insertClientTraceId().value(std::string("client_trace_id"));
 
-  EXPECT_CALL(config_, operationName());
-  EXPECT_CALL(request_info_, startTime());
-  EXPECT_CALL(request_info_, bytesReceived()).WillOnce(Return(10));
-  EXPECT_CALL(tracer_, startSpan(operation_, start_time_)).WillOnce(Return(SpanPtr{span}));
+  EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
+  const std::string service_node = "i-453";
 
   // Check that span is populated correctly.
   EXPECT_CALL(*span, setTag("guid:x-request-id", "id"));
-  EXPECT_CALL(*span, setTag("node_id", "i-453"));
+  EXPECT_CALL(*span, setTag("node_id", service_node));
   EXPECT_CALL(*span, setTag("request_line", "GET /test HTTP/1.0"));
   EXPECT_CALL(*span, setTag("host_header", "api"));
   EXPECT_CALL(*span, setTag("user_agent", "agent"));
@@ -331,11 +286,11 @@ TEST_F(TracingContextImplTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("request_size", "10"));
   EXPECT_CALL(*span, setTag("guid:x-client-trace-id", "client_trace_id"));
 
-  context_->startSpan(request_info_, request_headers_);
+  HttpTracerUtility::populateSpan(span_ptr, service_node, request_headers, request_info);
 
   Optional<uint32_t> response_code(500);
-  EXPECT_CALL(request_info_, responseCode()).WillRepeatedly(ReturnRef(response_code));
-  EXPECT_CALL(request_info_, bytesSent()).WillOnce(Return(100));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
 
   EXPECT_CALL(*span, setTag("error", "true"));
   EXPECT_CALL(*span, setTag("response_code", "500"));
@@ -343,16 +298,7 @@ TEST_F(TracingContextImplTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
   EXPECT_CALL(*span, finishSpan());
-  context_->finishSpan(request_info_, &response_headers_);
-}
-
-TEST_F(TracingContextImplTest, NullHttpTracer) {
-  setup(true);
-  EXPECT_CALL(config_, operationName());
-  EXPECT_CALL(request_info_, startTime());
-
-  context_->startSpan(request_info_, request_headers_);
-  context_->finishSpan(request_info_, &response_headers_);
+  HttpTracerUtility::finalizeSpan(span_ptr, request_info);
 }
 
 class LightStepDriverTest : public Test {

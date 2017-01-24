@@ -280,8 +280,11 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
-  if (tracing_context_) {
-    tracing_context_->finishSpan(request_info_, response_headers_.get());
+  if (active_span_) {
+    if (!request_info_.healthCheck()) {
+      Tracing::HttpTracerUtility::finalizeSpan(active_span_, request_info_);
+    }
+    active_span_.reset();
   }
 }
 
@@ -420,18 +423,21 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.config_, connection_manager_.random_generator_,
       connection_manager_.runtime_);
 
-  // Set the trusted address for the connection by taking the last address in XFF.
-  downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
-  decodeHeaders(nullptr, *request_headers_, end_stream);
-
   Tracing::Decision tracing_decision =
       Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
   chargeTracingStats(tracing_decision);
 
   if (tracing_decision.is_tracing) {
-    tracing_context_.reset(new Tracing::TracingContextImpl(connection_manager_.tracer_, *this));
-    tracing_context_->startSpan(request_info_, *request_headers_);
+    Tracing::SpanPtr active_span =
+        connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
+    if (active_span) {
+      active_span_ = std::move(active_span);
+    }
   }
+
+  // Set the trusted address for the connection by taking the last address in XFF.
+  downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
+  decodeHeaders(nullptr, *request_headers_, end_stream);
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
@@ -682,10 +688,6 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
 
 const std::string& ConnectionManagerImpl::ActiveStream::operationName() const {
   return connection_manager_.config_.tracingConfig().value().operation_name_;
-}
-
-const std::string& ConnectionManagerImpl::ActiveStream::serviceNode() const {
-  return connection_manager_.config_.tracingConfig().value().service_node_;
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::addResetStreamCallback(

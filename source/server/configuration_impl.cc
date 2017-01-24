@@ -79,7 +79,8 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 
   // Initialize tracing driver.
   if (tracing_configuration.hasObject("http")) {
-    http_tracer_.reset(new Tracing::HttpTracerImpl(server_.runtime(), server_.stats()));
+    http_tracer_.reset(
+        new Tracing::HttpTracerImpl(server_.runtime(), server_.localInfo(), server_.stats()));
 
     Json::ObjectPtr http_tracer_config = tracing_configuration.getObject("http");
     Json::ObjectPtr driver = http_tracer_config->getObject("driver");
@@ -96,7 +97,7 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
       opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
       opts->guid_generator = [&rand]() { return rand.random(); };
 
-      http_tracer_->initializeDriver(Tracing::TracingDriverPtr{new Tracing::LightStepDriver(
+      http_tracer_->initializeDriver(Tracing::DriverPtr{new Tracing::LightStepDriver(
           *driver->getObject("config"), *cluster_manager_, server_.stats(), server_.threadLocal(),
           server_.runtime(), std::move(opts))});
     } else {

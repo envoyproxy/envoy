@@ -21,40 +21,6 @@ struct LightstepTracerStats {
   LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class TracingContextImpl : public TracingContext {
-public:
-  TracingContextImpl(HttpTracer& http_tracer, const TracingConfig& config);
-
-  void startSpan(const Http::AccessLog::RequestInfo& request_info,
-                 const Http::HeaderMap& request_headers) override;
-
-  void finishSpan(const Http::AccessLog::RequestInfo& request_info,
-                  const Http::HeaderMap* response_headers) override;
-
-private:
-  HttpTracer& http_tracer_;
-  const TracingConfig& tracing_config_;
-  SpanPtr active_span_{};
-};
-
-class LightStepSpan : public Span {
-public:
-  LightStepSpan(lightstep::Span& span);
-
-  void finishSpan() override;
-  void setTag(const std::string& name, const std::string& value) override;
-
-private:
-  lightstep::Span span_;
-};
-
-class HttpNullTracer : public HttpTracer {
-public:
-  // Tracing::HttpTracer
-  void initializeDriver(TracingDriverPtr&&) override {}
-  SpanPtr startSpan(const std::string&, SystemTime) override { return nullptr; }
-};
-
 enum class Reason {
   NotTraceableRequestId,
   HealthCheck,
@@ -83,20 +49,56 @@ public:
    * Mutate request headers if request needs to be traced.
    */
   static void mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime);
+
+  /**
+   * Fill in span tags based on request.
+   */
+  static void populateSpan(SpanPtr& active_span, const std::string& service_node,
+                           const Http::HeaderMap& request_headers,
+                           const Http::AccessLog::RequestInfo& request_info);
+
+  /**
+   * Fill in span tags based on the response headers.
+   */
+  static void finalizeSpan(SpanPtr& active_span, const Http::AccessLog::RequestInfo& request_info);
+};
+
+class HttpNullTracer : public HttpTracer {
+public:
+  // Tracing::HttpTracer
+  void initializeDriver(DriverPtr&&) override {}
+  SpanPtr startSpan(const Config&, const Http::HeaderMap&,
+                    const Http::AccessLog::RequestInfo&) override {
+    return nullptr;
+  }
 };
 
 class HttpTracerImpl : public HttpTracer {
 public:
-  HttpTracerImpl(Runtime::Loader& runtime, Stats::Store& stats);
+  HttpTracerImpl(Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                 Stats::Store& stats);
 
   // Tracing::HttpTracer
-  void initializeDriver(TracingDriverPtr&& driver) override;
+  void initializeDriver(DriverPtr&& driver) override;
 
-  SpanPtr startSpan(const std::string& operation_name, SystemTime start_time) override;
+  SpanPtr startSpan(const Config& config, const Http::HeaderMap& request_headers,
+                    const Http::AccessLog::RequestInfo& request_info) override;
 
 private:
   Runtime::Loader& runtime_;
-  TracingDriverPtr driver_;
+  const LocalInfo::LocalInfo& local_info_;
+  DriverPtr driver_;
+};
+
+class LightStepSpan : public Span {
+public:
+  LightStepSpan(lightstep::Span& span);
+
+  void finishSpan() override;
+  void setTag(const std::string& name, const std::string& value) override;
+
+private:
+  lightstep::Span span_;
 };
 
 /**
@@ -105,7 +107,7 @@ private:
  *
  * LightStepSink is for flushing data to LightStep collectors.
  */
-class LightStepDriver : public TracingDriver {
+class LightStepDriver : public Driver {
 public:
   LightStepDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                   Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,

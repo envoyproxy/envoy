@@ -45,7 +45,7 @@ public:
                                         POOL_TIMER(fake_stats_))},
                "",
                fake_stats_} {
-    tracing_config_.value({"operation", "service_node"});
+    tracing_config_.value({"operation"});
   }
 
   ~HttpConnectionManagerImplTest() {

@@ -98,60 +98,54 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
   throw std::invalid_argument("Unknown trace_status");
 }
 
-HttpTracerImpl::HttpTracerImpl(Runtime::Loader& runtime, Stats::Store&) : runtime_(runtime) {}
+void HttpTracerUtility::populateSpan(SpanPtr& active_span, const std::string& service_node,
+                                     const Http::HeaderMap& request_headers,
+                                     const Http::AccessLog::RequestInfo& request_info) {
+  active_span->setTag("guid:x-request-id",
+                      std::string(request_headers.RequestId()->value().c_str()));
+  active_span->setTag("request_line", buildRequestLine(request_headers, request_info));
+  active_span->setTag("request_size", std::to_string(request_info.bytesReceived()));
+  active_span->setTag("host_header", valueOrDefault(request_headers.Host(), "-"));
+  active_span->setTag("downstream_cluster",
+                      valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-"));
+  active_span->setTag("user_agent", valueOrDefault(request_headers.UserAgent(), "-"));
+  active_span->setTag("node_id", service_node);
 
-void HttpTracerImpl::initializeDriver(TracingDriverPtr&& driver) { driver_ = std::move(driver); }
-
-SpanPtr HttpTracerImpl::startSpan(const std::string& operation_name, SystemTime start_time) {
-  return driver_->startSpan(operation_name, start_time);
-}
-
-TracingContextImpl::TracingContextImpl(HttpTracer& http_tracer, const TracingConfig& config)
-    : http_tracer_(http_tracer), tracing_config_(config) {}
-
-void TracingContextImpl::startSpan(const Http::AccessLog::RequestInfo& request_info,
-                                   const Http::HeaderMap& request_headers) {
-  active_span_ = http_tracer_.startSpan(tracing_config_.operationName(), request_info.startTime());
-
-  if (active_span_) {
-    active_span_->setTag("guid:x-request-id",
-                         std::string(request_headers.RequestId()->value().c_str()));
-    active_span_->setTag("request_line", buildRequestLine(request_headers, request_info));
-    active_span_->setTag("request_size", std::to_string(request_info.bytesReceived()));
-    active_span_->setTag("host_header", valueOrDefault(request_headers.Host(), "-"));
-    active_span_->setTag("downstream_cluster",
-                         valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-"));
-    active_span_->setTag("user_agent", valueOrDefault(request_headers.UserAgent(), "-"));
-    active_span_->setTag("node_id", tracing_config_.serviceNode());
-
-    if (request_headers.ClientTraceId()) {
-      active_span_->setTag("guid:x-client-trace-id",
-                           std::string(request_headers.ClientTraceId()->value().c_str()));
-    }
+  if (request_headers.ClientTraceId()) {
+    active_span->setTag("guid:x-client-trace-id",
+                        std::string(request_headers.ClientTraceId()->value().c_str()));
   }
 }
 
-void TracingContextImpl::finishSpan(const Http::AccessLog::RequestInfo& request_info,
-                                    const Http::HeaderMap* response_headers) {
-  static const Http::HeaderMapImpl empty_headers;
-  if (!response_headers) {
-    response_headers = &empty_headers;
+void HttpTracerUtility::finalizeSpan(SpanPtr& active_span,
+                                     const Http::AccessLog::RequestInfo& request_info) {
+  active_span->setTag("response_code", buildResponseCode(request_info));
+  active_span->setTag("response_size", std::to_string(request_info.bytesSent()));
+  active_span->setTag("response_flags",
+                      Http::AccessLog::ResponseFlagUtils::toShortString(request_info));
+
+  if (request_info.responseCode().valid() &&
+      Http::CodeUtility::is5xx(request_info.responseCode().value())) {
+    active_span->setTag("error", "true");
   }
 
-  if (active_span_) {
-    active_span_->setTag("response_code", buildResponseCode(request_info));
-    active_span_->setTag("response_size", std::to_string(request_info.bytesSent()));
-    active_span_->setTag("response_flags",
-                         Http::AccessLog::ResponseFlagUtils::toShortString(request_info));
+  active_span->finishSpan();
+}
 
-    if (request_info.responseCode().valid() &&
-        Http::CodeUtility::is5xx(request_info.responseCode().value())) {
-      active_span_->setTag("error", "true");
-    }
+HttpTracerImpl::HttpTracerImpl(Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                               Stats::Store&)
+    : runtime_(runtime), local_info_(local_info) {}
 
-    active_span_->finishSpan();
-    active_span_.reset();
+void HttpTracerImpl::initializeDriver(DriverPtr&& driver) { driver_ = std::move(driver); }
+
+SpanPtr HttpTracerImpl::startSpan(const Config& config, const Http::HeaderMap& request_headers,
+                                  const Http::AccessLog::RequestInfo& request_info) {
+  SpanPtr active_span = driver_->startSpan(config.operationName(), request_info.startTime());
+  if (active_span) {
+    HttpTracerUtility::populateSpan(active_span, "service_node", request_headers, request_info);
   }
+
+  return active_span;
 }
 
 LightStepSpan::LightStepSpan(lightstep::Span& span) : span_(span) {}

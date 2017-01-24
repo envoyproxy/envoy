@@ -89,7 +89,6 @@ struct ConnectionManagerStats {
  */
 struct TracingConnectionManagerConfig {
   std::string operation_name_;
-  std::string service_node_;
 };
 
 /**
@@ -335,7 +334,7 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public Tracing::TracingConfig {
+                        public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
 
@@ -368,7 +367,6 @@ private:
 
     // Tracing::TracingConfig
     virtual const std::string& operationName() const override;
-    virtual const std::string& serviceNode() const override;
 
     // All state for the stream. Put here for readability. We could move this to a bit field
     // eventually if we want.
@@ -381,7 +379,7 @@ private:
     };
 
     ConnectionManagerImpl& connection_manager_;
-    Tracing::TracingContextPtr tracing_context_;
+    Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
     HeaderMapPtr response_headers_;

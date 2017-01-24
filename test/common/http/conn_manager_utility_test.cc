@@ -22,7 +22,7 @@ public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
-    tracing_config_.value({"operation", "service_node"});
+    tracing_config_.value({"operation"});
     ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
   }
 
