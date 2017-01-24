@@ -1047,6 +1047,7 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrRedirectEntry) {
     EXPECT_EQ(nullptr, config.route(headers, 0)->redirectEntry());
     EXPECT_EQ("www2", config.route(headers, 0)->routeEntry()->clusterName());
   }
+
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/foo", false, false);
     EXPECT_EQ("http://new.lyft.com/foo",
@@ -1109,9 +1110,9 @@ TEST(RouteMatcherTest, WeightedClusters) {
   // Weighted Cluster with no runtime
   {
     Http::TestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
-    EXPECT_EQ("cluster1", config.route(headers, 15)->routeEntry()->clusterName());
-    EXPECT_EQ("cluster2", config.route(headers, 45)->routeEntry()->clusterName());
-    EXPECT_EQ("cluster3", config.route(headers, 60)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster1", config.route(headers, 115)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster2", config.route(headers, 445)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster3", config.route(headers, 560)->routeEntry()->clusterName());
   }
 
   // Weighted Cluster with valid runtime values
@@ -1144,7 +1145,7 @@ TEST(RouteMatcherTest, WeightedClusters) {
     EXPECT_CALL(runtime.snapshot_, getInteger("www2_weights.cluster3", 40))
         .WillRepeatedly(Return(10));
 
-    EXPECT_EQ("cluster1", config.route(headers, 5)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster1", config.route(headers, 1005)->routeEntry()->clusterName());
     EXPECT_EQ("cluster2", config.route(headers, 82)->routeEntry()->clusterName());
     EXPECT_EQ("cluster2", config.route(headers, 92)->routeEntry()->clusterName());
   }
