@@ -82,18 +82,6 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
   return result.empty() ? NONE : result;
 }
 
-bool ResponseFlagUtils::isTraceableFailure(const Http::AccessLog::RequestInfo& request_info) {
-  return request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoHealthyUpstream) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRequestTimeout) |
-         request_info.getResponseFlag(
-             Http::AccessLog::ResponseFlag::UpstreamConnectionTermination) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::NoRouteFound) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::DelayInjected) |
-         request_info.getResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
-}
-
 const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
     "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
     "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "

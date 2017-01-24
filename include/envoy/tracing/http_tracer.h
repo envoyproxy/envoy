@@ -27,12 +27,10 @@ public:
   virtual void finishSpan() PURE;
 };
 
-typedef std::shared_ptr<Span> SpanPtr;
+typedef std::unique_ptr<Span> SpanPtr;
 
 /**
  * Tracing driver is responsible for span creation.
- *
- * TODO: make tracing driver to be responsible for context extraction/injection.
  */
 class Driver {
 public:

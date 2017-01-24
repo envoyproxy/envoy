@@ -132,9 +132,7 @@ void HttpTracerUtility::finalizeSpan(SpanPtr& active_span,
   active_span->finishSpan();
 }
 
-HttpTracerImpl::HttpTracerImpl(Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-                               Stats::Store&)
-    : runtime_(runtime), local_info_(local_info) {}
+HttpTracerImpl::HttpTracerImpl(const LocalInfo::LocalInfo& local_info) : local_info_(local_info) {}
 
 void HttpTracerImpl::initializeDriver(DriverPtr&& driver) { driver_ = std::move(driver); }
 
@@ -142,7 +140,8 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, const Http::HeaderMap& r
                                   const Http::AccessLog::RequestInfo& request_info) {
   SpanPtr active_span = driver_->startSpan(config.operationName(), request_info.startTime());
   if (active_span) {
-    HttpTracerUtility::populateSpan(active_span, "service_node", request_headers, request_info);
+    HttpTracerUtility::populateSpan(active_span, local_info_.nodeName(), request_headers,
+                                    request_info);
   }
 
   return active_span;

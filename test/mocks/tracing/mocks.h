@@ -38,7 +38,11 @@ public:
   MockDriver();
   ~MockDriver();
 
-  MOCK_METHOD2(startSpan, SpanPtr(const std::string& operation_name, SystemTime start_time));
+  SpanPtr startSpan(const std::string& operation_name, SystemTime start_time) override {
+    return SpanPtr{startSpan_(operation_name, start_time)};
+  }
+
+  MOCK_METHOD2(startSpan_, Span*(const std::string& operation_name, SystemTime start_time));
 };
 
 } // Tracing

@@ -75,8 +75,7 @@ public:
 
 class HttpTracerImpl : public HttpTracer {
 public:
-  HttpTracerImpl(Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-                 Stats::Store& stats);
+  HttpTracerImpl(const LocalInfo::LocalInfo& local_info);
 
   // Tracing::HttpTracer
   void initializeDriver(DriverPtr&& driver) override;
@@ -85,7 +84,6 @@ public:
                     const Http::AccessLog::RequestInfo& request_info) override;
 
 private:
-  Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   DriverPtr driver_;
 };

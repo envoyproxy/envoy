@@ -79,8 +79,7 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 
   // Initialize tracing driver.
   if (tracing_configuration.hasObject("http")) {
-    http_tracer_.reset(
-        new Tracing::HttpTracerImpl(server_.runtime(), server_.localInfo(), server_.stats()));
+    http_tracer_.reset(new Tracing::HttpTracerImpl(server_.localInfo()));
 
     Json::ObjectPtr http_tracer_config = tracing_configuration.getObject("http");
     Json::ObjectPtr driver = http_tracer_config->getObject("driver");
