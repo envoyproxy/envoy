@@ -157,7 +157,7 @@ public:
   FakeRawConnectionPtr waitForRawConnection();
 
   // Network::FilterChainFactory
-  void createFilterChain(Network::Connection& connection) override;
+  bool createFilterChain(Network::Connection& connection) override;
 
 private:
   FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,

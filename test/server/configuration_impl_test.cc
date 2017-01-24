@@ -19,8 +19,15 @@ TEST(FilterChainUtility, buildFilterChain) {
   factories.push_back(factory);
 
   EXPECT_CALL(watcher, ready()).Times(2);
-  EXPECT_CALL(connection, initializeReadFilters());
-  FilterChainUtility::buildFilterChain(connection, factories);
+  EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(true));
+  EXPECT_EQ(FilterChainUtility::buildFilterChain(connection, factories), true);
+}
+
+TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
+  Network::MockConnection connection;
+  std::list<NetworkFilterFactoryCb> factories;
+  EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(false));
+  EXPECT_EQ(FilterChainUtility::buildFilterChain(connection, factories), false);
 }
 
 TEST(ConfigurationImplTest, DefaultStatsFlushInterval) {

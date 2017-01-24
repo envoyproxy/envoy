@@ -28,9 +28,12 @@ void FilterManagerImpl::destroyFilters() {
   downstream_filters_.clear();
 }
 
-void FilterManagerImpl::initializeReadFilters() {
-  ASSERT(!upstream_filters_.empty());
+bool FilterManagerImpl::initializeReadFilters() {
+  if (upstream_filters_.empty()) {
+    return false;
+  }
   onContinueReading(nullptr);
+  return true;
 }
 
 void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter) {
