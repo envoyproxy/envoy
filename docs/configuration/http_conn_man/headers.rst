@@ -48,7 +48,8 @@ external requests, but for internal requests will contain the service cluster of
 that in the current implementation, this should be considered a hint as it is set by the caller and
 could be easily spoofed by any internal entity. In the future Envoy will support a mutual
 authentication TLS mesh which will make this header fully secure. Like *user-agent*, the value
-is determined by the :option:`--service-cluster` command line option.
+is determined by the :option:`--service-cluster` command line option. In order to enable this
+feature you need to set :ref:`user_agent <config_http_conn_man_add_user_agent>` option to true.
 
 .. _config_http_conn_man_headers_x-envoy-external-address:
 
@@ -72,10 +73,10 @@ x-envoy-force-trace
 If an internal request sets this header, Envoy will modify the generated
 :ref:`config_http_conn_man_headers_x-request-id` such that it forces traces to be collected.
 This also forces :ref:`config_http_conn_man_headers_x-request-id` to be returned in the response
-headers. If this request ID is then propagated to other hosts, traces will also be collected on 
-those hosts which will provide a consistent trace for an entire request flow. See the 
-:ref:`tracing.global_enabled <config_http_conn_man_runtime_global_enabled>` and 
-:ref:`tracing.random_sampling <config_http_conn_man_runtime_random_sampling>` runtime 
+headers. If this request ID is then propagated to other hosts, traces will also be collected on
+those hosts which will provide a consistent trace for an entire request flow. See the
+:ref:`tracing.global_enabled <config_http_conn_man_runtime_global_enabled>` and
+:ref:`tracing.random_sampling <config_http_conn_man_runtime_random_sampling>` runtime
 configuration settings.
 
 .. _config_http_conn_man_headers_x-envoy-internal:
