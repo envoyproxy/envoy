@@ -39,7 +39,7 @@ path
 .. _config_http_conn_man_route_table_route_cluster:
 
 cluster
-  *(sometimes required, string)* If the route is not a redirect (i.e., *host_redirect* and/or
+  *(sometimes required, string)* If the route is not a redirect (*host_redirect* and/or
   *path_redirect* is not specified), one of *cluster* or *weighted_clusters* must be specified.
   When a *cluster* is specified, its value indicates the upstream cluster to which the request
   should be forwarded to.

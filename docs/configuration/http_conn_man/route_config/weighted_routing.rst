@@ -4,11 +4,16 @@ Traffic splitting across multiple upstreams
 ===========================================
 
 Envoy's router can split traffic to a route in a virtual host across
-multiple upstream clusters. A common use case is A/B testing or
-multivariate testing, where two or more versions of the same service are
-tested simultaneously. In this case, the traffic to the route has to be
-*split* between clusters running different versions of the same
-service.
+multiple upstream clusters. There are two common use cases. The first use
+case is version upgrades, where traffic to a route is shifted gradually
+from one cluster to another. The
+:ref:`traffic shifting <config_http_conn_man_route_table_traffic_shifting>`
+describes this scenario in more detail.
+
+The second use case, discussed in this section, is A/B testing or multivariate
+testing, where ``two or more versions`` of the same service are tested simultaneously.
+The traffic to the route has to be *split* between clusters running different versions
+of the same service.
 
 Consider a simple example ``service`` with three versions (v1, v2 and
 v3). Envoy provides two ways to split traffic evenly across the three
@@ -37,6 +42,7 @@ to each upstream cluster.
               {
                 "prefix": "/",
                 "weighted_clusters": {
+                  "runtime_key_prefix" : "routing.traffic_split.service",
                   "clusters" : [
                     { "name" : "service_v1", "weight" : 33 },
                     { "name" : "service_v2", "weight" : 33 },
@@ -49,6 +55,11 @@ to each upstream cluster.
         ]
       }
     }
+
+The weights assigned to each cluster can be dynamically adjusted using the
+following runtime variables: ``routing.traffic_split.service.service_v1``,
+``routing.traffic_split.service.service_v2`` and
+``routing.traffic_split.service.service_v3``.
 
 .. _config_http_conn_man_route_table_weighted_routing_probabilities:
 
