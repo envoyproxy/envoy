@@ -78,7 +78,6 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 // if we inject a delay, then we will inject the abort in the delay timer
 // callback.
 FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
-
   if (!matchesTargetCluster(headers)) {
     return FilterHeadersStatus::Continue;
   }
