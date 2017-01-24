@@ -29,6 +29,8 @@ IpWhiteList::IpWhiteList(const Json::Object& config) {
       throw EnvoyException(fmt::format("invalid ipv4/mask combo '{}' (invalid IP address)", entry));
     }
 
+    // "0.0.0.0/0" is a valid subnet that contains all possible IPv4 addresses,
+    // so mask can be equal to 0
     uint64_t mask;
     if (!StringUtil::atoul(parts[1].c_str(), mask) || mask > 32) {
       throw EnvoyException(
@@ -37,7 +39,10 @@ IpWhiteList::IpWhiteList(const Json::Object& config) {
 
     Ipv4Entry white_list_entry;
     white_list_entry.ipv4_address_ = ntohl(addr.s_addr);
-    white_list_entry.ipv4_mask_ = ~((1 << (32 - mask)) - 1);
+    // The 1ULL below makes sure that the RHS is computed as a 64-bit value, so that we do not
+    // over-shift to the left when mask = 0. The assignment to ipv4_mask_ then truncates
+    // the value back to 32 bits.
+    white_list_entry.ipv4_mask_ = ~((1ULL << (32 - mask)) - 1);
 
     // Check to make sure applying the mask to the address equals the address. This can prevent
     // user error.
