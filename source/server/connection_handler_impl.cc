@@ -97,10 +97,10 @@ void ConnectionHandlerImpl::ActiveListener::onNewConnection(
 
   // If the connection is already closed, we can just let this connection immediately die.
   if (new_connection->state() != Network::Connection::State::Closed) {
-    // Close the connection if the filter chain is empty to avoid
-    // leaving open connections with nothing to do.
+    // Close the connection if the filter chain is empty to avoid leaving open connections
+    // with nothing to do.
     if (empty_filter_chain) {
-      conn_log(parent_.logger_, info, "closing connection - no filters", *new_connection);
+      conn_log(parent_.logger_, info, "closing connection: no filters", *new_connection);
       new_connection->close(Network::ConnectionCloseType::NoFlush);
     } else {
       ActiveConnectionPtr active_connection(
