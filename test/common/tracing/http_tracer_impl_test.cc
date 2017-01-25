@@ -223,6 +223,26 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   }
 }
 
+TEST(HttpTracerUtilityTest, OrigianlAndLongPath) {
+  const std::string path(300, 'a');
+  const std::string expected_path(256, 'a');
+  NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
+  SpanPtr span_ptr(span);
+
+  Http::TestHeaderMapImpl request_headers{
+      {"x-request-id", "id"}, {"x-envoy-original-path", path}, {":method", "GET"}};
+  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
+
+  Http::Protocol protocol = Http::Protocol::Http2;
+  EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
+  const std::string service_node = "node";
+
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
+  HttpTracerUtility::populateSpan(span_ptr, service_node, request_headers, request_info);
+}
+
 TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
   SpanPtr span_ptr(span);

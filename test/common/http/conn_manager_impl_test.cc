@@ -193,6 +193,49 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPath) {
   conn_manager_->onData(fake_input);
 }
 
+TEST_F(HttpConnectionManagerImplTest, VerifyTracing) {
+  setup(false, "envoy-custom-server");
+
+  // Store the basic request encoder during filter chain setup.
+  std::shared_ptr<Http::MockStreamDecoderFilter> filter(
+      new NiceMock<Http::MockStreamDecoderFilter>());
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](HeaderMap&, bool)
+                           -> FilterHeadersStatus { return FilterHeadersStatus::StopIteration; }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks)
+                                 -> void { callbacks.addStreamDecoderFilter(filter); }));
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
+  // When dispatch is called on the codec, we pretend to get a new stream and then fire a headers
+  // only request into it. Then we respond into the filter.
+  Http::StreamDecoder* decoder = nullptr;
+  NiceMock<Http::MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+        decoder = &conn_manager_->newStream(encoder);
+
+        Http::HeaderMapPtr headers{
+            new TestHeaderMapImpl{{":authority", "host"},
+                                  {":path", "/"},
+                                  {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+
+        Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+        data.drain(4);
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+}
+
 TEST_F(HttpConnectionManagerImplTest, NoPath) {
   setup(false, "");
 

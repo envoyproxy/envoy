@@ -428,6 +428,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   chargeTracingStats(tracing_decision);
 
   if (tracing_decision.is_tracing) {
+    std::cout << "about to do span creation" << std::endl;
     Tracing::SpanPtr active_span =
         connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
     if (active_span) {
