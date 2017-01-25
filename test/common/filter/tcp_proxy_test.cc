@@ -114,7 +114,8 @@ TEST(TcpProxyConfigTest, Routes) {
     // hit route with destination_ip (10.10.10.10/32)
     NiceMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.10.10.10"));
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getClusterForConnection(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getClusterForConnection(connection));
   }
 
   {
@@ -128,7 +129,8 @@ TEST(TcpProxyConfigTest, Routes) {
     // hit route with destination_ip (10.10.11.0/24)
     NiceMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.10.11.11"));
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getClusterForConnection(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getClusterForConnection(connection));
   }
 
   {
@@ -142,7 +144,8 @@ TEST(TcpProxyConfigTest, Routes) {
     // hit route with destination_ip (10.11.0.0/16)
     NiceMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.11.11.11"));
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getClusterForConnection(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getClusterForConnection(connection));
   }
 
   {
@@ -156,7 +159,8 @@ TEST(TcpProxyConfigTest, Routes) {
     // hit route with destination_ip (11.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("11.11.11.11"));
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getClusterForConnection(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getClusterForConnection(connection));
   }
 
   {
@@ -170,7 +174,8 @@ TEST(TcpProxyConfigTest, Routes) {
     // hit route with destination_ip (128.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
     EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("128.255.255.255"));
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getClusterForConnection(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getClusterForConnection(connection));
   }
 
   {

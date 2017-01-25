@@ -121,17 +121,14 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
 }
 
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
-  const std::string& destination_cluster =
-      config_->getClusterForConnection(read_callbacks_->connection());
-  conn_log_debug("Connection from {}", read_callbacks_->connection(), destination_cluster);
+  const std::string& cluster_name = config_->getClusterForConnection(read_callbacks_->connection());
 
-  Upstream::ClusterInfoPtr cluster = cluster_manager_.get(destination_cluster);
+  Upstream::ClusterInfoPtr cluster = cluster_manager_.get(cluster_name);
+
   if (cluster) {
-    conn_log_debug("Connection cluster with name {} found", read_callbacks_->connection(),
-                   destination_cluster);
+    conn_log_debug("Creating connection to cluster {}", read_callbacks_->connection(),
+                   cluster_name);
   } else {
-    conn_log_debug("Connection cluster with name {} NOT FOUND", read_callbacks_->connection(),
-                   destination_cluster);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -140,8 +137,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
-  Upstream::Host::CreateConnectionData conn_info =
-      cluster_manager_.tcpConnForCluster(destination_cluster);
+  Upstream::Host::CreateConnectionData conn_info = cluster_manager_.tcpConnForCluster(cluster_name);
 
   upstream_connection_ = std::move(conn_info.connection_);
   read_callbacks_->upstreamHost(conn_info.host_description_);

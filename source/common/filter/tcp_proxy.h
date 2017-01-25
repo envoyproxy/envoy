@@ -39,6 +39,13 @@ public:
   TcpProxyConfig(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                  Stats::Store& stats_store);
 
+  /**
+   * Find out which cluster an upstream connection should be opened to.
+   * @param connection supplies the parameters of the downstream connection for
+   * which the proxy needs to open the corresponding upstream
+   * @return the cluster name to be used for the upstream connection.
+     If no route applies, returns the empty string.
+   */
   const std::string& getClusterForConnection(Network::Connection& connection);
 
   const TcpProxyStats& stats() { return stats_; }
