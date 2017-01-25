@@ -1,4 +1,5 @@
 #include "connection_impl.h"
+#include "utility.h"
 
 #include "envoy/event/timer.h"
 #include "envoy/common/exception.h"
@@ -33,9 +34,9 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                               const std::string& remote_address)
-    : filter_manager_(*this, *this), remote_address_(remote_address), dispatcher_(dispatcher),
-      fd_(fd), id_(++next_global_id_) {
+                               const std::string& remote_address, uint32_t remote_port)
+    : filter_manager_(*this, *this), remote_address_(remote_address), remote_port_(remote_port),
+      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -395,9 +396,35 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
                                            buffer_stats_->write_current_);
 }
 
+const std::string Network::ConnectionImpl::destinationAddress() {
+  if (fd_ != -1) {
+    sockaddr_storage orig_dst_addr;
+    memset(&orig_dst_addr, 0, sizeof(orig_dst_addr));
+    bool success = Utility::getOriginalDst(fd_, &orig_dst_addr);
+    if (success) {
+      return Utility::getAddressName(reinterpret_cast<struct sockaddr_in*>(&orig_dst_addr));
+    }
+  }
+
+  return EMPTY_STRING;
+}
+
+uint32_t Network::ConnectionImpl::destinationPort() {
+  if (fd_ != -1) {
+    sockaddr_storage orig_dst_addr;
+    memset(&orig_dst_addr, 0, sizeof(orig_dst_addr));
+    bool success = Utility::getOriginalDst(fd_, &orig_dst_addr);
+    if (success) {
+      return Utility::getAddressPort(reinterpret_cast<struct sockaddr_in*>(&orig_dst_addr));
+    }
+  }
+
+  return 0;
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                                           const std::string& url)
-    : ConnectionImpl(dispatcher, fd, url) {}
+                                           const std::string& url, uint32_t port)
+    : ConnectionImpl(dispatcher, fd, url, port) {}
 
 Network::ClientConnectionPtr ClientConnectionImpl::create(Event::DispatcherImpl& dispatcher,
                                                           const std::string& url) {
@@ -412,7 +439,8 @@ Network::ClientConnectionPtr ClientConnectionImpl::create(Event::DispatcherImpl&
 
 TcpClientConnectionImpl::TcpClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                                                  const std::string& url)
-    : ClientConnectionImpl(dispatcher, socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), url) {}
+    : ClientConnectionImpl(dispatcher, socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), url,
+                           Network::Utility::portFromUrl(url)) {}
 
 void TcpClientConnectionImpl::connect() {
   AddrInfoPtr addr_info = Utility::resolveTCP(Utility::hostFromUrl(remote_address_),
@@ -422,7 +450,7 @@ void TcpClientConnectionImpl::connect() {
 
 UdsClientConnectionImpl::UdsClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                                                  const std::string& url)
-    : ClientConnectionImpl(dispatcher, socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0), url) {}
+    : ClientConnectionImpl(dispatcher, socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0), url, 0) {}
 
 void UdsClientConnectionImpl::connect() {
   sockaddr_un addr = Utility::resolveUnixDomainSocket(Utility::pathFromUrl(remote_address_));

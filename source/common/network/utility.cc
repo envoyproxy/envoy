@@ -11,12 +11,8 @@
 
 namespace Network {
 
-IpWhiteList::IpWhiteList(const Json::Object& config) {
-  if (!config.hasObject("ip_white_list")) {
-    return;
-  }
-
-  for (const std::string& entry : config.getStringArray("ip_white_list")) {
+IpList::IpList(const std::vector<std::string>& subnets) {
+  for (const std::string& entry : subnets) {
     std::vector<std::string> parts = StringUtil::split(entry, '/');
     if (parts.size() != 2) {
       throw EnvoyException(
@@ -37,33 +33,32 @@ IpWhiteList::IpWhiteList(const Json::Object& config) {
           fmt::format("invalid ipv4/mask combo '{}' (mask bits must be <= 32)", entry));
     }
 
-    Ipv4Entry white_list_entry;
-    white_list_entry.ipv4_address_ = ntohl(addr.s_addr);
+    Ipv4Entry list_entry;
+    list_entry.ipv4_address_ = ntohl(addr.s_addr);
     // The 1ULL below makes sure that the RHS is computed as a 64-bit value, so that we do not
     // over-shift to the left when mask = 0. The assignment to ipv4_mask_ then truncates
     // the value back to 32 bits.
-    white_list_entry.ipv4_mask_ = ~((1ULL << (32 - mask)) - 1);
+    list_entry.ipv4_mask_ = ~((1ULL << (32 - mask)) - 1);
 
     // Check to make sure applying the mask to the address equals the address. This can prevent
     // user error.
-    if ((white_list_entry.ipv4_address_ & white_list_entry.ipv4_mask_) !=
-        white_list_entry.ipv4_address_) {
+    if ((list_entry.ipv4_address_ & list_entry.ipv4_mask_) != list_entry.ipv4_address_) {
       throw EnvoyException(
           fmt::format("invalid ipv4/mask combo '{}' ((address & mask) != address)", entry));
     }
 
-    ipv4_white_list_.push_back(white_list_entry);
+    ipv4_list_.push_back(list_entry);
   }
 }
 
-bool IpWhiteList::contains(const std::string& remote_address) const {
+bool IpList::contains(const std::string& remote_address) const {
   in_addr addr;
   int rc = inet_pton(AF_INET, remote_address.c_str(), &addr);
   if (1 != rc) {
     return false;
   }
 
-  for (const Ipv4Entry& entry : ipv4_white_list_) {
+  for (const Ipv4Entry& entry : ipv4_list_) {
     if ((ntohl(addr.s_addr) & entry.ipv4_mask_) == entry.ipv4_address_) {
       return true;
     }
@@ -71,6 +66,10 @@ bool IpWhiteList::contains(const std::string& remote_address) const {
 
   return false;
 }
+
+IpWhiteList::IpWhiteList(const Json::Object& config)
+    : ip_list_(config.hasObject("ip_white_list") ? config.getStringArray("ip_white_list")
+                                                 : std::vector<std::string>()) {}
 
 const std::string Utility::TCP_SCHEME = "tcp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
@@ -233,6 +232,37 @@ bool Utility::getOriginalDst(int fd, sockaddr_storage* orig_addr) {
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, orig_addr, &addr_len);
 
   return (status == 0);
+}
+
+void Utility::parsePortRangeList(const std::string& string, std::list<PortRange>& list) {
+  std::vector<std::string> ranges = StringUtil::split(string.c_str(), ',');
+  for (const std::string& s : ranges) {
+    uint32_t min = 0;
+    uint32_t max = 0;
+    char dash = 0;
+
+    std::stringstream ss(s);
+
+    if (s.find('-') != std::string::npos) {
+      ss >> min;
+      ss >> dash;
+      ss >> max;
+    } else {
+      ss >> min;
+      max = min;
+    }
+
+    list.emplace_back(PortRange(min, max));
+  }
+}
+
+bool Utility::portInRangeList(uint32_t port, const std::list<PortRange>& list) {
+  for (const Network::PortRange& p : list) {
+    if (p.contains(port)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 } // Network

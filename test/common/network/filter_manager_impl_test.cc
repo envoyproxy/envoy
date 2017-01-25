@@ -122,8 +122,14 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
 
   std::string tcp_proxy_json = R"EOF(
     {
-      "cluster": "fake_cluster",
-      "stat_prefix": "name"
+      "stat_prefix": "name",
+      "route_config": {
+        "routes": [
+          {
+            "cluster": "fake_cluster"
+          }
+        ]
+      }
     }
     )EOF";
 

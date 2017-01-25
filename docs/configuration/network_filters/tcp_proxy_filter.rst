@@ -11,14 +11,13 @@ TCP proxy :ref:`architecture overview <arch_overview_tcp_proxy>`.
     "type": "read",
     "name": "tcp_proxy",
     "config": {
-      "cluster": "...",
-      "stat_prefix": "..."
+      "stat_prefix": "...",
+      "route_config": "{...}"
     }
   }
 
-cluster
-  *(required, string)* The :ref:`cluster manager <arch_overview_cluster_manager>` cluster to connect
-  to when a new downstream network connection is received.
+:ref:`route_config <config_network_filters_tcp_proxy_route_config>`
+  *(required, object)* The route table for the filter. All filter instances must have a route table, even if it is empty.
 
 stat_prefix
   *(required, string)* The prefix to use when emitting :ref:`statistics
@@ -39,3 +38,8 @@ statistics are rooted at *tcp.<stat_prefix>.* with the following statistics:
 
   downstream_cx_tx_bytes_total, Counter, Total bytes written to the downstream connection.
   downstream_cx_tx_bytes_buffered, Gauge, Total bytes currently buffered to the downstream connection.
+
+.. toctree::
+  :hidden:
+  
+  tcp_proxy_filter_route_config

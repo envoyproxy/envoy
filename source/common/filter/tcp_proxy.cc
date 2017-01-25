@@ -8,17 +8,82 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/json/json_loader.h"
 
 namespace Filter {
 
+TcpProxyConfig::Route::Route(const Json::Object& config) {
+  if (config.hasObject("cluster")) {
+    cluster_name_ = config.getString("cluster");
+  } else {
+    throw EnvoyException(fmt::format("tcp proxy: route without cluster"));
+  }
+
+  if (config.hasObject("source_ip_list")) {
+    source_ips_ = Network::IpList(config.getStringArray("source_ip_list"));
+  }
+
+  if (config.hasObject("source_ports")) {
+    Network::Utility::parsePortRangeList(config.getString("source_ports"), source_port_ranges_);
+  }
+
+  if (config.hasObject("destination_ip_list")) {
+    destination_ips_ = Network::IpList(config.getStringArray("destination_ip_list"));
+  }
+
+  if (config.hasObject("destination_ports")) {
+    Network::Utility::parsePortRangeList(config.getString("destination_ports"),
+                                         destination_port_ranges_);
+  }
+}
+
 TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
                                Upstream::ClusterManager& cluster_manager, Stats::Store& stats_store)
-    : cluster_name_(config.getString("cluster")),
-      stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
-  if (!cluster_manager.get(cluster_name_)) {
-    throw EnvoyException(fmt::format("tcp proxy: unknown cluster '{}'", cluster_name_));
+    : stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
+  if (!config.hasObject("route_config")) {
+    throw EnvoyException(fmt::format("tcp proxy: missing route config"));
   }
+
+  for (const Json::ObjectPtr& route_desc :
+       config.getObject("route_config")->getObjectArray("routes")) {
+    routes_.emplace_back(Route(*route_desc));
+
+    if (!cluster_manager.get(route_desc->getString("cluster"))) {
+      throw EnvoyException(fmt::format("tcp proxy: unknown cluster '{}' in TCP route",
+                                       route_desc->getString("cluster")));
+    }
+  }
+}
+
+const std::string& TcpProxyConfig::getClusterForConnection(Network::Connection& connection) {
+  for (const TcpProxyConfig::Route& route : routes_) {
+    if (!route.source_port_ranges_.empty() &&
+        !Network::Utility::portInRangeList(connection.remotePort(), route.source_port_ranges_)) {
+      continue; // no match, try next route
+    }
+
+    if (!route.source_ips_.empty() && !route.source_ips_.contains(connection.remoteAddress())) {
+      continue; // no match, try next route
+    }
+
+    if (!route.destination_port_ranges_.empty() &&
+        !Network::Utility::portInRangeList(connection.destinationPort(),
+                                           route.destination_port_ranges_)) {
+      continue; // no match, try next route
+    }
+
+    if (!route.destination_ips_.empty() &&
+        !route.destination_ips_.contains(connection.destinationAddress())) {
+      continue; // no match, try next route
+    }
+
+    // if we made it past all checks, the route matches
+    return route.cluster_name_;
+  }
+
+  // no match, no more routes to try
+  return EMPTY_STRING;
 }
 
 TcpProxy::TcpProxy(TcpProxyConfigPtr config, Upstream::ClusterManager& cluster_manager)
@@ -56,14 +121,27 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
 }
 
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
-  Upstream::ClusterInfoPtr cluster = cluster_manager_.get(config_->clusterName());
+  const std::string& destination_cluster =
+      config_->getClusterForConnection(read_callbacks_->connection());
+  conn_log_debug("Connection from {}", read_callbacks_->connection(), destination_cluster);
+
+  Upstream::ClusterInfoPtr cluster = cluster_manager_.get(destination_cluster);
+  if (cluster) {
+    conn_log_debug("Connection cluster with name {} found", read_callbacks_->connection(),
+                   destination_cluster);
+  } else {
+    conn_log_debug("Connection cluster with name {} NOT FOUND", read_callbacks_->connection(),
+                   destination_cluster);
+    return Network::FilterStatus::StopIteration;
+  }
+
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
     cluster->stats().upstream_cx_overflow_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
   Upstream::Host::CreateConnectionData conn_info =
-      cluster_manager_.tcpConnForCluster(config_->clusterName());
+      cluster_manager_.tcpConnForCluster(destination_cluster);
 
   upstream_connection_ = std::move(conn_info.connection_);
   read_callbacks_->upstreamHost(conn_info.host_description_);

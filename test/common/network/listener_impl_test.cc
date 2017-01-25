@@ -52,8 +52,8 @@ public:
   MOCK_METHOD2(newConnection_, void(int, sockaddr*));
 
   void newConnection(int fd, sockaddr* addr) override { newConnection_(fd, addr); }
-  void newConnection(int fd, const std::string& addr) override {
-    ListenerImpl::newConnection(fd, addr);
+  void newConnection(int fd, const std::string& addr, uint32_t port) override {
+    ListenerImpl::newConnection(fd, addr, port);
   }
 
 protected:

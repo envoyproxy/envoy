@@ -33,8 +33,9 @@ public:
    * Accept/process a new connection with the given remote address.
    * @param fd supplies the new connection's fd.
    * @param remote_address supplies the remote address for the new connection.
+   * @param remote_address supplies the remote port for the new connection.
    */
-  virtual void newConnection(int fd, const std::string& remote_address);
+  virtual void newConnection(int fd, const std::string& remote_address, uint32_t remote_port);
 
   /**
    * @return the socket supplied to the listener at construction time
@@ -73,7 +74,7 @@ public:
 
   // ListenerImpl
   void newConnection(int fd, sockaddr* addr) override;
-  void newConnection(int fd, const std::string& remote_address) override;
+  void newConnection(int fd, const std::string& remote_address, uint32_t remote_port) override;
 
 private:
   Ssl::Context& ssl_ctx_;

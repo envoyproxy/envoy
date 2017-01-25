@@ -138,4 +138,42 @@ TEST(NetworkUtility, loopbackAddress) {
   }
 }
 
+TEST(NetworkUtility, PortRangeList) {
+  {
+    std::string port_range_str = "1";
+    std::list<PortRange> port_range_list;
+
+    Utility::parsePortRangeList(port_range_str, port_range_list);
+    EXPECT_TRUE(Utility::portInRangeList(1, port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(2, port_range_list));
+  }
+
+  {
+    std::string port_range_str = "1024-2048";
+    std::list<PortRange> port_range_list;
+
+    Utility::parsePortRangeList(port_range_str, port_range_list);
+    EXPECT_TRUE(Utility::portInRangeList(1024, port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(2048, port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(1536, port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(1023, port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(2049, port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(0, port_range_list));
+  }
+
+  {
+    std::string port_range_str = "1,10-100,1000-10000,65535";
+    std::list<PortRange> port_range_list;
+
+    Utility::parsePortRangeList(port_range_str, port_range_list);
+    EXPECT_TRUE(Utility::portInRangeList(1, port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(50, port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(5000, port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(65535, port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(2, port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(200, port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(20000, port_range_list));
+  }
+}
+
 } // Network

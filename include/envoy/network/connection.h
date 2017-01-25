@@ -116,6 +116,25 @@ public:
   virtual const std::string& remoteAddress() PURE;
 
   /**
+   * @return The port number used by the remote client.
+   */
+  virtual uint32_t remotePort() PURE;
+
+  /**
+   * @return The address the remote client is trying to connect to.
+   * It can be different from the proxy address if the downstream connection
+   * has been redirected or the proxy is operating in transparent mode.
+   */
+  virtual const std::string destinationAddress() PURE;
+
+  /**
+   * @return The port number the remote client is trying to connect to.
+   * It can be different from the port the listener is listening on if the connection
+   * has been redirected or the proxy is operating in transparent mode.
+   */
+  virtual uint32_t destinationPort() PURE;
+
+  /**
    * Set the buffer stats to update when the connection's read/write buffers change. Note that
    * for performance reasons these stats are eventually consistent and may not always accurately
    * represent the buffer contents at any given point in time.

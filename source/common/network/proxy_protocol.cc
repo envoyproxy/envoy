@@ -68,7 +68,10 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
 
   removeFromList(parent_.connections_);
 
-  listener.newConnection(fd, remote_address);
+  // Technically we could extract the remote port from the PROXY protocol header
+  // and pass it to the listener. However, the listener does not care about
+  // client-side ports for downstream connections, so we can just pass a 0
+  listener.newConnection(fd, remote_address, 0);
 }
 
 void ProxyProtocol::ActiveConnection::close() {

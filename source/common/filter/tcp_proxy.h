@@ -9,6 +9,7 @@
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
 #include "common/network/filter_impl.h"
+#include "common/network/utility.h"
 
 namespace Filter {
 
@@ -38,13 +39,24 @@ public:
   TcpProxyConfig(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                  Stats::Store& stats_store);
 
-  const std::string& clusterName() { return cluster_name_; }
+  const std::string& getClusterForConnection(Network::Connection& connection);
+
   const TcpProxyStats& stats() { return stats_; }
 
 private:
+  struct Route {
+    Route(const Json::Object& config);
+
+    Network::IpList source_ips_;
+    Network::PortRangeList source_port_ranges_;
+    Network::IpList destination_ips_;
+    Network::PortRangeList destination_port_ranges_;
+    std::string cluster_name_;
+  };
+
   static TcpProxyStats generateStats(const std::string& name, Stats::Store& store);
 
-  std::string cluster_name_;
+  std::list<Route> routes_;
   const TcpProxyStats stats_;
 };
 
