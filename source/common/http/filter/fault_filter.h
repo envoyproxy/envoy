@@ -40,6 +40,7 @@ public:
   uint64_t delayPercent() { return fixed_delay_percent_; }
   uint64_t delayDuration() { return fixed_duration_ms_; }
   uint64_t abortCode() { return http_status_; }
+  const std::string& upstreamCluster() { return upstream_cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   FaultFilterStats& stats() { return stats_; }
 
@@ -50,6 +51,7 @@ private:
   uint64_t http_status_{};         // HTTP or gRPC return codes
   uint64_t fixed_delay_percent_{}; // 0-100
   uint64_t fixed_duration_ms_{};   // in milliseconds
+  std::string upstream_cluster_;   // restrict faults to specific upstream cluster
   std::vector<Router::ConfigUtility::HeaderData> fault_filter_headers_;
   Runtime::Loader& runtime_;
   FaultFilterStats stats_;
@@ -75,6 +77,7 @@ private:
   void resetTimerState();
   void postDelayInjection();
   void abortWithHTTPStatus();
+  bool matchesTargetCluster(const HeaderMap& headers);
 
   FaultFilterConfigPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};

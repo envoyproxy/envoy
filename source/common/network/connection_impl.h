@@ -45,7 +45,7 @@ public:
   void addWriteFilter(WriteFilterPtr filter) override;
   void addFilter(FilterPtr filter) override;
   void addReadFilter(ReadFilterPtr filter) override;
-  void initializeReadFilters() override;
+  bool initializeReadFilters() override;
 
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;

@@ -60,7 +60,7 @@ TEST_F(NetworkFilterManagerTest, All) {
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
 
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::StopIteration));
-  manager.initializeReadFilters();
+  EXPECT_EQ(manager.initializeReadFilters(), true);
 
   EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   read_filter->callbacks_->continueReading();
@@ -146,7 +146,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
       .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks = &callbacks; })));
 
-  manager.initializeReadFilters();
+  EXPECT_EQ(manager.initializeReadFilters(), true);
 
   NiceMock<Network::MockClientConnection>* upstream_connection =
       new NiceMock<Network::MockClientConnection>();

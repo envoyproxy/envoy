@@ -34,7 +34,7 @@ public:
   }
 
   // Network::FilterChainFactory
-  void createFilterChain(Network::Connection& connection) override;
+  bool createFilterChain(Network::Connection& connection) override;
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;

@@ -46,7 +46,7 @@ public:
   MOCK_METHOD1(close, void(ConnectionCloseType type));
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(id, uint64_t());
-  MOCK_METHOD0(initializeReadFilters, void());
+  MOCK_METHOD0(initializeReadFilters, bool());
   MOCK_METHOD0(nextProtocol, std::string());
   MOCK_METHOD1(noDelay, void(bool enable));
   MOCK_METHOD1(readDisable, void(bool disable));
@@ -78,7 +78,7 @@ public:
   MOCK_METHOD1(close, void(ConnectionCloseType type));
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(id, uint64_t());
-  MOCK_METHOD0(initializeReadFilters, void());
+  MOCK_METHOD0(initializeReadFilters, bool());
   MOCK_METHOD0(nextProtocol, std::string());
   MOCK_METHOD1(noDelay, void(bool enable));
   MOCK_METHOD1(readDisable, void(bool disable));
@@ -186,7 +186,7 @@ public:
   MockFilterChainFactory();
   ~MockFilterChainFactory();
 
-  MOCK_METHOD1(createFilterChain, void(Connection& connection));
+  MOCK_METHOD1(createFilterChain, bool(Connection& connection));
 };
 
 class MockListenSocket : public ListenSocket {

@@ -25,11 +25,11 @@ public:
    *        allows stable choices between calls if desired.
    * @return true if input headers match this object.
    */
-  virtual bool matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
+  virtual const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
 };
 
 class RouteEntryImplBase;
-typedef std::shared_ptr<RouteEntryImplBase> RouteEntryImplBasePtr;
+typedef std::unique_ptr<RouteEntryImplBase> RouteEntryImplBasePtr;
 
 /**
  * Redirect entry that does an SSL redirect.
@@ -179,6 +179,10 @@ public:
   bool isRedirect() const { return !host_redirect_.empty() || !path_redirect_.empty(); }
   bool usesRuntime() const { return runtime_.valid(); }
 
+  bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
+  void validateClusters(Upstream::ClusterManager& cm) const;
+  const Route* clusterEntry(uint64_t random_value) const;
+
   // Router::RouteEntry
   const std::string& clusterName() const override;
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
@@ -194,9 +198,6 @@ public:
 
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
-
-  // Router::Matchable
-  bool matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
   // Router::Route
   const RedirectEntry* redirectEntry() const override;
@@ -215,6 +216,58 @@ private:
     uint64_t default_;
   };
 
+  /**
+   * Route entry implementation for weighted clusters. The RouteEntryImplBase object holds
+   * one or more weighted cluster objects, where each object has a back pointer to the parent
+   * RouteEntryImplBase object. Almost all functions in this class forward calls back to the
+   * parent, with the exception of clusterName and routeEntry.
+   */
+  struct WeightedClusterEntry : public RouteEntry, public Route {
+  public:
+    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string runtime_key,
+                         Runtime::Loader& loader, const std::string name, uint64_t weight)
+        : parent_(parent), runtime_key_(runtime_key), loader_(loader), cluster_name_(name),
+          cluster_weight_(weight) {}
+
+    uint64_t clusterWeight() const {
+      return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
+    }
+
+    // Router::RouteEntry
+    const std::string& clusterName() const override { return cluster_name_; }
+
+    void finalizeRequestHeaders(Http::HeaderMap& headers) const override {
+      return parent_->finalizeRequestHeaders(headers);
+    }
+
+    Upstream::ResourcePriority priority() const override { return parent_->priority(); }
+    const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
+    const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
+    const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
+    std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
+
+    const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
+      return parent_->virtualCluster(headers);
+    }
+
+    const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
+
+    // Router::Route
+    const RedirectEntry* redirectEntry() const override { return nullptr; }
+    const RouteEntry* routeEntry() const override { return this; }
+
+    static const uint64_t MAX_CLUSTER_WEIGHT;
+
+  private:
+    const RouteEntryImplBase* parent_;
+    const std::string runtime_key_;
+    Runtime::Loader& loader_;
+    const std::string cluster_name_;
+    const uint64_t cluster_weight_;
+  };
+
+  typedef std::unique_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
+
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
 
   // Default timeout is 15s if nothing is specified in the route config.
@@ -232,6 +285,7 @@ private:
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
   std::vector<ConfigUtility::HeaderData> config_headers_;
+  std::vector<WeightedClusterEntryPtr> weighted_clusters_;
 };
 
 /**
@@ -246,7 +300,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  bool matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string prefix_;
@@ -264,7 +318,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  bool matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string path_;
