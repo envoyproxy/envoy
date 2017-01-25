@@ -31,6 +31,7 @@ public:
 
     Json::ObjectPtr config = Json::Factory::LoadFromString(config_json);
     cds_ = CdsApiImpl::create(*config, cm_, dispatcher_, random_, local_info_, store_);
+    cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     expectRequest();
     cds_->initialize();
@@ -76,6 +77,7 @@ public:
   CdsApiPtr cds_;
   Event::MockTimer* interval_timer_{new Event::MockTimer(&dispatcher_)};
   Http::AsyncClient::Callbacks* callbacks_{};
+  ReadyWatcher initialized_;
 };
 
 TEST_F(CdsApiImplTest, InvalidOptions) {
@@ -121,6 +123,7 @@ TEST_F(CdsApiImplTest, Basic) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   expectAdd("cluster1");
   expectAdd("cluster2");
+  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
@@ -169,6 +172,7 @@ TEST_F(CdsApiImplTest, Failure) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
 
+  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 

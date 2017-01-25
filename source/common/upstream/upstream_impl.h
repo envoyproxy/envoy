@@ -16,7 +16,6 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
-#include "common/json/json_loader.h"
 #include "common/stats/stats_impl.h"
 
 namespace Upstream {

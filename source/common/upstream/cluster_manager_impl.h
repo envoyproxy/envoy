@@ -49,6 +49,38 @@ private:
 };
 
 /**
+ * This is a helper class used during cluster management initialization. Dealing with primary
+ * clusters, secondary clusters, and CDS, is quite complicated, so this makes it easier to test.
+ */
+class ClusterManagerInitHelper {
+public:
+  ~ClusterManagerInitHelper();
+  void addCluster(Cluster& cluster);
+  void onStaticLoadComplete();
+  void removeCluster(Cluster& cluster);
+  void setCds(CdsApi* cds);
+  void setInitializedCb(std::function<void()> callback);
+
+private:
+  enum class State {
+    Loading,
+    WaitingForStaticInitialize,
+    WaitingForCdsInitialize,
+    CdsInitialized,
+    AllClustersInitialized
+  };
+
+  void maybeFinishInitialize();
+
+  CdsApi* cds_{};
+  std::function<void()> initialized_callback_;
+  std::list<Cluster*> primary_init_clusters_;
+  std::list<Cluster*> secondary_init_clusters_;
+  State state_{State::Loading};
+  bool started_secondary_initialize_{};
+};
+
+/**
  * All cluster manager stats. @see stats_macros.h
  */
 // clang-format off
@@ -80,11 +112,7 @@ public:
   // Upstream::ClusterManager
   bool addOrUpdatePrimaryCluster(const Json::Object& config) override;
   void setInitializedCb(std::function<void()> callback) override {
-    if (pending_cluster_init_ == 0) {
-      callback();
-    } else {
-      initialized_callback_ = callback;
-    }
+    init_helper_.setInitializedCb(callback);
   }
   ClusterInfoMap clusters() override {
     ClusterInfoMap clusters_map;
@@ -177,14 +205,12 @@ private:
   Runtime::RandomGenerator& random_;
   uint32_t thread_local_slot_;
   std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
-  std::function<void()> initialized_callback_;
-  uint32_t pending_cluster_init_;
   Optional<SdsConfig> sds_config_;
-  std::list<Cluster*> secondary_init_clusters_;
   Outlier::EventLoggerPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
+  ClusterManagerInitHelper init_helper_;
 };
 
 } // Upstream
