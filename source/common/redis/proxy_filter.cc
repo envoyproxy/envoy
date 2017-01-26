@@ -8,7 +8,7 @@ namespace Redis {
 ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm)
     : cluster_name_{config.getString("cluster_name")} {
 
-  config.validateSchema(Json::Schema::REDIS_PROXY_SCHEMA);
+  config.validateSchema(Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA);
 
   if (!cm.get(cluster_name_)) {
     throw EnvoyException(

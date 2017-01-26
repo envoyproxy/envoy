@@ -21,7 +21,7 @@ Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream:
       tls_(tls), tls_slot_(tls.allocateSlot()), ip_white_list_(config),
       stats_(generateStats(stats_store, config.getString("stat_prefix"))) {
 
-  config.validateSchema(Json::Schema::CLIENT_SSL_SCHEMA);
+  config.validateSchema(Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA);
 
   if (!cm.get(remote_cluster_name_)) {
     throw EnvoyException(

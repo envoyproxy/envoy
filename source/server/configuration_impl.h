@@ -100,7 +100,6 @@ private:
     void createFilterChain(Network::Connection& connection) override;
 
   private:
-    static const std::string LISTENER_SCHEMA;
     MainImpl& parent_;
     uint64_t port_;
     bool bind_to_port_{};

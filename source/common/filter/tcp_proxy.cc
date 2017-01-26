@@ -18,7 +18,7 @@ TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
     : cluster_name_(config.getString("cluster")),
       stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
 
-  config.validateSchema(Json::Schema::TCP_PROXY_SCHEMA);
+  config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
   if (!cluster_manager.get(cluster_name_)) {
     throw EnvoyException(fmt::format("tcp proxy: unknown cluster '{}'", cluster_name_));

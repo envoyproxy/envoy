@@ -10,7 +10,7 @@ Config::Config(const Json::Object& config, Stats::Store& stats_store, Runtime::L
     : domain_(config.getString("domain")),
       stats_(generateStats(config.getString("stat_prefix"), stats_store)), runtime_(runtime) {
 
-  config.validateSchema(Json::Schema::RATELIMIT_SCHEMA);
+  config.validateSchema(Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA);
 
   for (const Json::ObjectPtr& descriptor : config.getObjectArray("descriptors")) {
     Descriptor new_descriptor;

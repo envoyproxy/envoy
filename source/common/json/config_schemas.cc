@@ -52,7 +52,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
   }
   )EOF");
 
-const std::string Json::Schema::CLIENT_SSL_SCHEMA(R"EOF(
+const std::string Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
     "properties": {
@@ -73,7 +73,7 @@ const std::string Json::Schema::CLIENT_SSL_SCHEMA(R"EOF(
   }
   )EOF");
 
-const std::string Json::Schema::MONGO_PROXY_SCHEMA(R"EOF(
+const std::string Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
     "properties":{
@@ -85,7 +85,7 @@ const std::string Json::Schema::MONGO_PROXY_SCHEMA(R"EOF(
   }
   )EOF");
 
-const std::string Json::Schema::RATELIMIT_SCHEMA(R"EOF(
+const std::string Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
     "properties":{
@@ -103,6 +103,7 @@ const std::string Json::Schema::RATELIMIT_SCHEMA(R"EOF(
               "key" : {"type" : "string"},
               "value" : {"type" : "string"}
             },
+            "required": ["key", "value"],
             "additionalProperties": false
           }
         }
@@ -113,7 +114,7 @@ const std::string Json::Schema::RATELIMIT_SCHEMA(R"EOF(
   }
   )EOF");
 
-const std::string Json::Schema::REDIS_PROXY_SCHEMA(R"EOF(
+const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
       "$schema": "http://json-schema.org/schema#",
       "properties":{
@@ -124,7 +125,7 @@ const std::string Json::Schema::REDIS_PROXY_SCHEMA(R"EOF(
   }
   )EOF");
 
-const std::string Json::Schema::TCP_PROXY_SCHEMA(R"EOF(
+const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
       "$schema": "http://json-schema.org/schema#",
       "properties":{

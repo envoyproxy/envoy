@@ -16,7 +16,7 @@ NetworkFilterFactoryCb MongoProxyFilterConfigFactory::tryCreateFilterFactory(
     return nullptr;
   }
 
-  config.validateSchema(Json::Schema::MONGO_PROXY_SCHEMA);
+  config.validateSchema(Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA);
 
   std::string stat_prefix = "mongo." + config.getString("stat_prefix") + ".";
   Mongo::AccessLogPtr access_log;
