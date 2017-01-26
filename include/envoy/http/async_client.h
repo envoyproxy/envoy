@@ -45,21 +45,22 @@ public:
     virtual ~StreamCallbacks() {}
 
     /**
-     * Called when the async HTTP stream receives headers.
+     * Called when all headers get received on the async HTTP stream.
      * @param headers the headers received
      * @param end_stream whether the response is header only
      */
     virtual void onHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
 
     /**
-     * Called when the async HTTP stream receives data.
+     * Called when a data frame get received on the async HTTP stream.
+     * This can be invoked multiple times if the data get streamed.
      * @param data the data received
      * @param end_stream whether the data is the last data frame
      */
     virtual void onData(Buffer::Instance& data, bool end_stream) PURE;
 
     /**
-     * Called when the async HTTP stream receives trailers.
+     * Called when all trailers get received on the async HTTP stream.
      * @param trailers the trailers received.
      */
     virtual void onTrailers(HeaderMapPtr&& trailers) PURE;
@@ -67,7 +68,7 @@ public:
     /**
      * Called when the async HTTP stream is reset.
      */
-    virtual void onResetStream() PURE;
+    virtual void onReset() PURE;
   };
 
   /**
@@ -91,21 +92,23 @@ public:
     virtual ~Stream() {}
 
     /***
-     * Send headers to the stream.
+     * Send headers to the stream. This method cannot be invoked more than once and
+     * need to be called before sendData.
      * @param headers supplies the headers to send.
      * @param end_stream supplies whether this is a header only request.
      */
     virtual void sendHeaders(HeaderMap& headers, bool end_stream) PURE;
 
     /***
-     * Send data to the stream.
+     * Send data to the stream. This method can be invoked multiple times if it get streamed.
+     * To end the stream without data, call this method with empty buffer.
      * @param data supplies the data to send.
      * @param end_stream supplies whether this is the last data.
      */
     virtual void sendData(Buffer::Instance& data, bool end_stream) PURE;
 
     /***
-     * Send trailers. This implicitly ends the stream.
+     * Send trailers. This method cannot be invoked more than once, and implicitly ends the stream.
      * @param trailers supplies the trailers to send.
      */
     virtual void sendTrailers(HeaderMap& trailers) PURE;

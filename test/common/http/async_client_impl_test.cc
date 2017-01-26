@@ -77,7 +77,7 @@ TEST_F(AsyncClientImplTest, BasicStream) {
 
   TestHeaderMapImpl expected_headers{{":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
-  EXPECT_CALL(stream_callbacks_, onData_(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
 
   AsyncClient::Stream* stream =
       client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
@@ -186,7 +186,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
 
   TestHeaderMapImpl expected_headers{{":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
-  EXPECT_CALL(stream_callbacks_, onData_(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
 
   AsyncClient::Stream* stream =
       client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
@@ -313,7 +313,7 @@ TEST_F(AsyncClientImplTest, StreamAndRequest) {
 
   TestHeaderMapImpl expected_headers{{":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
-  EXPECT_CALL(stream_callbacks_, onData_(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
 
   AsyncClient::Stream* stream =
       client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
@@ -353,7 +353,7 @@ TEST_F(AsyncClientImplTest, StreamWithTrailers) {
   TestHeaderMapImpl expected_headers{{":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
   TestHeaderMapImpl expected_trailers{{"some", "trailer"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
-  EXPECT_CALL(stream_callbacks_, onData_(BufferEqual(body.get()), false));
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
   EXPECT_CALL(stream_callbacks_, onTrailers_(HeaderMapEqualRef(&expected_trailers)));
 
   AsyncClient::Stream* stream =
@@ -430,7 +430,7 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
 
   TestHeaderMapImpl expected_headers{{":status", "200"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
-  EXPECT_CALL(stream_callbacks_, onData_(BufferEqual(body.get()), false));
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
 
   AsyncClient::Stream* stream =
       client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
@@ -465,8 +465,8 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
 
   TestHeaderMapImpl expected_headers{{":status", "200"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
-  EXPECT_CALL(stream_callbacks_, onData_(BufferEqual(body.get()), false));
-  EXPECT_CALL(stream_callbacks_, onResetStream_());
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
+  EXPECT_CALL(stream_callbacks_, onReset());
 
   AsyncClient::Stream* stream =
       client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
@@ -540,7 +540,7 @@ TEST_F(AsyncClientImplTest, DestroyWithActiveStream) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), false));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
-  EXPECT_CALL(stream_callbacks_, onResetStream_());
+  EXPECT_CALL(stream_callbacks_, onReset());
   AsyncClient::Stream* stream =
       client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
   stream->sendHeaders(message_->headers(), false);
@@ -591,7 +591,7 @@ TEST_F(AsyncClientImplTest, StreamTimeout) {
   TestHeaderMapImpl expected_timeout{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_timeout), false));
-  EXPECT_CALL(stream_callbacks_, onData_(_, true));
+  EXPECT_CALL(stream_callbacks_, onData(_, true));
 
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, std::chrono::milliseconds(40));
   stream->sendHeaders(message_->headers(), true);
@@ -683,7 +683,7 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
 
   TestHeaderMapImpl expected_headers{{":status", "200"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
-  EXPECT_CALL(stream_callbacks_, onData_(BufferEqual(body.get()), false));
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
 
   AsyncClient::Stream* stream =
       client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
@@ -694,7 +694,7 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
   response_decoder_->decodeData(*body, false);
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body2.get()), true));
-  EXPECT_CALL(stream_callbacks_, onData_(BufferEqual(body2.get()), true));
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body2.get()), true));
 
   stream->sendData(*body2, true);
   response_decoder_->decodeData(*body2, true);

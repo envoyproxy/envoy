@@ -180,7 +180,7 @@ private:
   std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
   RouteImpl route_;
-  Buffer::Instance* decoding_buffer_{nullptr};
+  Buffer::Instance* decoding_buffer_{};
   bool local_closed_{};
   bool remote_closed_{};
 
@@ -201,7 +201,7 @@ private:
   void onHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;
   void onTrailers(HeaderMapPtr&& trailers) override;
-  void onResetStream() override;
+  void onReset() override;
   void onComplete();
   MessagePtr request_;
   AsyncClient::Callbacks& callbacks_;

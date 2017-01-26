@@ -118,9 +118,6 @@ MockAsyncClientStreamCallbacks::~MockAsyncClientStreamCallbacks() {}
 MockAsyncClientRequest::MockAsyncClientRequest(MockAsyncClient* client) : client_(client) {}
 MockAsyncClientRequest::~MockAsyncClientRequest() { client_->onRequestDestroy(); }
 
-MockAsyncClientStream::MockAsyncClientStream(MockAsyncClient* client) : client_(client) {}
-MockAsyncClientStream::~MockAsyncClientStream() { client_->onRequestDestroy(); }
-
 } // Http
 
 namespace Http {

@@ -116,6 +116,8 @@ void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) {
 }
 
 void AsyncStreamImpl::closeLocal(bool end_stream) {
+  ASSERT(!(local_closed_ && end_stream));
+
   local_closed_ |= end_stream;
   if (complete())
     cleanup();
@@ -143,7 +145,7 @@ void AsyncStreamImpl::cleanup() {
 }
 
 void AsyncStreamImpl::resetStream() {
-  stream_callbacks_.onResetStream();
+  stream_callbacks_.onReset();
   cleanup();
 }
 
@@ -192,7 +194,7 @@ void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
   onComplete();
 }
 
-void AsyncRequestImpl::onResetStream() {
+void AsyncRequestImpl::onReset() {
   // In this case we don't have a valid response so we do need to raise a failure.
   callbacks_.onFailure(AsyncClient::FailureReason::Reset);
 }
