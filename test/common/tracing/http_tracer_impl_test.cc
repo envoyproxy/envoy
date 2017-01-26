@@ -223,10 +223,10 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   }
 }
 
-TEST(HttpTracerUtilityTest, OrigianlAndLongPath) {
+TEST(HttpTracerUtilityTest, OriginalAndLongPath) {
   const std::string path(300, 'a');
   const std::string expected_path(256, 'a');
-  NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
+  std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
   Http::TestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {"x-envoy-original-path", path}, {":method", "GET"}};
@@ -243,7 +243,7 @@ TEST(HttpTracerUtilityTest, OrigianlAndLongPath) {
 }
 
 TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
-  NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
+  std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
   Http::TestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
@@ -278,7 +278,7 @@ TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
 }
 
 TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
-  NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
+  std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
   Http::TestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
