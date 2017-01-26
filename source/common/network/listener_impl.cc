@@ -82,7 +82,8 @@ void ListenerImpl::newConnection(int fd, sockaddr* addr) {
 }
 
 void ListenerImpl::newConnection(int fd, const std::string& remote_address, uint32_t remote_port) {
-  ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, fd, remote_address, remote_port));
+  ConnectionPtr new_connection(new ConnectionImpl(
+      dispatcher_, fd, Network::Utility::urlForTcp(remote_address, remote_port)));
   cb_.onNewConnection(std::move(new_connection));
 }
 
@@ -96,9 +97,9 @@ void SslListenerImpl::newConnection(int fd, sockaddr* addr) {
 
 void SslListenerImpl::newConnection(int fd, const std::string& remote_address,
                                     uint32_t remote_port) {
-  ConnectionPtr new_connection(new Ssl::ConnectionImpl(dispatcher_, fd, remote_address, remote_port,
-                                                       ssl_ctx_,
-                                                       Ssl::ConnectionImpl::InitialState::Server));
+  ConnectionPtr new_connection(new Ssl::ConnectionImpl(
+      dispatcher_, fd, Network::Utility::urlForTcp(remote_address, remote_port), ssl_ctx_,
+      Ssl::ConnectionImpl::InitialState::Server));
   cb_.onNewConnection(std::move(new_connection));
 }
 

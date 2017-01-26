@@ -21,7 +21,9 @@ namespace Filter {
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
   GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_tx_bytes_buffered)
+  GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
+  COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_cx_no_route)
 // clang-format on
 
 /**
@@ -40,13 +42,14 @@ public:
                  Stats::Store& stats_store);
 
   /**
-   * Find out which cluster an upstream connection should be opened to.
+   * Find out which cluster an upstream connection should be opened to based on the
+   * parameters of a downstream connection.
    * @param connection supplies the parameters of the downstream connection for
-   * which the proxy needs to open the corresponding upstream
+   * which the proxy needs to open the corresponding upstream.
    * @return the cluster name to be used for the upstream connection.
      If no route applies, returns the empty string.
    */
-  const std::string& getClusterForConnection(Network::Connection& connection);
+  const std::string& getRouteFromEntries(Network::Connection& connection);
 
   const TcpProxyStats& stats() { return stats_; }
 
@@ -63,7 +66,7 @@ private:
 
   static TcpProxyStats generateStats(const std::string& name, Stats::Store& store);
 
-  std::list<Route> routes_;
+  std::vector<Route> routes_;
   const TcpProxyStats stats_;
 };
 

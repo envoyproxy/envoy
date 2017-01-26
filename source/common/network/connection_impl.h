@@ -37,8 +37,7 @@ class ConnectionImpl : public virtual Connection,
                        public BufferSource,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& remote_address,
-                 uint32_t remote_port);
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& remote_address);
   ~ConnectionImpl();
 
   // Network::FilterManager
@@ -57,9 +56,7 @@ public:
   void readDisable(bool disable) override;
   bool readEnabled() override;
   const std::string& remoteAddress() override { return remote_address_; }
-  uint32_t remotePort() override { return remote_port_; };
   const std::string destinationAddress() override;
-  uint32_t destinationPort() override;
   void setBufferStats(const BufferStats& stats) override;
   Ssl::Connection* ssl() override { return nullptr; }
   State state() override;
@@ -83,7 +80,6 @@ protected:
 
   FilterManagerImpl filter_manager_;
   const std::string remote_address_;
-  uint32_t remote_port_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
 
@@ -127,8 +123,7 @@ private:
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
 public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& url,
-                       uint32_t port);
+  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& url);
 
   static Network::ClientConnectionPtr create(Event::DispatcherImpl& dispatcher,
                                              const std::string& url);

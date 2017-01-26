@@ -161,6 +161,8 @@ public:
   /**
    * Parses a string containing a comma-separated list of port numbers and/or
    * port ranges and appends the values to a caller-provided list of PortRange structures.
+   * For example, the string "1-1024,2048-4096,12345" causes 3 PortRange structures
+   * to be appended to the supplied list.
    * @param str is the string containing the port numbers and ranges
    * @param list is the list to append the new data structures to
    */

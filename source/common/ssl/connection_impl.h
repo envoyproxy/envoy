@@ -11,7 +11,7 @@ public:
   enum class InitialState { Client, Server };
 
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& remote_address,
-                 uint32_t remote_port, Context& ctx, InitialState state);
+                 Context& ctx, InitialState state);
   ~ConnectionImpl();
 
   // Network::Connection

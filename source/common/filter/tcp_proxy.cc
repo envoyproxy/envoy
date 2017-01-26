@@ -17,7 +17,7 @@ TcpProxyConfig::Route::Route(const Json::Object& config) {
   if (config.hasObject("cluster")) {
     cluster_name_ = config.getString("cluster");
   } else {
-    throw EnvoyException(fmt::format("tcp proxy: route without cluster"));
+    throw EnvoyException("tcp proxy: route without cluster");
   }
 
   if (config.hasObject("source_ip_list")) {
@@ -42,7 +42,7 @@ TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
                                Upstream::ClusterManager& cluster_manager, Stats::Store& stats_store)
     : stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
   if (!config.hasObject("route_config")) {
-    throw EnvoyException(fmt::format("tcp proxy: missing route config"));
+    throw EnvoyException("tcp proxy: missing route config");
   }
 
   for (const Json::ObjectPtr& route_desc :
@@ -56,25 +56,29 @@ TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
   }
 }
 
-const std::string& TcpProxyConfig::getClusterForConnection(Network::Connection& connection) {
+const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& connection) {
   for (const TcpProxyConfig::Route& route : routes_) {
     if (!route.source_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(connection.remotePort(), route.source_port_ranges_)) {
+        !Network::Utility::portInRangeList(
+            Network::Utility::portFromUrl(connection.remoteAddress()), route.source_port_ranges_)) {
       continue; // no match, try next route
     }
 
-    if (!route.source_ips_.empty() && !route.source_ips_.contains(connection.remoteAddress())) {
+    if (!route.source_ips_.empty() &&
+        !route.source_ips_.contains(Network::Utility::hostFromUrl(connection.remoteAddress()))) {
       continue; // no match, try next route
     }
 
     if (!route.destination_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(connection.destinationPort(),
-                                           route.destination_port_ranges_)) {
+        !Network::Utility::portInRangeList(
+            Network::Utility::portFromUrl(connection.destinationAddress()),
+            route.destination_port_ranges_)) {
       continue; // no match, try next route
     }
 
     if (!route.destination_ips_.empty() &&
-        !route.destination_ips_.contains(connection.destinationAddress())) {
+        !route.destination_ips_.contains(
+            Network::Utility::hostFromUrl(connection.destinationAddress()))) {
       continue; // no match, try next route
     }
 
@@ -113,6 +117,7 @@ TcpProxyStats TcpProxyConfig::generateStats(const std::string& name, Stats::Stor
 void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   conn_log_info("new tcp proxy session", read_callbacks_->connection());
+  config_->stats().downstream_cx_total_.inc();
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   read_callbacks_->connection().setBufferStats({config_->stats().downstream_cx_rx_bytes_total_,
                                                 config_->stats().downstream_cx_rx_bytes_buffered_,
@@ -121,7 +126,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
 }
 
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
-  const std::string& cluster_name = config_->getClusterForConnection(read_callbacks_->connection());
+  const std::string& cluster_name = config_->getRouteFromEntries(read_callbacks_->connection());
 
   Upstream::ClusterInfoPtr cluster = cluster_manager_.get(cluster_name);
 
@@ -129,6 +134,8 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     conn_log_debug("Creating connection to cluster {}", read_callbacks_->connection(),
                    cluster_name);
   } else {
+    config_->stats().downstream_cx_no_route_.inc();
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
 

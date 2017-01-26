@@ -113,126 +113,124 @@ TEST(TcpProxyConfigTest, Routes) {
   {
     // hit route with destination_ip (10.10.10.10/32)
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.10.10.10"));
-    EXPECT_EQ(std::string("with_destination_ip_list"),
-              config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.10.10.10:0"));
+    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.10.10.11"));
-    EXPECT_EQ(std::string("catch_all"), config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.10.10.11:0"));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // hit route with destination_ip (10.10.11.0/24)
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.10.11.11"));
-    EXPECT_EQ(std::string("with_destination_ip_list"),
-              config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.10.11.11:0"));
+    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.10.12.12"));
-    EXPECT_EQ(std::string("catch_all"), config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.10.12.12:0"));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // hit route with destination_ip (10.11.0.0/16)
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.11.11.11"));
-    EXPECT_EQ(std::string("with_destination_ip_list"),
-              config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.11.11.11:0"));
+    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.12.12.12"));
-    EXPECT_EQ(std::string("catch_all"), config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.12.12.12:0"));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // hit route with destination_ip (11.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("11.11.11.11"));
-    EXPECT_EQ(std::string("with_destination_ip_list"),
-              config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://11.11.11.11:0"));
+    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("12.12.12.12"));
-    EXPECT_EQ(std::string("catch_all"), config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://12.12.12.12:0"));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // hit route with destination_ip (128.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("128.255.255.255"));
-    EXPECT_EQ(std::string("with_destination_ip_list"),
-              config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://128.255.255.255:0"));
+    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // hit route with destination port range
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("1.2.3.4"));
-    EXPECT_CALL(connection, destinationPort()).WillRepeatedly(Return(12345));
-    EXPECT_EQ(std::string("with_destination_ports"),
-              config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://1.2.3.4:12345"));
+    EXPECT_EQ(std::string("with_destination_ports"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("1.2.3.4"));
-    EXPECT_CALL(connection, destinationPort()).WillRepeatedly(Return(23456));
-    EXPECT_EQ(std::string("catch_all"), config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://1.2.3.4:23456"));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // hit route with source port range
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("1.2.3.4"));
-    EXPECT_CALL(connection, destinationPort()).WillRepeatedly(Return(23456));
-    EXPECT_CALL(connection, remotePort()).WillRepeatedly(Return(23459));
-    EXPECT_EQ(std::string("with_source_ports"), config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://1.2.3.4:23456"));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:23459")));
+    EXPECT_EQ(std::string("with_source_ports"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("1.2.3.4"));
-    EXPECT_CALL(connection, destinationPort()).WillRepeatedly(Return(23456));
-    EXPECT_CALL(connection, remotePort()).WillRepeatedly(Return(23458));
-    EXPECT_EQ(std::string("catch_all"), config_obj.getClusterForConnection(connection));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://1.2.3.4:23456"));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:23458")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // hit the route with all criterias present
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.0.0.0"));
-    EXPECT_CALL(connection, destinationPort()).WillRepeatedly(Return(10000));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.0.0.0:10000"));
     EXPECT_CALL(connection, remoteAddress())
-        .WillRepeatedly(ReturnRefOfCopy(std::string("20.0.0.0")));
-    EXPECT_CALL(connection, remotePort()).WillRepeatedly(Return(20000));
-    EXPECT_EQ(std::string("with_everything"), config_obj.getClusterForConnection(connection));
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://20.0.0.0:20000")));
+    EXPECT_EQ(std::string("with_everything"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("10.0.0.0"));
-    EXPECT_CALL(connection, destinationPort()).WillRepeatedly(Return(10000));
+    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.0.0.0:10000"));
     EXPECT_CALL(connection, remoteAddress())
-        .WillRepeatedly(ReturnRefOfCopy(std::string("30.0.0.0")));
-    EXPECT_CALL(connection, remotePort()).WillRepeatedly(Return(20000));
-    EXPECT_EQ(std::string("catch_all"), config_obj.getClusterForConnection(connection));
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://30.0.0.0:20000")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
   }
 }
 
@@ -253,7 +251,7 @@ TEST(TcpProxyConfigTest, EmptyRouteConfig) {
   TcpProxyConfig config_obj(*json_config, cm_, cm_.cluster_.info_->stats_store_);
 
   NiceMock<Network::MockConnection> connection;
-  EXPECT_EQ(std::string(""), config_obj.getClusterForConnection(connection));
+  EXPECT_EQ(std::string(""), config_obj.getRouteFromEntries(connection));
 }
 
 class TcpProxyTest : public testing::Test {

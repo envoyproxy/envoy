@@ -43,7 +43,8 @@ TEST(ConnectionImplUtility, updateBufferStats) {
 
 TEST(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
-  EXPECT_DEATH(ConnectionImpl(dispatcher, -1, "127.0.0.1", 0), ".*assert failure: fd_ != -1.*");
+  EXPECT_DEATH(ConnectionImpl(dispatcher, -1, "tcp://127.0.0.1:0"),
+               ".*assert failure: fd_ != -1.*");
 }
 
 struct MockBufferStats {

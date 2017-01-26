@@ -10,9 +10,8 @@
 namespace Ssl {
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                               const std::string& remote_address, uint32_t remote_port,
-                               Context& ctx, InitialState state)
-    : Network::ConnectionImpl(dispatcher, fd, remote_address, remote_port),
+                               const std::string& remote_address, Context& ctx, InitialState state)
+    : Network::ConnectionImpl(dispatcher, fd, remote_address),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
   BIO* bio = BIO_new_socket(fd, 0);
   SSL_set_bio(ssl_.get(), bio, bio);
@@ -188,8 +187,8 @@ std::string ConnectionImpl::sha256PeerCertificateDigest() {
 
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
                                            const std::string& url)
-    : ConnectionImpl(dispatcher, socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), url,
-                     Network::Utility::portFromUrl(url), ctx, InitialState::Client) {}
+    : ConnectionImpl(dispatcher, socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), url, ctx,
+                     InitialState::Client) {}
 
 void ClientConnectionImpl::connect() {
   Network::AddrInfoPtr addr_info =

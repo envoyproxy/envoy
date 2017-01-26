@@ -237,13 +237,12 @@ bool Utility::getOriginalDst(int fd, sockaddr_storage* orig_addr) {
 void Utility::parsePortRangeList(const std::string& string, std::list<PortRange>& list) {
   std::vector<std::string> ranges = StringUtil::split(string.c_str(), ',');
   for (const std::string& s : ranges) {
+    std::stringstream ss(s);
     uint32_t min = 0;
     uint32_t max = 0;
-    char dash = 0;
-
-    std::stringstream ss(s);
 
     if (s.find('-') != std::string::npos) {
+      char dash = 0;
       ss >> min;
       ss >> dash;
       ss >> max;
