@@ -11,7 +11,6 @@ namespace AccessLog {
 class ResponseFlagUtils {
 public:
   static const std::string toShortString(const RequestInfo& request_info);
-  static bool isTraceableFailure(const Http::AccessLog::RequestInfo& request_info);
 
 private:
   ResponseFlagUtils();

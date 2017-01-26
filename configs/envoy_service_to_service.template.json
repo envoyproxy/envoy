@@ -260,15 +260,13 @@
 
   "tracing": {
     "http": {
-      "sinks": [
-        {
-          "type": "lightstep",
-          "access_token_file": "/etc/envoy/lightstep_access_token",
-          "config": {
-            "collector_cluster": "lightstep_saas"
-          }
+      "driver": {
+        "type": "lightstep",
+        "access_token_file": "/etc/envoy/lightstep_access_token",
+        "config": {
+          "collector_cluster": "lightstep_saas"
         }
-      ]
+      }
     }
   },
 

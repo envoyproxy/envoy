@@ -32,6 +32,11 @@ ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& p
       stats};
 }
 
+ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
+                                                                          Stats::Store& stats) {
+  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(stats, prefix + "tracing."))};
+}
+
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Network::DrainDecision& drain_close,
                                              Runtime::RandomGenerator& random_generator,
@@ -280,10 +285,8 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
-  if (ConnectionManagerUtility::shouldTraceRequest(request_info_,
-                                                   connection_manager_.config_.tracingConfig())) {
-    connection_manager_.tracer_.trace(request_headers_.get(), response_headers_.get(),
-                                      request_info_, *this);
+  if (active_span_ && !request_info_.healthCheck()) {
+    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_info_);
   }
 }
 
@@ -320,6 +323,27 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
     connection_manager_.stats_.named_.downstream_rq_4xx_.inc();
   } else if (CodeUtility::is5xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_5xx_.inc();
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::chargeTracingStats(
+    const Tracing::Decision& tracing_decision) {
+  switch (tracing_decision.reason) {
+  case Tracing::Reason::ClientForced:
+    connection_manager_.config_.tracingStats().client_enabled_.inc();
+    break;
+  case Tracing::Reason::HealthCheck:
+    connection_manager_.config_.tracingStats().health_check_.inc();
+    break;
+  case Tracing::Reason::NotTraceableRequestId:
+    connection_manager_.config_.tracingStats().not_traceable_.inc();
+    break;
+  case Tracing::Reason::Sampling:
+    connection_manager_.config_.tracingStats().random_sampling_.inc();
+    break;
+  case Tracing::Reason::ServiceForced:
+    connection_manager_.config_.tracingStats().service_forced_.inc();
+    break;
   }
 }
 
@@ -400,6 +424,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       *request_headers_, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, connection_manager_.random_generator_,
       connection_manager_.runtime_);
+
+  Tracing::Decision tracing_decision =
+      Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
+  chargeTracingStats(tracing_decision);
+
+  if (tracing_decision.is_tracing) {
+    active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
+  }
 
   // Set the trusted address for the connection by taking the last address in XFF.
   downstream_address_ = Utility::getLastAddressFromXFF(*request_headers_);
