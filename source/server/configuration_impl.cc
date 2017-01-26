@@ -6,6 +6,7 @@
 #include "envoy/ssl/context_manager.h"
 
 #include "common/common/utility.h"
+#include "common/json/config_schemas.h"
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -119,6 +120,8 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
     : parent_(parent), port_(json.getInteger("port")),
       scope_(parent_.server_.stats().createScope(fmt::format("listener.{}.", port_))) {
   log().info("  port={}", port_);
+
+  json.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
   if (json.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*json.getObject("ssl_context"));

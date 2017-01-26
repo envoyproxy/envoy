@@ -32,6 +32,21 @@ TEST(TcpProxyConfigTest, NoCluster) {
       EnvoyException);
 }
 
+TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": 1,
+    "cluster_name" : "fake_cluster"
+   }
+  )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  EXPECT_THROW(
+      TcpProxyConfig(*json_config, cluster_manager, cluster_manager.cluster_.info_->stats_store_),
+      Json::Exception);
+}
+
 class TcpProxyTest : public testing::Test {
 public:
   TcpProxyTest() {
