@@ -137,7 +137,8 @@ public:
   /**
    * Validates JSON object against passed in schema.
    * @param schema supplies the schema in string format. A Json::Exception will be thrown if
-   *        the JSON object doesn't conform to the supplied schema.
+   *        the JSON object doesn't conform to the supplied schema or the schema itself is not
+   * valid.
    */
   virtual void validateSchema(const std::string& schema) const PURE;
 };
