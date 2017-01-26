@@ -53,7 +53,7 @@ public:
   /**
    * Fill in span tags based on request.
    */
-  static void populateSpan(SpanPtr& active_span, const std::string& service_node,
+  static void populateSpan(Span& active_span, const std::string& service_node,
                            const Http::HeaderMap& request_headers,
                            const Http::AccessLog::RequestInfo& request_info);
 
@@ -61,13 +61,12 @@ public:
    * 1) Fill in span tags based on the response headers.
    * 2) Finish active span.
    */
-  static void finalizeSpan(SpanPtr& active_span, const Http::AccessLog::RequestInfo& request_info);
+  static void finalizeSpan(Span& active_span, const Http::AccessLog::RequestInfo& request_info);
 };
 
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
-  void initializeDriver(DriverPtr&&) override {}
   SpanPtr startSpan(const Config&, const Http::HeaderMap&,
                     const Http::AccessLog::RequestInfo&) override {
     return nullptr;
@@ -76,17 +75,15 @@ public:
 
 class HttpTracerImpl : public HttpTracer {
 public:
-  HttpTracerImpl(const LocalInfo::LocalInfo& local_info);
+  HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info);
 
   // Tracing::HttpTracer
-  void initializeDriver(DriverPtr&& driver) override;
-
   SpanPtr startSpan(const Config& config, const Http::HeaderMap& request_headers,
                     const Http::AccessLog::RequestInfo& request_info) override;
 
 private:
-  const LocalInfo::LocalInfo& local_info_;
   DriverPtr driver_;
+  const LocalInfo::LocalInfo& local_info_;
 };
 
 class LightStepSpan : public Span {

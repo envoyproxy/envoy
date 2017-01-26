@@ -441,7 +441,6 @@ private:
   ConnectionManagerConfig& config_;
   ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on the
                                   // config in the hot path.
-  ConnectionManagerTracingStats& tracing_stats_;
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;

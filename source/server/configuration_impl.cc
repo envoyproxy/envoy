@@ -79,8 +79,6 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 
   // Initialize tracing driver.
   if (tracing_configuration.hasObject("http")) {
-    http_tracer_.reset(new Tracing::HttpTracerImpl(server_.localInfo()));
-
     Json::ObjectPtr http_tracer_config = tracing_configuration.getObject("http");
     Json::ObjectPtr driver = http_tracer_config->getObject("driver");
 
@@ -96,9 +94,12 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
       opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
       opts->guid_generator = [&rand]() { return rand.random(); };
 
-      http_tracer_->initializeDriver(Tracing::DriverPtr{new Tracing::LightStepDriver(
+      Tracing::DriverPtr lightstep_driver(new Tracing::LightStepDriver(
           *driver->getObject("config"), *cluster_manager_, server_.stats(), server_.threadLocal(),
-          server_.runtime(), std::move(opts))});
+          server_.runtime(), std::move(opts)));
+
+      http_tracer_.reset(
+          new Tracing::HttpTracerImpl(std::move(lightstep_driver), server_.localInfo()));
     } else {
       throw EnvoyException(fmt::format("unsupported driver type: '{}'", type));
     }

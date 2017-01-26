@@ -227,7 +227,6 @@ TEST(HttpTracerUtilityTest, OrigianlAndLongPath) {
   const std::string path(300, 'a');
   const std::string expected_path(256, 'a');
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
-  SpanPtr span_ptr(span);
 
   Http::TestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {"x-envoy-original-path", path}, {":method", "GET"}};
@@ -240,12 +239,11 @@ TEST(HttpTracerUtilityTest, OrigianlAndLongPath) {
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
-  HttpTracerUtility::populateSpan(span_ptr, service_node, request_headers, request_info);
+  HttpTracerUtility::populateSpan(*span, service_node, request_headers, request_info);
 }
 
 TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
-  SpanPtr span_ptr(span);
 
   Http::TestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
@@ -265,7 +263,7 @@ TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("downstream_cluster", "-"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
 
-  HttpTracerUtility::populateSpan(span_ptr, service_node, request_headers, request_info);
+  HttpTracerUtility::populateSpan(*span, service_node, request_headers, request_info);
 
   Optional<uint32_t> response_code;
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
@@ -276,12 +274,11 @@ TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
   EXPECT_CALL(*span, finishSpan());
-  HttpTracerUtility::finalizeSpan(span_ptr, request_info);
+  HttpTracerUtility::finalizeSpan(*span, request_info);
 }
 
 TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
-  SpanPtr span_ptr(span);
   Http::TestHeaderMapImpl request_headers{
       {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
   NiceMock<Http::AccessLog::MockRequestInfo> request_info;
@@ -306,7 +303,7 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("request_size", "10"));
   EXPECT_CALL(*span, setTag("guid:x-client-trace-id", "client_trace_id"));
 
-  HttpTracerUtility::populateSpan(span_ptr, service_node, request_headers, request_info);
+  HttpTracerUtility::populateSpan(*span, service_node, request_headers, request_info);
 
   Optional<uint32_t> response_code(503);
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
@@ -320,7 +317,7 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
 
   EXPECT_CALL(*span, finishSpan());
-  HttpTracerUtility::finalizeSpan(span_ptr, request_info);
+  HttpTracerUtility::finalizeSpan(*span, request_info);
 }
 
 class LightStepDriverTest : public Test {
@@ -427,12 +424,10 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
 TEST(HttpNullTracerTest, BasicFunctionality) {
   HttpNullTracer null_tracer;
-  DriverPtr driver_ptr(new MockDriver());
   MockConfig config;
   Http::AccessLog::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_headers;
 
-  null_tracer.initializeDriver(std::move(driver_ptr));
   EXPECT_EQ(nullptr, null_tracer.startSpan(config, request_headers, request_info));
 }
 
@@ -450,8 +445,7 @@ TEST(HttpTracerImplTest, BasicFunctionalityNullSpan) {
   MockDriver* driver = new MockDriver();
   DriverPtr driver_ptr(driver);
 
-  HttpTracerImpl tracer(local_info);
-  tracer.initializeDriver(std::move(driver_ptr));
+  HttpTracerImpl tracer(std::move(driver_ptr), local_info);
 
   EXPECT_CALL(*driver, startSpan_(operation_name, time)).WillOnce(Return(nullptr));
 
@@ -474,8 +468,7 @@ TEST(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   MockDriver* driver = new MockDriver();
   DriverPtr driver_ptr(driver);
 
-  HttpTracerImpl tracer(local_info);
-  tracer.initializeDriver(std::move(driver_ptr));
+  HttpTracerImpl tracer(std::move(driver_ptr), local_info);
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
   EXPECT_CALL(*driver, startSpan_(operation_name, time)).WillOnce(Return(span));
@@ -611,4 +604,5 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
                     .value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
+
 } // Tracing

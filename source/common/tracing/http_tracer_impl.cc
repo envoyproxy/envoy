@@ -98,49 +98,48 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
   throw std::invalid_argument("Unknown trace_status");
 }
 
-void HttpTracerUtility::populateSpan(SpanPtr& active_span, const std::string& service_node,
+void HttpTracerUtility::populateSpan(Span& active_span, const std::string& service_node,
                                      const Http::HeaderMap& request_headers,
                                      const Http::AccessLog::RequestInfo& request_info) {
-  active_span->setTag("guid:x-request-id",
-                      std::string(request_headers.RequestId()->value().c_str()));
-  active_span->setTag("request_line", buildRequestLine(request_headers, request_info));
-  active_span->setTag("request_size", std::to_string(request_info.bytesReceived()));
-  active_span->setTag("host_header", valueOrDefault(request_headers.Host(), "-"));
-  active_span->setTag("downstream_cluster",
-                      valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-"));
-  active_span->setTag("user_agent", valueOrDefault(request_headers.UserAgent(), "-"));
-  active_span->setTag("node_id", service_node);
+  active_span.setTag("guid:x-request-id",
+                     std::string(request_headers.RequestId()->value().c_str()));
+  active_span.setTag("request_line", buildRequestLine(request_headers, request_info));
+  active_span.setTag("request_size", std::to_string(request_info.bytesReceived()));
+  active_span.setTag("host_header", valueOrDefault(request_headers.Host(), "-"));
+  active_span.setTag("downstream_cluster",
+                     valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-"));
+  active_span.setTag("user_agent", valueOrDefault(request_headers.UserAgent(), "-"));
+  active_span.setTag("node_id", service_node);
 
   if (request_headers.ClientTraceId()) {
-    active_span->setTag("guid:x-client-trace-id",
-                        std::string(request_headers.ClientTraceId()->value().c_str()));
+    active_span.setTag("guid:x-client-trace-id",
+                       std::string(request_headers.ClientTraceId()->value().c_str()));
   }
 }
 
-void HttpTracerUtility::finalizeSpan(SpanPtr& active_span,
+void HttpTracerUtility::finalizeSpan(Span& active_span,
                                      const Http::AccessLog::RequestInfo& request_info) {
-  active_span->setTag("response_code", buildResponseCode(request_info));
-  active_span->setTag("response_size", std::to_string(request_info.bytesSent()));
-  active_span->setTag("response_flags",
-                      Http::AccessLog::ResponseFlagUtils::toShortString(request_info));
+  active_span.setTag("response_code", buildResponseCode(request_info));
+  active_span.setTag("response_size", std::to_string(request_info.bytesSent()));
+  active_span.setTag("response_flags",
+                     Http::AccessLog::ResponseFlagUtils::toShortString(request_info));
 
   if (request_info.responseCode().valid() &&
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {
-    active_span->setTag("error", "true");
+    active_span.setTag("error", "true");
   }
 
-  active_span->finishSpan();
+  active_span.finishSpan();
 }
 
-HttpTracerImpl::HttpTracerImpl(const LocalInfo::LocalInfo& local_info) : local_info_(local_info) {}
-
-void HttpTracerImpl::initializeDriver(DriverPtr&& driver) { driver_ = std::move(driver); }
+HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
+    : driver_(std::move(driver)), local_info_(local_info) {}
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, const Http::HeaderMap& request_headers,
                                   const Http::AccessLog::RequestInfo& request_info) {
   SpanPtr active_span = driver_->startSpan(config.operationName(), request_info.startTime());
   if (active_span) {
-    HttpTracerUtility::populateSpan(active_span, local_info_.nodeName(), request_headers,
+    HttpTracerUtility::populateSpan(*active_span, local_info_.nodeName(), request_headers,
                                     request_info);
   }
 
