@@ -29,8 +29,14 @@ public:
   void initializeDriver(DriverPtr&& driver) override { initializeDriver_(driver); }
 
   MOCK_METHOD1(initializeDriver_, void(DriverPtr& driver));
-  MOCK_METHOD3(startSpan, SpanPtr(const Config& config, const Http::HeaderMap& request_headers,
-                                  const Http::AccessLog::RequestInfo& request_info));
+
+  SpanPtr startSpan(const Config& config, const Http::HeaderMap& request_headers,
+                    const Http::AccessLog::RequestInfo& request_info) override {
+    return SpanPtr{startSpan_(config, request_headers, request_info)};
+  }
+
+  MOCK_METHOD3(startSpan_, Span*(const Config& config, const Http::HeaderMap& request_headers,
+                                 const Http::AccessLog::RequestInfo& request_info));
 };
 
 class MockDriver : public Driver {

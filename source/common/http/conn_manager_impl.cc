@@ -32,11 +32,16 @@ ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& p
       stats};
 }
 
+ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
+                                                                          Stats::Store& stats) {
+  return {CONN_MAN_TRACING_STATS(POOL_COUNTER_PREFIX(stats, prefix + "tracing."))};
+}
+
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Network::DrainDecision& drain_close,
                                              Runtime::RandomGenerator& random_generator,
                                              Tracing::HttpTracer& tracer, Runtime::Loader& runtime)
-    : config_(config), stats_(config_.stats()),
+    : config_(config), stats_(config_.stats()), tracing_stats_(config.tracingStats()),
       conn_length_(stats_.named_.downstream_cx_length_ms_.allocateSpan()),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
       runtime_(runtime) {}
@@ -328,19 +333,19 @@ void ConnectionManagerImpl::ActiveStream::chargeTracingStats(
     const Tracing::Decision& tracing_decision) {
   switch (tracing_decision.reason) {
   case Tracing::Reason::ClientForced:
-    connection_manager_.stats_.named_.tracing_client_enabled_.inc();
+    connection_manager_.tracing_stats_.client_enabled_.inc();
     break;
   case Tracing::Reason::HealthCheck:
-    connection_manager_.stats_.named_.tracing_health_check_.inc();
+    connection_manager_.tracing_stats_.health_check_.inc();
     break;
   case Tracing::Reason::NotTraceableRequestId:
-    connection_manager_.stats_.named_.tracing_not_traceable_.inc();
+    connection_manager_.tracing_stats_.not_traceable_.inc();
     break;
   case Tracing::Reason::Sampling:
-    connection_manager_.stats_.named_.tracing_random_sampling_.inc();
+    connection_manager_.tracing_stats_.random_sampling_.inc();
     break;
   case Tracing::Reason::ServiceForced:
-    connection_manager_.stats_.named_.tracing_service_forced_.inc();
+    connection_manager_.tracing_stats_.service_forced_.inc();
     break;
   }
 }
@@ -428,7 +433,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   chargeTracingStats(tracing_decision);
 
   if (tracing_decision.is_tracing) {
-    std::cout << "about to do span creation" << std::endl;
     Tracing::SpanPtr active_span =
         connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
     if (active_span) {

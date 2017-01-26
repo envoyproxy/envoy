@@ -61,12 +61,7 @@ namespace Http {
   COUNTER(downstream_rq_4xx)                                                                       \
   COUNTER(downstream_rq_5xx)                                                                       \
   TIMER  (downstream_rq_time)                                                                      \
-  COUNTER(failed_generate_uuid)                                                                    \
-  COUNTER(tracing_random_sampling)                                                                 \
-  COUNTER(tracing_service_forced)                                                                  \
-  COUNTER(tracing_client_enabled)                                                                  \
-  COUNTER(tracing_not_traceable)                                                                   \
-  COUNTER(tracing_health_check)
+  COUNTER(failed_generate_uuid)
 // clang-format on
 
 /**
@@ -80,6 +75,19 @@ struct ConnectionManagerStats {
   ConnectionManagerNamedStats named_;
   std::string prefix_;
   Stats::Store& store_;
+};
+
+// clang-format off
+#define CONN_MAN_TRACING_STATS(COUNTER)                                                            \
+  COUNTER(random_sampling)                                                                 \
+  COUNTER(service_forced)                                                                  \
+  COUNTER(client_enabled)                                                                  \
+  COUNTER(not_traceable)                                                                   \
+  COUNTER(health_check)
+// clang-format on
+
+struct ConnectionManagerTracingStats {
+  CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
@@ -160,6 +168,11 @@ public:
   virtual ConnectionManagerStats& stats() PURE;
 
   /**
+   * @return ConnectionManagerTracingStats& the stats to write to.
+   */
+  virtual ConnectionManagerTracingStats& tracingStats() PURE;
+
+  /**
    * @return bool whether to use the remote address for populating XFF, determining internal request
    *         status, etc. or to assume that XFF will already be populated with the remote address.
    */
@@ -200,6 +213,8 @@ public:
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Store& stats);
+  static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
+                                                            Stats::Store& stats);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -420,6 +435,7 @@ private:
   ConnectionManagerConfig& config_;
   ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on the
                                   // config in the hot path.
+  ConnectionManagerTracingStats& tracing_stats_;
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;

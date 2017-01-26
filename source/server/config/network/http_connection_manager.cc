@@ -72,6 +72,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
                                                          Server::Instance& server)
     : server_(server), stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, server.stats())),
+      tracing_stats_(
+          Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, server.stats())),
       codec_options_(Http::Utility::parseCodecOptions(config)),
       route_config_(new Router::ConfigImpl(*config.getObject("route_config"), server.runtime(),
                                            server.clusterManager())),

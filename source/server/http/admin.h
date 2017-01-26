@@ -54,6 +54,7 @@ public:
     return Server::Configuration::HttpConnectionManagerConfig::DEFAULT_SERVER_STRING;
   }
   Http::ConnectionManagerStats& stats() override { return stats_; }
+  Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
   const std::string& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
@@ -99,6 +100,7 @@ private:
   std::list<Http::AccessLog::InstancePtr> access_logs_;
   Network::ListenSocketPtr socket_;
   Http::ConnectionManagerStats stats_;
+  Http::ConnectionManagerTracingStats tracing_stats_;
   Router::ConfigPtr route_config_;
   std::list<UrlHandler> handlers_;
   Optional<std::chrono::milliseconds> idle_timeout_;
