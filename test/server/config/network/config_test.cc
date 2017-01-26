@@ -29,22 +29,6 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
   cb(connection);
 }
 
-TEST(NetworkFilterConfigTest, BadRedisProxyConfig) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "cluster": "fake_cluster"
-  }
-  )EOF";
-
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
-  NiceMock<MockInstance> server;
-  RedisProxyFilterConfigFactory factory;
-  EXPECT_THROW(
-      factory.tryCreateFilterFactory(NetworkFilterType::Read, "redis_proxy", *json_config, server),
-      Json::Exception);
-}
-
 TEST(NetworkFilterConfigTest, MongoProxy) {
   std::string json_string = R"EOF(
   {
@@ -98,22 +82,6 @@ TEST(NetworkFilterConfigTest, TcpProxy) {
   cb(connection);
 }
 
-TEST(NetworkFilterConfigTest, BadTcpProxyConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": 1,
-    "cluster_name" : "fake_cluster"
-   }
-  )EOF";
-
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
-  NiceMock<MockInstance> server;
-  TcpProxyConfigFactory factory;
-  EXPECT_THROW(
-      factory.tryCreateFilterFactory(NetworkFilterType::Read, "tcp_proxy", *json_config, server),
-      Json::Exception);
-}
-
 TEST(NetworkFilterConfigTest, ClientSslAuth) {
   std::string json_string = R"EOF(
   {
@@ -133,24 +101,6 @@ TEST(NetworkFilterConfigTest, ClientSslAuth) {
   cb(connection);
 }
 
-TEST(NetworkFilterConfigTest, BadClientSslAuthConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "auth_api_cluster" : "fake_cluster",
-    "ip_white_list": ["192.168.3.0/24"],
-    "test" : "a"
-  }
-  )EOF";
-
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
-  NiceMock<MockInstance> server;
-  ClientSslAuthConfigFactory factory;
-  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "client_ssl_auth",
-                                              *json_config, server),
-               Json::Exception);
-}
-
 TEST(NetworkFilterConfigTest, Ratelimit) {
   std::string json_string = R"EOF(
   {
@@ -168,24 +118,6 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
-}
-
-TEST(NetworkFilterConfigTest, BadRatelimitConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "domain" : "fake_domain",
-    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
-    "ip_white_list": "12"
-  }
-  )EOF";
-
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
-  NiceMock<MockInstance> server;
-  RateLimitConfigFactory factory;
-  EXPECT_THROW(
-      factory.tryCreateFilterFactory(NetworkFilterType::Read, "ratelimit", *json_config, server),
-      Json::Exception);
 }
 
 } // Configuration

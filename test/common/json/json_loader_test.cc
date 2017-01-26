@@ -158,16 +158,43 @@ TEST(JsonLoaderTest, Hash) {
 }
 
 TEST(JsonLoaderTest, Schema) {
-  ObjectPtr json1 = Factory::LoadFromString("{\"value1\": 10, \"value2\" : \"test\" }");
-  std::string invalid_schema("{\"properties\": {\"value1\"}}");
-  std::string valid_schema("{ \"properties\": {\"value1\": { \"type\" : \"number\"}, \"value2\": "
-                           "{\"type\": \"string\"}}, \"additionalProperties\": false }");
-  std::string different_schema("{\"properties\" :{ \"value1\" : {\"type\" : \"number\"} "
-                               "},\"additionalProperties\" : false }");
+  std::string invalid_schema = R"EOF(
+  {
+    "properties": {"value1"}
+  }
+  )EOF";
 
-  EXPECT_THROW(json1->validateSchema(invalid_schema), std::invalid_argument);
-  EXPECT_THROW(json1->validateSchema(different_schema), Exception);
-  EXPECT_NO_THROW(json1->validateSchema(valid_schema));
+  std::string valid_schema = R"EOF(
+  {
+    "properties": {
+      "value1": {"type" : "number"},
+      "value2": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+  )EOF";
+
+  std::string different_schema = R"EOF(
+  {
+    "properties" : {
+      "value1" : {"type" : "number"}
+    },
+    "additionalProperties" : false
+  }
+  )EOF";
+
+  std::string json_string = R"EOF(
+  {
+    "value1": 10,
+    "value2" : "test"
+  }
+  )EOF";
+
+  ObjectPtr json = Factory::LoadFromString(json_string);
+
+  EXPECT_THROW(json->validateSchema(invalid_schema), std::invalid_argument);
+  EXPECT_THROW(json->validateSchema(different_schema), Exception);
+  EXPECT_NO_THROW(json->validateSchema(valid_schema));
 }
 
 } // Json

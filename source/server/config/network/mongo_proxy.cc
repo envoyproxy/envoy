@@ -3,23 +3,11 @@
 #include "envoy/network/connection.h"
 #include "envoy/server/instance.h"
 
-#include "common/json/json_loader.h"
+#include "common/json/config_schemas.h"
 #include "common/mongo/proxy.h"
 
 namespace Server {
 namespace Configuration {
-
-const std::string MongoProxyFilterConfigFactory::MONGO_PROXY_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "properties":{
-      "stat_prefix" : {"type" : "string"},
-      "access_log" : {"type" : "string"}
-    },
-    "required": ["stat_prefix"],
-    "additionalProperties": false
-  }
-  )EOF");
 
 NetworkFilterFactoryCb MongoProxyFilterConfigFactory::tryCreateFilterFactory(
     NetworkFilterType type, const std::string& name, const Json::Object& config,
@@ -28,7 +16,7 @@ NetworkFilterFactoryCb MongoProxyFilterConfigFactory::tryCreateFilterFactory(
     return nullptr;
   }
 
-  config.validateSchema(MONGO_PROXY_SCHEMA);
+  config.validateSchema(Json::Schema::MONGO_PROXY_SCHEMA);
 
   std::string stat_prefix = "mongo." + config.getString("stat_prefix") + ".";
   Mongo::AccessLogPtr access_log;

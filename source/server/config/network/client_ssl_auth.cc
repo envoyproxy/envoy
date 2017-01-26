@@ -8,25 +8,6 @@
 namespace Server {
 namespace Configuration {
 
-const std::string ClientSslAuthConfigFactory::CLIENT_SSL_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "properties": {
-      "auth_api_cluster" : {"type" : "string"},
-      "stat_prefix" : {"type" : "string"},
-      "ip_white_list" : {
-        "type" : "array",
-        "items" : {
-          "type": "string",
-          "format" : "ipv4"
-        }
-      }
-    },
-    "required": ["auth_api_cluster", "stat_prefix"],
-    "additionalProperties": false
-  }
-  )EOF");
-
 NetworkFilterFactoryCb
 ClientSslAuthConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
                                                    const Json::Object& json_config,
@@ -34,8 +15,6 @@ ClientSslAuthConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const
   if (type != NetworkFilterType::Read || name != "client_ssl_auth") {
     return nullptr;
   }
-
-  json_config.validateSchema(CLIENT_SSL_SCHEMA);
 
   Filter::Auth::ClientSsl::ConfigPtr config(Filter::Auth::ClientSsl::Config::create(
       json_config, server.threadLocal(), server.clusterManager(), server.dispatcher(),

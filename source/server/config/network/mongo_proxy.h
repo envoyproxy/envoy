@@ -14,9 +14,6 @@ public:
   NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
                                                 const Json::Object& config,
                                                 Server::Instance& server);
-
-private:
-  static const std::string MONGO_PROXY_SCHEMA;
 };
 
 } // Configuration

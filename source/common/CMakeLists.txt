@@ -68,6 +68,7 @@ add_library(
   http/rest_api_fetcher.cc
   http/user_agent.cc
   http/utility.cc
+  json/config_schemas.cc
   json/json_loader.cc
   memory/stats.cc
   mongo/bson_impl.cc

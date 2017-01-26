@@ -1,11 +1,15 @@
 #include "proxy_filter.h"
 
 #include "common/common/assert.h"
+#include "common/json/config_schemas.h"
 
 namespace Redis {
 
 ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm)
     : cluster_name_{config.getString("cluster_name")} {
+
+  config.validateSchema(Json::Schema::REDIS_PROXY_SCHEMA);
+
   if (!cm.get(cluster_name_)) {
     throw EnvoyException(
         fmt::format("redis filter config: unknown cluster name '{}'", cluster_name_));

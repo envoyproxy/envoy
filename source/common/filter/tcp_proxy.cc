@@ -8,6 +8,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
 namespace Filter {
@@ -16,6 +17,9 @@ TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
                                Upstream::ClusterManager& cluster_manager, Stats::Store& stats_store)
     : cluster_name_(config.getString("cluster")),
       stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
+
+  config.validateSchema(Json::Schema::TCP_PROXY_SCHEMA);
+
   if (!cluster_manager.get(cluster_name_)) {
     throw EnvoyException(fmt::format("tcp proxy: unknown cluster '{}'", cluster_name_));
   }

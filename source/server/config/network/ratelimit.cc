@@ -7,32 +7,6 @@
 namespace Server {
 namespace Configuration {
 
-const std::string RateLimitConfigFactory::RATELIMIT_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "properties":{
-      "stat_prefix" : {"type" : "string"},
-      "domain" : {"type" : "string"},
-      "descriptors": {
-        "type": "array",
-        "items" : {
-          "type" : "array" ,
-          "items": {
-            "type": "object",
-            "properties": {
-              "key" : {"type" : "string"},
-              "value" : {"type" : "string"}
-            },
-            "additionalProperties": false
-          }
-        }
-      }
-    },
-    "required": ["stat_prefix", "descriptors", "domain"],
-    "additionalProperties": false
-  }
-  )EOF");
-
 NetworkFilterFactoryCb
 RateLimitConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
                                                const Json::Object& json_config,
@@ -40,8 +14,6 @@ RateLimitConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const std
   if (type != NetworkFilterType::Read || name != "ratelimit") {
     return nullptr;
   }
-
-  json_config.validateSchema(RATELIMIT_SCHEMA);
 
   RateLimit::TcpFilter::ConfigPtr config(
       new RateLimit::TcpFilter::Config(json_config, server.stats(), server.runtime()));
