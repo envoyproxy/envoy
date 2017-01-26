@@ -77,15 +77,21 @@ struct ConnectionManagerStats {
   Stats::Store& store_;
 };
 
+/**
+ * Connection manager tracing specific stats. @see stats_macros.h
+ */
 // clang-format off
 #define CONN_MAN_TRACING_STATS(COUNTER)                                                            \
-  COUNTER(random_sampling)                                                                 \
-  COUNTER(service_forced)                                                                  \
-  COUNTER(client_enabled)                                                                  \
-  COUNTER(not_traceable)                                                                   \
+  COUNTER(random_sampling)                                                                         \
+  COUNTER(service_forced)                                                                          \
+  COUNTER(client_enabled)                                                                          \
+  COUNTER(not_traceable)                                                                           \
   COUNTER(health_check)
 // clang-format on
 
+/**
+* Wrapper struct for connection manager tracing stats. @see stats_macros.h
+*/
 struct ConnectionManagerTracingStats {
   CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };

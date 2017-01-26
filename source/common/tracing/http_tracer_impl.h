@@ -58,7 +58,8 @@ public:
                            const Http::AccessLog::RequestInfo& request_info);
 
   /**
-   * Fill in span tags based on the response headers.
+   * 1) Fill in span tags based on the response headers.
+   * 2) Finish active span.
    */
   static void finalizeSpan(SpanPtr& active_span, const Http::AccessLog::RequestInfo& request_info);
 };
@@ -92,6 +93,7 @@ class LightStepSpan : public Span {
 public:
   LightStepSpan(lightstep::Span& span);
 
+  // Tracing::Span
   void finishSpan() override;
   void setTag(const std::string& name, const std::string& value) override;
 
