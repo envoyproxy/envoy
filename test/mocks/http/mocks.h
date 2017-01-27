@@ -197,7 +197,7 @@ public:
   std::function<void()> reset_callback_;
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<AccessLog::MockRequestInfo> request_info_;
-  testing::NiceMock<Router::MockStableRouteTable> route_table_;
+  testing::NiceMock<Router::MockRoute> route_;
   std::string downstream_address_;
 };
 
@@ -212,7 +212,7 @@ public:
   MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
-  MOCK_METHOD0(routeTable, Router::StableRouteTable&());
+  MOCK_METHOD0(route, const Router::Route*());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
@@ -241,7 +241,7 @@ public:
   MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
-  MOCK_METHOD0(routeTable, Router::StableRouteTable&());
+  MOCK_METHOD0(route, const Router::Route*());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(downstreamAddress, const std::string&());

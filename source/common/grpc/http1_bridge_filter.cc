@@ -95,7 +95,7 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
 }
 
 void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
-  const Router::Route* route = decoder_callbacks_->routeTable().route(headers);
+  const Router::Route* route = decoder_callbacks_->route();
   if (!route) {
     return;
   }

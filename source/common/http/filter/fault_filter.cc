@@ -149,11 +149,11 @@ void FaultFilter::abortWithHTTPStatus() {
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
 }
 
-bool FaultFilter::matchesTargetCluster(const HeaderMap& headers) {
+bool FaultFilter::matchesTargetCluster(const HeaderMap&) {
   bool matches = true;
 
   if (!config_->upstreamCluster().empty()) {
-    const Router::Route* route = callbacks_->routeTable().route(headers);
+    const Router::Route* route = callbacks_->route();
     matches = route && route->routeEntry() &&
               (route->routeEntry()->clusterName() == config_->upstreamCluster());
   }

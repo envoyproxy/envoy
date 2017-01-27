@@ -242,8 +242,7 @@ private:
   /**
    * Base class wrapper for both stream encoder and decoder filters.
    */
-  struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
-                                  public Router::StableRouteTable {
+  struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent) : parent_(parent) {}
 
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status);
@@ -264,19 +263,15 @@ private:
     uint64_t connectionId() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
-    const Router::StableRouteTable& routeTable() override { return *this; }
+    const Router::Route* route() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     const std::string& downstreamAddress() override;
 
-    // Router::StableRouteTable
-    const Router::Route* route(const HeaderMap& headers) const {
-      return parent_.connection_manager_.config_.routeConfig().route(headers, parent_.stream_id_);
-    }
-
     ActiveStream& parent_;
     bool headers_continued_{};
     bool stopped_{};
+    Optional<const Router::Route*> cached_route_;
   };
 
   /**

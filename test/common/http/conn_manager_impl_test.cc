@@ -120,6 +120,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
       new NiceMock<Http::MockStreamDecoderFilter>());
 
   EXPECT_CALL(filter->reset_stream_called_, ready()).Times(0);
+  EXPECT_CALL(route_config_, route(_, _)).Times(2);
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .Times(2)
       .WillRepeatedly(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
@@ -128,6 +129,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
         if (headers.Path()->value() == "/healthcheck") {
           filter->callbacks_->requestInfo().healthCheck(true);
         }
+
+        // Test route caching.
+        EXPECT_EQ(&route_config_.route_, filter->callbacks_->route());
+        EXPECT_EQ(&route_config_.route_, filter->callbacks_->route());
 
         return FilterHeadersStatus::StopIteration;
       }));
