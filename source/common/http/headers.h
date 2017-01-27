@@ -51,6 +51,7 @@ public:
   const LowerCaseString TransferEncoding{"transfer-encoding"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
+  const LowerCaseString OtSpanContext{"x-ot-span-context"};
 
   struct {
     const std::string Close{"close"};

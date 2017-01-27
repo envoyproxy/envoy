@@ -355,6 +355,7 @@ public:
   const Http::TestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
+  SystemTime start_time_;
 
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
@@ -447,7 +448,7 @@ TEST(HttpTracerImplTest, BasicFunctionalityNullSpan) {
 
   HttpTracerImpl tracer(std::move(driver_ptr), local_info);
 
-  EXPECT_CALL(*driver, startSpan_(operation_name, time)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*driver, startSpan_("", operation_name, time)).WillOnce(Return(nullptr));
 
   tracer.startSpan(config, request_headers, request_info);
 }
@@ -471,7 +472,7 @@ TEST(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   HttpTracerImpl tracer(std::move(driver_ptr), local_info);
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
-  EXPECT_CALL(*driver, startSpan_(operation_name, time)).WillOnce(Return(span));
+  EXPECT_CALL(*driver, startSpan_("", operation_name, time)).WillOnce(Return(span));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("node_id", "node_name"));
@@ -499,16 +500,19 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
             return &request;
           }));
 
-  SystemTime start_time;
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .Times(2)
       .WillRepeatedly(Return(2));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr first_span = driver_->startSpan(operation_name_, start_time);
+  SpanPtr first_span = driver_->startSpan("", operation_name_, start_time_);
+  Http::TestHeaderMapImpl headers;
+  // Simulate inject.
+  driver_->inject(first_span.get(), headers);
   first_span->finishSpan();
-  SpanPtr second_span = driver_->startSpan(operation_name_, start_time);
+
+  SpanPtr second_span = driver_->startSpan("", operation_name_, start_time_);
   second_span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -539,11 +543,10 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
   const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout));
 
-  SystemTime start_time;
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(5));
 
-  SpanPtr span = driver_->startSpan(operation_name_, start_time);
+  SpanPtr span = driver_->startSpan("", operation_name_, start_time_);
   span->finishSpan();
 
   // Timer should be re-enabled.
@@ -579,15 +582,12 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
 
             return &request;
           }));
-
-  SystemTime start_time;
-
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr span = driver_->startSpan(operation_name_, start_time);
+  SpanPtr span = driver_->startSpan("", operation_name_, start_time_);
   span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -603,6 +603,34 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
                     .counter("grpc.lightstep.collector.CollectorService.Report.total")
                     .value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
+}
+
+TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
+  setupValidDriver();
+
+  // Supply empty context.
+  SpanPtr span = driver_->startSpan("", operation_name_, start_time_);
+
+  Http::TestHeaderMapImpl carrier;
+  driver_->inject(span.get(), carrier);
+
+  std::string injected_ctx = carrier.OtSpanContext()->value().c_str();
+  EXPECT_FALSE(injected_ctx.empty());
+
+  // Inject again, there should be the same context.
+  driver_->inject(span.get(), carrier);
+  std::string same_ctx = carrier.OtSpanContext()->value().c_str();
+  EXPECT_EQ(same_ctx, injected_ctx);
+
+  // Context can be parsed fine.
+  lightstep::envoy::CarrierStruct ctx;
+  ctx.ParseFromString(injected_ctx);
+
+  // Supply parent context.
+  SpanPtr span_with_parent = driver_->startSpan(injected_ctx, operation_name_, start_time_);
+  driver_->inject(span_with_parent.get(), carrier);
+  injected_ctx = carrier.OtSpanContext()->value().c_str();
+  EXPECT_FALSE(injected_ctx.empty());
 }
 
 } // Tracing

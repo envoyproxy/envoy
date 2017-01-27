@@ -213,7 +213,8 @@ private:
   HEADER_FUNC(Status)                                                                              \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \
-  HEADER_FUNC(UserAgent)
+  HEADER_FUNC(UserAgent)                                                                           \
+  HEADER_FUNC(OtSpanContext)
 
 /**
  * The following functions are defined for each inline header above. E.g., for ContentLength we

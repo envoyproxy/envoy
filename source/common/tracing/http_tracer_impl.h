@@ -10,6 +10,7 @@
 #include "common/json/json_loader.h"
 
 #include "lightstep/tracer.h"
+#include "lightstep/envoy.h"
 
 namespace Tracing {
 
@@ -71,6 +72,8 @@ public:
                     const Http::AccessLog::RequestInfo&) override {
     return nullptr;
   }
+
+  void inject(Span*, Http::HeaderMap&) override {}
 };
 
 class HttpTracerImpl : public HttpTracer {
@@ -80,6 +83,7 @@ public:
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config& config, const Http::HeaderMap& request_headers,
                     const Http::AccessLog::RequestInfo& request_info) override;
+  void inject(Span* active_span, Http::HeaderMap& request_headers) override;
 
 private:
   DriverPtr driver_;
@@ -88,11 +92,13 @@ private:
 
 class LightStepSpan : public Span {
 public:
-  LightStepSpan(lightstep::Span& span);
+  LightStepSpan(lightstep::Span span);
 
   // Tracing::Span
   void finishSpan() override;
   void setTag(const std::string& name, const std::string& value) override;
+
+  lightstep::SpanContext context() { return span_.context(); }
 
 private:
   lightstep::Span span_;
@@ -111,7 +117,9 @@ public:
                   std::unique_ptr<lightstep::TracerOptions> options);
 
   // Tracer::TracingDriver
-  SpanPtr startSpan(const std::string& operation_name, SystemTime start_time) override;
+  SpanPtr startSpan(const std::string& parent_context, const std::string& operation_name,
+                    SystemTime start_time) override;
+  void inject(Span* active_span, Http::HeaderMap& headers) override;
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoPtr cluster() { return cluster_; }
