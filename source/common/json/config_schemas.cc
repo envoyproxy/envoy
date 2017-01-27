@@ -129,36 +129,40 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
       "$schema": "http://json-schema.org/schema#",
       "properties": {
-        "stat_prefix" : {"type" : "string"},
-        "route_config" : {
-          "type" : "object",
+        "stat_prefix": {"type" : "string"},
+        "route_config": {
+          "type": "object",
           "properties": {
-            "routes" : {
-              "type" : "array",
-              "items" : {
-                "cluster": {
-                  "type" : "string"
-                },
-                "source_ip_list" : {
-                  "type" : "array",
-                  "items" : {
-                    "type" : "string"
+            "routes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "cluster": {
+                    "type": "string"
+                  },
+                  "source_ip_list" : {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "source_ports": {
+                    "type": "string"
+                  },
+                  "destination_ip_list" : {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "destination_ports": {
+                    "type": "string"
                   }
                 },
-                "source__ports": {
-                  "type" : "string"
-                },
-                "destination_ip_list" : {
-                  "type" : "array",
-                  "items" : {
-                    "type" : "string"
-                  }
-                },
-                "destination_ports": {
-                  "type" : "string"
-                }
+                "required": ["cluster"],
+                "additionalProperties": false
               },
-              "required": ["cluster"],
               "additionalProperties": false
             }
           },
