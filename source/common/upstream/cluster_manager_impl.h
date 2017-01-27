@@ -54,7 +54,6 @@ private:
  */
 class ClusterManagerInitHelper {
 public:
-  ~ClusterManagerInitHelper();
   void addCluster(Cluster& cluster);
   void onStaticLoadComplete();
   void removeCluster(Cluster& cluster);

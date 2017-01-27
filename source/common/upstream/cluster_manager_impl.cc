@@ -15,11 +15,6 @@
 
 namespace Upstream {
 
-ClusterManagerInitHelper::~ClusterManagerInitHelper() {
-  ASSERT(primary_init_clusters_.empty());
-  ASSERT(secondary_init_clusters_.empty());
-}
-
 void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
   if (state_ == State::AllClustersInitialized) {
     cluster.initialize();
