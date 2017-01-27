@@ -41,12 +41,12 @@ void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
 }
 
 void ClusterManagerInitHelper::removeCluster(Cluster& cluster) {
-  // There is a remote edge case where we can remove a cluster via CDS that has not yet been
-  // initialized. This catches that case.
   if (state_ == State::AllClustersInitialized) {
     return;
   }
 
+  // There is a remote edge case where we can remove a cluster via CDS that has not yet been
+  // initialized. When called via the remove cluster API this code catches that case.
   std::list<Cluster*>* cluster_list;
   if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
     cluster_list = &primary_init_clusters_;
