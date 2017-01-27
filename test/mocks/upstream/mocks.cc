@@ -78,6 +78,7 @@ MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpConnPoolForCluster(_, _)).WillByDefault(Return(&conn_pool_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, get(_)).WillByDefault(Return(cluster_.info_));
+  ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault((ReturnRef(async_client_)));
 }
 
 MockClusterManager::~MockClusterManager() {}

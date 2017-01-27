@@ -138,23 +138,4 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
   }
 }
 
-bool ConnectionManagerUtility::shouldTraceRequest(
-    const Http::AccessLog::RequestInfo& request_info,
-    const Optional<TracingConnectionManagerConfig>& config) {
-  if (!config.valid()) {
-    return false;
-  }
-
-  switch (config.value().tracing_type_) {
-  case Http::TracingType::All:
-    return true;
-  case Http::TracingType::UpstreamFailure:
-    return Http::AccessLog::ResponseFlagUtils::isTraceableFailure(request_info);
-  }
-
-  // Compiler enforces switch above to cover all the cases and it's impossible to be here,
-  // but compiler complains on missing return statement, this is to make compiler happy.
-  NOT_IMPLEMENTED;
-}
-
 } // Http

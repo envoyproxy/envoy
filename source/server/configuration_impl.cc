@@ -6,6 +6,7 @@
 #include "envoy/ssl/context_manager.h"
 
 #include "common/common/utility.h"
+#include "common/json/config_schemas.h"
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -77,39 +78,32 @@ void MainImpl::initialize(const Json::Object& json) {
 void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
   log().info("loading tracing configuration");
 
-  // Initialize http sinks
+  // Initialize tracing driver.
   if (tracing_configuration.hasObject("http")) {
-    http_tracer_.reset(new Tracing::HttpTracerImpl(server_.runtime(), server_.stats()));
-
     Json::ObjectPtr http_tracer_config = tracing_configuration.getObject("http");
+    Json::ObjectPtr driver = http_tracer_config->getObject("driver");
 
-    if (http_tracer_config->hasObject("sinks")) {
-      std::vector<Json::ObjectPtr> sinks = http_tracer_config->getObjectArray("sinks");
-      log().info(fmt::format("  loading {} http sink(s):", sinks.size()));
+    std::string type = driver->getString("type");
+    log().info(fmt::format("  loading tracing driver: {}", type));
 
-      for (const Json::ObjectPtr& sink : sinks) {
-        std::string type = sink->getString("type");
-        log().info(fmt::format("    loading {}", type));
+    if (type == "lightstep") {
+      ::Runtime::RandomGenerator& rand = server_.random();
+      std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
+      opts->access_token = server_.api().fileReadToEnd(driver->getString("access_token_file"));
+      StringUtil::rtrim(opts->access_token);
 
-        if (type == "lightstep") {
-          ::Runtime::RandomGenerator& rand = server_.random();
-          std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
-          opts->access_token = server_.api().fileReadToEnd(sink->getString("access_token_file"));
-          StringUtil::rtrim(opts->access_token);
+      opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
+      opts->guid_generator = [&rand]() { return rand.random(); };
 
-          opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
-          opts->guid_generator = [&rand]() { return rand.random(); };
+      Tracing::DriverPtr lightstep_driver(new Tracing::LightStepDriver(
+          *driver->getObject("config"), *cluster_manager_, server_.stats(), server_.threadLocal(),
+          server_.runtime(), std::move(opts)));
 
-          http_tracer_->addSink(Tracing::HttpSinkPtr{new Tracing::LightStepSink(
-              *sink->getObject("config"), *cluster_manager_, server_.stats(), server_.localInfo(),
-              server_.threadLocal(), server_.runtime(), std::move(opts))});
-        } else {
-          throw EnvoyException(fmt::format("unsupported sink type: '{}'", type));
-        }
-      }
+      http_tracer_.reset(
+          new Tracing::HttpTracerImpl(std::move(lightstep_driver), server_.localInfo()));
+    } else {
+      throw EnvoyException(fmt::format("unsupported driver type: '{}'", type));
     }
-  } else {
-    throw EnvoyException("incorrect tracing configuration");
   }
 }
 
@@ -119,6 +113,8 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
     : parent_(parent), port_(json.getInteger("port")),
       scope_(parent_.server_.stats().createScope(fmt::format("listener.{}.", port_))) {
   log().info("  port={}", port_);
+
+  json.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
   if (json.hasObject("ssl_context")) {
     Ssl::ContextConfigImpl context_config(*json.getObject("ssl_context"));

@@ -95,6 +95,21 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
                EnvoyException);
 }
 
+TEST_F(ClientSslAuthFilterTest, BadClientSslAuthConfig) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "auth_api_cluster" : "fake_cluster",
+    "ip_white_list": ["192.168.3.0/24"],
+    "test" : "a"
+  }
+  )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  EXPECT_THROW(Config::create(*json_config, tls_, cm_, dispatcher_, stats_store_, random_),
+               Json::Exception);
+}
+
 TEST_F(ClientSslAuthFilterTest, NoSsl) {
   setup();
   Buffer::OwnedImpl dummy("hello");

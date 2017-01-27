@@ -21,9 +21,9 @@ class ConnectionManagerUtilityTest : public testing::Test {
 public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
-    ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(tracing_not_set_));
 
-    set_tracing_all_.value({"test", Http::TracingType::All});
+    tracing_config_.value({"operation"});
+    ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -31,8 +31,7 @@ public:
   NiceMock<MockConnectionManagerConfig> config_;
   Optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Optional<Http::TracingConnectionManagerConfig> tracing_not_set_;
-  Optional<Http::TracingConnectionManagerConfig> set_tracing_all_;
+  Optional<Http::TracingConnectionManagerConfig> tracing_config_;
 };
 
 TEST_F(ConnectionManagerUtilityTest, generateStreamId) {
@@ -44,57 +43,6 @@ TEST_F(ConnectionManagerUtilityTest, generateStreamId) {
   EXPECT_CALL(config_.route_config_, usesRuntime()).WillOnce(Return(true));
   EXPECT_CALL(random_, random()).WillOnce(Return(5));
   EXPECT_EQ(5UL, ConnectionManagerUtility::generateStreamId(config_.route_config_, random_));
-}
-
-TEST_F(ConnectionManagerUtilityTest, ShouldTraceRequest) {
-  {
-    NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-    EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_not_set_));
-  }
-
-  {
-    NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-    EXPECT_TRUE(ConnectionManagerUtility::shouldTraceRequest(request_info, set_tracing_all_));
-  }
-
-  {
-    NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-    Optional<Http::TracingConnectionManagerConfig> tracing_failure(
-        {"operation", Http::TracingType::UpstreamFailure});
-
-    std::vector<Http::AccessLog::ResponseFlag> upstream_failed_response_flag{
-        Http::AccessLog::ResponseFlag::UpstreamConnectionFailure,
-        Http::AccessLog::ResponseFlag::UpstreamConnectionTermination,
-        Http::AccessLog::ResponseFlag::NoHealthyUpstream,
-        Http::AccessLog::ResponseFlag::UpstreamRequestTimeout,
-        Http::AccessLog::ResponseFlag::UpstreamOverflow,
-        Http::AccessLog::ResponseFlag::DelayInjected, Http::AccessLog::ResponseFlag::FaultInjected,
-        Http::AccessLog::ResponseFlag::NoRouteFound};
-
-    for (Http::AccessLog::ResponseFlag flag : upstream_failed_response_flag) {
-      ON_CALL(request_info, getResponseFlag(flag)).WillByDefault(Return(true));
-      EXPECT_TRUE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
-
-      ON_CALL(request_info, getResponseFlag(flag)).WillByDefault(Return(false));
-      EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
-    }
-  }
-
-  {
-    NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-    Optional<Http::TracingConnectionManagerConfig> tracing_failure(
-        {"operation", Http::TracingType::UpstreamFailure});
-
-    std::vector<Http::AccessLog::ResponseFlag> upstream_not_failed_response_flag{
-        Http::AccessLog::ResponseFlag::FailedLocalHealthCheck,
-        Http::AccessLog::ResponseFlag::LocalReset,
-        Http::AccessLog::ResponseFlag::UpstreamRemoteReset};
-
-    for (Http::AccessLog::ResponseFlag flag : upstream_not_failed_response_flag) {
-      ON_CALL(request_info, getResponseFlag(flag)).WillByDefault(Return(true));
-      EXPECT_FALSE(ConnectionManagerUtility::shouldTraceRequest(request_info, tracing_failure));
-    }
-  }
 }
 
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
@@ -160,7 +108,6 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
   const std::string uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
-  ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(set_tracing_all_));
 
   {
     // Internal request, make traceable
@@ -197,7 +144,6 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(external_remote_address));
   ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillByDefault(Return(true));
-  ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(set_tracing_all_));
 
   {
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},

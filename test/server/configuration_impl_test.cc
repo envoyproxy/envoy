@@ -72,5 +72,28 @@ TEST(ConfigurationImplTest, CustomStatsFlushInterval) {
   EXPECT_EQ(std::chrono::milliseconds(500), config.statsFlushInterval());
 }
 
+TEST(ConfigurationImplTest, BadListenerConfig) {
+  std::string json = R"EOF(
+{
+  "listeners" : [
+    {
+      "port" : 1234,
+      "filters": [],
+      "test": "a"
+    }
+  ],
+  "cluster_manager": {
+    "clusters": []
+  }
+}
+)EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  MainImpl config(server);
+  EXPECT_THROW(config.initialize(*loader), Json::Exception);
+}
+
 } // Configuration
 } // Server

@@ -43,6 +43,19 @@ TEST(RedisProxyFilterConfigTest, InvalidCluster) {
   EXPECT_THROW(ProxyFilterConfig(*json_config, cm), EnvoyException);
 }
 
+TEST(RedisProxyFilterConfigTest, BadRedisProxyConfig) {
+  std::string json_string = R"EOF(
+  {
+    "cluster_name": "fake_cluster",
+    "cluster": "fake_cluster"
+  }
+  )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ProxyFilterConfig(*json_config, cm), Json::Exception);
+}
+
 class RedisProxyFilterTest : public testing::Test, public DecoderFactory {
 public:
   RedisProxyFilterTest() {

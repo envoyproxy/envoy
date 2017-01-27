@@ -8,6 +8,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/json/config_schemas.h"
 #include "common/common/empty_string.h"
 #include "common/json/json_loader.h"
 
@@ -41,9 +42,7 @@ TcpProxyConfig::Route::Route(const Json::Object& config) {
 TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
                                Upstream::ClusterManager& cluster_manager, Stats::Store& stats_store)
     : stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
-  if (!config.hasObject("route_config")) {
-    throw EnvoyException("tcp proxy: missing route config");
-  }
+  config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
   for (const Json::ObjectPtr& route_desc :
        config.getObject("route_config")->getObjectArray("routes")) {

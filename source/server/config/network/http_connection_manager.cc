@@ -72,6 +72,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
                                                          Server::Instance& server)
     : server_(server), stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, server.stats())),
+      tracing_stats_(
+          Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, server.stats())),
       codec_options_(Http::Utility::parseCodecOptions(config)),
       route_config_(new Router::ConfigImpl(*config.getObject("route_config"), server.runtime(),
                                            server.clusterManager())),
@@ -89,18 +91,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
 
   if (config.hasObject("tracing")) {
     const std::string operation_name = config.getObject("tracing")->getString("operation_name");
-
-    std::string tracing_type = config.getObject("tracing")->getString("type", "all");
-    Http::TracingType type;
-    if (tracing_type == "all") {
-      type = Http::TracingType::All;
-    } else if (tracing_type == "upstream_failure") {
-      type = Http::TracingType::UpstreamFailure;
-    } else {
-      throw EnvoyException(fmt::format("unsupported tracing type '{}'", tracing_type));
-    }
-
-    tracing_config_.value({operation_name, type});
+    tracing_config_.value({operation_name});
   }
 
   if (config.hasObject("idle_timeout_s")) {
