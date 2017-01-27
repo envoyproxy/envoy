@@ -39,6 +39,10 @@ public:
 
   /**
    * Notifies caller of async HTTP stream status.
+   * Note the HTTP stream is full-duplex, even if the local to remote stream has been ended 
+   * by Stream.sendHeaders/sendData with end_stream=true or sendTrailers,
+   * StreamCallbacks can continue to receive events until the remote to local stream is closed,
+   * and vice versa.
    */
   class StreamCallbacks {
   public:
