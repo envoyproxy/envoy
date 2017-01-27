@@ -69,15 +69,14 @@ const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& conn
     }
 
     if (!route.destination_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(
-            Network::Utility::portFromUrl(connection.destinationAddress()),
-            route.destination_port_ranges_)) {
+        !Network::Utility::portInRangeList(Network::Utility::portFromUrl(connection.localAddress()),
+                                           route.destination_port_ranges_)) {
       continue; // no match, try next route
     }
 
     if (!route.destination_ips_.empty() &&
         !route.destination_ips_.contains(
-            Network::Utility::hostFromUrl(connection.destinationAddress()))) {
+            Network::Utility::hostFromUrl(connection.localAddress()))) {
       continue; // no match, try next route
     }
 

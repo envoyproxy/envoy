@@ -56,7 +56,7 @@ public:
   void readDisable(bool disable) override;
   bool readEnabled() override;
   const std::string& remoteAddress() override { return remote_address_; }
-  const std::string destinationAddress() override;
+  const std::string& localAddress() override { return local_address_; }
   void setBufferStats(const BufferStats& stats) override;
   Ssl::Connection* ssl() override { return nullptr; }
   State state() override;
@@ -80,6 +80,7 @@ protected:
 
   FilterManagerImpl filter_manager_;
   const std::string remote_address_;
+  const std::string local_address_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
 
@@ -103,6 +104,7 @@ private:
   void onWriteReady();
   void updateReadBufferStats(uint64_t num_read, uint64_t new_size);
   void updateWriteBufferStats(uint64_t num_written, uint64_t new_size);
+  static const std::string getLocalAddress(int fd);
 
   static std::atomic<uint64_t> next_global_id_;
 

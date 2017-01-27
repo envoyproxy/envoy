@@ -120,7 +120,7 @@ public:
    * It can be different from the proxy address if the downstream connection
    * has been redirected or the proxy is operating in transparent mode.
    */
-  virtual const std::string destinationAddress() PURE;
+  virtual const std::string& localAddress() PURE;
 
   /**
    * Set the buffer stats to update when the connection's read/write buffers change. Note that

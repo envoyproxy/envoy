@@ -35,8 +35,9 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                const std::string& remote_address)
-    : filter_manager_(*this, *this), remote_address_(remote_address), dispatcher_(dispatcher),
-      fd_(fd), id_(++next_global_id_) {
+    : filter_manager_(*this, *this), remote_address_(remote_address),
+      local_address_(getLocalAddress(fd)), dispatcher_(dispatcher), fd_(fd),
+      id_(++next_global_id_) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -396,11 +397,11 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
                                            buffer_stats_->write_current_);
 }
 
-const std::string Network::ConnectionImpl::destinationAddress() {
-  if (fd_ != -1) {
+const std::string Network::ConnectionImpl::getLocalAddress(int fd) {
+  if (fd != -1) {
     sockaddr_storage orig_dst_addr;
     memset(&orig_dst_addr, 0, sizeof(orig_dst_addr));
-    bool success = Utility::getOriginalDst(fd_, &orig_dst_addr);
+    bool success = Utility::getOriginalDst(fd, &orig_dst_addr);
     if (success) {
       return Utility::urlForTcp(
           Utility::getAddressName(reinterpret_cast<struct sockaddr_in*>(&orig_dst_addr)),

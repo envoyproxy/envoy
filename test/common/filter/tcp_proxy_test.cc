@@ -134,14 +134,16 @@ TEST(TcpProxyConfigTest, Routes) {
   {
     // hit route with destination_ip (10.10.10.10/32)
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.10.10.10:0"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.10.10.10:0")));
     EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.10.10.11:0"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.10.10.11:0")));
     EXPECT_CALL(connection, remoteAddress())
         .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
@@ -150,14 +152,16 @@ TEST(TcpProxyConfigTest, Routes) {
   {
     // hit route with destination_ip (10.10.11.0/24)
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.10.11.11:0"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.10.11.11:0")));
     EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.10.12.12:0"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.10.12.12:0")));
     EXPECT_CALL(connection, remoteAddress())
         .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
@@ -166,14 +170,16 @@ TEST(TcpProxyConfigTest, Routes) {
   {
     // hit route with destination_ip (10.11.0.0/16)
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.11.11.11:0"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.11.11.11:0")));
     EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.12.12.12:0"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.12.12.12:0")));
     EXPECT_CALL(connection, remoteAddress())
         .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
@@ -182,14 +188,16 @@ TEST(TcpProxyConfigTest, Routes) {
   {
     // hit route with destination_ip (11.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://11.11.11.11:0"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://11.11.11.11:0")));
     EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://12.12.12.12:0"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://12.12.12.12:0")));
     EXPECT_CALL(connection, remoteAddress())
         .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
@@ -198,21 +206,24 @@ TEST(TcpProxyConfigTest, Routes) {
   {
     // hit route with destination_ip (128.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://128.255.255.255:0"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://128.255.255.255:0")));
     EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // hit route with destination port range
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://1.2.3.4:12345"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:12345")));
     EXPECT_EQ(std::string("with_destination_ports"), config_obj.getRouteFromEntries(connection));
   }
 
   {
     // fall through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://1.2.3.4:23456"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:23456")));
     EXPECT_CALL(connection, remoteAddress())
         .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
@@ -221,7 +232,8 @@ TEST(TcpProxyConfigTest, Routes) {
   {
     // hit route with source port range
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://1.2.3.4:23456"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:23456")));
     EXPECT_CALL(connection, remoteAddress())
         .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:23459")));
     EXPECT_EQ(std::string("with_source_ports"), config_obj.getRouteFromEntries(connection));
@@ -230,7 +242,8 @@ TEST(TcpProxyConfigTest, Routes) {
   {
     // fall through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://1.2.3.4:23456"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:23456")));
     EXPECT_CALL(connection, remoteAddress())
         .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:23458")));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
@@ -239,7 +252,8 @@ TEST(TcpProxyConfigTest, Routes) {
   {
     // hit the route with all criterias present
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.0.0.0:10000"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.0.0.0:10000")));
     EXPECT_CALL(connection, remoteAddress())
         .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://20.0.0.0:20000")));
     EXPECT_EQ(std::string("with_everything"), config_obj.getRouteFromEntries(connection));
@@ -248,7 +262,8 @@ TEST(TcpProxyConfigTest, Routes) {
   {
     // fall through
     NiceMock<Network::MockConnection> connection;
-    EXPECT_CALL(connection, destinationAddress()).WillRepeatedly(Return("tcp://10.0.0.0:10000"));
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.0.0.0:10000")));
     EXPECT_CALL(connection, remoteAddress())
         .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://30.0.0.0:20000")));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));

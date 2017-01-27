@@ -52,7 +52,7 @@ public:
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD0(readEnabled, bool());
   MOCK_METHOD0(remoteAddress, const std::string&());
-  MOCK_METHOD0(destinationAddress, const std::string());
+  MOCK_METHOD0(localAddress, const std::string&());
   MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(state, State());
@@ -82,7 +82,7 @@ public:
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD0(readEnabled, bool());
   MOCK_METHOD0(remoteAddress, const std::string&());
-  MOCK_METHOD0(destinationAddress, const std::string());
+  MOCK_METHOD0(localAddress, const std::string&());
   MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(state, State());
