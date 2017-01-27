@@ -259,7 +259,6 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
 SpanPtr LightStepDriver::startSpan(const std::string& parent_context,
                                    const std::string& operation_name, SystemTime start_time) {
   lightstep::Tracer& tracer = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_;
-
   SpanPtr active_span;
 
   if (!parent_context.empty()) {
