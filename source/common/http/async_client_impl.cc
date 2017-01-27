@@ -22,7 +22,7 @@ AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::St
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
-    active_streams_.front()->failDueToClientDestroy();
+    active_streams_.front()->reset();
   }
 }
 
@@ -131,7 +131,7 @@ void AsyncStreamImpl::closeRemote(bool end_stream) {
 
 void AsyncStreamImpl::reset() {
   reset_callback_();
-  cleanup();
+  resetStream();
 }
 
 void AsyncStreamImpl::cleanup() {
@@ -147,13 +147,6 @@ void AsyncStreamImpl::cleanup() {
 void AsyncStreamImpl::resetStream() {
   stream_callbacks_.onReset();
   cleanup();
-}
-
-void AsyncStreamImpl::failDueToClientDestroy() {
-  // In this case we are going away because the client is being destroyed. We need to both reset
-  // the stream as well as raise a failure callback.
-  reset_callback_();
-  resetStream();
 }
 
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
@@ -195,10 +188,15 @@ void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
 }
 
 void AsyncRequestImpl::onReset() {
-  // In this case we don't have a valid response so we do need to raise a failure.
-  callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+  if (!cancelled_) {
+    // In this case we don't have a valid response so we do need to raise a failure.
+    callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+  }
 }
 
-void AsyncRequestImpl::cancel() { reset(); }
+void AsyncRequestImpl::cancel() {
+  cancelled_ = true;
+  reset();
+}
 
 } // Http

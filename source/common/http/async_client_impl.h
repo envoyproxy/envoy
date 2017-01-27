@@ -149,7 +149,6 @@ private:
   };
 
   void cleanup();
-  void failDueToClientDestroy();
 
   void closeLocal(bool end_stream);
   void closeRemote(bool end_stream);
@@ -206,6 +205,7 @@ private:
   MessagePtr request_;
   AsyncClient::Callbacks& callbacks_;
   std::unique_ptr<MessageImpl> response_;
+  bool cancelled_{};
 
   friend class AsyncClientImpl;
 };
