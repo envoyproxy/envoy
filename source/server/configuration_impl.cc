@@ -94,7 +94,7 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 
       if (server_.localInfo().clusterName().empty()) {
         throw EnvoyException("cluster name must be defined if LightStep tracing is enabled. See "
-                             "--service-cluster option");
+                             "--service-cluster option.");
       }
       opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
       opts->guid_generator = [&rand]() { return rand.random(); };
