@@ -87,10 +87,10 @@ public:
    * Returns the route for the current request. The assumption is that the implementation can do
    * caching where applicable to avoid multiple lookups.
    *
-   * NOTE: This breaks down a bit if the caller knows it has modified something that would effect
+   * NOTE: This breaks down a bit if the caller knows it has modified something that would affect
    *       routing (such as the request headers). In practice, we don't do this anywhere currently,
    *       but in the future we might need to provide the ability to clear the cache if a filter
-   *       knows that it has modified the headers in a way that would effect routing. In the future
+   *       knows that it has modified the headers in a way that would affect routing. In the future
    *       we may also want to allow the filter to override the route entry.
    */
   virtual const Router::Route* route() PURE;
