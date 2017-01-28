@@ -15,6 +15,112 @@
 
 namespace Upstream {
 
+void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
+  if (state_ == State::AllClustersInitialized) {
+    cluster.initialize();
+    return;
+  }
+
+  if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
+    primary_init_clusters_.push_back(&cluster);
+    cluster.initialize();
+  } else {
+    ASSERT(cluster.initializePhase() == Cluster::InitializePhase::Secondary);
+    secondary_init_clusters_.push_back(&cluster);
+  }
+
+  cluster.setInitializedCb([&cluster, this]() -> void {
+    ASSERT(state_ != State::AllClustersInitialized);
+    removeCluster(cluster);
+  });
+}
+
+void ClusterManagerInitHelper::removeCluster(Cluster& cluster) {
+  if (state_ == State::AllClustersInitialized) {
+    return;
+  }
+
+  // There is a remote edge case where we can remove a cluster via CDS that has not yet been
+  // initialized. When called via the remove cluster API this code catches that case.
+  std::list<Cluster*>* cluster_list;
+  if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
+    cluster_list = &primary_init_clusters_;
+  } else {
+    ASSERT(cluster.initializePhase() == Cluster::InitializePhase::Secondary);
+    cluster_list = &secondary_init_clusters_;
+  }
+
+  ASSERT(std::find(cluster_list->begin(), cluster_list->end(), &cluster) != cluster_list->end());
+  cluster_list->remove(&cluster);
+  maybeFinishInitialize();
+}
+
+void ClusterManagerInitHelper::maybeFinishInitialize() {
+  // Do not do anything if we are still doing the initial static load or if we are waiting for
+  // CDS initialize.
+  if (state_ == State::Loading || state_ == State::WaitingForCdsInitialize) {
+    return;
+  }
+
+  // If we are still waiting for primary clusters to initialize, do nothing.
+  ASSERT(state_ == State::WaitingForStaticInitialize || state_ == State::CdsInitialized);
+  if (!primary_init_clusters_.empty()) {
+    return;
+  }
+
+  // If we are still waiting for secondary clusters to initialize, see if we need to first call
+  // initialize on them. This is only done once.
+  if (!secondary_init_clusters_.empty()) {
+    if (!started_secondary_initialize_) {
+      started_secondary_initialize_ = true;
+      for (Cluster* cluster : secondary_init_clusters_) {
+        cluster->initialize();
+      }
+    }
+
+    return;
+  }
+
+  // At this point, if we are doing static init, and we have CDS, start CDS init. Otherwise, move
+  // directly to initialized.
+  started_secondary_initialize_ = false;
+  if (state_ == State::WaitingForStaticInitialize && cds_) {
+    state_ = State::WaitingForCdsInitialize;
+    cds_->initialize();
+  } else {
+    state_ = State::AllClustersInitialized;
+    if (initialized_callback_) {
+      initialized_callback_();
+    }
+  }
+}
+
+void ClusterManagerInitHelper::onStaticLoadComplete() {
+  ASSERT(state_ == State::Loading);
+  state_ = State::WaitingForStaticInitialize;
+  maybeFinishInitialize();
+}
+
+void ClusterManagerInitHelper::setCds(CdsApi* cds) {
+  ASSERT(state_ == State::Loading);
+  cds_ = cds;
+  if (cds_) {
+    cds_->setInitializedCb([this]() -> void {
+      ASSERT(state_ == State::WaitingForCdsInitialize);
+      state_ = State::CdsInitialized;
+      maybeFinishInitialize();
+    });
+  }
+}
+
+void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) {
+  if (state_ == State::AllClustersInitialized) {
+    callback();
+  } else {
+    initialized_callback_ = callback;
+  }
+}
+
 ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
                                        Stats::Store& stats, ThreadLocal::Instance& tls,
                                        Runtime::Loader& runtime, Runtime::RandomGenerator& random,
@@ -23,9 +129,6 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls), random_(random),
       thread_local_slot_(tls.allocateSlot()), local_info_(local_info),
       cm_stats_(generateStats(stats)) {
-
-  std::vector<Json::ObjectPtr> clusters = config.getObjectArray("clusters");
-  pending_cluster_init_ = clusters.size();
 
   if (config.hasObject("outlier_detection")) {
     std::string event_log_file_path =
@@ -37,7 +140,6 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
   }
 
   if (config.hasObject("sds")) {
-    pending_cluster_init_++;
     loadCluster(*config.getObject("sds")->getObject("cluster"), false);
 
     SdsConfig sds_config{
@@ -48,11 +150,14 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
   }
 
   if (config.hasObject("cds")) {
-    pending_cluster_init_++;
     loadCluster(*config.getObject("cds")->getObject("cluster"), false);
   }
 
-  for (const Json::ObjectPtr& cluster : clusters) {
+  // We can now potentially create the CDS API once the backing cluster exists.
+  cds_api_ = factory_.createCds(config, *this);
+  init_helper_.setCds(cds_api_.get());
+
+  for (const Json::ObjectPtr& cluster : config.getObjectArray("clusters")) {
     loadCluster(*cluster, false);
   }
 
@@ -78,12 +183,7 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
     postInitializeCluster(*cluster.second.cluster_);
   }
 
-  // Once all clusters are initiailized we can attempt to initialize the CDS API if configured.
-  // TODO: Graceful initialize of CDS on initial load.
-  cds_api_ = factory_.createCds(config, *this);
-  if (cds_api_) {
-    cds_api_->initialize();
-  }
+  init_helper_.onStaticLoadComplete();
 }
 
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
@@ -131,7 +231,8 @@ bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
     return false;
   }
 
-  primary_clusters_.erase(cluster_name);
+  init_helper_.removeCluster(*existing_cluster->second.cluster_);
+  primary_clusters_.erase(existing_cluster);
   cm_stats_.cluster_removed_.inc();
   cm_stats_.total_clusters_.set(primary_clusters_.size());
   tls_.runOnAllThreads([this, cluster_name]() -> void {
@@ -148,35 +249,12 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, bool added_via
   ClusterPtr new_cluster =
       factory_.clusterFromJson(cluster, *this, sds_config_, outlier_event_logger_);
 
+  init_helper_.addCluster(*new_cluster);
   if (!added_via_api) {
     if (primary_clusters_.find(new_cluster->info()->name()) != primary_clusters_.end()) {
       throw EnvoyException(
           fmt::format("cluster manager: duplicate cluster '{}'", new_cluster->info()->name()));
     }
-
-    if (new_cluster->initializePhase() == Cluster::InitializePhase::Primary) {
-      new_cluster->initialize();
-    } else {
-      ASSERT(new_cluster->initializePhase() == Cluster::InitializePhase::Secondary);
-      secondary_init_clusters_.push_back(new_cluster.get());
-    }
-
-    ASSERT(pending_cluster_init_ > 0);
-    new_cluster->setInitializedCb([this]() -> void {
-      ASSERT(pending_cluster_init_ > 0);
-      if (--pending_cluster_init_ == 0) {
-        if (initialized_callback_) {
-          initialized_callback_();
-        }
-      } else if (pending_cluster_init_ == secondary_init_clusters_.size()) {
-        // All primary clusters have initialized. Now we start up the secondary clusters.
-        for (Cluster* cluster : secondary_init_clusters_) {
-          cluster->initialize();
-        }
-      }
-    });
-  } else {
-    new_cluster->initialize();
   }
 
   const Cluster& primary_cluster_reference = *new_cluster;
