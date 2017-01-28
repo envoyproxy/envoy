@@ -15,11 +15,7 @@
 namespace Filter {
 
 TcpProxyConfig::Route::Route(const Json::Object& config) {
-  if (config.hasObject("cluster")) {
-    cluster_name_ = config.getString("cluster");
-  } else {
-    throw EnvoyException("tcp proxy: route without cluster");
-  }
+  cluster_name_ = config.getString("cluster");
 
   if (config.hasObject("source_ip_list")) {
     source_ips_ = Network::IpList(config.getStringArray("source_ip_list"));
@@ -66,6 +62,14 @@ const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& conn
     if (!route.source_ips_.empty() &&
         !route.source_ips_.contains(Network::Utility::hostFromUrl(connection.remoteAddress()))) {
       continue; // no match, try next route
+    }
+
+    // If the route needs to match on destination address and port but they are not available
+    // (localAddress is empty), we skip it. The connection has a chance to match a different
+    // route that does not depend on destination address and port.
+    if ((!route.destination_port_ranges_.empty() || !route.destination_ips_.empty()) &&
+        connection.localAddress().empty()) {
+      continue;
     }
 
     if (!route.destination_port_ranges_.empty() &&

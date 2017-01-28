@@ -37,7 +37,9 @@ class ConnectionImpl : public virtual Connection,
                        public BufferSource,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& remote_address);
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& remote_address,
+                 const std::string& local_address);
+
   ~ConnectionImpl();
 
   // Network::FilterManager
@@ -104,7 +106,6 @@ private:
   void onWriteReady();
   void updateReadBufferStats(uint64_t num_read, uint64_t new_size);
   void updateWriteBufferStats(uint64_t num_written, uint64_t new_size);
-  static const std::string getLocalAddress(int fd);
 
   static std::atomic<uint64_t> next_global_id_;
 

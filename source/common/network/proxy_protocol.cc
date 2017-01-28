@@ -6,6 +6,9 @@
 #include "envoy/event/file_event.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/empty_string.h"
+#include "common/network/utility.h"
+
 namespace Network {
 
 const std::string ProxyProtocol::ActiveConnection::PROXY_TCP4 = "PROXY TCP4 ";
@@ -68,10 +71,8 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
 
   removeFromList(parent_.connections_);
 
-  // Technically we could extract the remote port from the PROXY protocol header
-  // and pass it to the listener. However, the listener does not care about
-  // client-side ports for downstream connections, so we can just pass a 0
-  listener.newConnection(fd, remote_address, 0);
+  // TODO: pass in something more meaningful than 0 as remote port and EMPTY_STRING as local_address
+  listener.newConnection(fd, Network::Utility::urlForTcp(remote_address, 0), EMPTY_STRING);
 }
 
 void ProxyProtocol::ActiveConnection::close() {

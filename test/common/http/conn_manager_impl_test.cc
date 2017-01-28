@@ -27,6 +27,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::ReturnRefOfCopy;
 using testing::Sequence;
 using testing::Test;
 
@@ -60,6 +61,8 @@ public:
 
     server_name_ = server_name;
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_.get()));
+    ON_CALL(filter_callbacks_.connection_, remoteAddress())
+        .WillByDefault(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
   }

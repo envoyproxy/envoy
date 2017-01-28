@@ -1,4 +1,5 @@
 #include "common/buffer/buffer_impl.h"
+#include "common/common/empty_string.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -43,7 +44,7 @@ TEST(ConnectionImplUtility, updateBufferStats) {
 
 TEST(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
-  EXPECT_DEATH(ConnectionImpl(dispatcher, -1, "tcp://127.0.0.1:0"),
+  EXPECT_DEATH(ConnectionImpl(dispatcher, -1, "tcp://127.0.0.1:0", EMPTY_STRING),
                ".*assert failure: fd_ != -1.*");
 }
 
