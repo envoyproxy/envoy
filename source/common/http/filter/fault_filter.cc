@@ -78,7 +78,7 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 // if we inject a delay, then we will inject the abort in the delay timer
 // callback.
 FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
-  if (!matchesTargetCluster(headers)) {
+  if (!matchesTargetCluster()) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -149,7 +149,7 @@ void FaultFilter::abortWithHTTPStatus() {
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
 }
 
-bool FaultFilter::matchesTargetCluster(const HeaderMap&) {
+bool FaultFilter::matchesTargetCluster() {
   bool matches = true;
 
   if (!config_->upstreamCluster().empty()) {
