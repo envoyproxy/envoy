@@ -342,24 +342,26 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   }
   )EOF";
 
+  MockCdsApi* cds = new MockCdsApi();
   MockCluster* cds_cluster = new NiceMock<MockCluster>();
   cds_cluster->info_->name_ = "cds_cluster";
   MockCluster* cluster1 = new NiceMock<MockCluster>();
   MockCluster* cluster2 = new NiceMock<MockCluster>();
   cluster2->info_->name_ = "fake_cluster2";
 
+  // This part tests static init.
   InSequence s;
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cds_cluster));
   ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cds_cluster, initialize());
+  EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
+  EXPECT_CALL(*cds, setInitializedCb(_));
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster2));
   ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  MockCdsApi* cds = new MockCdsApi();
-  EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
-  EXPECT_CALL(*cds, initialize());
+
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   create(*loader);
 
@@ -370,8 +372,61 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   cds_cluster->initialize_callback_();
   cluster1->initialize_callback_();
 
-  EXPECT_CALL(initialized, ready());
+  EXPECT_CALL(*cds, initialize());
   cluster2->initialize_callback_();
+
+  // This part tests CDS init.
+  MockCluster* cluster3 = new NiceMock<MockCluster>();
+  cluster3->info_->name_ = "cluster3";
+  MockCluster* cluster4 = new NiceMock<MockCluster>();
+  cluster4->info_->name_ = "cluster4";
+  MockCluster* cluster5 = new NiceMock<MockCluster>();
+  cluster5->info_->name_ = "cluster5";
+
+  std::string json_api = R"EOF(
+  {
+    "name": "cluster3"
+  }
+  )EOF";
+
+  Json::ObjectPtr loader_api = Json::Factory::LoadFromString(json_api);
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster3));
+  ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
+
+  json_api = R"EOF(
+  {
+    "name": "cluster4"
+  }
+  )EOF";
+
+  loader_api = Json::Factory::LoadFromString(json_api);
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster4));
+  ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*cluster4, initialize());
+  cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
+
+  json_api = R"EOF(
+  {
+    "name": "cluster5"
+  }
+  )EOF";
+
+  loader_api = Json::Factory::LoadFromString(json_api);
+  EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster5));
+  ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
+
+  cds->initialized_callback_();
+
+  EXPECT_CALL(*cluster3, initialize());
+  cluster4->initialize_callback_();
+
+  // Test cluster 5 getting removed before everything is initialized.
+  cluster_manager_->removePrimaryCluster("cluster5");
+
+  EXPECT_CALL(initialized, ready());
+  cluster3->initialize_callback_();
 }
 
 TEST_F(ClusterManagerImplTest, dynamicAddRemove) {
@@ -577,6 +632,47 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   dns_callback({"127.0.0.2", "127.0.0.3"});
   dns_timer_->callback_();
   dns_callback({"127.0.0.2"});
+}
+
+TEST(ClusterManagerInitHelper, ImmediateInitialize) {
+  InSequence s;
+  ClusterManagerInitHelper init_helper;
+
+  NiceMock<MockCluster> cluster1;
+  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(cluster1, initialize());
+  init_helper.addCluster(cluster1);
+  cluster1.initialize_callback_();
+
+  init_helper.onStaticLoadComplete();
+
+  ReadyWatcher cm_initialized;
+  EXPECT_CALL(cm_initialized, ready());
+  init_helper.setInitializedCb([&]() -> void { cm_initialized.ready(); });
+}
+
+TEST(ClusterManagerInitHelper, StaticSdsInitialize) {
+  InSequence s;
+  ClusterManagerInitHelper init_helper;
+
+  NiceMock<MockCluster> sds;
+  ON_CALL(sds, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(sds, initialize());
+  init_helper.addCluster(sds);
+  sds.initialize_callback_();
+
+  NiceMock<MockCluster> cluster1;
+  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  init_helper.addCluster(cluster1);
+
+  EXPECT_CALL(cluster1, initialize());
+  init_helper.onStaticLoadComplete();
+
+  ReadyWatcher cm_initialized;
+  init_helper.setInitializedCb([&]() -> void { cm_initialized.ready(); });
+
+  EXPECT_CALL(cm_initialized, ready());
+  cluster1.initialize_callback_();
 }
 
 } // Upstream

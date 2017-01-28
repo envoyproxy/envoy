@@ -124,6 +124,9 @@ public:
   ~MockCdsApi();
 
   MOCK_METHOD0(initialize, void());
+  MOCK_METHOD1(setInitializedCb, void(std::function<void()> callback));
+
+  std::function<void()> initialized_callback_;
 };
 
 } // Upstream

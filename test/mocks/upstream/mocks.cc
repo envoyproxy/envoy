@@ -9,6 +9,7 @@ using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Upstream {
 namespace Outlier {
@@ -90,7 +91,10 @@ MockHealthChecker::MockHealthChecker() {
 
 MockHealthChecker::~MockHealthChecker() {}
 
-MockCdsApi::MockCdsApi() {}
+MockCdsApi::MockCdsApi() {
+  ON_CALL(*this, setInitializedCb(_)).WillByDefault(SaveArg<0>(&initialized_callback_));
+}
+
 MockCdsApi::~MockCdsApi() {}
 
 } // Upstream
