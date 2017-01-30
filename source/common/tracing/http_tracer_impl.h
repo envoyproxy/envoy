@@ -9,8 +9,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
-#include "lightstep/tracer.h"
 #include "lightstep/envoy.h"
+#include "lightstep/tracer.h"
 
 namespace Tracing {
 

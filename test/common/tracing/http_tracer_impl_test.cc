@@ -607,7 +607,7 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
 TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
   setupValidDriver();
 
-  // Supply bogus context.
+  // Supply bogus context, that will be simply ignored.
   const std::string invalid_context = "not valid context";
   request_headers_.insertOtSpanContext().value(invalid_context);
   driver_->startSpan(request_headers_, operation_name_, start_time_);
