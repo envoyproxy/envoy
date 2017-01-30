@@ -90,6 +90,9 @@ The following command operators are supported:
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
 
+%UPSTREAM_CLUSTER%
+  Upstream cluster to which the upstream host belongs to.
+
 %REQ(X?Y):Z%
   An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
   optional parameter denoting string truncation up to Z characters long. The value is taken from the

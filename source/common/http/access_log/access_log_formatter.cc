@@ -258,6 +258,15 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
 
       return upstream_host_url.empty() ? "-" : upstream_host_url;
     };
+  } else if (field_name == "UPSTREAM_CLUSTER") {
+    field_extractor_ = [](const RequestInfo& request_info) {
+      std::string upstream_cluster_name;
+      if (nullptr != request_info.upstreamHost()) {
+        upstream_cluster_name = request_info.upstreamHost()->cluster().name();
+      }
+
+      return upstream_cluster_name.empty() ? "-" : upstream_cluster_name;
+    };
   } else {
     throw EnvoyException(fmt::format("Not supported field in RequestInfo: {}", field_name));
   }

@@ -46,6 +46,9 @@ public:
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionPtr());
   MOCK_CONST_METHOD0(healthCheck, bool());
   MOCK_METHOD1(healthCheck, void(bool is_hc));
+
+  std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
+      new testing::NiceMock<Upstream::MockHostDescription>()};
 };
 
 } // AccessLog
