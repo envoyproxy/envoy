@@ -201,7 +201,6 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _)).WillOnce(Return(span));
-  EXPECT_CALL(tracer_, inject(span, _));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
@@ -241,7 +240,6 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
 
   EXPECT_CALL(tracer_, startSpan_(_, _, _)).WillOnce(Return(span));
-  EXPECT_CALL(tracer_, inject(span, _));
   EXPECT_CALL(*span, finishSpan()).Times(0);
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))

@@ -205,6 +205,7 @@ private:
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(Method)                                                                              \
+  HEADER_FUNC(OtSpanContext)                                                                       \
   HEADER_FUNC(Path)                                                                                \
   HEADER_FUNC(ProxyConnection)                                                                     \
   HEADER_FUNC(RequestId)                                                                           \
@@ -213,8 +214,7 @@ private:
   HEADER_FUNC(Status)                                                                              \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \
-  HEADER_FUNC(UserAgent)                                                                           \
-  HEADER_FUNC(OtSpanContext)
+  HEADER_FUNC(UserAgent)
 
 /**
  * The following functions are defined for each inline header above. E.g., for ContentLength we

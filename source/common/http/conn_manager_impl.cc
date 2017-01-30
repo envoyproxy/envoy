@@ -431,7 +431,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   if (tracing_decision.is_tracing) {
     active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
-    connection_manager_.tracer_.inject(active_span_.get(), *request_headers_);
   }
 
   // Set the trusted address for the connection by taking the last address in XFF.

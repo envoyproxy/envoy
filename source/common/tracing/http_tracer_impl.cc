@@ -135,27 +135,20 @@ void HttpTracerUtility::finalizeSpan(Span& active_span,
 HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
     : driver_(std::move(driver)), local_info_(local_info) {}
 
-SpanPtr HttpTracerImpl::startSpan(const Config& config, const Http::HeaderMap& request_headers,
+SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
                                   const Http::AccessLog::RequestInfo& request_info) {
   std::string parent_context;
   if (request_headers.OtSpanContext()) {
-    parent_context = request_headers.OtSpanContext()->value().c_str();
   }
 
   SpanPtr active_span =
-      driver_->startSpan(parent_context, config.operationName(), request_info.startTime());
+      driver_->startSpan(request_headers, config.operationName(), request_info.startTime());
   if (active_span) {
     HttpTracerUtility::populateSpan(*active_span, local_info_.nodeName(), request_headers,
                                     request_info);
   }
 
   return active_span;
-}
-
-void HttpTracerImpl::inject(Span* active_span, Http::HeaderMap& request_headers) {
-  if (active_span) {
-    driver_->inject(active_span, request_headers);
-  }
 }
 
 LightStepSpan::LightStepSpan(lightstep::Span span) : span_(span) {}
@@ -256,37 +249,38 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
   });
 }
 
-SpanPtr LightStepDriver::startSpan(const std::string& parent_context,
+SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
                                    const std::string& operation_name, SystemTime start_time) {
   lightstep::Tracer& tracer = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_;
-  SpanPtr active_span;
+  LightStepSpanPtr active_span;
+
+  // Extract downstream context from HTTP carrier.
+  const std::string parent_context =
+      request_headers.OtSpanContext() ? request_headers.OtSpanContext()->value().c_str() : "";
 
   if (!parent_context.empty()) {
     lightstep::envoy::CarrierStruct ctx;
     ctx.ParseFromString(parent_context);
+
     lightstep::SpanContext parent_span_ctx = tracer.Extract(
         lightstep::CarrierFormat::EnvoyProtoCarrier, lightstep::envoy::ProtoReader(ctx));
-
-    active_span.reset(new LightStepSpan(
+    lightstep::Span ls_span =
         tracer.StartSpan(operation_name, {lightstep::ChildOf(parent_span_ctx),
-                                          lightstep::StartTimestamp(start_time)})));
+                                          lightstep::StartTimestamp(start_time)});
+    active_span.reset(new LightStepSpan(ls_span));
   } else {
-    active_span.reset(new LightStepSpan(
-        tracer.StartSpan(operation_name, {lightstep::StartTimestamp(start_time)})));
+    lightstep::Span ls_span =
+        tracer.StartSpan(operation_name, {lightstep::StartTimestamp(start_time)});
+    active_span.reset(new LightStepSpan(ls_span));
   }
 
-  return active_span;
-}
-
-void LightStepDriver::inject(Span* active_span, Http::HeaderMap& headers) {
-  lightstep::Tracer& tracer = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_;
+  // Inject newly created span context into HTTP carrier.
   lightstep::envoy::CarrierStruct ctx;
-
-  LightStepSpan* ligthstep_span = dynamic_cast<LightStepSpan*>(active_span);
-  tracer.Inject(ligthstep_span->context(), lightstep::CarrierFormat::EnvoyProtoCarrier,
+  tracer.Inject(active_span->context(), lightstep::CarrierFormat::EnvoyProtoCarrier,
                 lightstep::envoy::ProtoWriter(&ctx));
+  request_headers.insertOtSpanContext().value(ctx.SerializeAsString());
 
-  headers.insertOtSpanContext().value(ctx.SerializeAsString());
+  return std::move(active_span);
 }
 
 void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {

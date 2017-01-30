@@ -68,12 +68,9 @@ public:
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config&, const Http::HeaderMap&,
-                    const Http::AccessLog::RequestInfo&) override {
+  SpanPtr startSpan(const Config&, Http::HeaderMap&, const Http::AccessLog::RequestInfo&) override {
     return nullptr;
   }
-
-  void inject(Span*, Http::HeaderMap&) override {}
 };
 
 class HttpTracerImpl : public HttpTracer {
@@ -81,9 +78,8 @@ public:
   HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info);
 
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config& config, const Http::HeaderMap& request_headers,
+  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                     const Http::AccessLog::RequestInfo& request_info) override;
-  void inject(Span* active_span, Http::HeaderMap& request_headers) override;
 
 private:
   DriverPtr driver_;
@@ -104,6 +100,8 @@ private:
   lightstep::Span span_;
 };
 
+typedef std::unique_ptr<LightStepSpan> LightStepSpanPtr;
+
 /**
  * LightStep (http://lightstep.com/) provides tracing capabilities, aggregation, visualization of
  * application trace data.
@@ -117,9 +115,8 @@ public:
                   std::unique_ptr<lightstep::TracerOptions> options);
 
   // Tracer::TracingDriver
-  SpanPtr startSpan(const std::string& parent_context, const std::string& operation_name,
+  SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string& operation_name,
                     SystemTime start_time) override;
-  void inject(Span* active_span, Http::HeaderMap& headers) override;
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoPtr cluster() { return cluster_; }

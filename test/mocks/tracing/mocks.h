@@ -26,14 +26,13 @@ public:
   MockHttpTracer();
   ~MockHttpTracer();
 
-  SpanPtr startSpan(const Config& config, const Http::HeaderMap& request_headers,
+  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                     const Http::AccessLog::RequestInfo& request_info) override {
     return SpanPtr{startSpan_(config, request_headers, request_info)};
   }
 
-  MOCK_METHOD3(startSpan_, Span*(const Config& config, const Http::HeaderMap& request_headers,
+  MOCK_METHOD3(startSpan_, Span*(const Config& config, Http::HeaderMap& request_headers,
                                  const Http::AccessLog::RequestInfo& request_info));
-  MOCK_METHOD2(inject, void(Span* active_span, Http::HeaderMap& request_headers));
 };
 
 class MockDriver : public Driver {
@@ -41,14 +40,13 @@ public:
   MockDriver();
   ~MockDriver();
 
-  SpanPtr startSpan(const std::string& parent_context, const std::string& operation_name,
+  SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string& operation_name,
                     SystemTime start_time) override {
-    return SpanPtr{startSpan_(parent_context, operation_name, start_time)};
+    return SpanPtr{startSpan_(request_headers, operation_name, start_time)};
   }
 
-  MOCK_METHOD3(startSpan_, Span*(const std::string& parent_context,
+  MOCK_METHOD3(startSpan_, Span*(Http::HeaderMap& request_headers,
                                  const std::string& operation_name, SystemTime start_time));
-  MOCK_METHOD2(inject, void(Span* active_span, Http::HeaderMap& request_headers));
 };
 
 } // Tracing

@@ -39,13 +39,8 @@ public:
   /**
    * Start driver specific span.
    */
-  virtual SpanPtr startSpan(const std::string& parent_context, const std::string& operation_name,
+  virtual SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string& operation_name,
                             SystemTime start_time) PURE;
-
-  /**
-   * Inject span context into HTTP carrier.
-   */
-  virtual void inject(Span* active_span, Http::HeaderMap& headers) PURE;
 };
 
 typedef std::unique_ptr<Driver> DriverPtr;
@@ -58,9 +53,8 @@ class HttpTracer {
 public:
   virtual ~HttpTracer() {}
 
-  virtual SpanPtr startSpan(const Config& config, const Http::HeaderMap& request_headers,
+  virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                             const Http::AccessLog::RequestInfo& request_info) PURE;
-  virtual void inject(Span* active_span, Http::HeaderMap& request_headers) PURE;
 };
 
 typedef std::unique_ptr<HttpTracer> HttpTracerPtr;
