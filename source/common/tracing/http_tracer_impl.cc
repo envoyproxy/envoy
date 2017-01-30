@@ -151,7 +151,7 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
   return active_span;
 }
 
-LightStepSpan::LightStepSpan(lightstep::Span span) : span_(span) {}
+LightStepSpan::LightStepSpan(lightstep::Span& span) : span_(span) {}
 
 void LightStepSpan::finishSpan() { span_.Finish(); }
 
