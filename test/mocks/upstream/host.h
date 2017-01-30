@@ -1,9 +1,10 @@
 #pragma once
 
+#include "cluster_info.h"
+
 #include "envoy/upstream/upstream.h"
 
 #include "common/stats/stats_impl.h"
-#include "cluster_info.h"
 
 namespace Upstream {
 namespace Outlier {
