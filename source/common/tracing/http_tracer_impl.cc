@@ -250,13 +250,10 @@ SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
   lightstep::Tracer& tracer = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_;
   LightStepSpanPtr active_span;
 
-  // Extract downstream context from HTTP carrier.
-  const std::string parent_context =
-      request_headers.OtSpanContext() ? request_headers.OtSpanContext()->value().c_str() : "";
-
-  if (!parent_context.empty()) {
+  if (request_headers.OtSpanContext()) {
+    // Extract downstream context from HTTP carrier.
     lightstep::envoy::CarrierStruct ctx;
-    ctx.ParseFromString(parent_context);
+    ctx.ParseFromString(request_headers.OtSpanContext()->value().c_str());
 
     lightstep::SpanContext parent_span_ctx = tracer.Extract(
         lightstep::CarrierFormat::EnvoyProtoCarrier, lightstep::envoy::ProtoReader(ctx));
