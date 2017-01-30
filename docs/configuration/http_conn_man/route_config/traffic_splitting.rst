@@ -4,17 +4,19 @@ Traffic Shifting/Splitting
 ===========================================
 
 Envoy's router can split traffic to a route in a virtual host across
-two or more upstream clusters. There are two common use cases. The first use
-case is version upgrades, where traffic to a route is shifted gradually
+two or more upstream clusters. There are two common use cases.
+
+1. Version upgrades: traffic to a route is shifted gradually
 from one cluster to another. The
 :ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting_shift>`
 section describes this scenario in more detail.
 
-The second use case, as discussed in the
-:ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split>`
-section is A/B testing or multivariate testing, where ``two or more versions`` of
+2. A/B testing or multivariate testing: ``two or more versions`` of
 the same service are tested simultaneously. The traffic to the route has to
-be *split* between clusters running different versions of the same service.
+be *split* between clusters running different versions of the same
+service. The
+:ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split>`
+section describes this scenario in more detail.
 
 .. _config_http_conn_man_route_table_traffic_splitting_shift:
 

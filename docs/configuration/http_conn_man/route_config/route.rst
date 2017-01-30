@@ -123,7 +123,7 @@ Runtime
 
 A :ref:`runtime <arch_overview_runtime>` route configuration can be used to roll out route changes
 in a gradual manner without full code/config deploys. Refer to
-:ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting_shift>` docs for examples
+:ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting_shift>` docs 
 for additional documentation.
 
 .. code-block:: json

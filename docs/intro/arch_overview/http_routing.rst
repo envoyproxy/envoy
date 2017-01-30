@@ -27,7 +27,7 @@ request. The router filter supports the following features:
 * Request timeout specified either via :ref:`HTTP
   header <config_http_filters_router_headers>` or via :ref:`route configuration
   <config_http_conn_man_route_table_route_timeout>`.
-* Probability-based route selection via :ref:`runtimes <config_http_conn_man_route_table_route_runtime>`
+* Probability-based route selection via :ref:`runtime values <config_http_conn_man_route_table_route_runtime>`
   (see :ref:`traffic shifting/shifting <config_http_conn_man_route_table_traffic_splitting>`).
 * :ref:`Weight/percentage-based <config_http_conn_man_route_table_route_weighted_clusters>` upstream cluster selection
   for a given route (see :ref:`traffic shifting/splitting <config_http_conn_man_route_table_traffic_splitting_split>`).
