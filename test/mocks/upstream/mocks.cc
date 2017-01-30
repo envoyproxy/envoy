@@ -33,7 +33,7 @@ MockHostDescription::MockHostDescription() {
   ON_CALL(*this, url()).WillByDefault(ReturnRef(url_));
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
-  ON_CALL(*this, cluster()).WillByDefault(ReturnRef(*cluster_));
+  ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
 }
 
 MockHostDescription::~MockHostDescription() {}

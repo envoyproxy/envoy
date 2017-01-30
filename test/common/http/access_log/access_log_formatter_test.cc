@@ -129,17 +129,9 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter upstream_format("UPSTREAM_HOST");
-    std::shared_ptr<Upstream::MockHostDescription> host(new Upstream::MockHostDescription());
-    EXPECT_CALL(requestInfo, upstreamHost()).WillRepeatedly(Return(host));
     const std::string host_url = "name";
-    EXPECT_CALL(*host, url()).WillOnce(ReturnRef(host_url));
+    EXPECT_CALL(*requestInfo.host_, url()).WillOnce(ReturnRef(host_url));
     EXPECT_EQ("name", upstream_format.format(header, header, requestInfo));
-  }
-
-  {
-    RequestInfoFormatter upstream_format("UPSTREAM_HOST");
-    EXPECT_CALL(requestInfo, upstreamHost()).WillOnce(Return(nullptr));
-    EXPECT_EQ("-", upstream_format.format(header, header, requestInfo));
   }
 
   {
@@ -147,6 +139,12 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
     const std::string upstream_cluster_name = "cluster_name";
     EXPECT_CALL(requestInfo.host_->cluster_, name()).WillOnce(ReturnRef(upstream_cluster_name));
     EXPECT_EQ("cluster_name", upstream_format.format(header, header, requestInfo));
+  }
+
+  {
+    RequestInfoFormatter upstream_format("UPSTREAM_HOST");
+    EXPECT_CALL(requestInfo, upstreamHost()).WillOnce(Return(nullptr));
+    EXPECT_EQ("-", upstream_format.format(header, header, requestInfo));
   }
 
   {
