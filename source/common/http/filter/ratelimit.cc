@@ -19,7 +19,7 @@ FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
     return FilterHeadersStatus::Continue;
   }
 
-  const Router::Route* route = callbacks_->routeTable().route(headers);
+  const Router::Route* route = callbacks_->route();
   if (route && route->routeEntry()) {
     const Router::RouteEntry* route_entry = route->routeEntry();
 

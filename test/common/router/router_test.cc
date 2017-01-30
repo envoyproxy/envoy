@@ -83,14 +83,14 @@ TEST_F(RouterTest, RouteNotFound) {
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.route_table_, route(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
 
   router_.decodeHeaders(headers, true);
 }
 
 TEST_F(RouterTest, PoolFailureWithPriority) {
   NiceMock<MockRouteEntry> route_entry;
-  EXPECT_CALL(callbacks_.route_table_.route_, routeEntry()).WillOnce(Return(&route_entry));
+  EXPECT_CALL(callbacks_.route_, routeEntry()).WillOnce(Return(&route_entry));
   route_entry.virtual_cluster_.priority_ = Upstream::ResourcePriority::High;
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High));
 
@@ -603,8 +603,8 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 }
 
 TEST_F(RouterTest, Shadow) {
-  callbacks_.route_table_.route_.route_entry_.shadow_policy_.cluster_ = "foo";
-  callbacks_.route_table_.route_.route_entry_.shadow_policy_.runtime_key_ = "bar";
+  callbacks_.route_.route_entry_.shadow_policy_.cluster_ = "foo";
+  callbacks_.route_.route_entry_.shadow_policy_.runtime_key_ = "bar";
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -644,7 +644,7 @@ TEST_F(RouterTest, Shadow) {
 TEST_F(RouterTest, AltStatName) {
   // Also test no upstream timeout here.
   NiceMock<MockRouteEntry> route_entry;
-  EXPECT_CALL(callbacks_.route_table_.route_, routeEntry()).WillOnce(Return(&route_entry));
+  EXPECT_CALL(callbacks_.route_, routeEntry()).WillOnce(Return(&route_entry));
   EXPECT_CALL(route_entry, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
 
@@ -688,7 +688,7 @@ TEST_F(RouterTest, AltStatName) {
 TEST_F(RouterTest, Redirect) {
   MockRedirectEntry redirect;
   EXPECT_CALL(redirect, newPath(_)).WillOnce(Return("hello"));
-  EXPECT_CALL(callbacks_.route_table_.route_, redirectEntry()).WillRepeatedly(Return(&redirect));
+  EXPECT_CALL(callbacks_.route_, redirectEntry()).WillRepeatedly(Return(&redirect));
 
   Http::TestHeaderMapImpl response_headers{{":status", "301"}, {"location", "hello"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -805,7 +805,7 @@ TEST(RouterFilterUtilityTest, shouldShadow) {
 
 TEST_F(RouterTest, CanaryStatusTrue) {
   NiceMock<MockRouteEntry> route_entry;
-  EXPECT_CALL(callbacks_.route_table_.route_, routeEntry()).WillOnce(Return(&route_entry));
+  EXPECT_CALL(callbacks_.route_, routeEntry()).WillOnce(Return(&route_entry));
   EXPECT_CALL(route_entry, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
 
@@ -836,7 +836,7 @@ TEST_F(RouterTest, CanaryStatusTrue) {
 
 TEST_F(RouterTest, CanaryStatusFalse) {
   NiceMock<MockRouteEntry> route_entry;
-  EXPECT_CALL(callbacks_.route_table_.route_, routeEntry()).WillOnce(Return(&route_entry));
+  EXPECT_CALL(callbacks_.route_, routeEntry()).WillOnce(Return(&route_entry));
   EXPECT_CALL(route_entry, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
 

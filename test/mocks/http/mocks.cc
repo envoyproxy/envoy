@@ -72,7 +72,7 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
       .WillByDefault(SaveArg<0>(&callbacks.reset_callback_));
   ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(callbacks.dispatcher_));
   ON_CALL(callbacks, requestInfo()).WillByDefault(ReturnRef(callbacks.request_info_));
-  ON_CALL(callbacks, routeTable()).WillByDefault(ReturnRef(callbacks.route_table_));
+  ON_CALL(callbacks, route()).WillByDefault(Return(&callbacks.route_));
   ON_CALL(callbacks, downstreamAddress()).WillByDefault(ReturnRef(callbacks.downstream_address_));
 }
 
