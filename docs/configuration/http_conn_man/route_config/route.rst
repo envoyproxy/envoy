@@ -46,7 +46,7 @@ cluster
 
 :ref:`weighted_clusters <config_http_conn_man_route_table_route_weighted_clusters>`
   *(sometimes required, string)* If the route is not a redirect (*host_redirect* and/or
-  *path_redirect* is not specified), one of *cluster* or *weighted_clusters* must be specified. 
+  *path_redirect* is not specified), one of *cluster* or *weighted_clusters* must be specified.
   With the *weighted_clusters* option, multiple upstream clusters can be specified for a given route.
   The request is forwarded to one of the upstream clusters based on weights assigned
   to each cluster. See :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split_percentages>`
@@ -229,6 +229,11 @@ The router will check the request's headers against all the specified
 headers in the route config. A match will happen if all the headers in the route are present in
 the request with the same values (or based on presence if the ``value`` field is not in the config).
 
+.. attention::
+
+  Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1 *Host*
+  header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+
 .. _config_http_conn_man_route_table_route_weighted_clusters:
 
 Weighted Clusters
@@ -247,7 +252,7 @@ The router selects an upstream cluster based on the weights.
    }
 
 clusters
-  *(required, array)* Specifies one or more upstream clusters associated with the route. 
+  *(required, array)* Specifies one or more upstream clusters associated with the route.
 
   .. code-block:: json
 
@@ -268,7 +273,7 @@ clusters
 runtime_key_prefix
   *(optional, string)* Specifies the runtime key prefix that should be used to construct the runtime
   keys associated with each cluster. When the ``runtime_key_prefix`` is specified, the router will
-  look for weights associated with each upstream cluster under the key 
+  look for weights associated with each upstream cluster under the key
   ``runtime_key_prefix + "." + cluster[i].name`` where ``cluster[i]``  denotes an entry in the
   ``clusters`` array field. If the runtime key for the cluster does not exist, the value specified
   in the configuration file will be used as the default weight.

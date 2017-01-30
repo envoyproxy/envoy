@@ -122,3 +122,16 @@ linkerd’s memory and CPU requirements are significantly higher than Envoy’s.
 linkerd provides a minimalist configuration language, and explicitly does not support hot reloads,
 relying instead on dynamic provisioning and service abstractions. linkerd supports HTTP/1.1, Thrift,
 ThriftMux, HTTP/2 (experimental) and gRPC (experimental).
+
+`nghttp2 <https://nghttp2.org/>`_
+---------------------------------
+
+nghttp2 is a project that contains a few different things. Primarily, it contains a library
+(nghttp2) that implements the HTTP/2 protocol. Envoy uses this library (with a very thin wrapper
+on top) for its HTTP/2 support. The project also contains a very useful load testing tool (h2load)
+as well as a reverse proxy (nghttpx). From a comparison perspective, Envoy is most similar to
+nghttpx. nghttpx is a transparent HTTP/1 <-> HTTP/2 reverse proxy, supports TLS termination,
+correctly supports gRPC proxying, among a variety of other features. With that said, we consider
+nghttpx to be an excellent example of a variety of proxy features, rather than a robust production
+ready solution. Envoy's focus is much more targeted towards observability, general operational
+agility, and advanced load balancing features.
