@@ -144,12 +144,8 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter upstream_format("UPSTREAM_CLUSTER");
-    std::shared_ptr<Upstream::MockHostDescription> host(new Upstream::MockHostDescription());
-    Upstream::MockClusterInfo cluster;
-    EXPECT_CALL(requestInfo, upstreamHost()).WillRepeatedly(Return(host));
-    EXPECT_CALL(*host, cluster()).WillRepeatedly(ReturnRef(cluster));
     const std::string upstream_cluster_name = "cluster_name";
-    EXPECT_CALL(cluster, name()).WillOnce(ReturnRef(upstream_cluster_name));
+    EXPECT_CALL(requestInfo.host_->cluster_, name()).WillOnce(ReturnRef(upstream_cluster_name));
     EXPECT_EQ("cluster_name", upstream_format.format(header, header, requestInfo));
   }
 

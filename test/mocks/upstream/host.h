@@ -58,6 +58,7 @@ public:
 
   std::string url_{"tcp://10.0.0.1:443"};
   testing::NiceMock<Outlier::MockDetectorHostSink> outlier_detector_;
+  testing::NiceMock<MockClusterInfo> cluster_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
 };
