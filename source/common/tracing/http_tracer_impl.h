@@ -88,7 +88,7 @@ private:
 
 class LightStepSpan : public Span {
 public:
-  LightStepSpan(lightstep::Span span);
+  LightStepSpan(lightstep::Span& span);
 
   // Tracing::Span
   void finishSpan() override;
