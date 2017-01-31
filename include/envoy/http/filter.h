@@ -268,6 +268,22 @@ class StreamFilter : public StreamDecoderFilter, public StreamEncoderFilter {};
 typedef std::shared_ptr<StreamFilter> StreamFilterPtr;
 
 /**
+ * Stream access log handler interface.
+ */
+class AccessLogHandler {
+public:
+  virtual ~AccessLogHandler() {}
+
+  /**
+   * Called with request_info data.
+   * @param request_info: the request_info data.
+   */
+  virtual void logRequestInfo(const Http::AccessLog::RequestInfo& request_info) PURE;
+};
+
+typedef std::shared_ptr<AccessLogHandler> AccessLogHandlerPtr;
+
+/**
  * These callbacks are provided by the connection manager to the factory so that the factory can
  * build the filter chain in an application specific way.
  */
@@ -292,6 +308,12 @@ public:
    * @param filter supplies the filter to add.
    */
   virtual void addStreamFilter(Http::StreamFilterPtr filter) PURE;
+
+  /**
+   * Add an access log handler that is called after response is send.
+   * @param handler supplies the handler to add.
+   */
+  virtual void addAccessLogHandler(AccessLogHandlerPtr handler) PURE;
 };
 
 /**

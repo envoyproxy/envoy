@@ -380,6 +380,7 @@ private:
     void addStreamDecoderFilter(StreamDecoderFilterPtr filter) override;
     void addStreamEncoderFilter(StreamEncoderFilterPtr filter) override;
     void addStreamFilter(StreamFilterPtr filter) override;
+    void addAccessLogHandler(AccessLogHandlerPtr handler) override;
 
     // Tracing::TracingConfig
     virtual const std::string& operationName() const override;
@@ -406,6 +407,7 @@ private:
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
+    std::list<AccessLogHandlerPtr> access_log_handlers_;
     Stats::TimespanPtr request_timer_;
     std::list<std::function<void()>> reset_callbacks_;
     State state_;
