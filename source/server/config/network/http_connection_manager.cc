@@ -29,7 +29,6 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::tryCreateFilter
   std::shared_ptr<HttpConnectionManagerConfig> http_config(
       new HttpConnectionManagerConfig(config, server));
   return [http_config, &server](Network::FilterManager& filter_manager) mutable -> void {
-    std::cout << "ctx " << std::endl;
     filter_manager.addReadFilter(Network::ReadFilterPtr{
         new Http::ConnectionManagerImpl(*http_config, server.drainManager(), server.random(),
                                         server.httpTracer(), server.runtime())});
