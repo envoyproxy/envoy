@@ -425,3 +425,15 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
     "additionalProperties" : false
   }
   )EOF");
+
+const std::string Json::Schema::BUFFER_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "max_request_bytes" : {"type" : "integer"},
+      "max_request_time_s" : {"type" : "integer"}
+    },
+    "required" : ["max_request_bytes", "max_request_time_s"],
+    "additionalProperties" : false
+  }
+  )EOF");
