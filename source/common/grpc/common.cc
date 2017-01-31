@@ -1,12 +1,16 @@
 #include "common.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 
 namespace Grpc {
 
@@ -23,23 +27,36 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
 
 Buffer::InstancePtr Common::serializeBody(const google::protobuf::Message& message) {
   // http://www.grpc.io/docs/guides/wire.html
+  // Reserve enough space for the entire message and the 5 byte header.
   Buffer::InstancePtr body(new Buffer::OwnedImpl());
-  uint8_t compressed = 0;
-  body->add(&compressed, sizeof(compressed));
-  uint32_t size = htonl(message.ByteSize());
-  body->add(&size, sizeof(size));
-  body->add(message.SerializeAsString());
+  const uint32_t size = message.ByteSize();
+  const uint32_t alloc_size = size + 5;
+  Buffer::RawSlice iovec;
+  body->reserve(alloc_size, &iovec, 1);
+  ASSERT(iovec.len_ >= alloc_size);
+  iovec.len_ = alloc_size;
+  uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
 
+  *current++ = 0; // flags
+  *reinterpret_cast<uint32_t*>(current) = htonl(size);
+  current += sizeof(uint32_t);
+  google::protobuf::io::ArrayOutputStream stream(current, size, -1);
+  google::protobuf::io::CodedOutputStream codec_stream(&stream);
+  message.SerializeWithCachedSizes(&codec_stream);
+  body->commit(&iovec, 1);
   return body;
 }
 
 Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                         const std::string& service_full_name,
                                         const std::string& method_name) {
-  // TODO PERF: Build path without fmt::format
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
-  message->headers().insertPath().value(fmt::format("/{}/{}", service_full_name, method_name));
+  message->headers().insertPath().value().append("/", 1);
+  message->headers().insertPath().value().append(service_full_name.c_str(),
+                                                 service_full_name.size());
+  message->headers().insertPath().value().append("/", 1);
+  message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
   message->headers().insertHost().value(upstream_cluster);
   message->headers().insertContentType().value(Common::GRPC_CONTENT_TYPE);
 
