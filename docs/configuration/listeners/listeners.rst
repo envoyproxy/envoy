@@ -26,11 +26,13 @@ port
   that make up the filter chain for connections established with the listener. Order matters as the
   filters are processed sequentially as connection events happen.
 
+  **Note:** If the filter list is empty, the connection will close by default.
+
 :ref:`ssl_context <config_listener_ssl_context>`
   *(optional, object)* The :ref:`TLS <arch_overview_ssl>` context configuration for a TLS listener.
   If no TLS context block is defined, the listener is a plain text listener.
 
-bind_to_port 
+bind_to_port
   *(optional, boolean)* Whether the listener should bind to the port. A listener that doesn't bind
   can only receive connections redirected from other listeners that set use_origin_dst parameter to
   true. Default is true.

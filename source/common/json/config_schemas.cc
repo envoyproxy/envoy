@@ -36,7 +36,6 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
        "port": {"type": "number"},
        "filters" : {
          "type" : "array",
-         "minItems" : 1,
          "items": {
            "type": "object",
            "properties": {"$ref" : "#/definitions/filters"}
