@@ -425,12 +425,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.config_, connection_manager_.random_generator_,
       connection_manager_.runtime_);
 
-  Tracing::Decision tracing_decision =
-      Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
-  chargeTracingStats(tracing_decision);
+  // Check if tracing is enabled at all.
+  if (connection_manager_.config_.tracingConfig().valid()) {
+    Tracing::Decision tracing_decision =
+        Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
+    chargeTracingStats(tracing_decision);
 
-  if (tracing_decision.is_tracing) {
-    active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
+    if (tracing_decision.is_tracing) {
+      active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
+    }
   }
 
   // Set the trusted address for the connection by taking the last address in XFF.
