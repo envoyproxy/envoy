@@ -1,4 +1,5 @@
 #include "server/config/network/client_ssl_auth.h"
+#include "server/config/network/http_connection_manager.h"
 #include "server/config/network/mongo_proxy.h"
 #include "server/config/network/ratelimit.h"
 #include "server/config/network/redis_proxy.h"
@@ -118,6 +119,37 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
+}
+
+TEST(NetworkFilterConfigTest, BadHttpConnectionMangerConfig) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filter" : [{}]
+  }
+  )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  NiceMock<MockInstance> server;
+  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
+                                              *json_config, server),
+               Json::Exception);
 }
 
 } // Configuration
