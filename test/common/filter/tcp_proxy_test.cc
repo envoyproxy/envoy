@@ -120,15 +120,6 @@ TEST(TcpProxyConfigTest, Routes) {
   Json::ObjectPtr json_config = Json::Factory::LoadFromString(json);
   NiceMock<Upstream::MockClusterManager> cm_;
 
-  // The TcpProxyConfig constructor checks if the clusters mentioned in the route_config are valid.
-  // We need to make sure to return a non-null pointer for each, otherwise the constructor will
-  // throw an exception and fail.
-  EXPECT_CALL(cm_, get("with_destination_ip_list")).WillRepeatedly(Return(cm_.cluster_.info_));
-  EXPECT_CALL(cm_, get("with_destination_ports")).WillRepeatedly(Return(cm_.cluster_.info_));
-  EXPECT_CALL(cm_, get("with_source_ports")).WillRepeatedly(Return(cm_.cluster_.info_));
-  EXPECT_CALL(cm_, get("with_everything")).WillRepeatedly(Return(cm_.cluster_.info_));
-  EXPECT_CALL(cm_, get("catch_all")).WillRepeatedly(Return(cm_.cluster_.info_));
-
   TcpProxyConfig config_obj(*json_config, cm_, cm_.cluster_.info_->stats_store_);
 
   {
@@ -453,6 +444,82 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
 
   EXPECT_EQ(1U,
             cluster_manager_.cluster_.info_->stats_store_.counter("upstream_cx_overflow").value());
+}
+
+class TcpProxyRoutingTest : public testing::Test {
+public:
+  TcpProxyRoutingTest() {
+    std::string json = R"EOF(
+    {
+      "stat_prefix": "name",
+      "route_config": {
+        "routes": [
+          {
+            "destination_ports": "1-9999",
+            "cluster": "fake_cluster"
+          }
+        ]
+      }
+    }
+    )EOF";
+
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+    config_.reset(new TcpProxyConfig(*config, cluster_manager_,
+                                     cluster_manager_.cluster_.info_->stats_store_));
+  }
+
+  void setup() {
+    EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+
+    filter_.reset(new TcpProxy(config_, cluster_manager_));
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  }
+
+  TcpProxyConfigPtr config_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  std::unique_ptr<TcpProxy> filter_;
+};
+
+TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
+  uint32_t total_cx = config_->stats().downstream_cx_total_.value();
+  uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
+
+  setup();
+
+  // port 10000 is outside the specified destination port range
+  EXPECT_CALL(connection_, localAddress())
+      .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:10000")));
+
+  // getRouteFromEntries() returns an empty string if no route matches
+  EXPECT_CALL(cluster_manager_, get("")).WillRepeatedly(Return(nullptr));
+
+  // Expect filter to stop iteration and close connection
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
+  EXPECT_EQ(non_routable_cx + 1, config_->stats().downstream_cx_no_route_.value());
+}
+
+TEST_F(TcpProxyRoutingTest, RoutableConnection) {
+  uint32_t total_cx = config_->stats().downstream_cx_total_.value();
+  uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
+
+  setup();
+
+  // port 9999 is within the specified destination port range
+  EXPECT_CALL(connection_, localAddress())
+      .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:9999")));
+
+  // Expect filter to try to open a connection to specified cluster
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster"));
+
+  filter_->onNewConnection();
+
+  EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
+  EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
 }
 
 } // Filter

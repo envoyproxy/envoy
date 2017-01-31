@@ -4,7 +4,7 @@
 
 namespace Network {
 
-TEST(IpWhiteListTest, Errors) {
+TEST(IpListTest, Errors) {
   {
     std::string json = R"EOF(
     {
@@ -13,7 +13,7 @@ TEST(IpWhiteListTest, Errors) {
     )EOF";
 
     Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-    EXPECT_THROW({ IpWhiteList wl(*loader); }, EnvoyException);
+    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
   }
 
   {
@@ -24,7 +24,7 @@ TEST(IpWhiteListTest, Errors) {
     )EOF";
 
     Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-    EXPECT_THROW({ IpWhiteList wl(*loader); }, EnvoyException);
+    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
   }
 
   {
@@ -35,7 +35,7 @@ TEST(IpWhiteListTest, Errors) {
     )EOF";
 
     Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-    EXPECT_THROW({ IpWhiteList wl(*loader); }, EnvoyException);
+    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
   }
 
   {
@@ -46,11 +46,11 @@ TEST(IpWhiteListTest, Errors) {
     )EOF";
 
     Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-    EXPECT_THROW({ IpWhiteList wl(*loader); }, EnvoyException);
+    EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
   }
 }
 
-TEST(IpWhiteListTest, Normal) {
+TEST(IpListTest, Normal) {
   std::string json = R"EOF(
   {
     "ip_white_list": [
@@ -62,7 +62,7 @@ TEST(IpWhiteListTest, Normal) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  IpWhiteList wl(*loader);
+  IpList wl(*loader, "ip_white_list");
 
   EXPECT_TRUE(wl.contains("192.168.3.0"));
   EXPECT_TRUE(wl.contains("192.168.3.3"));
@@ -83,7 +83,7 @@ TEST(IpWhiteListTest, Normal) {
   EXPECT_FALSE(wl.contains(""));
 }
 
-TEST(IpWhiteListTest, MatchAny) {
+TEST(IpListTest, MatchAny) {
   std::string json = R"EOF(
   {
     "ip_white_list": [
@@ -93,7 +93,7 @@ TEST(IpWhiteListTest, MatchAny) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  IpWhiteList wl(*loader);
+  IpList wl(*loader, "ip_white_list");
 
   EXPECT_TRUE(wl.contains("192.168.3.3"));
   EXPECT_TRUE(wl.contains("192.168.3.0"));
@@ -138,7 +138,39 @@ TEST(NetworkUtility, loopbackAddress) {
   }
 }
 
-TEST(NetworkUtility, PortRangeList) {
+TEST(PortRangeListTest, Errors) {
+  {
+    std::string port_range_str = "a1";
+    std::list<PortRange> port_range_list;
+    EXPECT_THROW(Utility::parsePortRangeList(port_range_str, port_range_list), EnvoyException);
+  }
+
+  {
+    std::string port_range_str = "1A";
+    std::list<PortRange> port_range_list;
+    EXPECT_THROW(Utility::parsePortRangeList(port_range_str, port_range_list), EnvoyException);
+  }
+
+  {
+    std::string port_range_str = "1_1";
+    std::list<PortRange> port_range_list;
+    EXPECT_THROW(Utility::parsePortRangeList(port_range_str, port_range_list), EnvoyException);
+  }
+
+  {
+    std::string port_range_str = "1,1X1";
+    std::list<PortRange> port_range_list;
+    EXPECT_THROW(Utility::parsePortRangeList(port_range_str, port_range_list), EnvoyException);
+  }
+
+  {
+    std::string port_range_str = "1,1*1";
+    std::list<PortRange> port_range_list;
+    EXPECT_THROW(Utility::parsePortRangeList(port_range_str, port_range_list), EnvoyException);
+  }
+}
+
+TEST(PortRangeListTest, Normal) {
   {
     std::string port_range_str = "1";
     std::list<PortRange> port_range_list;

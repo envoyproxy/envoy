@@ -112,7 +112,6 @@ public:
 
   /**
    * @return The address of the remote client.
-   * For TCP connections, it is in the form tcp://a.b.c.d:port
    */
   virtual const std::string& remoteAddress() PURE;
 

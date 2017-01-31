@@ -19,6 +19,7 @@ namespace Network {
 class IpList {
 public:
   IpList(const std::vector<std::string>& subnets);
+  IpList(const Json::Object& config, const std::string& member_name);
   IpList(){};
 
   bool contains(const std::string& address) const;
@@ -33,15 +34,6 @@ private:
   std::vector<Ipv4Entry> ipv4_list_;
 };
 
-class IpWhiteList {
-public:
-  IpWhiteList(const Json::Object& config);
-  bool contains(const std::string& address) const { return ip_list_.contains(address); }
-
-private:
-  IpList ip_list_;
-};
-
 /**
  * Utility class to represent TCP/UDP port range
  */
@@ -52,8 +44,8 @@ public:
   bool contains(uint32_t port) const { return (port >= min_ && port <= max_); }
 
 private:
-  uint32_t min_;
-  uint32_t max_;
+  const uint32_t min_;
+  const uint32_t max_;
 };
 
 typedef std::list<PortRange> PortRangeList;

@@ -39,7 +39,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
   if (config.useRemoteAddress()) {
-    const std::string& remote_address = Network::Utility::hostFromUrl(connection.remoteAddress());
+    const std::string remote_address = Network::Utility::hostFromUrl(connection.remoteAddress());
     if (Network::Utility::isLoopbackAddress(remote_address.c_str())) {
       Utility::appendXff(request_headers, config.localAddress());
     } else {

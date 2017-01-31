@@ -34,7 +34,7 @@ public:
    * Accept/process a new connection with the given remote address.
    * @param fd supplies the new connection's fd.
    * @param remote_address supplies the remote address for the new connection.
-   * @param remote_address supplies the local address for the new connection.
+   * @param local_address supplies the local address for the new connection.
    */
   virtual void newConnection(int fd, const std::string& remote_address,
                              const std::string& local_address);

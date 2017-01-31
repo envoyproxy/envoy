@@ -67,9 +67,9 @@ bool IpList::contains(const std::string& remote_address) const {
   return false;
 }
 
-IpWhiteList::IpWhiteList(const Json::Object& config)
-    : ip_list_(config.hasObject("ip_white_list") ? config.getStringArray("ip_white_list")
-                                                 : std::vector<std::string>()) {}
+IpList::IpList(const Json::Object& config, const std::string& member_name)
+    : IpList(config.hasObject(member_name) ? config.getStringArray(member_name)
+                                           : std::vector<std::string>()) {}
 
 const std::string Utility::TCP_SCHEME = "tcp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
@@ -249,6 +249,10 @@ void Utility::parsePortRangeList(const std::string& string, std::list<PortRange>
     } else {
       ss >> min;
       max = min;
+    }
+
+    if (s.empty() || (min > 65535) || (max > 65535) || ss.fail() || !ss.eof()) {
+      throw EnvoyException(fmt::format("invalid port number or range '{}'", s));
     }
 
     list.emplace_back(PortRange(min, max));
