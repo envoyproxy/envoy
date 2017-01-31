@@ -197,11 +197,14 @@ public:
   virtual void cancel() override;
 
 private:
+  void onComplete();
+
+  // AsyncClient::StreamCallbacks
   void onHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;
   void onTrailers(HeaderMapPtr&& trailers) override;
   void onReset() override;
-  void onComplete();
+
   MessagePtr request_;
   AsyncClient::Callbacks& callbacks_;
   std::unique_ptr<MessageImpl> response_;
