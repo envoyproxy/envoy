@@ -47,6 +47,7 @@ $EXTRA_CMAKE_FLAGS \
 -DENVOY_HTTP_PARSER_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_LIBEVENT_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_NGHTTP2_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
+-DENVOY_CARES_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_SPDLOG_INCLUDE_DIR:FILEPATH=/thirdparty/spdlog-0.11.0/include \
 -DENVOY_TCLAP_INCLUDE_DIR:FILEPATH=/thirdparty/tclap-1.2.1/include \
 -DENVOY_OPENSSL_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
@@ -62,5 +63,6 @@ $EXTRA_CMAKE_FLAGS \
 
 cmake -L || true
 
+make fix_format
 make check_format
 make -j$NUM_CPUS $TEST_TARGET

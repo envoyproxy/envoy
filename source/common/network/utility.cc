@@ -191,9 +191,11 @@ std::string Utility::getLocalAddress() {
   return ret;
 }
 
-std::string Utility::getAddressName(sockaddr_in* addr) {
+std::string Utility::getAddressName(sockaddr_in* addr) { return getAddressName(&addr->sin_addr); }
+
+std::string Utility::getAddressName(in_addr* addr) {
   char str[INET_ADDRSTRLEN];
-  inet_ntop(AF_INET, &addr->sin_addr, str, INET_ADDRSTRLEN);
+  inet_ntop(AF_INET, addr, str, INET_ADDRSTRLEN);
   return std::string(str);
 }
 

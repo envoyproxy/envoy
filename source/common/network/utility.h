@@ -122,6 +122,13 @@ public:
   static std::string getAddressName(sockaddr_in* addr);
 
   /**
+   * Converts a in_addr to a human readable string.
+   * @param addr the address to convert to a string
+   * @return the string IP address representation for 'addr'
+   */
+  static std::string getAddressName(in_addr* addr);
+
+  /**
    * Extract port information from a sockaddr_in.
    * @param addr the address from which to extract the port number
    * @return the port number
