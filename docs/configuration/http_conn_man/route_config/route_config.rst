@@ -55,5 +55,4 @@ response_headers_to_remove
   vcluster
   rate_limits
   route_matching
-  traffic_shifting
-  weighted_routing
+  traffic_splitting

@@ -84,12 +84,16 @@ public:
   virtual void resetStream() PURE;
 
   /**
-   * @return const Router::StableRouteTable& the route table used for HTTP routing decisions.
-   *         The most important consumer of this information is the router filter. However,
-   *         other filters may wish to know the route that will be taken for various reasons so
-   *         the information is supplied to all filters. The table may be empty.
+   * Returns the route for the current request. The assumption is that the implementation can do
+   * caching where applicable to avoid multiple lookups.
+   *
+   * NOTE: This breaks down a bit if the caller knows it has modified something that would affect
+   *       routing (such as the request headers). In practice, we don't do this anywhere currently,
+   *       but in the future we might need to provide the ability to clear the cache if a filter
+   *       knows that it has modified the headers in a way that would affect routing. In the future
+   *       we may also want to allow the filter to override the route entry.
    */
-  virtual const Router::StableRouteTable& routeTable() PURE;
+  virtual const Router::Route* route() PURE;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.

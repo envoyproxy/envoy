@@ -802,6 +802,15 @@ AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestIn
   return parent_.request_info_;
 }
 
+const Router::Route* ConnectionManagerImpl::ActiveStreamFilterBase::route() {
+  if (!cached_route_.valid()) {
+    cached_route_.value(parent_.connection_manager_.config_.routeConfig().route(
+        *parent_.request_headers_, parent_.stream_id_));
+  }
+
+  return cached_route_.value();
+}
+
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeHeaders(HeaderMapPtr&& headers,

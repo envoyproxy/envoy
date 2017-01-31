@@ -47,7 +47,6 @@ private:
  */
 class AsyncRequestImpl final : public AsyncClient::Request,
                                StreamDecoderFilterCallbacks,
-                               Router::StableRouteTable,
                                Logger::Loggable<Logger::Id::http>,
                                LinkedObject<AsyncRequestImpl> {
 public:
@@ -147,7 +146,7 @@ private:
   uint64_t connectionId() override { return 0; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
-  const Router::StableRouteTable& routeTable() { return *this; }
+  const Router::Route* route() override { return &route_; }
   uint64_t streamId() override { return stream_id_; }
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
@@ -156,9 +155,6 @@ private:
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;
-
-  // Router::StableRouteTable
-  const Router::Route* route(const Http::HeaderMap&) const override { return &route_; }
 
   MessagePtr request_;
   AsyncClientImpl& parent_;

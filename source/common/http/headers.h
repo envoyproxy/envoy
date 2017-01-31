@@ -42,6 +42,7 @@ public:
   const LowerCaseString KeepAlive{"keep-alive"};
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
+  const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
   const LowerCaseString RequestId{"x-request-id"};

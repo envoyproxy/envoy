@@ -123,6 +123,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
       new NiceMock<Http::MockStreamDecoderFilter>());
 
   EXPECT_CALL(filter->reset_stream_called_, ready()).Times(0);
+  EXPECT_CALL(route_config_, route(_, _)).Times(2);
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .Times(2)
       .WillRepeatedly(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
@@ -131,6 +132,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
         if (headers.Path()->value() == "/healthcheck") {
           filter->callbacks_->requestInfo().healthCheck(true);
         }
+
+        // Test route caching.
+        EXPECT_EQ(&route_config_.route_, filter->callbacks_->route());
+        EXPECT_EQ(&route_config_.route_, filter->callbacks_->route());
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -241,8 +246,10 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
   setup(false, "");
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
+
   EXPECT_CALL(tracer_, startSpan_(_, _, _)).WillOnce(Return(span));
   EXPECT_CALL(*span, finishSpan()).Times(0);
+
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
 

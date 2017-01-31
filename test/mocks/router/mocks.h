@@ -149,6 +149,18 @@ public:
   testing::NiceMock<MockVirtualHost> virtual_host_;
 };
 
+class MockRoute : public Route {
+public:
+  MockRoute();
+  ~MockRoute();
+
+  // Router::Route
+  MOCK_CONST_METHOD0(redirectEntry, const RedirectEntry*());
+  MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
+
+  testing::NiceMock<MockRouteEntry> route_entry_;
+};
+
 class MockConfig : public Config {
 public:
   MockConfig();
@@ -162,32 +174,10 @@ public:
   MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
   MOCK_CONST_METHOD0(usesRuntime, bool());
 
+  testing::NiceMock<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
-};
-
-class MockRoute : public Route {
-public:
-  MockRoute();
-  ~MockRoute();
-
-  // Router::Route
-  MOCK_CONST_METHOD0(redirectEntry, const RedirectEntry*());
-  MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
-
-  testing::NiceMock<MockRouteEntry> route_entry_;
-};
-
-class MockStableRouteTable : public StableRouteTable {
-public:
-  MockStableRouteTable();
-  ~MockStableRouteTable();
-
-  // Router::StableRouteTable
-  MOCK_CONST_METHOD1(route, const Route*(const Http::HeaderMap&));
-
-  testing::NiceMock<MockRoute> route_;
 };
 
 } // Router

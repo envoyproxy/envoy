@@ -77,7 +77,7 @@ private:
   void resetTimerState();
   void postDelayInjection();
   void abortWithHTTPStatus();
-  bool matchesTargetCluster(const HeaderMap& headers);
+  bool matchesTargetCluster();
 
   FaultFilterConfigPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
