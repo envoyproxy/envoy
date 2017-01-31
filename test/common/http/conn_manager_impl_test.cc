@@ -239,6 +239,45 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   conn_manager_->onData(fake_input);
 }
 
+TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
+  setup(false, "");
+
+  // Disable tracing.
+  tracing_config_ = Optional<Http::TracingConnectionManagerConfig>();
+
+  EXPECT_CALL(tracer_, startSpan_(_, _, _)).Times(0);
+  ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillByDefault(Return(true));
+
+  std::shared_ptr<Http::MockStreamDecoderFilter> filter(
+      new NiceMock<Http::MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks)
+                                 -> void { callbacks.addStreamDecoderFilter(filter); }));
+
+  Http::StreamDecoder* decoder = nullptr;
+  NiceMock<Http::MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+        decoder = &conn_manager_->newStream(encoder);
+
+        Http::HeaderMapPtr headers{
+            new TestHeaderMapImpl{{":authority", "host"},
+                                  {":path", "/"},
+                                  {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+
+        Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+        data.drain(4);
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+}
+
 TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
   setup(false, "");
 
