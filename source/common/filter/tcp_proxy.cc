@@ -8,8 +8,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
-#include "common/json/config_schemas.h"
 #include "common/common/empty_string.h"
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
 namespace Filter {
