@@ -330,6 +330,7 @@ public:
   MOCK_METHOD1(addStreamDecoderFilter, void(Http::StreamDecoderFilterPtr filter));
   MOCK_METHOD1(addStreamEncoderFilter, void(Http::StreamEncoderFilterPtr filter));
   MOCK_METHOD1(addStreamFilter, void(Http::StreamFilterPtr filter));
+  MOCK_METHOD1(addAccessLogHandler, void(Http::AccessLog::InstancePtr handler));
 };
 } // Http
 
