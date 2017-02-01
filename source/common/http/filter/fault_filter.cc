@@ -10,6 +10,7 @@
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/router/config_impl.h"
 
 namespace Http {
 
@@ -64,6 +65,8 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
                                          header_map->getBoolean("regex", false));
     }
   }
+
+  upstream_cluster_ = json_config.getString("upstream_cluster", EMPTY_STRING);
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigPtr config) : config_(config) {}
@@ -75,7 +78,11 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 // if we inject a delay, then we will inject the abort in the delay timer
 // callback.
 FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
-  // Check for header matches first
+  if (!matchesTargetCluster()) {
+    return FilterHeadersStatus::Continue;
+  }
+
+  // Check for header matches
   if (!Router::ConfigUtility::matchHeaders(headers, config_->filterHeaders())) {
     return FilterHeadersStatus::Continue;
   }
@@ -140,6 +147,18 @@ void FaultFilter::abortWithHTTPStatus() {
   callbacks_->encodeHeaders(std::move(response_headers), true);
   config_->stats().aborts_injected_.inc();
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
+}
+
+bool FaultFilter::matchesTargetCluster() {
+  bool matches = true;
+
+  if (!config_->upstreamCluster().empty()) {
+    const Router::Route* route = callbacks_->route();
+    matches = route && route->routeEntry() &&
+              (route->routeEntry()->clusterName() == config_->upstreamCluster());
+  }
+
+  return matches;
 }
 
 void FaultFilter::resetTimerState() {

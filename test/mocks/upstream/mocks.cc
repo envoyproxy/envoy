@@ -9,6 +9,7 @@ using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Upstream {
 namespace Outlier {
@@ -32,6 +33,7 @@ MockHostDescription::MockHostDescription() {
   ON_CALL(*this, url()).WillByDefault(ReturnRef(url_));
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
+  ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
 }
 
 MockHostDescription::~MockHostDescription() {}
@@ -78,6 +80,7 @@ MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpConnPoolForCluster(_, _)).WillByDefault(Return(&conn_pool_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, get(_)).WillByDefault(Return(cluster_.info_));
+  ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault((ReturnRef(async_client_)));
 }
 
 MockClusterManager::~MockClusterManager() {}
@@ -89,7 +92,10 @@ MockHealthChecker::MockHealthChecker() {
 
 MockHealthChecker::~MockHealthChecker() {}
 
-MockCdsApi::MockCdsApi() {}
+MockCdsApi::MockCdsApi() {
+  ON_CALL(*this, setInitializedCb(_)).WillByDefault(SaveArg<0>(&initialized_callback_));
+}
+
 MockCdsApi::~MockCdsApi() {}
 
 } // Upstream

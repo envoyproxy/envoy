@@ -37,6 +37,9 @@ public:
 
   // Upstream::CdsApi
   void initialize() override { RestApiFetcher::initialize(); }
+  void setInitializedCb(std::function<void()> callback) override {
+    initialize_callback_ = callback;
+  }
 
 private:
   CdsApiImpl(const Json::Object& config, ClusterManager& cm, Event::Dispatcher& dispatcher,
@@ -46,11 +49,12 @@ private:
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override;
   void parseResponse(const Http::Message& response) override;
-  void onFetchComplete() override {}
+  void onFetchComplete() override;
   void onFetchFailure(EnvoyException* e) override;
 
   const LocalInfo::LocalInfo& local_info_;
   CdsStats stats_;
+  std::function<void()> initialize_callback_;
 };
 
 } // Upstream

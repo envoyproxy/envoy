@@ -4,6 +4,7 @@
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/istreamwrapper.h"
+#include "rapidjson/schema.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
@@ -153,6 +154,33 @@ public:
   }
 
   bool hasObject(const std::string& name) const override { return value_.HasMember(name.c_str()); }
+
+  void validateSchema(const std::string& schema) const override {
+    rapidjson::Document document;
+    if (document.Parse<0>(schema.c_str()).HasParseError()) {
+      throw std::invalid_argument(fmt::format("invalid schema \n Effor(offset {}) : {}\n",
+                                              document.GetErrorOffset(),
+                                              GetParseError_En(document.GetParseError())));
+    }
+
+    rapidjson::SchemaDocument schema_document(document);
+    rapidjson::SchemaValidator schema_validator(schema_document);
+
+    if (!value_.Accept(schema_validator)) {
+      // TODO: Improve errors by switching to SAX API.
+      rapidjson::StringBuffer schema_string_buffer;
+      rapidjson::StringBuffer document_string_buffer;
+
+      schema_validator.GetInvalidSchemaPointer().StringifyUriFragment(schema_string_buffer);
+      schema_validator.GetInvalidDocumentPointer().StringifyUriFragment(document_string_buffer);
+
+      throw Exception(fmt::format(
+          "JSON object doesn't conform to schema.\n Invalid schema: {}.\n Invalid keyword: "
+          "{}.\n Invalid document key: {}",
+          schema_string_buffer.GetString(), schema_validator.GetInvalidSchemaKeyword(),
+          document_string_buffer.GetString()));
+    }
+  }
 
 private:
   const std::string name_;

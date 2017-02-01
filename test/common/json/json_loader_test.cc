@@ -157,4 +157,53 @@ TEST(JsonLoaderTest, Hash) {
   EXPECT_EQ(json2->hash(), json3->hash());
 }
 
+TEST(JsonLoaderTest, Schema) {
+  std::string invalid_json_schema = R"EOF(
+  {
+    "properties": {"value1"}
+  }
+  )EOF";
+
+  std::string invalid_schema = R"EOF(
+  {
+    "properties" : {
+      "value1": {"type" : "faketype"}
+    }
+  }
+  )EOF";
+
+  std::string different_schema = R"EOF(
+  {
+    "properties" : {
+      "value1" : {"type" : "number"}
+    },
+    "additionalProperties" : false
+  }
+  )EOF";
+
+  std::string valid_schema = R"EOF(
+  {
+    "properties": {
+      "value1": {"type" : "number"},
+      "value2": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+  )EOF";
+
+  std::string json_string = R"EOF(
+  {
+    "value1": 10,
+    "value2" : "test"
+  }
+  )EOF";
+
+  ObjectPtr json = Factory::LoadFromString(json_string);
+
+  EXPECT_THROW(json->validateSchema(invalid_json_schema), std::invalid_argument);
+  EXPECT_THROW(json->validateSchema(invalid_schema), Exception);
+  EXPECT_THROW(json->validateSchema(different_schema), Exception);
+  EXPECT_NO_THROW(json->validateSchema(valid_schema));
+}
+
 } // Json

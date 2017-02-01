@@ -7,6 +7,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/json/config_schemas.h"
 
 namespace Filter {
 namespace Auth {
@@ -19,6 +20,8 @@ Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream:
                      std::chrono::milliseconds(config.getInteger("refresh_interval_ms", 60000))),
       tls_(tls), tls_slot_(tls.allocateSlot()), ip_white_list_(config),
       stats_(generateStats(stats_store, config.getString("stat_prefix"))) {
+
+  config.validateSchema(Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA);
 
   if (!cm.get(remote_cluster_name_)) {
     throw EnvoyException(

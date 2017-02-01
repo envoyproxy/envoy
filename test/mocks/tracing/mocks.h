@@ -4,9 +4,21 @@
 
 namespace Tracing {
 
-class MockTracingContext : public TracingContext {
+class MockConfig : public Config {
 public:
+  MockConfig();
+  ~MockConfig();
+
   MOCK_CONST_METHOD0(operationName, const std::string&());
+};
+
+class MockSpan : public Span {
+public:
+  MockSpan();
+  ~MockSpan();
+
+  MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
+  MOCK_METHOD0(finishSpan, void());
 };
 
 class MockHttpTracer : public HttpTracer {
@@ -14,24 +26,27 @@ public:
   MockHttpTracer();
   ~MockHttpTracer();
 
-  void addSink(HttpSinkPtr&& sink) override { addSink_(sink); }
+  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+                    const Http::AccessLog::RequestInfo& request_info) override {
+    return SpanPtr{startSpan_(config, request_headers, request_info)};
+  }
 
-  MOCK_METHOD1(addSink_, void(HttpSinkPtr& sink));
-  MOCK_METHOD4(trace,
-               void(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-                    const Http::AccessLog::RequestInfo& request_info,
-                    const TracingContext& tracing_context));
+  MOCK_METHOD3(startSpan_, Span*(const Config& config, Http::HeaderMap& request_headers,
+                                 const Http::AccessLog::RequestInfo& request_info));
 };
 
-class MockHttpSink : public HttpSink {
+class MockDriver : public Driver {
 public:
-  MockHttpSink();
-  ~MockHttpSink();
+  MockDriver();
+  ~MockDriver();
 
-  MOCK_METHOD4(flushTrace,
-               void(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-                    const Http::AccessLog::RequestInfo& request_info,
-                    const TracingContext& tracing_context));
+  SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string& operation_name,
+                    SystemTime start_time) override {
+    return SpanPtr{startSpan_(request_headers, operation_name, start_time)};
+  }
+
+  MOCK_METHOD3(startSpan_, Span*(Http::HeaderMap& request_headers,
+                                 const std::string& operation_name, SystemTime start_time));
 };
 
 } // Tracing

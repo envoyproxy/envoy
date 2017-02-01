@@ -83,6 +83,28 @@ TEST(IpWhiteListTest, Normal) {
   EXPECT_FALSE(wl.contains(""));
 }
 
+TEST(IpWhiteListTest, MatchAny) {
+  std::string json = R"EOF(
+  {
+    "ip_white_list": [
+      "0.0.0.0/0"
+     ]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  IpWhiteList wl(*loader);
+
+  EXPECT_TRUE(wl.contains("192.168.3.3"));
+  EXPECT_TRUE(wl.contains("192.168.3.0"));
+  EXPECT_TRUE(wl.contains("192.168.3.255"));
+  EXPECT_TRUE(wl.contains("192.168.0.0"));
+  EXPECT_TRUE(wl.contains("192.0.0.0"));
+  EXPECT_TRUE(wl.contains("1.1.1.1"));
+
+  EXPECT_FALSE(wl.contains(""));
+}
+
 TEST(NetworkUtility, NonNumericResolve) {
   EXPECT_THROW(Utility::resolveTCP("localhost", 80), EnvoyException);
 }

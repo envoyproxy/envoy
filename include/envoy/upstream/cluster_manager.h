@@ -105,6 +105,12 @@ public:
    * Start the first fetch of CDS data.
    */
   virtual void initialize() PURE;
+
+  /**
+   * Set a callback that will be called when the CDS API has done an initial load from the remote
+   * server. If the initial load fails, the callback will also be called.
+   */
+  virtual void setInitializedCb(std::function<void()> callback) PURE;
 };
 
 typedef std::unique_ptr<CdsApi> CdsApiPtr;

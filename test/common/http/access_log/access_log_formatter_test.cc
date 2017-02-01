@@ -3,6 +3,7 @@
 #include "common/http/header_map_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
@@ -70,127 +71,138 @@ TEST(AccessLogFormatterTest, plainStringFormatter) {
 TEST(AccessLogFormatterTest, requestInfoFormatter) {
   EXPECT_THROW(RequestInfoFormatter formatter("unknown_field"), EnvoyException);
 
-  NiceMock<MockRequestInfo> requestInfo;
+  NiceMock<MockRequestInfo> request_info;
   TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
   {
     RequestInfoFormatter start_time_format("START_TIME");
     SystemTime time;
-    EXPECT_CALL(requestInfo, startTime()).WillOnce(Return(time));
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              start_time_format.format(header, header, requestInfo));
+              start_time_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter bytes_received_format("BYTES_RECEIVED");
-    EXPECT_CALL(requestInfo, bytesReceived()).WillOnce(Return(1));
-    EXPECT_EQ("1", bytes_received_format.format(header, header, requestInfo));
+    EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(1));
+    EXPECT_EQ("1", bytes_received_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter protocol_format("PROTOCOL");
-    EXPECT_CALL(requestInfo, protocol()).WillOnce(Return(Protocol::Http11));
-    EXPECT_EQ("HTTP/1.1", protocol_format.format(header, header, requestInfo));
+    EXPECT_CALL(request_info, protocol()).WillOnce(Return(Protocol::Http11));
+    EXPECT_EQ("HTTP/1.1", protocol_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_format("RESPONSE_CODE");
     Optional<uint32_t> response_code{200};
-    EXPECT_CALL(requestInfo, responseCode()).WillRepeatedly(ReturnRef(response_code));
-    EXPECT_EQ("200", response_format.format(header, header, requestInfo));
+    EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+    EXPECT_EQ("200", response_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_code_format("RESPONSE_CODE");
     Optional<uint32_t> response_code;
-    EXPECT_CALL(requestInfo, responseCode()).WillRepeatedly(ReturnRef(response_code));
-    EXPECT_EQ("0", response_code_format.format(header, header, requestInfo));
+    EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+    EXPECT_EQ("0", response_code_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter bytes_sent_format("BYTES_SENT");
-    EXPECT_CALL(requestInfo, bytesSent()).WillOnce(Return(1));
-    EXPECT_EQ("1", bytes_sent_format.format(header, header, requestInfo));
+    EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(1));
+    EXPECT_EQ("1", bytes_sent_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter duration_format("DURATION");
     std::chrono::milliseconds time{2};
-    EXPECT_CALL(requestInfo, duration()).WillOnce(Return(time));
-    EXPECT_EQ("2", duration_format.format(header, header, requestInfo));
+    EXPECT_CALL(request_info, duration()).WillOnce(Return(time));
+    EXPECT_EQ("2", duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_flags_format("RESPONSE_FLAGS");
-    ON_CALL(requestInfo, getResponseFlag(ResponseFlag::LocalReset)).WillByDefault(Return(true));
-    EXPECT_EQ("LR", response_flags_format.format(header, header, requestInfo));
+    ON_CALL(request_info, getResponseFlag(ResponseFlag::LocalReset)).WillByDefault(Return(true));
+    EXPECT_EQ("LR", response_flags_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter upstream_format("UPSTREAM_HOST");
-    std::shared_ptr<Upstream::MockHostDescription> host(new Upstream::MockHostDescription());
-    EXPECT_CALL(requestInfo, upstreamHost()).WillRepeatedly(Return(host));
     const std::string host_url = "name";
-    EXPECT_CALL(*host, url()).WillOnce(ReturnRef(host_url));
-    EXPECT_EQ("name", upstream_format.format(header, header, requestInfo));
+    EXPECT_CALL(*request_info.host_, url()).WillOnce(ReturnRef(host_url));
+    EXPECT_EQ("name", upstream_format.format(header, header, request_info));
+  }
+
+  {
+    RequestInfoFormatter upstream_format("UPSTREAM_CLUSTER");
+    const std::string upstream_cluster_name = "cluster_name";
+    EXPECT_CALL(request_info.host_->cluster_, name()).WillOnce(ReturnRef(upstream_cluster_name));
+    EXPECT_EQ("cluster_name", upstream_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter upstream_format("UPSTREAM_HOST");
-    EXPECT_CALL(requestInfo, upstreamHost()).WillOnce(Return(nullptr));
-    EXPECT_EQ("-", upstream_format.format(header, header, requestInfo));
+    EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
+    EXPECT_EQ("-", upstream_format.format(header, header, request_info));
+  }
+
+  {
+    RequestInfoFormatter upstream_format("UPSTREAM_CLUSTER");
+    EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
+    EXPECT_EQ("-", upstream_format.format(header, header, request_info));
   }
 }
 
 TEST(AccessLogFormatterTest, requestHeaderFormatter) {
-  MockRequestInfo requestInfo;
+  MockRequestInfo request_info;
   TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   TestHeaderMapImpl response_header{{":method", "PUT"}};
 
   {
     RequestHeaderFormatter formatter(":Method", "", Optional<size_t>());
-    EXPECT_EQ("GET", formatter.format(request_header, response_header, requestInfo));
+    EXPECT_EQ("GET", formatter.format(request_header, response_header, request_info));
   }
 
   {
     RequestHeaderFormatter formatter(":path", ":method", Optional<size_t>());
-    EXPECT_EQ("/", formatter.format(request_header, response_header, requestInfo));
+    EXPECT_EQ("/", formatter.format(request_header, response_header, request_info));
   }
 
   {
     RequestHeaderFormatter formatter(":TEST", ":METHOD", Optional<size_t>());
-    EXPECT_EQ("GET", formatter.format(request_header, response_header, requestInfo));
+    EXPECT_EQ("GET", formatter.format(request_header, response_header, request_info));
   }
 
   {
     RequestHeaderFormatter formatter("does_not_exist", "", Optional<size_t>());
-    EXPECT_EQ("-", formatter.format(request_header, response_header, requestInfo));
+    EXPECT_EQ("-", formatter.format(request_header, response_header, request_info));
   }
 }
 
 TEST(AccessLogFormatterTest, responseHeaderFormatter) {
-  MockRequestInfo requestInfo;
+  MockRequestInfo request_info;
   TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
   TestHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
 
   {
     ResponseHeaderFormatter formatter(":method", "", Optional<size_t>());
-    EXPECT_EQ("PUT", formatter.format(request_header, response_header, requestInfo));
+    EXPECT_EQ("PUT", formatter.format(request_header, response_header, request_info));
   }
 
   {
     ResponseHeaderFormatter formatter("test", ":method", Optional<size_t>());
-    EXPECT_EQ("test", formatter.format(request_header, response_header, requestInfo));
+    EXPECT_EQ("test", formatter.format(request_header, response_header, request_info));
   }
 
   {
     ResponseHeaderFormatter formatter(":path", ":method", Optional<size_t>());
-    EXPECT_EQ("PUT", formatter.format(request_header, response_header, requestInfo));
+    EXPECT_EQ("PUT", formatter.format(request_header, response_header, request_info));
   }
 
   {
     ResponseHeaderFormatter formatter("does_not_exist", "", Optional<size_t>());
-    EXPECT_EQ("-", formatter.format(request_header, response_header, requestInfo));
+    EXPECT_EQ("-", formatter.format(request_header, response_header, request_info));
   }
 }
 

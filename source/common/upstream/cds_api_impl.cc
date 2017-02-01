@@ -59,6 +59,13 @@ void CdsApiImpl::parseResponse(const Http::Message& response) {
   stats_.update_success_.inc();
 }
 
+void CdsApiImpl::onFetchComplete() {
+  if (initialize_callback_) {
+    initialize_callback_();
+    initialize_callback_ = nullptr;
+  }
+}
+
 void CdsApiImpl::onFetchFailure(EnvoyException* e) {
   stats_.update_failure_.inc();
   if (e) {

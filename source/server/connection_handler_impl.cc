@@ -93,14 +93,21 @@ Network::Listener* ConnectionHandlerImpl::findListener(const std::string& socket
 void ConnectionHandlerImpl::ActiveListener::onNewConnection(
     Network::ConnectionPtr&& new_connection) {
   conn_log(parent_.logger_, info, "new connection", *new_connection);
-  factory_.createFilterChain(*new_connection);
+  bool empty_filter_chain = !factory_.createFilterChain(*new_connection);
 
   // If the connection is already closed, we can just let this connection immediately die.
   if (new_connection->state() != Network::Connection::State::Closed) {
-    ActiveConnectionPtr active_connection(
-        new ActiveConnection(parent_, std::move(new_connection), stats_));
-    active_connection->moveIntoList(std::move(active_connection), parent_.connections_);
-    parent_.num_connections_++;
+    // Close the connection if the filter chain is empty to avoid leaving open connections
+    // with nothing to do.
+    if (empty_filter_chain) {
+      conn_log(parent_.logger_, info, "closing connection: no filters", *new_connection);
+      new_connection->close(Network::ConnectionCloseType::NoFlush);
+    } else {
+      ActiveConnectionPtr active_connection(
+          new ActiveConnection(parent_, std::move(new_connection), stats_));
+      active_connection->moveIntoList(std::move(active_connection), parent_.connections_);
+      parent_.num_connections_++;
+    }
   }
 }
 

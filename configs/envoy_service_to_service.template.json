@@ -260,15 +260,13 @@
 
   "tracing": {
     "http": {
-      "sinks": [
-        {
-          "type": "lightstep",
-          "access_token_file": "/etc/envoy/lightstep_access_token",
-          "config": {
-            "collector_cluster": "lightstep_saas"
-          }
+      "driver": {
+        "type": "lightstep",
+        "access_token_file": "/etc/envoy/lightstep_access_token",
+        "config": {
+          "collector_cluster": "lightstep_saas"
         }
-      ]
+      }
     }
   },
 
@@ -388,12 +386,12 @@
       "features": "http2",
       "ssl_context": {
         "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt",
-        "verify_subject_alt_name": "collector.lightstep.com"
+        "verify_subject_alt_name": "collector-grpc.lightstep.com"
       },
       "connect_timeout_ms": 1000,
       "type": "logical_dns",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://collector.lightstep.com:443"}]
+      "hosts": [{"url": "tcp://collector-grpc.lightstep.com:443"}]
     }
     ]
   }

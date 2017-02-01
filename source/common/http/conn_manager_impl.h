@@ -17,6 +17,7 @@
 
 #include "common/common/linked_object.h"
 #include "common/http/access_log/request_info_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
 
@@ -76,11 +77,23 @@ struct ConnectionManagerStats {
   Stats::Store& store_;
 };
 
-enum class TracingType {
-  // Trace all traceable requests.
-  All,
-  // Trace only when there is an upstream failure reason.
-  UpstreamFailure
+/**
+ * Connection manager tracing specific stats. @see stats_macros.h
+ */
+// clang-format off
+#define CONN_MAN_TRACING_STATS(COUNTER)                                                            \
+  COUNTER(random_sampling)                                                                         \
+  COUNTER(service_forced)                                                                          \
+  COUNTER(client_enabled)                                                                          \
+  COUNTER(not_traceable)                                                                           \
+  COUNTER(health_check)
+// clang-format on
+
+/**
+* Wrapper struct for connection manager tracing stats. @see stats_macros.h
+*/
+struct ConnectionManagerTracingStats {
+  CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
@@ -90,7 +103,6 @@ enum class TracingType {
  */
 struct TracingConnectionManagerConfig {
   std::string operation_name_;
-  TracingType tracing_type_;
 };
 
 /**
@@ -162,6 +174,11 @@ public:
   virtual ConnectionManagerStats& stats() PURE;
 
   /**
+   * @return ConnectionManagerTracingStats& the stats to write to.
+   */
+  virtual ConnectionManagerTracingStats& tracingStats() PURE;
+
+  /**
    * @return bool whether to use the remote address for populating XFF, determining internal request
    *         status, etc. or to assume that XFF will already be populated with the remote address.
    */
@@ -202,6 +219,8 @@ public:
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Store& stats);
+  static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
+                                                            Stats::Store& stats);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -223,8 +242,7 @@ private:
   /**
    * Base class wrapper for both stream encoder and decoder filters.
    */
-  struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
-                                  public Router::StableRouteTable {
+  struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent) : parent_(parent) {}
 
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status);
@@ -245,19 +263,15 @@ private:
     uint64_t connectionId() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
-    const Router::StableRouteTable& routeTable() override { return *this; }
+    const Router::Route* route() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     const std::string& downstreamAddress() override;
 
-    // Router::StableRouteTable
-    const Router::Route* route(const HeaderMap& headers) const {
-      return parent_.connection_manager_.config_.routeConfig().route(headers, parent_.stream_id_);
-    }
-
     ActiveStream& parent_;
     bool headers_continued_{};
     bool stopped_{};
+    Optional<const Router::Route*> cached_route_;
   };
 
   /**
@@ -336,11 +350,12 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public Tracing::TracingContext {
+                        public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
 
     void chargeStats(HeaderMap& headers);
+    void chargeTracingStats(const Tracing::Decision& tracing_decision);
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     uint64_t connectionId();
@@ -366,7 +381,7 @@ private:
     void addStreamEncoderFilter(StreamEncoderFilterPtr filter) override;
     void addStreamFilter(StreamFilterPtr filter) override;
 
-    // Tracing::TracingContext
+    // Tracing::TracingConfig
     virtual const std::string& operationName() const override;
 
     // All state for the stream. Put here for readability. We could move this to a bit field
@@ -380,6 +395,7 @@ private:
     };
 
     ConnectionManagerImpl& connection_manager_;
+    Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
     HeaderMapPtr response_headers_;

@@ -9,25 +9,10 @@
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
+#include "lightstep/envoy.h"
 #include "lightstep/tracer.h"
 
 namespace Tracing {
-
-#define HTTP_TRACER_STATS(COUNTER)                                                                 \
-  COUNTER(global_switch_off)                                                                       \
-  COUNTER(invalid_request_id)                                                                      \
-  COUNTER(random_sampling)                                                                         \
-  COUNTER(service_forced)                                                                          \
-  COUNTER(client_enabled)                                                                          \
-  COUNTER(doing_tracing)                                                                           \
-  COUNTER(flush)                                                                                   \
-  COUNTER(not_traceable)                                                                           \
-  COUNTER(health_check)                                                                            \
-  COUNTER(traceable)
-
-struct HttpTracerStats {
-  HTTP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
-};
 
 #define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
   COUNTER(spans_sent)                                                                              \
@@ -35,14 +20,6 @@ struct HttpTracerStats {
 
 struct LightstepTracerStats {
   LIGHTSTEP_TRACER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-class HttpNullTracer : public HttpTracer {
-public:
-  // Tracing::HttpTracer
-  void addSink(HttpSinkPtr&&) override {}
-  void trace(const Http::HeaderMap*, const Http::HeaderMap*, const Http::AccessLog::RequestInfo&,
-             const TracingContext&) override {}
 };
 
 enum class Reason {
@@ -73,25 +50,57 @@ public:
    * Mutate request headers if request needs to be traced.
    */
   static void mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime);
+
+  /**
+   * Fill in span tags based on request.
+   */
+  static void populateSpan(Span& active_span, const std::string& service_node,
+                           const Http::HeaderMap& request_headers,
+                           const Http::AccessLog::RequestInfo& request_info);
+
+  /**
+   * 1) Fill in span tags based on the response headers.
+   * 2) Finish active span.
+   */
+  static void finalizeSpan(Span& active_span, const Http::AccessLog::RequestInfo& request_info);
+};
+
+class HttpNullTracer : public HttpTracer {
+public:
+  // Tracing::HttpTracer
+  SpanPtr startSpan(const Config&, Http::HeaderMap&, const Http::AccessLog::RequestInfo&) override {
+    return nullptr;
+  }
 };
 
 class HttpTracerImpl : public HttpTracer {
 public:
-  HttpTracerImpl(Runtime::Loader& runtime, Stats::Store& stats);
+  HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info);
 
   // Tracing::HttpTracer
-  void addSink(HttpSinkPtr&& sink) override;
-  void trace(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-             const Http::AccessLog::RequestInfo& request_info,
-             const TracingContext& tracing_context) override;
+  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+                    const Http::AccessLog::RequestInfo& request_info) override;
 
 private:
-  void populateStats(const Decision& decision);
-
-  Runtime::Loader& runtime_;
-  HttpTracerStats stats_;
-  std::vector<HttpSinkPtr> sinks_;
+  DriverPtr driver_;
+  const LocalInfo::LocalInfo& local_info_;
 };
+
+class LightStepSpan : public Span {
+public:
+  LightStepSpan(lightstep::Span& span);
+
+  // Tracing::Span
+  void finishSpan() override;
+  void setTag(const std::string& name, const std::string& value) override;
+
+  lightstep::SpanContext context() { return span_.context(); }
+
+private:
+  lightstep::Span span_;
+};
+
+typedef std::unique_ptr<LightStepSpan> LightStepSpanPtr;
 
 /**
  * LightStep (http://lightstep.com/) provides tracing capabilities, aggregation, visualization of
@@ -99,17 +108,15 @@ private:
  *
  * LightStepSink is for flushing data to LightStep collectors.
  */
-class LightStepSink : public HttpSink {
+class LightStepDriver : public Driver {
 public:
-  LightStepSink(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                Stats::Store& stats, const LocalInfo::LocalInfo& local_info,
-                ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                std::unique_ptr<lightstep::TracerOptions> options);
+  LightStepDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
+                  Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                  std::unique_ptr<lightstep::TracerOptions> options);
 
-  // Tracer::HttpSink
-  void flushTrace(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-                  const Http::AccessLog::RequestInfo& request_info,
-                  const TracingContext& tracing_context) override;
+  // Tracer::TracingDriver
+  SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string& operation_name,
+                    SystemTime start_time) override;
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoPtr cluster() { return cluster_; }
@@ -118,22 +125,17 @@ public:
 
 private:
   struct TlsLightStepTracer : ThreadLocal::ThreadLocalObject {
-    TlsLightStepTracer(lightstep::Tracer tracer, LightStepSink& sink);
+    TlsLightStepTracer(lightstep::Tracer tracer, LightStepDriver& driver);
 
     void shutdown() override {}
 
     lightstep::Tracer tracer_;
-    LightStepSink& sink_;
+    LightStepDriver& driver_;
   };
-
-  std::string buildRequestLine(const Http::HeaderMap& request_headers,
-                               const Http::AccessLog::RequestInfo& info);
-  std::string buildResponseCode(const Http::AccessLog::RequestInfo& info);
 
   Upstream::ClusterManager& cm_;
   Upstream::ClusterInfoPtr cluster_;
   LightstepTracerStats tracer_stats_;
-  const LocalInfo::LocalInfo& local_info_;
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;
   std::unique_ptr<lightstep::TracerOptions> options_;
@@ -142,7 +144,7 @@ private:
 
 class LightStepRecorder : public lightstep::Recorder, Http::AsyncClient::Callbacks {
 public:
-  LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepSink& sink,
+  LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepDriver& driver,
                     Event::Dispatcher& dispatcher);
 
   // lightstep::Recorder
@@ -153,7 +155,7 @@ public:
   void onSuccess(Http::MessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
-  static std::unique_ptr<lightstep::Recorder> NewInstance(LightStepSink& sink,
+  static std::unique_ptr<lightstep::Recorder> NewInstance(LightStepDriver& driver,
                                                           Event::Dispatcher& dispatcher,
                                                           const lightstep::TracerImpl& tracer);
 
@@ -162,7 +164,7 @@ private:
   void flushSpans();
 
   lightstep::ReportBuilder builder_;
-  LightStepSink& sink_;
+  LightStepDriver& driver_;
   Event::TimerPtr flush_timer_;
 };
 

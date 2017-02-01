@@ -199,15 +199,13 @@
   "statsd_tcp_cluster_name": "statsd",
   "tracing": {
     "http": {
-      "sinks": [
-        {
-          "type": "lightstep",
-          "access_token_file": "test/config/integration/lightstep_access_token",
-          "config": {
-            "collector_cluster": "lightstep_saas"
-          }
+      "driver": {
+        "type": "lightstep",
+        "access_token_file": "test/config/integration/lightstep_access_token",
+        "config": {
+          "collector_cluster": "lightstep_saas"
         }
-      ]
+      }
     }
   },
 

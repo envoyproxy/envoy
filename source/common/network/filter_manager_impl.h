@@ -36,7 +36,7 @@ public:
   void addFilter(FilterPtr filter);
   void addReadFilter(ReadFilterPtr filter);
   void destroyFilters();
-  void initializeReadFilters();
+  bool initializeReadFilters();
   void onRead();
   FilterStatus onWrite();
 

@@ -200,6 +200,13 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
     log().warn("caught and eating SIGHUP. See documentation for how to hot restart.");
   });
 
+  initializeStatSinks();
+
+  // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
+  // Just setup the timer.
+  stat_flush_timer_ = handler_.dispatcher().createTimer([this]() -> void { flushStats(); });
+  stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
   // if there are only static clusters this will fire immediately.
@@ -224,13 +231,6 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
     restarter_.drainParentListeners();
     hooks.onServerInitialized();
   });
-
-  initializeStatSinks();
-
-  // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
-  // Just setup the timer.
-  stat_flush_timer_ = handler_.dispatcher().createTimer([this]() -> void { flushStats(); });
-  stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
