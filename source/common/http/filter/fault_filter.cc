@@ -21,8 +21,8 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
 
   json_config.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
 
-  const Json::ObjectPtr& abort = json_config.getObject("abort", true);
-  const Json::ObjectPtr& delay = json_config.getObject("delay", true);
+  const Json::ObjectPtr abort = json_config.getObject("abort", true);
+  const Json::ObjectPtr delay = json_config.getObject("delay", true);
 
   if (abort->empty() && delay->empty()) {
     throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
