@@ -200,6 +200,17 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers);
+
+  // If this header is set with any value, use an alternate response code on timeout
+  const Http::HeaderEntry* header_timeout_alt_response =
+      headers.EnvoyUpstreamRequestTimeoutAltResponse();
+  if (header_timeout_alt_response) {
+    timeout_response_code_ = Http::Code::NoContent;
+    headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
+  } else {
+    timeout_response_code_ = Http::Code::GatewayTimeout;
+  }
+
   route_entry_->finalizeRequestHeaders(headers);
   FilterUtility::setUpstreamScheme(headers, *cluster_);
   retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
@@ -381,7 +392,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       callbacks_->requestInfo().setResponseFlag(
           Http::AccessLog::ResponseFlag::UpstreamRequestTimeout);
 
-      code = Http::Code::GatewayTimeout;
+      code = timeout_response_code_;
       body = "upstream request timeout";
     } else {
       Http::AccessLog::ResponseFlag response_flags =
