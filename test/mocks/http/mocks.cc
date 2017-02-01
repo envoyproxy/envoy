@@ -115,6 +115,9 @@ MockAsyncClientCallbacks::~MockAsyncClientCallbacks() {}
 MockAsyncClientRequest::MockAsyncClientRequest(MockAsyncClient* client) : client_(client) {}
 MockAsyncClientRequest::~MockAsyncClientRequest() { client_->onRequestDestroy(); }
 
+MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() {}
+MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() {}
+
 } // Http
 
 namespace Http {

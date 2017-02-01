@@ -182,6 +182,8 @@ public:
     }
   }
 
+  bool empty() const override { return value_.IsObject() && value_.ObjectEmpty(); }
+
 private:
   const std::string name_;
   const rapidjson::Value& value_;

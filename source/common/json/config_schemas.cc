@@ -187,12 +187,12 @@ const std::string Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA(R"EOF(
 
 const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
-      "$schema": "http://json-schema.org/schema#",
-      "properties":{
-        "cluster_name" : {"type" : "string"}
-      },
-      "required": ["cluster_name"],
-      "additionalProperties": false
+    "$schema": "http://json-schema.org/schema#",
+    "properties":{
+      "cluster_name" : {"type" : "string"}
+    },
+    "required": ["cluster_name"],
+    "additionalProperties": false
   }
   )EOF");
 
@@ -459,6 +459,111 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
       }
     },
     "required" : ["actions"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::BUFFER_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "max_request_bytes" : {"type" : "integer"},
+      "max_request_time_s" : {"type" : "integer"}
+    },
+    "required" : ["max_request_bytes", "max_request_time_s"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "abort": {
+        "type" : "object",
+        "properties" : {
+          "abort_percent" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          },
+          "http_status" : {"type" : "integer"}
+        },
+        "required" : ["abort_percent", "http_status"],
+        "additionalProperties" : false
+      },
+      "delay" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["fixed"]
+          },
+          "fixed_delay_percent" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          },
+          "fixed_duration_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          }
+        },
+        "required" : ["type", "fixed_delay_percent", "fixed_duration_ms"],
+        "additionalProperties" : false
+      },
+      "upstream_cluster" : {"type" : "string"},
+      "headers" : {
+        "type" : "array",
+        "minItems" : 1,
+        "items" : {
+          "type" : "object",
+          "properties" : {
+            "name" : {"type" : "string"},
+            "value" : {"type" : "string"},
+            "regex" : {"type" : "boolean"}
+          },
+          "required" : ["name"],
+          "additionalProperties" : false
+        }
+      }
+    },
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "pass_through_mode" : {"type" : "boolean"},
+      "endpoint" : {"type" : "string"},
+      "cache_time_ms" : {"type" : "integer"}
+    },
+    "required" : ["pass_through_mode", "endpoint"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "domain" : {"type" : "string"},
+      "stage" : {"type" : "integer"}
+    },
+    "required" : ["domain"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "dynamic_stats" : {"type" : "boolean"}
+    },
     "additionalProperties" : false
   }
   )EOF");

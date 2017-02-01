@@ -141,6 +141,11 @@ public:
    *        valid.
    */
   virtual void validateSchema(const std::string& schema) const PURE;
+
+  /**
+   * @return true if the JSON object is empty;
+   */
+  virtual bool empty() const PURE;
 };
 
 } // Json
