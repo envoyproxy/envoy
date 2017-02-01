@@ -28,7 +28,7 @@ public:
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutMs{"x-envoy-upstream-rq-timeout-ms"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
-      "x-envoy-upstream_request-timeout-alt-response"};
+      "x-envoy-upstream-request-timeout-alt-response"};
   const LowerCaseString EnvoyUpstreamRequestPerTryTimeoutMs{
       "x-envoy-upstream-rq-per-try-timeout-ms"};
   const LowerCaseString EnvoyExpectedRequestTimeoutMs{"x-envoy-expected-rq-timeout-ms"};
