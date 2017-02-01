@@ -36,11 +36,7 @@ class Driver {
 public:
   virtual ~Driver() {}
 
-  /**
-   * Start driver specific span.
-   */
-  virtual SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string& operation_name,
-                            SystemTime start_time) PURE;
+  virtual SpanPtr startSpan(const std::string& operation_name, SystemTime start_time) PURE;
 };
 
 typedef std::unique_ptr<Driver> DriverPtr;
@@ -53,7 +49,7 @@ class HttpTracer {
 public:
   virtual ~HttpTracer() {}
 
-  virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+  virtual SpanPtr startSpan(const Config& config, const Http::HeaderMap& request_headers,
                             const Http::AccessLog::RequestInfo& request_info) PURE;
 };
 
