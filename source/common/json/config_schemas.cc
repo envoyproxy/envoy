@@ -261,7 +261,7 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
       "name" : {"type" : "string"},
       "domains": {
         "type": "array",
-          "items": {"type" : "string"}
+        "items": {"type" : "string"}
       },
       "routes": {"type" : "array"},
       "require_ssl" : {
