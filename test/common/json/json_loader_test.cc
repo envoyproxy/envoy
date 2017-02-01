@@ -10,6 +10,7 @@ TEST(JsonLoaderTest, Basic) {
     ObjectPtr json = Factory::LoadFromString("{\"hello\":123}");
     EXPECT_TRUE(json->hasObject("hello"));
     EXPECT_FALSE(json->hasObject("world"));
+    EXPECT_FALSE(json->empty());
     EXPECT_THROW(json->getObject("world"), Exception);
     EXPECT_THROW(json->getBoolean("hello"), Exception);
     EXPECT_THROW(json->getObjectArray("hello"), Exception);
@@ -114,6 +115,7 @@ TEST(JsonLoaderTest, Basic) {
     ObjectPtr config = Factory::LoadFromString(json);
     ObjectPtr object = config->getObject("foo", true);
     EXPECT_EQ(2, object->getInteger("bar", 2));
+    EXPECT_TRUE(object->empty());
   }
 }
 

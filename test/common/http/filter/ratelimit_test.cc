@@ -71,6 +71,18 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
+TEST_F(HttpRateLimitFilterTest, BadConfig) {
+  const std::string filter_config = R"EOF(
+  {
+    "domain": "foo",
+    "route_key" : "my_route"
+  }
+  )EOF";
+
+  Json::ObjectPtr config = Json::Factory::LoadFromString(filter_config);
+  EXPECT_THROW(FilterConfig(*config, local_info_, stats_store_, runtime_, cm_), Json::Exception);
+}
+
 TEST_F(HttpRateLimitFilterTest, NoRoute) {
   SetUpTest(filter_config);
 

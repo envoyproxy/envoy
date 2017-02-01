@@ -10,7 +10,7 @@ providing the ability to stage different failure scenarios such as service
 failures, service overloads, high network latency, network partitions,
 etc. Faults injection can be limited to a specific set of requests based on
 the (destination) upstream cluster of a request and/or a set of pre-defined
-request headers. 
+request headers.
 
 The scope of failures is restricted to those that are observable by an
 application communicating over the network. CPU and disk failures on the
@@ -37,34 +37,33 @@ including the router filter.*
       "type" : "decoder",
       "name" : "fault",
       "config" : {
-        "abort" : {
-          "abort_percent" : "...",
-          "http_status" : "..."
-        },
-        "delay" : {
-          "type" : "...",
-          "fixed_delay_percent" : "...",
-          "fixed_duration_ms" : "..."
-        },
+        "abort" : "{...}",
+        "delay" : "{...}",
         "upstream_cluster" : "...",
         "headers" : []
       }
     }
 
-abort.abort_percent
+abort
+  *(sometimes required, object)*
+
+delay
+  *(sometimes required, object)*
+
+abort_percent
   *(required, integer)* The percentage of requests that
   should be aborted with the specified *http_status* code. Valid values
   range from 0 to 100.
 
-abort.http_status
+http_status
   *(required, integer)* The HTTP status code that will be used as the
   response code for the request being aborted.
 
-delay.type:
+type:
   *(required, string)* Specifies the type of delay being
   injected. Currently only *fixed* delay type (step function) is supported.
 
-delay.fixed_delay_percent:
+fixed_delay_percent:
   *(required, integer)* The percentage of requests that will
   be delayed for the duration specified by *fixed_duration_ms*. Valid
   values range from 0 to 100.
@@ -72,6 +71,8 @@ delay.fixed_delay_percent:
 delay.fixed_duration_ms:
   *(required, integer)* The delay duration in
   milliseconds. Must be greater than 0.
+
+**Note:** The filter expects at least *abort* or *delay* objects to be specified in the config.
 
 upstream_cluster:
   *(optional, string)* Specifies the name of the (destination) upstream
@@ -158,4 +159,3 @@ prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection
 
   delays_injected, Counter, Total requests that were delayed
   aborts_injected, Counter, Total requests that were aborted
-

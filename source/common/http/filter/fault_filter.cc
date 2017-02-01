@@ -10,6 +10,7 @@
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
 
 namespace Http {
@@ -18,8 +19,16 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
                                      const std::string& stat_prefix, Stats::Store& stats)
     : runtime_(runtime), stats_(generateStats(stat_prefix, stats)) {
 
-  if (json_config.hasObject("abort")) {
-    const Json::ObjectPtr& abort = json_config.getObject("abort");
+  json_config.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
+
+  const Json::ObjectPtr& abort = json_config.getObject("abort", true);
+  const Json::ObjectPtr& delay = json_config.getObject("delay", true);
+
+  if (abort->empty() && delay->empty()) {
+    throw EnvoyException("fault filter must have either abort or delay specified in the config.");
+  }
+
+  if (!abort->empty()) {
     abort_percent_ = static_cast<uint64_t>(abort->getInteger("abort_percent", 0));
 
     if (abort_percent_ > 0) {
@@ -36,7 +45,7 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
     }
   }
 
-  if (json_config.hasObject("delay")) {
+  if (!delay->empty()) {
     const Json::ObjectPtr& delay = json_config.getObject("delay");
     const std::string type = delay->getString("type", "empty");
     if (type == "fixed") {
