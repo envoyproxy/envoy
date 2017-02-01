@@ -25,7 +25,7 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
   const Json::ObjectPtr& delay = json_config.getObject("delay", true);
 
   if (abort->empty() && delay->empty()) {
-    throw EnvoyException("fault filter must have either abort or delay specified in the config.");
+    throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
   }
 
   if (!abort->empty()) {

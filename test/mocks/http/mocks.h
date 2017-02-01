@@ -331,7 +331,6 @@ public:
   MOCK_METHOD1(addStreamEncoderFilter, void(Http::StreamEncoderFilterPtr filter));
   MOCK_METHOD1(addStreamFilter, void(Http::StreamFilterPtr filter));
 };
-
 } // Http
 
 namespace Http {
