@@ -284,6 +284,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   for (AccessLog::InstancePtr access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
+  for (const auto& log_handler : access_log_handlers_) {
+    log_handler->log(request_headers_.get(), response_headers_.get(), request_info_);
+  }
 
   if (active_span_ && !request_info_.healthCheck()) {
     Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_info_);
@@ -305,6 +308,11 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilter(StreamEncoderFi
 void ConnectionManagerImpl::ActiveStream::addStreamFilter(StreamFilterPtr filter) {
   addStreamDecoderFilter(filter);
   addStreamEncoderFilter(filter);
+}
+
+void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
+    Http::AccessLog::InstancePtr handler) {
+  access_log_handlers_.push_back(handler);
 }
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {

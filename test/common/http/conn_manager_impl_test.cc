@@ -3,13 +3,13 @@
 #include "envoy/http/access_log.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/http/access_log/access_log_impl.h"
 #include "common/http/access_log/access_log_formatter.h"
+#include "common/http/access_log/access_log_impl.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
-#include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -216,6 +216,49 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks)
                                  -> void { callbacks.addStreamDecoderFilter(filter); }));
+
+  Http::StreamDecoder* decoder = nullptr;
+  NiceMock<Http::MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+        decoder = &conn_manager_->newStream(encoder);
+
+        Http::HeaderMapPtr headers{
+            new TestHeaderMapImpl{{":authority", "host"},
+                                  {":path", "/"},
+                                  {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+
+        Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+        data.drain(4);
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
+  setup(false, "");
+
+  std::shared_ptr<Http::MockStreamDecoderFilter> filter(
+      new NiceMock<Http::MockStreamDecoderFilter>());
+  std::shared_ptr<Http::AccessLog::MockInstance> handler(
+      new NiceMock<Http::AccessLog::MockInstance>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+        callbacks.addAccessLogHandler(handler);
+      }));
+
+  EXPECT_CALL(*handler, log(_, _, _))
+      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*,
+                          const Http::AccessLog::RequestInfo& request_info) {
+        EXPECT_TRUE(request_info.responseCode().valid());
+        EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
+      }));
 
   Http::StreamDecoder* decoder = nullptr;
   NiceMock<Http::MockStreamEncoder> encoder;
