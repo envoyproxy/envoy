@@ -251,12 +251,11 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "UPSTREAM_HOST") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      std::string upstream_host_url;
-      if (nullptr != request_info.upstreamHost()) {
-        upstream_host_url = request_info.upstreamHost()->url();
+      if (request_info.upstreamHost()) {
+        return request_info.upstreamHost()->address()->asString();
+      } else {
+        return std::string("-");
       }
-
-      return upstream_host_url.empty() ? "-" : upstream_host_url;
     };
   } else if (field_name == "UPSTREAM_CLUSTER") {
     field_extractor_ = [](const RequestInfo& request_info) {

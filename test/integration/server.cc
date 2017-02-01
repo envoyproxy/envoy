@@ -6,6 +6,7 @@
 #include "envoy/server/hot_restart.h"
 
 #include "common/local_info/local_info_impl.h"
+#include "common/network/utility.h"
 
 namespace Server {
 
@@ -102,7 +103,8 @@ void IntegrationTestServer::threadRoutine() {
   Server::TestHotRestart restarter;
   Thread::MutexBasicLockable lock;
   Stats::TestIsolatedStoreImpl stats_store;
-  LocalInfo::LocalInfoImpl local_info("127.0.0.1", "zone_name", "cluster_name", "node_name");
+  LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(), "zone_name",
+                                      "cluster_name", "node_name");
   server_.reset(
       new Server::InstanceImpl(options, *this, restarter, stats_store, lock, *this, local_info));
   server_->run();

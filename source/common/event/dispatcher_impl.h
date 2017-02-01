@@ -25,9 +25,11 @@ public:
 
   // Event::Dispatcher
   void clearDeferredDeleteList() override;
-  Network::ClientConnectionPtr createClientConnection(const std::string& url) override;
-  Network::ClientConnectionPtr createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                                         const std::string& url) override;
+  Network::ClientConnectionPtr
+  createClientConnection(Network::Address::InstancePtr address) override;
+  Network::ClientConnectionPtr
+  createSslClientConnection(Ssl::ClientContext& ssl_ctx,
+                            Network::Address::InstancePtr address) override;
   Network::DnsResolverPtr createDnsResolver() override;
   FileEventPtr createFileEvent(int fd, FileReadyCb cb) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;

@@ -224,7 +224,7 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
 
   file_->write(fmt::format(json,
                            AccessLogDateTimeFormatter::fromTime(time_source_.currentSystemTime()),
-                           host->cluster().name(), host->url(), typeToString(type),
+                           host->cluster().name(), host->address()->asString(), typeToString(type),
                            host->outlierDetector().numEjections()));
 }
 
@@ -241,9 +241,9 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
     "}}\n";
   // clang-format on
 
-  file_->write(
-      fmt::format(json, AccessLogDateTimeFormatter::fromTime(time_source_.currentSystemTime()),
-                  host->cluster().name(), host->url(), host->outlierDetector().numEjections()));
+  file_->write(fmt::format(
+      json, AccessLogDateTimeFormatter::fromTime(time_source_.currentSystemTime()),
+      host->cluster().name(), host->address()->asString(), host->outlierDetector().numEjections()));
 }
 
 std::string EventLoggerImpl::typeToString(EjectionType type) {

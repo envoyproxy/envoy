@@ -1,6 +1,7 @@
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
+#include "common/network/address_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -54,13 +55,15 @@ TEST(HttpUtility, isInternalRequest) {
 TEST(HttpUtility, appendXff) {
   {
     TestHeaderMapImpl headers;
-    Utility::appendXff(headers, "127.0.0.1");
+    Network::Address::Ipv4Instance address("127.0.0.1");
+    Utility::appendXff(headers, address);
     EXPECT_EQ("127.0.0.1", headers.get_("x-forwarded-for"));
   }
 
   {
     TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
-    Utility::appendXff(headers, "127.0.0.1");
+    Network::Address::Ipv4Instance address("127.0.0.1");
+    Utility::appendXff(headers, address);
     EXPECT_EQ("10.0.0.1, 127.0.0.1", headers.get_("x-forwarded-for"));
   }
 }

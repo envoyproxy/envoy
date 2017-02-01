@@ -28,16 +28,8 @@ public:
    * @param remote_address supplies the remote address for the new connection.
    * @param local_address supplies the local address for the new connection.
    */
-  virtual void newConnection(int fd, sockaddr* remote_address, sockaddr* local_address);
-
-  /**
-   * Accept/process a new connection with the given remote address.
-   * @param fd supplies the new connection's fd.
-   * @param remote_address supplies the remote address for the new connection.
-   * @param local_address supplies the local address for the new connection.
-   */
-  virtual void newConnection(int fd, const std::string& remote_address,
-                             const std::string& local_address);
+  virtual void newConnection(int fd, Address::InstancePtr remote_address,
+                             Address::InstancePtr local_address);
 
   /**
    * @return the socket supplied to the listener at construction time
@@ -45,8 +37,7 @@ public:
   ListenSocket& socket() { return socket_; }
 
 protected:
-  const std::string getAddressName(sockaddr* addr);
-  virtual uint16_t getAddressPort(sockaddr* addr);
+  virtual Address::InstancePtr getOriginalDst(int fd);
 
   Network::ConnectionHandler& connection_handler_;
   Event::DispatcherImpl& dispatcher_;
@@ -75,9 +66,8 @@ public:
         ssl_ctx_(ssl_ctx) {}
 
   // ListenerImpl
-  void newConnection(int fd, sockaddr* remote_addr, sockaddr* local_addr) override;
-  void newConnection(int fd, const std::string& remote_address,
-                     const std::string& local_address) override;
+  void newConnection(int fd, Address::InstancePtr remote_address,
+                     Address::InstancePtr local_address) override;
 
 private:
   Ssl::Context& ssl_ctx_;

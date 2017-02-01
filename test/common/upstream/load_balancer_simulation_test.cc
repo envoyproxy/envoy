@@ -1,3 +1,4 @@
+#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -12,7 +13,7 @@ namespace Upstream {
 
 static HostPtr newTestHost(Upstream::ClusterInfoPtr cluster, const std::string& url,
                            uint32_t weight = 1, const std::string& zone = "") {
-  return HostPtr{new HostImpl(cluster, url, false, weight, zone)};
+  return HostPtr{new HostImpl(cluster, Network::Utility::resolveUrl(url), false, weight, zone)};
 }
 
 /**
@@ -84,7 +85,7 @@ public:
                                    per_zone_local, empty_vector_, empty_vector_);
 
       ConstHostPtr selected = lb.chooseHost();
-      hits[selected->url()]++;
+      hits[selected->address()->asString()]++;
     }
 
     double mean = total_number_of_requests * 1.0 / hits.size();

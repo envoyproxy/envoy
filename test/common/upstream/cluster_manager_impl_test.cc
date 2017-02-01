@@ -1,5 +1,6 @@
 #include "envoy/upstream/upstream.h"
 
+#include "common/network/utility.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
@@ -11,11 +12,13 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Pointee;
 using testing::Return;
 using testing::ReturnRef;
 using testing::ReturnNew;
@@ -269,8 +272,8 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(factory_.dispatcher_, createClientConnection_("tcp://127.0.0.1:11001"))
-      .WillOnce(Return(connection));
+  EXPECT_CALL(factory_.dispatcher_, createClientConnection_(PointeesEq(Network::Utility::resolveUrl(
+                                        "tcp://127.0.0.1:11001")))).WillOnce(Return(connection));
   create(*loader);
 }
 
@@ -480,7 +483,8 @@ TEST_F(ClusterManagerImplTest, dynamicAddRemove) {
 
   loader_api = Json::Factory::LoadFromString(json_api_3);
   MockCluster* cluster2 = new NiceMock<MockCluster>();
-  cluster2->hosts_ = {HostPtr{new HostImpl(cluster2->info_, "tcp://127.0.0.1:80", false, 1, "")}};
+  cluster2->hosts_ = {HostPtr{new HostImpl(
+      cluster2->info_, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize());
@@ -579,7 +583,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback({"127.0.0.1", "127.0.0.2"});
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
   // initialize callback.
@@ -611,7 +615,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->callback_();
-  dns_callback({"127.0.0.2"});
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
   EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(2);
@@ -629,9 +633,9 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->callback_();
-  dns_callback({"127.0.0.2", "127.0.0.3"});
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   dns_timer_->callback_();
-  dns_callback({"127.0.0.2"});
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
 }
 
 TEST(ClusterManagerInitHelper, ImmediateInitialize) {

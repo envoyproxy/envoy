@@ -10,6 +10,7 @@
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/network/address_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -27,7 +28,6 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::ReturnRefOfCopy;
 using testing::Sequence;
 using testing::Test;
 
@@ -62,7 +62,7 @@ public:
     server_name_ = server_name;
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_.get()));
     ON_CALL(filter_callbacks_.connection_, remoteAddress())
-        .WillByDefault(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+        .WillByDefault(ReturnRef(remote_address_));
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
   }
@@ -83,7 +83,7 @@ public:
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
-  const std::string& localAddress() override { return local_address_; }
+  const Network::Address::Instance& localAddress() override { return local_address_; }
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
     return tracing_config_;
@@ -104,7 +104,8 @@ public:
   NiceMock<Network::MockDrainDecision> drain_close_;
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;
-  std::string local_address_;
+  Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
+  Network::Address::Ipv4Instance remote_address_{"0.0.0.0"};
   bool use_remote_address_{true};
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;

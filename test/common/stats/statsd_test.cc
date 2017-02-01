@@ -1,3 +1,4 @@
+#include "common/network/utility.h"
 #include "common/stats/statsd.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -31,8 +32,9 @@ TEST_F(TcpStatsdSinkTest, All) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = connection;
-  conn_info.host_.reset(new Upstream::HostImpl(
-      Upstream::ClusterInfoPtr{new Upstream::MockClusterInfo}, "tcp://127.0.0.1:80", false, 1, ""));
+  conn_info.host_.reset(
+      new Upstream::HostImpl(Upstream::ClusterInfoPtr{new Upstream::MockClusterInfo},
+                             Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
 
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("statsd")).WillOnce(Return(conn_info));
   EXPECT_CALL(*connection, connect());

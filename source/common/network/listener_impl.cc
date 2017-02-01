@@ -7,6 +7,7 @@
 #include "common/common/empty_string.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/file_event_impl.h"
+#include "common/network/address_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/ssl/connection_impl.h"
 
@@ -14,26 +15,26 @@
 
 namespace Network {
 
+Address::InstancePtr ListenerImpl::getOriginalDst(int fd) { return Utility::getOriginalDst(fd); }
+
 void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr, int,
                                   void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
-  sockaddr_storage local_addr;
-  memset(&local_addr, 0, sizeof(local_addr));
-
-  bool success = Utility::getOriginalDst(fd, &local_addr);
-
-  if (success && listener->use_original_dst_) {
-    std::string orig_sock_name =
-        std::to_string(listener->getAddressPort(reinterpret_cast<struct sockaddr*>(&local_addr)));
+  Address::InstancePtr final_local_address = listener->socket_.localAddress();
+  if (listener->use_original_dst_ && final_local_address->type() == Address::Type::Ip) {
+    Address::InstancePtr orginal_local_address = listener->getOriginalDst(fd);
+    if (orginal_local_address) {
+      final_local_address = orginal_local_address;
+    }
 
     // A listener that has the use_original_dst flag set to true can still receive connections
     // that are NOT redirected using iptables. If a connection was not redirected,
     // the address and port returned by getOriginalDst() match the listener port.
     // In this case the listener handles the connection directly and does not hand it off.
-    if (listener->socket_.name() != orig_sock_name) {
-      ListenerImpl* new_listener =
-          dynamic_cast<ListenerImpl*>(listener->connection_handler_.findListener(orig_sock_name));
+    if (listener->socket_.localAddress()->ip()->port() != final_local_address->ip()->port()) {
+      ListenerImpl* new_listener = dynamic_cast<ListenerImpl*>(
+          listener->connection_handler_.findListener(final_local_address->asString()));
 
       if (new_listener != nullptr) {
         listener = new_listener;
@@ -41,7 +42,22 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
     }
   }
 
-  listener->newConnection(fd, remote_addr, reinterpret_cast<struct sockaddr*>(&local_addr));
+  if (listener->use_proxy_proto_) {
+    listener->proxy_protocol_.newConnection(listener->dispatcher_, fd, *listener);
+  } else {
+    Address::InstancePtr final_remote_address;
+    if (remote_addr->sa_family == AF_INET) {
+      final_remote_address.reset(
+          new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(remote_addr)));
+    } else {
+      // TODO: IPv6 support.
+      ASSERT(remote_addr->sa_family == AF_UNIX);
+      final_remote_address.reset(
+          new Address::PipeInstance(reinterpret_cast<sockaddr_un*>(remote_addr)));
+    }
+
+    listener->newConnection(fd, final_remote_address, final_local_address);
+  }
 }
 
 ListenerImpl::ListenerImpl(Network::ConnectionHandler& conn_handler,
@@ -57,7 +73,8 @@ ListenerImpl::ListenerImpl(Network::ConnectionHandler& conn_handler,
         evconnlistener_new(&dispatcher_.base(), listenCallback, this, 0, -1, socket.fd()));
 
     if (!listener_) {
-      throw CreateListenerException(fmt::format("cannot listen on socket: {}", socket.name()));
+      throw CreateListenerException(
+          fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
     }
 
     evconnlistener_set_error_cb(listener_.get(), errorCallback);
@@ -70,49 +87,18 @@ void ListenerImpl::errorCallback(evconnlistener*, void*) {
   PANIC(fmt::format("listener accept failure: {}", strerror(errno)));
 }
 
-void ListenerImpl::newConnection(int fd, sockaddr* remote_addr, sockaddr* local_addr) {
-  evutil_make_socket_nonblocking(fd);
-  if (use_proxy_proto_) {
-    proxy_protocol_.newConnection(dispatcher_, fd, *this);
-  } else {
-    newConnection(
-        fd, Network::Utility::urlForTcp(getAddressName(remote_addr), getAddressPort(remote_addr)),
-        Network::Utility::urlForTcp(getAddressName(local_addr), getAddressPort(local_addr)));
-  }
-}
-
-void ListenerImpl::newConnection(int fd, const std::string& remote_address,
-                                 const std::string& local_address) {
+void ListenerImpl::newConnection(int fd, Address::InstancePtr remote_address,
+                                 Address::InstancePtr local_address) {
   ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, fd, remote_address, local_address));
   cb_.onNewConnection(std::move(new_connection));
 }
 
-void SslListenerImpl::newConnection(int fd, sockaddr* remote_addr, sockaddr* local_addr) {
-  if (use_proxy_proto_) {
-    proxy_protocol_.newConnection(dispatcher_, fd, *this);
-  } else {
-    newConnection(
-        fd, Network::Utility::urlForTcp(getAddressName(remote_addr), getAddressPort(remote_addr)),
-        Network::Utility::urlForTcp(getAddressName(local_addr), getAddressPort(local_addr)));
-  }
-}
-
-void SslListenerImpl::newConnection(int fd, const std::string& remote_address,
-                                    const std::string& local_address) {
+void SslListenerImpl::newConnection(int fd, Address::InstancePtr remote_address,
+                                    Address::InstancePtr local_address) {
   ConnectionPtr new_connection(new Ssl::ConnectionImpl(dispatcher_, fd, remote_address,
                                                        local_address, ssl_ctx_,
                                                        Ssl::ConnectionImpl::InitialState::Server));
   cb_.onNewConnection(std::move(new_connection));
-}
-
-const std::string ListenerImpl::getAddressName(sockaddr* addr) {
-  return (addr->sa_family == AF_INET)
-             ? Utility::getAddressName(reinterpret_cast<sockaddr_in*>(addr))
-             : EMPTY_STRING;
-}
-
-uint16_t ListenerImpl::getAddressPort(sockaddr* addr) {
-  return (addr->sa_family == AF_INET) ? ntohs(reinterpret_cast<sockaddr_in*>(addr)->sin_port) : 0;
 }
 
 } // Network
