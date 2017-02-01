@@ -187,12 +187,12 @@ const std::string Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA(R"EOF(
 
 const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
-      "$schema": "http://json-schema.org/schema#",
-      "properties":{
-        "cluster_name" : {"type" : "string"}
-      },
-      "required": ["cluster_name"],
-      "additionalProperties": false
+    "$schema": "http://json-schema.org/schema#",
+    "properties":{
+      "cluster_name" : {"type" : "string"}
+    },
+    "required": ["cluster_name"],
+    "additionalProperties": false
   }
   )EOF");
 
