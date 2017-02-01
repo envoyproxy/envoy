@@ -10,38 +10,30 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
-#include "server/configuration_impl.h"
 
 namespace Server {
 namespace Configuration {
 
 const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 
-/**
- * Config registration for the HTTP connection manager filter. @see NetworkFilterConfigFactory.
- */
-class HttpConnectionManagerFilterConfigFactory : Logger::Loggable<Logger::Id::config>,
-                                                 public NetworkFilterConfigFactory {
-public:
-  // NetworkFilterConfigFactory
-  NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                                const Json::Object& config,
-                                                Server::Instance& server) {
-    if (type != NetworkFilterType::Read || name != "http_connection_manager") {
-      return nullptr;
-    }
-
-    std::shared_ptr<HttpConnectionManagerConfig> http_config(
-        new HttpConnectionManagerConfig(config, server));
-    return [http_config, &server](Network::FilterManager& filter_manager) mutable -> void {
-      filter_manager.addReadFilter(Network::ReadFilterPtr{
-          new Http::ConnectionManagerImpl(*http_config, server.drainManager(), server.random(),
-                                          server.httpTracer(), server.runtime())});
-    };
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::tryCreateFilterFactory(
+    NetworkFilterType type, const std::string& name, const Json::Object& config,
+    Server::Instance& server) {
+  if (type != NetworkFilterType::Read || name != "http_connection_manager") {
+    return nullptr;
   }
-};
+
+  std::shared_ptr<HttpConnectionManagerConfig> http_config(
+      new HttpConnectionManagerConfig(config, server));
+  return [http_config, &server](Network::FilterManager& filter_manager) mutable -> void {
+    filter_manager.addReadFilter(Network::ReadFilterPtr{
+        new Http::ConnectionManagerImpl(*http_config, server.drainManager(), server.random(),
+                                        server.httpTracer(), server.runtime())});
+  };
+}
 
 /**
  * Static registration for the HTTP connection manager filter. @see
@@ -80,6 +72,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
       date_provider_(server.dispatcher(), server.threadLocal()) {
+
+  config.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
 
   if (config.hasObject("use_remote_address")) {
     use_remote_address_ = config.getBoolean("use_remote_address");

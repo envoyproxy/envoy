@@ -7,11 +7,24 @@
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/json/json_loader.h"
+#include "server/configuration_impl.h"
 
 namespace Server {
 namespace Configuration {
 
 enum class HttpFilterType { Decoder, Encoder, Both };
+
+/**
+ * Config registration for the HTTP connection manager filter. @see NetworkFilterConfigFactory.
+ */
+class HttpConnectionManagerFilterConfigFactory : Logger::Loggable<Logger::Id::config>,
+                                                 public NetworkFilterConfigFactory {
+public:
+  // NetworkFilterConfigFactory
+  NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
+                                                const Json::Object& config,
+                                                Server::Instance& server);
+};
 
 /**
  * Callback lambda used for dynamic HTTP filter chain construction.

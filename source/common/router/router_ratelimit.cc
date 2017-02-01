@@ -1,5 +1,7 @@
 #include "router_ratelimit.h"
 
+#include "common/json/config_schemas.h"
+
 namespace Router {
 
 const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>
@@ -57,6 +59,9 @@ void RemoteAddressAction::populateDescriptors(const Router::RouteEntry&,
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
     : kill_switch_key_(config.getString("kill_switch_key", "")),
       stage_(config.getInteger("stage", 0)), route_key_(config.getString("route_key", "")) {
+
+  config.validateSchema(Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA);
+
   for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
     std::string type = action->getString("type");
     if (type == "service_to_service") {
