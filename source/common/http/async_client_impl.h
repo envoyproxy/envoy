@@ -164,7 +164,7 @@ private:
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
-  const Buffer::Instance* decodingBuffer() override { return decoding_buffer_; }
+  const Buffer::Instance* decodingBuffer() override { NOT_IMPLEMENTED; }
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;
@@ -175,7 +175,6 @@ private:
   std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
   RouteImpl route_;
-  Buffer::Instance* decoding_buffer_{};
   bool local_closed_{};
   bool remote_closed_{};
 
@@ -200,6 +199,9 @@ private:
   void onData(Buffer::Instance& data, bool end_stream) override;
   void onTrailers(HeaderMapPtr&& trailers) override;
   void onReset() override;
+
+  // Http::StreamDecoderFilterCallbacks
+  const Buffer::Instance* decodingBuffer() override { return request_->body(); }
 
   MessagePtr request_;
   AsyncClient::Callbacks& callbacks_;
