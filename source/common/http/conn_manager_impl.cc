@@ -284,6 +284,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   for (AccessLog::InstancePtr access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
+  for (const auto& log_handler : access_log_handlers_) {
+    log_handler->log(request_headers_.get(), response_headers_.get(), request_info_);
+  }
 
   if (active_span_ && !request_info_.healthCheck()) {
     Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_info_);
@@ -305,6 +308,11 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilter(StreamEncoderFi
 void ConnectionManagerImpl::ActiveStream::addStreamFilter(StreamFilterPtr filter) {
   addStreamDecoderFilter(filter);
   addStreamEncoderFilter(filter);
+}
+
+void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
+    Http::AccessLog::InstancePtr handler) {
+  access_log_handlers_.push_back(handler);
 }
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
@@ -425,12 +433,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.config_, connection_manager_.random_generator_,
       connection_manager_.runtime_);
 
-  Tracing::Decision tracing_decision =
-      Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
-  chargeTracingStats(tracing_decision);
+  // Check if tracing is enabled at all.
+  if (connection_manager_.config_.tracingConfig().valid()) {
+    Tracing::Decision tracing_decision =
+        Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
+    chargeTracingStats(tracing_decision);
 
-  if (tracing_decision.is_tracing) {
-    active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
+    if (tracing_decision.is_tracing) {
+      active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
+    }
   }
 
   // Set the trusted address for the connection by taking the last address in XFF.

@@ -1339,4 +1339,84 @@ TEST(NullConfigImplTest, All) {
   EXPECT_FALSE(config.usesRuntime());
 }
 
+TEST(BadHttpRouteConfigurationsTest, BadRouteConfig) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "cluster": "www2"
+          }
+        ]
+      }
+    ],
+    "fake_entry" : "fake_type"
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+}
+
+TEST(BadHttpRouteConfigurationsTest, BadVirtualHostConfig) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "router" : {
+          "cluster" : "my_cluster"
+        },
+        "routes": [
+          {
+            "prefix": "/",
+            "cluster": "www2"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+}
+
+TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfig) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "cluster": "www2",
+            "timeout_ms" : "1234"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+}
+
 } // Router

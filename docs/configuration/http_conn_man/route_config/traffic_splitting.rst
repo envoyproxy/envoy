@@ -3,6 +3,9 @@
 Traffic Shifting/Splitting
 ===========================================
 
+.. contents::
+  :local:
+
 Envoy's router can split traffic to a route in a virtual host across
 two or more upstream clusters. There are two common use cases.
 
@@ -21,7 +24,7 @@ section describes this scenario in more detail.
 .. _config_http_conn_man_route_table_traffic_splitting_shift:
 
 Traffic shifting between two upstreams
-======================================
+--------------------------------------
 
 The :ref:`runtime <config_http_conn_man_route_table_route_runtime>` object
 in the route configuration determines the probability of selecting a
@@ -87,7 +90,7 @@ accomplish the task.
 .. _config_http_conn_man_route_table_traffic_splitting_split:
 
 Traffic splitting across multiple upstreams
-===========================================
+-------------------------------------------
 
 Consider the ``helloworld`` example again with three versions (v1, v2 and
 v3). Envoy provides two ways to split traffic evenly across the three
@@ -96,9 +99,9 @@ versions (i.e., ``33%, 33%, 34%``):
 .. _config_http_conn_man_route_table_traffic_splitting_split_percentages:
 
 (a) Weight-based cluster selection
-----------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The first option is to use a **single** :ref:`route <config_http_conn_man_route_table_route>` with 
+The first option is to use a **single** :ref:`route <config_http_conn_man_route_table_route>` with
 :ref:`weighted_clusters <config_http_conn_man_route_table_route_weighted_clusters>`,
 where multiple upstream cluster targets are specified for a single route,
 along with weights that indicate the **percentage** of traffic to be sent
@@ -138,7 +141,7 @@ following runtime variables: ``routing.traffic_split.helloworld.helloworld_v1``,
 .. _config_http_conn_man_route_table_traffic_splitting_split_probabilities:
 
 (b) Probabilistic route selection
----------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The second option is to use **multiple** :ref:`routes <config_http_conn_man_route_table_route>`
 as shown in the traffic shifting example, with :ref:`runtimes <config_http_conn_man_route_table_route_runtime>`

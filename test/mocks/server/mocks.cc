@@ -36,6 +36,7 @@ MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_) {
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
+  ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
 }
 
 MockInstance::~MockInstance() {}
