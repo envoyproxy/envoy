@@ -2,7 +2,7 @@
 
 #include "common/common/base64.h"
 
-TEST(Base64, EmptyBufferEncode) {
+TEST(Base64Test, EmptyBufferEncode) {
   {
     Buffer::OwnedImpl buffer;
     EXPECT_EQ("", Base64::encode(buffer, 0));
@@ -15,14 +15,40 @@ TEST(Base64, EmptyBufferEncode) {
   }
 }
 
-TEST(Base64, SingleSliceBufferEncode) {
+TEST(Base64Test, SingleSliceBufferEncode) {
   Buffer::OwnedImpl buffer;
   buffer.add("foo", 3);
   EXPECT_EQ("Zm9v", Base64::encode(buffer, 3));
   EXPECT_EQ("Zm8=", Base64::encode(buffer, 2));
 }
 
-TEST(Base64, MultiSlicesBufferEncode) {
+TEST(Base64Test, Decode) {
+  EXPECT_EQ("foo", Base64::decode("Zm9v"));
+  EXPECT_EQ("fo", Base64::decode("Zm8="));
+  EXPECT_EQ("foobar", Base64::decode("Zm9vYmFy"));
+  EXPECT_EQ("foob", Base64::decode("Zm9vYg=="));
+
+  {
+    const char* test_string = "\0\1\2\3\b\n\t";
+    EXPECT_FALSE(memcmp(test_string, Base64::decode("AAECAwgKCQ==").data(), 7));
+  }
+
+  {
+    const char* test_string = "\0\0\0\0als;jkopqitu[\0opbjlcxnb35g]b[\xaa\b\n";
+    Buffer::OwnedImpl buffer;
+    buffer.add(test_string, 36);
+    EXPECT_FALSE(memcmp(test_string, Base64::decode(Base64::encode(buffer, 36)).data(), 36));
+  }
+
+  {
+    std::string test_string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string decoded = Base64::decode(test_string);
+    Buffer::OwnedImpl buffer(decoded);
+    EXPECT_EQ(test_string, Base64::encode(buffer, decoded.length()));
+  }
+}
+
+TEST(Base64Test, MultiSlicesBufferEncode) {
   Buffer::OwnedImpl buffer;
   buffer.add("foob", 4);
   buffer.add("ar", 2);
@@ -32,7 +58,7 @@ TEST(Base64, MultiSlicesBufferEncode) {
   EXPECT_EQ("Zm9vYmFy", Base64::encode(buffer, 7));
 }
 
-TEST(Base64, BinaryBufferEncode) {
+TEST(Base64Test, BinaryBufferEncode) {
   Buffer::OwnedImpl buffer;
   buffer.add("\0\1\2\3", 4);
   buffer.add("\b\n\t", 4);
