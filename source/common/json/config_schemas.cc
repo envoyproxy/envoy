@@ -482,11 +482,11 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
         "minItems" : 1,
         "items" : {
           "type" : "object",
-            "properties" : {
-              "name" : {"type" : "string"},
-              "value" : {"type" : "string"},
-              "regex" : {"type" : "boolean"}
-            },
+          "properties" : {
+            "name" : {"type" : "string"},
+            "value" : {"type" : "string"},
+            "regex" : {"type" : "boolean"}
+          },
           "required" : ["name"],
           "additionalProperties" : false
         }
@@ -510,23 +510,23 @@ const std::string Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA(R"EOF(
   )EOF");
 
 const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
-{
-  "$schema": "http://json-schema.org/schema#",
-  "properties" : {
-    "domain" : {"type" : "string"},
-    "stage" : {"type" : "integer"}
-  },
-  "required" : ["domain"],
-  "additionalProperties" : false
-}
-)EOF");
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "domain" : {"type" : "string"},
+      "stage" : {"type" : "integer"}
+    },
+    "required" : ["domain"],
+    "additionalProperties" : false
+  }
+  )EOF");
 
 const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
-{
-  "$schema": "http://json-schema.org/schema#",
-  "properties" : {
-    "dynamic_stats" : {"type" : "boolean"}
-  },
-  "additionalProperties" : false
-}
-)EOF");
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "dynamic_stats" : {"type" : "boolean"}
+    },
+    "additionalProperties" : false
+  }
+  )EOF");
