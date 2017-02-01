@@ -37,7 +37,9 @@ class ConnectionImpl : public virtual Connection,
                        public BufferSource,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& remote_address);
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& remote_address,
+                 const std::string& local_address);
+
   ~ConnectionImpl();
 
   // Network::FilterManager
@@ -56,6 +58,7 @@ public:
   void readDisable(bool disable) override;
   bool readEnabled() override;
   const std::string& remoteAddress() override { return remote_address_; }
+  const std::string& localAddress() override { return local_address_; }
   void setBufferStats(const BufferStats& stats) override;
   Ssl::Connection* ssl() override { return nullptr; }
   State state() override;
@@ -79,6 +82,7 @@ protected:
 
   FilterManagerImpl filter_manager_;
   const std::string remote_address_;
+  const std::string local_address_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
 

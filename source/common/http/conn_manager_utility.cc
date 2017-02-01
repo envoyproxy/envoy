@@ -1,5 +1,6 @@
 #include "conn_manager_utility.h"
 
+#include "common/common/empty_string.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -38,10 +39,11 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
   if (config.useRemoteAddress()) {
-    if (Network::Utility::isLoopbackAddress(connection.remoteAddress().c_str())) {
+    const std::string remote_address = Network::Utility::hostFromUrl(connection.remoteAddress());
+    if (Network::Utility::isLoopbackAddress(remote_address.c_str())) {
       Utility::appendXff(request_headers, config.localAddress());
     } else {
-      Utility::appendXff(request_headers, connection.remoteAddress());
+      Utility::appendXff(request_headers, remote_address);
     }
     request_headers.insertForwardedProto().value(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
@@ -94,7 +96,8 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   // If we are an external request, AND we are "using remote address" (see above), we set
   // x-envoy-external-address since this is our first ingress point into the trusted network.
   if (edge_request) {
-    request_headers.insertEnvoyExternalAddress().value(connection.remoteAddress());
+    request_headers.insertEnvoyExternalAddress().value(
+        Network::Utility::hostFromUrl(connection.remoteAddress()));
   }
 
   // Generate x-request-id for all edge requests, or if there is none.

@@ -198,13 +198,50 @@ const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
 
 const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
-    "$schema": "http://json-schema.org/schema#",
-    "properties":{
-      "stat_prefix" : {"type" : "string"},
-      "cluster" : {"type" : "string"}
-    },
-    "required": ["stat_prefix", "cluster"],
-    "additionalProperties": false
+      "$schema": "http://json-schema.org/schema#",
+      "properties": {
+        "stat_prefix": {"type" : "string"},
+        "route_config": {
+          "type": "object",
+          "properties": {
+            "routes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "cluster": {
+                    "type": "string"
+                  },
+                  "source_ip_list" : {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "source_ports": {
+                    "type": "string"
+                  },
+                  "destination_ip_list" : {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "destination_ports": {
+                    "type": "string"
+                  }
+                },
+                "required": ["cluster"],
+                "additionalProperties": false
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["stat_prefix", "route_config"],
+      "additionalProperties": false
   }
   )EOF");
 

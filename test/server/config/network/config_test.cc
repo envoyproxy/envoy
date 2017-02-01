@@ -69,7 +69,27 @@ TEST(NetworkFilterConfigTest, TcpProxy) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
-    "cluster" : "fake_cluster"
+    "route_config": {
+      "routes": [
+        {
+          "destination_ip_list": [
+            "192.168.1.1/32",
+            "192.168.1.0/24"
+          ],
+          "source_ip_list": [
+            "192.168.0.0/16",
+            "192.0.0.0/8",
+            "127.0.0.0/8"
+          ],
+          "destination_ports": "1-1024,2048-4096,12345",
+          "cluster": "fake_cluster"
+        },
+        {
+          "source_ports": "23457,23459",
+          "cluster": "fake_cluster2"
+        }
+      ]
+    }
   }
   )EOF";
 

@@ -8,6 +8,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
+#include "common/network/utility.h"
 
 namespace Filter {
 namespace Auth {
@@ -18,7 +19,7 @@ Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream:
                Runtime::RandomGenerator& random)
     : RestApiFetcher(cm, config.getString("auth_api_cluster"), dispatcher, random,
                      std::chrono::milliseconds(config.getInteger("refresh_interval_ms", 60000))),
-      tls_(tls), tls_slot_(tls.allocateSlot()), ip_white_list_(config),
+      tls_(tls), tls_slot_(tls.allocateSlot()), ip_white_list_(config, "ip_white_list"),
       stats_(generateStats(stats_store, config.getString("stat_prefix"))) {
 
   config.validateSchema(Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA);
@@ -97,7 +98,8 @@ void Instance::onEvent(uint32_t events) {
   }
 
   ASSERT(read_callbacks_->connection().ssl());
-  if (config_->ipWhiteList().contains(read_callbacks_->connection().remoteAddress())) {
+  if (config_->ipWhiteList().contains(
+          Network::Utility::hostFromUrl(read_callbacks_->connection().remoteAddress()))) {
     config_->stats().auth_ip_white_list_.inc();
     read_callbacks_->continueReading();
     return;
