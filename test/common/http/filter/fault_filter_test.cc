@@ -112,7 +112,6 @@ public:
 TEST(FaultFilterBadConfigTest, EmptyConfig) {
   const std::string json = R"EOF(
   {
-
   }
   )EOF";
 
