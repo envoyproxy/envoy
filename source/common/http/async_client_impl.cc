@@ -105,8 +105,14 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
-  router_.decodeData(data, end_stream);
-  decoding_buffer_ = &data;
+  FilterDataStatus status = router_.decodeData(data, end_stream);
+
+  if (status == FilterDataStatus::StopIterationAndBuffer) {
+    decoding_buffer_ = &data;
+  } else {
+    decoding_buffer_ = nullptr;
+  }
+
   closeLocal(end_stream);
 }
 
