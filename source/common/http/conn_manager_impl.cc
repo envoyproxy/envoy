@@ -285,7 +285,7 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
   for (const auto& log_handler : access_log_handlers_) {
-    log_handler->logRequestInfo(request_info_);
+    log_handler->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
   if (active_span_ && !request_info_.healthCheck()) {
@@ -310,7 +310,8 @@ void ConnectionManagerImpl::ActiveStream::addStreamFilter(StreamFilterPtr filter
   addStreamEncoderFilter(filter);
 }
 
-void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(AccessLogHandlerPtr handler) {
+void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
+    Http::AccessLog::InstancePtr handler) {
   access_log_handlers_.push_back(handler);
 }
 
