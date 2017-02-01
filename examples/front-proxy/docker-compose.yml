@@ -1,21 +1,6 @@
 version: '2'
 services:
 
-  front-envoy:
-    build:
-      context: ../
-      dockerfile: front-proxy/Dockerfile-frontenvoy
-    volumes:
-      - ./front-envoy.json:/etc/front-envoy.json
-    networks:
-      - envoymesh
-    expose:
-      - "80"
-      - "8001"
-    ports:
-      - "8000:80"
-      - "8001:8001"
-
   service1:
     build:
       context: .
@@ -30,6 +15,7 @@ services:
       - SERVICE_NAME=1
     expose:
       - "80"
+      - "443"
 
   service2:
     build:
@@ -45,6 +31,7 @@ services:
       - SERVICE_NAME=2
     expose:
       - "80"
+      - "443"
 
 networks:
   envoymesh: {}

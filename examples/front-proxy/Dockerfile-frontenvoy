@@ -1,3 +1,0 @@
-FROM lyft/envoy:latest
-
-CMD /usr/local/bin/envoy -c /etc/front-envoy.json
