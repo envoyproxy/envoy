@@ -294,7 +294,7 @@ public:
   virtual void addStreamFilter(Http::StreamFilterPtr filter) PURE;
 
   /**
-   * Add an access log handler that is called after response is send.
+   * Add an access log handler that is called when the stream is destroyed.
    * @param handler supplies the handler to add.
    */
   virtual void addAccessLogHandler(Http::AccessLog::InstancePtr handler) PURE;
