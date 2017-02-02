@@ -37,6 +37,7 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
     new_request->moveIntoList(std::move(new_request), active_streams_);
     return async_request;
   } else {
+    new_request->cleanup();
     return nullptr;
   }
 }
@@ -44,14 +45,8 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
                                             const Optional<std::chrono::milliseconds>& timeout) {
   std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, timeout)};
-
-  // The request may get immediately failed. If so, we will return nullptr.
-  if (!new_stream->remote_closed_) {
-    new_stream->moveIntoList(std::move(new_stream), active_streams_);
-    return active_streams_.front().get();
-  } else {
-    return nullptr;
-  }
+  new_stream->moveIntoList(std::move(new_stream), active_streams_);
+  return active_streams_.front().get();
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
@@ -156,7 +151,7 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
     : AsyncStreamImpl(parent, *this, timeout), request_(std::move(request)), callbacks_(callbacks) {
 
   sendHeaders(request_->headers(), !request_->body());
-  if (!complete() && request_->body()) {
+  if (!remoteClosed() && request_->body()) {
     sendData(*request_->body(), true);
   }
   // TODO: Support request trailers.

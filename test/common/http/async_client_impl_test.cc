@@ -610,6 +610,22 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
   EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
 }
 
+TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder&,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+        return nullptr;
+      }));
+
+  expectSuccess(503);
+  message_->body(Buffer::InstancePtr{new Buffer::OwnedImpl("hello")});
+  EXPECT_EQ(nullptr,
+            client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>()));
+
+  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
+}
+
 TEST_F(AsyncClientImplTest, StreamTimeout) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&, ConnectionPool::Callbacks& callbacks)

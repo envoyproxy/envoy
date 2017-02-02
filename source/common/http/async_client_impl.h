@@ -66,7 +66,8 @@ public:
   void reset() override;
 
 protected:
-  bool complete() { return local_closed_ && remote_closed_; }
+  bool remoteClosed() { return remote_closed_; }
+
   AsyncClientImpl& parent_;
 
 private:
@@ -148,9 +149,9 @@ private:
   };
 
   void cleanup();
-
   void closeLocal(bool end_stream);
   void closeRemote(bool end_stream);
+  bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
   void addResetStreamCallback(std::function<void()> callback) override {
