@@ -23,6 +23,7 @@ TEST(Base64Test, SingleSliceBufferEncode) {
 }
 
 TEST(Base64Test, Decode) {
+  EXPECT_EQ("", Base64::decode(""));
   EXPECT_EQ("foo", Base64::decode("Zm9v"));
   EXPECT_EQ("fo", Base64::decode("Zm8="));
   EXPECT_EQ("foobar", Base64::decode("Zm9vYmFy"));
