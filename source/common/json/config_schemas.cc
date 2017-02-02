@@ -78,7 +78,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
     "definitions" : {
       "status_code" : {
         "type" : "object",
-        "properties": {
+        "properties" : {
           "type" : {
             "type" : "string",
             "enum" : ["status_code"]
@@ -95,7 +95,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       },
       "duration" : {
         "type" : "object",
-        "properties": {
+        "properties" : {
           "type" : {
             "type" : "string",
             "enum" : ["duration"]
@@ -112,7 +112,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       },
       "not_healthcheck" : {
         "type" : "object",
-        "properties": {
+        "properties" : {
           "type" : {
             "type" : "string",
             "enum" : ["not_healthcheck"]
@@ -121,9 +121,9 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "required" : ["type"],
         "additionalProperties" : false
       },
-      "logical_and" :{
+      "logical_and" : {
         "type" : "object",
-        "properties": {
+        "properties" : {
           "type" : {
             "type" : "string",
             "enum" : ["logical_and"]
@@ -132,7 +132,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "type" : "array",
             "minItems" : 2,
             "items" : {
-              "anyOf" :[
+              "anyOf" : [
                 {"$ref" : "#/defintions/status_code"},
                 {"$ref" : "#/definitions/duration"},
                 {"$ref" : "#/definitions/not_healthcheck"}
@@ -143,9 +143,9 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "required" : ["type", "filters"],
         "additionalProperties" : false
       },
-      "logical_or" :{
+      "logical_or" : {
         "type" : "object",
-        "properties": {
+        "properties" : {
           "type" : {
             "type" : "string",
             "enum" : ["logical_or"]
