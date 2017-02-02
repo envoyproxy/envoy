@@ -112,6 +112,9 @@ MockAsyncClient::~MockAsyncClient() {}
 MockAsyncClientCallbacks::MockAsyncClientCallbacks() {}
 MockAsyncClientCallbacks::~MockAsyncClientCallbacks() {}
 
+MockAsyncClientStreamCallbacks::MockAsyncClientStreamCallbacks() {}
+MockAsyncClientStreamCallbacks::~MockAsyncClientStreamCallbacks() {}
+
 MockAsyncClientRequest::MockAsyncClientRequest(MockAsyncClient* client) : client_(client) {}
 MockAsyncClientRequest::~MockAsyncClientRequest() { client_->onRequestDestroy(); }
 

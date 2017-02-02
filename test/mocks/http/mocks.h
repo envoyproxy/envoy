@@ -298,6 +298,9 @@ public:
 
   MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks,
                                const Optional<std::chrono::milliseconds>& timeout));
+
+  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks,
+                              const Optional<std::chrono::milliseconds>& timeout));
 };
 
 class MockAsyncClientCallbacks : public AsyncClient::Callbacks {
@@ -310,6 +313,22 @@ public:
   // Http::AsyncClient::Callbacks
   MOCK_METHOD1(onSuccess_, void(Message* response));
   MOCK_METHOD1(onFailure, void(Http::AsyncClient::FailureReason reason));
+};
+
+class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {
+public:
+  MockAsyncClientStreamCallbacks();
+  ~MockAsyncClientStreamCallbacks();
+
+  void onHeaders(HeaderMapPtr&& headers, bool end_stream) override {
+    onHeaders_(*headers, end_stream);
+  }
+  void onTrailers(HeaderMapPtr&& trailers) override { onTrailers_(*trailers); }
+
+  MOCK_METHOD2(onHeaders_, void(HeaderMap& headers, bool end_stream));
+  MOCK_METHOD2(onData, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD1(onTrailers_, void(HeaderMap& headers));
+  MOCK_METHOD0(onReset, void());
 };
 
 class MockAsyncClientRequest : public AsyncClient::Request {
