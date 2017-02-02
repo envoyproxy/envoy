@@ -1,27 +1,14 @@
 version: '2'
 services:
 
-  front-envoy:
-    build:
-      context: ../
-      dockerfile: front-proxy/Dockerfile-frontenvoy
-    volumes:
-      - ./front-envoy.json:/etc/front-envoy.json
-    networks:
-      - envoymesh
-    expose:
-      - "80"
-      - "8001"
-    ports:
-      - "8000:80"
-      - "8001:8001"
-
   service1:
     build:
       context: .
       dockerfile: Dockerfile-service
     volumes:
       - ./service-envoy.json:/etc/service-envoy.json
+      - ./key.pem:/etc/key.pem
+      - ./cert.pem:/etc/cert.pem
     networks:
       envoymesh:
         aliases:
@@ -30,6 +17,7 @@ services:
       - SERVICE_NAME=1
     expose:
       - "80"
+      - "9400"
 
   service2:
     build:
@@ -37,6 +25,8 @@ services:
       dockerfile: Dockerfile-service
     volumes:
       - ./service-envoy.json:/etc/service-envoy.json
+      - ./key.pem:/etc/key.pem
+      - ./cert.pem:/etc/cert.pem
     networks:
       envoymesh:
         aliases:
@@ -45,6 +35,7 @@ services:
       - SERVICE_NAME=2
     expose:
       - "80"
+      - "9400"
 
 networks:
   envoymesh: {}
