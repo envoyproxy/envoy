@@ -36,6 +36,7 @@ add_executable(envoy-test
   common/event/file_event_impl_test.cc
   common/filesystem/filesystem_impl_test.cc
   common/filesystem/watcher_impl_test.cc
+  common/grpc/codec_test.cc
   common/grpc/common_test.cc
   common/grpc/http1_bridge_filter_test.cc
   common/grpc/rpc_channel_impl_test.cc
