@@ -19,10 +19,18 @@
         {
           "path": "/dev/null",
           "filter" : {
-            "type" : "logical_or",
+            "type": "logical_or",
             "filters": [
-              {"type": "status_code", "op": ">=", "value": 500},
-              {"type": "duration", "op": ">=", "value": 1000000}
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
             ]
           }
         },
