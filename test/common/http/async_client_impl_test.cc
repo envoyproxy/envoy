@@ -168,6 +168,39 @@ TEST_F(AsyncClientImplTest, Retry) {
   response_decoder_->decodeHeaders(std::move(response_headers2), true);
 }
 
+TEST_F(AsyncClientImplTest, NoRetryWithStream) {
+  ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
+      .WillByDefault(Return(true));
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks)
+                           -> ConnectionPool::Cancellable* {
+                             callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_);
+                             response_decoder_ = &decoder;
+                             return nullptr;
+                           }));
+
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
+
+  headers.insertEnvoyRetryOn().value(Headers::get().EnvoyRetryOnValues._5xx);
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, Optional<std::chrono::milliseconds>());
+  stream->sendHeaders(headers, false);
+  stream->sendData(*body, true);
+
+  // Expect retry and retry timer create.
+  timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "503"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), true);
+
+  EXPECT_THROW(timer_->callback_(), EnvoyException);
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
 TEST_F(AsyncClientImplTest, MultipleStreams) {
   // Start stream 1
   Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
