@@ -1,3 +1,4 @@
+#include <common/json/config_schemas.h>
 #include "access_log_impl.h"
 #include "access_log_formatter.h"
 
@@ -52,6 +53,9 @@ bool FilterImpl::compareAgainstValue(uint64_t lhs) {
 }
 
 FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {
+
+  // json.validateSchema(Json::Schema::ACCESS_LOG_CONFIGURATION_SCHEMA);
+
   std::string type = json.getString("type");
   if (type == "status_code") {
     return FilterPtr{new StatusCodeFilter(json, runtime)};
@@ -172,6 +176,7 @@ InstancePtr InstanceImpl::fromJson(Json::Object& json, Runtime::Loader& runtime,
   FilterPtr filter;
   if (json.hasObject("filter")) {
     Json::ObjectPtr filterObject = json.getObject("filter");
+    filterObject->validateSchema(Json::Schema::ACCESS_LOG_CONFIGURATION_SCHEMA);
     filter = FilterImpl::fromJson(*filterObject, runtime);
   }
 

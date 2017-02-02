@@ -567,3 +567,110 @@ const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
     "additionalProperties" : false
   }
   )EOF");
+
+const std::string Json::Schema::ACCESS_LOG_CONFIGURATION_SCHEMA(R"EOF(
+{
+  "$schema" : "http://json-schema.org/schema#",
+  "definitions" :{
+    "status_code" : {
+      "type" : "object",
+      "properties": {
+        "type" : {
+          "type" : "string",
+          "enum" : ["status_code"]
+        },
+        "op" : {
+          "type" : "string",
+          "enum" : ["=>", "="]
+        },
+        "value" : {"type" : "integer"},
+        "runtime_key" : {"type" : "string"}
+      },
+      "required" : ["type", "op", "value"],
+      "additionalProperties" : false
+    },
+    "duration" : {
+      "type" : "object",
+      "properties": {
+        "type" : {
+          "type" : "string",
+          "enum" : ["duration"]
+        },
+        "op" : {
+          "type" : "string",
+          "enum" : ["=>", "="]
+        },
+        "value" : {"type" : "integer"},
+        "runtime_key" : {"type" : "string"}
+      },
+      "required" : ["type", "op", "value"],
+      "additionalProperties" : false
+    },
+    "not_healthcheck" : {
+      "type" : "object",
+      "properties": {
+        "type" : {
+          "type" : "string",
+          "enum" : ["not_healthcheck"]
+        }
+      },
+      "required" : ["type"],
+      "additionalProperties" : false
+    },
+    "logical_and" :{
+      "type" : "object",
+      "properties": {
+        "type" : {
+          "type" : "string",
+          "enum" : ["logical_and"]
+        },
+        "filters" : {
+          "type" : "array",
+          "minItems" : 2,
+          "items" : {
+            "anyOf" :[
+              {"$ref" : "#/defintions/status_code"},
+              {"$ref" : "#/definitions/duration"},
+              {"$ref" : "#/definitions/not_healthcheck"}
+            ]
+          }
+        }
+      },
+      "required" : ["type", "filters"],
+      "additionalProperties" : false
+    },
+    "logical_or" :{
+      "type" : "object",
+      "properties": {
+        "type" : {
+          "type" : "string",
+          "enum" : ["logical_or"]
+        },
+        "filters" : {
+          "type" : "array",
+          "minItems" : 2,
+          "items" : {
+            "anyOf" : [
+              {"$ref" : "#/defintions/status_code"},
+              {"$ref" : "#/definitions/duration"},
+              {"$ref" : "#/definitions/not_healthcheck"}
+            ]
+          }
+        }
+      },
+      "required" : ["type", "filters"],
+      "additionalProperties" : false
+    }
+  },
+  "properties" : {
+    "oneOf" : [
+      {"$ref" : "#/definitions/status_code"},
+      {"$ref" : "#/definitions/duration"},
+      {"$ref" : "#/definitions/not_healthcheck"},
+      {"$ref" : "#/defintions/logical_and"},
+      {"$ref" : "#/defintions/logical_or"}
+    ]
+  },
+  "additionalProperties" : false
+}
+)EOF");

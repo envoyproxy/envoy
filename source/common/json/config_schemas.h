@@ -20,6 +20,7 @@ public:
   static const std::string VIRTUAL_HOST_CONFIGURATION_SCHEMA;
   static const std::string ROUTE_ENTRY_CONFIGURATION_SCHEMA;
   static const std::string HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA;
+  static const std::string ACCESS_LOG_CONFIGURATION_SCHEMA;
 
   // HTTP Filter Schemas
   static const std::string BUFFER_HTTP_FILTER_SCHEMA;

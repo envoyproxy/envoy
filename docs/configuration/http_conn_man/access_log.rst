@@ -36,7 +36,7 @@ format
 .. _config_http_conn_man_access_log_filter_param:
 
 filter
-  *(optional, string)* :ref:`Filter <config_http_con_manager_access_log_filters>` which is used to
+  *(optional, object)* :ref:`Filter <config_http_con_manager_access_log_filters>` which is used to
   determine if the access log needs to be written.
 
 .. _config_http_con_manager_access_log_format:
@@ -175,7 +175,7 @@ Duration
 Filters on total request duration in milliseconds.
 
 op
-  *(required, string)* Comparison operator. Currently *>=* is the only supported operator.
+  *(required, string)* Comparison operator. Currently *>=* and *=* are the only supported operator.
 
 value
   *(required, integer)* Default value to compare against if runtime values is not available.
