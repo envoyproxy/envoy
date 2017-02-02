@@ -44,6 +44,23 @@ TEST(CodecTest, encodeHeader) {
   EXPECT_EQ(buffer[4], 0);
 }
 
+TEST(CodecTest, decodeInvalidFrame) {
+  helloworld::HelloRequest request;
+  request.set_name("hello");
+
+  Buffer::OwnedImpl buffer;
+  uint8_t header[5];
+  Encoder encoder;
+  encoder.NewFrame(0b10u, request.ByteSizeLong(), header);
+  buffer.add(header, 5);
+  buffer.add(request.SerializeAsString());
+
+  std::vector<Frame> frames;
+
+  Decoder decoder;
+  EXPECT_EQ(false, decoder.Decode(buffer, &frames));
+}
+
 TEST(CodecTest, decodeSingleFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
