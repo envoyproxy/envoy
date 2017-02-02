@@ -20,6 +20,7 @@ include_directories(${PROJECT_BINARY_DIR})
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 include_directories(${ENVOY_NGHTTP2_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
+include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 
 add_executable(envoy-test
   $<TARGET_OBJECTS:envoy-server>
@@ -27,13 +28,14 @@ add_executable(envoy-test
   ${ENVOY_TEST_EXTRA_OBJECTS}
   common/access_log/access_log_manager_impl_test.cc
   common/api/api_impl_test.cc
+  common/common/base64_test.cc
   common/common/hex_test.cc
   common/common/optional_test.cc
   common/common/utility_test.cc
+  common/event/dispatcher_impl_test.cc
   common/event/file_event_impl_test.cc
   common/filesystem/filesystem_impl_test.cc
   common/filesystem/watcher_impl_test.cc
-  common/grpc/codec_test.cc
   common/grpc/common_test.cc
   common/grpc/http1_bridge_filter_test.cc
   common/grpc/rpc_channel_impl_test.cc
@@ -45,7 +47,9 @@ add_executable(envoy-test
   common/http/common.cc
   common/http/conn_manager_impl_test.cc
   common/http/conn_manager_utility_test.cc
+  common/http/date_provider_impl_test.cc
   common/http/filter/buffer_filter_test.cc
+  common/http/filter/fault_filter_test.cc
   common/http/filter/ratelimit_test.cc
   common/http/header_map_impl_test.cc
   common/http/http1/codec_impl_test.cc
@@ -68,20 +72,28 @@ add_executable(envoy-test
   common/network/connection_impl_test.cc
   common/network/dns_impl_test.cc
   common/network/filter_manager_impl_test.cc
+  common/network/listener_impl_test.cc
   common/network/listen_socket_impl_test.cc
   common/network/proxy_protocol_test.cc
   common/network/utility_test.cc
   common/ratelimit/ratelimit_impl_test.cc
+  common/redis/codec_impl_test.cc
+  common/redis/conn_pool_impl_test.cc
+  common/redis/proxy_filter_test.cc
   common/router/config_impl_test.cc
   common/router/retry_state_impl_test.cc
   common/router/router_test.cc
+  common/router/router_ratelimit_test.cc
   common/router/shadow_writer_impl_test.cc
   common/runtime/runtime_impl_test.cc
   common/runtime/uuid_util_test.cc
   common/ssl/connection_impl_test.cc
   common/ssl/context_impl_test.cc
+  common/stats/stats_impl_test.cc
   common/stats/statsd_test.cc
+  common/stats/thread_local_store_test.cc
   common/tracing/http_tracer_impl_test.cc
+  common/upstream/cds_api_impl_test.cc
   common/upstream/cluster_manager_impl_test.cc
   common/upstream/health_checker_impl_test.cc
   common/upstream/host_utility_test.cc
@@ -113,8 +125,10 @@ add_executable(envoy-test
   mocks/filesystem/mocks.cc
   mocks/grpc/mocks.cc
   mocks/http/mocks.cc
+  mocks/local_info/mocks.cc
   mocks/network/mocks.cc
   mocks/ratelimit/mocks.cc
+  mocks/redis/mocks.cc
   mocks/router/mocks.cc
   mocks/runtime/mocks.cc
   mocks/server/mocks.cc
@@ -123,6 +137,8 @@ add_executable(envoy-test
   mocks/thread_local/mocks.cc
   mocks/tracing/mocks.cc
   mocks/upstream/mocks.cc
+  server/config/http/config_test.cc
+  server/config/network/config_test.cc
   server/config/network/http_connection_manager_test.cc
   server/configuration_impl_test.cc
   server/connection_handler_test.cc
@@ -138,10 +154,8 @@ if (ENVOY_TCMALLOC)
 endif()
 
 target_link_libraries(envoy-test event)
-target_link_libraries(envoy-test event_openssl)
 target_link_libraries(envoy-test event_pthreads)
 target_link_libraries(envoy-test http_parser)
-target_link_libraries(envoy-test jansson)
 target_link_libraries(envoy-test ssl)
 target_link_libraries(envoy-test crypto)
 target_link_libraries(envoy-test nghttp2)
