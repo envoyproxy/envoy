@@ -26,7 +26,7 @@ bool Decoder::Decode(Buffer::Instance& input, std::vector<Frame>* output) {
       uint8_t c = *mem;
       switch (state_) {
         case State::FH_FLAG:
-          if (c & !GRPC_FH_COMPRESSED) {
+          if (c & ~GRPC_FH_COMPRESSED) {
             // Unsupported flags.
             return false;
           }
