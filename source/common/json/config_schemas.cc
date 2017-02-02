@@ -76,14 +76,93 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
     "definitions" : {
-      "access_log": {
+      "status_code" : {
         "type" : "object",
-        "properties" : {
-          "path" : {"type" : "string"},
-          "format" : {"type" : "string"},
-          "filter" : {"type" : "object"}
+        "properties": {
+          "type" : {
+            "type" : "string",
+            "enum" : ["status_code"]
+          },
+          "op" : {
+            "type" : "string",
+            "enum" : ["=>", "="]
+          },
+          "value" : {"type" : "integer"},
+          "runtime_key" : {"type" : "string"}
         },
-        "required" : ["path"],
+        "required" : ["type", "op", "value"],
+        "additionalProperties" : false
+      },
+      "duration" : {
+        "type" : "object",
+        "properties": {
+          "type" : {
+            "type" : "string",
+            "enum" : ["duration"]
+          },
+          "op" : {
+            "type" : "string",
+            "enum" : ["=>", "="]
+          },
+          "value" : {"type" : "integer"},
+          "runtime_key" : {"type" : "string"}
+        },
+        "required" : ["type", "op", "value"],
+        "additionalProperties" : false
+      },
+      "not_healthcheck" : {
+        "type" : "object",
+        "properties": {
+          "type" : {
+            "type" : "string",
+            "enum" : ["not_healthcheck"]
+          }
+        },
+        "required" : ["type"],
+        "additionalProperties" : false
+      },
+      "logical_and" :{
+        "type" : "object",
+        "properties": {
+          "type" : {
+            "type" : "string",
+            "enum" : ["logical_and"]
+          },
+          "filters" : {
+            "type" : "array",
+            "minItems" : 2,
+            "items" : {
+              "anyOf" :[
+                {"$ref" : "#/defintions/status_code"},
+                {"$ref" : "#/definitions/duration"},
+                {"$ref" : "#/definitions/not_healthcheck"}
+              ]
+            }
+          }
+        },
+        "required" : ["type", "filters"],
+        "additionalProperties" : false
+      },
+      "logical_or" :{
+        "type" : "object",
+        "properties": {
+          "type" : {
+            "type" : "string",
+            "enum" : ["logical_or"]
+          },
+          "filters" : {
+            "type" : "array",
+            "minItems" : 2,
+            "items" : {
+              "anyOf" : [
+                {"$ref" : "#/defintions/status_code"},
+                {"$ref" : "#/definitions/duration"},
+                {"$ref" : "#/definitions/not_healthcheck"}
+              ]
+            }
+          }
+        },
+        "required" : ["type", "filters"],
         "additionalProperties" : false
       },
       "tracing" : {
@@ -133,7 +212,24 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "type" : "array",
         "items" : {
           "type" : "object",
-          "properties" : {"$ref" : "#/definitions/access_log"}
+          "properties" : {
+            "path" : {"type" : "string"},
+            "format" : {"type" : "string"},
+            "filter" : {
+              "type" : "object",
+              "properties" : {
+                "oneOf" : [
+                  {"$ref" : "#/definitions/status_code"},
+                  {"$ref" : "#/definitions/duration"},
+                  {"$ref" : "#/definitions/not_healthcheck"},
+                  {"$ref" : "#/defintions/logical_and"},
+                  {"$ref" : "#/defintions/logical_or"}
+                ]
+              }
+            }
+          },
+          "required" : ["path"],
+          "additionalProperties" : false
         }
       },
       "use_remote_address" : {"type" : "boolean"},
