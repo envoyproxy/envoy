@@ -45,7 +45,7 @@ std::string Base64::decode(const std::string& input) {
   // Read input string by group of 4 chars, length of input string must be divided evenly by 4.
   // Decode 4 chars 6 bits each into 3 chars 8 bits each.
   while (bytes_left > 0) {
-    // Take first 6 bits from first converted char and first 2 bits from second converted char,
+    // Take first 6 bits from 1st converted char and first 2 bits from 2nd converted char,
     // make 8 bits char from it.
     // Use conversion table to map char to decoded value (value is between 0 and 64).
     result.push_back(REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read])] << 2 |
@@ -55,13 +55,13 @@ std::string Base64::decode(const std::string& input) {
     // Chars not less than 64 will be skipped, '=' for example.
     // Everything less than 64 is going to be decoded.
     if (c < 64) {
-      // Take last 4 bits from second converted char and 4 first bits from third converted char.
+      // Take last 4 bits from 2nd converted char and 4 first bits from 3rd converted char.
       result.push_back(REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 1])] << 4 |
                        c >> 2);
       unsigned char d = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 3])];
 
       if (d < 64) {
-        // Take last 2 bits from 3rd converted char and all (6) bits from fourth converted char.
+        // Take last 2 bits from 3rd converted char and all(6) bits from 4th converted char.
         result.push_back(REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 2])] << 6 | d);
       }
     }

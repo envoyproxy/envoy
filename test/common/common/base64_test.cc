@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include "common/buffer/buffer_impl.h"
 
 #include "common/common/base64.h"
@@ -48,6 +49,8 @@ TEST(Base64Test, Decode) {
     Buffer::OwnedImpl buffer(decoded);
     EXPECT_EQ(test_string, Base64::encode(buffer, decoded.length()));
   }
+
+  EXPECT_THROW(Base64::decode("123"), std::invalid_argument);
 }
 
 TEST(Base64Test, MultiSlicesBufferEncode) {
