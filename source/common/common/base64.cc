@@ -1,4 +1,5 @@
 #include "base64.h"
+#include "empty_string.h"
 
 static constexpr char CHAR_TABLE[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -19,18 +20,16 @@ static const unsigned char REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64};
 
 std::string Base64::decode(const std::string& input) {
-  if (input.length() % 4) {
-    throw std::invalid_argument("Base64 encoded string should have length divided evenly by 4.");
+  if (input.length() % 4 || input.empty()) {
+    return EMPTY_STRING;
   }
 
   int max_length = input.length() / 4 * 3;
   // At most last two chars can be '='.
-  if (input.length() > 0) {
-    if (input[input.length() - 1] == '=') {
+  if (input[input.length() - 1] == '=') {
+    max_length--;
+    if (input[input.length() - 2] == '=') {
       max_length--;
-      if (input[input.length() - 2] == '=') {
-        max_length--;
-      }
     }
   }
   std::string result;

@@ -28,6 +28,7 @@ TEST(Base64Test, Decode) {
   EXPECT_EQ("fo", Base64::decode("Zm8="));
   EXPECT_EQ("foobar", Base64::decode("Zm9vYmFy"));
   EXPECT_EQ("foob", Base64::decode("Zm9vYg=="));
+  EXPECT_EQ("", Base64::decode("123"));
 
   {
     const char* test_string = "\0\1\2\3\b\n\t";
@@ -47,8 +48,6 @@ TEST(Base64Test, Decode) {
     Buffer::OwnedImpl buffer(decoded);
     EXPECT_EQ(test_string, Base64::encode(buffer, decoded.length()));
   }
-
-  EXPECT_THROW(Base64::decode("123"), std::invalid_argument);
 }
 
 TEST(Base64Test, MultiSlicesBufferEncode) {
