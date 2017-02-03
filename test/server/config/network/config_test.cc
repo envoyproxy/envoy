@@ -314,5 +314,6 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
                                               *json_config, server),
                Json::Exception);
 }
+
 } // Configuration
 } // Server
