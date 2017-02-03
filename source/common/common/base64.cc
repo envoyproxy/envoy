@@ -1,4 +1,3 @@
-#include <stdexcept>
 #include "base64.h"
 
 #include "common/common/assert.h"
