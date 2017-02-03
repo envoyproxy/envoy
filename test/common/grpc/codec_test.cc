@@ -51,7 +51,7 @@ TEST(CodecTest, decodeInvalidFrame) {
   Buffer::OwnedImpl buffer;
   uint8_t header[5];
   Encoder encoder;
-  encoder.NewFrame(0b10u, request.ByteSizeLong(), header);
+  encoder.NewFrame(0b10u, request.ByteSize(), header);
   buffer.add(header, 5);
   buffer.add(request.SerializeAsString());
 
@@ -68,7 +68,7 @@ TEST(CodecTest, decodeSingleFrame) {
   Buffer::OwnedImpl buffer;
   uint8_t header[5];
   Encoder encoder;
-  encoder.NewFrame(GRPC_FH_DEFAULT, request.ByteSizeLong(), header);
+  encoder.NewFrame(GRPC_FH_DEFAULT, request.ByteSize(), header);
   buffer.add(header, 5);
   buffer.add(request.SerializeAsString());
 
@@ -78,7 +78,7 @@ TEST(CodecTest, decodeSingleFrame) {
   decoder.Decode(buffer, &frames);
   EXPECT_EQ(frames.size(), 1);
   EXPECT_EQ(GRPC_FH_DEFAULT, frames[0].flags);
-  EXPECT_EQ(request.ByteSizeLong(), frames[0].length);
+  EXPECT_EQ(request.ByteSize(), frames[0].length);
 
   helloworld::HelloRequest result;
   result.ParseFromArray(frames[0].data->linearize(frames[0].data->length()),
@@ -93,7 +93,7 @@ TEST(CodecTest, decodeMultipleFrame) {
   Buffer::OwnedImpl buffer;
   uint8_t header[5];
   Encoder encoder;
-  encoder.NewFrame(GRPC_FH_DEFAULT, request.ByteSizeLong(), header);
+  encoder.NewFrame(GRPC_FH_DEFAULT, request.ByteSize(), header);
   for (int i = 0; i < 1009; i++) {
     buffer.add(header, 5);
     buffer.add(request.SerializeAsString());
@@ -106,7 +106,7 @@ TEST(CodecTest, decodeMultipleFrame) {
   EXPECT_EQ(frames.size(), 1009);
   for (Frame& frame : frames) {
     EXPECT_EQ(GRPC_FH_DEFAULT, frame.flags);
-    EXPECT_EQ(request.ByteSizeLong(), frame.length);
+    EXPECT_EQ(request.ByteSize(), frame.length);
 
     helloworld::HelloRequest result;
     result.ParseFromArray(frame.data->linearize(frame.data->length()), frame.data->length());
