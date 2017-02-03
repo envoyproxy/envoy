@@ -85,7 +85,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           },
           "op" : {
             "type" : "string",
-            "enum" : ["=>", "="]
+            "enum" : [">=", "="]
           },
           "value" : {"type" : "integer"},
           "runtime_key" : {"type" : "string"}
@@ -102,7 +102,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           },
           "op" : {
             "type" : "string",
-            "enum" : ["=>", "="]
+            "enum" : [">=", "="]
           },
           "value" : {"type" : "integer"},
           "runtime_key" : {"type" : "string"}
@@ -121,6 +121,29 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "required" : ["type"],
         "additionalProperties" : false
       },
+      "traceable_request" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["traceable_request"]
+          }
+        },
+        "required" : ["type"],
+        "additionalProperties" : false
+      },
+      "runtime" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["runtime"]
+          },
+          "key" : {"type" : "string"}
+        },
+        "required" : ["type", "key"],
+        "additionalProperties" : false
+      },
       "logical_and" : {
         "type" : "object",
         "properties" : {
@@ -132,10 +155,14 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "type" : "array",
             "minItems" : 2,
             "items" : {
-              "anyOf" : [
-                {"$ref" : "#/defintions/status_code"},
+              "oneOf" : [
+                {"$ref" : "#/definitions/status_code"},
                 {"$ref" : "#/definitions/duration"},
-                {"$ref" : "#/definitions/not_healthcheck"}
+                {"$ref" : "#/definitions/not_healthcheck"},
+                {"$ref" : "#/definitions/logical_and"},
+                {"$ref" : "#/definitions/logical_or"},
+                {"$ref" : "#/definitions/traceable_request"},
+                {"$ref" : "#/definitions/runtime"}
               ]
             }
           }
@@ -154,10 +181,14 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "type" : "array",
             "minItems" : 2,
             "items" : {
-              "anyOf" : [
-                {"$ref" : "#/defintions/status_code"},
+              "oneOf" : [
+                {"$ref" : "#/definitions/status_code"},
                 {"$ref" : "#/definitions/duration"},
-                {"$ref" : "#/definitions/not_healthcheck"}
+                {"$ref" : "#/definitions/not_healthcheck"},
+                {"$ref" : "#/definitions/logical_and"},
+                {"$ref" : "#/definitions/logical_or"},
+                {"$ref" : "#/definitions/traceable_request"},
+                {"$ref" : "#/definitions/runtime"}
               ]
             }
           }
@@ -217,15 +248,15 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "format" : {"type" : "string"},
             "filter" : {
               "type" : "object",
-              "properties" : {
-                "oneOf" : [
-                  {"$ref" : "#/definitions/status_code"},
-                  {"$ref" : "#/definitions/duration"},
-                  {"$ref" : "#/definitions/not_healthcheck"},
-                  {"$ref" : "#/defintions/logical_and"},
-                  {"$ref" : "#/defintions/logical_or"}
-                ]
-              }
+              "oneOf" : [
+                {"$ref" : "#/definitions/not_healthcheck"},
+                {"$ref" : "#/definitions/status_code"},
+                {"$ref" : "#/definitions/duration"},
+                {"$ref" : "#/definitions/traceable_request"},
+                {"$ref" : "#/definitions/runtime"},
+                {"$ref" : "#/definitions/logical_and"},
+                {"$ref" : "#/definitions/logical_or"}
+              ]
             }
           },
           "required" : ["path"],

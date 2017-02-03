@@ -215,5 +215,104 @@ TEST(NetworkFilterConfigTest, BadAccessLogConfig) {
                Json::Exception);
 }
 
+TEST(NetworkFilterConfigTest, BadAccessLogType) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters" : [
+      {
+        "type" : "both",
+        "name" : "http_dynamo_filter",
+        "config" : {}
+      }
+    ],
+    "access_log" :[
+      {
+        "path" : "mypath",
+        "filter" : {
+          "type" : "bad_type"
+        }
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  NiceMock<MockInstance> server;
+  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
+                                              *json_config, server),
+               Json::Exception);
+}
+
+TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters" : [
+      {
+        "type" : "both",
+        "name" : "http_dynamo_filter",
+        "config" : {}
+      }
+    ],
+    "access_log" :[
+      {
+        "path": "/dev/null",
+        "filter": {
+          "type": "logical_and",
+          "filters": [
+            {
+              "type": "logical_or",
+              "filters": [
+                {"type": "duration", "op": ">=", "value": 10000},
+                {"type": "bad_type", "op": ">=", "value": 500}
+              ]
+            },
+            {"type": "not_healthcheck"}
+          ]
+        }
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  NiceMock<MockInstance> server;
+  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
+                                              *json_config, server),
+               Json::Exception);
+}
 } // Configuration
 } // Server

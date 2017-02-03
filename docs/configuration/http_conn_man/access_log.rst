@@ -175,7 +175,7 @@ Duration
 Filters on total request duration in milliseconds.
 
 op
-  *(required, string)* Comparison operator. Currently *>=* and *=* are the only supported operator.
+  *(required, string)* Comparison operator. Currently *>=* and *=* are the only supported operators.
 
 value
   *(required, integer)* Default value to compare against if runtime values is not available.
@@ -211,6 +211,26 @@ Traceable
 
 Filters for requests that are traceable. See the :ref:`tracing overview <arch_overview_tracing>` for
 more information on how a request becomes traceable.
+
+Runtime
+^^^^^^^^^
+.. code-block:: json
+
+  {
+    "filter": {
+      "type": "runtime",
+      "key" : "..."
+    }
+  }
+
+Filters for the header :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`.
+If :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` is present, the filter will
+consistently sample across multiple hosts based on the runtime key value. If it is missing, the
+filter will randomly sample based on the runtime key value.
+
+key
+  *(required, string)* Runtime key to get the percentage of requests to be sampled.
+  This runtime control is specified in the range 0-100 and defaults to 0.
 
 And
 ^^^

@@ -156,7 +156,7 @@ is one of the few areas where a thin client library is needed to perform this du
 is out of scope for this documentation. If *x-request-id* is propagated across all hosts, the
 following features are available:
 
-* Stable :ref:`access logging <config_http_conn_man_access_log>` via the sampling filter.
+* Stable :ref:`access logging <config_http_conn_man_access_log>` via the runtime filter.
 * Stable tracing when performing random sampling via the :ref:`tracing.random_sampling
   <config_http_conn_man_runtime_random_sampling>` runtime setting or via forced tracing using the
   :ref:`config_http_conn_man_headers_x-envoy-force-trace` and
