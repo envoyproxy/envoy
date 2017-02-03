@@ -3,3 +3,4 @@
 /generated
 cscope.*
 BROWSE
+bazel-*
