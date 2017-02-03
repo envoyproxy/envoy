@@ -208,7 +208,13 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   setup(false, "");
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
-  EXPECT_CALL(tracer_, startSpan_(_, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(tracer_, startSpan_(_, _, _))
+      .WillOnce(Invoke([&](const Tracing::Config& config, const Http::HeaderMap&,
+                           const Http::AccessLog::RequestInfo&) -> Tracing::Span* {
+        EXPECT_EQ("operation", config.operationName());
+
+        return span;
+      }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
@@ -240,6 +246,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);
+
+  EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
+  EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
@@ -355,7 +364,7 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
         Http::HeaderMapPtr headers{
             new TestHeaderMapImpl{{":authority", "host"},
                                   {":path", "/healthcheck"},
-                                  {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+                                  {"x-request-id", "125a4afb-6f55-94ba-ad80-413f09f48a28"}}};
         decoder->decodeHeaders(std::move(headers), true);
 
         Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -366,6 +375,14 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);
+
+  // Make destruction of active stream so that we can capture tracing HC stat.
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  // HC request, but was originally sampled, so check for two stats here.
+  EXPECT_EQ(1UL, tracing_stats_.random_sampling_.value());
+  EXPECT_EQ(1UL, tracing_stats_.health_check_.value());
+  EXPECT_EQ(0UL, tracing_stats_.service_forced_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, NoPath) {

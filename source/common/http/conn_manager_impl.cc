@@ -288,8 +288,12 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     log_handler->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
 
-  if (active_span_ && !request_info_.healthCheck()) {
-    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_info_);
+  if (active_span_) {
+    if (request_info_.healthCheck()) {
+      connection_manager_.config_.tracingStats().health_check_.inc();
+    } else {
+      Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_info_);
+    }
   }
 }
 
@@ -341,7 +345,7 @@ void ConnectionManagerImpl::ActiveStream::chargeTracingStats(
     connection_manager_.config_.tracingStats().client_enabled_.inc();
     break;
   case Tracing::Reason::HealthCheck:
-    connection_manager_.config_.tracingStats().health_check_.inc();
+    // At this point we have not run any filters, including HC one, so this should not happen.
     break;
   case Tracing::Reason::NotTraceableRequestId:
     connection_manager_.config_.tracingStats().not_traceable_.inc();
