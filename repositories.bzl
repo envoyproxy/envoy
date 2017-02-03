@@ -1,56 +1,18 @@
-def boringssl_repositories(bind=True):
+def boringssl_repositories():
     native.git_repository(
         name = "boringssl",
         commit = "bfd36df3da38dbf8828e712f42fbab2a0034bc40",  # 2017-02-02
         remote = "https://boringssl.googlesource.com/boringssl",
     )
 
-    if bind:
-        native.bind(
-            name = "boringssl_crypto",
-            actual = "@boringssl//:crypto",
-        )
-
-        native.bind(
-            name = "libssl",
-            actual = "@boringssl//:ssl",
-        )
-
-
-def protobuf_repositories(bind=True):
+def protobuf_repositories():
     native.git_repository(
-        name = "protobuf_git",
+        name = "protobuf",
         commit = "a428e42072765993ff674fda72863c9f1aa2d268",  # v3.1.0
         remote = "https://github.com/google/protobuf.git",
     )
 
-    if bind:
-        native.bind(
-            name = "protoc",
-            actual = "@protobuf_git//:protoc",
-        )
-
-        native.bind(
-            name = "protobuf",
-            actual = "@protobuf_git//:protobuf",
-        )
-
-        native.bind(
-            name = "cc_wkt_protos",
-            actual = "@protobuf_git//:cc_wkt_protos",
-        )
-
-        native.bind(
-            name = "cc_wkt_protos_genproto",
-            actual = "@protobuf_git//:cc_wkt_protos_genproto",
-        )
-
-        native.bind(
-            name = "protobuf_compiler",
-            actual = "@protobuf_git//:protoc_lib",
-        )
-
-def googletest_repositories(bind=True):
+def googletest_repositories():
     BUILD = """
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
@@ -110,29 +72,13 @@ cc_library(
 )
 """
     native.new_git_repository(
-        name = "googletest_git",
+        name = "googletest",
         build_file_content = BUILD,
         commit = "d225acc90bc3a8c420a9bcd1f033033c1ccd7fe0",
         remote = "https://github.com/google/googletest.git",
     )
 
-    if bind:
-        native.bind(
-            name = "googletest",
-            actual = "@googletest_git//:googletest",
-        )
-
-        native.bind(
-            name = "googletest_main",
-            actual = "@googletest_git//:googletest_main",
-        )
-
-        native.bind(
-            name = "googletest_prod",
-            actual = "@googletest_git//:googletest_prod",
-        )
-
-def libevent_repositories(bind=True):
+def libevent_repositories():
     BUILD = """
 genrule(
     name = "config",
@@ -248,25 +194,13 @@ cc_library(
 """
 
     native.new_http_archive(
-        name = "libevent_git",
+        name = "libevent",
         url = "https://github.com/libevent/libevent/releases/download/release-2.0.22-stable/libevent-2.0.22-stable.tar.gz",
         strip_prefix = "libevent-2.0.22-stable",
         build_file_content = BUILD,
     )
 
-    if bind:
-        native.bind(
-            name = "event",
-            actual = "@libevent_git//:event",
-        )
-
-        native.bind(
-            name = "event_pthreads",
-            actual = "@libevent_git//:event_pthreads",
-        )
-
-
-def spdlog_repositories(bind=True):
+def spdlog_repositories():
     BUILD = """
 package(default_visibility=["//visibility:public"])
 
@@ -282,19 +216,13 @@ cc_library(
 )"""
 
     native.new_git_repository(
-        name = "spdlog_git",
+        name = "spdlog",
         remote = "https://github.com/gabime/spdlog.git",
         commit = "1f1f6a5f3b424203a429e9cb78e6548037adefa8",
         build_file_content = BUILD,
     )
 
-    if bind:
-        native.bind(
-            name = "spdlog",
-            actual = "@spdlog_git//:spdlog",
-        )
-
-def tclap_repositories(bind=True):
+def tclap_repositories():
     BUILD = """
 cc_library(
     name = "tclap",
@@ -335,20 +263,15 @@ cc_library(
 )"""
 
     native.new_http_archive(
-        name = "tclap_tar",
+        name = "tclap",
         url = "https://storage.googleapis.com/istio-build-deps/tclap-1.2.1.tar.gz",
         strip_prefix = "tclap-1.2.1",
         build_file_content = BUILD,
     )
-    if bind:
-        native.bind(
-            name = "tclap",
-            actual = "@tclap_tar//:tclap",
-        )
 
-def lightstep_repositories(bind=True):
+def lightstep_repositories():
     BUILD = """
-load("@protobuf_git//:protobuf.bzl", "cc_proto_library")
+load("@protobuf//:protobuf.bzl", "cc_proto_library")
 
 genrule(
     name = "envoy_carrier_pb",
@@ -361,11 +284,11 @@ cc_proto_library(
     name = "envoy_carrier_proto",
     srcs = ["lightstep/envoy_carrier.proto"],
     include = ".",
-    default_runtime = "//external:protobuf",
-    protoc = "//external:protoc",
+    default_runtime = "@protobuf//:protobuf",
+    protoc = "@protobuf//:protoc",
     visibility = ["//visibility:public"],
     deps = [
-        "//external:cc_wkt_protos",
+        "@protobuf//:cc_wkt_protos",
     ],
 )
 
@@ -391,8 +314,8 @@ cc_library(
     ],
     copts = [
         "-DPACKAGE_VERSION='\\"0.19\\"'",
-        "-Iexternal/lightstep_git/src/c++11/lightstep",
-        "-Iexternal/lightstep_git/src/c++11/mapbox_variant",
+        "-Iexternal/lightstep/src/c++11/lightstep",
+        "-Iexternal/lightstep/src/c++11/mapbox_variant",
     ],
     includes = [
         "src/c++11",
@@ -400,14 +323,14 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":envoy_carrier_proto",
-        "//external:protobuf",
-        "@lightstep_common_git//:collector_proto",
+        "@lightstep_common//:collector_proto",
+        "@protobuf//:protobuf",
     ],
 )
 """
 
     COMMON_BUILD = """
-load("@protobuf_git//:protobuf.bzl", "cc_proto_library")
+load("@protobuf//:protobuf.bzl", "cc_proto_library")
 
 genrule(
     name = "collector_pb",
@@ -420,36 +343,30 @@ cc_proto_library(
     name = "collector_proto",
     srcs = ["lightstep/collector.proto"],
     include = ".",
-    default_runtime = "//external:protobuf",
-    protoc = "//external:protoc",
+    default_runtime = "@protobuf//:protobuf",
+    protoc = "@protobuf//:protoc",
     visibility = ["//visibility:public"],
     deps = [
-        "//external:cc_wkt_protos",
+        "@protobuf//:cc_wkt_protos",
     ],
 )
 """
 
     native.new_git_repository(
-        name = "lightstep_common_git",
+        name = "lightstep_common",
         remote = "https://github.com/lightstep/lightstep-tracer-common.git",
         commit = "8d932f7f76cd286691e6179621d0012b0ff1e6aa",
         build_file_content = COMMON_BUILD,
     )
 
     native.new_git_repository(
-        name = "lightstep_git",
+        name = "lightstep",
         remote = "https://github.com/lightstep/lightstep-tracer-cpp.git",
         commit = "5a71d623cac17a059041b04fabca4ed86ffff7cc",
         build_file_content = BUILD,
     )
 
-    if bind:
-        native.bind(
-            name = "lightstep",
-            actual = "@lightstep_git//:lightstep_core",
-        )
-
-def http_parser_repositories(bind=True):
+def http_parser_repositories():
     BUILD = """
 cc_library(
     name = "http_parser",
@@ -463,19 +380,13 @@ cc_library(
 )"""
 
     native.new_git_repository(
-        name = "http_parser_git",
+        name = "http_parser",
         remote = "https://github.com/nodejs/http-parser.git",
         commit = "9b0d5b33ebdaacff1dadd06bad4e198b11ff880e",
         build_file_content = BUILD,
     )
 
-    if bind:
-        native.bind(
-            name = "http_parser",
-            actual = "@http_parser_git//:http_parser",
-        )
-
-def rapidjson_repositories(bind=True):
+def rapidjson_repositories():
     BUILD = """
 cc_library(
     name = "rapidjson",
@@ -492,19 +403,13 @@ cc_library(
 """
 
     native.new_git_repository(
-        name = "rapidjson_git",
+        name = "rapidjson",
         remote = "https://github.com/miloyip/rapidjson.git",
         commit = "f54b0e47a08782a6131cc3d60f94d038fa6e0a51", # v1.1.0
         build_file_content = BUILD,
     )
 
-    if bind:
-        native.bind(
-            name = "rapidjson",
-            actual = "@rapidjson_git//:rapidjson",
-        )
-
-def nghttp2_repositories(bind=True):
+def nghttp2_repositories():
     BUILD = """
 genrule(
     name = "config",
@@ -533,7 +438,6 @@ cc_library(
     copts = [
         "-DHAVE_CONFIG_H",
         "-DBUILDING_NGHTTP2",
-        "-Iexternal/nghttp2_tar",
     ],
     includes = [
         ".",
@@ -544,14 +448,8 @@ cc_library(
 """
 
     native.new_http_archive(
-        name = "nghttp2_tar",
+        name = "nghttp2",
         url = "https://github.com/nghttp2/nghttp2/releases/download/v1.14.1/nghttp2-1.14.1.tar.gz",
         strip_prefix = "nghttp2-1.14.1",
         build_file_content = BUILD,
     )
-
-    if bind:
-        native.bind(
-            name = "nghttp2",
-            actual = "@nghttp2_tar//:nghttp2",
-        )

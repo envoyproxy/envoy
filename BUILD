@@ -1,4 +1,4 @@
-load("@protobuf_git//:protobuf.bzl", "cc_proto_library")
+load("@protobuf//:protobuf.bzl", "cc_proto_library")
 
 exports_files(["source/precompiled/precompiled.h"])
 
@@ -21,8 +21,8 @@ cc_proto_library(
         "source/common/generated/ratelimit.proto",
     ],
     include = "source",
-    default_runtime = "//external:protobuf",
-    protoc = "//external:protoc",
+    default_runtime = "@protobuf//:protobuf",
+    protoc = "@protobuf//:protoc",
 )
 
 genrule(
@@ -42,8 +42,8 @@ cc_proto_library(
         "test/generated/helloworld.proto",
     ],
     include = "test",
-    default_runtime = "//external:protobuf",
-    protoc = "//external:protoc",
+    default_runtime = "@protobuf//:protobuf",
+    protoc = "@protobuf//:protoc",
 )
 
 genrule(
@@ -88,16 +88,16 @@ cc_library(
     linkstatic = 1,
     deps = [
         ":envoy-ratelimit-pb",
-        "//external:event",
-        "//external:event_pthreads",
-        "//external:http_parser",
-        "//external:libssl",
-        "//external:lightstep",
-        "//external:nghttp2",
-        "//external:protobuf",
-        "//external:rapidjson",
-        "//external:spdlog",
-        "//external:tclap",
+        "@libevent//:event",
+        "@libevent//:event_pthreads",
+        "@http_parser//:http_parser",
+        "@boringssl//:ssl",
+        "@lightstep//:lightstep_core",
+        "@nghttp2//:nghttp2",
+        "@protobuf//:protobuf",
+        "@rapidjson//:rapidjson",
+        "@spdlog//:spdlog",
+        "@tclap//:tclap",
     ],
     alwayslink = 1,
 )
@@ -128,7 +128,7 @@ cc_library(
     deps = [
         ":envoy-common",
         ":envoy-test-pb",
-        "//external:googletest",
+        "@googletest//:googletest",
     ],
     alwayslink = 1,
 )
@@ -150,6 +150,6 @@ cc_test(
     deps = [
         ":envoy-test-lib",
         ":envoy-test-pb",
-        "//external:googletest",
+        "@googletest//:googletest",
     ],
 )
