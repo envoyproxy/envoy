@@ -1,7 +1,5 @@
 #include "base64.h"
 
-#include "common/common/assert.h"
-
 static constexpr char CHAR_TABLE[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
