@@ -4,4 +4,4 @@ ADD build/source/exe/envoy /usr/local/bin/envoy
 RUN apt-get update && apt-get install -y \
     build-essential
 RUN strip /usr/local/bin/envoy
-RUN apt-get remove -y build-essential
+RUN apt-get purge -y build-essential
