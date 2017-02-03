@@ -1,4 +1,3 @@
-#include <stdexcept>
 #include "common/buffer/buffer_impl.h"
 
 #include "common/common/base64.h"
