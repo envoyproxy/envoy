@@ -1,4 +1,4 @@
-#include "third_party/envoy/src/source/common/grpc/codec.h"
+#include "common/grpc/codec.h"
 
 #include "common/buffer/buffer_impl.h"
 

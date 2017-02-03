@@ -56,9 +56,11 @@ TEST(CodecTest, decodeInvalidFrame) {
   buffer.add(request.SerializeAsString());
 
   std::vector<Frame> frames;
-
   Decoder decoder;
-  EXPECT_EQ(false, decoder.Decode(buffer, &frames));
+  EXPECT_FALSE(decoder.Decode(buffer, &frames));
+  for (Frame& frame : frames) {
+    delete frame.data;
+  }
 }
 
 TEST(CodecTest, decodeSingleFrame) {
@@ -73,17 +75,19 @@ TEST(CodecTest, decodeSingleFrame) {
   buffer.add(request.SerializeAsString());
 
   std::vector<Frame> frames;
-
   Decoder decoder;
   decoder.Decode(buffer, &frames);
-  EXPECT_EQ(frames.size(), 1);
+  EXPECT_EQ(frames.size(), static_cast<uint64_t>(1));
   EXPECT_EQ(GRPC_FH_DEFAULT, frames[0].flags);
-  EXPECT_EQ(request.ByteSize(), frames[0].length);
+  EXPECT_EQ(static_cast<uint64_t>(request.ByteSize()), frames[0].length);
 
   helloworld::HelloRequest result;
   result.ParseFromArray(frames[0].data->linearize(frames[0].data->length()),
                         frames[0].data->length());
   EXPECT_EQ("hello", result.name());
+  for (Frame& frame : frames) {
+    delete frame.data;
+  }
 }
 
 TEST(CodecTest, decodeMultipleFrame) {
@@ -100,17 +104,19 @@ TEST(CodecTest, decodeMultipleFrame) {
   }
 
   std::vector<Frame> frames;
-
   Decoder decoder;
   decoder.Decode(buffer, &frames);
-  EXPECT_EQ(frames.size(), 1009);
+  EXPECT_EQ(frames.size(), static_cast<uint64_t>(1009));
   for (Frame& frame : frames) {
     EXPECT_EQ(GRPC_FH_DEFAULT, frame.flags);
-    EXPECT_EQ(request.ByteSize(), frame.length);
+    EXPECT_EQ(static_cast<uint64_t>(request.ByteSize()), frame.length);
 
     helloworld::HelloRequest result;
     result.ParseFromArray(frame.data->linearize(frame.data->length()), frame.data->length());
     EXPECT_EQ("hello", result.name());
+  }
+  for (Frame& frame : frames) {
+    delete frame.data;
   }
 }
 } // Grpc
