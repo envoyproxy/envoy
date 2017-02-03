@@ -111,9 +111,17 @@ public:
   virtual bool readEnabled() PURE;
 
   /**
-   * @return The address of the remote client
+   * @return The address of the remote client.
    */
   virtual const std::string& remoteAddress() PURE;
+
+  /**
+   * @return the local address of the connection. For client connections, this is the origin
+   * address. For server connections, this is the local destination address. For server connections
+   * it can be different from the proxy address if the downstream connection has been redirected or
+   * the proxy is operating in transparent mode.
+   */
+  virtual const std::string& localAddress() PURE;
 
   /**
    * Set the buffer stats to update when the connection's read/write buffers change. Note that

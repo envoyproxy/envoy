@@ -18,9 +18,7 @@ namespace RateLimit {
 class FilterConfig {
 public:
   FilterConfig(const Json::Object& config, const LocalInfo::LocalInfo& local_info,
-               Stats::Store& global_store, Runtime::Loader& runtime, Upstream::ClusterManager& cm)
-      : domain_(config.getString("domain")), stage_(config.getInteger("stage", 0)),
-        local_info_(local_info), global_store_(global_store), runtime_(runtime), cm_(cm) {}
+               Stats::Store& global_store, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }

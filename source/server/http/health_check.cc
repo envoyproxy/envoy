@@ -11,6 +11,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
 namespace Server {
@@ -27,6 +28,8 @@ HttpFilterFactoryCb HealthCheckFilterConfig::tryCreateFilterFactory(HttpFilterTy
   if (type != HttpFilterType::Both || name != "health_check") {
     return nullptr;
   }
+
+  config.validateSchema(Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA);
 
   bool pass_through_mode = config.getBoolean("pass_through_mode");
   int64_t cache_time_ms = config.getInteger("cache_time_ms", 0);

@@ -10,8 +10,9 @@
 namespace Ssl {
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                               const std::string& remote_address, Context& ctx, InitialState state)
-    : Network::ConnectionImpl(dispatcher, fd, remote_address),
+                               const std::string& remote_address, const std::string& local_address,
+                               Context& ctx, InitialState state)
+    : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
   BIO* bio = BIO_new_socket(fd, 0);
   SSL_set_bio(ssl_.get(), bio, bio);
@@ -185,10 +186,11 @@ std::string ConnectionImpl::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
+// TODO: see if we can pass something more meaningful than EMPTY_STRING as localAddress
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
                                            const std::string& url)
-    : ConnectionImpl(dispatcher, socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), url, ctx,
-                     InitialState::Client) {}
+    : ConnectionImpl(dispatcher, socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), url, EMPTY_STRING,
+                     ctx, InitialState::Client) {}
 
 void ClientConnectionImpl::connect() {
   Network::AddrInfoPtr addr_info =

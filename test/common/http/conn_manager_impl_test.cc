@@ -3,13 +3,13 @@
 #include "envoy/http/access_log.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/http/access_log/access_log_impl.h"
 #include "common/http/access_log/access_log_formatter.h"
+#include "common/http/access_log/access_log_impl.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
-#include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -27,6 +27,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::ReturnRefOfCopy;
 using testing::Sequence;
 using testing::Test;
 
@@ -60,6 +61,8 @@ public:
 
     server_name_ = server_name;
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_.get()));
+    ON_CALL(filter_callbacks_.connection_, remoteAddress())
+        .WillByDefault(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
   }
@@ -120,6 +123,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
       new NiceMock<Http::MockStreamDecoderFilter>());
 
   EXPECT_CALL(filter->reset_stream_called_, ready()).Times(0);
+  EXPECT_CALL(route_config_, route(_, _)).Times(2);
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .Times(2)
       .WillRepeatedly(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
@@ -128,6 +132,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
         if (headers.Path()->value() == "/healthcheck") {
           filter->callbacks_->requestInfo().healthCheck(true);
         }
+
+        // Test route caching.
+        EXPECT_EQ(&route_config_.route_, filter->callbacks_->route());
+        EXPECT_EQ(&route_config_.route_, filter->callbacks_->route());
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -204,6 +212,88 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
+
+  std::shared_ptr<Http::MockStreamDecoderFilter> filter(
+      new NiceMock<Http::MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks)
+                                 -> void { callbacks.addStreamDecoderFilter(filter); }));
+
+  Http::StreamDecoder* decoder = nullptr;
+  NiceMock<Http::MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+        decoder = &conn_manager_->newStream(encoder);
+
+        Http::HeaderMapPtr headers{
+            new TestHeaderMapImpl{{":authority", "host"},
+                                  {":path", "/"},
+                                  {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+
+        Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+        data.drain(4);
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
+  setup(false, "");
+
+  std::shared_ptr<Http::MockStreamDecoderFilter> filter(
+      new NiceMock<Http::MockStreamDecoderFilter>());
+  std::shared_ptr<Http::AccessLog::MockInstance> handler(
+      new NiceMock<Http::AccessLog::MockInstance>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+        callbacks.addAccessLogHandler(handler);
+      }));
+
+  EXPECT_CALL(*handler, log(_, _, _))
+      .WillOnce(Invoke([](const Http::HeaderMap*, const Http::HeaderMap*,
+                          const Http::AccessLog::RequestInfo& request_info) {
+        EXPECT_TRUE(request_info.responseCode().valid());
+        EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
+      }));
+
+  Http::StreamDecoder* decoder = nullptr;
+  NiceMock<Http::MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+        decoder = &conn_manager_->newStream(encoder);
+
+        Http::HeaderMapPtr headers{
+            new TestHeaderMapImpl{{":authority", "host"},
+                                  {":path", "/"},
+                                  {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+
+        Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+        data.drain(4);
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input);
+}
+
+TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
+  setup(false, "");
+
+  // Disable tracing.
+  tracing_config_ = Optional<Http::TracingConnectionManagerConfig>();
+
+  EXPECT_CALL(tracer_, startSpan_(_, _, _)).Times(0);
+  ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillByDefault(Return(true));
 
   std::shared_ptr<Http::MockStreamDecoderFilter> filter(
       new NiceMock<Http::MockStreamDecoderFilter>());

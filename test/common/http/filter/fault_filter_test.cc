@@ -109,6 +109,18 @@ public:
   Event::MockTimer* timer_{};
 };
 
+TEST(FaultFilterBadConfigTest, EmptyConfig) {
+  const std::string json = R"EOF(
+  {
+  }
+  )EOF";
+
+  Stats::IsolatedStoreImpl stats;
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
+}
+
 TEST(FaultFilterBadConfigTest, BadAbortPercent) {
   const std::string json = R"EOF(
     {
@@ -118,6 +130,7 @@ TEST(FaultFilterBadConfigTest, BadAbortPercent) {
       }
     }
   )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -132,6 +145,7 @@ TEST(FaultFilterBadConfigTest, MissingHTTPStatus) {
       }
     }
   )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -148,6 +162,7 @@ TEST(FaultFilterBadConfigTest, BadDelayType) {
       }
     }
   )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -164,6 +179,7 @@ TEST(FaultFilterBadConfigTest, BadDelayPercent) {
       }
     }
   )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -180,6 +196,7 @@ TEST(FaultFilterBadConfigTest, BadDelayDuration) {
       }
     }
    )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -195,6 +212,7 @@ TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
       }
     }
    )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -450,7 +468,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
   SetUpTest(fault_with_target_cluster_json);
   const std::string upstream_cluster("www1");
 
-  EXPECT_CALL(filter_callbacks_.route_table_.route_.route_entry_, clusterName())
+  EXPECT_CALL(filter_callbacks_.route_.route_entry_, clusterName())
       .WillOnce(ReturnRef(upstream_cluster));
 
   // Delay related calls
@@ -490,7 +508,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
   SetUpTest(fault_with_target_cluster_json);
   const std::string upstream_cluster("mismatch");
 
-  EXPECT_CALL(filter_callbacks_.route_table_.route_.route_entry_, clusterName())
+  EXPECT_CALL(filter_callbacks_.route_.route_entry_, clusterName())
       .WillOnce(ReturnRef(upstream_cluster));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _))
       .Times(0);
@@ -513,7 +531,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   SetUpTest(fault_with_target_cluster_json);
   const std::string upstream_cluster("www1");
 
-  EXPECT_CALL(filter_callbacks_.route_table_.route_, routeEntry()).WillOnce(Return(nullptr));
+  EXPECT_CALL(filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);

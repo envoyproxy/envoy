@@ -10,6 +10,7 @@
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
 
 namespace Http {
@@ -18,8 +19,16 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
                                      const std::string& stat_prefix, Stats::Store& stats)
     : runtime_(runtime), stats_(generateStats(stat_prefix, stats)) {
 
-  if (json_config.hasObject("abort")) {
-    const Json::ObjectPtr& abort = json_config.getObject("abort");
+  json_config.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
+
+  const Json::ObjectPtr abort = json_config.getObject("abort", true);
+  const Json::ObjectPtr delay = json_config.getObject("delay", true);
+
+  if (abort->empty() && delay->empty()) {
+    throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
+  }
+
+  if (!abort->empty()) {
     abort_percent_ = static_cast<uint64_t>(abort->getInteger("abort_percent", 0));
 
     if (abort_percent_ > 0) {
@@ -36,8 +45,7 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
     }
   }
 
-  if (json_config.hasObject("delay")) {
-    const Json::ObjectPtr& delay = json_config.getObject("delay");
+  if (!delay->empty()) {
     const std::string type = delay->getString("type", "empty");
     if (type == "fixed") {
       fixed_delay_percent_ = static_cast<uint64_t>(delay->getInteger("fixed_delay_percent", 0));
@@ -78,7 +86,7 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 // if we inject a delay, then we will inject the abort in the delay timer
 // callback.
 FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
-  if (!matchesTargetCluster(headers)) {
+  if (!matchesTargetCluster()) {
     return FilterHeadersStatus::Continue;
   }
 
@@ -149,11 +157,11 @@ void FaultFilter::abortWithHTTPStatus() {
   callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::FaultInjected);
 }
 
-bool FaultFilter::matchesTargetCluster(const HeaderMap& headers) {
+bool FaultFilter::matchesTargetCluster() {
   bool matches = true;
 
   if (!config_->upstreamCluster().empty()) {
-    const Router::Route* route = callbacks_->routeTable().route(headers);
+    const Router::Route* route = callbacks_->route();
     matches = route && route->routeEntry() &&
               (route->routeEntry()->clusterName() == config_->upstreamCluster());
   }

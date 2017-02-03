@@ -188,7 +188,16 @@
     "filters": [
       { "type": "read", "name":
         "tcp_proxy",
-        "config": { "cluster": "cluster_1", "stat_prefix": "test_tcp" }
+        "config": {
+          "stat_prefix": "test_tcp",
+          "route_config": {
+            "routes": [
+              {
+                "cluster": "cluster_1"
+              }
+            ]
+          }
+        }
       }
     ]
   }],

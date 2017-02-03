@@ -264,21 +264,4 @@ public:
 
 typedef std::unique_ptr<Config> ConfigPtr;
 
-/**
- * An interface into the config that removes the random value parameters. An implementation is
- * expected to pass the same random_value for all wrapped calls.
- */
-class StableRouteTable {
-public:
-  virtual ~StableRouteTable() {}
-
-  /**
-   * Based on the incoming HTTP request headers, determine the target route (containing either a
-   * route entry or a redirect entry) for the request.
-   * @param headers supplies the request headers.
-   * @return the route or nullptr if there is no matching route for the request.
-   */
-  virtual const Route* route(const Http::HeaderMap& headers) const PURE;
-};
-
 } // Router

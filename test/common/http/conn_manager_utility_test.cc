@@ -1,5 +1,6 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/headers.h"
+#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 
@@ -46,7 +47,7 @@ TEST_F(ConnectionManagerUtilityTest, generateStreamId) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
-  const std::string not_local_host_remote_address = "12.12.12.12";
+  const std::string not_local_host_remote_address = "tcp://12.12.12.12:0";
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, remoteAddress())
       .WillRepeatedly(ReturnRef(not_local_host_remote_address));
@@ -55,11 +56,12 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
   ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, random_, runtime_);
 
   EXPECT_TRUE(headers.has(Headers::get().ForwardedFor));
-  EXPECT_EQ(not_local_host_remote_address, headers.get_(Headers::get().ForwardedFor));
+  EXPECT_EQ(Network::Utility::hostFromUrl(not_local_host_remote_address),
+            headers.get_(Headers::get().ForwardedFor));
 }
 
 TEST_F(ConnectionManagerUtilityTest, UseLocalAddressWhenLocalHostRemoteAddress) {
-  const std::string local_host_remote_address = "127.0.0.1";
+  const std::string local_host_remote_address = "tcp://127.0.0.1:0";
   const std::string local_address = "10.3.2.1";
 
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(local_host_remote_address));
@@ -74,7 +76,7 @@ TEST_F(ConnectionManagerUtilityTest, UseLocalAddressWhenLocalHostRemoteAddress) 
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
-  const std::string internal_remote_address = "10.0.0.1";
+  const std::string internal_remote_address = "tcp://10.0.0.1:0";
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
@@ -88,7 +90,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
-  const std::string internal_remote_address = "10.0.0.1";
+  const std::string internal_remote_address = "tcp://10.0.0.1:0";
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
@@ -137,7 +139,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownstream) {
-  const std::string external_remote_address = "34.0.0.1";
+  const std::string external_remote_address = "tcp://34.0.0.1:0";
   const std::string generated_uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -208,7 +210,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstre
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
-  const std::string internal_remote_address = "10.0.0.1";
+  const std::string internal_remote_address = "tcp://10.0.0.1:0";
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
@@ -223,7 +225,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
-  const std::string internal_remote_address = "10.0.0.1";
+  const std::string internal_remote_address = "tcp://10.0.0.1:0";
 
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(internal_remote_address));
@@ -263,7 +265,7 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternalRequest) {
-  std::string local_remote_address = "10.0.0.1";
+  std::string local_remote_address = "tcp://10.0.0.1:0";
   EXPECT_CALL(config_, useRemoteAddress()).WillOnce(Return(true));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(local_remote_address));
 
@@ -275,7 +277,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternal
 }
 
 TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
-  std::string external_ip = "134.2.2.11";
+  std::string external_ip = "tcp://134.2.2.11:0";
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(external_ip));
   TestHeaderMapImpl headers{{"x-request-id", "original"}};
 
@@ -287,7 +289,8 @@ TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
-  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRefOfCopy(std::string("50.0.0.1")));
+  ON_CALL(connection_, remoteAddress())
+      .WillByDefault(ReturnRefOfCopy(std::string("tcp://50.0.0.1:0")));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   config_.route_config_.internal_only_headers_.push_back(LowerCaseString("custom_header"));
@@ -310,7 +313,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote) {
-  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRefOfCopy(std::string("50.0.0.1")));
+  ON_CALL(connection_, remoteAddress())
+      .WillByDefault(ReturnRefOfCopy(std::string("tcp://50.0.0.1:0")));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
 
   TestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
@@ -322,7 +326,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
 }
 
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
-  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRefOfCopy(std::string("10.0.0.1")));
+  ON_CALL(connection_, remoteAddress())
+      .WillByDefault(ReturnRefOfCopy(std::string("tcp://10.0.0.1:0")));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   TestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},

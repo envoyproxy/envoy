@@ -137,6 +137,7 @@ add_executable(envoy-test
   mocks/thread_local/mocks.cc
   mocks/tracing/mocks.cc
   mocks/upstream/mocks.cc
+  server/config/http/config_test.cc
   server/config/network/config_test.cc
   server/config/network/http_connection_manager_test.cc
   server/configuration_impl_test.cc

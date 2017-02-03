@@ -182,6 +182,8 @@ public:
     }
   }
 
+  bool empty() const override { return value_.IsObject() && value_.ObjectEmpty(); }
+
 private:
   const std::string name_;
   const rapidjson::Value& value_;
@@ -205,7 +207,7 @@ private:
 
 ObjectPtr Factory::LoadFromFile(const std::string& file_path) {
   rapidjson::Document document;
-  std::fstream file_stream(file_path);
+  std::ifstream file_stream(file_path);
   rapidjson::IStreamWrapper stream_wrapper(file_stream);
   if (document.ParseStream(stream_wrapper).HasParseError()) {
     throw Exception(fmt::format("Error(offset {}): {}\n", document.GetErrorOffset(),

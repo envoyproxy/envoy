@@ -46,6 +46,9 @@ public:
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionPtr());
   MOCK_CONST_METHOD0(healthCheck, bool());
   MOCK_METHOD1(healthCheck, void(bool is_hc));
+
+  std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
+      new testing::NiceMock<Upstream::MockHostDescription>()};
 };
 
 } // AccessLog
@@ -197,7 +200,7 @@ public:
   std::function<void()> reset_callback_;
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<AccessLog::MockRequestInfo> request_info_;
-  testing::NiceMock<Router::MockStableRouteTable> route_table_;
+  testing::NiceMock<Router::MockRoute> route_;
   std::string downstream_address_;
 };
 
@@ -212,7 +215,7 @@ public:
   MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
-  MOCK_METHOD0(routeTable, Router::StableRouteTable&());
+  MOCK_METHOD0(route, const Router::Route*());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
@@ -241,7 +244,7 @@ public:
   MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
-  MOCK_METHOD0(routeTable, Router::StableRouteTable&());
+  MOCK_METHOD0(route, const Router::Route*());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
@@ -295,6 +298,9 @@ public:
 
   MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks,
                                const Optional<std::chrono::milliseconds>& timeout));
+
+  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks,
+                              const Optional<std::chrono::milliseconds>& timeout));
 };
 
 class MockAsyncClientCallbacks : public AsyncClient::Callbacks {
@@ -309,6 +315,22 @@ public:
   MOCK_METHOD1(onFailure, void(Http::AsyncClient::FailureReason reason));
 };
 
+class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {
+public:
+  MockAsyncClientStreamCallbacks();
+  ~MockAsyncClientStreamCallbacks();
+
+  void onHeaders(HeaderMapPtr&& headers, bool end_stream) override {
+    onHeaders_(*headers, end_stream);
+  }
+  void onTrailers(HeaderMapPtr&& trailers) override { onTrailers_(*trailers); }
+
+  MOCK_METHOD2(onHeaders_, void(HeaderMap& headers, bool end_stream));
+  MOCK_METHOD2(onData, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD1(onTrailers_, void(HeaderMap& headers));
+  MOCK_METHOD0(onReset, void());
+};
+
 class MockAsyncClientRequest : public AsyncClient::Request {
 public:
   MockAsyncClientRequest(MockAsyncClient* client);
@@ -317,6 +339,17 @@ public:
   MOCK_METHOD0(cancel, void());
 
   MockAsyncClient* client_;
+};
+
+class MockFilterChainFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
+public:
+  MockFilterChainFactoryCallbacks();
+  ~MockFilterChainFactoryCallbacks();
+
+  MOCK_METHOD1(addStreamDecoderFilter, void(Http::StreamDecoderFilterPtr filter));
+  MOCK_METHOD1(addStreamEncoderFilter, void(Http::StreamEncoderFilterPtr filter));
+  MOCK_METHOD1(addStreamFilter, void(Http::StreamFilterPtr filter));
+  MOCK_METHOD1(addAccessLogHandler, void(Http::AccessLog::InstancePtr handler));
 };
 } // Http
 

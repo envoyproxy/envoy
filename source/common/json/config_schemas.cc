@@ -36,7 +36,6 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
        "port": {"type": "number"},
        "filters" : {
          "type" : "array",
-         "minItems" : 1,
          "items": {
            "type": "object",
            "properties": {"$ref" : "#/definitions/filters"}
@@ -69,6 +68,78 @@ const std::string Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA(R"EOF(
       }
     },
     "required": ["auth_api_cluster", "stat_prefix"],
+    "additionalProperties": false
+  }
+  )EOF");
+
+const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions" : {
+      "access_log": {
+        "type" : "object",
+        "properties" : {
+          "path" : {"type" : "string"},
+          "format" : {"type" : "string"},
+          "filter" : {"type" : "object"}
+        },
+        "required" : ["path"],
+        "additionalProperties" : false
+      },
+      "tracing" : {
+        "type" : "object",
+        "properties" : {
+          "operation_name" : {"type" : "string"}
+        },
+        "required" : ["operation_name"],
+        "additionalProperties" : false
+      },
+      "filters" : {
+        "type" : "object",
+        "properties" : {
+          "type": {
+            "type" : "string",
+            "enum" : ["encoder", "decoder", "both"]
+          },
+          "name" : {"type": "string"},
+          "config": {"type" : "object"}
+        },
+        "required": ["type", "name", "config"],
+        "additionalProperties": false
+      }
+    },
+    "properties" : {
+      "codec_type" : {
+        "type" : "string",
+        "enum" : ["http1", "http2", "auto"]
+      },
+      "stat_prefix" : {"type" : "string"},
+      "route_config" : {"type": "object"},
+      "filters" : {
+        "type" : "array",
+        "minItems" : 1,
+        "properties" : {"$ref" : "#/definitions/filters"}
+      },
+      "add_user_agent" : {"type" : "boolean"},
+      "tracing" : {"$ref" : "#/defintions/tracing"},
+      "http_codec_options" : {
+        "type" : "string",
+        "enum" : ["no_compression"]
+      },
+      "server_name" : {"type" : "string"},
+      "idle_timeout_s" : {"type" : "integer"},
+      "drain_timeout_ms" : {"type" : "integer"},
+      "access_log" : {
+        "type" : "array",
+        "items" : {
+          "type" : "object",
+          "properties" : {"$ref" : "#/definitions/access_log"}
+        }
+      },
+      "use_remote_address" : {"type" : "boolean"},
+      "generate_request_id" : {"type" : "boolean"}
+    },
+    "required" : ["codec_type", "stat_prefix", "route_config", "filters"],
     "additionalProperties": false
   }
   )EOF");
@@ -116,23 +187,383 @@ const std::string Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA(R"EOF(
 
 const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
-      "$schema": "http://json-schema.org/schema#",
-      "properties":{
-        "cluster_name" : {"type" : "string"}
-      },
-      "required": ["cluster_name"],
-      "additionalProperties": false
+    "$schema": "http://json-schema.org/schema#",
+    "properties":{
+      "cluster_name" : {"type" : "string"}
+    },
+    "required": ["cluster_name"],
+    "additionalProperties": false
   }
   )EOF");
 
 const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
       "$schema": "http://json-schema.org/schema#",
-      "properties":{
-        "stat_prefix" : {"type" : "string"},
-        "cluster" : {"type" : "string"}
+      "properties": {
+        "stat_prefix": {"type" : "string"},
+        "route_config": {
+          "type": "object",
+          "properties": {
+            "routes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "cluster": {
+                    "type": "string"
+                  },
+                  "source_ip_list" : {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "source_ports": {
+                    "type": "string"
+                  },
+                  "destination_ip_list" : {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "destination_ports": {
+                    "type": "string"
+                  }
+                },
+                "required": ["cluster"],
+                "additionalProperties": false
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
       },
-      "required": ["stat_prefix", "cluster"],
+      "required": ["stat_prefix", "route_config"],
       "additionalProperties": false
+  }
+  )EOF");
+
+const std::string Json::Schema::ROUTE_CONFIGURATION_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties":{
+      "virtual_hosts" : {"type" : "array"},
+      "internal_only_headers" : {
+        "type" : "array",
+        "items" : {"type" : "string"}
+      },
+      "response_headers_to_add" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "object",
+          "properties": {
+            "key" : {"type" : "string"},
+            "value" : {"type" : "string"}
+          },
+          "required": ["key", "value"],
+          "additionalProperties": false
+        }
+      },
+      "response_headers_to_remove" : {
+        "type" : "array",
+        "items" : {"type" : "string"}
+      }
+    },
+    "required": ["virtual_hosts"],
+    "additionalProperties": false
+  }
+  )EOF");
+
+const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions" : {
+      "virtual_clusters" : {
+        "type" : "object" ,
+        "properties" : {
+          "pattern" : {"type" : "string"},
+          "string" : {"type" : "string"},
+          "method" : {"type" : "string"},
+          "priority" : {"type" : "string"}
+        },
+        "required" : ["pattern", "name"],
+        "additionalProperties" : false
+      }
+    },
+    "properties" : {
+      "name" : {"type" : "string"},
+      "domains": {
+        "type": "array",
+        "items": {"type" : "string"}
+      },
+      "routes": {"type" : "array"},
+      "require_ssl" : {
+        "type" : "string",
+        "enum" : ["all", "external_only"]
+      },
+      "virtual_clusters" : {
+        "type" : "array",
+        "minItems" : 1,
+        "properties" : {"$ref" : "#/definitions/virtual_clusters"}
+      },
+      "rate_limits" : {"type" : "array"}
+    },
+    "required" : ["name", "domains", "routes"],
+    "additionalProperties": false
+  }
+  )EOF");
+
+const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions" : {
+      "weighted_clusters" : {
+        "type" : "object",
+        "properties" : {
+          "clusters" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {"type" : "string"},
+                "weight" : {"type" : "integer"}
+              },
+              "required" : ["name", "weight"],
+              "additionalProperties" : false
+            }
+          },
+          "runtime_key_prefix" : {"type" : "string"}
+        }
+      }
+    },
+    "properties" : {
+      "prefix" : {"type" : "string"},
+      "path" : {"type" : "string"},
+      "cluster" : {"type" : "string"},
+      "weighted_clusters": {"$ref" : "#/definitions/weighted_clusters"},
+      "host_redirect" : {"type" : "string"},
+      "path_redirect" : {"type" : "string"},
+      "prefix_rewrite" : {"type" : "string"},
+      "host_rewrite" : {"type" : "string"},
+      "case_sensitive" : {"type" : "boolean"},
+      "timeout_ms" : {"type" : "integer"},
+      "runtime" : {
+        "type" : "object",
+        "properties" : {
+          "key": {"type" : "string"},
+          "default" : {"type" : "integer"}
+        },
+        "required" : ["key", "default"],
+        "additionalProperties" : false
+      },
+      "retry_policy" : {
+        "type" : "object",
+        "properties" : {
+          "num_retries" : {"type" : "integer"},
+          "retry_on" : {"type" : "string"}
+        },
+        "required" : ["retry_on"],
+        "additionalProperties" : false
+      },
+      "shadow" : {
+        "type" : "object",
+        "properties" : {
+          "cluster" : {"type" : "string"},
+          "runtime_key" : {"type": "string"}
+        },
+        "required" : ["cluster"],
+        "additionalProperties" : false
+      },
+      "priority" : {
+        "type" : "string",
+        "enum" : ["default", "high"]
+      },
+      "headers" : {
+        "type" : "array",
+        "minItems" : 1,
+        "items" : {
+          "type" : "object",
+          "properties" : {
+            "name" : {"type" : "string"},
+            "value" : {"type" : "string"},
+            "regex" : {"type" : "boolean"}
+          },
+          "required" : ["name"],
+          "additionalProperties" : false
+        }
+      },
+      "rate_limits" : {"type" : "array"}
+    },
+    "additionalProperties": false
+  }
+  )EOF");
+
+const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions" : {
+      "service_to_service" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["service_to_service"]
+          }
+        },
+        "required" : ["type"],
+        "additionalProperties" : false
+      },
+      "request_headers" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["request_headers"]
+          },
+          "header_name" : {"type" : "string"},
+          "descriptor_key" : {"type" : "string"}
+        },
+        "required" : ["type", "header_name", "descriptor_key"],
+        "additionalProperties" : false
+      },
+      "remote_address" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["remote_address"]
+          }
+        },
+        "required" : ["type"],
+        "additionalProperties" : false
+      }
+    },
+    "properties" : {
+      "stage" : {"type" : "integer"},
+      "kill_switch_key" : {"type" : "string"},
+      "route_key" : {"type" : "string"},
+      "actions" : {
+        "type" : "array",
+        "minItems": 1,
+        "items" : {
+          "anyOf" : [
+            {"$ref" : "#/definitions/service_to_service"},
+            {"$ref" : "#/definitions/request_headers"},
+            {"$ref" : "#/definitions/remote_address"}
+          ]
+        }
+      }
+    },
+    "required" : ["actions"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::BUFFER_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "max_request_bytes" : {"type" : "integer"},
+      "max_request_time_s" : {"type" : "integer"}
+    },
+    "required" : ["max_request_bytes", "max_request_time_s"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "abort": {
+        "type" : "object",
+        "properties" : {
+          "abort_percent" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          },
+          "http_status" : {"type" : "integer"}
+        },
+        "required" : ["abort_percent", "http_status"],
+        "additionalProperties" : false
+      },
+      "delay" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["fixed"]
+          },
+          "fixed_delay_percent" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          },
+          "fixed_duration_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          }
+        },
+        "required" : ["type", "fixed_delay_percent", "fixed_duration_ms"],
+        "additionalProperties" : false
+      },
+      "upstream_cluster" : {"type" : "string"},
+      "headers" : {
+        "type" : "array",
+        "minItems" : 1,
+        "items" : {
+          "type" : "object",
+          "properties" : {
+            "name" : {"type" : "string"},
+            "value" : {"type" : "string"},
+            "regex" : {"type" : "boolean"}
+          },
+          "required" : ["name"],
+          "additionalProperties" : false
+        }
+      }
+    },
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "pass_through_mode" : {"type" : "boolean"},
+      "endpoint" : {"type" : "string"},
+      "cache_time_ms" : {"type" : "integer"}
+    },
+    "required" : ["pass_through_mode", "endpoint"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "domain" : {"type" : "string"},
+      "stage" : {"type" : "integer"}
+    },
+    "required" : ["domain"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "dynamic_stats" : {"type" : "boolean"}
+    },
+    "additionalProperties" : false
   }
   )EOF");

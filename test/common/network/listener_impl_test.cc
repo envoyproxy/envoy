@@ -49,11 +49,14 @@ public:
   ~TestListenerImpl() {}
 
   MOCK_METHOD1(getAddressPort_, uint16_t(sockaddr*));
-  MOCK_METHOD2(newConnection_, void(int, sockaddr*));
+  MOCK_METHOD3(newConnection_, void(int, sockaddr*, sockaddr*));
 
-  void newConnection(int fd, sockaddr* addr) override { newConnection_(fd, addr); }
-  void newConnection(int fd, const std::string& addr) override {
-    ListenerImpl::newConnection(fd, addr);
+  void newConnection(int fd, sockaddr* remote_addr, sockaddr* local_addr) override {
+    newConnection_(fd, remote_addr, local_addr);
+  }
+  void newConnection(int fd, const std::string& remote_addr,
+                     const std::string& local_addr) override {
+    ListenerImpl::newConnection(fd, remote_addr, local_addr);
   }
 
 protected:
@@ -79,10 +82,10 @@ TEST(ListenerImplTest, UseOriginalDst) {
   EXPECT_CALL(listener, getAddressPort_(_)).WillRepeatedly(Return(10001));
   EXPECT_CALL(connection_handler, findListener("10001")).WillRepeatedly(Return(&listenerDst));
 
-  EXPECT_CALL(listener, newConnection_(_, _)).Times(0);
-  EXPECT_CALL(listenerDst, newConnection_(_, _))
+  EXPECT_CALL(listener, newConnection_(_, _, _)).Times(0);
+  EXPECT_CALL(listenerDst, newConnection_(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](int, sockaddr*) -> void {
+      .WillOnce(Invoke([&](int, sockaddr*, sockaddr*) -> void {
         client_connection->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
       }));

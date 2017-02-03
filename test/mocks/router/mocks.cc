@@ -54,6 +54,7 @@ MockRouteEntry::MockRouteEntry() {
 MockRouteEntry::~MockRouteEntry() {}
 
 MockConfig::MockConfig() {
+  ON_CALL(*this, route(_, _)).WillByDefault(Return(&route_));
   ON_CALL(*this, internalOnlyHeaders()).WillByDefault(ReturnRef(internal_only_headers_));
   ON_CALL(*this, responseHeadersToAdd()).WillByDefault(ReturnRef(response_headers_to_add_));
   ON_CALL(*this, responseHeadersToRemove()).WillByDefault(ReturnRef(response_headers_to_remove_));
@@ -63,11 +64,5 @@ MockConfig::~MockConfig() {}
 
 MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_)); }
 MockRoute::~MockRoute() {}
-
-MockStableRouteTable::MockStableRouteTable() {
-  ON_CALL(*this, route(_)).WillByDefault(Return(&route_));
-}
-
-MockStableRouteTable::~MockStableRouteTable() {}
 
 } // Router

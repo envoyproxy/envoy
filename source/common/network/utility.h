@@ -16,11 +16,14 @@ namespace Network {
  * Utility class for keeping a list of IPV4 addresses and masks, and then determining whether an
  * IP address is in the address/mask list.
  */
-class IpWhiteList {
+class IpList {
 public:
-  IpWhiteList(const Json::Object& config);
+  IpList(const std::vector<std::string>& subnets);
+  IpList(const Json::Object& config, const std::string& member_name);
+  IpList(){};
 
-  bool contains(const std::string& remote_address) const;
+  bool contains(const std::string& address) const;
+  bool empty() const { return ipv4_list_.empty(); }
 
 private:
   struct Ipv4Entry {
@@ -28,8 +31,24 @@ private:
     uint32_t ipv4_mask_;
   };
 
-  std::vector<Ipv4Entry> ipv4_white_list_;
+  std::vector<Ipv4Entry> ipv4_list_;
 };
+
+/**
+ * Utility class to represent TCP/UDP port range
+ */
+class PortRange {
+public:
+  PortRange(uint32_t min, uint32_t max) : min_(min), max_(max) {}
+
+  bool contains(uint32_t port) const { return (port >= min_ && port <= max_); }
+
+private:
+  const uint32_t min_;
+  const uint32_t max_;
+};
+
+typedef std::list<PortRange> PortRangeList;
 
 /**
  * Common network utility routines.
@@ -130,6 +149,24 @@ public:
    * @return true if the operation succeeded, false otherwise
    */
   static bool getOriginalDst(int fd, sockaddr_storage* orig_addr);
+
+  /**
+   * Parses a string containing a comma-separated list of port numbers and/or
+   * port ranges and appends the values to a caller-provided list of PortRange structures.
+   * For example, the string "1-1024,2048-4096,12345" causes 3 PortRange structures
+   * to be appended to the supplied list.
+   * @param str is the string containing the port numbers and ranges
+   * @param list is the list to append the new data structures to
+   */
+  static void parsePortRangeList(const std::string& string, std::list<PortRange>& list);
+
+  /**
+   * Checks whether a given port number appears in at least one of the port ranges in a list
+   * @param port is the port number to search
+   * @param list the list of port ranges in which the port may appear
+   * @return whether the port appears in at least one of the ranges in the list
+   */
+  static bool portInRangeList(uint32_t port, const std::list<PortRange>& list);
 };
 
 } // Network

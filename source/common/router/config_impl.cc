@@ -11,6 +11,7 @@
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
 namespace Router {
@@ -86,6 +87,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       path_redirect_(route.getString("path_redirect", "")), retry_policy_(route),
       rate_limit_policy_(route), shadow_policy_(route),
       priority_(ConfigUtility::parsePriority(route)) {
+
+  route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
 
   bool have_weighted_clusters = route.hasObject("weighted_clusters");
   bool have_cluster = !cluster_name_.empty() || have_weighted_clusters;
@@ -342,6 +345,8 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Load
                                  Upstream::ClusterManager& cm)
     : name_(virtual_host.getString("name")), rate_limit_policy_(virtual_host) {
 
+  virtual_host.validateSchema(Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA);
+
   std::string require_ssl = virtual_host.getString("require_ssl", "");
   if (require_ssl == "") {
     ssl_requirements_ = SslRequirements::NONE;
@@ -401,6 +406,9 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
 
 RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
                            Upstream::ClusterManager& cm) {
+
+  config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
+
   for (const Json::ObjectPtr& virtual_host_config : config.getObjectArray("virtual_hosts")) {
     VirtualHostPtr virtual_host(new VirtualHostImpl(*virtual_host_config, runtime, cm));
     uses_runtime_ |= virtual_host->usesRuntime();
