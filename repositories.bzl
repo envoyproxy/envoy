@@ -72,8 +72,8 @@ def googletest_repositories(bind=True):
 cc_library(
     name = "googletest",
     srcs = [
-        "googletest/src/gtest-all.cc",
         "googlemock/src/gmock-all.cc",
+        "googletest/src/gtest-all.cc",
     ],
     hdrs = glob([
         "googletest/include/**/*.h",
@@ -84,9 +84,9 @@ cc_library(
     ]),
     includes = [
         "googlemock",
+        "googlemock/include",
         "googletest",
         "googletest/include",
-        "googlemock/include",
     ],
     visibility = ["//visibility:public"],
 )
@@ -142,13 +142,11 @@ genrule(
     outs = [
         "config.h",
     ],
+    cmd = "$(location configure) --enable-shared=no --disable-libevent-regress --disable-openssl" +
+          " && cp config.h $@",
     tools = [
         "configure",
     ],
-    cmd = ' '.join([
-        "$(location configure) --enable-shared=no --disable-libevent-regress --disable-openssl",
-        "&& cp config.h $@",
-    ]),
 )
 
 genrule(
@@ -189,7 +187,6 @@ event_srcs = [
     ":event-config",
 ] + glob(["*.h"])
 
-
 event_pthread_srcs = [
     "evthread_pthread.c",
     ":event-config",
@@ -197,6 +194,7 @@ event_pthread_srcs = [
 
 cc_library(
     name = "event",
+    srcs = event_srcs,
     hdrs = glob(["include/**/*.h"]) + [
         "arc4random.c",  # arc4random.c is included by evutil_rand.c
         "bufferevent-internal.h",
@@ -216,14 +214,13 @@ cc_library(
         "util-internal.h",
         "compat/sys/queue.h",
     ],
-    srcs = event_srcs,
-    includes = [
-        "include",
-        "compat",
-    ],
     copts = [
         "-w",
         "-DHAVE_CONFIG_H",
+    ],
+    includes = [
+        "compat",
+        "include",
     ],
     visibility = ["//visibility:public"],
 )
@@ -232,22 +229,23 @@ cc_library(
     name = "event_pthreads",
     srcs = event_pthread_srcs + ["include/event2/thread.h"],
     hdrs = [
-        "evthread-internal.h",
         "compat/sys/queue.h",
+        "evthread-internal.h",
     ],
     copts = [
         "-w",
         "-DHAVE_CONFIG_H",
     ],
     includes = [
-        "include",
         "compat",
+        "include",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         ":event",
     ],
-    visibility = ["//visibility:public"],
-)"""
+)
+"""
 
     native.new_http_archive(
         name = "libevent_git",
@@ -363,12 +361,12 @@ cc_proto_library(
     name = "envoy_carrier_proto",
     srcs = ["lightstep/envoy_carrier.proto"],
     include = ".",
+    default_runtime = "//external:protobuf",
+    protoc = "//external:protoc",
+    visibility = ["//visibility:public"],
     deps = [
         "//external:cc_wkt_protos",
     ],
-    protoc = "//external:protoc",
-    default_runtime = "//external:protobuf",
-    visibility = ["//visibility:public"],
 )
 
 cc_library(
@@ -380,10 +378,10 @@ cc_library(
         "src/c++11/util.cc",
     ],
     hdrs = [
+        "src/c++11/lightstep/envoy.h",
         "src/c++11/lightstep/impl.h",
         "src/c++11/lightstep/options.h",
         "src/c++11/lightstep/propagation.h",
-        "src/c++11/lightstep/envoy.h",
         "src/c++11/lightstep/span.h",
         "src/c++11/lightstep/tracer.h",
         "src/c++11/lightstep/util.h",
@@ -401,11 +399,12 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@lightstep_common_git//:collector_proto",
         ":envoy_carrier_proto",
         "//external:protobuf",
+        "@lightstep_common_git//:collector_proto",
     ],
-)"""
+)
+"""
 
     COMMON_BUILD = """
 load("@protobuf_git//:protobuf.bzl", "cc_proto_library")
@@ -421,13 +420,14 @@ cc_proto_library(
     name = "collector_proto",
     srcs = ["lightstep/collector.proto"],
     include = ".",
+    default_runtime = "//external:protobuf",
+    protoc = "//external:protoc",
+    visibility = ["//visibility:public"],
     deps = [
         "//external:cc_wkt_protos",
     ],
-    protoc = "//external:protoc",
-    default_runtime = "//external:protobuf",
-    visibility = ["//visibility:public"],
-)"""
+)
+"""
 
     native.new_git_repository(
         name = "lightstep_common_git",
@@ -514,13 +514,11 @@ genrule(
     outs = [
         "config.h",
     ],
+    cmd = "$(location configure) --enable-lib-only --enable-shared=no" +
+          " && cp config.h $@",
     tools = [
         "configure",
     ],
-    cmd = ' '.join([
-        "$(location configure) --enable-lib-only --enable-shared=no",
-        "&& cp config.h $@",
-    ]),
 )
 
 cc_library(

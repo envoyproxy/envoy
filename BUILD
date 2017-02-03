@@ -20,9 +20,9 @@ cc_proto_library(
     srcs = [
         "source/common/generated/ratelimit.proto",
     ],
+    include = "source",
     default_runtime = "//external:protobuf",
     protoc = "//external:protoc",
-    include = "source",
 )
 
 genrule(
@@ -41,9 +41,9 @@ cc_proto_library(
     srcs = [
         "test/generated/helloworld.proto",
     ],
+    include = "test",
     default_runtime = "//external:protobuf",
     protoc = "//external:protoc",
-    include = "test",
 )
 
 genrule(
@@ -51,23 +51,26 @@ genrule(
     srcs = glob([
         ".git/**",
     ]),
-    tools = [
-        "tools/gen_git_sha.sh",
-    ],
     outs = [
         "source/common/version_generated.cc",
     ],
     cmd = "touch $@ && $(location tools/gen_git_sha.sh) $$(dirname $(location tools/gen_git_sha.sh)) $@",
     local = 1,
+    tools = [
+        "tools/gen_git_sha.sh",
+    ],
 )
 
 cc_library(
     name = "envoy-common",
-    srcs = glob([
-        "source/**/*.cc",
-        "source/**/*.h",
-        "include/**/*.h",
-    ], exclude=["source/exe/main.cc"]) + [
+    srcs = glob(
+        [
+            "source/**/*.cc",
+            "source/**/*.h",
+            "include/**/*.h",
+        ],
+        exclude = ["source/exe/main.cc"],
+    ) + [
         "source/common/version_generated.cc",
     ],
     copts = [
@@ -82,21 +85,21 @@ cc_library(
         "-lanl",
         "-lrt",
     ],
-    linkstatic=1,
-    alwayslink=1,
+    linkstatic = 1,
     deps = [
         ":envoy-ratelimit-pb",
+        "//external:event",
+        "//external:event_pthreads",
+        "//external:http_parser",
         "//external:libssl",
+        "//external:lightstep",
         "//external:nghttp2",
+        "//external:protobuf",
+        "//external:rapidjson",
         "//external:spdlog",
         "//external:tclap",
-        "//external:lightstep",
-        "//external:event",
-        "//external:protobuf",
-        "//external:http_parser",
-        "//external:rapidjson",
-        "//external:event_pthreads",
     ],
+    alwayslink = 1,
 )
 
 cc_binary(
@@ -107,10 +110,10 @@ cc_binary(
     copts = [
         "-includesource/precompiled/precompiled.h",
     ],
+    linkstatic = 1,
     deps = [
         ":envoy-common",
     ],
-    linkstatic=1,
 )
 
 cc_library(
@@ -127,7 +130,7 @@ cc_library(
         ":envoy-test-pb",
         "//external:googletest",
     ],
-    alwayslink=1,
+    alwayslink = 1,
 )
 
 filegroup(
@@ -143,10 +146,10 @@ cc_test(
     data = [
         ":envoy-testdata",
     ],
+    linkstatic = 1,
     deps = [
         ":envoy-test-lib",
         ":envoy-test-pb",
         "//external:googletest",
     ],
-    linkstatic=1,
 )
