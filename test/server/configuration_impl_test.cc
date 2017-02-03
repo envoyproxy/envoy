@@ -119,5 +119,37 @@ TEST(ConfigurationImplTest, BadListenerConfig) {
   EXPECT_THROW(config.initialize(*loader), Json::Exception);
 }
 
+TEST(ConfigurationImplTest, NotSetServiceClusterWhenLSTracing) {
+  std::string json = R"EOF(
+  {
+    "listeners" : [
+      {
+        "port" : 1234,
+        "filters": []
+      }
+    ],
+    "cluster_manager": {
+      "clusters": []
+    }
+    "tracing": {
+      "http": {
+        "driver": {
+          "type": "lightstep",
+          "access_token_file": "/etc/envoy/envoy.cfg"
+        }
+      }
+    }
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  MainImpl config(server);
+  config.initialize(*loader);
+
+  EXPECT_EQ(1U, config.listeners().size());
+}
+
 } // Configuration
 } // Server
