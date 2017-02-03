@@ -109,9 +109,8 @@ TEST(CodecTest, decodeMultipleFrame) {
     EXPECT_EQ(request.ByteSizeLong(), frame.length);
 
     helloworld::HelloRequest result;
-    result.ParseFromArray(frame.data->linearize(frame.data->length()),
-                          frame.data->length());
+    result.ParseFromArray(frame.data->linearize(frame.data->length()), frame.data->length());
     EXPECT_EQ("hello", result.name());
   }
 }
-}  // Grpc
+} // Grpc

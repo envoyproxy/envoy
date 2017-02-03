@@ -17,7 +17,7 @@ struct Frame {
 };
 
 class Encoder {
- public:
+public:
   Encoder();
 
   // Creates a new GRPC data frame with the given flags and length.
@@ -28,7 +28,7 @@ class Encoder {
 };
 
 class Decoder {
- public:
+public:
   Decoder();
 
   // Decodes the given buffer with GRPC data frame.
@@ -37,7 +37,7 @@ class Decoder {
   // @return bool whether the decoding success.
   bool Decode(Buffer::Instance& input, std::vector<Frame>* output);
 
- private:
+private:
   // Wiring format of GRPC data frame header:
   // -----------------------------------------------------------------------
   // |R|R|R|R|R|R|R|R|C|      L     |      L     |      L     |      L     |
@@ -71,4 +71,4 @@ class Decoder {
   State state_;
   Frame frame_;
 };
-}  // Grpc
+} // Grpc
