@@ -87,7 +87,11 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "type" : "string",
             "enum" : [">=", "="]
           },
-          "value" : {"type" : "integer"},
+          "value" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 600
+          },
           "runtime_key" : {"type" : "string"}
         },
         "required" : ["type", "op", "value"],
@@ -104,7 +108,10 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "type" : "string",
             "enum" : [">=", "="]
           },
-          "value" : {"type" : "integer"},
+          "value" : {
+            "type" : "integer",
+            "minimum" : 0
+          },
           "runtime_key" : {"type" : "string"}
         },
         "required" : ["type", "op", "value"],
@@ -614,7 +621,11 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "maximum" : 100
           },
-          "http_status" : {"type" : "integer"}
+          "http_status" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 600
+          }
         },
         "required" : ["abort_percent", "http_status"],
         "additionalProperties" : false
