@@ -90,7 +90,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           "value" : {
             "type" : "integer",
             "minimum" : 0,
-            "maximum" : 600
+            "maximum" : 599
           },
           "runtime_key" : {"type" : "string"}
         },
@@ -624,7 +624,7 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
           "http_status" : {
             "type" : "integer",
             "minimum" : 0,
-            "maximum" : 600
+            "maximum" : 599
           }
         },
         "required" : ["abort_percent", "http_status"],
