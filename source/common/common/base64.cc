@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include "base64.h"
 
 #include "common/common/assert.h"
@@ -5,6 +6,8 @@
 static constexpr char CHAR_TABLE[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+// Conversion table is taken from
+// https://opensource.apple.com/source/QuickTimeStreamingServer/QuickTimeStreamingServer-452/CommonUtilitiesLib/base64.c
 static const unsigned char REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64, 64, 63,
@@ -19,25 +22,46 @@ static const unsigned char REVERSE_LOOKUP_TABLE[256] = {
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64};
 
 std::string Base64::decode(const std::string& input) {
-  ASSERT(!(input.length() % 4));
+  if (input.length() % 4) {
+    throw std::invalid_argument("Base64 encoded string should have length divided evenly by 4.");
+  }
 
   int max_length = input.length() / 4 * 3;
+  // At most last two chars can be '='.
+  if (input.length() > 0) {
+    if (input[input.length() - 1] == '=') {
+      max_length--;
+      if (input[input.length() - 2] == '=') {
+        max_length--;
+      }
+    }
+  }
   std::string result;
   result.reserve(max_length);
 
   uint64_t bytes_left = input.length();
   uint64_t cur_read = 0;
 
+  // Read input string by group of 4 chars, length of input string must be divided evenly by 4.
+  // Decode 4 chars 6 bits each into 3 chars 8 bits each.
   while (bytes_left > 0) {
+    // Take first 6 bits from first converted char and first 2 bits from second converted char,
+    // make 8 bits char from it.
+    // Use conversion table to map char to decoded value (value is between 0 and 64).
     result.push_back(REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read])] << 2 |
                      REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 1])] >> 4);
     unsigned char c = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 2])];
+
+    // Chars not less than 64 will be skipped, '=' for example.
+    // Everything less than 64 is going to be decoded.
     if (c < 64) {
+      // Take last 4 bits from second converted char and 4 first bits from third converted char.
       result.push_back(REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 1])] << 4 |
                        c >> 2);
       unsigned char d = REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 3])];
 
       if (d < 64) {
+        // Take last 2 bits from 3rd converted char and all (6) bits from fourth converted char.
         result.push_back(REVERSE_LOOKUP_TABLE[static_cast<uint32_t>(input[cur_read + 2])] << 6 | d);
       }
     }

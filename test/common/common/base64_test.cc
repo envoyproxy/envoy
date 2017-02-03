@@ -10,8 +10,9 @@ TEST(Base64Test, EmptyBufferEncode) {
 
   {
     Buffer::OwnedImpl buffer;
-    buffer.add("\0\0");
-    EXPECT_EQ("", Base64::encode(buffer, 2));
+    const char* tmp = "\0\0";
+    buffer.add(tmp, 2);
+    EXPECT_EQ("AAA=", Base64::encode(buffer, 2));
   }
 }
 
