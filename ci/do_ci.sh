@@ -46,6 +46,7 @@ $EXTRA_CMAKE_FLAGS \
 -DENVOY_GTEST_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_HTTP_PARSER_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_LIBEVENT_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
+-DENVOY_LIBCARES_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_NGHTTP2_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_SPDLOG_INCLUDE_DIR:FILEPATH=/thirdparty/spdlog-0.11.0/include \
 -DENVOY_TCLAP_INCLUDE_DIR:FILEPATH=/thirdparty/tclap-1.2.1/include \

@@ -47,6 +47,10 @@ set(ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR "" CACHE FILEPATH "location of lighstep t
 # Last tested with 1.1.0
 set(ENVOY_RAPIDJSON_INCLUDE_DIR "" CACHE FILEPATH "location of rapidjson includes")
 
+# https://c-ares.haxx.se/
+# Last tested with 1.12.0
+set(ENVOY_LIBCARES_INCLUDE_DIR "" CACHE STRING "location of libcares includes")
+
 # Extra linker flags required to properly link envoy with all of the above libraries.
 set(ENVOY_EXE_EXTRA_LINKER_FLAGS "" CACHE STRING "envoy extra linker flags")
 

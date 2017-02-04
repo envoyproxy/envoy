@@ -28,24 +28,49 @@ TEST(DnsImplTest, LocalAsyncLookup) {
   EXPECT_THAT(address_list, testing::Contains("127.0.0.1"));
 }
 
+TEST(DnsImplTest, MultipleResolvers) {
+  Api::Impl api(std::chrono::milliseconds(10000));
+  Event::DispatcherPtr dispatcher = api.allocateDispatcher();
+  DnsResolverPtr resolver1 = dispatcher->createDnsResolver();
+  DnsResolverPtr resolver2 = dispatcher->createDnsResolver();
+
+  std::list<std::string> address_list;
+  resolver1->resolve("localhost", [&](std::list<std::string>&& results) -> void {
+    address_list.splice(address_list.end(), results);
+  });
+  resolver2->resolve("localhost", [&](std::list<std::string>&& results) -> void {
+    address_list.splice(address_list.end(), results);
+  });
+
+  dispatcher->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(address_list.size(), 2UL);
+}
+
+TEST(DnsImplTest, CancelInflightLookups) {
+  Api::Impl api(std::chrono::milliseconds(10000));
+  Event::DispatcherPtr dispatcher = api.allocateDispatcher();
+  DnsResolverPtr resolver = dispatcher->createDnsResolver();
+
+  resolver->resolve("lyft.com", [](std::list<std::string> && ) -> void { FAIL(); });
+  resolver->resolve("lyft.com", [](std::list<std::string> && ) -> void { FAIL(); });
+  resolver->resolve("lyft.com", [](std::list<std::string> && ) -> void { FAIL(); });
+
+  resolver.reset();
+  dispatcher->run(Event::Dispatcher::RunType::Block);
+}
+
 TEST(DnsImplTest, Cancel) {
   Api::Impl api(std::chrono::milliseconds(10000));
   Event::DispatcherPtr dispatcher = api.allocateDispatcher();
   DnsResolverPtr resolver = dispatcher->createDnsResolver();
-  Event::TimerPtr stop_timer = dispatcher->createTimer([&]() -> void {
-    // TODO: This is an absurd hack, but right now the DNS resolver uses signalfd, which means
-    //       that we can get delivery when a new resolver comes up later in the test. We will
-    //       get rid of all of this when we switch this out for c-ares.
-    dispatcher->exit();
-  });
 
   ActiveDnsQuery& query =
-      resolver->resolve("localhost", [](std::list<std::string> && ) -> void { FAIL(); });
+      resolver->resolve("lyft.com", [](std::list<std::string> && ) -> void { FAIL(); });
 
   std::list<std::string> address_list;
   resolver->resolve("localhost", [&](std::list<std::string>&& results) -> void {
     address_list = results;
-    stop_timer->enableTimer(std::chrono::milliseconds(250));
+    dispatcher->exit();
   });
 
   query.cancel();

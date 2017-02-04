@@ -13,6 +13,7 @@ add_custom_command(
 set_source_files_properties(generated/helloworld.pb.cc PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
 
 include_directories(${ENVOY_GMOCK_INCLUDE_DIR})
+include_directories(${ENVOY_LIBCARES_INCLUDE_DIR})
 include_directories(${ENVOY_GTEST_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_HTTP_PARSER_INCLUDE_DIR})
 include_directories(${PROJECT_SOURCE_DIR})
@@ -152,6 +153,7 @@ if (ENVOY_TCMALLOC)
   target_link_libraries(envoy-test tcmalloc_and_profiler)
 endif()
 
+target_link_libraries(envoy-test cares)
 target_link_libraries(envoy-test event)
 target_link_libraries(envoy-test event_pthreads)
 target_link_libraries(envoy-test http_parser)
