@@ -7,13 +7,13 @@
 namespace Memory {
 
 uint64_t Stats::totalCurrentlyAllocated() {
-  uint64_t value = 0;
+  size_t value = 0;
   MallocExtension::instance()->GetNumericProperty("generic.current_allocated_bytes", &value);
   return value;
 }
 
 uint64_t Stats::totalCurrentlyReserved() {
-  uint64_t value = 0;
+  size_t value = 0;
   MallocExtension::instance()->GetNumericProperty("generic.heap_size", &value);
   return value;
 }

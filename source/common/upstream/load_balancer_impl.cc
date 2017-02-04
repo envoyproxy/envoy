@@ -117,7 +117,7 @@ bool LoadBalancerBase::earlyExitNonZoneRouting() {
 
 bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
   uint64_t global_panic_threshold =
-      std::min(100UL, runtime_.snapshot().getInteger(RuntimePanicThreshold, 50));
+      std::min<uint64_t>(100, runtime_.snapshot().getInteger(RuntimePanicThreshold, 50));
   double healthy_percent = 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
 
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.

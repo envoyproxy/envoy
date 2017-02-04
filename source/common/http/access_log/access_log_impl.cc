@@ -99,7 +99,8 @@ bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header
   const HeaderEntry* uuid = request_header.RequestId();
   uint16_t sampled_value;
   if (uuid && UuidUtils::uuidModBy(uuid->value().c_str(), sampled_value, 100)) {
-    uint64_t runtime_value = std::min(runtime_.snapshot().getInteger(runtime_key_, 0), 100UL);
+    uint64_t runtime_value =
+        std::min<uint64_t>(runtime_.snapshot().getInteger(runtime_key_, 0), 100);
 
     return sampled_value < static_cast<uint16_t>(runtime_value);
   } else {
