@@ -212,6 +212,9 @@ Traceable
 Filters for requests that are traceable. See the :ref:`tracing overview <arch_overview_tracing>` for
 more information on how a request becomes traceable.
 
+
+.. _config_http_con_manager_access_log_filters_runtime:
+
 Runtime
 ^^^^^^^^^
 .. code-block:: json
@@ -223,9 +226,11 @@ Runtime
     }
   }
 
-Filters for the header :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`.
-If :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` is present, the filter will
-consistently sample across multiple hosts based on the runtime key value. If it is missing, the
+Filters for random sampling of requests. Sampling pivots on the header
+:ref:`x-request-id<config_http_conn_man_headers_x-request-id>` being present. If
+:ref:`x-request-id<config_http_conn_man_headers_x-request-id>` is present, the filter will
+consistently sample across multiple hosts based on the runtime key value and the value extracted
+from :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`. If it is missing, the
 filter will randomly sample based on the runtime key value.
 
 key

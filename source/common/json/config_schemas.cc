@@ -151,12 +151,12 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "required" : ["type", "key"],
         "additionalProperties" : false
       },
-      "logical_and" : {
+      "logical_filter" : {
         "type" : "object",
         "properties" : {
           "type" : {
             "type" : "string",
-            "enum" : ["logical_and"]
+            "enum" : ["logical_and", "logical_or"]
           },
           "filters" : {
             "type" : "array",
@@ -166,34 +166,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
                 {"$ref" : "#/definitions/status_code"},
                 {"$ref" : "#/definitions/duration"},
                 {"$ref" : "#/definitions/not_healthcheck"},
-                {"$ref" : "#/definitions/logical_and"},
-                {"$ref" : "#/definitions/logical_or"},
-                {"$ref" : "#/definitions/traceable_request"},
-                {"$ref" : "#/definitions/runtime"}
-              ]
-            }
-          }
-        },
-        "required" : ["type", "filters"],
-        "additionalProperties" : false
-      },
-      "logical_or" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "type" : "string",
-            "enum" : ["logical_or"]
-          },
-          "filters" : {
-            "type" : "array",
-            "minItems" : 2,
-            "items" : {
-              "oneOf" : [
-                {"$ref" : "#/definitions/status_code"},
-                {"$ref" : "#/definitions/duration"},
-                {"$ref" : "#/definitions/not_healthcheck"},
-                {"$ref" : "#/definitions/logical_and"},
-                {"$ref" : "#/definitions/logical_or"},
+                {"$ref" : "#/definitions/logical_filter"},
                 {"$ref" : "#/definitions/traceable_request"},
                 {"$ref" : "#/definitions/runtime"}
               ]
@@ -261,8 +234,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
                 {"$ref" : "#/definitions/duration"},
                 {"$ref" : "#/definitions/traceable_request"},
                 {"$ref" : "#/definitions/runtime"},
-                {"$ref" : "#/definitions/logical_and"},
-                {"$ref" : "#/definitions/logical_or"}
+                {"$ref" : "#/definitions/logical_filter"}
               ]
             }
           },
