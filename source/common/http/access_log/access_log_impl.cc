@@ -72,7 +72,7 @@ FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {
   }
 }
 
-TraceableRequestFilter::TraceableRequestFilter(Runtime::Loader& runtime) : runtime_(runtime) {}
+TraceableRequestFilter::TraceableRequestFilter(Runtime::Loader&) {}
 
 bool TraceableRequestFilter::evaluate(const RequestInfo& info, const HeaderMap& request_headers) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);

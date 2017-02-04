@@ -32,14 +32,11 @@ public:
 
 class LocalMockFilter : public MockFilter {
 public:
-  LocalMockFilter(const Upstream::HostDescription* host) : host_(host) {}
+  LocalMockFilter(const Upstream::HostDescription*) {}
   ~LocalMockFilter() {
     // Make sure the upstream host is still valid in the filter destructor.
     callbacks_->upstreamHost()->url();
   }
-
-private:
-  const Upstream::HostDescription* host_;
 };
 
 TEST_F(NetworkFilterManagerTest, All) {
