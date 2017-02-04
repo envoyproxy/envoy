@@ -296,7 +296,7 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
               "type": "logical_or",
               "filters": [
                 {"type": "duration", "op": ">=", "value": 10000},
-                {"type": "bad_type", "op": ">=", "value": 500}
+                {"type": "bad_type"}
               ]
             },
             {"type": "not_healthcheck"}
