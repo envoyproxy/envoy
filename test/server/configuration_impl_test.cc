@@ -6,6 +6,7 @@
 
 using testing::InSequence;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Server {
 namespace Configuration {
@@ -130,7 +131,7 @@ TEST(ConfigurationImplTest, NotSetServiceClusterWhenLSTracing) {
     ],
     "cluster_manager": {
       "clusters": []
-    }
+    },
     "tracing": {
       "http": {
         "driver": {
@@ -145,10 +146,11 @@ TEST(ConfigurationImplTest, NotSetServiceClusterWhenLSTracing) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
-  config.initialize(*loader);
+  std::string cluster_not_set = "";
+  EXPECT_CALL(server.local_info_, clusterName()).WillOnce(ReturnRef(cluster_not_set));
 
-  EXPECT_EQ(1U, config.listeners().size());
+  MainImpl config(server);
+  EXPECT_THROW(config.initialize(*loader), EnvoyException);
 }
 
 } // Configuration
