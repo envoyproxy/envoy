@@ -376,7 +376,7 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);
 
-  // Make destruction of active stream so that we can capture tracing HC stat.
+  // Force dtor of active stream to be called so that we can capture tracing HC stat.
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   // HC request, but was originally sampled, so check for two stats here.
@@ -880,6 +880,21 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       .WillOnce(Return(Http::FilterTrailersStatus::Continue));
   EXPECT_CALL(encoder, encodeTrailers(_));
   encoder_filter1->callbacks_->continueEncoding();
+}
+
+TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
+  Stats::IsolatedStoreImpl stats;
+  ConnectionManagerTracingStats tracing_stats{CONN_MAN_TRACING_STATS(POOL_COUNTER(stats))};
+
+  EXPECT_THROW(
+      ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::HealthCheck, tracing_stats),
+      std::invalid_argument);
+
+  ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::ClientForced, tracing_stats);
+  EXPECT_EQ(1UL, tracing_stats.client_enabled_.value());
+
+  ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::NotTraceableRequestId, tracing_stats);
+  EXPECT_EQ(1UL, tracing_stats.not_traceable_.value());
 }
 
 } // Http
