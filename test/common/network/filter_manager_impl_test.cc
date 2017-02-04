@@ -32,7 +32,6 @@ public:
 
 class LocalMockFilter : public MockFilter {
 public:
-  LocalMockFilter(const Upstream::HostDescription*) {}
   ~LocalMockFilter() {
     // Make sure the upstream host is still valid in the filter destructor.
     callbacks_->upstreamHost()->url();
@@ -45,7 +44,7 @@ TEST_F(NetworkFilterManagerTest, All) {
   Upstream::HostDescription* host_description(new NiceMock<Upstream::MockHostDescription>());
   MockReadFilter* read_filter(new MockReadFilter());
   MockWriteFilter* write_filter(new MockWriteFilter());
-  MockFilter* filter(new LocalMockFilter(host_description));
+  MockFilter* filter(new LocalMockFilter());
 
   NiceMock<MockConnection> connection;
   FilterManagerImpl manager(connection, *this);
