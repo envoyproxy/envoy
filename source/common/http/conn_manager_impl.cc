@@ -1,4 +1,3 @@
-#include <stdexcept>
 #include "conn_manager_impl.h"
 #include "conn_manager_utility.h"
 #include "headers.h"
