@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 
 namespace Network {
