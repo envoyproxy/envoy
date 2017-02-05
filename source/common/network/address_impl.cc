@@ -1,5 +1,7 @@
 #include "address_impl.h"
 
+#include "envoy/common/exception.h"
+
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 

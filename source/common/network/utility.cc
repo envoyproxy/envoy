@@ -77,9 +77,8 @@ const std::string Utility::UNIX_SCHEME = "unix://";
 
 Address::InstancePtr Utility::resolveUrl(const std::string& url) {
   // TODO: IPv6 support.
-  // TODO: We have switched to ip:// for IP addresses and pipe:// for unix/pipe addresses, but we
-  //       still support the legacy tcp:// and unix:// names. Actually support/parse ip:// and
-  //       pipe:// and document it.
+  // TODO: We still support the legacy tcp:// and unix:// names. We should support/parse ip:// and
+  //       pipe:// as better names.
   if (url.find(TCP_SCHEME) == 0) {
     return Address::InstancePtr{
         new Address::Ipv4Instance(hostFromTcpUrl(url), portFromTcpUrl(url))};
