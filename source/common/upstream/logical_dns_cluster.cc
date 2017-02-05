@@ -66,7 +66,7 @@ void LogicalDnsCluster::startResolve() {
             // TODO: The logical host is only used in /clusters admin output. We used to show
             //       the friendly DNS name in that output, but currently there is no way to
             //       express a DNS name inside of an Address::Instance. For now this is OK but
-            //       we might want to do better agan later.
+            //       we might want to do better again later.
             logical_host_.reset(
                 new LogicalHost(info_, Network::Utility::resolveUrl("tcp://0.0.0.0:0"), *this));
             HostVectorPtr new_hosts(new std::vector<HostPtr>());
