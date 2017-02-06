@@ -119,7 +119,7 @@ public:
   std::string toString(bool full) const override;
 
   // Mongo::QueryMessage
-  bool operator==(const QueryMessage& rhs) const;
+  bool operator==(const QueryMessage& rhs) const override;
   int32_t flags() const override { return flags_; }
   void flags(int32_t flags) override { flags_ = flags; }
   const std::string& fullCollectionName() const override { return full_collection_name_; }

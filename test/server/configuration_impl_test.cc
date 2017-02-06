@@ -6,6 +6,7 @@
 
 using testing::InSequence;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Server {
 namespace Configuration {
@@ -117,6 +118,67 @@ TEST(ConfigurationImplTest, BadListenerConfig) {
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
   EXPECT_THROW(config.initialize(*loader), Json::Exception);
+}
+
+TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
+  std::string json = R"EOF(
+  {
+    "listeners" : [
+      {
+        "port" : 1234,
+        "filters": []
+      }
+    ],
+    "cluster_manager": {
+      "clusters": []
+    },
+    "tracing": {
+      "http": {
+        "driver": {
+          "type": "lightstep",
+          "access_token_file": "/etc/envoy/envoy.cfg"
+        }
+      }
+    }
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  server.local_info_.cluster_name_ = "";
+  MainImpl config(server);
+  EXPECT_THROW(config.initialize(*loader), EnvoyException);
+}
+
+TEST(ConfigurationImplTest, UnsupportedDriverType) {
+  std::string json = R"EOF(
+  {
+    "listeners" : [
+      {
+        "port" : 1234,
+        "filters": []
+      }
+    ],
+    "cluster_manager": {
+      "clusters": []
+    },
+    "tracing": {
+      "http": {
+        "driver": {
+          "type": "unknown",
+          "access_token_file": "/etc/envoy/envoy.cfg"
+        }
+      }
+    }
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  MainImpl config(server);
+  EXPECT_THROW(config.initialize(*loader), EnvoyException);
 }
 
 } // Configuration
