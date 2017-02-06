@@ -63,6 +63,5 @@ $EXTRA_CMAKE_FLAGS \
 
 cmake -L || true
 
-make fix_format
 make check_format
 make -j$NUM_CPUS $TEST_TARGET

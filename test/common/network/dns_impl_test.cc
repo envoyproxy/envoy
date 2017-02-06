@@ -29,8 +29,9 @@ typedef std::unordered_map<std::string, IpList> HostMap;
 // just enough of RFC 1035 to handle queries we generate in the tests below.
 class TestDnsServerQuery {
 public:
-  TestDnsServerQuery(struct event_base* base, const HostMap& hosts)
-      : event_base_(base), hosts_(hosts) {}
+  TestDnsServerQuery(struct bufferevent* bev, const HostMap& hosts)
+      : bufferevent_(bev), hosts_(hosts) {}
+  ~TestDnsServerQuery() { bufferevent_free(bufferevent_); }
 
   void onRead(struct bufferevent* bev) {
     while (true) {
@@ -117,15 +118,11 @@ public:
 
   void onError(struct bufferevent* bev, short events) {
     UNREFERENCED_PARAMETER(bev);
-    if (events & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
-      EXPECT_TRUE(!(events & BEV_EVENT_ERROR));
-      bufferevent_free(bev);
-      delete this;
-    }
+    EXPECT_TRUE(!(events & BEV_EVENT_ERROR));
   }
 
 private:
-  struct event_base* event_base_;
+  struct bufferevent* bufferevent_;
   const HostMap& hosts_;
   // The expected size of the current DNS query to read. If zero, indicates that
   // no DNS query is in progress and that a 2 byte size is expected from the
@@ -138,9 +135,9 @@ public:
   TestDnsServer(struct event_base* base) : event_base_(base) {}
 
   void onAccept(int fd) {
-    TestDnsServerQuery* query = new TestDnsServerQuery(event_base_, hosts_);
-    evutil_make_socket_nonblocking(fd);
     struct bufferevent* bev = bufferevent_socket_new(event_base_, fd, BEV_OPT_CLOSE_ON_FREE);
+    TestDnsServerQuery* query = new TestDnsServerQuery(bev, hosts_);
+    queries_.emplace_back(query);
     bufferevent_setcb(bev, [](struct bufferevent* bev,
                               void* ctx) { static_cast<TestDnsServerQuery*>(ctx)->onRead(bev); },
                       nullptr,
@@ -157,6 +154,9 @@ public:
 private:
   HostMap hosts_;
   struct event_base* event_base_;
+  // All queries are tracked so we can do resource reclamation when the test is
+  // over.
+  std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
 };
 } // namespace
 
