@@ -146,7 +146,7 @@ private:
  */
 class NullLoaderImpl : public Loader {
 public:
-  NullLoaderImpl(RandomGenerator& generator) : generator_(generator), snapshot_(generator) {}
+  NullLoaderImpl(RandomGenerator& generator) : snapshot_(generator) {}
 
   // Runtime::Loader
   Snapshot& snapshot() override { return snapshot_; }
@@ -186,7 +186,6 @@ private:
     RandomGenerator& generator_;
   };
 
-  RandomGenerator& generator_;
   NullSnapshotImpl snapshot_;
 };
 
