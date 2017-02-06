@@ -38,8 +38,7 @@ public:
   HttpConnectionManagerImplTest()
       : access_log_path_("dummy_path"),
         access_logs_{Http::AccessLog::InstancePtr{new Http::AccessLog::InstanceImpl(
-            access_log_path_, {},
-            AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
+            access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
             log_manager_)}},
         codec_(new NiceMock<Http::MockServerConnection>()),
         stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
