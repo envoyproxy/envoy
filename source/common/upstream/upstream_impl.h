@@ -86,7 +86,7 @@ public:
   }
   bool healthy() const override { return !health_flags_; }
   uint32_t weight() const override { return weight_; }
-  void weight(uint32_t new_weight);
+  void weight(uint32_t new_weight) override;
 
 protected:
   static Network::ClientConnectionPtr createConnection(Event::Dispatcher& dispatcher,
