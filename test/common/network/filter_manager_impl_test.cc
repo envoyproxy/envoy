@@ -32,14 +32,10 @@ public:
 
 class LocalMockFilter : public MockFilter {
 public:
-  LocalMockFilter(const Upstream::HostDescription* host) : host_(host) {}
   ~LocalMockFilter() {
     // Make sure the upstream host is still valid in the filter destructor.
     callbacks_->upstreamHost()->url();
   }
-
-private:
-  const Upstream::HostDescription* host_;
 };
 
 TEST_F(NetworkFilterManagerTest, All) {
@@ -48,7 +44,7 @@ TEST_F(NetworkFilterManagerTest, All) {
   Upstream::HostDescription* host_description(new NiceMock<Upstream::MockHostDescription>());
   MockReadFilter* read_filter(new MockReadFilter());
   MockWriteFilter* write_filter(new MockWriteFilter());
-  MockFilter* filter(new LocalMockFilter(host_description));
+  MockFilter* filter(new LocalMockFilter());
 
   NiceMock<MockConnection> connection;
   FilterManagerImpl manager(connection, *this);
@@ -122,8 +118,14 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
 
   std::string tcp_proxy_json = R"EOF(
     {
-      "cluster": "fake_cluster",
-      "stat_prefix": "name"
+      "stat_prefix": "name",
+      "route_config": {
+        "routes": [
+          {
+            "cluster": "fake_cluster"
+          }
+        ]
+      }
     }
     )EOF";
 

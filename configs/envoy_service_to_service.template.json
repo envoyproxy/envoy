@@ -245,8 +245,14 @@
       "type": "read",
       "name": "tcp_proxy",
       "config": {
-        "cluster": "mongo_{{ key }}",
-        "stat_prefix": "mongo_{{ key }}"
+        "stat_prefix": "mongo_{{ key }}",
+        "route_config": {
+          "routes": [
+            {
+              "cluster": "mongo_{{ key }}"
+            }
+          ]
+        }
       }
     }]
   }{% if not loop.last %},{% endif -%}

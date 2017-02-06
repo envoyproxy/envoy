@@ -12,7 +12,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "prefix": "...",
     "path": "...",
     "cluster": "...",
-    "weighted_clusters" : "...",
+    "weighted_clusters" : "{...}",
     "host_redirect": "...",
     "path_redirect": "...",
     "prefix_rewrite": "...",
@@ -45,7 +45,7 @@ cluster
   should be forwarded to.
 
 :ref:`weighted_clusters <config_http_conn_man_route_table_route_weighted_clusters>`
-  *(sometimes required, string)* If the route is not a redirect (*host_redirect* and/or
+  *(sometimes required, object)* If the route is not a redirect (*host_redirect* and/or
   *path_redirect* is not specified), one of *cluster* or *weighted_clusters* must be specified.
   With the *weighted_clusters* option, multiple upstream clusters can be specified for a given route.
   The request is forwarded to one of the upstream clusters based on weights assigned
@@ -123,7 +123,7 @@ Runtime
 
 A :ref:`runtime <arch_overview_runtime>` route configuration can be used to roll out route changes
 in a gradual manner without full code/config deploys. Refer to
-:ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting_shift>` docs 
+:ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting_shift>` docs
 for additional documentation.
 
 .. code-block:: json

@@ -6,10 +6,19 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
+#include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
 
 namespace Http {
 namespace RateLimit {
+
+FilterConfig::FilterConfig(const Json::Object& config, const LocalInfo::LocalInfo& local_info,
+                           Stats::Store& global_store, Runtime::Loader& runtime,
+                           Upstream::ClusterManager& cm)
+    : domain_(config.getString("domain")), stage_(config.getInteger("stage", 0)),
+      local_info_(local_info), global_store_(global_store), runtime_(runtime), cm_(cm) {
+  config.validateSchema(Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA);
+}
 
 const Http::HeaderMapPtr Filter::TOO_MANY_REQUESTS_HEADER{new Http::HeaderMapImpl{
     {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}}};

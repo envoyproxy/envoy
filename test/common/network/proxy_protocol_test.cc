@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
@@ -47,7 +48,7 @@ TEST_F(ProxyProtocolTest, Basic) {
 
   EXPECT_CALL(callbacks_, onNewConnection_(_))
       .WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-        ASSERT_EQ("1.2.3.4", conn->remoteAddress());
+        ASSERT_EQ("1.2.3.4", Network::Utility::hostFromUrl(conn->remoteAddress()));
         conn->addReadFilter(read_filter_);
         accepted_connection = std::move(conn);
       }));
@@ -71,7 +72,7 @@ TEST_F(ProxyProtocolTest, Fragmented) {
 
   EXPECT_CALL(callbacks_, onNewConnection_(_))
       .WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-        ASSERT_EQ("255.255.255.255", conn->remoteAddress());
+        ASSERT_EQ("255.255.255.255", Network::Utility::hostFromUrl(conn->remoteAddress()));
         read_filter_.reset(new MockReadFilter());
         conn->addReadFilter(read_filter_);
         conn->close(ConnectionCloseType::NoFlush);
@@ -87,7 +88,7 @@ TEST_F(ProxyProtocolTest, PartialRead) {
 
   EXPECT_CALL(callbacks_, onNewConnection_(_))
       .WillOnce(Invoke([&](ConnectionPtr& conn) -> void {
-        ASSERT_EQ("255.255.255.255", conn->remoteAddress());
+        ASSERT_EQ("255.255.255.255", Network::Utility::hostFromUrl(conn->remoteAddress()));
         read_filter_.reset(new MockReadFilter());
         conn->addReadFilter(read_filter_);
         conn->close(ConnectionCloseType::NoFlush);

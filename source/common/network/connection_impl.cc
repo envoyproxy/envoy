@@ -1,4 +1,5 @@
 #include "connection_impl.h"
+#include "utility.h"
 
 #include "envoy/event/timer.h"
 #include "envoy/common/exception.h"
@@ -33,9 +34,9 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                               const std::string& remote_address)
-    : filter_manager_(*this, *this), remote_address_(remote_address), dispatcher_(dispatcher),
-      fd_(fd), id_(++next_global_id_) {
+                               const std::string& remote_address, const std::string& local_address)
+    : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
+      dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -395,9 +396,10 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
                                            buffer_stats_->write_current_);
 }
 
+// TODO: see if we can pass something more meaningful than EMPTY_STRING as localAddress
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
                                            const std::string& url)
-    : ConnectionImpl(dispatcher, fd, url) {}
+    : ConnectionImpl(dispatcher, fd, url, EMPTY_STRING) {}
 
 Network::ClientConnectionPtr ClientConnectionImpl::create(Event::DispatcherImpl& dispatcher,
                                                           const std::string& url) {

@@ -74,7 +74,7 @@ public:
                           Stats::Store& stats_store, Runtime::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
-  const Network::IpWhiteList& ipWhiteList() { return ip_white_list_; }
+  const Network::IpList& ipWhiteList() { return ip_white_list_; }
   GlobalStats& stats() { return stats_; }
 
 private:
@@ -92,7 +92,7 @@ private:
 
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;
-  Network::IpWhiteList ip_white_list_;
+  Network::IpList ip_white_list_;
   GlobalStats stats_;
 };
 

@@ -109,6 +109,18 @@ public:
   Event::MockTimer* timer_{};
 };
 
+TEST(FaultFilterBadConfigTest, EmptyConfig) {
+  const std::string json = R"EOF(
+  {
+  }
+  )EOF";
+
+  Stats::IsolatedStoreImpl stats;
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
+}
+
 TEST(FaultFilterBadConfigTest, BadAbortPercent) {
   const std::string json = R"EOF(
     {
@@ -118,6 +130,7 @@ TEST(FaultFilterBadConfigTest, BadAbortPercent) {
       }
     }
   )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -132,6 +145,7 @@ TEST(FaultFilterBadConfigTest, MissingHTTPStatus) {
       }
     }
   )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -148,6 +162,7 @@ TEST(FaultFilterBadConfigTest, BadDelayType) {
       }
     }
   )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -164,6 +179,7 @@ TEST(FaultFilterBadConfigTest, BadDelayPercent) {
       }
     }
   )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -180,6 +196,7 @@ TEST(FaultFilterBadConfigTest, BadDelayDuration) {
       }
     }
    )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
@@ -195,6 +212,7 @@ TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
       }
     }
    )EOF";
+
   Stats::IsolatedStoreImpl stats;
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;

@@ -9,6 +9,7 @@
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
 #include "common/network/filter_impl.h"
+#include "common/network/utility.h"
 
 namespace Filter {
 
@@ -20,7 +21,9 @@ namespace Filter {
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
   GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_tx_bytes_buffered)
+  GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
+  COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_cx_no_route)
 // clang-format on
 
 /**
@@ -38,13 +41,32 @@ public:
   TcpProxyConfig(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                  Stats::Store& stats_store);
 
-  const std::string& clusterName() { return cluster_name_; }
+  /**
+   * Find out which cluster an upstream connection should be opened to based on the
+   * parameters of a downstream connection.
+   * @param connection supplies the parameters of the downstream connection for
+   * which the proxy needs to open the corresponding upstream.
+   * @return the cluster name to be used for the upstream connection.
+   * If no route applies, returns the empty string.
+   */
+  const std::string& getRouteFromEntries(Network::Connection& connection);
+
   const TcpProxyStats& stats() { return stats_; }
 
 private:
+  struct Route {
+    Route(const Json::Object& config);
+
+    Network::IpList source_ips_;
+    Network::PortRangeList source_port_ranges_;
+    Network::IpList destination_ips_;
+    Network::PortRangeList destination_port_ranges_;
+    std::string cluster_name_;
+  };
+
   static TcpProxyStats generateStats(const std::string& name, Stats::Store& store);
 
-  std::string cluster_name_;
+  std::vector<Route> routes_;
   const TcpProxyStats stats_;
 };
 

@@ -12,15 +12,36 @@
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRefOfCopy;
 using testing::SaveArg;
 
 namespace Filter {
 
+TEST(TcpProxyConfigTest, NoRouteConfig) {
+  std::string json = R"EOF(
+    {
+      "stat_prefix": "name"
+    }
+    )EOF";
+
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  EXPECT_THROW(
+      TcpProxyConfig(*config, cluster_manager, cluster_manager.cluster_.info_->stats_store_),
+      EnvoyException);
+}
+
 TEST(TcpProxyConfigTest, NoCluster) {
   std::string json = R"EOF(
     {
-      "cluster": "fake_cluster",
-      "stat_prefix": "name"
+      "stat_prefix": "name",
+      "route_config": {
+        "routes": [
+          {
+            "cluster": "fake_cluster"
+          }
+        ]
+      }
     }
     )EOF";
 
@@ -36,7 +57,13 @@ TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": 1,
-    "cluster_name" : "fake_cluster"
+    "route_config": {
+      "routes": [
+        {
+          "cluster": "fake_cluster"
+        }
+      ]
+    }
    }
   )EOF";
 
@@ -47,13 +74,226 @@ TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
       Json::Exception);
 }
 
+TEST(TcpProxyConfigTest, Routes) {
+  std::string json = R"EOF(
+    {
+      "stat_prefix": "name",
+      "route_config": {
+        "routes": [
+          {
+            "destination_ip_list": [
+              "10.10.10.10/32",
+              "10.10.11.0/24",
+              "10.11.0.0/16",
+              "11.0.0.0/8",
+              "128.0.0.0/1"
+            ],
+            "cluster": "with_destination_ip_list"
+          },
+          {
+            "destination_ports": "1-1024,2048-4096,12345", 
+            "cluster": "with_destination_ports"
+          },
+          {  
+            "source_ports": "23457,23459", 
+            "cluster": "with_source_ports"
+          },
+          {
+            "destination_ip_list": [
+              "10.0.0.0/24"
+            ],
+            "source_ip_list": [
+              "20.0.0.0/24"
+            ],
+            "destination_ports" : "10000",
+            "source_ports": "20000",
+            "cluster": "with_everything"
+          },
+          {
+            "cluster": "catch_all"
+          }
+        ]
+      }
+    }
+    )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json);
+  NiceMock<Upstream::MockClusterManager> cm_;
+
+  TcpProxyConfig config_obj(*json_config, cm_, cm_.cluster_.info_->stats_store_);
+
+  {
+    // hit route with destination_ip (10.10.10.10/32)
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.10.10.10:0")));
+    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // fall-through
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.10.10.11:0")));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // hit route with destination_ip (10.10.11.0/24)
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.10.11.11:0")));
+    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // fall-through
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.10.12.12:0")));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // hit route with destination_ip (10.11.0.0/16)
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.11.11.11:0")));
+    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // fall-through
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.12.12.12:0")));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // hit route with destination_ip (11.0.0.0/8)
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://11.11.11.11:0")));
+    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // fall-through
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://12.12.12.12:0")));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // hit route with destination_ip (128.0.0.0/8)
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://128.255.255.255:0")));
+    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // hit route with destination port range
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:12345")));
+    EXPECT_EQ(std::string("with_destination_ports"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // fall through
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:23456")));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:0")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // hit route with source port range
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:23456")));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:23459")));
+    EXPECT_EQ(std::string("with_source_ports"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // fall through
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:23456")));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://0.0.0.0:23458")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // hit the route with all criterias present
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.0.0.0:10000")));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://20.0.0.0:20000")));
+    EXPECT_EQ(std::string("with_everything"), config_obj.getRouteFromEntries(connection));
+  }
+
+  {
+    // fall through
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, localAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://10.0.0.0:10000")));
+    EXPECT_CALL(connection, remoteAddress())
+        .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://30.0.0.0:20000")));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+  }
+}
+
+TEST(TcpProxyConfigTest, EmptyRouteConfig) {
+  std::string json = R"EOF(
+    {
+      "stat_prefix": "name",
+      "route_config": {
+        "routes": [
+        ]
+      }
+    }
+    )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json);
+  NiceMock<Upstream::MockClusterManager> cm_;
+
+  TcpProxyConfig config_obj(*json_config, cm_, cm_.cluster_.info_->stats_store_);
+
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_EQ(std::string(""), config_obj.getRouteFromEntries(connection));
+}
+
 class TcpProxyTest : public testing::Test {
 public:
   TcpProxyTest() {
     std::string json = R"EOF(
     {
-      "cluster": "fake_cluster",
-      "stat_prefix": "name"
+      "stat_prefix": "name",
+      "route_config": {
+        "routes": [
+          {
+            "cluster": "fake_cluster"
+          }
+        ]
+      }
     }
     )EOF";
 
@@ -204,6 +444,82 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
 
   EXPECT_EQ(1U,
             cluster_manager_.cluster_.info_->stats_store_.counter("upstream_cx_overflow").value());
+}
+
+class TcpProxyRoutingTest : public testing::Test {
+public:
+  TcpProxyRoutingTest() {
+    std::string json = R"EOF(
+    {
+      "stat_prefix": "name",
+      "route_config": {
+        "routes": [
+          {
+            "destination_ports": "1-9999",
+            "cluster": "fake_cluster"
+          }
+        ]
+      }
+    }
+    )EOF";
+
+    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+    config_.reset(new TcpProxyConfig(*config, cluster_manager_,
+                                     cluster_manager_.cluster_.info_->stats_store_));
+  }
+
+  void setup() {
+    EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+
+    filter_.reset(new TcpProxy(config_, cluster_manager_));
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  }
+
+  TcpProxyConfigPtr config_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  std::unique_ptr<TcpProxy> filter_;
+};
+
+TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
+  uint32_t total_cx = config_->stats().downstream_cx_total_.value();
+  uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
+
+  setup();
+
+  // port 10000 is outside the specified destination port range
+  EXPECT_CALL(connection_, localAddress())
+      .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:10000")));
+
+  // getRouteFromEntries() returns an empty string if no route matches
+  EXPECT_CALL(cluster_manager_, get("")).WillRepeatedly(Return(nullptr));
+
+  // Expect filter to stop iteration and close connection
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
+  EXPECT_EQ(non_routable_cx + 1, config_->stats().downstream_cx_no_route_.value());
+}
+
+TEST_F(TcpProxyRoutingTest, RoutableConnection) {
+  uint32_t total_cx = config_->stats().downstream_cx_total_.value();
+  uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
+
+  setup();
+
+  // port 9999 is within the specified destination port range
+  EXPECT_CALL(connection_, localAddress())
+      .WillRepeatedly(ReturnRefOfCopy(std::string("tcp://1.2.3.4:9999")));
+
+  // Expect filter to try to open a connection to specified cluster
+  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster"));
+
+  filter_->onNewConnection();
+
+  EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
+  EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
 }
 
 } // Filter

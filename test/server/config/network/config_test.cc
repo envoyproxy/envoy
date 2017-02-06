@@ -1,4 +1,5 @@
 #include "server/config/network/client_ssl_auth.h"
+#include "server/config/network/http_connection_manager.h"
 #include "server/config/network/mongo_proxy.h"
 #include "server/config/network/ratelimit.h"
 #include "server/config/network/redis_proxy.h"
@@ -68,7 +69,27 @@ TEST(NetworkFilterConfigTest, TcpProxy) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
-    "cluster" : "fake_cluster"
+    "route_config": {
+      "routes": [
+        {
+          "destination_ip_list": [
+            "192.168.1.1/32",
+            "192.168.1.0/24"
+          ],
+          "source_ip_list": [
+            "192.168.0.0/16",
+            "192.0.0.0/8",
+            "127.0.0.0/8"
+          ],
+          "destination_ports": "1-1024,2048-4096,12345",
+          "cluster": "fake_cluster"
+        },
+        {
+          "source_ports": "23457,23459",
+          "cluster": "fake_cluster2"
+        }
+      ]
+    }
   }
   )EOF";
 
@@ -118,6 +139,180 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
+}
+
+TEST(NetworkFilterConfigTest, BadHttpConnectionMangerConfig) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filter" : [{}]
+  }
+  )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  NiceMock<MockInstance> server;
+  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
+                                              *json_config, server),
+               Json::Exception);
+}
+
+TEST(NetworkFilterConfigTest, BadAccessLogConfig) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters" : [
+      {
+        "type" : "both",
+        "name" : "http_dynamo_filter",
+        "config" : {}
+      }
+    ],
+    "access_log" :[
+      {
+        "path" : "mypath",
+        "filter" : []
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  NiceMock<MockInstance> server;
+  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
+                                              *json_config, server),
+               Json::Exception);
+}
+
+TEST(NetworkFilterConfigTest, BadAccessLogType) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters" : [
+      {
+        "type" : "both",
+        "name" : "http_dynamo_filter",
+        "config" : {}
+      }
+    ],
+    "access_log" :[
+      {
+        "path" : "mypath",
+        "filter" : {
+          "type" : "bad_type"
+        }
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  NiceMock<MockInstance> server;
+  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
+                                              *json_config, server),
+               Json::Exception);
+}
+
+TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters" : [
+      {
+        "type" : "both",
+        "name" : "http_dynamo_filter",
+        "config" : {}
+      }
+    ],
+    "access_log" :[
+      {
+        "path": "/dev/null",
+        "filter": {
+          "type": "logical_and",
+          "filters": [
+            {
+              "type": "logical_or",
+              "filters": [
+                {"type": "duration", "op": ">=", "value": 10000},
+                {"type": "bad_type"}
+              ]
+            },
+            {"type": "not_healthcheck"}
+          ]
+        }
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  NiceMock<MockInstance> server;
+  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
+                                              *json_config, server),
+               Json::Exception);
 }
 
 } // Configuration
