@@ -4,7 +4,7 @@ set -e
 
 # Setup basic requirements and install them.
 apt-get update
-apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc
+apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc google-perftools
 apt-get install -y golang
 add-apt-repository -y ppa:ubuntu-toolchain-r/test
 apt-get update
