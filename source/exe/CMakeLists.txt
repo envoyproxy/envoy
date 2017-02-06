@@ -4,6 +4,7 @@ if (ENVOY_TCMALLOC)
   target_link_libraries(envoy tcmalloc_and_profiler)
 endif()
 
+target_link_libraries(envoy cares)
 target_link_libraries(envoy event)
 target_link_libraries(envoy event_pthreads)
 target_link_libraries(envoy http_parser)

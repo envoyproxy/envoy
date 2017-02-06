@@ -19,7 +19,6 @@
 #include <signal.h>
 #include <sstream>
 #include <string.h>
-#include <sys/signalfd.h>
 #include <unistd.h>
 #include <unordered_set>
 

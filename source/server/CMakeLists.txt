@@ -24,6 +24,7 @@ add_library(envoy-server OBJECT
 include_directories(SYSTEM ${ENVOY_TCLAP_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_HTTP_PARSER_INCLUDE_DIR})
 include_directories(${ENVOY_NGHTTP2_INCLUDE_DIR})
+include_directories(${ENVOY_LIBCARES_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
 include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})

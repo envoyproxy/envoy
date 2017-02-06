@@ -129,3 +129,10 @@ wget -O gcovr-3.3.tar.gz https://github.com/gcovr/gcovr/archive/3.3.tar.gz
 tar xf gcovr-3.3.tar.gz
 rm gcovr-3.3.tar.gz
 
+# libcares
+wget https://c-ares.haxx.se/download/c-ares-1.12.0.tar.gz
+tar xf c-ares-1.12.0.tar.gz
+rm c-ares-1.12.0.tar.gz
+cd c-ares-1.12.0
+./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no
+make install
