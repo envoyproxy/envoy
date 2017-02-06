@@ -15,7 +15,7 @@ public:
   const std::string& serviceZone() { return service_zone_; }
 
   // Server::Options
-  uint64_t baseId() { return base_id_; }
+  uint64_t baseId() override { return base_id_; }
   uint32_t concurrency() override { return concurrency_; }
   const std::string& configPath() override { return config_path_; }
   std::chrono::seconds drainTime() override { return drain_time_; }

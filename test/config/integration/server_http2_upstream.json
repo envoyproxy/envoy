@@ -12,10 +12,21 @@
         "access_log": [
         {
           "path": "/dev/null",
-          "filters": [
-            {"type": "status_code", "op": ">=", "value": 500},
-            {"type": "duration", "op": ">=", "value": 1000000}
-          ]
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
         },
         {
           "path": "/dev/null"
@@ -82,10 +93,21 @@
         "access_log": [
         {
           "path": "/dev/null",
-          "filters": [
-            {"type": "status_code", "op": ">=", "value": 500},
-            {"type": "duration", "op": ">=", "value": 1000000}
-          ]
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
         },
         {
           "path": "/dev/null"
@@ -157,10 +179,21 @@
         "access_log": [
         {
           "path": "/dev/null",
-          "filters": [
-            {"type": "status_code", "op": ">=", "value": 500},
-            {"type": "duration", "op": ">=", "value": 1000000}
-          ]
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
         },
         {
           "path": "/dev/null"

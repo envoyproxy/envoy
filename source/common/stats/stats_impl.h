@@ -95,7 +95,7 @@ public:
   }
   virtual void dec() override { sub(1); }
   virtual void inc() override { add(1); }
-  virtual std::string name() { return data_.name_; }
+  virtual std::string name() override { return data_.name_; }
   virtual void set(uint64_t value) override {
     data_.value_ = value;
     data_.flags_ |= RawStatData::Flags::Used;
@@ -224,7 +224,7 @@ private:
 
     // Stats::Scope
     void deliverHistogramToSinks(const std::string&, uint64_t) override {}
-    void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) {}
+    void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
     Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
     Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
     Timer& timer(const std::string& name) override { return parent_.timer(prefix_ + name); }

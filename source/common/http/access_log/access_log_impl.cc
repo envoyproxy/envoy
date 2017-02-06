@@ -66,13 +66,11 @@ FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {
   } else if (type == "not_healthcheck") {
     return FilterPtr{new NotHealthCheckFilter()};
   } else if (type == "traceable_request") {
-    return FilterPtr{new TraceableRequestFilter(runtime)};
+    return FilterPtr{new TraceableRequestFilter()};
   } else {
     throw EnvoyException(fmt::format("invalid access log filter type '{}'", type));
   }
 }
-
-TraceableRequestFilter::TraceableRequestFilter(Runtime::Loader& runtime) : runtime_(runtime) {}
 
 bool TraceableRequestFilter::evaluate(const RequestInfo& info, const HeaderMap& request_headers) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);

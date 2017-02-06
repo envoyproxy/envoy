@@ -2,6 +2,10 @@
 
 # Run a CI build/test target, e.g. docs, asan.
 
+set -e
+
+echo "building using $NUM_CPUS CPUs"
+
 if [[ "$1" == "docs" ]]; then
   echo "docs build..."
   make docs
