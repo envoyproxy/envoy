@@ -6,6 +6,8 @@ set -e
 apt-get update
 apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc
 apt-get install -y golang
+# For debugging.
+apt-get install -y gdb strace
 add-apt-repository -y ppa:ubuntu-toolchain-r/test
 apt-get update
 apt-get install -y g++-4.9
