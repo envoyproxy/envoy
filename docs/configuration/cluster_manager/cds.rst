@@ -11,7 +11,7 @@ clusters depending on what is required.
 
   {
     "cluster": "{...}",
-    "refresh_delay_ms": "{...}"
+    "refresh_interval_ms": "{...}"
   }
 
 :ref:`cluster <config_cluster_manager_cluster>`
@@ -19,11 +19,11 @@ clusters depending on what is required.
   discovery service. The cluster must run a REST service that implements the :ref:`CDS HTTP API
   <config_cluster_manager_cds_api>`.
 
-refresh_delay_ms
-  *(required, integer)* The delay, in milliseconds, between fetches to the CDS API for each
+refresh_interval_ms
+  *(optional, integer)* The delay, in milliseconds, between fetches to the CDS API for each
   configured CDS cluster. Envoy will add an additional random jitter to the delay that is between
-  zero and *refresh_delay_ms* milliseconds. Thus the longest possible refresh delay is
-  2 \* *refresh_delay_ms*.
+  zero and *refresh_interval_ms* milliseconds. Thus the longest possible refresh delay is
+  2 \* *refresh_interval_ms*. Default value is 30 seconds.
 
 .. _config_cluster_manager_cds_api:
 

@@ -11,6 +11,7 @@
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/http/async_client_impl.h"
+#include "common/json/config_schemas.h"
 #include "common/router/shadow_writer_impl.h"
 
 namespace Upstream {
@@ -129,6 +130,8 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls), random_(random),
       thread_local_slot_(tls.allocateSlot()), local_info_(local_info),
       cm_stats_(generateStats(stats)) {
+
+  config.validateSchema(Json::Schema::CLUSTER_SCHEMA);
 
   if (config.hasObject("outlier_detection")) {
     std::string event_log_file_path =

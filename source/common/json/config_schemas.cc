@@ -677,3 +677,114 @@ const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
     "additionalProperties" : false
   }
   )EOF");
+
+const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
+{
+  "$schema": "http://json-schema.org/schema#",
+  "definitions" : {
+    "cluster" : {
+      "type" : "object",
+      "properties" : {
+        "name" : {"type" : "string"},
+        "type" : {
+          "type" : "string",
+          "enum" : ["static", "strict_dns", "logical_dns", "sds"]
+        },
+        "connect_timeout_ms" : {
+          "type" : "integer",
+          "minimum" : 0,
+          "exclusiveMinimum" : true
+        },
+        "lb_type" : {
+          "type" : "string",
+          "enum" : ["round_robin", "least_request", "random"]
+        },
+        "hosts" : {
+          "type" : "array",
+          "items" : {
+            "type" : "object",
+            "properties" : {
+              "url" : {"type" : "string"}
+            }
+          }
+        },
+        "service_name" : {"type" : "string"},
+        "health_check" : {"type" : "object"},
+        "max_requests_per_connection" : {
+          "type" : "integer",
+          "minimum" : 0,
+          "exclusiveMinimum" : true
+        },
+        "circuit_breakers" : {"type" : "object"},
+        "ssl_context" : {"type" : "object"},
+        "features" : {
+          "type" : "string",
+          "enum" : ["http2"]
+        },
+        "http_codec_options" : {"type" : "string"},
+        "dns_refresh_rate_ms" : {
+          "type" : "integer",
+          "minimum" : 0,
+          "exclusiveMinimum" : true
+        },
+        "outlier_detection" : {"type" : "object"}
+      },
+      "required" : ["name", "type", "connect_timeout_ms", "lb_type"],
+      "additionalProperties" : false
+    },
+    "sds" : {
+      "type" : "object",
+      "properties" : {
+        "cluster" : {
+          "type" : "object",
+          "properties": {"$ref" : "#/definitions/cluster"}
+        },
+        "refresh_delay_ms" :  {
+          "type" : "integer",
+          "minimum" : 0,
+          "exclusiveMinimum" : true
+        }
+      },
+      "required" : ["cluster", "refresh_delay_ms"],
+      "additionalProperties" : false
+    },
+    "cds" : {
+      "type" : "object",
+      "properties" : {
+        "cluster" : {
+          "type" : "object",
+          "properties": {"$ref" : "#/definitions/cluster"}
+        },
+        "refresh_interval_ms" :  {
+          "type" : "integer",
+          "minimum" : 0,
+          "exclusiveMinimum" : true
+        }
+      },
+      "required" : ["cluster"],
+      "additionalProperties" : false
+    }
+  },
+  "properties" : {
+    "clusters" : {
+      "type" : "array",
+      "items" : {
+        "type": "object",
+        "properties": {"$ref" : "#/definitions/cluster"}
+      }
+    },
+    "sds" : {"$ref" : "#/definitions/sds"},
+    "local_cluster_name" : {"type" : "string"},
+    "outlier_detection" : {
+      "type" : "object",
+      "properties" : {
+        "event_log_path" : {"type" : "string"}
+      },
+      "additionalProperties" : false
+    },
+    "cds" : {"$ref" : "#/definitions/cds"}
+  },
+  "required" : ["clusters"],
+  "additionalProperties" : false
+}
+)EOF");

@@ -4,7 +4,7 @@ namespace Json {
 
 class Schema {
 public:
-  // Listener Schemas
+  // Listener Schema
   static const std::string LISTENER_SCHEMA;
 
   // Network Filter Schemas
@@ -27,6 +27,9 @@ public:
   static const std::string HEALTH_CHECK_HTTP_FILTER_SCHEMA;
   static const std::string RATE_LIMIT_HTTP_FILTER_SCHEMA;
   static const std::string ROUTER_HTTP_FILTER_SCHEMA;
+
+  // Cluster Schema
+  static const std::string CLUSTER_SCHEMA;
 };
 
 } // Json
