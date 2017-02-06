@@ -120,7 +120,7 @@ TEST(ConfigurationImplTest, BadListenerConfig) {
   EXPECT_THROW(config.initialize(*loader), Json::Exception);
 }
 
-TEST(ConfigurationImplTest, NotSetServiceClusterWhenLSTracing) {
+TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
   std::string json = R"EOF(
   {
     "listeners" : [
@@ -146,9 +146,7 @@ TEST(ConfigurationImplTest, NotSetServiceClusterWhenLSTracing) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  std::string cluster_not_set = "";
-  EXPECT_CALL(server.local_info_, clusterName()).WillOnce(ReturnRef(cluster_not_set));
-
+  server.local_info_.cluster_name_ = "";
   MainImpl config(server);
   EXPECT_THROW(config.initialize(*loader), EnvoyException);
 }
