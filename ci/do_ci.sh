@@ -5,6 +5,7 @@ set -e
 export CC=gcc-4.9
 export CXX=g++-4.9
 export HEAPCHECK=normal
+export PPROF_PATH=/thirdparty_build/bin/pprof
 
 NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 echo "building using $NUM_CPUS CPUs"
