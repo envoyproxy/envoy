@@ -10,6 +10,11 @@
 namespace Network {
 
 DnsResolverImpl::DnsResolverImpl(Event::DispatcherImpl& dispatcher) : dispatcher_(dispatcher) {
+  // This is also done in main(), to satisfy the requirement that c-ares is
+  // initialized prior to threading. The additional call to ares_library_init()
+  // here is a nop in normal execution, but exists for testing where we don't
+  // launch via main().
+  ares_library_init(ARES_LIB_INIT_ALL);
   struct ares_options options;
   initializeChannel(&options, 0);
 }
@@ -21,6 +26,7 @@ DnsResolverImpl::~DnsResolverImpl() {
     event_free(it.second);
   }
   events_.clear();
+  ares_library_cleanup();
 }
 
 void DnsResolverImpl::initializeChannel(struct ares_options* options, int optmask) {

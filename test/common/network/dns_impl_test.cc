@@ -188,7 +188,6 @@ private:
 class DnsImplTest : public testing::Test {
 public:
   void SetUp() override {
-    ares_library_init(ARES_LIB_INIT_ALL);
     Api::Impl api(std::chrono::milliseconds(10000));
     dispatcher_ = api.allocateDispatcher();
     resolver_ = dispatcher_->createDnsResolver();
@@ -217,10 +216,7 @@ public:
                                         -1, reinterpret_cast<sockaddr*>(&sin), sizeof(sin));
     ASSERT_NE(nullptr, listener_);
   }
-  void TearDown() override {
-    evconnlistener_free(listener_);
-    ares_library_cleanup();
-  }
+  void TearDown() override { evconnlistener_free(listener_); }
 
 protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
