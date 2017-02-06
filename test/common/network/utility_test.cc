@@ -131,6 +131,10 @@ TEST(NetworkUtility, loopbackAddress) {
     Address::Ipv4Instance address("10.0.0.1");
     EXPECT_FALSE(Utility::isLoopbackAddress(address));
   }
+  {
+    Address::PipeInstance address("/foo");
+    EXPECT_FALSE(Utility::isLoopbackAddress(address));
+  }
 }
 
 TEST(PortRangeListTest, Errors) {
@@ -177,6 +181,7 @@ TEST(PortRangeListTest, Normal) {
     Utility::parsePortRangeList(port_range_str, port_range_list);
     EXPECT_TRUE(Utility::portInRangeList(makeFromPort(1), port_range_list));
     EXPECT_FALSE(Utility::portInRangeList(makeFromPort(2), port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(Address::PipeInstance("/foo"), port_range_list));
   }
 
   {

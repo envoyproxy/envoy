@@ -8,6 +8,15 @@
 
 namespace Network {
 
+void ListenSocketImpl::doBind() {
+  int rc = local_address_->bind(fd_);
+  if (rc == -1) {
+    close();
+    throw EnvoyException(
+        fmt::format("cannot bind '{}': {}", local_address_->asString(), strerror(errno)));
+  }
+}
+
 TcpListenSocket::TcpListenSocket(uint32_t port, bool bind_to_port) {
   // TODO: IPv6 support.
   local_address_.reset(new Address::Ipv4Instance(port));
@@ -19,11 +28,7 @@ TcpListenSocket::TcpListenSocket(uint32_t port, bool bind_to_port) {
   RELEASE_ASSERT(rc != -1);
 
   if (bind_to_port) {
-    rc = local_address_->bind(fd_);
-    if (rc == -1) {
-      close();
-      throw EnvoyException(fmt::format("cannot bind on port {}: {}", port, strerror(errno)));
-    }
+    doBind();
   }
 }
 
@@ -37,13 +42,7 @@ UdsListenSocket::UdsListenSocket(const std::string& uds_path) {
   local_address_.reset(new Address::PipeInstance(uds_path));
   fd_ = local_address_->socket(Address::SocketType::Stream);
   RELEASE_ASSERT(fd_ != -1);
-
-  int rc = local_address_->bind(fd_);
-  if (rc == -1) {
-    close();
-    throw EnvoyException(
-        fmt::format("cannot bind unix domain socket path {}: {}", uds_path, strerror(errno)));
-  }
+  doBind();
 }
 
 } // Network

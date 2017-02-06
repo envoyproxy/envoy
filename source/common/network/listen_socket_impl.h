@@ -22,6 +22,8 @@ public:
   }
 
 protected:
+  void doBind();
+
   int fd_;
   Address::InstancePtr local_address_;
 };

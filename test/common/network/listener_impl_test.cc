@@ -66,12 +66,13 @@ TEST(ListenerImplTest, UseOriginalDst) {
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::TcpListenSocket socketDst(uint32_t(10001), false);
-  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
-  Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks,
+  Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
                                      stats_store, true, false, true);
+  Network::MockListenerCallbacks listener_callbacks2;
   Network::TestListenerImpl listenerDst(connection_handler, dispatcher, socketDst,
-                                        listener_callbacks, stats_store, false, false, false);
+                                        listener_callbacks2, stats_store, false, false, false);
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
@@ -83,9 +84,12 @@ TEST(ListenerImplTest, UseOriginalDst) {
       .WillRepeatedly(Return(&listenerDst));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
-  EXPECT_CALL(listenerDst, newConnection(_, _, _))
-      .WillOnce(Invoke([&](int, Address::InstancePtr, Address::InstancePtr) -> void {
+  EXPECT_CALL(listenerDst, newConnection(_, _, _));
+  EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        EXPECT_EQ("127.0.0.1:10001", conn->localAddress().asString());
         client_connection->close(ConnectionCloseType::NoFlush);
+        conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
       }));
 
