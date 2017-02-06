@@ -118,9 +118,12 @@ TEST(NetworkUtility, Url) {
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo"), EnvoyException);
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:bar"), EnvoyException);
   EXPECT_THROW(Utility::hostFromTcpUrl(""), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("foo"), EnvoyException);
 }
 
-TEST(NetworkUtility, GetLocalAddress) { EXPECT_NE(nullptr, Utility::getLocalAddress()); }
+TEST(NetworkUtility, getLocalAddress) { EXPECT_NE(nullptr, Utility::getLocalAddress()); }
+
+TEST(NetworkUtlity, getOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
 
 TEST(NetworkUtility, loopbackAddress) {
   {

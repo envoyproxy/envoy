@@ -83,7 +83,7 @@ Address::InstancePtr Utility::resolveUrl(const std::string& url) {
     return Address::InstancePtr{
         new Address::Ipv4Instance(hostFromTcpUrl(url), portFromTcpUrl(url))};
   } else if (url.find(UNIX_SCHEME) == 0) {
-    return Address::InstancePtr{new Address::PipeInstance(pathFromUnixUrl(url))};
+    return Address::InstancePtr{new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
   } else {
     throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
   }
@@ -119,14 +119,6 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   } catch (const std::invalid_argument& e) {
     throw EnvoyException(e.what());
   }
-}
-
-std::string Utility::pathFromUnixUrl(const std::string& url) {
-  if (url.find(UNIX_SCHEME) != 0) {
-    throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
-  }
-
-  return url.substr(UNIX_SCHEME.size());
 }
 
 Address::InstancePtr Utility::getLocalAddress() {
