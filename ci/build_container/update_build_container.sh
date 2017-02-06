@@ -1,12 +1,14 @@
 #!/bin/bash
-set -ev
-read -r -p "Are you on master and have a clean branch? [y/N] " response
+set -e
+read -r -p "Do you have master checked out with most recent changes? [y/N] " response
 if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]
 then
-  read -r -p "What SHA do you want to tag the envoy-build with? [y/N] " tag
+  TAG="$(git rev-parse origin/master)"
   docker-machine start default
   eval $(docker-machine env default)
-  docker build --rm -t lyft/envoy-build:$tag .
+  docker build --rm -t lyft/envoy-build:$TAG .
   docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-  docker push lyft/envoy-build:$tag
+  docker push lyft/envoy-build:$TAG
+  docker tag lyft/envoy-build:$TAG lyft/envoy-build:latest
+  docker push lyft/envoy-build:latest
 fi
