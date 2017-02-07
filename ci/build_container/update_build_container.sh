@@ -8,7 +8,7 @@ then
   docker build --rm -t lyft/envoy-build:$TAG .
   docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
   docker push lyft/envoy-build:$TAG
-  echo 'Pushed lyft/envoy-build:${TAG}'
+  echo Pushed lyft/envoy-build:$TAG
   docker tag lyft/envoy-build:$TAG lyft/envoy-build:latest
   docker push lyft/envoy-build:latest
 fi
