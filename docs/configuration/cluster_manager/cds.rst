@@ -23,7 +23,7 @@ refresh_interval_ms
   *(optional, integer)* The delay, in milliseconds, between fetches to the CDS API for each
   configured CDS cluster. Envoy will add an additional random jitter to the delay that is between
   zero and *refresh_interval_ms* milliseconds. Thus the longest possible refresh delay is
-  2 \* *refresh_interval_ms*. Default value is 30 seconds.
+  2 \* *refresh_interval_ms*. Default value is 30000ms (30 seconds).
 
 .. _config_cluster_manager_cds_api:
 

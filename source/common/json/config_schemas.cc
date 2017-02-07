@@ -36,10 +36,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
        "port": {"type": "number"},
        "filters" : {
          "type" : "array",
-         "items": {
-           "type": "object",
-           "properties": {"$ref" : "#/definitions/filters"}
-         }
+         "items": {"$ref" : "#/definitions/filters"}
        },
        "ssl_context" : {"$ref" : "#/definitions/ssl_context"},
        "bind_to_port" : {"type": "boolean"},
@@ -195,7 +192,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           "config": {"type" : "object"}
         },
         "required": ["type", "name", "config"],
-        "additionalProperties": false
+        "additionalProperties" : false
       }
     },
     "properties" : {
@@ -246,7 +243,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       "generate_request_id" : {"type" : "boolean"}
     },
     "required" : ["codec_type", "stat_prefix", "route_config", "filters"],
-    "additionalProperties": false
+    "additionalProperties" : false
   }
   )EOF");
 
@@ -258,7 +255,7 @@ const std::string Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
       "access_log" : {"type" : "string"}
     },
     "required": ["stat_prefix"],
-    "additionalProperties": false
+    "additionalProperties" : false
   }
   )EOF");
 
@@ -419,7 +416,7 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
       "rate_limits" : {"type" : "array"}
     },
     "required" : ["name", "domains", "routes"],
-    "additionalProperties": false
+    "additionalProperties" : false
   }
   )EOF");
 
@@ -443,7 +440,8 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
             }
           },
           "runtime_key_prefix" : {"type" : "string"}
-        }
+        },
+        "additionalProperties" : false
       }
     },
     "properties" : {
@@ -504,7 +502,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       },
       "rate_limits" : {"type" : "array"}
     },
-    "additionalProperties": false
+    "additionalProperties" : false
   }
   )EOF");
 
@@ -679,112 +677,288 @@ const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
   )EOF");
 
 const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions" : {
+      "health_check_bytes" : {
+        "type" : "object",
+        "properties" : {
+          "binary" : {"type" : "string"}
+        },
+        "additionalProperties" : false
+      },
+      "health_check" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["http", "tcp"]
+          },
+          "timeout_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "interval_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "unhealthy_threshold" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "health_threshold" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "path" : {"type" : "string"},
+          "send" : {
+            "type" : "array",
+            "items" : {"$ref" : "#/definitions/health_check_bytes"}
+          },
+          "receive" : {
+            "type" : "array",
+            "items" : {"$ref" : "#/definitions/health_check_bytes"}
+          },
+          "interval_jitter_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "service_name" : {"type" : "string"}
+        },
+        "required" : ["type", "timeout_ms", "interval_ms", "unhealthy_threshold", "health_threshold"],
+        "additionalProperties" : false
+      },
+      "circuit_breakers" : {
+        "type" : "object",
+        "properties" : {
+          "max_connections" : {"type" : "integer"},
+          "max_pending_requests" : {"type" : "integer"},
+          "max_requests" : {"type" : "integer"},
+          "max_retries" : {"type" : "integer"}
+        },
+        "additionalProperties" : false
+      },
+      "ssl" : {
+        "type" : "object",
+        "properties" : {
+          "alpn_protocols" : {"type" : "string"},
+          "cert_chain_file" : {"type" : "string"},
+          "private_key_file" : {"type" : "string"},
+          "ca_cert_file" : {"type" : "string"},
+          "verify_certificate_hash" : {"type" : "string"},
+          "verify_subject_alt_name" : {"type" : "string"},
+          "cipher_suites" : {"type" : "string"},
+          "sni" : {"type" :"string"}
+        },
+        "additionalProperties" : false
+      },
+      "cluster" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {"type" : "string"},
+          "type" : {
+            "type" : "string",
+            "enum" : ["static", "strict_dns", "logical_dns", "sds"]
+          },
+          "connect_timeout_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "lb_type" : {
+            "type" : "string",
+            "enum" : ["round_robin", "least_request", "random"]
+          },
+          "hosts" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "url" : {"type" : "string"}
+              }
+            }
+          },
+          "service_name" : {"type" : "string"},
+          "health_check" : {"$ref" : "#/definitions/health_check"},
+          "max_requests_per_connection" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "circuit_breakers" : {
+            "type" : "object",
+            "properties" : {
+              "default" : {"$ref" : "#/definitions/circuit_breakers"},
+              "high" : {"$ref" : "#/definitions/circuit_breakers"}
+            },
+            "additionalProperties" : false
+          },
+          "ssl_context" : {"type" : "object"},
+          "features" : {
+            "type" : "string",
+            "enum" : ["http2"]
+          },
+          "http_codec_options" : {"type" : "string"},
+          "dns_refresh_rate_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "outlier_detection" : {"type" : "object"}
+        },
+        "required" : ["name", "type", "connect_timeout_ms", "lb_type"],
+        "additionalProperties" : false
+      },
+      "sds" : {
+        "type" : "object",
+        "properties" : {
+          "cluster" : {
+            "type" : "object",
+            "properties": {"$ref" : "#/definitions/cluster"}
+          },
+          "refresh_delay_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          }
+        },
+        "required" : ["cluster", "refresh_delay_ms"],
+        "additionalProperties" : false
+      },
+      "cds" : {
+        "type" : "object",
+        "properties" : {
+          "cluster" : {
+            "type" : "object",
+            "properties": {"$ref" : "#/definitions/cluster"}
+          },
+          "refresh_interval_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          }
+        },
+        "required" : ["cluster"],
+        "additionalProperties" : false
+      }
+    },
+    "properties" : {
+      "clusters" : {
+        "type" : "array",
+        "items" : {
+          "type": "object",
+          "properties": {"$ref" : "#/definitions/cluster"}
+        }
+      },
+      "sds" : {"$ref" : "#/definitions/sds"},
+      "local_cluster_name" : {"type" : "string"},
+      "outlier_detection" : {
+        "type" : "object",
+        "properties" : {
+          "event_log_path" : {"type" : "string"}
+        },
+        "additionalProperties" : false
+      },
+      "cds" : {"$ref" : "#/definitions/cds"}
+    },
+    "required" : ["clusters"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
 {
   "$schema": "http://json-schema.org/schema#",
   "definitions" : {
-    "cluster" : {
+    "sinks" : {
       "type" : "object",
       "properties" : {
-        "name" : {"type" : "string"},
         "type" : {
           "type" : "string",
-          "enum" : ["static", "strict_dns", "logical_dns", "sds"]
+          "enum" : ["lightstep"]
         },
-        "connect_timeout_ms" : {
-          "type" : "integer",
-          "minimum" : 0,
-          "exclusiveMinimum" : true
-        },
-        "lb_type" : {
-          "type" : "string",
-          "enum" : ["round_robin", "least_request", "random"]
-        },
-        "hosts" : {
-          "type" : "array",
-          "items" : {
-            "type" : "object",
-            "properties" : {
-              "url" : {"type" : "string"}
-            }
-          }
-        },
-        "service_name" : {"type" : "string"},
-        "health_check" : {"type" : "object"},
-        "max_requests_per_connection" : {
-          "type" : "integer",
-          "minimum" : 0,
-          "exclusiveMinimum" : true
-        },
-        "circuit_breakers" : {"type" : "object"},
-        "ssl_context" : {"type" : "object"},
-        "features" : {
-          "type" : "string",
-          "enum" : ["http2"]
-        },
-        "http_codec_options" : {"type" : "string"},
-        "dns_refresh_rate_ms" : {
-          "type" : "integer",
-          "minimum" : 0,
-          "exclusiveMinimum" : true
-        },
-        "outlier_detection" : {"type" : "object"}
-      },
-      "required" : ["name", "type", "connect_timeout_ms", "lb_type"],
-      "additionalProperties" : false
-    },
-    "sds" : {
-      "type" : "object",
-      "properties" : {
-        "cluster" : {
+        "access_token_file" : {"type" : "string"},
+        "config" : {
           "type" : "object",
-          "properties": {"$ref" : "#/definitions/cluster"}
-        },
-        "refresh_delay_ms" :  {
-          "type" : "integer",
-          "minimum" : 0,
-          "exclusiveMinimum" : true
+          "properties" : {
+            "collector_cluster" : {"type" : "string"}
+          },
+          "required": ["collector_cluster"],
+          "additionalProperties" : false
         }
       },
-      "required" : ["cluster", "refresh_delay_ms"],
+      "required" : ["type", "access_token_file", "config"],
       "additionalProperties" : false
     },
-    "cds" : {
+    "rate_limit_service" : {
       "type" : "object",
       "properties" : {
-        "cluster" : {
-          "type" : "object",
-          "properties": {"$ref" : "#/definitions/cluster"}
+        "type" : {
+          "type" : "string",
+          "enum" : ["grpc_service"]
         },
-        "refresh_interval_ms" :  {
-          "type" : "integer",
-          "minimum" : 0,
-          "exclusiveMinimum" : true
+        "config" : {
+          "type" : "object",
+          "properties" : {
+            "cluster_name" :{"type" : "string"}
+          },
+          "required" : ["cluster_name"],
+          "additionalProperties" : false
         }
       },
-      "required" : ["cluster"],
+      "required" : ["type", "config"],
       "additionalProperties" : false
     }
   },
   "properties" : {
-    "clusters" : {
+    "listeners" : {
       "type" : "array",
-      "items" : {
-        "type": "object",
-        "properties": {"$ref" : "#/definitions/cluster"}
-      }
+      "items" : {"type" : "object"}
     },
-    "sds" : {"$ref" : "#/definitions/sds"},
-    "local_cluster_name" : {"type" : "string"},
-    "outlier_detection" : {
+    "admin" : {
       "type" : "object",
       "properties" : {
-        "event_log_path" : {"type" : "string"}
+        "access_log_path" : {"type" : "string"},
+        "port" : {"type" : "integer"}
       },
+      "required" : ["access_log_path", "port"],
       "additionalProperties" : false
     },
-    "cds" : {"$ref" : "#/definitions/cds"}
+    "cluster_manager" : {"type" : "object"},
+    "flags_path" : {"type" : "string"},
+    "statsd_local_udp_port" : {"type" : "integer"},
+    "statsd_tcp_cluster_name" : {"type" : "string"},
+    "stats_flush_interval_ms" : {"type" : "integer"},
+    "tracing" : {
+      "type" : "object",
+      "properties" : {
+        "http": {
+          "type" : "object",
+          "properties" : {
+            "driver" : {"$ref" : "#/definitions/sinks"}
+          },
+          "additionalProperties" : false
+        }
+      }
+    },
+    "rate_limit_service" : {"$ref" : "#/definitions/rate_limit_service"},
+    "runtime" : {
+      "type" : "object",
+      "properties" : {
+        "symlink_root" : {"type" : "string"},
+        "subdirectory" : {"type" : "string"},
+        "override_subdirectory" : {"type" : "string"}
+      },
+      "required" : ["symlink_root", "subdirectory"],
+      "additionalProperties" : false
+    }
   },
-  "required" : ["clusters"],
+  "required" : ["listeners", "admin", "cluster_manager"],
   "additionalProperties" : false
 }
 )EOF");

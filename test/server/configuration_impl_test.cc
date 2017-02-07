@@ -120,6 +120,34 @@ TEST(ConfigurationImplTest, BadListenerConfig) {
   EXPECT_THROW(config.initialize(*loader), Json::Exception);
 }
 
+TEST(ConfigurationImplTest, BadFilterConfig) {
+  std::string json = R"EOF(
+  {
+    "listeners" : [
+      {
+        "port" : 1234,
+        "filters": [
+          {
+            "type" : "type",
+            "name" : "name",
+            "config" : {}
+          }
+        ]
+      }
+    ],
+    "cluster_manager": {
+      "clusters": []
+    }
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  MainImpl config(server);
+  EXPECT_THROW(config.initialize(*loader), Json::Exception);
+}
+
 TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
   std::string json = R"EOF(
   {

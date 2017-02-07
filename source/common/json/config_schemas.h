@@ -4,6 +4,9 @@ namespace Json {
 
 class Schema {
 public:
+  // Top Level Config Schemas
+  static const std::string TOP_LEVEL_CONFIG_SCHEMA;
+
   // Listener Schema
   static const std::string LISTENER_SCHEMA;
 
