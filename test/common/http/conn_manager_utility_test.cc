@@ -295,6 +295,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                             {"x-envoy-retry-on", "foo"},
                             {"x-envoy-upstream-alt-stat-name", "foo"},
+                            {"x-envoy-upstream-rq-timeout-alt-response", "204"},
                             {"x-envoy-upstream-rq-timeout-ms", "foo"},
                             {"x-envoy-expected-rq-timeout-ms", "10"},
                             {"custom_header", "foo"}};
@@ -304,6 +305,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("x-envoy-downstream-service-cluster"));
   EXPECT_FALSE(headers.has("x-envoy-retry-on"));
   EXPECT_FALSE(headers.has("x-envoy-upstream-alt-stat-name"));
+  EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-alt-response"));
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("custom_header"));

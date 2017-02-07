@@ -131,6 +131,15 @@ The output tree is documented :ref:`here <config_cluster_manager_cluster_stats_d
 
 .. _config_http_filters_router_x-envoy-upstream-rq-timeout-ms:
 
+x-envoy-upstream-rq-timeout-alt-response
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Setting this header on egress requests will cause Envoy to set a 204 response code (instead of 504)
+in the event of a configured request timeout. The actual value of the header is ignored; only its
+presence is considered. See also :ref:`x-envoy-upstream-rq-timeout-ms`.
+
+.. _config_http_filters_router_x-envoy-upstream-rq-timeout-ms
+
 x-envoy-upstream-rq-timeout-ms
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

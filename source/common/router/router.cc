@@ -368,7 +368,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host) {
       upstream_host->outlierDetector().putHttpResponseCode(
           enumToInt(type == UpstreamResetType::Reset ? Http::Code::ServiceUnavailable
-                                                     : Http::Code::GatewayTimeout));
+                                                     : timeout_response_code_));
     }
   }
 
@@ -382,7 +382,8 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   // This will destroy any created retry timers.
   cleanup();
 
-  // If we have never sent any response, send a 503. Otherwise just reset the ongoing response.
+  // If we have not yet sent anything downstream, send a response with an appropriate status code.
+  // Otherwise just reset the ongoing response.
   if (downstream_response_started_) {
     callbacks_->resetStream();
   } else {
@@ -393,7 +394,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
           Http::AccessLog::ResponseFlag::UpstreamRequestTimeout);
 
       code = timeout_response_code_;
-      body = "upstream request timeout";
+      body = timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
     } else {
       Http::AccessLog::ResponseFlag response_flags =
           streamResetReasonToResponseFlag(reset_reason.value());
