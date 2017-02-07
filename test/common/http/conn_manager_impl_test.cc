@@ -232,7 +232,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
         decoder = &conn_manager_->newStream(encoder);
 
         Http::HeaderMapPtr headers{
-            new TestHeaderMapImpl{{":authority", "host"},
+            new TestHeaderMapImpl{{":method", "GET"},
+                                  {":authority", "host"},
                                   {":path", "/"},
                                   {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
         decoder->decodeHeaders(std::move(headers), true);
@@ -278,7 +279,8 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         decoder = &conn_manager_->newStream(encoder);
 
         Http::HeaderMapPtr headers{
-            new TestHeaderMapImpl{{":authority", "host"},
+            new TestHeaderMapImpl{{":method", "GET"},
+                                  {":authority", "host"},
                                   {":path", "/"},
                                   {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
         decoder->decodeHeaders(std::move(headers), true);
@@ -317,7 +319,8 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
         decoder = &conn_manager_->newStream(encoder);
 
         Http::HeaderMapPtr headers{
-            new TestHeaderMapImpl{{":authority", "host"},
+            new TestHeaderMapImpl{{":method", "GET"},
+                                  {":authority", "host"},
                                   {":path", "/"},
                                   {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
         decoder->decodeHeaders(std::move(headers), true);
@@ -336,8 +339,10 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
   setup(false, "");
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
+
   EXPECT_CALL(tracer_, startSpan_(_, _, _)).WillOnce(Return(span));
   EXPECT_CALL(*span, finishSpan()).Times(0);
+
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
 
@@ -361,7 +366,8 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
         decoder = &conn_manager_->newStream(encoder);
 
         Http::HeaderMapPtr headers{
-            new TestHeaderMapImpl{{":authority", "host"},
+            new TestHeaderMapImpl{{":method", "GET"},
+                                  {":authority", "host"},
                                   {":path", "/healthcheck"},
                                   {"x-request-id", "125a4afb-6f55-94ba-ad80-413f09f48a28"}}};
         decoder->decodeHeaders(std::move(headers), true);

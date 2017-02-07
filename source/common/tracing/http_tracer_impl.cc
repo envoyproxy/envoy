@@ -1,5 +1,6 @@
 #include "http_tracer_impl.h"
 
+#include "common/common/base64.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
@@ -18,7 +19,7 @@ static std::string buildRequestLine(const Http::HeaderMap& request_headers,
   std::string path = request_headers.EnvoyOriginalPath()
                          ? request_headers.EnvoyOriginalPath()->value().c_str()
                          : request_headers.Path()->value().c_str();
-  static const size_t max_path_length = 256;
+  static const size_t max_path_length = 128;
 
   if (path.length() > max_path_length) {
     path = path.substr(0, max_path_length);
@@ -98,9 +99,9 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
   throw std::invalid_argument("Unknown trace_status");
 }
 
-void HttpTracerUtility::populateSpan(Span& active_span, const std::string& service_node,
-                                     const Http::HeaderMap& request_headers,
+void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
                                      const Http::AccessLog::RequestInfo& request_info) {
+  // Pre response data.
   active_span.setTag("guid:x-request-id",
                      std::string(request_headers.RequestId()->value().c_str()));
   active_span.setTag("request_line", buildRequestLine(request_headers, request_info));
@@ -109,16 +110,13 @@ void HttpTracerUtility::populateSpan(Span& active_span, const std::string& servi
   active_span.setTag("downstream_cluster",
                      valueOrDefault(request_headers.EnvoyDownstreamServiceCluster(), "-"));
   active_span.setTag("user_agent", valueOrDefault(request_headers.UserAgent(), "-"));
-  active_span.setTag("node_id", service_node);
 
   if (request_headers.ClientTraceId()) {
     active_span.setTag("guid:x-client-trace-id",
                        std::string(request_headers.ClientTraceId()->value().c_str()));
   }
-}
 
-void HttpTracerUtility::finalizeSpan(Span& active_span,
-                                     const Http::AccessLog::RequestInfo& request_info) {
+  // Post response data.
   active_span.setTag("response_code", buildResponseCode(request_info));
   active_span.setTag("response_size", std::to_string(request_info.bytesSent()));
   active_span.setTag("response_flags",
@@ -135,12 +133,13 @@ void HttpTracerUtility::finalizeSpan(Span& active_span,
 HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
     : driver_(std::move(driver)), local_info_(local_info) {}
 
-SpanPtr HttpTracerImpl::startSpan(const Config& config, const Http::HeaderMap& request_headers,
+SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
                                   const Http::AccessLog::RequestInfo& request_info) {
-  SpanPtr active_span = driver_->startSpan(config.operationName(), request_info.startTime());
+  SpanPtr active_span =
+      driver_->startSpan(request_headers, config.operationName(), request_info.startTime());
   if (active_span) {
-    HttpTracerUtility::populateSpan(*active_span, local_info_.nodeName(), request_headers,
-                                    request_info);
+    active_span->setTag("node_id", local_info_.nodeName());
+    active_span->setTag("zone", local_info_.zoneName());
   }
 
   return active_span;
@@ -244,11 +243,37 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
   });
 }
 
-SpanPtr LightStepDriver::startSpan(const std::string& operation_name, SystemTime start_time) {
-  lightstep::Span span = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_.StartSpan(
-      operation_name, {lightstep::StartTimestamp(start_time)});
+SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
+                                   const std::string& operation_name, SystemTime start_time) {
+  lightstep::Tracer& tracer = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_;
+  LightStepSpanPtr active_span;
 
-  return SpanPtr{new LightStepSpan(span)};
+  if (request_headers.OtSpanContext()) {
+    // Extract downstream context from HTTP carrier.
+    std::string parent_context = Base64::decode(request_headers.OtSpanContext()->value().c_str());
+    lightstep::envoy::CarrierStruct ctx;
+    ctx.ParseFromString(parent_context);
+
+    lightstep::SpanContext parent_span_ctx = tracer.Extract(
+        lightstep::CarrierFormat::EnvoyProtoCarrier, lightstep::envoy::ProtoReader(ctx));
+    lightstep::Span ls_span =
+        tracer.StartSpan(operation_name, {lightstep::ChildOf(parent_span_ctx),
+                                          lightstep::StartTimestamp(start_time)});
+    active_span.reset(new LightStepSpan(ls_span));
+  } else {
+    lightstep::Span ls_span =
+        tracer.StartSpan(operation_name, {lightstep::StartTimestamp(start_time)});
+    active_span.reset(new LightStepSpan(ls_span));
+  }
+
+  // Inject newly created span context into HTTP carrier.
+  lightstep::envoy::CarrierStruct ctx;
+  tracer.Inject(active_span->context(), lightstep::CarrierFormat::EnvoyProtoCarrier,
+                lightstep::envoy::ProtoWriter(&ctx));
+  Buffer::OwnedImpl buffer(ctx.SerializeAsString());
+  request_headers.insertOtSpanContext().value(Base64::encode(buffer, buffer.length()));
+
+  return std::move(active_span);
 }
 
 void LightStepRecorder::onFailure(Http::AsyncClient::FailureReason) {
