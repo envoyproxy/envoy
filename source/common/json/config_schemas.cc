@@ -872,93 +872,93 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
   )EOF");
 
 const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
-{
-  "$schema": "http://json-schema.org/schema#",
-  "definitions" : {
-    "sinks" : {
-      "type" : "object",
-      "properties" : {
-        "type" : {
-          "type" : "string",
-          "enum" : ["lightstep"]
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions" : {
+      "sinks" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["lightstep"]
+          },
+          "access_token_file" : {"type" : "string"},
+          "config" : {
+            "type" : "object",
+            "properties" : {
+              "collector_cluster" : {"type" : "string"}
+            },
+            "required": ["collector_cluster"],
+            "additionalProperties" : false
+          }
         },
-        "access_token_file" : {"type" : "string"},
-        "config" : {
-          "type" : "object",
-          "properties" : {
-            "collector_cluster" : {"type" : "string"}
-          },
-          "required": ["collector_cluster"],
-          "additionalProperties" : false
-        }
+        "required" : ["type", "access_token_file", "config"],
+        "additionalProperties" : false
       },
-      "required" : ["type", "access_token_file", "config"],
-      "additionalProperties" : false
-    },
-    "rate_limit_service" : {
-      "type" : "object",
-      "properties" : {
-        "type" : {
-          "type" : "string",
-          "enum" : ["grpc_service"]
+      "rate_limit_service" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["grpc_service"]
+          },
+          "config" : {
+            "type" : "object",
+            "properties" : {
+              "cluster_name" :{"type" : "string"}
+            },
+            "required" : ["cluster_name"],
+            "additionalProperties" : false
+          }
         },
-        "config" : {
-          "type" : "object",
-          "properties" : {
-            "cluster_name" :{"type" : "string"}
-          },
-          "required" : ["cluster_name"],
-          "additionalProperties" : false
-        }
-      },
-      "required" : ["type", "config"],
-      "additionalProperties" : false
-    }
-  },
-  "properties" : {
-    "listeners" : {
-      "type" : "array",
-      "items" : {"type" : "object"}
-    },
-    "admin" : {
-      "type" : "object",
-      "properties" : {
-        "access_log_path" : {"type" : "string"},
-        "port" : {"type" : "integer"}
-      },
-      "required" : ["access_log_path", "port"],
-      "additionalProperties" : false
-    },
-    "cluster_manager" : {"type" : "object"},
-    "flags_path" : {"type" : "string"},
-    "statsd_local_udp_port" : {"type" : "integer"},
-    "statsd_tcp_cluster_name" : {"type" : "string"},
-    "stats_flush_interval_ms" : {"type" : "integer"},
-    "tracing" : {
-      "type" : "object",
-      "properties" : {
-        "http": {
-          "type" : "object",
-          "properties" : {
-            "driver" : {"$ref" : "#/definitions/sinks"}
-          },
-          "additionalProperties" : false
-        }
+        "required" : ["type", "config"],
+        "additionalProperties" : false
       }
     },
-    "rate_limit_service" : {"$ref" : "#/definitions/rate_limit_service"},
-    "runtime" : {
-      "type" : "object",
-      "properties" : {
-        "symlink_root" : {"type" : "string"},
-        "subdirectory" : {"type" : "string"},
-        "override_subdirectory" : {"type" : "string"}
+    "properties" : {
+      "listeners" : {
+        "type" : "array",
+        "items" : {"type" : "object"}
       },
-      "required" : ["symlink_root", "subdirectory"],
-      "additionalProperties" : false
-    }
-  },
-  "required" : ["listeners", "admin", "cluster_manager"],
-  "additionalProperties" : false
-}
-)EOF");
+      "admin" : {
+        "type" : "object",
+        "properties" : {
+          "access_log_path" : {"type" : "string"},
+          "port" : {"type" : "integer"}
+        },
+        "required" : ["access_log_path", "port"],
+        "additionalProperties" : false
+      },
+      "cluster_manager" : {"type" : "object"},
+      "flags_path" : {"type" : "string"},
+      "statsd_local_udp_port" : {"type" : "integer"},
+      "statsd_tcp_cluster_name" : {"type" : "string"},
+      "stats_flush_interval_ms" : {"type" : "integer"},
+      "tracing" : {
+        "type" : "object",
+        "properties" : {
+          "http": {
+            "type" : "object",
+            "properties" : {
+              "driver" : {"$ref" : "#/definitions/sinks"}
+            },
+            "additionalProperties" : false
+          }
+        }
+      },
+      "rate_limit_service" : {"$ref" : "#/definitions/rate_limit_service"},
+      "runtime" : {
+        "type" : "object",
+        "properties" : {
+          "symlink_root" : {"type" : "string"},
+          "subdirectory" : {"type" : "string"},
+          "override_subdirectory" : {"type" : "string"}
+        },
+        "required" : ["symlink_root", "subdirectory"],
+        "additionalProperties" : false
+      }
+    },
+    "required" : ["listeners", "admin", "cluster_manager"],
+    "additionalProperties" : false
+  }
+  )EOF");
