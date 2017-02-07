@@ -202,13 +202,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers);
 
   // If this header is set with any value, use an alternate response code on timeout
-  const Http::HeaderEntry* header_timeout_alt_response =
-      headers.EnvoyUpstreamRequestTimeoutAltResponse();
-  if (header_timeout_alt_response) {
+  if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
     timeout_response_code_ = Http::Code::NoContent;
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
-  } else {
-    timeout_response_code_ = Http::Code::GatewayTimeout;
   }
 
   route_entry_->finalizeRequestHeaders(headers);
@@ -394,7 +390,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
           Http::AccessLog::ResponseFlag::UpstreamRequestTimeout);
 
       code = timeout_response_code_;
-      body = timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
+      body = code == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
     } else {
       Http::AccessLog::ResponseFlag response_flags =
           streamResetReasonToResponseFlag(reset_reason.value());
