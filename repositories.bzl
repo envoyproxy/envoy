@@ -213,7 +213,8 @@ cc_library(
     includes = [
         "include",
     ],
-)"""
+)
+"""
 
     native.new_git_repository(
         name = "spdlog",
@@ -260,7 +261,8 @@ cc_library(
         "include",
     ],
     visibility = ["//visibility:public"],
-)"""
+)
+"""
 
     native.new_http_archive(
         name = "tclap",
@@ -377,7 +379,8 @@ cc_library(
         "http_parser.h",
     ],
     visibility = ["//visibility:public"],
-)"""
+)
+"""
 
     native.new_git_repository(
         name = "http_parser",
@@ -453,3 +456,16 @@ cc_library(
         strip_prefix = "nghttp2-1.14.1",
         build_file_content = BUILD,
     )
+
+
+def envoy_dependencies():
+    boringssl_repositories()
+    protobuf_repositories()
+    googletest_repositories()
+    libevent_repositories()
+    spdlog_repositories()
+    tclap_repositories()
+    lightstep_repositories()
+    http_parser_repositories()
+    rapidjson_repositories()
+    nghttp2_repositories()
