@@ -51,7 +51,7 @@ private:
  * ConnectionPool asynchronously.
  */
 class AsyncStreamImpl : public AsyncClient::Stream,
-                        StreamDecoderFilterCallbacks,
+                        public StreamDecoderFilterCallbacks,
                         Logger::Loggable<Logger::Id::http>,
                         LinkedObject<AsyncStreamImpl> {
 public:

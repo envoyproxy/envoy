@@ -38,8 +38,7 @@ public:
   HttpConnectionManagerImplTest()
       : access_log_path_("dummy_path"),
         access_logs_{Http::AccessLog::InstancePtr{new Http::AccessLog::InstanceImpl(
-            access_log_path_, {},
-            std::move(AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter()),
+            access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
             log_manager_)}},
         codec_(new NiceMock<Http::MockServerConnection>()),
         stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
@@ -208,7 +207,13 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   setup(false, "");
 
   NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
-  EXPECT_CALL(tracer_, startSpan_(_, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(tracer_, startSpan_(_, _, _))
+      .WillOnce(Invoke([&](const Tracing::Config& config, const Http::HeaderMap&,
+                           const Http::AccessLog::RequestInfo&) -> Tracing::Span* {
+        EXPECT_EQ("operation", config.operationName());
+
+        return span;
+      }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
@@ -240,6 +245,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);
+
+  EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
+  EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
@@ -355,7 +363,7 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
         Http::HeaderMapPtr headers{
             new TestHeaderMapImpl{{":authority", "host"},
                                   {":path", "/healthcheck"},
-                                  {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+                                  {"x-request-id", "125a4afb-6f55-94ba-ad80-413f09f48a28"}}};
         decoder->decodeHeaders(std::move(headers), true);
 
         Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -366,6 +374,14 @@ TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input);
+
+  // Force dtor of active stream to be called so that we can capture tracing HC stat.
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  // HC request, but was originally sampled, so check for two stats here.
+  EXPECT_EQ(1UL, tracing_stats_.random_sampling_.value());
+  EXPECT_EQ(1UL, tracing_stats_.health_check_.value());
+  EXPECT_EQ(0UL, tracing_stats_.service_forced_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, NoPath) {
@@ -863,6 +879,21 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       .WillOnce(Return(Http::FilterTrailersStatus::Continue));
   EXPECT_CALL(encoder, encodeTrailers(_));
   encoder_filter1->callbacks_->continueEncoding();
+}
+
+TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
+  Stats::IsolatedStoreImpl stats;
+  ConnectionManagerTracingStats tracing_stats{CONN_MAN_TRACING_STATS(POOL_COUNTER(stats))};
+
+  EXPECT_THROW(
+      ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::HealthCheck, tracing_stats),
+      std::invalid_argument);
+
+  ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::ClientForced, tracing_stats);
+  EXPECT_EQ(1UL, tracing_stats.client_enabled_.value());
+
+  ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::NotTraceableRequestId, tracing_stats);
+  EXPECT_EQ(1UL, tracing_stats.not_traceable_.value());
 }
 
 } // Http

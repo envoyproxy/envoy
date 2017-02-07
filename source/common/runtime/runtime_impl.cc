@@ -75,30 +75,29 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
 void SnapshotImpl::walkDirectory(const std::string& path, const std::string& prefix) {
   log_debug("walking directory: {}", path);
   Directory current_dir(path);
-  dirent entry;
-  dirent* result;
   while (true) {
-    int rc = readdir_r(current_dir.dir_, &entry, &result);
-    if (0 != rc) {
+    errno = 0;
+    dirent* entry = readdir(current_dir.dir_);
+    if (entry == nullptr && errno != 0) {
       throw EnvoyException(fmt::format("unable to iterate directory: {}", path));
     }
 
-    if (!result) {
+    if (entry == nullptr) {
       break;
     }
 
-    std::string full_path = path + "/" + entry.d_name;
+    std::string full_path = path + "/" + entry->d_name;
     std::string full_prefix;
     if (prefix.empty()) {
-      full_prefix = entry.d_name;
+      full_prefix = entry->d_name;
     } else {
-      full_prefix = prefix + "." + entry.d_name;
+      full_prefix = prefix + "." + entry->d_name;
     }
 
-    if (entry.d_type == DT_DIR && std::string(entry.d_name) != "." &&
-        std::string(entry.d_name) != "..") {
+    if (entry->d_type == DT_DIR && std::string(entry->d_name) != "." &&
+        std::string(entry->d_name) != "..") {
       walkDirectory(full_path, full_prefix);
-    } else if (entry.d_type == DT_REG) {
+    } else if (entry->d_type == DT_REG) {
       // Suck the file into a string. This is not very efficient but it should be good enough
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could
       // theoretically lead to issues.

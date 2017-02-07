@@ -145,14 +145,14 @@ public:
   InitialImpl(const Json::Object& json);
 
   // Server::Configuration::Initial
-  Admin& admin() { return admin_; }
-  Optional<std::string> flagsPath() { return flags_path_; }
+  Admin& admin() override { return admin_; }
+  Optional<std::string> flagsPath() override { return flags_path_; }
   Runtime* runtime() override { return runtime_.get(); }
 
 private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
-    const std::string& accessLogPath() { return access_log_path_; }
+    const std::string& accessLogPath() override { return access_log_path_; }
     uint32_t port() override { return port_; }
 
     std::string access_log_path_;

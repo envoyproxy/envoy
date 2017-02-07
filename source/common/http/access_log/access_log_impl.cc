@@ -66,13 +66,11 @@ FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {
   } else if (type == "not_healthcheck") {
     return FilterPtr{new NotHealthCheckFilter()};
   } else if (type == "traceable_request") {
-    return FilterPtr{new TraceableRequestFilter(runtime)};
+    return FilterPtr{new TraceableRequestFilter()};
   } else {
     throw EnvoyException(fmt::format("invalid access log filter type '{}'", type));
   }
 }
-
-TraceableRequestFilter::TraceableRequestFilter(Runtime::Loader& runtime) : runtime_(runtime) {}
 
 bool TraceableRequestFilter::evaluate(const RequestInfo& info, const HeaderMap& request_headers) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
@@ -99,7 +97,8 @@ bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header
   const HeaderEntry* uuid = request_header.RequestId();
   uint16_t sampled_value;
   if (uuid && UuidUtils::uuidModBy(uuid->value().c_str(), sampled_value, 100)) {
-    uint64_t runtime_value = std::min(runtime_.snapshot().getInteger(runtime_key_, 0), 100UL);
+    uint64_t runtime_value =
+        std::min<uint64_t>(runtime_.snapshot().getInteger(runtime_key_, 0), 100);
 
     return sampled_value < static_cast<uint16_t>(runtime_value);
   } else {
