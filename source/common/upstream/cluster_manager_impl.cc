@@ -131,7 +131,7 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
       thread_local_slot_(tls.allocateSlot()), local_info_(local_info),
       cm_stats_(generateStats(stats)) {
 
-  config.validateSchema(Json::Schema::CLUSTER_SCHEMA);
+  config.validateSchema(Json::Schema::CLUSTER_MANAGER_SCHEMA);
 
   if (config.hasObject("outlier_detection")) {
     std::string event_log_file_path =
@@ -506,6 +506,9 @@ ClusterPtr
 ProdClusterManagerFactory::clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
                                            const Optional<SdsConfig>& sds_config,
                                            Outlier::EventLoggerPtr outlier_event_logger) {
+
+  cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
+
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
                                  runtime_, random_, primary_dispatcher_, sds_config, local_info_,
                                  outlier_event_logger);

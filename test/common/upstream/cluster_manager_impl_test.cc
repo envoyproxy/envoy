@@ -1,5 +1,6 @@
 #include "envoy/upstream/upstream.h"
 
+#include "common/json/config_schemas.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
@@ -171,6 +172,33 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   EXPECT_THROW(create(*loader), Json::Exception);
+}
+
+TEST_F(ClusterManagerImplTest, BadClusterConfig) {
+  std::string json = R"EOF(
+  {
+    "local_cluster_name": "new_cluster",
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "fake_type" : "expected_failure",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    },
+    {
+      "name": "new_cluster",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11002"}]
+    }]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {

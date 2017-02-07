@@ -20,7 +20,7 @@ http
   *(optional, object)* Provides configuration for the HTTP tracer.
 
 driver
-  *(optional, object)* Provides the driver that traces are sent to.
+  *(optional, object)* Provides the driver that handles trace and span creation.
 
 Currently only `LightStep <http://lightstep.com/>`_ is supported.
 
