@@ -24,18 +24,18 @@ driver
 
 Currently only `LightStep <http://lightstep.com/>`_ is supported.
 
+LightStep driver
+----------------
+
 .. code-block:: json
 
   {
-    "type": "...",
+    "type": "lightstep",
     "access_token_file": "...",
     "config": {
       "collector_cluster": "..."
     }
   }
-
-type
-  *(required, string)* Driver type, the only currently supported value is *lightstep*.
 
 access_token_file
   *(required, string)* File containing the access token to the `LightStep <http://lightstep.com/>`_
