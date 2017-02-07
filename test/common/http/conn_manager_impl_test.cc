@@ -134,8 +134,8 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
         }
 
         // Test route caching.
-        EXPECT_EQ(&route_config_.route_, filter->callbacks_->route());
-        EXPECT_EQ(&route_config_.route_, filter->callbacks_->route());
+        EXPECT_EQ(route_config_.route_, filter->callbacks_->route());
+        EXPECT_EQ(route_config_.route_, filter->callbacks_->route());
 
         return FilterHeadersStatus::StopIteration;
       }));

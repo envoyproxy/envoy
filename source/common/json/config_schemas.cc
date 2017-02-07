@@ -448,6 +448,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "prefix" : {"type" : "string"},
       "path" : {"type" : "string"},
       "cluster" : {"type" : "string"},
+      "cluster_header" : {"type" : "string"},
       "weighted_clusters": {"$ref" : "#/definitions/weighted_clusters"},
       "host_redirect" : {"type" : "string"},
       "path_redirect" : {"type" : "string"},

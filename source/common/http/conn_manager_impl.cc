@@ -818,7 +818,7 @@ AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestIn
   return parent_.request_info_;
 }
 
-const Router::Route* ConnectionManagerImpl::ActiveStreamFilterBase::route() {
+Router::RoutePtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
   if (!cached_route_.valid()) {
     cached_route_.value(parent_.connection_manager_.config_.routeConfig().route(
         *parent_.request_headers_, parent_.stream_id_));

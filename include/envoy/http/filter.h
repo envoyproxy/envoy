@@ -93,7 +93,7 @@ public:
    *       knows that it has modified the headers in a way that would affect routing. In the future
    *       we may also want to allow the filter to override the route entry.
    */
-  virtual const Router::Route* route() PURE;
+  virtual Router::RoutePtr route() PURE;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.

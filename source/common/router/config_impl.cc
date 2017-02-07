@@ -81,6 +81,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       prefix_rewrite_(route.getString("prefix_rewrite", "")),
       host_rewrite_(route.getString("host_rewrite", "")), vhost_(vhost),
       cluster_name_(route.getString("cluster", "")),
+      cluster_header_name_(route.getString("cluster_header", "")),
       timeout_(route.getInteger("timeout_ms", DEFAULT_ROUTE_TIMEOUT_MS)),
       runtime_(loadRuntimeData(route)), loader_(loader),
       host_redirect_(route.getString("host_redirect", "")),
@@ -91,7 +92,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
 
   bool have_weighted_clusters = route.hasObject("weighted_clusters");
-  bool have_cluster = !cluster_name_.empty() || have_weighted_clusters;
+  bool have_cluster =
+      !cluster_name_.empty() || !cluster_header_name_.get().empty() || have_weighted_clusters;
 
   // Check to make sure that we are either a redirect route or we have a cluster.
   if (!(isRedirect() ^ have_cluster)) {
@@ -99,8 +101,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   }
 
   if (have_cluster) {
-    if (!cluster_name_.empty() && have_weighted_clusters) {
-      throw EnvoyException("routes must have either single or weighted_clusters as target");
+    // This is a trick to do a three-way XOR. It would be nice if we could do this with the JSON
+    // schema but there is no obvious way to do this.
+    if ((!cluster_name_.empty() + !cluster_header_name_.get().empty() + have_weighted_clusters) !=
+        1) {
+      throw EnvoyException("routes must specify one of cluster/cluster_header/weighted_clusters");
     }
   }
 
@@ -238,11 +243,28 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
-const Route* RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
+RoutePtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& headers,
+                                          uint64_t random_value) const {
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
   if (weighted_clusters_.empty()) {
-    return this;
+    if (!cluster_name_.empty() || isRedirect()) {
+      return shared_from_this();
+    } else {
+      ASSERT(!cluster_header_name_.get().empty());
+      const Http::HeaderEntry* entry = headers.get(cluster_header_name_);
+      std::string final_cluster_name;
+      if (entry) {
+        final_cluster_name = entry->value().c_str();
+      }
+
+      // NOTE: Though we return a shared_ptr here, the current ownership model assumes that
+      //       the route table sticks around. In v1 of RDS we will likely snap the route table
+      //       in the connection manager to account for this, but we may eventually want to have
+      //       a chain of references that goes back to the route table root. That is complicated
+      //       though.
+      return std::make_shared<DynanmicRouteEntry>(this, final_cluster_name);
+    }
   }
 
   uint64_t selected_value = random_value % WeightedClusterEntry::MAX_CLUSTER_WEIGHT;
@@ -261,7 +283,7 @@ const Route* RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
       // sum(weights) > WeightedClusterEntry::MAX_CLUSTER_WEIGHT.
       // In this case, terminate the search and just return the cluster
       // whose weight cased the overflow
-      return cluster.get();
+      return cluster;
     }
     begin = end;
   }
@@ -269,18 +291,15 @@ const Route* RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
-  // Throws an error if any of the clusters held by this Route or the
-  // internal weighted clusters are invalid.
   if (isRedirect()) {
     return;
   }
 
-  // We could have either a normal cluster or weighted cluster
-  if (weighted_clusters_.empty()) {
-    if (!cm.get(this->clusterName())) {
-      throw EnvoyException(fmt::format("route: unknown cluster '{}'", this->clusterName()));
+  if (!cluster_name_.empty()) {
+    if (!cm.get(cluster_name_)) {
+      throw EnvoyException(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
-  } else {
+  } else if (!weighted_clusters_.empty()) {
     for (const WeightedClusterEntryPtr& cluster : weighted_clusters_) {
       if (!cm.get(cluster->clusterName())) {
         throw EnvoyException(
@@ -300,11 +319,11 @@ void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) cons
   finalizePathHeader(headers, prefix_);
 }
 
-const Route* PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
-                                           uint64_t random_value) const {
+RoutePtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                       uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value) &&
       StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_)) {
-    return RouteEntryImplBase::clusterEntry(random_value);
+    return clusterEntry(headers, random_value);
   }
   return nullptr;
 }
@@ -319,8 +338,7 @@ void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const 
   finalizePathHeader(headers, path_);
 }
 
-const Route* PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
-                                         uint64_t random_value) const {
+RoutePtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value)) {
     // TODO PERF: Avoid copy.
     std::string path = headers.Path()->value().c_str();
@@ -328,12 +346,12 @@ const Route* PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
 
     if (case_sensitive_) {
       if (path.substr(0, query_string_start) == path_) {
-        return RouteEntryImplBase::clusterEntry(random_value);
+        return clusterEntry(headers, random_value);
       }
     } else {
       if (StringUtil::caseInsensitiveCompare(path.substr(0, query_string_start).c_str(),
                                              path_.c_str()) == 0) {
-        return RouteEntryImplBase::clusterEntry(random_value);
+        return clusterEntry(headers, random_value);
       }
     }
   }
@@ -359,12 +377,17 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Load
   }
 
   for (const Json::ObjectPtr& route : virtual_host.getObjectArray("routes")) {
-    if (route->hasObject("prefix")) {
+    bool has_prefix = route->hasObject("prefix");
+    bool has_path = route->hasObject("path");
+    if (!(has_prefix ^ has_path)) {
+      throw EnvoyException("routes must specify either prefix or path");
+    }
+
+    if (has_prefix) {
       routes_.emplace_back(new PrefixRouteEntryImpl(*this, *route, runtime));
-    } else if (route->hasObject("path")) {
-      routes_.emplace_back(new PathRouteEntryImpl(*this, *route, runtime));
     } else {
-      throw EnvoyException("unknown routing configuration type");
+      ASSERT(has_path);
+      routes_.emplace_back(new PathRouteEntryImpl(*this, *route, runtime));
     }
 
     routes_.back()->validateClusters(cm);
@@ -431,19 +454,19 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
   }
 }
 
-const Route* VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
-                                                  uint64_t random_value) const {
+RoutePtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
+                                              uint64_t random_value) const {
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto()->value() != "https") {
-    return &SSL_REDIRECT_ROUTE;
+    return SSL_REDIRECT_ROUTE;
   } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
              headers.ForwardedProto()->value() != "https" && !headers.EnvoyInternalRequest()) {
-    return &SSL_REDIRECT_ROUTE;
+    return SSL_REDIRECT_ROUTE;
   }
 
   // Check for a route that matches the request.
   for (const RouteEntryImplBasePtr& route : routes_) {
-    const Route* route_entry = route->matches(headers, random_value);
+    RoutePtr route_entry = route->matches(headers, random_value);
     if (nullptr != route_entry) {
       return route_entry;
     }
@@ -468,7 +491,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   return nullptr;
 }
 
-const Route* RouteMatcher::route(const Http::HeaderMap& headers, uint64_t random_value) const {
+RoutePtr RouteMatcher::route(const Http::HeaderMap& headers, uint64_t random_value) const {
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
     return virtual_host->getRouteFromEntries(headers, random_value);
@@ -479,7 +502,8 @@ const Route* RouteMatcher::route(const Http::HeaderMap& headers, uint64_t random
 
 const VirtualHostImpl::CatchAllVirtualCluster VirtualHostImpl::VIRTUAL_CLUSTER_CATCH_ALL;
 const SslRedirector SslRedirectRoute::SSL_REDIRECTOR;
-const SslRedirectRoute VirtualHostImpl::SSL_REDIRECT_ROUTE;
+const std::shared_ptr<const SslRedirectRoute> VirtualHostImpl::SSL_REDIRECT_ROUTE{
+    new SslRedirectRoute()};
 
 const VirtualCluster*
 VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
