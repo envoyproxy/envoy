@@ -14,6 +14,6 @@ env:
   - TEST_TYPE=docs
 script:
   - travis lint .travis.yml --skip-completion-check
-  - docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
+  - docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:4c887e005b129b28d815d59f9983b1ed3eb9568f /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
   - ./ci/docker_push.sh
   - ./ci/verify_examples.sh
