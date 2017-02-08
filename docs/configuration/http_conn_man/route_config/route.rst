@@ -49,7 +49,7 @@ cluster
   *path_redirect* is not specified), one of *cluster* or *weighted_clusters* must be specified.
   With the *weighted_clusters* option, multiple upstream clusters can be specified for a given route.
   The request is forwarded to one of the upstream clusters based on weights assigned
-  to each cluster. See :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split_percentages>`
+  to each cluster. See :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split>`
   for additional documentation.
 
 .. _config_http_conn_man_route_table_route_host_redirect:
