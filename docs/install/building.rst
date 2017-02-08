@@ -3,13 +3,7 @@ Building
 
 The Envoy build system uses cmake. In order to ease initial building and for a quick start, we
 provide an Ubuntu 14 based docker container that has everything needed inside of it to build
-and *statically link* envoy. The following command will build the server.
-
-.. code-block:: console
-
-  docker run -t -i -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh server_only"
-
-See :repo:`ci/do_ci.sh` for other possible targets (to run tests, etc.).
+and *statically link* envoy, see :repo:`ci/README.md`.
 
 In order to build manually, cmake is used like so:
 

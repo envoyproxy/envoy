@@ -1,0 +1,44 @@
+# Developer use of CI Docker image
+
+The Docker image at `lyft/envoy-build:<hash>` is used for Travis CI checks, where `<hash>` is specified in
+[.travis.yml](https://github.com/lyft/envoy/blob/master/.travis.yml). Developers
+may work with `lyft/envoy-build:latest` to provide a self-contained environment for
+building Envoy binaries and running tests that reflects the latest built image.
+
+An example basic invocation to build a debug image and run all tests is:
+
+  `docker run -t -i -u $(id -u):$(id -g) -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"`
+
+This bind mounts `<SOURCE_DIR>`, which allows for changes on the local
+filesystem to be consumed and outputs build artifacts in `<SOURCE_DIR>/build`.
+The static Envoy binary can be found in `<SOURCE_DIR>/build/source/exe/envoy`.
+
+The `do_ci.sh` targets are:
+
+* `asan` &mdash; build and run tests with [AddressSanitizer](https://github.com/google/sanitizers/wiki/AddressSanitizer).
+* `coverage` &mdash; build and run tests, generating coverage information in `<SOURCE_DIR>/build/coverage.html`.
+* `debug` &mdash; build debug binary and run tests.
+* `docs` &mdash; build documentation, generated docs are found in `<SOURCE_DIR>/generated`.
+* `fix_format`&mdash; run `clang-format` 3.6 on entire source tree.
+* `normal` &mdash; build unstripped optimized binary and run tests .
+* `server_only` &mdash; build stripped optimized binary only.
+
+A convenient shell function to define is:
+
+  `run_envoy_docker() { docker run -t -i -u $(id -u):$(id -g) -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}`
+
+This then allows for a simple invocation of `run_envoy_docker './ci/do_ci.sh debug'` from the
+Envoy source tree.
+
+## Advanced developer features
+
+* Any parameters following the `do_ci.sh` target are passed in as command-line
+  arguments to the `envoy-test` binary during unit test execution. This allows
+  for [GTest](https://github.com/google/googletest) flags to be passed, e.g.
+  `run_envoy_docker './ci/do_ci.sh debug --gtest_filter="*Dns*"'`.
+
+* A `UNIT_TEST_ONLY` environment variable is available to control test execution to limit testing to
+  just unit tests, e.g. `run_envoy_docker 'UNIT_TEST_ONLY=1 ./ci/do_ci.sh debug --gtest_filter="*Dns*"'`.
+
+* A `RUN_TEST_UNDER` environment variable is available to specify an executable to run the tests
+  under. For example, to run a subset of tests under `gdb`: `run_envoy_docker 'RUN_TEST_UNDER="gdb --args" UNIT_TEST_ONLY=1 ./ci/do_ci.sh debug --gtest_filter="*Dns*"'`.
