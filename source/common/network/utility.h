@@ -55,7 +55,7 @@ public:
   /**
    * Resolve a URL.
    * @param url supplies the url to resolve.
-   * @return a resolved address.
+   * @return Address::InstancePtr the resolved address.
    */
   static Address::InstancePtr resolveUrl(const std::string& url);
 
@@ -95,7 +95,7 @@ public:
    * The address (IP and port) may be not local and the port may differ from
    * the listener port if the packets were redirected using iptables
    * @param fd is the descriptor returned by accept()
-   * @return the original destination or nullptr not available.
+   * @return the original destination or nullptr if not available.
    */
   static Address::InstancePtr getOriginalDst(int fd);
 

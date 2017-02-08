@@ -71,8 +71,8 @@ public:
   virtual const std::string& asString() const PURE;
 
   /**
-   * Bind a socket to to this address. The socket should have been created with a call to socket()
-   * on this object.
+   * Bind a socket to this address. The socket should have been created with a call to socket() on
+   * this object.
    * @param fd supplies the platform socket handle.
    * @return the platform error code.
    */
