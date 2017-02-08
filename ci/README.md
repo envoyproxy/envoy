@@ -25,7 +25,7 @@ The `do_ci.sh` targets are:
 
 A convenient shell function to define is:
 
-  `run_envoy_docker() { docker run -t -i -u $(id -u):$(id -g) -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*"}`
+  `run_envoy_docker() { docker run -t -i -u $(id -u):$(id -g) -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}`
 
 This then allows for a simple invocation of `run_envoy_docker './ci/do_ci.sh debug'` from the
 Envoy source tree.
