@@ -1,8 +1,9 @@
 # Developer use of CI Docker image
 
-The Docker image at `lyft/envoy-build:latest` is used for Travis CI checks. It
-may also be used by developers to provide a self-contained environment for
-building Envoy binaries and running tests.
+The Docker image at `lyft/envoy-build:<hash>` is used for Travis CI checks, where `<hash>` is specified in
+[.travis.yml](https://github.com/lyft/envoy/blob/master/.travis.yml). Developers
+may work with `lyft/envoy-build:latest` to provide a self-contained environment for
+building Envoy binaries and running tests that reflects the latest built image.
 
 An example basic invocation to build a debug image and run all tests is:
 
@@ -18,7 +19,7 @@ The `do_ci.sh` targets are:
 * `coverage` &mdash; build and run tests, generating coverage information in `<SOURCE_DIR>/build/coverage.html`.
 * `debug` &mdash; build debug binary and run tests.
 * `docs` &mdash; build documentation, generated docs are found in `<SOURCE_DIR>/generated`.
-* `fix_format`&mdash; run `clang-format` on entire source tree.
+* `fix_format`&mdash; run `clang-format` 3.6 on entire source tree.
 * `normal` &mdash; build unstripped optimized binary and run tests .
 * `server_only` &mdash; build stripped optimized binary only.
 
