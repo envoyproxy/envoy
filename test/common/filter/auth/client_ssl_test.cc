@@ -1,6 +1,7 @@
 #include "common/filesystem/filesystem_impl.h"
 #include "common/filter/auth/client_ssl.h"
 #include "common/http/message_impl.h"
+#include "common/network/address_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -14,7 +15,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnNew;
-using testing::ReturnRefOfCopy;
+using testing::ReturnRef;
 using testing::WithArg;
 
 namespace Filter {
@@ -135,8 +136,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // Create a new filter for an SSL connection, with no backing auth data yet.
   createAuthFilter();
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(&ssl_));
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
-      .WillOnce(ReturnRefOfCopy(std::string("tcp://192.168.1.1:0")));
+  Network::Address::Ipv4Instance remote_address("192.168.1.1");
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(remote_address));
   EXPECT_CALL(ssl_, sha256PeerCertificateDigest()).WillOnce(Return("digest"));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
@@ -154,8 +155,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Create a new filter for an SSL connection with an authorized cert.
   createAuthFilter();
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
-      .WillOnce(ReturnRefOfCopy(std::string("tcp://192.168.1.1:0")));
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(remote_address));
   EXPECT_CALL(ssl_, sha256PeerCertificateDigest())
       .WillOnce(Return("1b7d42ef0025ad89c1c911d6c10d7e86a4cb7c5863b2980abcbad1895f8b5314"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
@@ -167,8 +167,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // White list case.
   createAuthFilter();
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress())
-      .WillOnce(ReturnRefOfCopy(std::string("tcp://1.2.3.4:0")));
+  Network::Address::Ipv4Instance remote_address2("1.2.3.4");
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(remote_address2));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvents(Network::ConnectionEvent::Connected);

@@ -25,12 +25,10 @@ namespace Upstream {
  */
 class HostDescriptionImpl : virtual public HostDescription {
 public:
-  HostDescriptionImpl(ClusterInfoPtr cluster, const std::string& url, bool canary,
+  HostDescriptionImpl(ClusterInfoPtr cluster, Network::Address::InstancePtr address, bool canary,
                       const std::string& zone)
-      : cluster_(cluster), url_(url), canary_(canary), zone_(zone),
-        stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {
-    checkUrl();
-  }
+      : cluster_(cluster), address_(address), canary_(canary), zone_(zone),
+        stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {}
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -43,12 +41,12 @@ public:
     }
   }
   const HostStats& stats() const override { return stats_; }
-  const std::string& url() const override { return url_; }
+  Network::Address::InstancePtr address() const override { return address_; }
   const std::string& zone() const override { return zone_; }
 
 protected:
   ClusterInfoPtr cluster_;
-  const std::string url_;
+  Network::Address::InstancePtr address_;
   const bool canary_;
   const std::string zone_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -56,8 +54,6 @@ protected:
   Outlier::DetectorHostSinkPtr outlier_detector_;
 
 private:
-  void checkUrl();
-
   static Outlier::DetectorHostSinkNullImpl null_outlier_detector_;
 };
 
@@ -68,9 +64,9 @@ class HostImpl : public HostDescriptionImpl,
                  public Host,
                  public std::enable_shared_from_this<HostImpl> {
 public:
-  HostImpl(ClusterInfoPtr cluster, const std::string& url, bool canary, uint32_t initial_weight,
-           const std::string& zone)
-      : HostDescriptionImpl(cluster, url, canary, zone) {
+  HostImpl(ClusterInfoPtr cluster, Network::Address::InstancePtr address, bool canary,
+           uint32_t initial_weight, const std::string& zone)
+      : HostDescriptionImpl(cluster, address, canary, zone) {
     weight(initial_weight);
   }
 
@@ -91,7 +87,7 @@ public:
 protected:
   static Network::ClientConnectionPtr createConnection(Event::Dispatcher& dispatcher,
                                                        const ClusterInfo& cluster,
-                                                       const std::string& url);
+                                                       Network::Address::InstancePtr address);
 
 private:
   std::atomic<uint64_t> health_flags_{};

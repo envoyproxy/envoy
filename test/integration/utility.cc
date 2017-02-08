@@ -8,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
@@ -47,11 +48,12 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   Api::Impl api(std::chrono::milliseconds(9000));
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionPtr host_description{
-      new Upstream::HostDescriptionImpl(cluster, "tcp://127.0.0.1:80", false, "")};
-  Http::CodecClientProd client(
-      type, dispatcher->createClientConnection(fmt::format("tcp://127.0.0.1:{}", port)),
-      host_description);
+  Upstream::HostDescriptionPtr host_description{new Upstream::HostDescriptionImpl(
+      cluster, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
+  Http::CodecClientProd client(type,
+                               dispatcher->createClientConnection(Network::Utility::resolveUrl(
+                                   fmt::format("tcp://127.0.0.1:{}", port))),
+                               host_description);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void { client.close(); }));
   Http::StreamEncoder& encoder = client.newStream(*response);
   encoder.getStream().addCallbacks(*response);
@@ -75,7 +77,8 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
                                          ReadCallback data_callback) {
   api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
   dispatcher_ = api_->allocateDispatcher();
-  client_ = dispatcher_->createClientConnection(fmt::format("tcp://127.0.0.1:{}", port));
+  client_ = dispatcher_->createClientConnection(
+      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", port)));
   client_->addReadFilter(Network::ReadFilterPtr{new ForwardingFilter(*this, data_callback)});
   client_->write(initial_data);
   client_->connect();

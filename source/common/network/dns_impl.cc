@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/event/libevent.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
 #include "event2/event.h"
@@ -41,12 +42,13 @@ void DnsResolverImpl::onSignal() {
     PendingResolution* pending_resolution =
         reinterpret_cast<PendingResolution*>(signal_info.ssi_ptr);
 
-    std::list<std::string> address_list;
+    std::list<Address::InstancePtr> address_list;
     addrinfo* result = pending_resolution->async_cb_data_.ar_result;
     while (result != nullptr) {
+      // TODO: IPv6 support.
       ASSERT(result->ai_family == AF_INET);
       sockaddr_in* address = reinterpret_cast<sockaddr_in*>(result->ai_addr);
-      address_list.emplace_back(Network::Utility::getAddressName(address));
+      address_list.emplace_back(new Address::Ipv4Instance(address));
       result = result->ai_next;
     }
 

@@ -18,13 +18,15 @@ public:
   MockDispatcher();
   ~MockDispatcher();
 
-  Network::ClientConnectionPtr createClientConnection(const std::string& url) override {
-    return Network::ClientConnectionPtr{createClientConnection_(url)};
+  Network::ClientConnectionPtr
+  createClientConnection(Network::Address::InstancePtr address) override {
+    return Network::ClientConnectionPtr{createClientConnection_(address)};
   }
 
-  Network::ClientConnectionPtr createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                                         const std::string& url) override {
-    return Network::ClientConnectionPtr{createSslClientConnection_(ssl_ctx, url)};
+  Network::ClientConnectionPtr
+  createSslClientConnection(Ssl::ClientContext& ssl_ctx,
+                            Network::Address::InstancePtr address) override {
+    return Network::ClientConnectionPtr{createSslClientConnection_(ssl_ctx, address)};
   }
 
   Network::DnsResolverPtr createDnsResolver() override {
@@ -72,9 +74,11 @@ public:
 
   // Event::Dispatcher
   MOCK_METHOD0(clearDeferredDeleteList, void());
-  MOCK_METHOD1(createClientConnection_, Network::ClientConnection*(const std::string& url));
+  MOCK_METHOD1(createClientConnection_,
+               Network::ClientConnection*(Network::Address::InstancePtr address));
   MOCK_METHOD2(createSslClientConnection_,
-               Network::ClientConnection*(Ssl::ClientContext& ssl_ctx, const std::string& url));
+               Network::ClientConnection*(Ssl::ClientContext& ssl_ctx,
+                                          Network::Address::InstancePtr address));
   MOCK_METHOD0(createDnsResolver_, Network::DnsResolver*());
   MOCK_METHOD2(createFileEvent_, FileEvent*(int fd, FileReadyCb cb));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());

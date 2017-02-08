@@ -5,6 +5,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
+#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 #include "common/stats/stats_impl.h"
@@ -138,8 +139,8 @@ TEST_F(AccessLogImplTest, NoFilter) {
 
 TEST_F(AccessLogImplTest, UpstreamHost) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new Upstream::MockClusterInfo()};
-  request_info_.upstream_host_ =
-      std::make_shared<Upstream::HostDescriptionImpl>(cluster, "tcp://10.0.0.5:1234", false, "");
+  request_info_.upstream_host_ = std::make_shared<Upstream::HostDescriptionImpl>(
+      cluster, Network::Utility::resolveUrl("tcp://10.0.0.5:1234"), false, "");
 
   std::string json = R"EOF(
       {
@@ -153,7 +154,7 @@ TEST_F(AccessLogImplTest, UpstreamHost) {
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
   EXPECT_EQ("[1900-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 - 1 2 3 - \"-\" \"-\" \"-\" \"-\" "
-            "\"tcp://10.0.0.5:1234\"\n",
+            "\"10.0.0.5:1234\"\n",
             output_);
 }
 

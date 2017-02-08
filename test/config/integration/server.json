@@ -2,6 +2,7 @@
   "listeners": [
   {
     "port": 10000,
+    "use_original_dst": true,
     "filters": [
       { "type": "read", "name": "ratelimit",
         "config": {

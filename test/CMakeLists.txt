@@ -69,6 +69,7 @@ add_executable(envoy-test
   common/mongo/codec_impl_test.cc
   common/mongo/proxy_test.cc
   common/mongo/utility_test.cc
+  common/network/address_impl_test.cc
   common/network/connection_impl_test.cc
   common/network/dns_impl_test.cc
   common/network/filter_manager_impl_test.cc

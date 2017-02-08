@@ -2,6 +2,7 @@
 
 #include "envoy/upstream/load_balancer.h"
 
+#include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 using testing::_;
@@ -29,8 +30,9 @@ MockDetector::~MockDetector() {}
 
 } // Outlier
 
-MockHostDescription::MockHostDescription() {
-  ON_CALL(*this, url()).WillByDefault(ReturnRef(url_));
+MockHostDescription::MockHostDescription()
+    : address_(Network::Utility::resolveUrl("tcp://10.0.0.1:443")) {
+  ON_CALL(*this, address()).WillByDefault(Return(address_));
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));

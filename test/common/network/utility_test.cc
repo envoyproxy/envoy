@@ -1,5 +1,7 @@
 #include "envoy/common/exception.h"
 
+#include "common/json/json_loader.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
 namespace Network {
@@ -64,23 +66,23 @@ TEST(IpListTest, Normal) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   IpList wl(*loader, "ip_white_list");
 
-  EXPECT_TRUE(wl.contains("192.168.3.0"));
-  EXPECT_TRUE(wl.contains("192.168.3.3"));
-  EXPECT_TRUE(wl.contains("192.168.3.255"));
-  EXPECT_FALSE(wl.contains("192.168.2.255"));
-  EXPECT_FALSE(wl.contains("192.168.4.0"));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.2.255")));
+  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("192.168.4.0")));
 
-  EXPECT_TRUE(wl.contains("50.1.2.3"));
-  EXPECT_FALSE(wl.contains("50.1.2.2"));
-  EXPECT_FALSE(wl.contains("50.1.2.4"));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("50.1.2.3")));
+  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("50.1.2.2")));
+  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("50.1.2.4")));
 
-  EXPECT_TRUE(wl.contains("10.15.0.0"));
-  EXPECT_TRUE(wl.contains("10.15.90.90"));
-  EXPECT_TRUE(wl.contains("10.15.255.255"));
-  EXPECT_FALSE(wl.contains("10.14.255.255"));
-  EXPECT_FALSE(wl.contains("10.16.0.0"));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("10.15.0.0")));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("10.15.90.90")));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("10.15.255.255")));
+  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("10.14.255.255")));
+  EXPECT_FALSE(wl.contains(Address::Ipv4Instance("10.16.0.0")));
 
-  EXPECT_FALSE(wl.contains(""));
+  EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAny) {
@@ -95,46 +97,46 @@ TEST(IpListTest, MatchAny) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   IpList wl(*loader, "ip_white_list");
 
-  EXPECT_TRUE(wl.contains("192.168.3.3"));
-  EXPECT_TRUE(wl.contains("192.168.3.0"));
-  EXPECT_TRUE(wl.contains("192.168.3.255"));
-  EXPECT_TRUE(wl.contains("192.168.0.0"));
-  EXPECT_TRUE(wl.contains("192.0.0.0"));
-  EXPECT_TRUE(wl.contains("1.1.1.1"));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.0.0")));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.0.0.0")));
+  EXPECT_TRUE(wl.contains(Address::Ipv4Instance("1.1.1.1")));
 
-  EXPECT_FALSE(wl.contains(""));
-}
-
-TEST(NetworkUtility, NonNumericResolve) {
-  EXPECT_THROW(Utility::resolveTCP("localhost", 80), EnvoyException);
+  EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
 }
 
 TEST(NetworkUtility, Url) {
-  EXPECT_EQ("foo", Utility::hostFromUrl("tcp://foo:1234"));
-  EXPECT_EQ(1234U, Utility::portFromUrl("tcp://foo:1234"));
-  EXPECT_THROW(Utility::hostFromUrl("bogus://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::portFromUrl("bogus://foo:1234"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromUrl("abc://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromUrl("abc://foo"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromUrl("tcp://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromUrl("tcp://foo"), EnvoyException);
-  EXPECT_THROW(Utility::portFromUrl("tcp://foo:bar"), EnvoyException);
-  EXPECT_THROW(Utility::hostFromUrl(""), EnvoyException);
+  EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));
+  EXPECT_EQ(1234U, Utility::portFromTcpUrl("tcp://foo:1234"));
+  EXPECT_THROW(Utility::hostFromTcpUrl("bogus://foo:1234"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("bogus://foo:1234"), EnvoyException);
+  EXPECT_THROW(Utility::hostFromTcpUrl("abc://foo"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("abc://foo"), EnvoyException);
+  EXPECT_THROW(Utility::hostFromTcpUrl("tcp://foo"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:bar"), EnvoyException);
+  EXPECT_THROW(Utility::hostFromTcpUrl(""), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("foo"), EnvoyException);
 }
 
-TEST(NetworkUtility, GetLocalAddress) {
-  std::string addr = Utility::getLocalAddress();
-  Utility::resolveTCP(addr, 80);
-}
+TEST(NetworkUtility, getLocalAddress) { EXPECT_NE(nullptr, Utility::getLocalAddress()); }
+
+TEST(NetworkUtlity, getOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
 
 TEST(NetworkUtility, loopbackAddress) {
   {
-    std::string address = "127.0.0.1";
-    EXPECT_TRUE(Utility::isLoopbackAddress(address.c_str()));
+    Address::Ipv4Instance address("127.0.0.1");
+    EXPECT_TRUE(Utility::isLoopbackAddress(address));
   }
   {
-    std::string address = "10.0.0.1";
-    EXPECT_FALSE(Utility::isLoopbackAddress(address.c_str()));
+    Address::Ipv4Instance address("10.0.0.1");
+    EXPECT_FALSE(Utility::isLoopbackAddress(address));
+  }
+  {
+    Address::PipeInstance address("/foo");
+    EXPECT_FALSE(Utility::isLoopbackAddress(address));
   }
 }
 
@@ -170,14 +172,19 @@ TEST(PortRangeListTest, Errors) {
   }
 }
 
+static Address::Ipv4Instance makeFromPort(uint32_t port) {
+  return Address::Ipv4Instance("0.0.0.0", port);
+}
+
 TEST(PortRangeListTest, Normal) {
   {
     std::string port_range_str = "1";
     std::list<PortRange> port_range_list;
 
     Utility::parsePortRangeList(port_range_str, port_range_list);
-    EXPECT_TRUE(Utility::portInRangeList(1, port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(2, port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(1), port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(2), port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(Address::PipeInstance("/foo"), port_range_list));
   }
 
   {
@@ -185,12 +192,12 @@ TEST(PortRangeListTest, Normal) {
     std::list<PortRange> port_range_list;
 
     Utility::parsePortRangeList(port_range_str, port_range_list);
-    EXPECT_TRUE(Utility::portInRangeList(1024, port_range_list));
-    EXPECT_TRUE(Utility::portInRangeList(2048, port_range_list));
-    EXPECT_TRUE(Utility::portInRangeList(1536, port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(1023, port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(2049, port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(0, port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(1024), port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(2048), port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(1536), port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(1023), port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(2049), port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(0), port_range_list));
   }
 
   {
@@ -198,13 +205,13 @@ TEST(PortRangeListTest, Normal) {
     std::list<PortRange> port_range_list;
 
     Utility::parsePortRangeList(port_range_str, port_range_list);
-    EXPECT_TRUE(Utility::portInRangeList(1, port_range_list));
-    EXPECT_TRUE(Utility::portInRangeList(50, port_range_list));
-    EXPECT_TRUE(Utility::portInRangeList(5000, port_range_list));
-    EXPECT_TRUE(Utility::portInRangeList(65535, port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(2, port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(200, port_range_list));
-    EXPECT_FALSE(Utility::portInRangeList(20000, port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(1), port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(50), port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(5000), port_range_list));
+    EXPECT_TRUE(Utility::portInRangeList(makeFromPort(65535), port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(2), port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(200), port_range_list));
+    EXPECT_FALSE(Utility::portInRangeList(makeFromPort(20000), port_range_list));
   }
 }
 
