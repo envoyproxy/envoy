@@ -6,7 +6,7 @@ namespace Grpc {
 
 Encoder::Encoder() {}
 
-void Encoder::NewFrame(uint8_t flags, uint64_t length, uint8_t* output) {
+void Encoder::newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& output) {
   output[0] = flags;
   output[1] = static_cast<uint8_t>(length >> 24);
   output[2] = static_cast<uint8_t>(length >> 16);
@@ -16,7 +16,7 @@ void Encoder::NewFrame(uint8_t flags, uint64_t length, uint8_t* output) {
 
 Decoder::Decoder() : state_(State::FH_FLAG) {}
 
-bool Decoder::Decode(Buffer::Instance& input, std::vector<Frame>* output) {
+bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   uint64_t count = input.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[count];
   input.getRawSlices(slices, count);
@@ -55,7 +55,7 @@ bool Decoder::Decode(Buffer::Instance& input, std::vector<Frame>* output) {
         break;
       case State::FH_LEN_3:
         frame_.length |= static_cast<uint32_t>(c);
-        frame_.data = new Buffer::OwnedImpl();
+        frame_.data.reset(new Buffer::OwnedImpl());
         state_ = State::DATA;
         mem++;
         j++;
@@ -73,10 +73,10 @@ bool Decoder::Decode(Buffer::Instance& input, std::vector<Frame>* output) {
           j += remain_in_frame;
         }
         if (frame_.length == frame_.data->length()) {
-          output->push_back(frame_); // make a copy.
+          output.push_back(std::move(frame_));
           frame_.flags = 0;
           frame_.length = 0;
-          frame_.data = nullptr;
+          frame_.data.reset();
           state_ = State::FH_FLAG;
         }
         break;

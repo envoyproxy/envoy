@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 #include "envoy/buffer/buffer.h"
 
 namespace Grpc {
@@ -13,7 +15,7 @@ enum class CompressionAlgorithm { None, Gzip };
 struct Frame {
   uint8_t flags;
   uint32_t length;
-  Buffer::Instance* data;
+  Buffer::InstancePtr data;
 };
 
 class Encoder {
@@ -24,7 +26,7 @@ public:
   // @param flags supplies the GRPC data frame flags.
   // @param length supplies the GRPC data frame length.
   // @param output the buffer to store the encoded data, it's size must be 5.
-  void NewFrame(uint8_t flags, uint64_t length, uint8_t* output);
+  void newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& output);
 };
 
 class Decoder {
@@ -33,12 +35,14 @@ public:
 
   // Decodes the given buffer with GRPC data frame.
   // @param input supplies the binary octets wrapped in a GRPC data frame.
-  // @param input supplies the buffer to store the decoded data.
+  // @param output supplies the buffer to store the decoded data.
   // @return bool whether the decoding success.
-  bool Decode(Buffer::Instance& input, std::vector<Frame>* output);
+  bool decode(Buffer::Instance& input, std::vector<Frame>& output);
 
 private:
-  // Wiring format of GRPC data frame header:
+  // Wiring format (http://www.grpc.io/docs/guides/wire.html) of GRPC data frame
+  // header:
+  //
   // -----------------------------------------------------------------------
   // |R|R|R|R|R|R|R|R|C|      L     |      L     |      L     |      L     |
   // -----------------------------------------------------------------------
