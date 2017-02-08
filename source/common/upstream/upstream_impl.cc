@@ -12,6 +12,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/http/utility.h"
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
@@ -93,6 +94,9 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
                                    const Optional<SdsConfig>& sds_config,
                                    const LocalInfo::LocalInfo& local_info,
                                    Outlier::EventLoggerPtr outlier_event_logger) {
+
+  cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
+
   std::unique_ptr<ClusterImplBase> new_cluster;
   std::string string_type = cluster.getString("type");
   if (string_type == "static") {

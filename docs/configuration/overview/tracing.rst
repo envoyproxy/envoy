@@ -12,18 +12,20 @@ the only one supported.
 
   {
     "http": {
-      "sinks": []
+      "driver": "{...}"
     }
   }
 
 http
   *(optional, object)* Provides configuration for the HTTP tracer.
 
-sinks
-  *(optional, string)* Provides list of sinks traces are sent to.
+driver
+  *(optional, object)* Provides the driver that handles trace and span creation.
 
-Each sink can be configured separately. Currently only the `LightStep <http://lightstep.com/>`_ sink
-is supported.
+Currently only `LightStep <http://lightstep.com/>`_ is supported.
+
+LightStep driver
+----------------
 
 .. code-block:: json
 
@@ -34,9 +36,6 @@ is supported.
       "collector_cluster": "..."
     }
   }
-
-type
-  *(required, string)* Sink type, the only currently supported value is *lightstep*.
 
 access_token_file
   *(required, string)* File containing the access token to the `LightStep <http://lightstep.com/>`_

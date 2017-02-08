@@ -158,6 +158,21 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   EXPECT_THROW(create(*loader), EnvoyException);
 }
 
+TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
+  std::string json = R"EOF(
+  {
+    "outlier_detection": {
+      "event_log_path": "foo"
+    },
+    "clusters": [],
+    "fake_property" : "fake_property"
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(create(*loader), Json::Exception);
+}
+
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
   std::string json = R"EOF(
   {
