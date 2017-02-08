@@ -3,7 +3,7 @@ Building
 
 The Envoy build system uses cmake. In order to ease initial building and for a quick start, we
 provide an Ubuntu 14 based docker container that has everything needed inside of it to build
-and *statically link* envoy, see the [developer documentation](https://github.com/lyft/envoy/tree/master/ci).
+and *statically link* envoy, see :repo:`ci/README.md`.
 
 In order to build manually, cmake is used like so:
 
