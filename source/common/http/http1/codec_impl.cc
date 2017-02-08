@@ -161,7 +161,7 @@ void ConnectionImpl::reserveBuffer(uint64_t size) {
 
   // TODO PERF: It would be better to allow a split reservation. That will make fill code more
   //            complicated.
-  output_buffer_.reserve(std::max(4096UL, size), &reserved_iovec_, 1);
+  output_buffer_.reserve(std::max<uint64_t>(4096, size), &reserved_iovec_, 1);
   reserved_current_ = static_cast<char*>(reserved_iovec_.mem_);
 }
 

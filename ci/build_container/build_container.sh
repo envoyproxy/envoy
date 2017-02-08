@@ -38,7 +38,7 @@ rm -fr libevent*
 # BoringSSL
 git clone https://boringssl.googlesource.com/boringssl
 cd boringssl
-git reset --hard 78684e5b222645828ca302e56b40b9daff2b2d27
+git reset --hard b87c80300647c2c0311c1489a104470e099f1531
 cmake .
 make
 cp -r include/* $THIRDPARTY_BUILD/include
@@ -128,4 +128,3 @@ rm -fr googletest
 wget -O gcovr-3.3.tar.gz https://github.com/gcovr/gcovr/archive/3.3.tar.gz
 tar xf gcovr-3.3.tar.gz
 rm gcovr-3.3.tar.gz
-

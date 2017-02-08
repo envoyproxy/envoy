@@ -514,7 +514,7 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
 
-  msg->trailers(std::move(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}}));
+  msg->trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
   callback->onSuccess(std::move(msg));
 
