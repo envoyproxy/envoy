@@ -1,6 +1,7 @@
 #include "envoy/api/api.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -381,6 +382,22 @@ TEST(StaticClusterImplTest, UnsupportedFeature) {
 
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   EXPECT_THROW(StaticClusterImpl(*config, runtime, stats, ssl_context_manager), EnvoyException);
+}
+
+TEST(ClusterDefinitionTest, BadClusterConfig) {
+  std::string json = R"EOF(
+  {
+    "name": "cluster_1",
+    "connect_timeout_ms": 250,
+    "type": "static",
+    "lb_type": "round_robin",
+    "fake_type" : "expected_failure",
+    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
 }
 
 } // Upstream

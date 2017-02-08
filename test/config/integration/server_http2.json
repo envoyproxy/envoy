@@ -243,7 +243,6 @@
       "connect_timeout_ms": 250,
       "type": "strict_dns",
       "lb_type": "round_robin",
-      "_comment:": "this is expected to fail",
       "hosts": [{"url": "tcp://localhost:10010"}]
     }]
   }
