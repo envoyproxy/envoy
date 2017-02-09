@@ -1,7 +1,6 @@
-#include <array>
-
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
+
 #include "test/generated/helloworld.pb.h"
 
 namespace Grpc {
@@ -112,4 +111,5 @@ TEST(CodecTest, decodeMultipleFrame) {
     EXPECT_EQ("hello", result.name());
   }
 }
+
 } // Grpc

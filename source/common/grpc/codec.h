@@ -1,7 +1,5 @@
 #pragma once
 
-#include <array>
-
 #include "envoy/buffer/buffer.h"
 
 namespace Grpc {
@@ -25,7 +23,7 @@ public:
   // Creates a new GRPC data frame with the given flags and length.
   // @param flags supplies the GRPC data frame flags.
   // @param length supplies the GRPC data frame length.
-  // @param output the buffer to store the encoded data, it's size must be 5.
+  // @param output the buffer to store the encoded data. Its size must be 5.
   void newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& output);
 };
 
@@ -36,11 +34,11 @@ public:
   // Decodes the given buffer with GRPC data frame.
   // @param input supplies the binary octets wrapped in a GRPC data frame.
   // @param output supplies the buffer to store the decoded data.
-  // @return bool whether the decoding success.
+  // @return bool whether the decoding succeeded or not.
   bool decode(Buffer::Instance& input, std::vector<Frame>& output);
 
 private:
-  // Wiring format (http://www.grpc.io/docs/guides/wire.html) of GRPC data frame
+  // Wire format (http://www.grpc.io/docs/guides/wire.html) of GRPC data frame
   // header:
   //
   // -----------------------------------------------------------------------
@@ -50,8 +48,8 @@ private:
   //
   // A fixed header consists of five bytes.
   // The first byte is the Flag. The last one "C" bit indicates if the message
-  // is compressed or not (0 is uncompressed, 1 is compressed). The rest seven
-  // "R" bits is reserved for future use.
+  // is compressed or not (0 is uncompressed, 1 is compressed). The other seven
+  // "R" bits are reserved for future use.
   // The next four "L" bytes represent the message length in BigEndian format.
   enum class State {
     // Waiting for decoding the flags (1 byte) of the GRPC data frame.
