@@ -49,7 +49,7 @@ public:
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return false; }
   const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
-  const Router::Config& routeConfig() override { return *route_config_; }
+  Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override {
     return Server::Configuration::HttpConnectionManagerConfig::DEFAULT_SERVER_STRING;
   }
@@ -70,6 +70,18 @@ private:
     const std::string prefix_;
     const std::string help_text_;
     const HandlerCb handler_;
+  };
+
+  /**
+   * Implementation of RouteConfigProvider that returns a static null route config.
+   */
+  struct RouteConfigProvider : public Router::RouteConfigProvider {
+    RouteConfigProvider();
+
+    // Http::ConnectionManagerRouteConfigProvider
+    Router::ConfigPtr config() override { return config_; }
+
+    Router::ConfigPtr config_;
   };
 
   /**
@@ -96,12 +108,12 @@ private:
   Http::Code handlerStats(const std::string& url, Buffer::Instance& response);
   Http::Code handlerQuitQuitQuit(const std::string& url, Buffer::Instance& response);
 
+  RouteConfigProvider route_config_provider_;
   Server::Instance& server_;
   std::list<Http::AccessLog::InstancePtr> access_logs_;
   Network::ListenSocketPtr socket_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
-  Router::ConfigPtr route_config_;
   std::list<UrlHandler> handlers_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   Optional<std::string> user_agent_;

@@ -287,8 +287,9 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
-      stream_id_(ConnectionManagerUtility::generateStreamId(
-          connection_manager.config_.routeConfig(), connection_manager.random_generator_)),
+      snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
+      stream_id_(ConnectionManagerUtility::generateStreamId(*snapped_route_config_,
+                                                            connection_manager.random_generator_)),
       request_timer_(connection_manager_.stats_.named_.downstream_rq_time_.allocateSpan()),
       request_info_(connection_manager_.codec_->protocol()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
@@ -434,7 +435,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, connection_manager_.read_callbacks_->connection(),
-      connection_manager_.config_, connection_manager_.random_generator_,
+      connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
       connection_manager_.runtime_);
 
   // Check if tracing is enabled at all.
@@ -582,7 +583,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   headers.insertServer().value(connection_manager_.config_.serverName());
   ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
-                                                  connection_manager_.config_);
+                                                  *snapped_route_config_);
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.
@@ -820,8 +821,8 @@ AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestIn
 
 Router::RoutePtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
   if (!parent_.cached_route_.valid()) {
-    parent_.cached_route_.value(parent_.connection_manager_.config_.routeConfig().route(
-        *parent_.request_headers_, parent_.stream_id_));
+    parent_.cached_route_.value(
+        parent_.snapped_route_config_->route(*parent_.request_headers_, parent_.stream_id_));
   }
 
   return parent_.cached_route_.value();

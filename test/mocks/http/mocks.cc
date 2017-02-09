@@ -12,7 +12,6 @@ using testing::SaveArg;
 namespace Http {
 
 MockConnectionManagerConfig::MockConnectionManagerConfig() {
-  ON_CALL(*this, routeConfig()).WillByDefault(ReturnRef(route_config_));
   ON_CALL(*this, generateRequestId()).WillByDefault(Return(true));
 }
 

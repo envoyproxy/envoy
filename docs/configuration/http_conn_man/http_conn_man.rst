@@ -14,6 +14,7 @@ HTTP connection manager
     "config": {
       "codec_type": "...",
       "stat_prefix": "...",
+      "rds": "{...}",
       "route_config": "{...}",
       "filters": [],
       "add_user_agent": "...",
@@ -54,9 +55,17 @@ stat_prefix
   connection manager. See the :ref:`statistics <config_http_conn_man_stats>` documentation
   for more information.
 
+:ref:`rds <config_http_conn_man_rds>`
+  *(sometimes required, object)* The connection manager configuration must specify one of *rds* or
+  *route_config*. If *rds* is specified, the connection manager's route table will be dynamically
+  loaded via the RDS API. See the :ref:`documentation <config_http_conn_man_rds>` for more
+  information.
+
 :ref:`route_config <config_http_conn_man_route_table>`
-  *(required, object)* The :ref:`route table <arch_overview_http_routing>` for the connection
-  manager. All connection managers must have a route table, even if it is empty.
+  *(sometimes required, object)* The connection manager configuration must specify one of *rds* or
+  *route_config*. If *route_config* is specified, the :ref:`route table <arch_overview_http_routing>`
+  for the connection manager is static and is specified in this property. All connection managers must have
+  a route table, even if it is empty.
 
 :ref:`filters <config_http_conn_man_filters>`
   *(required, array)* A list of individual :ref:`HTTP filters <arch_overview_http_filters>` that
@@ -74,7 +83,7 @@ add_user_agent
 :ref:`tracing <config_http_conn_man_tracing>`
   *(optional, object)* Presence of the object defines whether the connection manager
   emits :ref:`tracing <arch_overview_tracing>` data to the :ref:`configured tracing provider <config_tracing>`.
-  
+
 .. _config_http_conn_man_http_codec_options:
 
 http_codec_options
@@ -145,3 +154,4 @@ generate_request_id
   headers
   stats
   runtime
+  rds

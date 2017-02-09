@@ -25,6 +25,7 @@ uint64_t ConnectionManagerUtility::generateStreamId(const Router::Config& route_
 void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_headers,
                                                     Network::Connection& connection,
                                                     ConnectionManagerConfig& config,
+                                                    const Router::Config& route_config,
                                                     Runtime::RandomGenerator& random,
                                                     Runtime::Loader& runtime) {
   // Clean proxy headers.
@@ -79,7 +80,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     request_headers.removeEnvoyExpectedRequestTimeoutMs();
     request_headers.removeEnvoyForceTrace();
 
-    for (const Http::LowerCaseString& header : config.routeConfig().internalOnlyHeaders()) {
+    for (const Http::LowerCaseString& header : route_config.internalOnlyHeaders()) {
       request_headers.remove(header);
     }
   }
@@ -122,16 +123,16 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
                                                      const Http::HeaderMap& request_headers,
-                                                     ConnectionManagerConfig& config) {
+                                                     const Router::Config& route_config) {
   response_headers.removeConnection();
   response_headers.removeTransferEncoding();
 
-  for (const Http::LowerCaseString& to_remove : config.routeConfig().responseHeadersToRemove()) {
+  for (const Http::LowerCaseString& to_remove : route_config.responseHeadersToRemove()) {
     response_headers.remove(to_remove);
   }
 
   for (const std::pair<Http::LowerCaseString, std::string>& to_add :
-       config.routeConfig().responseHeadersToAdd()) {
+       route_config.responseHeadersToAdd()) {
     response_headers.addStatic(to_add.first, to_add.second);
   }
 

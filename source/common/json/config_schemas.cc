@@ -69,6 +69,23 @@ const std::string Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA(R"EOF(
   }
   )EOF");
 
+const std::string Json::Schema::RDS_CONFIGURATION_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "cluster" : {"type": "string"},
+      "route_config_name" : {"type": "string"},
+      "refresh_interval_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      }
+    },
+    "required" : ["cluster", "route_config_name"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
 const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -201,6 +218,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "enum" : ["http1", "http2", "auto"]
       },
       "stat_prefix" : {"type" : "string"},
+      "rds" : {"type": "object"},
       "route_config" : {"type": "object"},
       "filters" : {
         "type" : "array",
@@ -242,7 +260,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       "use_remote_address" : {"type" : "boolean"},
       "generate_request_id" : {"type" : "boolean"}
     },
-    "required" : ["codec_type", "stat_prefix", "route_config", "filters"],
+    "required" : ["codec_type", "stat_prefix", "filters"],
     "additionalProperties" : false
   }
   )EOF");

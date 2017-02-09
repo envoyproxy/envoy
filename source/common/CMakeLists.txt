@@ -90,6 +90,7 @@ add_library(
   redis/conn_pool_impl.cc
   redis/proxy_filter.cc
   router/config_impl.cc
+  router/rds_impl.cc
   router/retry_state_impl.cc
   router/router.cc
   router/router_ratelimit.cc

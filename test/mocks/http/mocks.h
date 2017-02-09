@@ -72,7 +72,7 @@ public:
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(generateRequestId, bool());
   MOCK_METHOD0(idleTimeout, const Optional<std::chrono::milliseconds>&());
-  MOCK_METHOD0(routeConfig, Router::Config&());
+  MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider&());
   MOCK_METHOD0(serverName, const std::string&());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
@@ -80,8 +80,6 @@ public:
   MOCK_METHOD0(localAddress, const Network::Address::Instance&());
   MOCK_METHOD0(userAgent, const Optional<std::string>&());
   MOCK_METHOD0(tracingConfig, const Optional<Http::TracingConnectionManagerConfig>&());
-
-  testing::NiceMock<Router::MockConfig> route_config_;
 };
 
 class MockConnectionCallbacks : public virtual ConnectionCallbacks {
