@@ -273,7 +273,6 @@ private:
     ActiveStream& parent_;
     bool headers_continued_{};
     bool stopped_{};
-    Optional<Router::RoutePtr> cached_route_;
   };
 
   /**
@@ -414,6 +413,7 @@ private:
     State state_;
     AccessLog::RequestInfoImpl request_info_;
     std::string downstream_address_;
+    Optional<Router::RoutePtr> cached_route_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

@@ -819,12 +819,12 @@ AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestIn
 }
 
 Router::RoutePtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!cached_route_.valid()) {
-    cached_route_.value(parent_.connection_manager_.config_.routeConfig().route(
+  if (!parent_.cached_route_.valid()) {
+    parent_.cached_route_.value(parent_.connection_manager_.config_.routeConfig().route(
         *parent_.request_headers_, parent_.stream_id_));
   }
 
-  return cached_route_.value();
+  return parent_.cached_route_.value();
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
