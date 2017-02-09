@@ -76,7 +76,6 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
           output.push_back(std::move(frame_));
           frame_.flags = 0;
           frame_.length = 0;
-          frame_.data.reset();
           state_ = State::FH_FLAG;
         }
         break;
