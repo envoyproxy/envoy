@@ -142,9 +142,10 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));
 
+  // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1"}));
+  resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));
 

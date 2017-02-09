@@ -282,13 +282,21 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
 
   // Go through and see if the list we have is different from what we just got. If it is, we
   // make a new host list and raise a change notification. This uses an N^2 search given that
-  // this does not happen very often and the list sizes should be small.
+  // this does not happen very often and the list sizes should be small. We also check for
+  // duplicates here. It's possible for DNS to return the same address multiple times, and a bad
+  // SDS implementation could do the same thing.
+  std::unordered_set<std::string> host_addresses;
   std::vector<HostPtr> final_hosts;
   for (HostPtr host : new_hosts) {
+    if (host_addresses.count(host->address()->asString())) {
+      continue;
+    }
+    host_addresses.emplace(host->address()->asString());
+
     bool found = false;
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
-      // If we find a host matched based on URL, we keep it. However we do change weight inline so
-      // do that here.
+      // If we find a host matched based on address, we keep it. However we do change weight inline
+      // so do that here.
       if (*(*i)->address() == *host->address()) {
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
