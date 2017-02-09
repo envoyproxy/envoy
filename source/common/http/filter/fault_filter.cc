@@ -161,7 +161,7 @@ bool FaultFilter::matchesTargetCluster() {
   bool matches = true;
 
   if (!config_->upstreamCluster().empty()) {
-    const Router::Route* route = callbacks_->route();
+    Router::RoutePtr route = callbacks_->route();
     matches = route && route->routeEntry() &&
               (route->routeEntry()->clusterName() == config_->upstreamCluster());
   }

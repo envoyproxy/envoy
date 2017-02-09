@@ -265,7 +265,7 @@ private:
     uint64_t connectionId() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
-    const Router::Route* route() override;
+    Router::RoutePtr route() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     const std::string& downstreamAddress() override;
@@ -273,7 +273,7 @@ private:
     ActiveStream& parent_;
     bool headers_continued_{};
     bool stopped_{};
-    Optional<const Router::Route*> cached_route_;
+    Optional<Router::RoutePtr> cached_route_;
   };
 
   /**
