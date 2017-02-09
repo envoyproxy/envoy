@@ -1,6 +1,7 @@
 #include "sds.h"
 
 #include "common/http/headers.h"
+#include "common/json/config_schemas.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -18,6 +19,7 @@ SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runt
 
 void SdsClusterImpl::parseResponse(const Http::Message& response) {
   Json::ObjectPtr json = Json::Factory::LoadFromString(response.bodyAsString());
+  json->validateSchema(Json::Schema::SDS_SCHEMA);
   std::vector<HostPtr> new_hosts;
   for (const Json::ObjectPtr& host : json->getObjectArray("hosts")) {
     bool canary = false;

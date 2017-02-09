@@ -823,6 +823,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
 
 const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
   {
+    "$schema": "http://json-schema.org/schema#",
     "definitions" : {
       "health_check_bytes" : {
         "type" : "object",
@@ -956,5 +957,53 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
     },
     "required" : ["name", "type", "connect_timeout_ms", "lb_type"],
     "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::CDS_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "properties" : {
+      "clusters" : {
+        "type" : "array",
+        "items" : {"type" : "object"}
+      }
+    },
+    "required" : ["clusters"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::SDS_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions" : {
+      "host" : {
+        "type" : "object",
+        "properties" : {
+          "ip_address" : {"type" : "string"},
+          "port" : {"type" : "integer"},
+          "tags" : {
+            "type" : "object",
+            "properties" : {
+              "az" : {"type" : "string"},
+              "canary" : {"type" : "boolean"},
+              "load_balancing_weight": {
+                "type" : "integer",
+                "minimum" : 1,
+                "maximum" : 100
+              }
+            }
+          }
+        },
+        "required" : ["ip_address", "port"]
+      }
+    },
+    "properties" : {
+      "hosts" : {
+        "type" : "array",
+        "items" : {"$ref" : "#/definitions/host"}
+      }
+    }
   }
   )EOF");
