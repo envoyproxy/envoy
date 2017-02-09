@@ -38,5 +38,5 @@ fi
 shift
 export EXTRA_TEST_ARGS="$@"
 
-make check_format
+[[ "$SKIP_CHECK_FORMAT" == "1" ]] || make check_format
 make -j$NUM_CPUS $TEST_TARGET
