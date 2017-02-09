@@ -31,7 +31,10 @@ class Decoder {
 public:
   Decoder();
 
-  // Decodes the given buffer with GRPC data frame.
+  // Decodes the given buffer with GRPC data frame. Drains the input buffer when
+  // decoding succeeded (returns true). If the input is not sufficient to make a
+  // complete GRPC data frame, it will be buffered in the decoder. If a decoding
+  // error happened, the input buffer remains unchanged.
   // @param input supplies the binary octets wrapped in a GRPC data frame.
   // @param output supplies the buffer to store the decoded data.
   // @return bool whether the decoding succeeded or not.

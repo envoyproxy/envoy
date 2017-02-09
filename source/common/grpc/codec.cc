@@ -82,6 +82,7 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
       }
     }
   }
+  input.drain(input.length());
   return true;
 }
 

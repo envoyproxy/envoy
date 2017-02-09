@@ -5,7 +5,7 @@
 
 namespace Grpc {
 
-TEST(CodecTest, encodeHeader) {
+TEST(GrpcCodecTest, encodeHeader) {
   Encoder encoder;
   std::array<uint8_t, 5> buffer;
 
@@ -45,7 +45,7 @@ TEST(CodecTest, encodeHeader) {
   EXPECT_EQ(buffer[4], 0);
 }
 
-TEST(CodecTest, decodeIncompleteFrame) {
+TEST(GrpcCodecTest, decodeIncompleteFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
   std::string request_buffer = request.SerializeAsString();
@@ -60,11 +60,12 @@ TEST(CodecTest, decodeIncompleteFrame) {
   std::vector<Frame> frames;
   Decoder decoder;
   EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(static_cast<size_t>(0), frames.size());
 
-  buffer.drain(buffer.length());
   buffer.add(request_buffer.c_str() + 5);
   EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(static_cast<size_t>(1), frames.size());
   helloworld::HelloRequest decoded_request;
   EXPECT_TRUE(decoded_request.ParseFromArray(frames[0].data_->linearize(frames[0].data_->length()),
@@ -72,7 +73,7 @@ TEST(CodecTest, decodeIncompleteFrame) {
   EXPECT_EQ("hello", decoded_request.name());
 }
 
-TEST(CodecTest, decodeInvalidFrame) {
+TEST(GrpcCodecTest, decodeInvalidFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
 
@@ -82,13 +83,15 @@ TEST(CodecTest, decodeInvalidFrame) {
   encoder.newFrame(0b10u, request.ByteSize(), header);
   buffer.add(header.data(), 5);
   buffer.add(request.SerializeAsString());
+  size_t size = buffer.length();
 
   std::vector<Frame> frames;
   Decoder decoder;
   EXPECT_FALSE(decoder.decode(buffer, frames));
+  EXPECT_EQ(size, buffer.length());
 }
 
-TEST(CodecTest, decodeSingleFrame) {
+TEST(GrpcCodecTest, decodeSingleFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
 
@@ -102,6 +105,7 @@ TEST(CodecTest, decodeSingleFrame) {
   std::vector<Frame> frames;
   Decoder decoder;
   EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(frames.size(), static_cast<uint64_t>(1));
   EXPECT_EQ(GRPC_FH_DEFAULT, frames[0].flags_);
   EXPECT_EQ(static_cast<uint64_t>(request.ByteSize()), frames[0].length_);
@@ -112,7 +116,7 @@ TEST(CodecTest, decodeSingleFrame) {
   EXPECT_EQ("hello", result.name());
 }
 
-TEST(CodecTest, decodeMultipleFrame) {
+TEST(GrpcCodecTest, decodeMultipleFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
 
@@ -128,6 +132,7 @@ TEST(CodecTest, decodeMultipleFrame) {
   std::vector<Frame> frames;
   Decoder decoder;
   EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(frames.size(), static_cast<uint64_t>(1009));
   for (Frame& frame : frames) {
     EXPECT_EQ(GRPC_FH_DEFAULT, frame.flags_);
