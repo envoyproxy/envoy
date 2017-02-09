@@ -48,18 +48,28 @@ TEST(CodecTest, encodeHeader) {
 TEST(CodecTest, decodeIncompleteFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
+  std::string request_buffer = request.SerializeAsString();
 
   Buffer::OwnedImpl buffer;
   std::array<uint8_t, 5> header;
   Encoder encoder;
   encoder.newFrame(GRPC_FH_DEFAULT, request.ByteSize(), header);
   buffer.add(header.data(), 5);
-  buffer.add(request.SerializeAsString().c_str(), 5);
+  buffer.add(request_buffer.c_str(), 5);
 
   std::vector<Frame> frames;
   Decoder decoder;
   EXPECT_TRUE(decoder.decode(buffer, frames));
   EXPECT_EQ(static_cast<size_t>(0), frames.size());
+
+  buffer.drain(buffer.length());
+  buffer.add(request_buffer.c_str() + 5);
+  EXPECT_TRUE(decoder.decode(buffer, frames));
+  EXPECT_EQ(static_cast<size_t>(1), frames.size());
+  helloworld::HelloRequest decoded_request;
+  EXPECT_TRUE(decoded_request.ParseFromArray(frames[0].data_->linearize(frames[0].data_->length()),
+                                             frames[0].data_->length()));
+  EXPECT_EQ("hello", decoded_request.name());
 }
 
 TEST(CodecTest, decodeInvalidFrame) {
