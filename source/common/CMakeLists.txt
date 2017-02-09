@@ -45,6 +45,7 @@ add_library(
   filter/ratelimit.cc
   filter/tcp_proxy.cc
   generated/ratelimit.pb.cc
+  grpc/codec.cc
   grpc/common.cc
   grpc/http1_bridge_filter.cc
   grpc/rpc_channel_impl.cc
