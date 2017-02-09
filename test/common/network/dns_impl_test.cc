@@ -256,7 +256,7 @@ TEST_F(DnsImplTest, DestructPending) {
 // asynchronous behavior or network events.
 TEST_F(DnsImplTest, LocalLookup) {
   std::list<Address::InstancePtr> address_list;
-  EXPECT_NE(nullptr, resolver->resolve("", [&](std::list<Address::InstancePtr>&& results) -> void {
+  EXPECT_NE(nullptr, resolver_->resolve("", [&](std::list<Address::InstancePtr>&& results) -> void {
     address_list = results;
     dispatcher_->exit();
   }));

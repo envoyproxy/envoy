@@ -38,7 +38,6 @@ void DnsResolverImpl::initializeChannel(struct ares_options* options, int optmas
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
-<<<<<<< HEAD
 void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, struct hostent* hostent) {
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
