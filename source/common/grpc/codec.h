@@ -11,9 +11,9 @@ const uint8_t GRPC_FH_COMPRESSED = 0b1u;
 enum class CompressionAlgorithm { None, Gzip };
 
 struct Frame {
-  uint8_t flags;
-  uint32_t length;
-  Buffer::InstancePtr data;
+  uint8_t flags_;
+  uint32_t length_;
+  Buffer::InstancePtr data_;
 };
 
 class Encoder {
