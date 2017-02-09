@@ -74,7 +74,7 @@ TEST(CodecTest, decodeSingleFrame) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  decoder.decode(buffer, frames);
+  EXPECT_TRUE(decoder.decode(buffer, frames));
   EXPECT_EQ(frames.size(), static_cast<uint64_t>(1));
   EXPECT_EQ(GRPC_FH_DEFAULT, frames[0].flags_);
   EXPECT_EQ(static_cast<uint64_t>(request.ByteSize()), frames[0].length_);
@@ -100,7 +100,7 @@ TEST(CodecTest, decodeMultipleFrame) {
 
   std::vector<Frame> frames;
   Decoder decoder;
-  decoder.decode(buffer, frames);
+  EXPECT_TRUE(decoder.decode(buffer, frames));
   EXPECT_EQ(frames.size(), static_cast<uint64_t>(1009));
   for (Frame& frame : frames) {
     EXPECT_EQ(GRPC_FH_DEFAULT, frame.flags_);
