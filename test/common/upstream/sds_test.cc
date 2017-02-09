@@ -321,10 +321,7 @@ TEST_F(SdsTest, Failure) {
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
-  EXPECT_CALL(*timer_, enableTimer(_));
-  callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
-
-  EXPECT_EQ(2UL, cluster_->info()->stats().update_failure_.value());
+  EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
 }
 
 } // Upstream
