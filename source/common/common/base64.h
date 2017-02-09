@@ -13,7 +13,7 @@ public:
 
   /**
    * Base64 encode an input string.
-   * @param input string to encode
+   * @param input string to encode.
    */
   static std::string encode(const std::string& input);
 
