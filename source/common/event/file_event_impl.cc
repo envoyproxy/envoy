@@ -7,8 +7,11 @@
 
 namespace Event {
 
-FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb) : cb_(cb) {
-  event_assign(&raw_event_, &dispatcher.base(), fd, EV_PERSIST | EV_ET | EV_READ | EV_WRITE,
+FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb,
+                             FileTriggerType trigger)
+    : cb_(cb) {
+  event_assign(&raw_event_, &dispatcher.base(), fd,
+               EV_PERSIST | (trigger == FileTriggerType::Level ? 0 : EV_ET) | EV_READ | EV_WRITE,
                [](evutil_socket_t, short what, void* arg) -> void {
                  FileEventImpl* event = static_cast<FileEventImpl*>(arg);
                  uint32_t events = 0;

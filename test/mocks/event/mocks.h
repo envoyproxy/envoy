@@ -33,8 +33,8 @@ public:
     return Network::DnsResolverPtr{createDnsResolver_()};
   }
 
-  FileEventPtr createFileEvent(int fd, FileReadyCb cb) override {
-    return FileEventPtr{createFileEvent_(fd, cb)};
+  FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger) override {
+    return FileEventPtr{createFileEvent_(fd, cb, trigger)};
   }
 
   Filesystem::WatcherPtr createFilesystemWatcher() override {
@@ -80,7 +80,7 @@ public:
                Network::ClientConnection*(Ssl::ClientContext& ssl_ctx,
                                           Network::Address::InstancePtr address));
   MOCK_METHOD0(createDnsResolver_, Network::DnsResolver*());
-  MOCK_METHOD2(createFileEvent_, FileEvent*(int fd, FileReadyCb cb));
+  MOCK_METHOD3(createFileEvent_, FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
   MOCK_METHOD7(createListener_,
                Network::Listener*(Network::ConnectionHandler& conn_handler,

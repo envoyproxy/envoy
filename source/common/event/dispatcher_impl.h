@@ -31,7 +31,7 @@ public:
   createSslClientConnection(Ssl::ClientContext& ssl_ctx,
                             Network::Address::InstancePtr address) override;
   Network::DnsResolverPtr createDnsResolver() override;
-  FileEventPtr createFileEvent(int fd, FileReadyCb cb) override;
+  FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
                                       Network::ListenSocket& socket, Network::ListenerCallbacks& cb,

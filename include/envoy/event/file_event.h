@@ -9,6 +9,8 @@ struct FileReadyType {
   static const uint32_t Write = 0x2;
 };
 
+enum class FileTriggerType { Level, Edge };
+
 /**
  * Callback invoked when a FileEvent is ready for reading or writing.
  */
