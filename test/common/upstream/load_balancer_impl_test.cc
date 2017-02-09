@@ -1,3 +1,4 @@
+#include "common/network/utility.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -11,7 +12,7 @@ namespace Upstream {
 
 static HostPtr newTestHost(Upstream::ClusterInfoPtr cluster, const std::string& url,
                            uint32_t weight = 1) {
-  return HostPtr{new HostImpl(cluster, url, false, weight, "")};
+  return HostPtr{new HostImpl(cluster, Network::Utility::resolveUrl(url), false, weight, "")};
 }
 
 class RoundRobinLoadBalancerTest : public testing::Test {

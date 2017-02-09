@@ -13,6 +13,7 @@
 #include "common/api/api_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
+#include "common/json/config_schemas.h"
 #include "common/memory/stats.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/statsd.h"
@@ -38,7 +39,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   }
   server_stats_.version_.set(version_int);
 
-  if (local_info_.address().empty()) {
+  if (!local_info_.address()) {
     throw EnvoyException("could not resolve local address");
   }
 
@@ -107,7 +108,8 @@ void InstanceImpl::flushStats() {
 
 int InstanceImpl::getListenSocketFd(uint32_t port) {
   for (const auto& entry : socket_map_) {
-    if (entry.second->port() == port) {
+    // TODO: UDS listeners.
+    if (entry.second->localAddress()->ip()->port() == port) {
       return entry.second->fd();
     }
   }
@@ -129,6 +131,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   Json::ObjectPtr config_json = Json::Factory::LoadFromFile(options.configPath());
+  config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
   log().info("admin port: {}", initial_config.admin().port());
 

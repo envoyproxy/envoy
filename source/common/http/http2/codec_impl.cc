@@ -113,7 +113,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   UNREFERENCED_PARAMETER(rc);
 }
 
-ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(size_t length, uint32_t* data_flags) {
+ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* data_flags) {
   if (pending_send_data_.length() == 0 && !local_end_stream_) {
     ASSERT(!data_deferred_);
     data_deferred_ = true;

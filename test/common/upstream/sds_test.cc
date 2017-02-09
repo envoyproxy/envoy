@@ -44,7 +44,7 @@ protected:
 
   HostPtr findHost(const std::string& address) {
     for (HostPtr host : cluster_->hosts()) {
-      if (Network::Utility::hostFromUrl(host->url()) == address) {
+      if (host->address()->ip()->addressAsString() == address) {
         return host;
       }
     }

@@ -70,6 +70,7 @@ add_executable(envoy-test
   common/mongo/codec_impl_test.cc
   common/mongo/proxy_test.cc
   common/mongo/utility_test.cc
+  common/network/address_impl_test.cc
   common/network/connection_impl_test.cc
   common/network/dns_impl_test.cc
   common/network/filter_manager_impl_test.cc
@@ -149,6 +150,12 @@ add_executable(envoy-test
   server/options_impl_test.cc
   test_common/printers.cc
   test_common/utility.cc)
+
+# The MOCK_METHOD* macros from gtest triggers this clang warning and it's hard
+# to work around, so we just ignore it.
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+  set_target_properties(envoy-test PROPERTIES COMPILE_FLAGS "-Wno-inconsistent-missing-override")
+endif()
 
 if (ENVOY_TCMALLOC)
   target_link_libraries(envoy-test tcmalloc_and_profiler)

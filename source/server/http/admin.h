@@ -56,7 +56,7 @@ public:
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
-  const std::string& localAddress() override;
+  const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
   const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
     return tracing_config_;

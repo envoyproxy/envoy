@@ -292,7 +292,7 @@ private:
 
   // ConnectionImpl
   void onEncodeComplete() override;
-  void onMessageBegin() {}
+  void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED; }
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;

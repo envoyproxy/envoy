@@ -1,3 +1,4 @@
+#include "common/network/utility.h"
 #include "common/upstream/logical_dns_cluster.h"
 
 #include "test/mocks/common.h"
@@ -5,6 +6,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::Invoke;
@@ -79,7 +81,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000)));
-  dns_callback_({"127.0.0.1", "127.0.0.2"});
+  dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   EXPECT_EQ(1UL, cluster_->hosts().size());
   EXPECT_EQ(1UL, cluster_->healthyHosts().size());
@@ -88,7 +90,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ(cluster_->hosts()[0], cluster_->healthyHosts()[0]);
   HostPtr logical_host = cluster_->hosts()[0];
 
-  EXPECT_CALL(dispatcher_, createClientConnection_("tcp://127.0.0.1:443"));
+  EXPECT_CALL(dispatcher_, createClientConnection_(
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443"))));
   logical_host->createConnection(dispatcher_);
   logical_host->outlierDetector().putHttpResponseCode(200);
 
@@ -97,15 +100,16 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   // Should not cause any changes.
   EXPECT_CALL(*resolve_timer_, enableTimer(_));
-  dns_callback_({"127.0.0.1", "127.0.0.2", "127.0.0.3"});
+  dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
-  EXPECT_CALL(dispatcher_, createClientConnection_("tcp://127.0.0.1:443"));
+  EXPECT_CALL(dispatcher_, createClientConnection_(
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443"))));
   Host::CreateConnectionData data = logical_host->createConnection(dispatcher_);
   EXPECT_FALSE(data.host_description_->canary());
   EXPECT_EQ(&cluster_->hosts()[0]->cluster(), &data.host_description_->cluster());
   EXPECT_EQ(&cluster_->hosts()[0]->stats(), &data.host_description_->stats());
-  EXPECT_EQ("tcp://127.0.0.1:443", data.host_description_->url());
+  EXPECT_EQ("127.0.0.1:443", data.host_description_->address()->asString());
   EXPECT_EQ("", data.host_description_->zone());
   data.host_description_->outlierDetector().putHttpResponseCode(200);
 
@@ -114,10 +118,11 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   // Should cause a change.
   EXPECT_CALL(*resolve_timer_, enableTimer(_));
-  dns_callback_({"127.0.0.3", "127.0.0.1", "127.0.0.2"});
+  dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
-  EXPECT_CALL(dispatcher_, createClientConnection_("tcp://127.0.0.3:443"));
+  EXPECT_CALL(dispatcher_, createClientConnection_(
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443"))));
   logical_host->createConnection(dispatcher_);
 
   expectResolve();
@@ -128,7 +133,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   dns_callback_({});
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
-  EXPECT_CALL(dispatcher_, createClientConnection_("tcp://127.0.0.3:443"));
+  EXPECT_CALL(dispatcher_, createClientConnection_(
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443"))));
   logical_host->createConnection(dispatcher_);
 
   // Make sure we cancel.

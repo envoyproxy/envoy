@@ -9,6 +9,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
 namespace Network {
@@ -33,8 +34,14 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
+// TODO: Currently we don't populate local address for client connections. Nothing looks at this
+//       currently, but we may want to populate this later for logging purposes.
+const Address::InstancePtr
+    ConnectionImpl::null_local_address_(new Address::Ipv4Instance("0.0.0.0"));
+
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                               const std::string& remote_address, const std::string& local_address)
+                               Address::InstancePtr remote_address,
+                               Address::InstancePtr local_address)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_) {
 
@@ -353,8 +360,9 @@ void ConnectionImpl::onWriteReady() {
   }
 }
 
-void ConnectionImpl::doConnect(const sockaddr* addr, socklen_t addrlen) {
-  int rc = ::connect(fd_, addr, addrlen);
+void ConnectionImpl::doConnect() {
+  conn_log_debug("connecting to {}", *this, remote_address_->asString());
+  int rc = remote_address_->connect(fd_);
   if (rc == 0) {
     // write will become ready.
     state_ |= InternalState::Connecting;
@@ -396,39 +404,9 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
                                            buffer_stats_->write_current_);
 }
 
-// TODO: see if we can pass something more meaningful than EMPTY_STRING as localAddress
-ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                                           const std::string& url)
-    : ConnectionImpl(dispatcher, fd, url, EMPTY_STRING) {}
-
-Network::ClientConnectionPtr ClientConnectionImpl::create(Event::DispatcherImpl& dispatcher,
-                                                          const std::string& url) {
-  if (url.find(Network::Utility::TCP_SCHEME) == 0) {
-    return Network::ClientConnectionPtr{new Network::TcpClientConnectionImpl(dispatcher, url)};
-  } else if (url.find(Network::Utility::UNIX_SCHEME) == 0) {
-    return Network::ClientConnectionPtr{new Network::UdsClientConnectionImpl(dispatcher, url)};
-  } else {
-    throw EnvoyException(fmt::format("malformed url: {}", url));
-  }
-}
-
-TcpClientConnectionImpl::TcpClientConnectionImpl(Event::DispatcherImpl& dispatcher,
-                                                 const std::string& url)
-    : ClientConnectionImpl(dispatcher, socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), url) {}
-
-void TcpClientConnectionImpl::connect() {
-  AddrInfoPtr addr_info = Utility::resolveTCP(Utility::hostFromUrl(remote_address_),
-                                              Utility::portFromUrl(remote_address_));
-  doConnect(addr_info->ai_addr, addr_info->ai_addrlen);
-}
-
-UdsClientConnectionImpl::UdsClientConnectionImpl(Event::DispatcherImpl& dispatcher,
-                                                 const std::string& url)
-    : ClientConnectionImpl(dispatcher, socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0), url) {}
-
-void UdsClientConnectionImpl::connect() {
-  sockaddr_un addr = Utility::resolveUnixDomainSocket(Utility::pathFromUrl(remote_address_));
-  doConnect(reinterpret_cast<sockaddr*>(&addr), sizeof(sockaddr_un));
-}
+ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
+                                           Address::InstancePtr address)
+    : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
+                     null_local_address_) {}
 
 } // Network

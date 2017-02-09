@@ -12,7 +12,7 @@
 namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher), inotify_fd_(inotify_init1(IN_NONBLOCK)),
+    : inotify_fd_(inotify_init1(IN_NONBLOCK)),
       inotify_event_(dispatcher.createFileEvent(inotify_fd_, [this](uint32_t events) -> void {
         if (events & Event::FileReadyType::Read) {
           onInotifyEvent();

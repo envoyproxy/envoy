@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/codec_client.h"
 #include "common/http/exception.h"
+#include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -47,8 +48,8 @@ public:
   Network::ConnectionCallbacks* connection_cb_;
   Network::ReadFilterPtr filter_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionPtr host_{
-      new Upstream::HostDescriptionImpl(cluster_, "tcp://127.0.0.1:80", false, "")};
+  Upstream::HostDescriptionPtr host_{new Upstream::HostDescriptionImpl(
+      cluster_, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
 };
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {

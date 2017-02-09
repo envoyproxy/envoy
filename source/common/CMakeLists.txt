@@ -75,6 +75,7 @@ add_library(
   mongo/codec_impl.cc
   mongo/proxy.cc
   mongo/utility.cc
+  network/address_impl.cc
   network/connection_impl.cc
   network/dns_impl.cc
   network/filter_manager_impl.cc

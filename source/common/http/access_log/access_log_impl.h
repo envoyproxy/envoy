@@ -106,13 +106,8 @@ public:
  */
 class TraceableRequestFilter : public Filter {
 public:
-  TraceableRequestFilter(Runtime::Loader& runtime);
-
   // Http::AccessLog::Filter
   bool evaluate(const RequestInfo& info, const HeaderMap& request_headers) override;
-
-private:
-  Runtime::Loader& runtime_;
 };
 
 /**

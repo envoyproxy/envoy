@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 
 namespace LocalInfo {
 
@@ -12,9 +13,9 @@ public:
   virtual ~LocalInfo() {}
 
   /**
-   * Human readable network address. E.g., "127.0.0.1".
+   * @return the local (non-loopback) address of the server.
    */
-  virtual const std::string& address() const PURE;
+  virtual Network::Address::InstancePtr address() const PURE;
 
   /**
    * Human readable zone name. E.g., "us-east-1a".

@@ -14,7 +14,11 @@
 
 namespace Http {
 
-void Utility::appendXff(HeaderMap& headers, const std::string& remote_address) {
+void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address) {
+  if (remote_address.type() != Network::Address::Type::Ip) {
+    return;
+  }
+
   // TODO PERF: Append and do not copy.
   HeaderEntry* header = headers.ForwardedFor();
   std::string forwarded_for = header ? header->value().c_str() : "";
@@ -22,7 +26,7 @@ void Utility::appendXff(HeaderMap& headers, const std::string& remote_address) {
     forwarded_for += ", ";
   }
 
-  forwarded_for += remote_address;
+  forwarded_for += remote_address.ip()->addressAsString();
   headers.insertForwardedFor().value(forwarded_for);
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 
 namespace Network {
 
@@ -29,7 +30,7 @@ public:
    * @param address_list supplies the list of resolved IP addresses. The list will be empty if
    *                     the resolution failed.
    */
-  typedef std::function<void(std::list<std::string>&& address_list)> ResolveCb;
+  typedef std::function<void(std::list<Address::InstancePtr>&& address_list)> ResolveCb;
 
   /**
    * Initiate an async DNS resolution.

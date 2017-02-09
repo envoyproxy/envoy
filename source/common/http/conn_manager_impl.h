@@ -188,7 +188,7 @@ public:
    * @return local address.
    * Gives richer information in case of internal requests.
    */
-  virtual const std::string& localAddress() PURE;
+  virtual const Network::Address::Instance& localAddress() PURE;
 
   /**
    * @return custom user agent for internal requests for better debugging. Must be configured to
@@ -221,6 +221,8 @@ public:
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Store& stats);
   static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
                                                             Stats::Store& stats);
+  static void chargeTracingStats(const Tracing::Reason& tracing_reason,
+                                 ConnectionManagerTracingStats& tracing_stats);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -355,7 +357,6 @@ private:
     ~ActiveStream();
 
     void chargeStats(HeaderMap& headers);
-    void chargeTracingStats(const Tracing::Decision& tracing_decision);
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     uint64_t connectionId();

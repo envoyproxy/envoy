@@ -1,4 +1,5 @@
 #include "common/buffer/buffer_impl.h"
+#include "common/network/utility.h"
 #include "common/router/router.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -45,7 +46,7 @@ public:
                 ShadowWriterPtr{shadow_writer_}, true),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
-    ON_CALL(*cm_.conn_pool_.host_, url()).WillByDefault(ReturnRef(host_url_));
+    ON_CALL(*cm_.conn_pool_.host_, address()).WillByDefault(Return(host_address_));
     ON_CALL(*cm_.conn_pool_.host_, zone()).WillByDefault(ReturnRef(upstream_zone_));
   }
 
@@ -74,7 +75,7 @@ public:
   TestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
-  std::string host_url_{"tcp://10.0.0.5:9211"};
+  Network::Address::InstancePtr host_address_{Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
 };
 
 TEST_F(RouterTest, RouteNotFound) {
@@ -111,7 +112,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
               setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
-                           -> void { EXPECT_EQ(host_url_, host->url()); }));
+                           -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -195,7 +196,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
                            }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
-                           -> void { EXPECT_EQ(host_url_, host->url()); }));
+                           -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   expectResponseTimerCreate();
 
@@ -232,7 +233,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
                            }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
-                           -> void { EXPECT_EQ(host_url_, host->url()); }));
+                           -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   expectResponseTimerCreate();
   expectPerTryTimerCreate();
@@ -272,7 +273,7 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
               setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRemoteReset));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
-                           -> void { EXPECT_EQ(host_url_, host->url()); }));
+                           -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -297,7 +298,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   expectResponseTimerCreate();
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
-                           -> void { EXPECT_EQ(host_url_, host->url()); }));
+                           -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);

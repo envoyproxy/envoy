@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/event/libevent.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
 #include "ares.h"
@@ -37,20 +38,25 @@ void DnsResolverImpl::initializeChannel(struct ares_options* options, int optmas
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
+<<<<<<< HEAD
 void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, struct hostent* hostent) {
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
     delete this;
     return;
   }
-  std::list<std::string> address_list;
+  std::list<Address::InstancePtr> address_list;
   completed_ = true;
   if (status == ARES_SUCCESS) {
     ASSERT(hostent->h_addrtype == AF_INET);
     for (int i = 0; hostent->h_addr_list[i] != nullptr; ++i) {
       ASSERT(hostent->h_length == sizeof(struct in_addr));
-      auto* address = reinterpret_cast<struct in_addr*>(hostent->h_addr_list[i]);
-      address_list.emplace_back(Network::Utility::getAddressName(address));
+      struct sockaddr_in address;
+      // TODO: IPv6 support.
+      address.sin_family = AF_INET;
+      address.sin_port = 0;
+      address.sin_addr = *reinterpret_cast<struct in_addr*>(hostent->h_addr_list[i]);
+      address_list.emplace_back(new Address::Ipv4Instance(&address));
     }
   }
   if (!cancelled_) {
