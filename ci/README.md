@@ -42,3 +42,5 @@ Envoy source tree.
 
 * A `RUN_TEST_UNDER` environment variable is available to specify an executable to run the tests
   under. For example, to run a subset of tests under `gdb`: `run_envoy_docker 'RUN_TEST_UNDER="gdb --args" UNIT_TEST_ONLY=1 ./ci/do_ci.sh debug --gtest_filter="*Dns*"'`.
+
+* A `SKIP_CHECK_FORMAT` environment variable is available to skip `clang-format` checks while developing locally, e.g. `run_envoy_docker 'SKIP_CHECK_FORMAT=1 ./ci/do_ci.sh debug'`.
