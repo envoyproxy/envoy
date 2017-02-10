@@ -132,8 +132,8 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
 
 std::string Base64::encode(const std::string& input) {
   uint64_t output_length = (input.length() + 2) / 3 * 4;
-  std::string ret;
   ret.reserve(output_length);
+  std::string ret;
 
   uint64_t pos = 0;
   uint8_t next_c = 0;
