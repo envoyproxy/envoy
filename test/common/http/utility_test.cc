@@ -124,4 +124,17 @@ TEST(HttpUtility, TestParseCookie) {
   EXPECT_EQ(value, "abc123");
 }
 
+TEST(HttpUtility, TestParseCookieWithQuotes) {
+  TestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "dquote=\"; quoteddquote=\"\"\""},
+      {"cookie", "leadingdquote=\"foobar;"},
+      {"cookie", "abc=def; token=\"abc123\"; Expires=Wed, 09 Jun 2021 10:18:14 GMT"}};
+
+  EXPECT_EQ(Utility::parseCookieValue(headers, "token"), "abc123");
+  EXPECT_EQ(Utility::parseCookieValue(headers, "dquote"), "\"");
+  EXPECT_EQ(Utility::parseCookieValue(headers, "quoteddquote"), "\"");
+  EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
+}
+
 } // Http

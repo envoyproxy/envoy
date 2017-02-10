@@ -83,7 +83,14 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
         std::string k = s.substr(first_non_space, equals_index - first_non_space);
         State* state = static_cast<State*>(context);
         if (k == state->key_) {
-          state->ret_ = s.substr(equals_index + 1, s.size() - 1);
+          std::string v = s.substr(equals_index + 1, s.size() - 1);
+
+          // Cookie values may be wrapped in double quotes.
+          // https://tools.ietf.org/html/rfc6265#section-4.1.1
+          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
+            v = v.substr(1, v.size() - 2);
+          }
+          state->ret_ = v;
           return;
         }
       }
