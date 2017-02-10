@@ -61,8 +61,9 @@ public:
    * can be used for any file like interface (files, sockets, etc.).
    * @param fd supplies the fd to watch.
    * @param cb supplies the callback to fire when the file is ready.
+   * @param trigger specifies whether to edge or level trigger.
    */
-  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb) PURE;
+  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.

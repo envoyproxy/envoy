@@ -49,8 +49,8 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
   // condition and just crash.
   RELEASE_ASSERT(fd_ != -1);
 
-  file_event_ =
-      dispatcher_.createFileEvent(fd_, [this](uint32_t events) -> void { onFileEvent(events); });
+  file_event_ = dispatcher_.createFileEvent(
+      fd_, [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge);
 }
 
 ConnectionImpl::~ConnectionImpl() {
