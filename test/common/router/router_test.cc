@@ -244,7 +244,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
                            }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
-                           -> void { EXPECT_EQ(host_url_, host->url()); }));
+                           -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   expectResponseTimerCreate();
 
