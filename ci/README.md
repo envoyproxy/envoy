@@ -37,7 +37,7 @@ The `do_ci.sh` targets are:
 A convenient shell function to define is:
 
 ```bash
-run_envoy_docker() { docker run -t -i -u $(id -u):$(id -g) -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}`
+run_envoy_docker() { docker run -t -i -u $(id -u):$(id -g) -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}
 ```
 
 Or on OSX.
