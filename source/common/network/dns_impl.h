@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"
 
 #include "common/common/linked_object.h"
@@ -35,7 +36,7 @@ private:
     }
 
     // c-ares ares_gethostbyname() query callback.
-    void onAresHostCallback(int status, struct hostent* hostent);
+    void onAresHostCallback(int status, hostent* hostent);
 
     // Caller supplied callback to invoke on query completion or error.
     ResolveCb callback_;
@@ -48,17 +49,20 @@ private:
     bool cancelled_ = false;
   };
 
-  // libevent callback for events on sockets tracked in events_.
-  void onEventCallback(evutil_socket_t socket, short events, void* arg);
+  // Callback for events on sockets tracked in events_.
+  void onEventCallback(int fd, uint32_t events);
   // c-ares callback when a socket state changes, indicating that libevent
   // should listen for read/write events.
   void onAresSocketStateChange(int fd, int read, int write);
   // Initialize the channel with given ares_init_options().
-  void initializeChannel(struct ares_options* options, int optmask);
+  void initializeChannel(ares_options* options, int optmask);
+  // Update timer for c-ares timeouts.
+  void updateAresTimer();
 
   Event::DispatcherImpl& dispatcher_;
+  Event::TimerPtr timer_;
   ares_channel channel_;
-  std::unordered_map<int, event*> events_;
+  std::unordered_map<int, Event::FileEventPtr> events_;
 };
 
 } // Network

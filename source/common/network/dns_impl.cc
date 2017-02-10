@@ -1,7 +1,6 @@
 #include "dns_impl.h"
 
 #include "common/common/assert.h"
-#include "common/event/libevent.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -10,27 +9,25 @@
 
 namespace Network {
 
-DnsResolverImpl::DnsResolverImpl(Event::DispatcherImpl& dispatcher) : dispatcher_(dispatcher) {
+DnsResolverImpl::DnsResolverImpl(Event::DispatcherImpl& dispatcher)
+    : dispatcher_(dispatcher),
+      timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
   // This is also done in main(), to satisfy the requirement that c-ares is
   // initialized prior to threading. The additional call to ares_library_init()
   // here is a nop in normal execution, but exists for testing where we don't
   // launch via main().
   ares_library_init(ARES_LIB_INIT_ALL);
-  struct ares_options options;
+  ares_options options;
   initializeChannel(&options, 0);
 }
 
 DnsResolverImpl::~DnsResolverImpl() {
+  timer_->disableTimer();
   ares_destroy(channel_);
-  for (auto it : events_) {
-    event_del(it.second);
-    event_free(it.second);
-  }
-  events_.clear();
   ares_library_cleanup();
 }
 
-void DnsResolverImpl::initializeChannel(struct ares_options* options, int optmask) {
+void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   options->sock_state_cb = [](void* arg, int fd, int read, int write) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
@@ -38,7 +35,8 @@ void DnsResolverImpl::initializeChannel(struct ares_options* options, int optmas
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
-void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, struct hostent* hostent) {
+void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent* hostent) {
+  std::cerr << "onAresHostCallback " << status << "\n";
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
     delete this;
@@ -49,12 +47,12 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, struct h
   if (status == ARES_SUCCESS) {
     ASSERT(hostent->h_addrtype == AF_INET);
     for (int i = 0; hostent->h_addr_list[i] != nullptr; ++i) {
-      ASSERT(hostent->h_length == sizeof(struct in_addr));
-      struct sockaddr_in address;
+      ASSERT(hostent->h_length == sizeof(in_addr));
+      sockaddr_in address;
       // TODO: IPv6 support.
       address.sin_family = AF_INET;
       address.sin_port = 0;
-      address.sin_addr = *reinterpret_cast<struct in_addr*>(hostent->h_addr_list[i]);
+      address.sin_addr = *reinterpret_cast<in_addr*>(hostent->h_addr_list[i]);
       address_list.emplace_back(new Address::Ipv4Instance(&address));
     }
   }
@@ -66,46 +64,46 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, struct h
   }
 }
 
-void DnsResolverImpl::onEventCallback(evutil_socket_t socket, short events, void* arg) {
-  const ares_socket_t read_fd = events & EV_READ ? socket : ARES_SOCKET_BAD;
-  const ares_socket_t write_fd = events & EV_WRITE ? socket : ARES_SOCKET_BAD;
+void DnsResolverImpl::updateAresTimer() {
+  // Update the timeout for events.
+  timeval timeout;
+  timeval* timeout_result = ares_timeout(channel_, nullptr, &timeout);
+  if (timeout_result != nullptr) {
+    timer_->enableTimer(
+        std::chrono::milliseconds(timeout_result->tv_sec * 1000 + timeout_result->tv_usec / 1000));
+  } else {
+    timer_->disableTimer();
+  }
+}
+
+void DnsResolverImpl::onEventCallback(int fd, uint32_t events) {
+  std::cerr << "onEventCallback " << events << "\n";
+  const ares_socket_t read_fd = events & Event::FileReadyType::Read ? fd : ARES_SOCKET_BAD;
+  const ares_socket_t write_fd = events & Event::FileReadyType::Write ? fd : ARES_SOCKET_BAD;
   ares_process_fd(channel_, read_fd, write_fd);
-  UNREFERENCED_PARAMETER(arg);
+  updateAresTimer();
 }
 
 void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
+  std::cerr << "onAresSock\n";
+  updateAresTimer();
   auto it = events_.find(fd);
   // Stop tracking events for fd if no more state change events.
   if (read == 0 && write == 0) {
     if (it != events_.end()) {
-      event_del(it->second);
-      event_free(it->second);
       events_.erase(it);
     }
     return;
   }
 
-  const short events = (read ? EV_READ : 0) | (write ? EV_WRITE : 0) | EV_PERSIST;
-  auto on_event_callback_fn = [](evutil_socket_t socket, short events, void* arg) {
-    static_cast<DnsResolverImpl*>(arg)->onEventCallback(socket, events, nullptr);
-  };
-
-  // Determine the timeout for events.
-  struct timeval timeout;
-  struct timeval* timeout_result = ares_timeout(channel_, nullptr, &timeout);
-
-  // If we weren't tracking the fd before, create a new event and we're done.
+  // If we weren't tracking the fd before, create a new FileEvent.
   if (it == events_.end()) {
-    event* ev = event_new(&dispatcher_.base(), fd, events, on_event_callback_fn, this);
-    event_add(ev, timeout_result);
-    events_[fd] = ev;
-    return;
+    events_[fd] = dispatcher_.createFileEvent(fd, [this, fd](uint32_t events) {
+      onEventCallback(fd, events);
+    }, Event::FileTriggerType::Level);
   }
-
-  // Otherwise, need to re-assign the event for the fd.
-  event_del(it->second);
-  event_assign(it->second, &dispatcher_.base(), fd, events, on_event_callback_fn, this);
-  event_add(it->second, timeout_result);
+  events_[fd]->setEnabled((read ? Event::FileReadyType::Read : 0) |
+                          (write ? Event::FileReadyType::Write : 0));
 }
 
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name, ResolveCb callback) {
@@ -113,7 +111,7 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name, ResolveCb 
   pending_resolution->callback_ = callback;
 
   ares_gethostbyname(channel_, dns_name.c_str(),
-                     AF_INET, [](void* arg, int status, int timeouts, struct hostent* hostent) {
+                     AF_INET, [](void* arg, int status, int timeouts, hostent* hostent) {
                        static_cast<PendingResolution*>(arg)->onAresHostCallback(status, hostent);
                        UNREFERENCED_PARAMETER(timeouts);
                      }, pending_resolution.get());
