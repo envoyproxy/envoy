@@ -19,7 +19,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_BINARY_DIR})
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 include_directories(${ENVOY_NGHTTP2_INCLUDE_DIR})
-include_directories(${ENVOY_CARES_INCLUDE_DIR})
+include_directories(SYSTEM ${ENVOY_CARES_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
 include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 
