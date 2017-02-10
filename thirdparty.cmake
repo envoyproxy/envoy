@@ -34,10 +34,6 @@ set(ENVOY_GPERFTOOLS_INCLUDE_DIR "" CACHE FILEPATH "location of gperftools inclu
 # Last tested with sha b87c80300647c2c0311c1489a104470e099f1531
 set(ENVOY_OPENSSL_INCLUDE_DIR "" CACHE FILEPATH "location of openssl includes")
 
-# https://github.com/c-ares/c-ares
-# Last tested with 1.12.0
-set(ENVOY_CARES_INCLUDE_DIR "" CACHE FILEPATH "location of c-ares includes")
-
 # https://github.com/google/protobuf
 # Last tested with 3.0.0
 set(ENVOY_PROTOBUF_INCLUDE_DIR "" CACHE FILEPATH "location of protobuf includes")

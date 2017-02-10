@@ -29,9 +29,9 @@ public:
   void expectResolve() {
     EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", _))
         .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                             -> Network::ActiveDnsQuery* {
+                             -> Network::ActiveDnsQuery& {
                                dns_callback_ = cb;
-                               return &active_dns_query_;
+                               return active_dns_query_;
                              }));
   }
 
