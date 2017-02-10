@@ -68,7 +68,7 @@ std::string Base64::decode(const std::string& input) {
   return result;
 }
 
-void Base64::encode_base(const uint8_t cur_char, uint64_t pos, uint8_t& next_c, std::string& ret) {
+void Base64::encodeBase(const uint8_t cur_char, uint64_t pos, uint8_t& next_c, std::string& ret) {
   switch (pos % 3) {
   case 0:
     ret.push_back(CHAR_TABLE[cur_char >> 2]);
@@ -86,7 +86,7 @@ void Base64::encode_base(const uint8_t cur_char, uint64_t pos, uint8_t& next_c, 
   }
 }
 
-void Base64::encode_last(uint64_t pos, uint8_t last_char, std::string& ret) {
+void Base64::encodeLast(uint64_t pos, uint8_t last_char, std::string& ret) {
   switch (pos % 3) {
   case 1:
     ret.push_back(CHAR_TABLE[last_char]);
@@ -117,7 +117,7 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
     const uint8_t* slice_mem = static_cast<const uint8_t*>(slice.mem_);
 
     for (uint64_t i = 0; i < slice.len_ && j < length; ++i, ++j) {
-      encode_base(slice_mem[i], j, next_c, ret);
+      encodeBase(slice_mem[i], j, next_c, ret);
     }
 
     if (j == length) {
@@ -125,25 +125,24 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
     }
   }
 
-  encode_last(j, next_c, ret);
+  encodeLast(j, next_c, ret);
 
   return ret;
 }
 
-std::string Base64::encode(const std::string& input) {
-  uint64_t output_length = (input.length() + 2) / 3 * 4;
+std::string Base64::encode(const char* input, uint64_t length) {
+  uint64_t output_length = (length + 2) / 3 * 4;
   std::string ret;
   ret.reserve(output_length);
 
   uint64_t pos = 0;
   uint8_t next_c = 0;
 
-  for (size_t i = 0; i < input.length(); ++i) {
-    encode_base(input[i], pos, next_c, ret);
-    pos++;
+  for (uint64_t i = 0; i < length; ++i) {
+    encodeBase(input[i], pos++, next_c, ret);
   }
 
-  encode_last(pos, next_c, ret);
+  encodeLast(pos, next_c, ret);
 
   return ret;
 }

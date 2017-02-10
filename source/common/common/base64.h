@@ -12,10 +12,11 @@ public:
   static std::string encode(const Buffer::Instance& buffer, uint64_t length);
 
   /**
-   * Base64 encode an input string.
-   * @param input string to encode.
+   * Base64 encode an input char buffer with a given length.
+   * @param input char array to encode.
+   * @param length of the input array.
    */
-  static std::string encode(const std::string& input);
+  static std::string encode(const char* input, uint64_t length);
 
   /**
    * Base64 decode an input string.
@@ -30,10 +31,9 @@ private:
   /**
    * Helper methods for encoding.
    */
-  static inline void encode_base(const uint8_t cur_char, uint64_t pos, uint8_t& next_c,
-                                 std::string& ret);
+  static void encodeBase(const uint8_t cur_char, uint64_t pos, uint8_t& next_c, std::string& ret);
   /**
    * Encode last characters if input string length is not divisible by 3.
    */
-  static inline void encode_last(uint64_t pos, uint8_t last_char, std::string& ret);
+  static void encodeLast(uint64_t pos, uint8_t last_char, std::string& ret);
 };
