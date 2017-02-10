@@ -88,7 +88,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
           // Cookie values may be wrapped in double quotes.
           // https://tools.ietf.org/html/rfc6265#section-4.1.1
           if (s.size() >= 2 && s.back() == '"' && s[0] == '"') {
-              s = s.substr(1, s.size() - 1);
+            s = s.substr(1, s.size() - 1);
           }
           state->ret_ = s;
           return;
