@@ -38,9 +38,9 @@ struct ResolverData {
   void expectResolve(Network::MockDnsResolver& dns_resolver) {
     EXPECT_CALL(dns_resolver, resolve(_, _))
         .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                             -> Network::ActiveDnsQuery& {
+                             -> Network::ActiveDnsQuery* {
                                dns_callback_ = cb;
-                               return active_dns_query_;
+                               return &active_dns_query_;
                              }))
         .RetiresOnSaturation();
   }
