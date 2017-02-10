@@ -7,7 +7,7 @@ building Envoy binaries and running tests that reflects the latest built image.
 
 An example basic invocation to build a debug image and run all tests is:
 
-  `docker run -t -i -u $(id -u):$(id -g) -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"`
+  `docker run -t -i -u root:root -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"`
 
 This bind mounts `<SOURCE_DIR>`, which allows for changes on the local
 filesystem to be consumed and outputs build artifacts in `<SOURCE_DIR>/build`.
@@ -25,7 +25,7 @@ The `do_ci.sh` targets are:
 
 A convenient shell function to define is:
 
-  `run_envoy_docker() { docker run -t -i -u $(id -u):$(id -g) -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}`
+  `run_envoy_docker() { docker run -t -i -u root:root -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}`
 
 This then allows for a simple invocation of `run_envoy_docker './ci/do_ci.sh debug'` from the
 Envoy source tree.
