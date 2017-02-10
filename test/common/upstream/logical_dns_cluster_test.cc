@@ -29,9 +29,9 @@ public:
   void expectResolve() {
     EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", _))
         .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                             -> Network::ActiveDnsQuery& {
+                             -> Network::ActiveDnsQuery* {
                                dns_callback_ = cb;
-                               return active_dns_query_;
+                               return &active_dns_query_;
                              }));
   }
 
@@ -80,15 +80,14 @@ TEST_F(LogicalDnsClusterTest, ImmediateResolve) {
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                           -> Network::ActiveDnsQuery& {
+                           -> Network::ActiveDnsQuery* {
                              EXPECT_CALL(*resolve_timer_, enableTimer(_));
                              cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
-                             return active_dns_query_;
+                             return nullptr;
                            }));
   setup(json);
   EXPECT_EQ(1UL, cluster_->hosts().size());
   EXPECT_EQ(1UL, cluster_->healthyHosts().size());
-  EXPECT_CALL(active_dns_query_, cancel());
   tls_.shutdownThread();
 }
 

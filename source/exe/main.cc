@@ -10,6 +10,8 @@
 #include "server/server.h"
 #include "server/test_hooks.h"
 
+#include "ares.h"
+
 namespace Server {
 
 class ProdComponentFactory : public ComponentFactory {
@@ -28,6 +30,7 @@ public:
 } // Server
 
 int main(int argc, char** argv) {
+  ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   Ssl::OpenSsl::initialize();
   OptionsImpl options(argc, argv, Server::SharedMemory::version(), spdlog::level::warn);
@@ -49,5 +52,6 @@ int main(int argc, char** argv) {
   Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
                               restarter->accessLogLock(), component_factory, local_info);
   server.run();
+  ares_library_cleanup();
   return 0;
 }
