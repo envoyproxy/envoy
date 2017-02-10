@@ -82,7 +82,6 @@ private:
         if (it != parent_.hosts_.end()) {
           ips = &it->second;
         }
-        std::cerr << "Got query " << name << "\n";
         ares_free_string(name);
 
         // The response begins with the intial part of the request
@@ -247,15 +246,12 @@ TEST_F(DnsImplTest, LocalLookup) {
     dispatcher_.exit();
   }));
 
-  std::cerr << "A\n";
   dispatcher_.run(Event::Dispatcher::RunType::Block);
-  std::cerr << "B\n";
   EXPECT_TRUE(address_list.empty());
 
   EXPECT_EQ(nullptr, resolver_->resolve("localhost", [&](std::list<Address::InstancePtr>&& results)
                                                          -> void { address_list = results; }));
   EXPECT_TRUE(hasAddress(address_list, "127.0.0.1"));
-  std::cerr << "Z\n";
 }
 
 // Validate success/fail lookup behavior via TestDnsServer. This exercises the

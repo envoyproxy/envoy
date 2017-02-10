@@ -36,7 +36,6 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
 }
 
 void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent* hostent) {
-  std::cerr << "onAresHostCallback " << status << "\n";
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
     delete this;
@@ -77,7 +76,6 @@ void DnsResolverImpl::updateAresTimer() {
 }
 
 void DnsResolverImpl::onEventCallback(int fd, uint32_t events) {
-  std::cerr << "onEventCallback " << events << "\n";
   const ares_socket_t read_fd = events & Event::FileReadyType::Read ? fd : ARES_SOCKET_BAD;
   const ares_socket_t write_fd = events & Event::FileReadyType::Write ? fd : ARES_SOCKET_BAD;
   ares_process_fd(channel_, read_fd, write_fd);
@@ -85,7 +83,6 @@ void DnsResolverImpl::onEventCallback(int fd, uint32_t events) {
 }
 
 void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
-  std::cerr << "onAresSock\n";
   updateAresTimer();
   auto it = events_.find(fd);
   // Stop tracking events for fd if no more state change events.
