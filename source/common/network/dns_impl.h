@@ -1,13 +1,12 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"
 
 #include "common/common/linked_object.h"
-#include "common/event/dispatcher_impl.h"
 
 #include "ares.h"
-#include "event2/event_struct.h"
 
 namespace Network {
 
@@ -19,7 +18,7 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver {
 public:
-  DnsResolverImpl(Event::DispatcherImpl& dispatcher);
+  DnsResolverImpl(Event::Dispatcher& dispatcher);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver
@@ -59,7 +58,7 @@ private:
   // Update timer for c-ares timeouts.
   void updateAresTimer();
 
-  Event::DispatcherImpl& dispatcher_;
+  Event::Dispatcher& dispatcher_;
   Event::TimerPtr timer_;
   ares_channel channel_;
   std::unordered_map<int, Event::FileEventPtr> events_;

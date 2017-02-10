@@ -5,11 +5,10 @@
 #include "common/network/utility.h"
 
 #include "ares.h"
-#include "event2/event.h"
 
 namespace Network {
 
-DnsResolverImpl::DnsResolverImpl(Event::DispatcherImpl& dispatcher)
+DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
   // This is also done in main(), to satisfy the requirement that c-ares is
@@ -36,6 +35,7 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
 }
 
 void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent* hostent) {
+  // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
     delete this;
@@ -48,6 +48,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent*
     for (int i = 0; hostent->h_addr_list[i] != nullptr; ++i) {
       ASSERT(hostent->h_length == sizeof(in_addr));
       sockaddr_in address;
+      memset(&address, 0, sizeof(address));
       // TODO: IPv6 support.
       address.sin_family = AF_INET;
       address.sin_port = 0;
