@@ -7,7 +7,18 @@ building Envoy binaries and running tests that reflects the latest built image.
 
 An example basic invocation to build a debug image and run all tests is:
 
-  `docker run -t -i -u root:root -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"`
+```bash
+docker run -t -i -u $(id -u):$(id -g) -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"
+```
+
+On OSX using the command below may work better. Unlike on Linux, users are not
+synced between the container and OS. Additionally, the bind mount will not
+create artifacts with the same ownership as in the container ([read more about
+osxfs][osxfs]).
+
+```bash
+docker run -t -i -u root:root -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"
+```
 
 This bind mounts `<SOURCE_DIR>`, which allows for changes on the local
 filesystem to be consumed and outputs build artifacts in `<SOURCE_DIR>/build`.
@@ -25,7 +36,15 @@ The `do_ci.sh` targets are:
 
 A convenient shell function to define is:
 
-  `run_envoy_docker() { docker run -t -i -u root:root -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}`
+```bash
+run_envoy_docker() { docker run -t -i -u $(id -u):$(id -g) -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}`
+```
+
+Or on OSX.
+
+```bash
+run_envoy_docker() { docker run -t -i -u root:root -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}
+```
 
 This then allows for a simple invocation of `run_envoy_docker './ci/do_ci.sh debug'` from the
 Envoy source tree.
@@ -44,3 +63,6 @@ Envoy source tree.
   under. For example, to run a subset of tests under `gdb`: `run_envoy_docker 'RUN_TEST_UNDER="gdb --args" UNIT_TEST_ONLY=1 ./ci/do_ci.sh debug --gtest_filter="*Dns*"'`.
 
 * A `SKIP_CHECK_FORMAT` environment variable is available to skip `clang-format` checks while developing locally, e.g. `run_envoy_docker 'SKIP_CHECK_FORMAT=1 ./ci/do_ci.sh debug'`.
+
+
+[osxfs]: https://docs.docker.com/docker-for-mac/osxfs/
