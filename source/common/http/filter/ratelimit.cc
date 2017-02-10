@@ -121,7 +121,7 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
                                           const HeaderMap& headers) const {
   for (const Router::RateLimitPolicyEntry& rate_limit :
        rate_limit_policy.getApplicableRateLimit(config_->stage())) {
-    const std::string& route_key = rate_limit.routeKey();
+    const std::string& route_key = rate_limit.killSwitchKey();
     if (!route_key.empty() &&
         !config_->runtime().snapshot().featureEnabled(
             fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {

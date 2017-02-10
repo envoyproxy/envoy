@@ -7,69 +7,67 @@ namespace Router {
 const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>
     RateLimitPolicyImpl::empty_rate_limit_;
 
-void ServiceToServiceAction::populateDescriptors(const Router::RouteEntry& route,
-                                                 std::vector<::RateLimit::Descriptor>& descriptors,
-                                                 const std::string& local_service_cluster,
-                                                 const Http::HeaderMap&, const std::string&) const {
-  // We limit on 2 dimensions.
-  // 1) All calls to the given cluster.
-  // 2) Calls to the given cluster and from this cluster.
-  // The service side configuration can choose to limit on 1 or both of the above.
-  descriptors.push_back({{{"to_cluster", route.clusterName()}}});
-  descriptors.push_back(
-      {{{"to_cluster", route.clusterName()}, {"from_cluster", local_service_cluster}}});
+void SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
+                                             ::RateLimit::Descriptor& descriptor,
+                                             const std::string& local_service_cluster,
+                                             const Http::HeaderMap&, const std::string&) const {
+  descriptor.entries_.push_back({"from_cluster", local_service_cluster});
 }
 
-void RequestHeadersAction::populateDescriptors(const Router::RouteEntry&,
-                                               std::vector<::RateLimit::Descriptor>& descriptors,
-                                               const std::string&, const Http::HeaderMap& headers,
-                                               const std::string&) const {
+void DestinationClusterAction::populateDescriptor(const Router::RouteEntry& route,
+                                                  ::RateLimit::Descriptor& descriptor,
+                                                  const std::string&, const Http::HeaderMap&,
+                                                  const std::string&) const {
+  descriptor.entries_.push_back({"to_cluster", route.clusterName()});
+}
+
+void RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
+                                              ::RateLimit::Descriptor& descriptor,
+                                              const std::string&, const Http::HeaderMap& headers,
+                                              const std::string&) const {
   const Http::HeaderEntry* header_value = headers.get(header_name_);
   if (!header_value) {
     return;
   }
 
-  descriptors.push_back({{{descriptor_key_, header_value->value().c_str()}}});
-
-  if (route_key_.empty()) {
-    return;
-  }
-
-  descriptors.push_back(
-      {{{"route_key", route_key_}, {descriptor_key_, header_value->value().c_str()}}});
+  descriptor.entries_.push_back({descriptor_key_, header_value->value().c_str()});
 }
 
-void RemoteAddressAction::populateDescriptors(const Router::RouteEntry&,
-                                              std::vector<::RateLimit::Descriptor>& descriptors,
-                                              const std::string&, const Http::HeaderMap&,
-                                              const std::string& remote_address) const {
+void RemoteAddressAction::populateDescriptor(const Router::RouteEntry&,
+                                             ::RateLimit::Descriptor& descriptor,
+                                             const std::string&, const Http::HeaderMap&,
+                                             const std::string& remote_address) const {
   if (remote_address.empty()) {
     return;
   }
 
-  descriptors.push_back({{{"remote_address", remote_address}}});
+  descriptor.entries_.push_back({"remote_address", remote_address});
+}
 
-  if (route_key_.empty()) {
-    return;
-  }
-
-  descriptors.push_back({{{"route_key", route_key_}, {"remote_address", remote_address}}});
+void RouteKeyAction::populateDescriptor(const Router::RouteEntry&,
+                                        ::RateLimit::Descriptor& descriptor, const std::string&,
+                                        const Http::HeaderMap&, const std::string&) const {
+  descriptor.entries_.push_back({"route_key", route_key_});
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
     : kill_switch_key_(config.getString("kill_switch_key", "")),
-      stage_(config.getInteger("stage", 0)), route_key_(config.getString("route_key", "")) {
+      stage_(config.getInteger("stage", 0)) {
 
   config.validateSchema(Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA);
 
   for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
     std::string type = action->getString("type");
-    if (type == "service_to_service") {
-      actions_.emplace_back(new ServiceToServiceAction());
+    if (type == "source_cluster") {
+      actions_.emplace_back(new SourceClusterAction());
+    } else if (type == "destination_cluster") {
+      actions_.emplace_back(new DestinationClusterAction());
     } else if (type == "request_headers") {
-      actions_.emplace_back(new RequestHeadersAction(*action, route_key_));
+      actions_.emplace_back(new RequestHeadersAction(*action));
     } else if (type == "remote_address") {
-      actions_.emplace_back(new RemoteAddressAction(route_key_));
+      actions_.emplace_back(new RemoteAddressAction());
+    } else if (type == "route_key") {
+      actions_.emplace_back(new RouteKeyAction(*action));
     } else {
       throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
     }
@@ -80,8 +78,13 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
     const Router::RouteEntry& route, std::vector<::RateLimit::Descriptor>& descriptors,
     const std::string& local_service_cluster, const Http::HeaderMap& headers,
     const std::string& remote_address) const {
+  ::RateLimit::Descriptor descriptor;
   for (const RateLimitActionPtr& action : actions_) {
-    action->populateDescriptors(route, descriptors, local_service_cluster, headers, remote_address);
+    action->populateDescriptor(route, descriptor, local_service_cluster, headers, remote_address);
+  }
+
+  if (!descriptor.entries_.empty()) {
+    descriptors.emplace_back(descriptor);
   }
 }
 

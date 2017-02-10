@@ -10,7 +10,6 @@ Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
   {
     "stage": "...",
     "kill_switch_key": "...",
-    "route_key": "...",
     "actions": []
   }
 
@@ -25,14 +24,10 @@ stage
 kill_switch_key
   *(optional, string)* The key to be set in runtime to disable this rate limit configuration.
 
-route_key
-  *(optional, string)* Specifies a descriptor value to be used when rate limiting for a route.
-  This information is used by the actions if it is set.
-
 actions
   *(required, array)* A list of actions that are to be applied for this rate limit configuration.
-  Order matters as the actions are processed sequentially and the descriptors will be composed in
-  that sequence.
+  Order matters as the actions are processed sequentially and the descriptor will be composed by
+  appending decriptor entries in that sequence.
 
 .. _config_http_conn_man_route_table_rate_limit_actions:
 
@@ -47,24 +42,36 @@ Actions
 
 type
   *(required, string)* The type of rate limit action to perform. The currently supported action
-  types are *service_to_service* , *request_headers* and *remote_address*.
+  types are *source_cluster*, *destination_cluster* , *request_headers*, *remote_address* and
+  *route_key*.
 
-Service to service
-^^^^^^^^^^^^^^^^^^
+Source Cluster
+^^^^^^^^^^^^^^
 
 .. code-block:: json
 
   {
-    "type": "service_to_service"
+    "type": "source_cluster"
   }
 
-The following descriptors are sent:
+The following descriptor entry is appended to the descriptor:
 
-  * ("to_cluster", "<:ref:`route target cluster <config_http_conn_man_route_table_route_cluster>`>")
-  * ("to_cluster", "<:ref:`route target cluster <config_http_conn_man_route_table_route_cluster>`>"),
-    ("from_cluster", "<local service cluster>")
+  * ("from_cluster", "<local service cluster>")
 
 <local service cluster> is derived from the :option:`--service-cluster` option.
+
+Destination Cluster
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: json
+
+  {
+    "type": "destination_cluster"
+  }
+
+The following descriptor entry is appended to the descriptor:
+
+  * ("to_cluster", "<:ref:`route target cluster <config_http_conn_man_route_table_route_cluster>`>")
 
 Request Headers
 ^^^^^^^^^^^^^^^
@@ -79,19 +86,15 @@ Request Headers
 
 header_name
   *(required, string)* The header name to be queried from the request headers and used to
-  populate the descriptor value for the *descriptor_key*.
+  populate the descriptor entry value for the *descriptor_key*.
 
 descriptor_key
-  *(required, string)* The key to use in the descriptor.
+  *(required, string)* The key to use in the descriptor entry.
 
-The following descriptor is sent when a header contains a key that matches the *header_name*:
+The following descriptor entry is appended when a header contains a key that matches the
+*header_name*:
 
   * ("<descriptor_key>", "<header_value_queried_from_header>")
-
-If *route_key* is set in the rate limit configuration, the following
-descriptor is sent as well:
-
-  * ("route_key", "<route_key>"), ("<descriptor_key>", "<header_value_queried_from_header>")
 
 Remote Address
 ^^^^^^^^^^^^^^
@@ -102,12 +105,25 @@ Remote Address
     "type": "remote_address"
   }
 
-The following descriptor is sent using the trusted address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
+The following descriptor entry is appended to the descriptor and is populated using the trusted
+address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
 
     * ("remote_address", "<:ref:`trusted address from x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`>")
 
-If *route_key* is set in the rate limit configuration, the following
-descriptor is sent as well:
+Route Key
+^^^^^^^^^
 
-      * ("route_key", "<route_key>"),
-        ("remote_address", "<:ref:`trusted address from x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`>")
+.. code-block:: json
+
+  {
+    "type": "route_key",
+    "route_key" : "..."
+  }
+
+
+route_key
+    *(required, string)* The value to use in the descriptor entry.
+
+The following descriptor entry is appended to the descriptor:
+
+    * ("route_key", "<route_key>")

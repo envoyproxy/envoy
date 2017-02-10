@@ -511,12 +511,23 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
     "definitions" : {
-      "service_to_service" : {
+      "source_cluster" : {
         "type" : "object",
         "properties" : {
           "type" : {
             "type" : "string",
-            "enum" : ["service_to_service"]
+            "enum" : ["source_cluster"]
+          }
+        },
+        "required" : ["type"],
+        "additionalProperties" : false
+      },
+      "destination_cluster" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["destination_cluster"]
           }
         },
         "required" : ["type"],
@@ -545,20 +556,33 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : ["type"],
         "additionalProperties" : false
+      },
+      "route_key" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["route_key"]
+          },
+          "route_key" : {"type" : "string"}
+        },
+        "required" : ["type", "route_key"],
+        "additionalProperties" : false
       }
     },
     "properties" : {
       "stage" : {"type" : "integer"},
       "kill_switch_key" : {"type" : "string"},
-      "route_key" : {"type" : "string"},
       "actions" : {
         "type" : "array",
         "minItems": 1,
         "items" : {
           "anyOf" : [
-            {"$ref" : "#/definitions/service_to_service"},
+            {"$ref" : "#/definitions/source_cluster"},
+            {"$ref" : "#/definitions/destination_cluster"},
             {"$ref" : "#/definitions/request_headers"},
-            {"$ref" : "#/definitions/remote_address"}
+            {"$ref" : "#/definitions/remote_address"},
+            {"$ref" : "#/definitions/route_key"}
           ]
         }
       }

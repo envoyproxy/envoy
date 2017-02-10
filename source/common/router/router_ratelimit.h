@@ -8,15 +8,25 @@
 namespace Router {
 
 /**
-* Action for service to service rate limiting.
-*/
-class ServiceToServiceAction : public RateLimitAction {
+ * Action for source service rate limiting.
+ */
+class SourceClusterAction : public RateLimitAction {
 public:
   // Router::RateLimitAction
-  void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors,
-                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                           const std::string& remote_address) const override;
+  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& remote_address) const override;
+};
+
+/**
+ * Action for destination service rate limiting.
+ */
+class DestinationClusterAction : public RateLimitAction {
+public:
+  // Router::RateLimitAction
+  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& remote_address) const override;
 };
 
 /**
@@ -24,20 +34,18 @@ public:
 */
 class RequestHeadersAction : public RateLimitAction {
 public:
-  RequestHeadersAction(const Json::Object& action, const std::string& route_key)
+  RequestHeadersAction(const Json::Object& action)
       : header_name_(action.getString("header_name")),
-        descriptor_key_(action.getString("descriptor_key")), route_key_(route_key) {}
+        descriptor_key_(action.getString("descriptor_key")) {}
 
   // Router::RateLimitAction
-  void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors,
-                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                           const std::string& remote_address) const override;
+  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& remote_address) const override;
 
 private:
   const Http::LowerCaseString header_name_;
   const std::string descriptor_key_;
-  const std::string route_key_;
 };
 
 /**
@@ -45,16 +53,26 @@ private:
  */
 class RemoteAddressAction : public RateLimitAction {
 public:
-  RemoteAddressAction(const std::string& route_key) : route_key_(route_key) {}
+  // Router::RateLimitAction
+  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& remote_address) const override;
+};
+
+/**
+ * Action for remote address rate limiting.
+ */
+class RouteKeyAction : public RateLimitAction {
+public:
+  RouteKeyAction(const Json::Object& action) : route_key_(action.getString("route_key")) {}
 
   // Router::RateLimitAction
-  void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<::RateLimit::Descriptor>& descriptors,
-                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                           const std::string& remote_address) const override;
+  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& remote_address) const override;
 
 private:
-  const std::string& route_key_;
+  const std::string route_key_;
 };
 
 /*
@@ -67,7 +85,6 @@ public:
   // Router::RateLimitPolicyEntry
   int64_t stage() const override { return stage_; }
   const std::string& killSwitchKey() const override { return kill_switch_key_; }
-  const std::string& routeKey() const override { return route_key_; }
 
   // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
@@ -78,7 +95,6 @@ public:
 private:
   const std::string kill_switch_key_;
   int64_t stage_;
-  const std::string route_key_;
   std::vector<RateLimitActionPtr> actions_;
 };
 

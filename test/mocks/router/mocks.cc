@@ -20,7 +20,7 @@ void MockRetryState::expectRetry() {
 MockRetryState::~MockRetryState() {}
 
 MockRateLimitPolicyEntry::MockRateLimitPolicyEntry() {
-  ON_CALL(*this, routeKey()).WillByDefault(ReturnRef(route_key_));
+  ON_CALL(*this, killSwitchKey()).WillByDefault(ReturnRef(kill_switch_key_));
 }
 
 MockRateLimitPolicyEntry::~MockRateLimitPolicyEntry() {}
