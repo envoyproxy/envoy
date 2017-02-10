@@ -16,9 +16,14 @@ public:
 
   // Event::FileEvent
   void activate(uint32_t events) override;
+  void setEnabled(uint32_t events) override;
 
 private:
+  void assignEvents(uint32_t events);
   FileReadyCb cb_;
+  event_base* base_;
+  int fd_;
+  FileTriggerType trigger_;
 };
 
 } // Event

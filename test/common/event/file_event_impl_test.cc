@@ -72,4 +72,35 @@ TEST_F(FileEventImplTest, LevelTrigger) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_F(FileEventImplTest, SetEnabled) {
+  DispatcherImpl dispatcher;
+  ReadyWatcher read_event;
+  EXPECT_CALL(read_event, ready()).Times(2);
+  ReadyWatcher write_event;
+  EXPECT_CALL(write_event, ready()).Times(2);
+
+  Event::FileEventPtr file_event =
+      dispatcher.createFileEvent(fds_[0], [&](uint32_t events) -> void {
+        if (events & FileReadyType::Read) {
+          read_event.ready();
+        }
+
+        if (events & FileReadyType::Write) {
+          write_event.ready();
+        }
+      }, FileTriggerType::Edge);
+
+  file_event->setEnabled(FileReadyType::Read);
+  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+
+  file_event->setEnabled(FileReadyType::Write);
+  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+
+  file_event->setEnabled(0);
+  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+
+  file_event->setEnabled(FileReadyType::Read | FileReadyType::Write);
+  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+}
+
 } // Event

@@ -28,6 +28,12 @@ public:
    * events.
    */
   virtual void activate(uint32_t events) PURE;
+
+  /**
+   * Enable the file event explicitly for a set of events. This allows read and
+   * write events to be independently enabled/disabled for a file event.
+   */
+  virtual void setEnabled(uint32_t events) PURE;
 };
 
 typedef std::unique_ptr<FileEvent> FileEventPtr;
