@@ -104,8 +104,8 @@ void Base64::encode_last(uint64_t pos, uint8_t last_char, std::string& ret) {
 
 std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
   uint64_t output_length = (std::min(length, buffer.length()) + 2) / 3 * 4;
-  ret.reserve(output_length);
   std::string ret;
+  ret.reserve(output_length);
 
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
@@ -132,8 +132,8 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
 
 std::string Base64::encode(const std::string& input) {
   uint64_t output_length = (input.length() + 2) / 3 * 4;
-  ret.reserve(output_length);
   std::string ret;
+  ret.reserve(output_length);
 
   uint64_t pos = 0;
   uint8_t next_c = 0;
