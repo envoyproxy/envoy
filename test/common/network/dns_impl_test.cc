@@ -158,14 +158,40 @@ private:
 };
 } // namespace
 
+class DnsResolverImplPeer {
+public:
+  DnsResolverImplPeer(DnsResolverImpl* resolver) : resolver_(resolver) {}
+  ares_channel channel() const { return resolver_->channel_; }
+  const std::unordered_map<int, Event::FileEventPtr>& events() { return resolver_->events_; }
+  // Reset the channel state for a DnsResolverImpl such that it will only use
+  // TCP and optionally has a zero timeout (for validating timeout behavior).
+  void resetChannelTcpOnly(bool zero_timeout) {
+    ares_destroy(resolver_->channel_);
+    ares_options options;
+    // TCP-only connections to TestDnsServer, since even loopback UDP can be
+    // lossy with a server under load.
+    options.flags = ARES_FLAG_USEVC;
+    // Avoid host-specific domain search behavior when testing to improve
+    // determinism.
+    options.ndomains = 0;
+    options.timeout = 0;
+    resolver_->initializeChannel(&options, ARES_OPT_FLAGS | ARES_OPT_DOMAINS |
+                                               (zero_timeout ? ARES_OPT_TIMEOUTMS : 0));
+  }
+
+private:
+  DnsResolverImpl* resolver_;
+};
+
 class DnsImplTest : public testing::Test {
 public:
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver();
-    // TCP-only connections to TestDnsServer, since even loopback UDP can be
-    // lossy with a server under load.
-    reinterpret_cast<DnsResolverImpl*>(resolver_.get())
-        ->resetChannelForTest(true, zero_timeout(), "127.0.0.1:10000");
+
+    // Point c-ares at 127.0.0.1:10000 with no search domains and TCP-only.
+    peer_.reset(new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver_.get())));
+    peer_->resetChannelTcpOnly(zero_timeout());
+    ares_set_servers_ports_csv(peer_->channel(), "127.0.0.1:10000");
 
     // Instantiate TestDnsServer and listen on 127.0.0.1:10000.
     server_.reset(new TestDnsServer());
@@ -178,6 +204,7 @@ protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
   virtual bool zero_timeout() const { return false; }
   std::unique_ptr<TestDnsServer> server_;
+  std::unique_ptr<DnsResolverImplPeer> peer_;
   Network::MockConnectionHandler connection_handler_;
   Network::TcpListenSocketPtr socket_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -206,7 +233,7 @@ TEST_F(DnsImplTest, DestructPending) {
   }));
   // Also validate that pending events are around to exercise the resource
   // reclamation path.
-  EXPECT_GT(reinterpret_cast<DnsResolverImpl*>(resolver_.get())->pending_queries(), 0U);
+  EXPECT_GT(peer_->events().size(), 0U);
 }
 
 // Validate basic success/fail lookup behavior. The empty request will connect

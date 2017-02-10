@@ -21,16 +21,11 @@ public:
   DnsResolverImpl(Event::Dispatcher& dispatcher);
   ~DnsResolverImpl() override;
 
-  // In-flight queries.
-  size_t pending_queries() const { return events_.size(); }
-
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, ResolveCb callback) override;
 
-  // Testing only.
-  void resetChannelForTest(bool tcp_only, bool zero_timeout, const char* servers_ports_csv);
-
 private:
+  friend class DnsResolverImplPeer;
   struct PendingResolution : public ActiveDnsQuery {
     // Network::ActiveDnsQuery
     void cancel() override {

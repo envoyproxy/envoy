@@ -34,23 +34,6 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
-void DnsResolverImpl::resetChannelForTest(bool tcp_only, bool zero_timeout,
-                                          const char* servers_ports_csv) {
-  ares_destroy(channel_);
-  ares_options options;
-  options.flags = 0;
-  if (tcp_only) {
-    options.flags |= ARES_FLAG_USEVC;
-  }
-  // Avoid host-specific domain search behavior when testing to improve
-  // determinism.
-  options.ndomains = 0;
-  options.timeout = 0;
-  initializeChannel(&options,
-                    ARES_OPT_FLAGS | ARES_OPT_DOMAINS | (zero_timeout ? ARES_OPT_TIMEOUTMS : 0));
-  ares_set_servers_ports_csv(channel_, servers_ports_csv);
-}
-
 void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent* hostent) {
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
