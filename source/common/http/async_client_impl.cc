@@ -54,7 +54,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                                  const Optional<std::chrono::milliseconds>& timeout)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
       router_(parent.config_), request_info_(Protocol::Http11),
-      route_(parent_.cluster_.name(), timeout) {
+      route_(std::make_shared<RouteImpl>(parent_.cluster_.name(), timeout)) {
 
   router_.setDecoderFilterCallbacks(*this);
   // TODO: Correctly set protocol in request info when we support access logging.

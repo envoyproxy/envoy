@@ -30,7 +30,7 @@ ProxyProtocol::ActiveConnection::ActiveConnection(ProxyProtocol& parent,
     if (events & Event::FileReadyType::Read) {
       onRead();
     }
-  });
+  }, Event::FileTriggerType::Edge);
 }
 
 ProxyProtocol::ActiveConnection::~ActiveConnection() {

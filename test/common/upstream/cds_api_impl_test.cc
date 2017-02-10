@@ -165,6 +165,7 @@ TEST_F(CdsApiImplTest, Failure) {
 
   std::string response1_json = R"EOF(
   {
+    clusters : {}
   }
   )EOF";
 

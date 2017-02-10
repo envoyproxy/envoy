@@ -167,14 +167,14 @@ public:
   ~MockConfig();
 
   // Router::Config
-  MOCK_CONST_METHOD2(route, const Route*(const Http::HeaderMap&, uint64_t random_value));
+  MOCK_CONST_METHOD2(route, RoutePtr(const Http::HeaderMap&, uint64_t random_value));
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());
   MOCK_CONST_METHOD0(responseHeadersToAdd,
                      const std::list<std::pair<Http::LowerCaseString, std::string>>&());
   MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
   MOCK_CONST_METHOD0(usesRuntime, bool());
 
-  testing::NiceMock<MockRoute> route_;
+  std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;

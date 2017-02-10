@@ -25,6 +25,7 @@
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -123,7 +124,6 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
       new NiceMock<Http::MockStreamDecoderFilter>());
 
   EXPECT_CALL(filter->reset_stream_called_, ready()).Times(0);
-  EXPECT_CALL(route_config_, route(_, _)).Times(2);
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .Times(2)
       .WillRepeatedly(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
@@ -132,10 +132,6 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
         if (headers.Path()->value() == "/healthcheck") {
           filter->callbacks_->requestInfo().healthCheck(true);
         }
-
-        // Test route caching.
-        EXPECT_EQ(&route_config_.route_, filter->callbacks_->route());
-        EXPECT_EQ(&route_config_.route_, filter->callbacks_->route());
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -817,8 +813,15 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
         callbacks.addStreamEncoderFilter(Http::StreamEncoderFilterPtr{encoder_filter2});
       }));
 
+  // Test route caching.
+  EXPECT_CALL(route_config_, route(_, _));
+
   EXPECT_CALL(*decoder_filter1, decodeHeaders(_, false))
-      .WillOnce(Return(Http::FilterHeadersStatus::StopIteration));
+      .WillOnce(InvokeWithoutArgs([&]() -> Http::FilterHeadersStatus {
+        EXPECT_EQ(route_config_.route_, decoder_filter1->callbacks_->route());
+        return Http::FilterHeadersStatus::StopIteration;
+      }));
+
   EXPECT_CALL(*decoder_filter1, decodeData(_, false))
       .WillOnce(Return(Http::FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(*decoder_filter1, decodeData(_, true))
@@ -846,7 +849,10 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   // Mimic a decoder filter that trapped data and now sends it on, since the data was buffered
   // by the first filter, we expect to get it in 1 decodeData() call.
   EXPECT_CALL(*decoder_filter2, decodeHeaders(_, false))
-      .WillOnce(Return(Http::FilterHeadersStatus::Continue));
+      .WillOnce(InvokeWithoutArgs([&]() -> Http::FilterHeadersStatus {
+        EXPECT_EQ(route_config_.route_, decoder_filter2->callbacks_->route());
+        return Http::FilterHeadersStatus::StopIteration;
+      }));
   EXPECT_CALL(*decoder_filter2, decodeData(_, true))
       .WillOnce(Return(Http::FilterDataStatus::Continue));
   EXPECT_CALL(*decoder_filter3, decodeHeaders(_, false))
