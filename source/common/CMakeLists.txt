@@ -124,7 +124,6 @@ if (NOT ENVOY_SANITIZE)
   include_directories(${ENVOY_GPERFTOOLS_INCLUDE_DIR})
 endif()
 
-include_directories(${ENVOY_CARES_INCLUDE_DIR})
 include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 include_directories(${ENVOY_NGHTTP2_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})

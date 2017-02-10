@@ -403,7 +403,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   log_debug("starting async DNS resolution for {}", dns_address_);
   parent_.info_->stats().update_attempt_.inc();
 
-  active_query_ = parent_.dns_resolver_.resolve(
+  active_query_ = &parent_.dns_resolver_.resolve(
       dns_address_, [this](std::list<Network::Address::InstancePtr>&& address_list) -> void {
         active_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address_);
