@@ -8,7 +8,7 @@
 namespace Router {
 
 /**
- * Action for source service rate limiting.
+ * Action for source cluster rate limiting.
  */
 class SourceClusterAction : public RateLimitAction {
 public:
@@ -19,7 +19,7 @@ public:
 };
 
 /**
- * Action for destination service rate limiting.
+ * Action for destination cluster rate limiting.
  */
 class DestinationClusterAction : public RateLimitAction {
 public:
@@ -60,7 +60,7 @@ public:
 };
 
 /**
- * Action for remote address rate limiting.
+ * Action for route key rate limiting.
  */
 class RouteKeyAction : public RateLimitAction {
 public:
