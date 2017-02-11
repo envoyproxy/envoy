@@ -76,6 +76,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     request_headers.removeEnvoyUpstreamAltStatName();
     request_headers.removeEnvoyUpstreamRequestTimeoutMs();
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
+    request_headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
     request_headers.removeEnvoyExpectedRequestTimeoutMs();
     request_headers.removeEnvoyForceTrace();
 
