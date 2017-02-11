@@ -75,10 +75,10 @@ private:
   /**
    * Implementation of RouteConfigProvider that returns a static null route config.
    */
-  struct RouteConfigProvider : public Router::RouteConfigProvider {
-    RouteConfigProvider();
+  struct NullRouteConfigProvider : public Router::RouteConfigProvider {
+    NullRouteConfigProvider();
 
-    // Http::ConnectionManagerRouteConfigProvider
+    // Router::RouteConfigProvider
     Router::ConfigPtr config() override { return config_; }
 
     Router::ConfigPtr config_;
@@ -113,7 +113,7 @@ private:
   Network::ListenSocketPtr socket_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
-  RouteConfigProvider route_config_provider_;
+  NullRouteConfigProvider route_config_provider_;
   std::list<UrlHandler> handlers_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   Optional<std::string> user_agent_;

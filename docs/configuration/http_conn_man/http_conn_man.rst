@@ -64,8 +64,7 @@ stat_prefix
 :ref:`route_config <config_http_conn_man_route_table>`
   *(sometimes required, object)* The connection manager configuration must specify one of *rds* or
   *route_config*. If *route_config* is specified, the :ref:`route table <arch_overview_http_routing>`
-  for the connection manager is static and is specified in this property. All connection managers must have
-  a route table, even if it is empty.
+  for the connection manager is static and is specified in this property.
 
 :ref:`filters <config_http_conn_man_filters>`
   *(required, array)* A list of individual :ref:`HTTP filters <arch_overview_http_filters>` that

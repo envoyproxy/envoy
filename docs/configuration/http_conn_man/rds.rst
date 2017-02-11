@@ -4,8 +4,10 @@ Route discovery service
 =======================
 
 The route discovery service (RDS) API is an optional API that Envoy will call to dynamically fetch
-route tables. Each :ref:`HTTP connection manager filter <config_http_conn_man>` can independently
-fetch its own route table via the API.
+:ref:`route configurations <config_http_conn_man_route_table>`. A route configuration includes both
+HTTP header modifications, virtual hosts, and the individual route entries contained within each
+virtual host. Each :ref:`HTTP connection manager filter <config_http_conn_man>` can independently
+fetch its own route configuration via the API.
 
 .. code-block:: json
 
@@ -21,9 +23,10 @@ cluster
   :ref:`RDS HTTP API <config_http_conn_man_rds_api>`.
 
 route_config_name
-  *(required, string)* The name of the route table. This name will be passed to the
-  :ref:`RDS HTTP API <config_http_conn_man_rds_api>` so that different route tables can be used by
-  independent filters.
+  *(required, string)* The name of the route configuration. This name will be passed to the
+  :ref:`RDS HTTP API <config_http_conn_man_rds_api>`. This allows an Envoy configuration with
+  multiple HTTP listeners (and associated HTTP connection manager filters) to use different route
+  configurations.
 
 refresh_interval_ms
   *(optional, integer)* The delay, in milliseconds, between fetches to the RDS API. Envoy will add
@@ -38,20 +41,26 @@ REST API
 
 .. http:get:: /v1/routes/(string: route_config_name)/(string: service_cluster)/(string: service_node)
 
-Asks the discovery service to return the route table for a particular `route_config_name`,
+Asks the discovery service to return the route configuration for a particular `route_config_name`,
 `service_cluster`, and `service_node`. `route_config_name` corresponds to the RDS configuration
 parameter above. `service_cluster` corresponds to the :option:`--service-cluster` CLI option.
 `service_node` corresponds to the :option:`--service-node` CLI option. Responses are a single JSON
-object that contains a route table as defined in the :ref:`route table documentation
+object that contains a route configuration as defined in the :ref:`route configuration documentation
 <config_http_conn_man_route_table>`.
 
-A new route table will be gracefully swapped in such that existing requests are not effected.
+A new route configuration will be gracefully swapped in such that existing requests are not
+affected. This means that when a request starts, it sees a consistent snapshot of the route
+configuration that does not change for the duration of the request. Thus, if an update changes a
+timeout for example, only new requests will use the updated timeout value.
+
+As a performance optimization, Envoy hashes the route configuration it receives from the RDS API and
+will only perform a full reload if the hash value changes.
 
 .. attention::
 
-  Route tables that are loaded via RDS are *not* checked to see if referenced clusters are known
-  to the :ref:`cluster manager <config_cluster_manager>`. The RDS API has been designed to work
-  alongside the :ref:`CDS API <config_cluster_manager_cds>` such that Envoy assumes eventually
+  Route configurations that are loaded via RDS are *not* checked to see if referenced clusters are
+  known to the :ref:`cluster manager <config_cluster_manager>`. The RDS API has been designed to
+  work alongside the :ref:`CDS API <config_cluster_manager_cds>` such that Envoy assumes eventually
   consistent updates. If a route references an unknown cluster a 404 response will be returned by
   the router filter.
 

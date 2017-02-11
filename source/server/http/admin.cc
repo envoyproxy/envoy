@@ -292,7 +292,8 @@ void AdminFilter::onComplete() {
   }
 }
 
-AdminImpl::RouteConfigProvider::RouteConfigProvider() : config_(new Router::NullConfigImpl()) {}
+AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
+    : config_(new Router::NullConfigImpl()) {}
 
 AdminImpl::AdminImpl(const std::string& access_log_path, uint32_t port, Server::Instance& server)
     : server_(server), socket_(new Network::TcpListenSocket(port, true)),

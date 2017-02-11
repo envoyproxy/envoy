@@ -13,7 +13,7 @@ public:
 
   /**
    * @return Router::ConfigPtr a route configuration for use during a single request. The returned
-   *         config may be different on a subsequent call so a new config should be acquired for
+   *         config may be different on a subsequent call, so a new config should be acquired for
    *         each request flow.
    */
   virtual Router::ConfigPtr config() PURE;
