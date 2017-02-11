@@ -108,12 +108,12 @@ private:
   Http::Code handlerStats(const std::string& url, Buffer::Instance& response);
   Http::Code handlerQuitQuitQuit(const std::string& url, Buffer::Instance& response);
 
-  RouteConfigProvider route_config_provider_;
   Server::Instance& server_;
   std::list<Http::AccessLog::InstancePtr> access_logs_;
   Network::ListenSocketPtr socket_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
+  RouteConfigProvider route_config_provider_;
   std::list<UrlHandler> handlers_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   Optional<std::string> user_agent_;

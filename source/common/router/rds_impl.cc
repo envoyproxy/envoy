@@ -30,7 +30,7 @@ RouteConfigProviderUtil::create(const Json::Object& config, Runtime::Loader& run
     std::unique_ptr<RdsRouteConfigProviderImpl> provider{new RdsRouteConfigProviderImpl(
         *rds_config, runtime, cm, dispatcher, random, local_info, scope, stat_prefix, tls)};
     provider->initialize();
-    return provider;
+    return std::move(provider);
   }
 }
 
