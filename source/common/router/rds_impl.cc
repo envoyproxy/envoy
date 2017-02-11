@@ -46,7 +46,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     ThreadLocal::Instance& tls)
 
     : RestApiFetcher(cm, config.getString("cluster"), dispatcher, random,
-                     std::chrono::milliseconds(config.getInteger("refresh_interval_ms", 30000))),
+                     std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
       runtime_(runtime), local_info_(local_info), tls_(tls), tls_slot_(tls.allocateSlot()),
       route_config_name_(config.getString("route_config_name")),
       stats_({ALL_RDS_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "rds."))}) {

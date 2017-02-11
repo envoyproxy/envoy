@@ -26,7 +26,7 @@ public:
       "rds": {
         "cluster": "foo_cluster",
         "route_config_name": "foo_route_config",
-        "refresh_interval_ms": 1000
+        "refresh_delay_ms": 1000
       }
     }
     )EOF";

@@ -75,7 +75,7 @@ const std::string Json::Schema::RDS_CONFIGURATION_SCHEMA(R"EOF(
     "properties" : {
       "cluster" : {"type": "string"},
       "route_config_name" : {"type": "string"},
-      "refresh_interval_ms" : {
+      "refresh_delay_ms" : {
         "type" : "integer",
         "minimum" : 0,
         "exclusiveMinimum" : true
@@ -716,7 +716,7 @@ const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
         "type" : "object",
         "properties" : {
           "cluster" : {"type" : "object"},
-          "refresh_interval_ms" : {
+          "refresh_delay_ms" : {
             "type" : "integer",
             "minimum" : 0,
             "exclusiveMinimum" : true

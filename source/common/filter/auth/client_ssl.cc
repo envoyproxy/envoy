@@ -18,7 +18,7 @@ Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream:
                Event::Dispatcher& dispatcher, Stats::Store& stats_store,
                Runtime::RandomGenerator& random)
     : RestApiFetcher(cm, config.getString("auth_api_cluster"), dispatcher, random,
-                     std::chrono::milliseconds(config.getInteger("refresh_interval_ms", 60000))),
+                     std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 60000))),
       tls_(tls), tls_slot_(tls.allocateSlot()), ip_white_list_(config, "ip_white_list"),
       stats_(generateStats(stats_store, config.getString("stat_prefix"))) {
 

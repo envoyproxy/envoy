@@ -22,7 +22,7 @@ CdsApiImpl::CdsApiImpl(const Json::Object& config, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
     : RestApiFetcher(cm, config.getObject("cluster")->getString("name"), dispatcher, random,
-                     std::chrono::milliseconds(config.getInteger("refresh_interval_ms", 30000))),
+                     std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
       local_info_(local_info),
       stats_({ALL_CDS_STATS(POOL_COUNTER_PREFIX(scope, "cluster_manager.cds."))}) {
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
