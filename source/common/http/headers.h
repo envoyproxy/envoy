@@ -26,6 +26,8 @@ public:
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
+  const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
+      "x-envoy-upstream-rq-timeout-alt-response"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutMs{"x-envoy-upstream-rq-timeout-ms"};
   const LowerCaseString EnvoyUpstreamRequestPerTryTimeoutMs{
       "x-envoy-upstream-rq-per-try-timeout-ms"};

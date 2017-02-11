@@ -200,6 +200,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers);
+
+  // If this header is set with any value, use an alternate response code on timeout
+  if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
+    timeout_response_code_ = Http::Code::NoContent;
+    headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
+  }
+
   route_entry_->finalizeRequestHeaders(headers);
   FilterUtility::setUpstreamScheme(headers, *cluster_);
   retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
@@ -357,7 +364,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host) {
       upstream_host->outlierDetector().putHttpResponseCode(
           enumToInt(type == UpstreamResetType::Reset ? Http::Code::ServiceUnavailable
-                                                     : Http::Code::GatewayTimeout));
+                                                     : timeout_response_code_));
     }
   }
 
@@ -371,7 +378,8 @@ void Filter::onUpstreamReset(UpstreamResetType type,
   // This will destroy any created retry timers.
   cleanup();
 
-  // If we have never sent any response, send a 503. Otherwise just reset the ongoing response.
+  // If we have not yet sent anything downstream, send a response with an appropriate status code.
+  // Otherwise just reset the ongoing response.
   if (downstream_response_started_) {
     callbacks_->resetStream();
   } else {
@@ -381,8 +389,8 @@ void Filter::onUpstreamReset(UpstreamResetType type,
       callbacks_->requestInfo().setResponseFlag(
           Http::AccessLog::ResponseFlag::UpstreamRequestTimeout);
 
-      code = Http::Code::GatewayTimeout;
-      body = "upstream request timeout";
+      code = timeout_response_code_;
+      body = code == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
     } else {
       Http::AccessLog::ResponseFlag response_flags =
           streamResetReasonToResponseFlag(reset_reason.value());

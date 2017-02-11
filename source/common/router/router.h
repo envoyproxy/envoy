@@ -208,6 +208,7 @@ private:
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
+  Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   UpstreamRequestPtr upstream_request_;
   RetryStatePtr retry_state_;
   Http::HeaderMap* downstream_headers_{};
