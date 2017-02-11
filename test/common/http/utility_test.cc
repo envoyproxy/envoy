@@ -137,4 +137,21 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
 }
 
+TEST(HttpUtility, TestRemoveCookieValues) {
+  TestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "foo=bar"},
+      {"cookie", "boo=yah; foo=bar"},
+      {"cookie", "foo=baz; bananas;"},
+      {"cookie", "abc=def"}};
+
+  Utility::removeCookieValues(headers, "foo")
+
+  TestHeaderMapImpl expected{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "abc=def"}};
+
+  EXPECT_EQ(headers, expected);
+}
+
 } // Http
