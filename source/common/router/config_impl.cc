@@ -50,7 +50,7 @@ Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& conf
 }
 
 bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
-                                 const std::vector<HeaderData> config_headers) {
+                                 const std::vector<HeaderData>& config_headers) {
   bool matches = true;
 
   if (!config_headers.empty()) {

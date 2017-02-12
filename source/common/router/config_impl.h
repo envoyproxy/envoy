@@ -79,7 +79,7 @@ public:
    * request_headers
    */
   static bool matchHeaders(const Http::HeaderMap& headers,
-                           const std::vector<HeaderData> request_headers);
+                           const std::vector<HeaderData>& request_headers);
 };
 
 /**
