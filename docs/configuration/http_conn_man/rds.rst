@@ -43,12 +43,12 @@ REST API
 
 .. http:get:: /v1/routes/(string: route_config_name)/(string: service_cluster)/(string: service_node)
 
-Asks the discovery service to return the route configuration for a particular `route_config_name`,
-`service_cluster`, and `service_node`. `route_config_name` corresponds to the RDS configuration
-parameter above. `service_cluster` corresponds to the :option:`--service-cluster` CLI option.
-`service_node` corresponds to the :option:`--service-node` CLI option. Responses are a single JSON
-object that contains a route configuration as defined in the :ref:`route configuration documentation
-<config_http_conn_man_route_table>`.
+Asks the route discovery service to return the route configuration for a particular
+`route_config_name`, `service_cluster`, and `service_node`. `route_config_name` corresponds to the
+RDS configuration parameter above. `service_cluster` corresponds to the :option:`--service-cluster`
+CLI option. `service_node` corresponds to the :option:`--service-node` CLI option. Responses are a
+single JSON object that contains a route configuration as defined in the :ref:`route configuration
+documentation <config_http_conn_man_route_table>`.
 
 A new route configuration will be gracefully swapped in such that existing requests are not
 affected. This means that when a request starts, it sees a consistent snapshot of the route
