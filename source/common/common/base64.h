@@ -29,11 +29,12 @@ public:
 
 private:
   /**
-   * Helper methods for encoding.
+   * Helper method for encoding. This is used to encode all of the characters from the input string.
    */
   static void encodeBase(const uint8_t cur_char, uint64_t pos, uint8_t& next_c, std::string& ret);
   /**
-   * Encode last characters if input string length is not divisible by 3.
+   * Encode last characters. It appends '=' chars to the ret if input
+   * string length is not divisible by 3.
    */
   static void encodeLast(uint64_t pos, uint8_t last_char, std::string& ret);
 };
