@@ -6,12 +6,11 @@
 
 namespace Router {
 
-RouteConfigProviderPtr
-RouteConfigProviderUtil::create(const Json::Object& config, Runtime::Loader& runtime,
-                                Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                                Runtime::RandomGenerator& random,
-                                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                                const std::string& stat_prefix, ThreadLocal::Instance& tls) {
+RouteConfigProviderPtr RouteConfigProviderUtil::create(
+    const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
+    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+    const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, const std::string& stat_prefix,
+    ThreadLocal::Instance& tls, Init::Manager& init_manager) {
   bool has_rds = config.hasObject("rds");
   bool has_route_config = config.hasObject("route_config");
   if (!(has_rds ^ has_route_config)) {
@@ -23,13 +22,11 @@ RouteConfigProviderUtil::create(const Json::Object& config, Runtime::Loader& run
     return RouteConfigProviderPtr{
         new StaticRouteConfigProviderImpl(*config.getObject("route_config"), runtime, cm)};
   } else {
-    // TODO: Ordered initialization of RDS: 1) CDS/clusters, 2) RDS, 3) start listening. This
-    //       will be done in a follow up where we will add a formal init handler in the server.
     Json::ObjectPtr rds_config = config.getObject("rds");
     rds_config->validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
     std::unique_ptr<RdsRouteConfigProviderImpl> provider{new RdsRouteConfigProviderImpl(
         *rds_config, runtime, cm, dispatcher, random, local_info, scope, stat_prefix, tls)};
-    provider->initialize();
+    provider->registerInitTarget(init_manager);
     return std::move(provider);
   }
 }
@@ -53,6 +50,10 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
 
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
     throw EnvoyException("rds: setting --service-cluster and --service-node are required");
+  }
+
+  if (!cm.get(remote_cluster_name_)) {
+    throw EnvoyException(fmt::format("rds: unknown remote cluster '{}'", remote_cluster_name_));
   }
 
   ConfigPtr initial_config(new NullConfigImpl());
@@ -94,6 +95,13 @@ void RdsRouteConfigProviderImpl::parseResponse(const Http::Message& response) {
   stats_.update_success_.inc();
 }
 
+void RdsRouteConfigProviderImpl::onFetchComplete() {
+  if (initialize_callback_) {
+    initialize_callback_();
+    initialize_callback_ = nullptr;
+  }
+}
+
 void RdsRouteConfigProviderImpl::onFetchFailure(EnvoyException* e) {
   stats_.update_failure_.inc();
   if (e) {
@@ -101,6 +109,10 @@ void RdsRouteConfigProviderImpl::onFetchFailure(EnvoyException* e) {
   } else {
     log().info("rds: fetch failure: network error");
   }
+}
+
+void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager) {
+  init_manager.registerTarget(*this);
 }
 
 } // Router
