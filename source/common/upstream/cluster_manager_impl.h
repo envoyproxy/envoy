@@ -163,6 +163,7 @@ private:
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const Optional<std::string>& local_cluster_name);
+    ~ThreadLocalClusterManagerImpl();
     void drainConnPools(const std::vector<HostPtr>& hosts);
     void drainConnPools(HostPtr old_host, ConnPoolsContainer& container);
     static void updateClusterMembership(const std::string& name, ConstHostVectorPtr hosts,

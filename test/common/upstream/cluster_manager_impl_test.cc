@@ -210,6 +210,8 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
 
   EXPECT_EQ(3UL, factory_.stats_.counter("cluster_manager.cluster_added").value());
   EXPECT_EQ(3UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
+
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
@@ -290,6 +292,7 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   EXPECT_CALL(factory_.dispatcher_, createClientConnection_(PointeesEq(Network::Utility::resolveUrl(
                                         "tcp://127.0.0.1:11001")))).WillOnce(Return(connection));
   create(*loader);
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
@@ -312,6 +315,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default));
   EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello"), EnvoyException);
   EXPECT_THROW(cluster_manager_->httpAsyncClientForCluster("hello"), EnvoyException);
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, ShutdownOrder) {
@@ -444,6 +448,8 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
 
   EXPECT_CALL(initialized, ready());
   cluster3->initialize_callback_();
+
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
@@ -529,7 +535,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(0UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
 }
 
-TEST_F(ClusterManagerImplTest, addOrUpdatePrimaryClusterStaticExists) {
+TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   std::string json = R"EOF(
   {
     "clusters": [
@@ -565,6 +571,8 @@ TEST_F(ClusterManagerImplTest, addOrUpdatePrimaryClusterStaticExists) {
 
   // Attempt to remove a static cluster.
   EXPECT_FALSE(cluster_manager_->removePrimaryCluster("fake_cluster"));
+
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
@@ -654,6 +662,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+
+  factory_.tls_.shutdownThread();
 }
 
 TEST(ClusterManagerInitHelper, ImmediateInitialize) {

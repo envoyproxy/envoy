@@ -389,6 +389,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
   }
 }
 
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImpl() {
+  ASSERT(thread_local_clusters_.empty());
+  ASSERT(host_http_conn_pool_map_.empty());
+}
+
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
     const std::vector<HostPtr>& hosts) {
   for (const HostPtr& host : hosts) {
