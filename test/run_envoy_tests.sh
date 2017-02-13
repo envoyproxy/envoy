@@ -41,7 +41,12 @@ openssl x509 -req -days -365 -in $TEST_CERT_DIR/unittestcert_expired.csr -sha256
 
 # First run the normal unit test suite
 cd $SOURCE_DIR
-$BINARY_DIR/test/envoy-test
+$RUN_TEST_UNDER $BINARY_DIR/test/envoy-test $EXTRA_TEST_ARGS
+
+if [ "$UNIT_TEST_ONLY" = "1" ]
+then
+  exit 0
+fi
 
 # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart
 # sanity test.

@@ -129,6 +129,13 @@ x-envoy-upstream-canary
 If an upstream host sets this header, the router will use it to generate canary specific statistics.
 The output tree is documented :ref:`here <config_cluster_manager_cluster_stats_dynamic_http>`.
 
+x-envoy-upstream-rq-timeout-alt-response
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Setting this header on egress requests will cause Envoy to set a 204 response code (instead of 504)
+in the event of a request timeout. The actual value of the header is ignored; only its presence
+is considered. See also :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`.
+
 .. _config_http_filters_router_x-envoy-upstream-rq-timeout-ms:
 
 x-envoy-upstream-rq-timeout-ms
@@ -172,6 +179,7 @@ prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection
   :widths: 1, 1, 2
 
   no_route, Counter, Total requests that had no route and resulted in a 404
+  no_cluster, Counter, Total requests in which the target cluster did not exist and resulted in a 404
   rq_redirect, Counter, Total requests that resulted in a redirect response
   rq_total, Counter, Total routed requests
 

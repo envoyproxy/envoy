@@ -1,6 +1,8 @@
 #include "sds.h"
 
 #include "common/http/headers.h"
+#include "common/json/config_schemas.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
 namespace Upstream {
@@ -17,6 +19,7 @@ SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runt
 
 void SdsClusterImpl::parseResponse(const Http::Message& response) {
   Json::ObjectPtr json = Json::Factory::LoadFromString(response.bodyAsString());
+  json->validateSchema(Json::Schema::SDS_SCHEMA);
   std::vector<HostPtr> new_hosts;
   for (const Json::ObjectPtr& host : json->getObjectArray("hosts")) {
     bool canary = false;
@@ -28,9 +31,10 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
       zone = host->getObject("tags")->getString("az", zone);
     }
 
-    new_hosts.emplace_back(new HostImpl(
-        info_, Network::Utility::urlForTcp(host->getString("ip_address"), host->getInteger("port")),
-        canary, weight, zone));
+    new_hosts.emplace_back(
+        new HostImpl(info_, Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
+                                host->getString("ip_address"), host->getInteger("port"))},
+                     canary, weight, zone));
   }
 
   HostVectorPtr current_hosts_copy(new std::vector<HostPtr>(hosts()));

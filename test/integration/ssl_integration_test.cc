@@ -3,6 +3,7 @@
 #include "utility.h"
 
 #include "common/event/dispatcher_impl.h"
+#include "common/network/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -75,9 +76,9 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn) {
-  return dispatcher_->createSslClientConnection(alpn ? *client_ssl_ctx_alpn_
-                                                     : *client_ssl_ctx_no_alpn_,
-                                                fmt::format("tcp://127.0.0.1:10001"));
+  return dispatcher_->createSslClientConnection(
+      alpn ? *client_ssl_ctx_alpn_ : *client_ssl_ctx_no_alpn_,
+      Network::Utility::resolveUrl("tcp://127.0.0.1:10001"));
 }
 
 void SslIntegrationTest::checkStats() {

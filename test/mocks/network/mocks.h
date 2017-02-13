@@ -28,7 +28,7 @@ public:
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::list<Network::ConnectionCallbacks*> callbacks_;
   uint64_t id_{next_id_++};
-  std::string remote_address_;
+  Address::InstancePtr remote_address_;
   bool read_enabled_{true};
   Connection::State state_{Connection::State::Open};
 };
@@ -51,8 +51,8 @@ public:
   MOCK_METHOD1(noDelay, void(bool enable));
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD0(readEnabled, bool());
-  MOCK_METHOD0(remoteAddress, const std::string&());
-  MOCK_METHOD0(localAddress, const std::string&());
+  MOCK_METHOD0(remoteAddress, const Address::Instance&());
+  MOCK_METHOD0(localAddress, const Address::Instance&());
   MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(state, State());
@@ -81,8 +81,8 @@ public:
   MOCK_METHOD1(noDelay, void(bool enable));
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD0(readEnabled, bool());
-  MOCK_METHOD0(remoteAddress, const std::string&());
-  MOCK_METHOD0(localAddress, const std::string&());
+  MOCK_METHOD0(remoteAddress, const Address::Instance&());
+  MOCK_METHOD0(localAddress, const Address::Instance&());
   MOCK_METHOD1(setBufferStats, void(const BufferStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(state, State());
@@ -190,9 +190,11 @@ public:
   MockListenSocket();
   ~MockListenSocket();
 
-  MOCK_METHOD0(name, const std::string());
+  MOCK_METHOD0(localAddress, Address::InstancePtr());
   MOCK_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
+
+  Address::InstancePtr local_address_;
 };
 
 class MockListener : public Listener {

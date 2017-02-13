@@ -521,6 +521,49 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   }
 }
 
+TEST(RouteMatcherTest, ClusterHeader) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "local_service",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "cluster_header": ":authority"
+        },
+        {
+          "prefix": "/bar",
+          "cluster_header": "some_header"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(*loader, runtime, cm);
+
+  EXPECT_FALSE(config.usesRuntime());
+
+  EXPECT_EQ(
+      "some_cluster",
+      config.route(genHeaders("some_cluster", "/foo", "GET"), 0)->routeEntry()->clusterName());
+
+  EXPECT_EQ(
+      "", config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry()->clusterName());
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
+    headers.addViaCopy("some_header", "some_cluster");
+    EXPECT_EQ("some_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
 TEST(RouteMatcherTest, ContentType) {
   std::string json = R"EOF(
 {
@@ -932,8 +975,8 @@ TEST(RouteMatcherTest, Redirect) {
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", false, false);
-    const Route* route = config.route(headers, 0);
-    EXPECT_EQ("https://www.lyft.com/foo", route->redirectEntry()->newPath(headers));
+    EXPECT_EQ("https://www.lyft.com/foo",
+              config.route(headers, 0)->redirectEntry()->newPath(headers));
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, true);
@@ -1405,6 +1448,32 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfig) {
             "prefix": "/",
             "cluster": "www2",
             "timeout_ms" : "1234"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm), EnvoyException);
+}
+
+TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPath) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "path": "/foo",
+            "cluster": "www2"
           }
         ]
       }

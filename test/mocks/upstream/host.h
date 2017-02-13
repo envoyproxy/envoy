@@ -54,11 +54,11 @@ public:
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostSink&());
-  MOCK_CONST_METHOD0(url, const std::string&());
+  MOCK_CONST_METHOD0(address, Network::Address::InstancePtr());
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(zone, const std::string&());
 
-  std::string url_{"tcp://10.0.0.1:443"};
+  Network::Address::InstancePtr address_;
   testing::NiceMock<Outlier::MockDetectorHostSink> outlier_detector_;
   testing::NiceMock<MockClusterInfo> cluster_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -76,7 +76,6 @@ public:
   ~MockHost();
 
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
-  MOCK_CONST_METHOD0(url, const std::string&());
   MOCK_CONST_METHOD0(counters, std::list<Stats::CounterPtr>());
   MOCK_CONST_METHOD0(gauges, std::list<Stats::GaugePtr>());
   MOCK_CONST_METHOD0(healthy, bool());

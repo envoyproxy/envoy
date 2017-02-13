@@ -34,6 +34,10 @@ public:
   // Cluster Schemas
   static const std::string CLUSTER_MANAGER_SCHEMA;
   static const std::string CLUSTER_SCHEMA;
+
+  // Discovery Service Schemas
+  static const std::string CDS_SCHEMA;
+  static const std::string SDS_SCHEMA;
 };
 
 } // Json

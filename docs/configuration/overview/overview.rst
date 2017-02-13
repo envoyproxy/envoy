@@ -3,9 +3,10 @@
 Overview
 ========
 
-The Envoy configuration format is written in JSON. The main configuration for the server is
-contained within the listeners and cluster manager sections. The other top level elements specify
-miscellaneous configuration.
+The Envoy configuration format is written in JSON and is validated against a JSON schema. The
+schema can be found in :repo:`source/common/json/config_schemas.cc`. The main configuration for the
+server is contained within the listeners and cluster manager sections. The other top level elements
+specify miscellaneous configuration.
 
 .. code-block:: json
 

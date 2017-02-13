@@ -44,7 +44,7 @@ protected:
 
   HostPtr findHost(const std::string& address) {
     for (HostPtr host : cluster_->hosts()) {
-      if (Network::Utility::hostFromUrl(host->url()) == address) {
+      if (host->address()->ip()->addressAsString() == address) {
         return host;
       }
     }
@@ -302,6 +302,26 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_EQ(3UL, cluster_->healthyHostsPerZone()[0].size());
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
+}
+
+TEST_F(SdsTest, Failure) {
+  setupRequest();
+  cluster_->initialize();
+
+  std::string bad_response_json = R"EOF(
+  {
+    "hosts" : {}
+  }
+  )EOF";
+
+  Http::MessagePtr message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(bad_response_json)});
+
+  EXPECT_CALL(*timer_, enableTimer(_));
+  callbacks_->onSuccess(std::move(message));
+
+  EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
 }
 
 } // Upstream

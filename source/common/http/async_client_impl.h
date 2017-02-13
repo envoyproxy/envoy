@@ -160,7 +160,7 @@ private:
   uint64_t connectionId() override { return 0; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
-  const Router::Route* route() override { return &route_; }
+  Router::RoutePtr route() override { return route_; }
   uint64_t streamId() override { return stream_id_; }
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
@@ -177,7 +177,7 @@ private:
   Router::ProdFilter router_;
   std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
-  RouteImpl route_;
+  std::shared_ptr<RouteImpl> route_;
   bool local_closed_{};
   bool remote_closed_{};
 

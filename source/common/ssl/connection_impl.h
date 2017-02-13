@@ -10,8 +10,9 @@ class ConnectionImpl : public Network::ConnectionImpl, public Connection {
 public:
   enum class InitialState { Client, Server };
 
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, const std::string& remote_address,
-                 const std::string& local_address, Context& ctx, InitialState state);
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+                 Network::Address::InstancePtr remote_address,
+                 Network::Address::InstancePtr local_address, Context& ctx, InitialState state);
   ~ConnectionImpl();
 
   // Network::Connection
@@ -38,7 +39,8 @@ private:
 
 class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
 public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx, const std::string& url);
+  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
+                       Network::Address::InstancePtr address);
 
   // Network::ClientConnection
   void connect() override;

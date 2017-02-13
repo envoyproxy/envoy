@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/network/address.h"
+
 #include "common/http/header_map_impl.h"
 
 class TestUtility {
@@ -18,6 +20,13 @@ public:
    * @return std::string the converted string.
    */
   static std::string bufferToString(const Buffer::Instance& buffer);
+
+  /**
+   * Convert a string list of IP addresses into a list of network addresses usable for DNS
+   * response testing.
+   */
+  static std::list<Network::Address::InstancePtr>
+  makeDnsResponse(const std::list<std::string>& addresses);
 };
 
 namespace Http {
