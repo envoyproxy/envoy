@@ -49,7 +49,7 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
-  return context_manager_->createSslServerContext(store(), cfg);
+  return context_manager_->createSslServerContext(test_server_->store(), cfg);
 }
 
 ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {
@@ -72,7 +72,7 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(alpn ? json_alpn : json_no_alpn);
   ContextConfigImpl cfg(*loader);
-  return context_manager_->createSslClientContext(store(), cfg);
+  return context_manager_->createSslClientContext(test_server_->store(), cfg);
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn) {
@@ -82,7 +82,7 @@ Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool al
 }
 
 void SslIntegrationTest::checkStats() {
-  Stats::Counter& counter = store().counter("listener.10001.ssl.handshake");
+  Stats::Counter& counter = test_server_->store().counter("listener.10001.ssl.handshake");
   EXPECT_EQ(1U, counter.value());
   counter.reset();
 }
