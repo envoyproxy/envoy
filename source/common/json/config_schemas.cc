@@ -62,6 +62,11 @@ const std::string Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA(R"EOF(
           "type": "string",
           "format" : "ipv4"
         }
+      },
+      "refresh_delay_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required": ["auth_api_cluster", "stat_prefix"],
