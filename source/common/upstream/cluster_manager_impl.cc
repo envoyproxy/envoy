@@ -180,11 +180,10 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
                     new ThreadLocalClusterManagerImpl(*this, dispatcher, local_cluster_name)};
               });
 
-  // To avoid threading issues, for those clusters that start with hosts already in them (like
-  // the static cluster), we need to post an update onto each thread to notify them of the update.
-  // We also require this for dynamic clusters where an immediate resolve
-  // occurred in the cluster constructor, prior to the member update callback
-  // being configured.
+  // To avoid threading issues, for those clusters that start with hosts already in them (like the
+  // static cluster), we need to post an update onto each thread to notify them of the update. We
+  // also require this for dynamic clusters where an immediate resolve occurred in the cluster
+  // constructor, prior to the member update callback being configured.
   for (auto& cluster : primary_clusters_) {
     postInitializeCluster(*cluster.second.cluster_);
   }
