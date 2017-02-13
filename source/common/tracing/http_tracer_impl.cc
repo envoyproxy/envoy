@@ -250,6 +250,7 @@ SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
 
   if (request_headers.OtSpanContext()) {
     // Extract downstream context from HTTP carrier.
+    // This code is safe even if decode returns empty string or data is malformed.
     std::string parent_context = Base64::decode(request_headers.OtSpanContext()->value().c_str());
     lightstep::envoy::CarrierStruct ctx;
     ctx.ParseFromString(parent_context);
@@ -270,8 +271,9 @@ SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
   lightstep::envoy::CarrierStruct ctx;
   tracer.Inject(active_span->context(), lightstep::CarrierFormat::EnvoyProtoCarrier,
                 lightstep::envoy::ProtoWriter(&ctx));
-  Buffer::OwnedImpl buffer(ctx.SerializeAsString());
-  request_headers.insertOtSpanContext().value(Base64::encode(buffer, buffer.length()));
+  const std::string current_span_context = ctx.SerializeAsString();
+  request_headers.insertOtSpanContext().value(
+      Base64::encode(current_span_context.c_str(), current_span_context.length()));
 
   return std::move(active_span);
 }
