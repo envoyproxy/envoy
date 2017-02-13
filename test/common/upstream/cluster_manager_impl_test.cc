@@ -309,8 +309,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   create(*loader);
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
-  EXPECT_THROW(cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default),
-               EnvoyException);
+  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default));
   EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello"), EnvoyException);
   EXPECT_THROW(cluster_manager_->httpAsyncClientForCluster("hello"), EnvoyException);
 }
@@ -447,7 +446,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   cluster3->initialize_callback_();
 }
 
-TEST_F(ClusterManagerImplTest, dynamicAddRemove) {
+TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   std::string json = R"EOF(
   {
     "clusters": []
@@ -512,13 +511,17 @@ TEST_F(ClusterManagerImplTest, dynamicAddRemove) {
   EXPECT_EQ(cp,
             cluster_manager_->httpConnPoolForCluster("fake_cluster", ResourcePriority::Default));
 
-  // Now remove it.
+  // Now remove it. This should drain the connection pool.
+  Http::ConnectionPool::Instance::DrainedCb drained_cb;
+  EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   EXPECT_TRUE(cluster_manager_->removePrimaryCluster("fake_cluster"));
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().size());
 
   // Remove an unknown cluster.
   EXPECT_FALSE(cluster_manager_->removePrimaryCluster("foo"));
+
+  drained_cb();
 
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_added").value());
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_modified").value());
@@ -692,6 +695,32 @@ TEST(ClusterManagerInitHelper, StaticSdsInitialize) {
 
   EXPECT_CALL(cm_initialized, ready());
   cluster1.initialize_callback_();
+}
+
+TEST(ClusterManagerInitHelper, UpdateAlreadyInitialized) {
+  InSequence s;
+  ClusterManagerInitHelper init_helper;
+
+  ReadyWatcher cm_initialized;
+  init_helper.setInitializedCb([&]() -> void { cm_initialized.ready(); });
+
+  NiceMock<MockCluster> cluster1;
+  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(cluster1, initialize());
+  init_helper.addCluster(cluster1);
+
+  NiceMock<MockCluster> cluster2;
+  ON_CALL(cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(cluster2, initialize());
+  init_helper.addCluster(cluster2);
+
+  init_helper.onStaticLoadComplete();
+
+  cluster1.initialize_callback_();
+  init_helper.removeCluster(cluster1);
+
+  EXPECT_CALL(cm_initialized, ready());
+  cluster2.initialize_callback_();
 }
 
 } // Upstream

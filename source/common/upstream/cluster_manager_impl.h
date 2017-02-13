@@ -148,6 +148,7 @@ private:
 
     struct ClusterEntry {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoPtr cluster);
+      ~ClusterEntry();
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority);
 
@@ -162,6 +163,7 @@ private:
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const Optional<std::string>& local_cluster_name);
+    void drainConnPools(const std::vector<HostPtr>& hosts);
     void drainConnPools(HostPtr old_host, ConnPoolsContainer& container);
     static void updateClusterMembership(const std::string& name, ConstHostVectorPtr hosts,
                                         ConstHostVectorPtr healthy_hosts,
