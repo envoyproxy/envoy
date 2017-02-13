@@ -83,6 +83,7 @@ add_executable(envoy-test
   common/redis/conn_pool_impl_test.cc
   common/redis/proxy_filter_test.cc
   common/router/config_impl_test.cc
+  common/router/rds_impl_test.cc
   common/router/retry_state_impl_test.cc
   common/router/router_test.cc
   common/router/router_ratelimit_test.cc

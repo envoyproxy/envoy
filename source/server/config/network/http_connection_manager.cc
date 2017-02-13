@@ -11,8 +11,7 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
-#include "common/json/json_loader.h"
-#include "common/router/config_impl.h"
+#include "common/router/rds_impl.h"
 
 namespace Server {
 namespace Configuration {
@@ -67,13 +66,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, server.stats())),
       codec_options_(Http::Utility::parseCodecOptions(config)),
-      route_config_(new Router::ConfigImpl(*config.getObject("route_config"), server.runtime(),
-                                           server.clusterManager())),
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
       date_provider_(server.dispatcher(), server.threadLocal()) {
 
   config.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
+
+  route_config_provider_ = Router::RouteConfigProviderUtil::create(
+      config, server.runtime(), server.clusterManager(), server.dispatcher(), server.random(),
+      server.localInfo(), server.stats(), stats_prefix_, server.threadLocal());
 
   if (config.hasObject("use_remote_address")) {
     use_remote_address_ = config.getBoolean("use_remote_address");

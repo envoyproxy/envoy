@@ -366,7 +366,7 @@ RoutePtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t ra
 }
 
 VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Loader& runtime,
-                                 Upstream::ClusterManager& cm)
+                                 Upstream::ClusterManager& cm, bool validate_clusters)
     : name_(virtual_host.getString("name")), rate_limit_policy_(virtual_host) {
 
   virtual_host.validateSchema(Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA);
@@ -396,12 +396,13 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Load
       routes_.emplace_back(new PathRouteEntryImpl(*this, *route, runtime));
     }
 
-    routes_.back()->validateClusters(cm);
-
-    if (!routes_.back()->shadowPolicy().cluster().empty()) {
-      if (!cm.get(routes_.back()->shadowPolicy().cluster())) {
-        throw EnvoyException(fmt::format("route: unknown shadow cluster '{}'",
-                                         routes_.back()->shadowPolicy().cluster()));
+    if (validate_clusters) {
+      routes_.back()->validateClusters(cm);
+      if (!routes_.back()->shadowPolicy().cluster().empty()) {
+        if (!cm.get(routes_.back()->shadowPolicy().cluster())) {
+          throw EnvoyException(fmt::format("route: unknown shadow cluster '{}'",
+                                           routes_.back()->shadowPolicy().cluster()));
+        }
       }
     }
   }
@@ -434,12 +435,13 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
 }
 
 RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
-                           Upstream::ClusterManager& cm) {
+                           Upstream::ClusterManager& cm, bool validate_clusters) {
 
   config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
   for (const Json::ObjectPtr& virtual_host_config : config.getObjectArray("virtual_hosts")) {
-    VirtualHostPtr virtual_host(new VirtualHostImpl(*virtual_host_config, runtime, cm));
+    VirtualHostPtr virtual_host(
+        new VirtualHostImpl(*virtual_host_config, runtime, cm, validate_clusters));
     uses_runtime_ |= virtual_host->usesRuntime();
 
     for (const std::string& domain : virtual_host_config->getStringArray("domains")) {
@@ -530,8 +532,8 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 }
 
 ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
-                       Upstream::ClusterManager& cm) {
-  route_matcher_.reset(new RouteMatcher(config, runtime, cm));
+                       Upstream::ClusterManager& cm, bool validate_clusters) {
+  route_matcher_.reset(new RouteMatcher(config, runtime, cm, validate_clusters));
 
   if (config.hasObject("internal_only_headers")) {
     for (std::string header : config.getStringArray("internal_only_headers")) {

@@ -88,7 +88,7 @@ public:
 class VirtualHostImpl : public VirtualHost {
 public:
   VirtualHostImpl(const Json::Object& virtual_host, Runtime::Loader& runtime,
-                  Upstream::ClusterManager& cm);
+                  Upstream::ClusterManager& cm, bool validate_clusters);
 
   RoutePtr getRouteFromEntries(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const;
@@ -343,7 +343,8 @@ private:
  */
 class RouteMatcher {
 public:
-  RouteMatcher(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
+  RouteMatcher(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
+               bool validate_clusters);
 
   RoutePtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const { return uses_runtime_; }
@@ -361,7 +362,8 @@ private:
  */
 class ConfigImpl : public Config {
 public:
-  ConfigImpl(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
+  ConfigImpl(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
+             bool validate_clusters);
 
   // Router::Config
   RoutePtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {

@@ -264,6 +264,6 @@ public:
   virtual bool usesRuntime() const PURE;
 };
 
-typedef std::unique_ptr<Config> ConfigPtr;
+typedef std::shared_ptr<const Config> ConfigPtr;
 
 } // Router

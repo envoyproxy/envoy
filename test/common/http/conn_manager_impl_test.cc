@@ -36,6 +36,13 @@ namespace Http {
 
 class HttpConnectionManagerImplTest : public Test, public ConnectionManagerConfig {
 public:
+  struct RouteConfigProvider : public Router::RouteConfigProvider {
+    // Router::RouteConfigProvider
+    Router::ConfigPtr config() override { return route_config_; }
+
+    std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
+  };
+
   HttpConnectionManagerImplTest()
       : access_log_path_("dummy_path"),
         access_logs_{Http::AccessLog::InstancePtr{new Http::AccessLog::InstanceImpl(
@@ -78,7 +85,7 @@ public:
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() override { return true; }
   const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
-  const Router::Config& routeConfig() override { return route_config_; }
+  Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -111,7 +118,7 @@ public:
   Optional<std::chrono::milliseconds> idle_timeout_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
-  NiceMock<Router::MockConfig> route_config_;
+  RouteConfigProvider route_config_provider_;
   Optional<Http::TracingConnectionManagerConfig> tracing_config_;
   Http::SlowDateProviderImpl date_provider_;
 };
@@ -814,11 +821,12 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       }));
 
   // Test route caching.
-  EXPECT_CALL(route_config_, route(_, _));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
 
   EXPECT_CALL(*decoder_filter1, decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs([&]() -> Http::FilterHeadersStatus {
-        EXPECT_EQ(route_config_.route_, decoder_filter1->callbacks_->route());
+        EXPECT_EQ(route_config_provider_.route_config_->route_,
+                  decoder_filter1->callbacks_->route());
         return Http::FilterHeadersStatus::StopIteration;
       }));
 
@@ -850,7 +858,8 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   // by the first filter, we expect to get it in 1 decodeData() call.
   EXPECT_CALL(*decoder_filter2, decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs([&]() -> Http::FilterHeadersStatus {
-        EXPECT_EQ(route_config_.route_, decoder_filter2->callbacks_->route());
+        EXPECT_EQ(route_config_provider_.route_config_->route_,
+                  decoder_filter2->callbacks_->route());
         return Http::FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(*decoder_filter2, decodeData(_, true))
