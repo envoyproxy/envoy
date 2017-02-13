@@ -63,6 +63,35 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   EXPECT_THROW(setup(json), EnvoyException);
 }
 
+// Validate that if the DNS resolves immediately, during the LogicalDnsCluster
+// constructor, we have the expected host state and initialization callback
+// invocation.
+TEST_F(LogicalDnsClusterTest, ImmediateResolve) {
+  std::string json = R"EOF(
+  {
+    "name": "name",
+    "connect_timeout_ms": 250,
+    "type": "logical_dns",
+    "lb_type": "round_robin",
+    "hosts": [{"url": "tcp://foo.bar.com:443"}]
+  }
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
+                           -> Network::ActiveDnsQuery& {
+                             EXPECT_CALL(*resolve_timer_, enableTimer(_));
+                             cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+                             return active_dns_query_;
+                           }));
+  setup(json);
+  EXPECT_EQ(1UL, cluster_->hosts().size());
+  EXPECT_EQ(1UL, cluster_->healthyHosts().size());
+  EXPECT_CALL(active_dns_query_, cancel());
+  tls_.shutdownThread();
+}
+
 TEST_F(LogicalDnsClusterTest, Basic) {
   std::string json = R"EOF(
   {

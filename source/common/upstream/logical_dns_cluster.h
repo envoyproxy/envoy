@@ -33,7 +33,11 @@ public:
   void initialize() override {}
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
   void setInitializedCb(std::function<void()> callback) override {
-    initialize_callback_ = callback;
+    if (initialized_) {
+      callback();
+    } else {
+      initialize_callback_ = callback;
+    }
   }
 
 private:
@@ -80,6 +84,8 @@ private:
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;
   std::function<void()> initialize_callback_;
+  // Set once the first resolve completes.
+  bool initialized_;
   Event::TimerPtr resolve_timer_;
   std::string dns_url_;
   Network::Address::InstancePtr current_resolved_address_;
