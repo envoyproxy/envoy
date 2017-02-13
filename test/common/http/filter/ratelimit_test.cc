@@ -275,7 +275,7 @@ TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
 }
 
 TEST_F(HttpRateLimitFilterTest, RouteRateLimitDisabledForRouteKey) {
-  route_rate_limit_.kill_switch_key_ = "test_key";
+  route_rate_limit_.disable_key_ = "test_key";
   SetUpTest(filter_config);
 
   ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_key.http_filter_enabled", 100))
@@ -290,7 +290,7 @@ TEST_F(HttpRateLimitFilterTest, RouteRateLimitDisabledForRouteKey) {
 }
 
 TEST_F(HttpRateLimitFilterTest, VirtualHostRateLimitDisabledForRouteKey) {
-  vh_rate_limit_.kill_switch_key_ = "test_vh_key";
+  vh_rate_limit_.disable_key_ = "test_vh_key";
   SetUpTest(filter_config);
 
   ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_vh_key.http_filter_enabled", 100))

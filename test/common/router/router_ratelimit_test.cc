@@ -305,7 +305,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitPolicyEntryMembers) {
   std::string json = R"EOF(
   {
     "stage": 2,
-    "kill_switch_key": "no_ratelimit",
+    "disable_key": "no_ratelimit",
     "actions":[
       {
         "type": "remote_address"
@@ -317,7 +317,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitPolicyEntryMembers) {
   SetUpTest(json);
 
   EXPECT_EQ(2, rate_limit_entry_->stage());
-  EXPECT_EQ("no_ratelimit", rate_limit_entry_->killSwitchKey());
+  EXPECT_EQ("no_ratelimit", rate_limit_entry_->disableKey());
 }
 
 TEST_F(RateLimitPolicyEntryTest, RemoteAddress) {
@@ -431,6 +431,25 @@ TEST_F(RateLimitPolicyEntryTest, RequestHeadersNoMatch) {
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header, "");
   EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, RateLimitKey) {
+  std::string json = R"EOF(
+  {
+    "actions":[
+      {
+        "type": "rate_limit_key",
+        "rate_limit_value" : "fake_key"
+      }
+    ]
+  }
+  )EOF";
+
+  SetUpTest(json);
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, "");
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"rate_limit_key", "fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
 }
 
 TEST_F(RateLimitPolicyEntryTest, CompoundActions) {

@@ -557,22 +557,22 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
         "required" : ["type"],
         "additionalProperties" : false
       },
-      "route_key" : {
+      "rate_limit_key" : {
         "type" : "object",
         "properties" : {
           "type" : {
             "type" : "string",
-            "enum" : ["route_key"]
+            "enum" : ["rate_limit_key"]
           },
-          "route_key" : {"type" : "string"}
+          "rate_limit_value" : {"type" : "string"}
         },
-        "required" : ["type", "route_key"],
+        "required" : ["type", "rate_limit_value"],
         "additionalProperties" : false
       }
     },
     "properties" : {
       "stage" : {"type" : "integer"},
-      "kill_switch_key" : {"type" : "string"},
+      "disable_key" : {"type" : "string"},
       "actions" : {
         "type" : "array",
         "minItems": 1,
@@ -582,7 +582,7 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
             {"$ref" : "#/definitions/destination_cluster"},
             {"$ref" : "#/definitions/request_headers"},
             {"$ref" : "#/definitions/remote_address"},
-            {"$ref" : "#/definitions/route_key"}
+            {"$ref" : "#/definitions/rate_limit_key"}
           ]
         }
       }

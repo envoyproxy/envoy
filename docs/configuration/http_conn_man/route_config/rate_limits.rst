@@ -9,7 +9,7 @@ Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
 
   {
     "stage": "...",
-    "kill_switch_key": "...",
+    "disable_key": "...",
     "actions": []
   }
 
@@ -21,13 +21,14 @@ stage
 
   **NOTE:** This functionality hasn't been implemented yet and stage values are currently ignored.
 
-kill_switch_key
+disable_key
   *(optional, string)* The key to be set in runtime to disable this rate limit configuration.
 
 actions
   *(required, array)* A list of actions that are to be applied for this rate limit configuration.
   Order matters as the actions are processed sequentially and the descriptor will be composed by
-  appending decriptor entries in that sequence.
+  appending decriptor entries in that sequence. See :ref:`composing actions
+  <config_http_conn_man_route_table_rate_limit_composing_actions>` for additional documentation.
 
 .. _config_http_conn_man_route_table_rate_limit_actions:
 
@@ -71,7 +72,11 @@ Destination Cluster
 
 The following descriptor entry is appended to the descriptor:
 
-  * ("to_cluster", "<:ref:`route target cluster <config_http_conn_man_route_table_route_cluster>`>")
+  * ("to_cluster", "<routed cluster>")
+
+The routed cluster is chosen based on the :ref:`route table
+<config_http_conn_man_route_table_route_cluster>` configuration for *cluster*, *weighted_clusters*
+or *cluster_header*.
 
 Request Headers
 ^^^^^^^^^^^^^^^
@@ -108,22 +113,85 @@ Remote Address
 The following descriptor entry is appended to the descriptor and is populated using the trusted
 address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
 
-    * ("remote_address", "<:ref:`trusted address from x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`>")
+    * ("remote_address", "<:ref:`trusted address from x-forwarded-for
+      <config_http_conn_man_headers_x-forwarded-for>`>")
 
-Route Key
-^^^^^^^^^
+Rate Limit Key
+^^^^^^^^^^^^^^
 
 .. code-block:: json
 
   {
-    "type": "route_key",
-    "route_key" : "..."
+    "type": "rate_limit_key",
+    "rate_limit_value" : "..."
   }
 
 
-route_key
+rate_limit_value
     *(required, string)* The value to use in the descriptor entry.
 
 The following descriptor entry is appended to the descriptor:
 
-    * ("route_key", "<route_key>")
+    * ("rate_limit_key", "<rate_limit_value>")
+
+
+.. _config_http_conn_man_route_table_rate_limit_composing_actions:
+
+Composing Actions
+-----------------
+
+Each action populates a descriptor entry. A vector of descriptor entries compose a descriptor. To
+create more complex rate limit descriptors, actions can be composed in any order. The descriptor
+will be populated in the order the actions are specified in the configuration.
+
+For example, if you wanted the following descriptor:
+
+  * ("rate_limit_key", "some_value"), ("source_cluster", "from_cluster")
+
+The configuration would be:
+
+.. code-block:: json
+
+  {
+    "actions" : [
+      {
+        "type" : "rate_limit_key",
+        "rate_limit_value" : "some_value"
+      },
+      {
+        "type" : "source_cluster"
+      }
+    ]
+  }
+
+If an action doesn't appened a descriptor entry, the next item in the action list will
+be processed. For example given the following rate limit configuration, a request can
+generate a few possible descriptors depending on what is present in the request.
+
+.. code-block:: json
+
+  {
+    "actions" : [
+      {
+        "type" : "rate_limit_key",
+        "rate_limit_value" : "some_value"
+      },
+      {
+        "type" : "remote_address"
+      },
+      {
+        "type" : "souce_cluster"
+      }
+    ]
+  }
+
+For a request with :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>` set and the
+trusted address is for example *127.0.0.1*, the following descriptor would be generated:
+
+  * ("rate_limit_key", "some_value"), ("remote_address", "127.0.0.1"), ("source_cluster",
+    "from_cluster")
+
+If a request did not set :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`, the
+following descriptor would be generated:
+
+  * ("rate_limit_key", "some_value"), ("source_cluster", "from_cluster")

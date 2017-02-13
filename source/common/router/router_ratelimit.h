@@ -62,9 +62,10 @@ public:
 /**
  * Action for route key rate limiting.
  */
-class RouteKeyAction : public RateLimitAction {
+class RateLimitKeyAction : public RateLimitAction {
 public:
-  RouteKeyAction(const Json::Object& action) : route_key_(action.getString("route_key")) {}
+  RateLimitKeyAction(const Json::Object& action)
+      : rate_limit_value_(action.getString("rate_limit_value")) {}
 
   // Router::RateLimitAction
   void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
@@ -72,7 +73,7 @@ public:
                           const std::string& remote_address) const override;
 
 private:
-  const std::string route_key_;
+  const std::string rate_limit_value_;
 };
 
 /*
@@ -84,7 +85,7 @@ public:
 
   // Router::RateLimitPolicyEntry
   int64_t stage() const override { return stage_; }
-  const std::string& killSwitchKey() const override { return kill_switch_key_; }
+  const std::string& disableKey() const override { return disable_key_; }
 
   // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
@@ -93,7 +94,7 @@ public:
                            const std::string& remote_address) const override;
 
 private:
-  const std::string kill_switch_key_;
+  const std::string disable_key_;
   int64_t stage_;
   std::vector<RateLimitActionPtr> actions_;
 };

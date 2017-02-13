@@ -43,7 +43,7 @@ public:
   /**
    * @return runtime key to be set to disable the configuration.
    */
-  virtual const std::string& killSwitchKey() const PURE;
+  virtual const std::string& disableKey() const PURE;
 
   /**
    * Potentially populate the descriptor array with new descriptors to query.
