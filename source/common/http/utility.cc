@@ -103,13 +103,23 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
 void Utility::removeCookieValues(const HeaderMap& headers, const std::string& key) {
   headers.iterate([](const HeaderEntry& header) -> void {
     if (header.key() == Http::Headers::get().Cookie.get().c_str()) {
-      for (const std::string& s : StringUtil::split(std::string{header.value().c_str()}, ';')) {
+      std::string new_header;
+      bool found = false;
+
+      for (const std::string& s : StringUtil::split(header_str, ';')) {
         size_t first_non_space = s.find_first_not_of(" ");
         size_t equals_index = s.find('=');
         std::string k = s.substr(first_non_space, equals_index - first_non_space);
-        if (k == state->key_) {
-          headers->removeInline(header);
+
+        if (k == key) {
+          found = true;
+        } else {
+          new_header.append(s)
+          new_header.append(";")
         }
+      }
+      if (found) {
+        header.value(new_header);
       }
     }
   });
