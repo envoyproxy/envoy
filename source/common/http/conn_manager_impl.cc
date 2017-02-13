@@ -314,7 +314,7 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     if (request_info_.healthCheck()) {
       connection_manager_.config_.tracingStats().health_check_.inc();
     } else {
-      Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_info_);
+      Tracing::HttpTracerUtility::finalizeSpan(*active_span_, *request_headers_, request_info_);
     }
   }
 }

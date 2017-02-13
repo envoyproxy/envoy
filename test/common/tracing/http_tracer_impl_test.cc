@@ -1,3 +1,4 @@
+#include "common/common/base64.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
@@ -225,7 +226,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
 TEST(HttpTracerUtilityTest, OriginalAndLongPath) {
   const std::string path(300, 'a');
-  const std::string expected_path(256, 'a');
+  const std::string expected_path(128, 'a');
   std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
 
   Http::TestHeaderMapImpl request_headers{
@@ -234,12 +235,14 @@ TEST(HttpTracerUtilityTest, OriginalAndLongPath) {
 
   Http::Protocol protocol = Http::Protocol::Http2;
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
   EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
-  const std::string service_node = "node";
+  Optional<uint32_t> response_code;
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
-  HttpTracerUtility::populateSpan(*span, service_node, request_headers, request_info);
+  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
 }
 
 TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
@@ -256,14 +259,11 @@ TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
 
   // Check that span is populated correctly.
   EXPECT_CALL(*span, setTag("guid:x-request-id", "id"));
-  EXPECT_CALL(*span, setTag("node_id", service_node));
   EXPECT_CALL(*span, setTag("request_line", "GET /test HTTP/1.0"));
   EXPECT_CALL(*span, setTag("host_header", "-"));
   EXPECT_CALL(*span, setTag("user_agent", "-"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "-"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
-
-  HttpTracerUtility::populateSpan(*span, service_node, request_headers, request_info);
 
   Optional<uint32_t> response_code;
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
@@ -274,7 +274,7 @@ TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
   EXPECT_CALL(*span, finishSpan());
-  HttpTracerUtility::finalizeSpan(*span, request_info);
+  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
 }
 
 TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
@@ -295,15 +295,12 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
 
   // Check that span is populated correctly.
   EXPECT_CALL(*span, setTag("guid:x-request-id", "id"));
-  EXPECT_CALL(*span, setTag("node_id", service_node));
   EXPECT_CALL(*span, setTag("request_line", "GET /test HTTP/1.0"));
   EXPECT_CALL(*span, setTag("host_header", "api"));
   EXPECT_CALL(*span, setTag("user_agent", "agent"));
   EXPECT_CALL(*span, setTag("downstream_cluster", "downstream_cluster"));
   EXPECT_CALL(*span, setTag("request_size", "10"));
   EXPECT_CALL(*span, setTag("guid:x-client-trace-id", "client_trace_id"));
-
-  HttpTracerUtility::populateSpan(*span, service_node, request_headers, request_info);
 
   Optional<uint32_t> response_code(503);
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
@@ -317,7 +314,7 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
 
   EXPECT_CALL(*span, finishSpan());
-  HttpTracerUtility::finalizeSpan(*span, request_info);
+  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
 }
 
 class LightStepDriverTest : public Test {
@@ -352,9 +349,10 @@ public:
   }
 
   const std::string operation_name_{"test"};
-  const Http::TestHeaderMapImpl request_headers_{
+  Http::TestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
+  SystemTime start_time_;
 
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
@@ -447,7 +445,7 @@ TEST(HttpTracerImplTest, BasicFunctionalityNullSpan) {
 
   HttpTracerImpl tracer(std::move(driver_ptr), local_info);
 
-  EXPECT_CALL(*driver, startSpan_(operation_name, time)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*driver, startSpan_(_, operation_name, time)).WillOnce(Return(nullptr));
 
   tracer.startSpan(config, request_headers, request_info);
 }
@@ -471,10 +469,9 @@ TEST(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   HttpTracerImpl tracer(std::move(driver_ptr), local_info);
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
-  EXPECT_CALL(*driver, startSpan_(operation_name, time)).WillOnce(Return(span));
+  EXPECT_CALL(*driver, startSpan_(_, operation_name, time)).WillOnce(Return(span));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(*span, setTag("node_id", "node_name"));
   tracer.startSpan(config, request_headers, request_info);
 }
 
@@ -499,16 +496,16 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
             return &request;
           }));
 
-  SystemTime start_time;
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .Times(2)
       .WillRepeatedly(Return(2));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr first_span = driver_->startSpan(operation_name_, start_time);
+  SpanPtr first_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
   first_span->finishSpan();
-  SpanPtr second_span = driver_->startSpan(operation_name_, start_time);
+
+  SpanPtr second_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
   second_span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -539,11 +536,10 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
   const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout));
 
-  SystemTime start_time;
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(5));
 
-  SpanPtr span = driver_->startSpan(operation_name_, start_time);
+  SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
   span->finishSpan();
 
   // Timer should be re-enabled.
@@ -579,15 +575,12 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
 
             return &request;
           }));
-
-  SystemTime start_time;
-
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr span = driver_->startSpan(operation_name_, start_time);
+  SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
   span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -603,6 +596,35 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
                     .counter("grpc.lightstep.collector.CollectorService.Report.total")
                     .value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
+}
+
+TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
+  setupValidDriver();
+
+  // Supply bogus context, that will be simply ignored.
+  const std::string invalid_context = "notvalidcontext";
+  request_headers_.insertOtSpanContext().value(invalid_context);
+  driver_->startSpan(request_headers_, operation_name_, start_time_);
+
+  std::string injected_ctx = request_headers_.OtSpanContext()->value().c_str();
+  EXPECT_FALSE(injected_ctx.empty());
+
+  // Supply empty context.
+  request_headers_.removeOtSpanContext();
+  SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+
+  injected_ctx = request_headers_.OtSpanContext()->value().c_str();
+  EXPECT_FALSE(injected_ctx.empty());
+
+  // Context can be parsed fine.
+  lightstep::envoy::CarrierStruct ctx;
+  std::string context = Base64::decode(injected_ctx);
+  ctx.ParseFromString(context);
+
+  // Supply parent context, request_headers has properly populated x-ot-span-context.
+  SpanPtr span_with_parent = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  injected_ctx = request_headers_.OtSpanContext()->value().c_str();
+  EXPECT_FALSE(injected_ctx.empty());
 }
 
 } // Tracing
