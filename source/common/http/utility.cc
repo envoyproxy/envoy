@@ -114,8 +114,8 @@ void Utility::removeCookieValues(const HeaderMap& headers, const std::string& ke
         if (k == key) {
           found = true;
         } else {
-          new_header.append(s)
-          new_header.append(";")
+          new_header.append(s);
+          new_header.append(";");
         }
       }
       if (found) {
