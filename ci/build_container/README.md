@@ -10,4 +10,4 @@ After you have made changes to `build_container.sh` and merge them to master:
     DOCKER_USERNAME and DOCKER_PASSWORD environment variables set**. This script will build
     the envoy-build container with the current state of `build_container.sh`, tag the image
     with the SHA provided, and push it to Dockerhub.
-4.  After you have done that, update `.travis.yml` to pull the new tagged version of `lyft/envoy-build`.
+4.  After you have done that, update `ci/ci_steps.sh` to pull the new tagged version of `lyft/envoy-build`.
