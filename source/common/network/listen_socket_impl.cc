@@ -4,12 +4,23 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/network/address_impl.h"
 
 namespace Network {
 
-TcpListenSocket::TcpListenSocket(uint32_t port, bool bind_to_port) : port_(port) {
-  AddrInfoPtr address = Utility::resolveTCP("", port);
-  fd_ = socket(address->ai_addr->sa_family, SOCK_STREAM | SOCK_NONBLOCK, 0);
+void ListenSocketImpl::doBind() {
+  int rc = local_address_->bind(fd_);
+  if (rc == -1) {
+    close();
+    throw EnvoyException(
+        fmt::format("cannot bind '{}': {}", local_address_->asString(), strerror(errno)));
+  }
+}
+
+TcpListenSocket::TcpListenSocket(uint32_t port, bool bind_to_port) {
+  // TODO: IPv6 support.
+  local_address_.reset(new Address::Ipv4Instance(port));
+  fd_ = local_address_->socket(Address::SocketType::Stream);
   RELEASE_ASSERT(fd_ != -1);
 
   int on = 1;
@@ -17,26 +28,21 @@ TcpListenSocket::TcpListenSocket(uint32_t port, bool bind_to_port) : port_(port)
   RELEASE_ASSERT(rc != -1);
 
   if (bind_to_port) {
-    rc = bind(fd_, address->ai_addr, address->ai_addrlen);
-    if (rc == -1) {
-      close();
-      throw EnvoyException(fmt::format("cannot bind on port {}: {}", port, strerror(errno)));
-    }
+    doBind();
   }
+}
+
+TcpListenSocket::TcpListenSocket(int fd, uint32_t port) {
+  fd_ = fd;
+  local_address_.reset(new Address::Ipv4Instance(port));
 }
 
 UdsListenSocket::UdsListenSocket(const std::string& uds_path) {
   remove(uds_path.c_str());
-  sockaddr_un address = Utility::resolveUnixDomainSocket(uds_path);
-  fd_ = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
+  local_address_.reset(new Address::PipeInstance(uds_path));
+  fd_ = local_address_->socket(Address::SocketType::Stream);
   RELEASE_ASSERT(fd_ != -1);
-
-  int rc = bind(fd_, reinterpret_cast<sockaddr*>(&address), sizeof(sockaddr_un));
-  if (rc == -1) {
-    close();
-    throw EnvoyException(
-        fmt::format("cannot bind unix domain socket path {}: {}", uds_path, strerror(errno)));
-  }
+  doBind();
 }
 
 } // Network

@@ -39,7 +39,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   }
   server_stats_.version_.set(version_int);
 
-  if (local_info_.address().empty()) {
+  if (!local_info_.address()) {
     throw EnvoyException("could not resolve local address");
   }
 
@@ -108,7 +108,8 @@ void InstanceImpl::flushStats() {
 
 int InstanceImpl::getListenSocketFd(uint32_t port) {
   for (const auto& entry : socket_map_) {
-    if (entry.second->port() == port) {
+    // TODO: UDS listeners.
+    if (entry.second->localAddress()->ip()->port() == port) {
       return entry.second->fd();
     }
   }

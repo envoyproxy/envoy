@@ -1,3 +1,4 @@
+#include "address_impl.h"
 #include "listener_impl.h"
 #include "proxy_protocol.h"
 
@@ -29,7 +30,7 @@ ProxyProtocol::ActiveConnection::ActiveConnection(ProxyProtocol& parent,
     if (events & Event::FileReadyType::Read) {
       onRead();
     }
-  });
+  }, Event::FileTriggerType::Edge);
 }
 
 ProxyProtocol::ActiveConnection::~ActiveConnection() {
@@ -71,8 +72,11 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
 
   removeFromList(parent_.connections_);
 
-  // TODO: pass in something more meaningful than 0 as remote port and EMPTY_STRING as local_address
-  listener.newConnection(fd, Network::Utility::urlForTcp(remote_address, 0), EMPTY_STRING);
+  // TODO: Parse the remote port instead of passing zero.
+  // TODO: IPv6 support.
+  listener.newConnection(
+      fd, Network::Address::InstancePtr{new Network::Address::Ipv4Instance(remote_address, 0)},
+      listener.socket().localAddress());
 }
 
 void ProxyProtocol::ActiveConnection::close() {

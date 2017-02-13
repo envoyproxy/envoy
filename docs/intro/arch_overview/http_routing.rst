@@ -27,10 +27,10 @@ request. The router filter supports the following features:
 * Request timeout specified either via :ref:`HTTP
   header <config_http_filters_router_headers>` or via :ref:`route configuration
   <config_http_conn_man_route_table_route_timeout>`.
-* Probability-based route selection via :ref:`runtime values <config_http_conn_man_route_table_route_runtime>`
-  (see :ref:`traffic shifting/shifting <config_http_conn_man_route_table_traffic_splitting>`).
-* :ref:`Weight/percentage-based <config_http_conn_man_route_table_route_weighted_clusters>` upstream cluster selection
-  for a given route (see :ref:`traffic shifting/splitting <config_http_conn_man_route_table_traffic_splitting_split>`).
+* Traffic shifting from one upstream cluster to another via :ref:`runtime values <config_http_conn_man_route_table_route_runtime>`
+  (see :ref:`traffic shifting/splitting <config_http_conn_man_route_table_traffic_splitting>`).
+* Traffic splitting across multiple upstream clusters using :ref:`weight/percentage-based routing<config_http_conn_man_route_table_route_weighted_clusters>`
+  (see :ref:`traffic shifting/splitting <config_http_conn_man_route_table_traffic_splitting_split>`).
 * Arbitrary headers :ref:`routing rules <config_http_conn_man_route_table_route_headers>`.
 * Virtual cluster specifications. A virtual cluster is specified at the virtual host level and is
   used by Envoy to generate additional statistics on top of the standard cluster level ones. Virtual

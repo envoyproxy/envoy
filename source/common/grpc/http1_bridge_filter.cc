@@ -95,13 +95,14 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
 }
 
 void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
-  const Router::Route* route = decoder_callbacks_->route();
-  if (!route) {
+  Router::RoutePtr route = decoder_callbacks_->route();
+  if (!route || !route->routeEntry()) {
     return;
   }
 
   const Router::RouteEntry* route_entry = route->routeEntry();
-  if (!route_entry) {
+  cluster_ = cm_.get(route_entry->clusterName());
+  if (!cluster_) {
     return;
   }
 
@@ -110,8 +111,6 @@ void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
     return;
   }
 
-  // TODO: Cluster may not exist.
-  cluster_ = cm_.get(route_entry->clusterName());
   grpc_service_ = parts[0];
   grpc_method_ = parts[1];
   do_stat_tracking_ = true;

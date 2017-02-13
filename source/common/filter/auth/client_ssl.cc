@@ -98,8 +98,7 @@ void Instance::onEvent(uint32_t events) {
   }
 
   ASSERT(read_callbacks_->connection().ssl());
-  if (config_->ipWhiteList().contains(
-          Network::Utility::hostFromUrl(read_callbacks_->connection().remoteAddress()))) {
+  if (config_->ipWhiteList().contains(read_callbacks_->connection().remoteAddress())) {
     config_->stats().auth_ip_white_list_.inc();
     read_callbacks_->continueReading();
     return;

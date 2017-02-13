@@ -135,17 +135,18 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
 
       for (auto stat : all_stats) {
         response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
-                                 host->url(), stat.first, stat.second));
+                                 host->address()->asString(), stat.first, stat.second));
       }
 
       response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
-                               host->url(), Upstream::HostUtility::healthFlagsToString(*host)));
+                               host->address()->asString(),
+                               Upstream::HostUtility::healthFlagsToString(*host)));
       response.add(fmt::format("{}::{}::weight::{}\n", cluster.second.get().info()->name(),
-                               host->url(), host->weight()));
+                               host->address()->asString(), host->weight()));
       response.add(fmt::format("{}::{}::zone::{}\n", cluster.second.get().info()->name(),
-                               host->url(), host->zone()));
+                               host->address()->asString(), host->zone()));
       response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
-                               host->url(), host->canary()));
+                               host->address()->asString(), host->canary()));
     }
   }
 
@@ -364,6 +365,8 @@ Http::Code AdminImpl::runCallback(const std::string& path, Buffer::Instance& res
   return code;
 }
 
-const std::string& AdminImpl::localAddress() { return server_.localInfo().address(); }
+const Network::Address::Instance& AdminImpl::localAddress() {
+  return *server_.localInfo().address();
+}
 
 } // Server

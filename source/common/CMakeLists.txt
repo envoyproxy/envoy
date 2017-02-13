@@ -45,6 +45,7 @@ add_library(
   filter/ratelimit.cc
   filter/tcp_proxy.cc
   generated/ratelimit.pb.cc
+  grpc/codec.cc
   grpc/common.cc
   grpc/http1_bridge_filter.cc
   grpc/rpc_channel_impl.cc
@@ -75,6 +76,7 @@ add_library(
   mongo/codec_impl.cc
   mongo/proxy.cc
   mongo/utility.cc
+  network/address_impl.cc
   network/connection_impl.cc
   network/dns_impl.cc
   network/filter_manager_impl.cc

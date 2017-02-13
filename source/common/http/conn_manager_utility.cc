@@ -39,11 +39,10 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
   if (config.useRemoteAddress()) {
-    const std::string remote_address = Network::Utility::hostFromUrl(connection.remoteAddress());
-    if (Network::Utility::isLoopbackAddress(remote_address.c_str())) {
+    if (Network::Utility::isLoopbackAddress(connection.remoteAddress())) {
       Utility::appendXff(request_headers, config.localAddress());
     } else {
-      Utility::appendXff(request_headers, remote_address);
+      Utility::appendXff(request_headers, connection.remoteAddress());
     }
     request_headers.insertForwardedProto().value(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
@@ -77,6 +76,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     request_headers.removeEnvoyUpstreamAltStatName();
     request_headers.removeEnvoyUpstreamRequestTimeoutMs();
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
+    request_headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
     request_headers.removeEnvoyExpectedRequestTimeoutMs();
     request_headers.removeEnvoyForceTrace();
 
@@ -95,9 +95,9 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
 
   // If we are an external request, AND we are "using remote address" (see above), we set
   // x-envoy-external-address since this is our first ingress point into the trusted network.
-  if (edge_request) {
+  if (edge_request && connection.remoteAddress().type() == Network::Address::Type::Ip) {
     request_headers.insertEnvoyExternalAddress().value(
-        Network::Utility::hostFromUrl(connection.remoteAddress()));
+        connection.remoteAddress().ip()->addressAsString());
   }
 
   // Generate x-request-id for all edge requests, or if there is none.

@@ -25,11 +25,11 @@ public:
    *        allows stable choices between calls if desired.
    * @return true if input headers match this object.
    */
-  virtual const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
+  virtual RoutePtr matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
 };
 
 class RouteEntryImplBase;
-typedef std::unique_ptr<RouteEntryImplBase> RouteEntryImplBasePtr;
+typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBasePtr;
 
 /**
  * Redirect entry that does an SSL redirect.
@@ -79,7 +79,7 @@ public:
    * request_headers
    */
   static bool matchHeaders(const Http::HeaderMap& headers,
-                           const std::vector<HeaderData> request_headers);
+                           const std::vector<HeaderData>& request_headers);
 };
 
 /**
@@ -90,7 +90,7 @@ public:
   VirtualHostImpl(const Json::Object& virtual_host, Runtime::Loader& runtime,
                   Upstream::ClusterManager& cm);
 
-  const Route* getRouteFromEntries(const Http::HeaderMap& headers, uint64_t random_value) const;
+  RoutePtr getRouteFromEntries(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
 
@@ -125,7 +125,7 @@ private:
   };
 
   static const CatchAllVirtualCluster VIRTUAL_CLUSTER_CATCH_ALL;
-  static const SslRedirectRoute SSL_REDIRECT_ROUTE;
+  static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
   const std::string name_;
   std::vector<RouteEntryImplBasePtr> routes_;
@@ -171,7 +171,11 @@ private:
 /**
  * Base implementation for all route entries.
  */
-class RouteEntryImplBase : public RouteEntry, public Matchable, public RedirectEntry, public Route {
+class RouteEntryImplBase : public RouteEntry,
+                           public Matchable,
+                           public RedirectEntry,
+                           public Route,
+                           public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
   RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
                      Runtime::Loader& loader);
@@ -181,7 +185,6 @@ public:
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
-  const Route* clusterEntry(uint64_t random_value) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -208,6 +211,7 @@ protected:
   const std::string prefix_rewrite_;
   const std::string host_rewrite_;
 
+  RoutePtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path) const;
 
 private:
@@ -216,22 +220,10 @@ private:
     uint64_t default_;
   };
 
-  /**
-   * Route entry implementation for weighted clusters. The RouteEntryImplBase object holds
-   * one or more weighted cluster objects, where each object has a back pointer to the parent
-   * RouteEntryImplBase object. Almost all functions in this class forward calls back to the
-   * parent, with the exception of clusterName and routeEntry.
-   */
-  struct WeightedClusterEntry : public RouteEntry, public Route {
+  class DynanmicRouteEntry : public RouteEntry, public Route {
   public:
-    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string runtime_key,
-                         Runtime::Loader& loader, const std::string name, uint64_t weight)
-        : parent_(parent), runtime_key_(runtime_key), loader_(loader), cluster_name_(name),
-          cluster_weight_(weight) {}
-
-    uint64_t clusterWeight() const {
-      return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
-    }
+    DynanmicRouteEntry(const RouteEntryImplBase* parent, const std::string& name)
+        : parent_(parent), cluster_name_(name) {}
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
@@ -256,17 +248,37 @@ private:
     const RedirectEntry* redirectEntry() const override { return nullptr; }
     const RouteEntry* routeEntry() const override { return this; }
 
+  private:
+    const RouteEntryImplBase* parent_;
+    const std::string cluster_name_;
+  };
+
+  /**
+   * Route entry implementation for weighted clusters. The RouteEntryImplBase object holds
+   * one or more weighted cluster objects, where each object has a back pointer to the parent
+   * RouteEntryImplBase object. Almost all functions in this class forward calls back to the
+   * parent, with the exception of clusterName and routeEntry.
+   */
+  class WeightedClusterEntry : public DynanmicRouteEntry {
+  public:
+    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string runtime_key,
+                         Runtime::Loader& loader, const std::string& name, uint64_t weight)
+        : DynanmicRouteEntry(parent, name), runtime_key_(runtime_key), loader_(loader),
+          cluster_weight_(weight) {}
+
+    uint64_t clusterWeight() const {
+      return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
+    }
+
     static const uint64_t MAX_CLUSTER_WEIGHT;
 
   private:
-    const RouteEntryImplBase* parent_;
     const std::string runtime_key_;
     Runtime::Loader& loader_;
-    const std::string cluster_name_;
     const uint64_t cluster_weight_;
   };
 
-  typedef std::unique_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
+  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
 
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
 
@@ -275,6 +287,7 @@ private:
 
   const VirtualHostImpl& vhost_;
   const std::string cluster_name_;
+  const Http::LowerCaseString cluster_header_name_;
   const std::chrono::milliseconds timeout_;
   const Optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;
@@ -300,7 +313,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  RoutePtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string prefix_;
@@ -318,7 +331,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  const Route* matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  RoutePtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string path_;
@@ -332,7 +345,7 @@ class RouteMatcher {
 public:
   RouteMatcher(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
-  const Route* route(const Http::HeaderMap& headers, uint64_t random_value) const;
+  RoutePtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const { return uses_runtime_; }
 
 private:
@@ -351,7 +364,7 @@ public:
   ConfigImpl(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
 
   // Router::Config
-  const Route* route(const Http::HeaderMap& headers, uint64_t random_value) const override {
+  RoutePtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
     return route_matcher_->route(headers, random_value);
   }
 
@@ -383,7 +396,7 @@ private:
 class NullConfigImpl : public Config {
 public:
   // Router::Config
-  const Route* route(const Http::HeaderMap&, uint64_t) const override { return nullptr; }
+  RoutePtr route(const Http::HeaderMap&, uint64_t) const override { return nullptr; }
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;

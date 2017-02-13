@@ -4,8 +4,10 @@ set -e
 
 # Setup basic requirements and install them.
 apt-get update
-apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc
+apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc libtool automake
 apt-get install -y golang
+# For debugging.
+apt-get install -y gdb strace
 add-apt-repository -y ppa:ubuntu-toolchain-r/test
 apt-get update
 apt-get install -y g++-4.9
@@ -64,6 +66,16 @@ cd nghttp2-1.14.1
 make install
 cd ..
 rm -fr nghttp2*
+
+# c-ares
+wget https://github.com/c-ares/c-ares/archive/cares-1_12_0.tar.gz
+tar xf cares-1_12_0.tar.gz
+cd c-ares-cares-1_12_0
+./buildconf
+./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-lib-only
+make install
+cd ..
+rm -fr cares* c-ares*
 
 # protobuf
 wget https://github.com/google/protobuf/releases/download/v3.0.0/protobuf-cpp-3.0.0.tar.gz

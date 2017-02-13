@@ -188,7 +188,7 @@ public:
    * @return local address.
    * Gives richer information in case of internal requests.
    */
-  virtual const std::string& localAddress() PURE;
+  virtual const Network::Address::Instance& localAddress() PURE;
 
   /**
    * @return custom user agent for internal requests for better debugging. Must be configured to
@@ -265,7 +265,7 @@ private:
     uint64_t connectionId() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
-    const Router::Route* route() override;
+    Router::RoutePtr route() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     const std::string& downstreamAddress() override;
@@ -273,7 +273,6 @@ private:
     ActiveStream& parent_;
     bool headers_continued_{};
     bool stopped_{};
-    Optional<const Router::Route*> cached_route_;
   };
 
   /**
@@ -414,6 +413,7 @@ private:
     State state_;
     AccessLog::RequestInfoImpl request_info_;
     std::string downstream_address_;
+    Optional<Router::RoutePtr> cached_route_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

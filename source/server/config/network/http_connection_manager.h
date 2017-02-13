@@ -89,7 +89,7 @@ public:
   const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
     return tracing_config_;
   }
-  const std::string& localAddress() override;
+  const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
 
   static void registerHttpFilterConfigFactory(HttpFilterConfigFactory& factory) {

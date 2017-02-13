@@ -1,4 +1,5 @@
 #include "async_client_impl.h"
+#include "utility.h"
 
 namespace Http {
 
@@ -53,7 +54,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                                  const Optional<std::chrono::milliseconds>& timeout)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
       router_(parent.config_), request_info_(Protocol::Http11),
-      route_(parent_.cluster_.name(), timeout) {
+      route_(std::make_shared<RouteImpl>(parent_.cluster_.name(), timeout)) {
 
   router_.setDecoderFilterCallbacks(*this);
   // TODO: Correctly set protocol in request info when we support access logging.
@@ -94,7 +95,7 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
 
 void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
   headers.insertEnvoyInternalRequest().value(Headers::get().EnvoyInternalRequestValues.True);
-  headers.insertForwardedFor().value(parent_.config_.local_info_.address());
+  Utility::appendXff(headers, *parent_.config_.local_info_.address());
   router_.decodeHeaders(headers, end_stream);
   closeLocal(end_stream);
 }

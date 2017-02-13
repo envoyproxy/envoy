@@ -19,7 +19,7 @@ public:
    * @param headers supplies the headers to append to.
    * @param remote_address supplies the remote address to append.
    */
-  static void appendXff(HeaderMap& headers, const std::string& remote_address);
+  static void appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address);
 
   /**
    * Creates an SSL (https) redirect path based on the input host and path headers.

@@ -3,6 +3,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -44,7 +45,8 @@ TEST(ConnectionImplUtility, updateBufferStats) {
 
 TEST(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
-  EXPECT_DEATH(ConnectionImpl(dispatcher, -1, "tcp://127.0.0.1:0", EMPTY_STRING),
+  EXPECT_DEATH(ConnectionImpl(dispatcher, -1, Utility::resolveUrl("tcp://127.0.0.1:0"),
+                              Utility::resolveUrl("tcp://127.0.0.1:0")),
                ".*assert failure: fd_ != -1.*");
 }
 
@@ -69,7 +71,7 @@ TEST(ConnectionImplTest, BufferStats) {
       connection_handler, socket, listener_callbacks, stats_store, true, false, false);
 
   Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection("tcp://127.0.0.1:10000");
+      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
   MockConnectionCallbacks client_callbacks;
   client_connection->addConnectionCallbacks(client_callbacks);
   MockBufferStats client_buffer_stats;
@@ -130,7 +132,8 @@ TEST(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   Event::DispatcherImpl dispatcher;
   // Connecting to 255.255.255.255 will cause a perm error and not ECONNREFUSED which is a
   // different path in libevent. Make sure this doesn't crash.
-  ClientConnectionPtr connection = dispatcher.createClientConnection("tcp://255.255.255.255:1");
+  ClientConnectionPtr connection =
+      dispatcher.createClientConnection(Utility::resolveUrl("tcp://255.255.255.255:1"));
   connection->connect();
   connection->noDelay(true);
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -140,7 +143,8 @@ TEST(TcpClientConnectionImplTest, BadConnectConnRefused) {
   Event::DispatcherImpl dispatcher;
   // Connecting to an invalid port on localhost will cause ECONNREFUSED which is a different code
   // path from other errors. Test this also.
-  ClientConnectionPtr connection = dispatcher.createClientConnection("tcp://255.255.255.255:1");
+  ClientConnectionPtr connection =
+      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:1"));
   connection->connect();
   connection->noDelay(true);
   dispatcher.run(Event::Dispatcher::RunType::Block);
