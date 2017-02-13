@@ -178,8 +178,10 @@ private:
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
-    std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
+    // Cluster entries reference the conn pool map during destruction, so the conn pool map needs
+    // to come first.
     std::unordered_map<ConstHostPtr, ConnPoolsContainer> host_http_conn_pool_map_;
+    std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
     const HostSet* local_host_set_{};
   };
 
