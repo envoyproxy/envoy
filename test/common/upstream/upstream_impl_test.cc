@@ -50,6 +50,41 @@ struct ResolverData {
   Network::MockActiveDnsQuery active_dns_query_;
 };
 
+TEST(StrictDnsClusterImplTest, ImmediateResolve) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  Network::MockActiveDnsQuery active_dns_query;
+  NiceMock<Network::MockDnsResolver> dns_resolver;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  ReadyWatcher initialized;
+
+  std::string json = R"EOF(
+  {
+    "name": "name",
+    "connect_timeout_ms": 250,
+    "type": "strict_dns",
+    "lb_type": "round_robin",
+    "hosts": [{"url": "tcp://foo.bar.com:443"}]
+  }
+  )EOF";
+
+  EXPECT_CALL(initialized, ready());
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
+                           -> Network::ActiveDnsQuery& {
+                             cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+                             return active_dns_query;
+                           }));
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
+                               dispatcher);
+  cluster.setInitializedCb([&]() -> void { initialized.ready(); });
+  EXPECT_EQ(2UL, cluster.hosts().size());
+  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+  EXPECT_CALL(active_dns_query, cancel());
+}
+
 TEST(StrictDnsClusterImplTest, Basic) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;

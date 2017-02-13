@@ -89,7 +89,7 @@ class RateLimitConfiguration : public testing::Test {
 public:
   void SetUpTest(const std::string json) {
     Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-    config_.reset(new ConfigImpl(*loader, runtime_, cm_));
+    config_.reset(new ConfigImpl(*loader, runtime_, cm_, true));
   }
 
   std::unique_ptr<ConfigImpl> config_;

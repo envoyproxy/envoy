@@ -271,7 +271,11 @@ class BaseDynamicClusterImpl : public ClusterImplBase {
 public:
   // Upstream::Cluster
   void setInitializedCb(std::function<void()> callback) override {
-    initialize_callback_ = callback;
+    if (initialized_) {
+      callback();
+    } else {
+      initialize_callback_ = callback;
+    }
   }
 
 protected:
@@ -282,6 +286,8 @@ protected:
                              std::vector<HostPtr>& hosts_removed, bool depend_on_hc);
 
   std::function<void()> initialize_callback_;
+  // Set once the first resolve completes.
+  bool initialized_ = false;
 };
 
 /**

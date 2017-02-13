@@ -10,6 +10,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/router/rds.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tracing/http_tracer.h"
@@ -159,9 +160,10 @@ public:
   virtual const Optional<std::chrono::milliseconds>& idleTimeout() PURE;
 
   /**
-   * @return const Router::Config& the route configuration for all connection manager requests.
+   * @return Router::RouteConfigProvider& the configuration provider used to acquire a route
+   *         config for each request flow.
    */
-  virtual const Router::Config& routeConfig() PURE;
+  virtual Router::RouteConfigProvider& routeConfigProvider() PURE;
 
   /**
    * @return const std::string& the server name to write into responses.
@@ -396,6 +398,7 @@ private:
     };
 
     ConnectionManagerImpl& connection_manager_;
+    Router::ConfigPtr snapped_route_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};

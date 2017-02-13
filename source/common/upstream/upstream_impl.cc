@@ -367,6 +367,12 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
   for (Json::ObjectPtr& host : config.getObjectArray("hosts")) {
     resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, host->getString("url")));
   }
+  // We have to first construct resolve_targets_ before invoking startResolve(),
+  // since startResolve() might resolve immediately and relies on
+  // resolve_targets_ indirectly for performing host updates on resolution.
+  for (const ResolveTargetPtr& target : resolve_targets_) {
+    target->startResolve();
+  }
 }
 
 void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostPtr>& hosts_added,
@@ -388,10 +394,7 @@ StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,
                                                    const std::string& url)
     : parent_(parent), dns_address_(Network::Utility::hostFromTcpUrl(url)),
       port_(Network::Utility::portFromTcpUrl(url)),
-      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
-
-  startResolve();
-}
+      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
@@ -436,6 +439,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           parent_.initialize_callback_();
           parent_.initialize_callback_ = nullptr;
         }
+        parent_.initialized_ = true;
 
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });

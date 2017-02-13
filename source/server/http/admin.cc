@@ -292,12 +292,14 @@ void AdminFilter::onComplete() {
   }
 }
 
+AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
+    : config_(new Router::NullConfigImpl()) {}
+
 AdminImpl::AdminImpl(const std::string& access_log_path, uint32_t port, Server::Instance& server)
     : server_(server), socket_(new Network::TcpListenSocket(port, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),
-      route_config_(new Router::NullConfigImpl()),
       handlers_{
           {"/certs", "print certs on machine", MAKE_HANDLER(handlerCerts)},
           {"/clusters", "upstream cluster status", MAKE_HANDLER(handlerClusters)},
