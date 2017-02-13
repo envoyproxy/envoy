@@ -68,6 +68,40 @@ std::string Base64::decode(const std::string& input) {
   return result;
 }
 
+void Base64::encodeBase(const uint8_t cur_char, uint64_t pos, uint8_t& next_c, std::string& ret) {
+  switch (pos % 3) {
+  case 0:
+    ret.push_back(CHAR_TABLE[cur_char >> 2]);
+    next_c = (cur_char & 0x03) << 4;
+    break;
+  case 1:
+    ret.push_back(CHAR_TABLE[next_c | (cur_char >> 4)]);
+    next_c = (cur_char & 0x0f) << 2;
+    break;
+  case 2:
+    ret.push_back(CHAR_TABLE[next_c | (cur_char >> 6)]);
+    ret.push_back(CHAR_TABLE[cur_char & 0x3f]);
+    next_c = 0;
+    break;
+  }
+}
+
+void Base64::encodeLast(uint64_t pos, uint8_t last_char, std::string& ret) {
+  switch (pos % 3) {
+  case 1:
+    ret.push_back(CHAR_TABLE[last_char]);
+    ret.push_back('=');
+    ret.push_back('=');
+    break;
+  case 2:
+    ret.push_back(CHAR_TABLE[last_char]);
+    ret.push_back('=');
+    break;
+  default:
+    break;
+  }
+}
+
 std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
   uint64_t output_length = (std::min(length, buffer.length()) + 2) / 3 * 4;
   std::string ret;
@@ -83,22 +117,7 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
     const uint8_t* slice_mem = static_cast<const uint8_t*>(slice.mem_);
 
     for (uint64_t i = 0; i < slice.len_ && j < length; ++i, ++j) {
-      const uint8_t c = slice_mem[i];
-      switch (j % 3) {
-      case 0:
-        ret.push_back(CHAR_TABLE[c >> 2]);
-        next_c = (c & 0x03) << 4;
-        break;
-      case 1:
-        ret.push_back(CHAR_TABLE[next_c | (c >> 4)]);
-        next_c = (c & 0x0f) << 2;
-        break;
-      case 2:
-        ret.push_back(CHAR_TABLE[next_c | (c >> 6)]);
-        ret.push_back(CHAR_TABLE[c & 0x3f]);
-        next_c = 0;
-        break;
-      }
+      encodeBase(slice_mem[i], j, next_c, ret);
     }
 
     if (j == length) {
@@ -106,19 +125,24 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
     }
   }
 
-  switch (j % 3) {
-  case 1:
-    ret.push_back(CHAR_TABLE[next_c]);
-    ret.push_back('=');
-    ret.push_back('=');
-    break;
-  case 2:
-    ret.push_back(CHAR_TABLE[next_c]);
-    ret.push_back('=');
-    break;
-  default:
-    break;
+  encodeLast(j, next_c, ret);
+
+  return ret;
+}
+
+std::string Base64::encode(const char* input, uint64_t length) {
+  uint64_t output_length = (length + 2) / 3 * 4;
+  std::string ret;
+  ret.reserve(output_length);
+
+  uint64_t pos = 0;
+  uint8_t next_c = 0;
+
+  for (uint64_t i = 0; i < length; ++i) {
+    encodeBase(input[i], pos++, next_c, ret);
   }
+
+  encodeLast(pos, next_c, ret);
 
   return ret;
 }
