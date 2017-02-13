@@ -108,7 +108,7 @@ void Utility::removeCookieValues(const HeaderMap& headers, const std::string& ke
         size_t equals_index = s.find('=');
         std::string k = s.substr(first_non_space, equals_index - first_non_space);
         if (k == state->key_) {
-            headers->removeInline(header);
+          headers->removeInline(header);
         }
       }
     }
