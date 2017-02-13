@@ -90,8 +90,8 @@ Request Headers
   }
 
 header_name
-  *(required, string)* The header name to be queried from the request headers and used to
-  populate the descriptor entry value for the *descriptor_key*.
+  *(required, string)* The header name to be queried from the request headers. The header's value is
+  used to populate the value of the descriptor entry for the descriptor_key.
 
 descriptor_key
   *(required, string)* The key to use in the descriptor entry.
