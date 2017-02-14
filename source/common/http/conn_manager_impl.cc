@@ -327,6 +327,10 @@ uint64_t ConnectionManagerImpl::ActiveStream::connectionId() {
   return connection_manager_.read_callbacks_->connection().id();
 }
 
+Ssl::Connection* ConnectionManagerImpl::ActiveStream::ssl() {
+  return connection_manager_.read_callbacks_->connection().ssl();
+}
+
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;

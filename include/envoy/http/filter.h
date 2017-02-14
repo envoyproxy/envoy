@@ -106,6 +106,11 @@ public:
    * @return the trusted downstream address for the connection.
    */
   virtual const std::string& downstreamAddress() PURE;
+
+  /**
+   * @return the ssl connection information.
+   */
+  virtual const Ssl::Connection* ssl() PURE;
 };
 
 /**

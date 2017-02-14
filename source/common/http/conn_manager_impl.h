@@ -243,6 +243,7 @@ private:
     // Http::StreamFilterCallbacks
     void addResetStreamCallback(std::function<void()> callback) override;
     uint64_t connectionId() override;
+    Ssl::Connection* ssl() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     const Router::StableRouteTable& routeTable() override { return *this; }
