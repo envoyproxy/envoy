@@ -74,14 +74,14 @@ The following descriptor entry is appended to the descriptor:
 
   * ("to_cluster", "<routed target cluster>")
 
-Once a request matches against a route table (on path or prefix), a routed cluster is determined by
-one of the following :ref:`route table configuration
-<config_http_conn_man_route_table_route_cluster>` settings:
+Once a request matches against a route table rule, a routed cluster is determined by one of the
+following :ref:`route table configuration <config_http_conn_man_route_table_route_cluster>`
+settings:
 
   * :ref:`cluster <config_http_conn_man_route_table_route_cluster>` indicates the upstream cluster
     to route to.
-  * :ref:`weighted_clusters <config_http_conn_man_route_table_route_config_weighted_clusters>` chooses
-    a cluster randomly from a set of clusters with attributed weight.
+  * :ref:`weighted_clusters <config_http_conn_man_route_table_route_config_weighted_clusters>`
+    chooses a cluster randomly from a set of clusters with attributed weight.
   * :ref:`cluster_header<config_http_conn_man_route_table_route_cluster_header>` indicates which
     header in the request contains the target cluster.
 
