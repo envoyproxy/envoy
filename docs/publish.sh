@@ -6,8 +6,7 @@ DOCS_DIR=$1
 PUBLISH_DIR=$2
 BUILD_SHA=`git rev-parse HEAD`
 
-if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ] &&\
-  [ "$TEST_TYPE" == "normal" ]
+if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ]
 then
   git clone https://GH_TOKEN@github.com/lyft/envoy $PUBLISH_DIR
   git -C $PUBLISH_DIR config user.name "Publish Docs"

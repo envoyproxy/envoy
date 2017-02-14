@@ -9,6 +9,8 @@ echo "building using $NUM_CPUS CPUs"
 if [[ "$1" == "docs" ]]; then
   echo "docs build..."
   make docs
+  # this target will run a script that will publish docs on a master commit. 
+  make publish_docs
   exit 0
 fi
 

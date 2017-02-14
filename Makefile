@@ -8,6 +8,5 @@ docs:
 	docs/build.sh $(DOCS_OUTPUT_DIR)
 
 .PHONY: publish_docs
-publish_docs: docs
+publish_docs:
 	docs/publish.sh $(DOCS_OUTPUT_DIR) $(DOCS_PUBLISH_DIR)
-  
