@@ -6,7 +6,7 @@ set -e
 # Lint travis file.
 travis lint .travis.yml --skip-completion-check
 # Do a build matrix with different types of builds docs, coverage, normal, etc.
-docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:4c887e005b129b28d815d59f9983b1ed3eb9568f /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
+docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:5ba9f93b749aaabdc4e6d16f941f9970a80fcf8e /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
 
 # The following scripts are only relevant on a `normal` run.
 # This script build a lyft/envoy image an that image is pushed on merge to master.

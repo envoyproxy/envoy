@@ -44,7 +44,7 @@ void LogicalDnsCluster::startResolve() {
   log_debug("starting async DNS resolution for {}", dns_address);
   info_->stats().update_attempt_.inc();
 
-  active_dns_query_ = &dns_resolver_.resolve(
+  active_dns_query_ = dns_resolver_.resolve(
       dns_address,
       [this, dns_address](std::list<Network::Address::InstancePtr>&& address_list) -> void {
         active_dns_query_ = nullptr;
