@@ -74,7 +74,6 @@ The following descriptor entry is appended to the descriptor:
 
   * ("to_cluster", "<routed target cluster>")
 
-
 Once a request matches against a route table (on path or prefix), a routed cluster is determined by
 one of the following :ref:`route table configuration
 <config_http_conn_man_route_table_route_cluster>` settings:
