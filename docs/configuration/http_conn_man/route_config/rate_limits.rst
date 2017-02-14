@@ -117,7 +117,7 @@ Remote Address
     "type": "remote_address"
   }
 
-The following descriptor entry is zappended to the descriptor and is populated using the trusted
+The following descriptor entry is appended to the descriptor and is populated using the trusted
 address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
 
     * ("remote_address", "<:ref:`trusted address from x-forwarded-for
