@@ -45,7 +45,6 @@ public:
   Network::ClientConnectionPtr makeSslClientConnection(bool alpn);
   static ServerContextPtr createUpstreamSslContext();
   static ClientContextPtr createClientSslContext(bool alpn);
-  static Stats::Store& store() { return test_server_->server().stats(); }
   void checkStats();
 
 private:
