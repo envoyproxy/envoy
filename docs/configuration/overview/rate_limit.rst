@@ -34,4 +34,4 @@ gRPC service IDL
 
 Envoy expects the rate limit service to support the gRPC IDL specified in
 :repo:`/source/common/ratelimit/ratelimit.proto`. See the IDL documentation for more information
-on how the API works. See Lyft's reference implementation [here](https://github.com/lyft/ratelimit)
+on how the API works. See Lyft's reference implementation `here <https://github.com/lyft/ratelimit>`_.
