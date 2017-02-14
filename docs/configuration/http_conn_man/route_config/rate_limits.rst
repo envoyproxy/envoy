@@ -44,7 +44,7 @@ Actions
 type
   *(required, string)* The type of rate limit action to perform. The currently supported action
   types are *source_cluster*, *destination_cluster* , *request_headers*, *remote_address* and
-  *route_key*.
+  *generic_key*.
 
 Source Cluster
 ^^^^^^^^^^^^^^
@@ -72,11 +72,19 @@ Destination Cluster
 
 The following descriptor entry is appended to the descriptor:
 
-  * ("to_cluster", "<routed cluster>")
+  * ("to_cluster", "<routed target cluster>")
 
-The routed cluster is chosen based on the :ref:`route table
-<config_http_conn_man_route_table_route_cluster>` configuration for *cluster*, *weighted_clusters*
-or *cluster_header*.
+
+Once a request matches against a route table (on path or prefix), a routed cluster is determined by
+one of the following :ref:`route table configuration
+<config_http_conn_man_route_table_route_cluster>` settings:
+
+  * :ref:`cluster <config_http_conn_man_route_table_route_cluster>` indicates the upstream cluster
+    to route to.
+  * :ref:`weighted_clusters <config_http_conn_man_route_table_route_config_weighted_clusters>` chooses
+    a cluster randomly from a set of clusters with attributed weight.
+  * :ref:`cluster_header<config_http_conn_man_route_table_route_cluster_header>` indicates which
+    header in the request contains the target cluster.
 
 Request Headers
 ^^^^^^^^^^^^^^^
@@ -110,29 +118,29 @@ Remote Address
     "type": "remote_address"
   }
 
-The following descriptor entry is appended to the descriptor and is populated using the trusted
+The following descriptor entry is zappended to the descriptor and is populated using the trusted
 address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
 
     * ("remote_address", "<:ref:`trusted address from x-forwarded-for
       <config_http_conn_man_headers_x-forwarded-for>`>")
 
-Rate Limit Key
-^^^^^^^^^^^^^^
+Generic Key
+^^^^^^^^^^^
 
 .. code-block:: json
 
   {
-    "type": "rate_limit_key",
-    "rate_limit_value" : "..."
+    "type": "generic_key",
+    "descriptor_value" : "..."
   }
 
 
-rate_limit_value
+descriptor_value
     *(required, string)* The value to use in the descriptor entry.
 
 The following descriptor entry is appended to the descriptor:
 
-    * ("rate_limit_key", "<rate_limit_value>")
+    * ("generic_key", "<descriptor_value>")
 
 
 .. _config_http_conn_man_route_table_rate_limit_composing_actions:
@@ -144,9 +152,9 @@ Each action populates a descriptor entry. A vector of descriptor entries compose
 create more complex rate limit descriptors, actions can be composed in any order. The descriptor
 will be populated in the order the actions are specified in the configuration.
 
-For example, if you wanted the following descriptor:
+For example, to generate the following descriptor:
 
-  * ("rate_limit_key", "some_value"), ("source_cluster", "from_cluster")
+  * ("generic_key", "some_value"), ("source_cluster", "from_cluster")
 
 The configuration would be:
 
@@ -155,8 +163,8 @@ The configuration would be:
   {
     "actions" : [
       {
-        "type" : "rate_limit_key",
-        "rate_limit_value" : "some_value"
+        "type" : "generic_key",
+        "descriptor_value" : "some_value"
       },
       {
         "type" : "source_cluster"
@@ -164,7 +172,7 @@ The configuration would be:
     ]
   }
 
-If an action doesn't appened a descriptor entry, the next item in the action list will
+If an action doesn't append a descriptor entry, the next item in the action list will
 be processed. For example given the following rate limit configuration, a request can
 generate a few possible descriptors depending on what is present in the request.
 
@@ -173,8 +181,8 @@ generate a few possible descriptors depending on what is present in the request.
   {
     "actions" : [
       {
-        "type" : "rate_limit_key",
-        "rate_limit_value" : "some_value"
+        "type" : "generic_key",
+        "descriptor_value" : "some_value"
       },
       {
         "type" : "remote_address"
@@ -188,10 +196,10 @@ generate a few possible descriptors depending on what is present in the request.
 For a request with :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>` set and the
 trusted address is for example *127.0.0.1*, the following descriptor would be generated:
 
-  * ("rate_limit_key", "some_value"), ("remote_address", "127.0.0.1"), ("source_cluster",
+  * ("generic_key", "some_value"), ("remote_address", "127.0.0.1"), ("source_cluster",
     "from_cluster")
 
 If a request did not set :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`, the
 following descriptor would be generated:
 
-  * ("rate_limit_key", "some_value"), ("source_cluster", "from_cluster")
+  * ("generic_key", "some_value"), ("source_cluster", "from_cluster")

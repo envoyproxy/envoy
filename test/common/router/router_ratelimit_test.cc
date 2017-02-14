@@ -438,8 +438,8 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitKey) {
   {
     "actions":[
       {
-        "type": "rate_limit_key",
-        "rate_limit_value" : "fake_key"
+        "type": "generic_key",
+        "descriptor_value" : "fake_key"
       }
     ]
   }
@@ -448,7 +448,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitKey) {
   SetUpTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, "");
-  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"rate_limit_key", "fake_key"}}}}),
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
               testing::ContainerEq(descriptors_));
 }
 

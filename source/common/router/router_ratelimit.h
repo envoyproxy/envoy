@@ -60,12 +60,12 @@ public:
 };
 
 /**
- * Action for route key rate limiting.
+ * Action for generic key rate limiting.
  */
-class RateLimitKeyAction : public RateLimitAction {
+class GenericKeyAction : public RateLimitAction {
 public:
-  RateLimitKeyAction(const Json::Object& action)
-      : rate_limit_value_(action.getString("rate_limit_value")) {}
+  GenericKeyAction(const Json::Object& action)
+      : descriptor_value_(action.getString("descriptor_value")) {}
 
   // Router::RateLimitAction
   void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
@@ -73,7 +73,7 @@ public:
                           const std::string& remote_address) const override;
 
 private:
-  const std::string rate_limit_value_;
+  const std::string descriptor_value_;
 };
 
 /*

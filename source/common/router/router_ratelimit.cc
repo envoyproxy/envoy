@@ -44,10 +44,10 @@ void RemoteAddressAction::populateDescriptor(const Router::RouteEntry&,
   descriptor.entries_.push_back({"remote_address", remote_address});
 }
 
-void RateLimitKeyAction::populateDescriptor(const Router::RouteEntry&,
-                                            ::RateLimit::Descriptor& descriptor, const std::string&,
-                                            const Http::HeaderMap&, const std::string&) const {
-  descriptor.entries_.push_back({"rate_limit_key", rate_limit_value_});
+void GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
+                                          ::RateLimit::Descriptor& descriptor, const std::string&,
+                                          const Http::HeaderMap&, const std::string&) const {
+  descriptor.entries_.push_back({"generic_key", descriptor_value_});
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
@@ -65,8 +65,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
       actions_.emplace_back(new RequestHeadersAction(*action));
     } else if (type == "remote_address") {
       actions_.emplace_back(new RemoteAddressAction());
-    } else if (type == "rate_limit_key") {
-      actions_.emplace_back(new RateLimitKeyAction(*action));
+    } else if (type == "generic_key") {
+      actions_.emplace_back(new GenericKeyAction(*action));
     } else {
       throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
     }
