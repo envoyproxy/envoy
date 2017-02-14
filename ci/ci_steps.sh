@@ -15,4 +15,4 @@ docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:5ba9f93b749aaabdc
 ./ci/verify_examples.sh
 
 # This make target publishes envoy's web site on a push to master.
-make publish_docs
+sudo make publish_docs
