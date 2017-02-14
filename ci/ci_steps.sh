@@ -13,3 +13,6 @@ docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:5ba9f93b749aaabdc
 ./ci/docker_push.sh
 # This script runs on every PRs normal run to test the docker examples.
 ./ci/verify_examples.sh
+
+# This make target publishes envoy's web site on a push to master.
+make publish_docs
