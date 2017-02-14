@@ -56,7 +56,7 @@ Smoketest configuration
 
 A very minimal Envoy configuration that can be used to validate basic plain HTTP proxying is
 available in :repo:`configs/google_com_proxy.json`. This is not intended to represent a realistic
-Envoy deployment. To smoketest Envoy with this, you can run:
+Envoy deployment. To smoketest Envoy with this, run:
 
 .. code-block:: console
 
