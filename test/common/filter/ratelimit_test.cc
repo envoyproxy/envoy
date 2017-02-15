@@ -55,7 +55,6 @@ public:
   std::unique_ptr<Instance> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   RequestCallbacks* request_callbacks_{};
-  Tracing::TransportContext empty_context_{"", ""};
 };
 
 TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
@@ -75,10 +74,11 @@ TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
 TEST_F(RateLimitFilterTest, OK) {
   InSequence s;
 
+  Tracing::TransportContext empty_context{"", ""};
   EXPECT_CALL(*client_,
               limit(_, "foo", testing::ContainerEq(std::vector<Descriptor>{
                                   {{{"hello", "world"}, {"foo", "bar"}}}, {{{"foo2", "bar2"}}}}),
-                    empty_context_))
+                    empty_context))
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 

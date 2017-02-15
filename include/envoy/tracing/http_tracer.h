@@ -14,7 +14,7 @@ struct TransportContext {
   std::string request_id_;
   std::string span_context_;
 
-  bool operator==(const TransportContext& rhs) const {
+  bool operator==(const Tracing::TransportContext& rhs) const {
     return request_id_ == rhs.request_id_ && span_context_ == rhs.span_context_;
   }
 };

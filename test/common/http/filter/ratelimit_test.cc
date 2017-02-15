@@ -69,7 +69,6 @@ public:
   NiceMock<Router::MockRateLimitPolicyEntry> vh_rate_limit_;
   std::vector<::RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Tracing::TransportContext empty_context_{"", ""};
 };
 
 TEST_F(HttpRateLimitFilterTest, BadConfig) {
@@ -173,9 +172,11 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
+
+  Tracing::TransportContext empty_context{"", ""};
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                             {{{"descriptor_key", "descriptor_value"}}}}),
-                              empty_context_))
+                              empty_context))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks) -> void {
         callbacks.complete(::RateLimit::LimitStatus::OK);
       })));
