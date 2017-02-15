@@ -10,7 +10,8 @@ incrementally add more complex dynamic configuration, the downside being that th
 provide one or more external REST based configuration provider APIs. This document gives an overview
 of the options currently available.
 
-Top level configuration :ref:`reference <config>`.
+* Top level configuration :ref:`reference <config>`.
+* :ref:`Reference configurations <install_ref_configs>`.
 
 Fully static
 ------------
@@ -41,7 +42,7 @@ The :ref:`cluster discovery service (CDS) API <config_cluster_manager_cds>` laye
 which Envoy can discover upstream clusters used during routing. Envoy will gracefully add, update,
 and remove clusters as specified by the API. This API allows implementors to build a topology in
 which Envoy does not need to be aware of all upstream clusters at initial configuration time.
-Typically, when doing HTTP routing along with CDS (but without RDS), implementors will make use of
+Typically, when doing HTTP routing along with CDS (but without route discovery service), implementors will make use of
 the router's ability to forward requests to a cluster specified in an :ref:`HTTP request header
 <config_http_conn_man_route_table_route_cluster_header>`.
 
@@ -54,12 +55,12 @@ the existing hosts in the cluster are unaffected.
 SDS, CDS, and RDS
 -----------------
 
-The :ref:`route discovery service API <config_http_conn_man_rds>` layers on a mechanism by which
+The :ref:`route discovery service (RDS) API <config_http_conn_man_rds>` layers on a mechanism by which
 Envoy can discover the entire route configuration for an HTTP connection manager filter at runtime.
-The route configuration will be gracefully swapped in without effecting existing requests. This API,
+The route configuration will be gracefully swapped in without affecting existing requests. This API,
 when used alongside SDS and CDS, allows implementors to build a complex routing topology
 (:ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting>`, blue/green
-deplyoment, etc.) that will not require any Envoy restarts other than to obtain a new Envoy binary.
+deployment, etc.) that will not require any Envoy restarts other than to obtain a new Envoy binary.
 
 Note that currently, there is no dynamic mechanism by which Envoy can add, update, and remove
 listeners. In the future it likely that a listener discovery service (LDS) API will be added.
