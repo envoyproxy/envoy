@@ -45,6 +45,8 @@ cluster
   be specified. When *cluster* is specified, its value indicates the upstream cluster to which the
   request should be forwarded to.
 
+.. _config_http_conn_man_route_table_route_cluster_header:
+
 cluster_header
   *(sometimes required, string)* If the route is not a redirect (*host_redirect* and/or
   *path_redirect* is not specified), one of *cluster*, *cluster_header*, or *weighted_clusters* must
