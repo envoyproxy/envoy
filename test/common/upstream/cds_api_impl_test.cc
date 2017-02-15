@@ -163,7 +163,7 @@ TEST_F(CdsApiImplTest, Failure) {
 
   setup();
 
-  std::string response1_json = R"EOF(
+  std::string response_json = R"EOF(
   {
     "clusters" : {}
   }
@@ -171,7 +171,7 @@ TEST_F(CdsApiImplTest, Failure) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
+  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -192,13 +192,13 @@ TEST_F(CdsApiImplTest, FailureArray) {
 
   setup();
 
-  std::string response1_json = R"EOF(
+  std::string response_json = R"EOF(
   []
   )EOF";
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
+  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));

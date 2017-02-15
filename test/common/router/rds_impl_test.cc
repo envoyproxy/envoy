@@ -191,7 +191,7 @@ TEST_F(RdsImplTest, Failure) {
 
   setup();
 
-  std::string response1_json = R"EOF(
+  std::string response_json = R"EOF(
   {
     "blah": true
   }
@@ -199,7 +199,7 @@ TEST_F(RdsImplTest, Failure) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
+  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
 
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -219,13 +219,13 @@ TEST_F(RdsImplTest, FailureArray) {
 
   setup();
 
-  std::string response1_json = R"EOF(
+  std::string response_json = R"EOF(
   []
   )EOF";
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
+  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
 
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
