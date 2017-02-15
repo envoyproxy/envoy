@@ -324,4 +324,22 @@ TEST_F(SdsTest, Failure) {
   EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
 }
 
+TEST_F(SdsTest, FailureArray) {
+  setupRequest();
+  cluster_->initialize();
+
+  std::string bad_response_json = R"EOF(
+  []
+  )EOF";
+
+  Http::MessagePtr message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(bad_response_json)});
+
+  EXPECT_CALL(*timer_, enableTimer(_));
+  callbacks_->onSuccess(std::move(message));
+
+  EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
+}
+
 } // Upstream

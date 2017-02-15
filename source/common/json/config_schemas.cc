@@ -32,6 +32,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
         "additionalProperties": false
       }
     },
+    "type" : "object",
     "properties": {
        "port": {"type": "number"},
        "filters" : {
@@ -51,6 +52,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
 const std::string Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties": {
       "auth_api_cluster" : {"type" : "string"},
       "stat_prefix" : {"type" : "string"},
@@ -77,6 +79,7 @@ const std::string Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA(R"EOF(
 const std::string Json::Schema::RDS_CONFIGURATION_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties" : {
       "cluster" : {"type": "string"},
       "route_config_name" : {"type": "string"},
@@ -217,6 +220,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "additionalProperties" : false
       }
     },
+    "type" : "object",
     "properties" : {
       "codec_type" : {
         "type" : "string",
@@ -273,6 +277,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
 const std::string Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties":{
       "stat_prefix" : {"type" : "string"},
       "access_log" : {"type" : "string"}
@@ -285,6 +290,7 @@ const std::string Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
 const std::string Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties":{
       "stat_prefix" : {"type" : "string"},
       "domain" : {"type" : "string"},
@@ -314,6 +320,7 @@ const std::string Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA(R"EOF(
 const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties":{
       "cluster_name" : {"type" : "string"}
     },
@@ -325,6 +332,7 @@ const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
 const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
   {
       "$schema": "http://json-schema.org/schema#",
+      "type" : "object",
       "properties": {
         "stat_prefix": {"type" : "string"},
         "route_config": {
@@ -374,6 +382,7 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
 const std::string Json::Schema::ROUTE_CONFIGURATION_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties":{
       "virtual_hosts" : {"type" : "array"},
       "internal_only_headers" : {
@@ -407,6 +416,7 @@ const std::string Json::Schema::ROUTE_CONFIGURATION_SCHEMA(R"EOF(
 const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "definitions" : {
       "virtual_clusters" : {
         "type" : "object" ,
@@ -467,6 +477,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
         "additionalProperties" : false
       }
     },
+    "type" : "object",
     "properties" : {
       "prefix" : {"type" : "string"},
       "path" : {"type" : "string"},
@@ -570,6 +581,7 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
         "additionalProperties" : false
       }
     },
+    "type" : "object",
     "properties" : {
       "stage" : {"type" : "integer"},
       "kill_switch_key" : {"type" : "string"},
@@ -594,6 +606,7 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
 const std::string Json::Schema::BUFFER_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties" : {
       "max_request_bytes" : {"type" : "integer"},
       "max_request_time_s" : {"type" : "integer"}
@@ -606,6 +619,7 @@ const std::string Json::Schema::BUFFER_HTTP_FILTER_SCHEMA(R"EOF(
 const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties" : {
       "abort": {
         "type" : "object",
@@ -668,6 +682,7 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
 const std::string Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties" : {
       "pass_through_mode" : {"type" : "boolean"},
       "endpoint" : {"type" : "string"},
@@ -681,6 +696,7 @@ const std::string Json::Schema::HEALTH_CHECK_HTTP_FILTER_SCHEMA(R"EOF(
 const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties" : {
       "domain" : {"type" : "string"},
       "stage" : {"type" : "integer"}
@@ -693,6 +709,7 @@ const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
 const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties" : {
       "dynamic_stats" : {"type" : "boolean"}
     },
@@ -731,6 +748,7 @@ const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
         "additionalProperties" : false
       }
     },
+    "type" : "object",
     "properties" : {
       "clusters" : {
         "type" : "array",
@@ -796,6 +814,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "additionalProperties" : false
       }
     },
+    "type" : "object",
     "properties" : {
       "listeners" : {
         "type" : "array",
@@ -926,6 +945,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "additionalProperties" : false
       }
     },
+    "type" : "object",
     "properties" : {
       "name" : {"type" : "string"},
       "type" : {
@@ -986,6 +1006,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
 const std::string Json::Schema::CDS_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
     "properties" : {
       "clusters" : {
         "type" : "array",
@@ -1022,6 +1043,7 @@ const std::string Json::Schema::SDS_SCHEMA(R"EOF(
         "required" : ["ip_address", "port"]
       }
     },
+    "type" : "object",
     "properties" : {
       "hosts" : {
         "type" : "array",

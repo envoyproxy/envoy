@@ -214,7 +214,7 @@ TEST_F(RdsImplTest, Failure) {
 
   setup();
 
-  std::string response1_json = R"EOF(
+  std::string response_json = R"EOF(
   {
     "blah": true
   }
@@ -222,7 +222,7 @@ TEST_F(RdsImplTest, Failure) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
+  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
 
   EXPECT_CALL(init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -236,6 +236,26 @@ TEST_F(RdsImplTest, Failure) {
 
   EXPECT_EQ(2UL, store_.counter("foo.rds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("foo.rds.update_failure").value());
+}
+
+TEST_F(RdsImplTest, FailureArray) {
+  InSequence s;
+
+  setup();
+
+  std::string response_json = R"EOF(
+  []
+  )EOF";
+
+  Http::MessagePtr message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
+
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  callbacks_->onSuccess(std::move(message));
+
+  EXPECT_EQ(1UL, store_.counter("foo.rds.update_attempt").value());
+  EXPECT_EQ(1UL, store_.counter("foo.rds.update_failure").value());
 }
 
 } // Upstream
