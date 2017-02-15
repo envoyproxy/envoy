@@ -165,7 +165,7 @@ TEST_F(CdsApiImplTest, Failure) {
 
   std::string response1_json = R"EOF(
   {
-    clusters : {}
+    "clusters" : {}
   }
   )EOF";
 
@@ -185,6 +185,27 @@ TEST_F(CdsApiImplTest, Failure) {
 
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_failure").value());
+}
+
+TEST_F(CdsApiImplTest, FailureArray) {
+  InSequence s;
+
+  setup();
+
+  std::string response1_json = R"EOF(
+  []
+  )EOF";
+
+  Http::MessagePtr message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  callbacks_->onSuccess(std::move(message));
+
+  EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_attempt").value());
+  EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_failure").value());
 }
 
 } // Upstream
