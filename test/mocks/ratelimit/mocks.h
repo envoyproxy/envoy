@@ -11,9 +11,9 @@ public:
 
   // RateLimit::Client
   MOCK_METHOD0(cancel, void());
-  MOCK_METHOD4(limit,
-               void(RequestCallbacks& callbacks, const std::string& domain,
-                    const std::vector<Descriptor>& descriptors, const std::string& request_id));
+  MOCK_METHOD5(limit, void(RequestCallbacks& callbacks, const std::string& domain,
+                           const std::vector<Descriptor>& descriptors,
+                           const std::string& request_id, const std::string& span_context));
 };
 
 inline bool operator==(const DescriptorEntry& lhs, const DescriptorEntry& rhs) {
