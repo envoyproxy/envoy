@@ -1,11 +1,6 @@
 Version history
 ---------------
 
-1.0.0
-=====
-
-Initial open source release.
-
 1.1.0
 =====
 
@@ -36,3 +31,8 @@ Initial open source release.
   (specifically request ID generation and dynamic response code stats).
 * Support Mongo 3.2 in the :ref:`Mongo sniffing filter <config_network_filters_mongo_proxy>`.
 * Lots of other small fixes and enhancements not listed.
+
+1.0.0
+=====
+
+Initial open source release.
