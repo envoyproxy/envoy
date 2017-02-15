@@ -6,6 +6,15 @@
 
 namespace Tracing {
 
+/**
+ * Transport tracing context, required for proper inject/extract when Envoy calls other
+ * clusters directly, e.g., ratelimit.
+ */
+struct TransportContext {
+  std::string request_id_;
+  std::string span_context_;
+};
+
 /*
  * Tracing configuration, it carries additional data needed to populate the span.
  */
