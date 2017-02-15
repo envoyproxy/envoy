@@ -2,6 +2,7 @@
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
 
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -34,9 +35,11 @@ public:
     Json::ObjectPtr config = Json::Factory::LoadFromString(config_json);
 
     interval_timer_ = new Event::MockTimer(&dispatcher_);
-    expectRequest();
+    EXPECT_CALL(init_manager_, registerTarget(_));
     rds_ = RouteConfigProviderUtil::create(*config, runtime_, cm_, dispatcher_, random_,
-                                           local_info_, store_, "foo.", tls_);
+                                           local_info_, store_, "foo.", tls_, init_manager_);
+    expectRequest();
+    init_manager_.initialize();
   }
 
   void expectRequest() {
@@ -62,6 +65,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Init::MockManager> init_manager_;
   Http::MockAsyncClientRequest request_;
   RouteConfigProviderPtr rds_;
   Event::MockTimer* interval_timer_{};
@@ -78,7 +82,7 @@ TEST_F(RdsImplTest, RdsAndStatic) {
 
   Json::ObjectPtr config = Json::Factory::LoadFromString(config_json);
   EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, dispatcher_, random_,
-                                               local_info_, store_, "foo.", tls_),
+                                               local_info_, store_, "foo.", tls_, init_manager_),
                EnvoyException);
 }
 
@@ -97,7 +101,25 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
   local_info_.node_name_ = "";
   interval_timer_ = new Event::MockTimer(&dispatcher_);
   EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, dispatcher_, random_,
-                                               local_info_, store_, "foo.", tls_),
+                                               local_info_, store_, "foo.", tls_, init_manager_),
+               EnvoyException);
+}
+
+TEST_F(RdsImplTest, UnknownCluster) {
+  std::string config_json = R"EOF(
+    {
+      "rds": {
+        "cluster": "foo_cluster",
+        "route_config_name": "foo_route_config"
+      }
+    }
+    )EOF";
+
+  Json::ObjectPtr config = Json::Factory::LoadFromString(config_json);
+  ON_CALL(cm_, get("foo_cluster")).WillByDefault(Return(nullptr));
+  interval_timer_ = new Event::MockTimer(&dispatcher_);
+  EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, dispatcher_, random_,
+                                               local_info_, store_, "foo.", tls_, init_manager_),
                EnvoyException);
 }
 
@@ -120,6 +142,7 @@ TEST_F(RdsImplTest, Basic) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
 
+  EXPECT_CALL(init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
@@ -201,6 +224,7 @@ TEST_F(RdsImplTest, Failure) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
 
+  EXPECT_CALL(init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 

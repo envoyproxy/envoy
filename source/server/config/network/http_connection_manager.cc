@@ -74,7 +74,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
       config, server.runtime(), server.clusterManager(), server.dispatcher(), server.random(),
-      server.localInfo(), server.stats(), stats_prefix_, server.threadLocal());
+      server.localInfo(), server.stats(), stats_prefix_, server.threadLocal(),
+      server.initManager());
 
   if (config.hasObject("use_remote_address")) {
     use_remote_address_ = config.getBoolean("use_remote_address");
