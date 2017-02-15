@@ -436,7 +436,7 @@ void ConnectionImpl::sendPendingFrames() {
   if (pending_deferred_reset_) {
     pending_deferred_reset_ = false;
     for (auto& stream : active_streams_) {
-      if (stream->local_end_stream_sent_ && stream->deferred_reset_.valid()) {
+      if (stream->deferred_reset_.valid()) {
         stream->resetStreamWorker(stream->deferred_reset_.value());
       }
     }
