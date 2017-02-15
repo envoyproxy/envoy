@@ -27,6 +27,7 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
 }
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
+ConnectionImpl::Http2Options ConnectionImpl::http2_options_;
 
 /**
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
@@ -535,11 +536,23 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
+ConnectionImpl::Http2Options::Http2Options() {
+  nghttp2_option_new(&options_);
+  // Currently we do not do anything with stream priority. Setting the following option prevents
+  // nghttp2 from keeping around closed streams for use during stream priority dependency graph
+  // calculations. This saves a tremendous amount of memory in cases where there a large number of
+  // kept alive http/2 connections.
+  nghttp2_option_set_no_closed_streams(options_, 1);
+}
+
+ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            ConnectionCallbacks& callbacks, Stats::Scope& stats,
                                            uint64_t codec_options)
     : ConnectionImpl(connection, stats), callbacks_(callbacks) {
-  nghttp2_session_client_new(&session_, http2_callbacks_.callbacks(), base());
+  nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
+                              http2_options_.options());
   sendSettings(codec_options);
 }
 
@@ -576,7 +589,8 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            Http::ServerConnectionCallbacks& callbacks,
                                            Stats::Store& stats, uint64_t codec_options)
     : ConnectionImpl(connection, stats), callbacks_(callbacks) {
-  nghttp2_session_server_new(&session_, http2_callbacks_.callbacks(), base());
+  nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
+                              http2_options_.options());
   sendSettings(codec_options);
 }
 
