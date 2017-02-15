@@ -63,7 +63,8 @@ class ConnectionImpl : public virtual Connection, Logger::Loggable<Logger::Id::h
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats)
       : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))},
-        connection_(connection) {}
+        connection_(connection), dispatching_(false), raised_goaway_(false),
+        pending_deferred_reset_(false) {}
 
   ~ConnectionImpl();
 
@@ -133,15 +134,15 @@ protected:
     HeaderMapImplPtr headers_;
     StreamDecoder* decoder_{};
     int32_t stream_id_{-1};
-    bool local_end_stream_{};
-    bool local_end_stream_sent_{};
-    bool remote_end_stream_{};
     Buffer::OwnedImpl pending_recv_data_;
     Buffer::OwnedImpl pending_send_data_;
-    bool data_deferred_{};
     HeaderMapPtr pending_trailers_;
     Optional<StreamResetReason> deferred_reset_;
     HeaderString cookies_;
+    bool local_end_stream_ : 1;
+    bool local_end_stream_sent_ : 1;
+    bool remote_end_stream_ : 1;
+    bool data_deferred_ : 1;
   };
 
   typedef std::unique_ptr<StreamImpl> StreamImplPtr;
@@ -196,8 +197,9 @@ private:
   static const uint64_t DEFAULT_WINDOW_SIZE = 256 * 1024 * 1024;
 
   Network::Connection& connection_;
-  bool dispatching_{};
-  bool raised_goaway_{};
+  bool dispatching_ : 1;
+  bool raised_goaway_ : 1;
+  bool pending_deferred_reset_ : 1;
 };
 
 /**
