@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
@@ -23,7 +24,8 @@ public:
                                        Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                                        Runtime::RandomGenerator& random,
                                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                                       const std::string& stat_prefix, ThreadLocal::Instance& tls);
+                                       const std::string& stat_prefix, ThreadLocal::Instance& tls,
+                                       Init::Manager& init_manager);
 };
 
 /**
@@ -64,16 +66,15 @@ struct RdsStats {
  * the RDS API.
  */
 class RdsRouteConfigProviderImpl : public RouteConfigProvider,
+                                   public Init::Target,
                                    Http::RestApiFetcher,
                                    Logger::Loggable<Logger::Id::router> {
 public:
-  RdsRouteConfigProviderImpl(const Json::Object& config, Runtime::Loader& runtime,
-                             Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                             Runtime::RandomGenerator& random,
-                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                             const std::string& stat_prefix, ThreadLocal::Instance& tls);
-
-  void initialize() { RestApiFetcher::initialize(); }
+  // Init::Target
+  void initialize(std::function<void()> callback) override {
+    initialize_callback_ = callback;
+    RestApiFetcher::initialize();
+  }
 
   // Router::RouteConfigProvider
   Router::ConfigPtr config() override;
@@ -81,7 +82,7 @@ public:
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override;
   void parseResponse(const Http::Message& response) override;
-  void onFetchComplete() override {}
+  void onFetchComplete() override;
   void onFetchFailure(EnvoyException* e) override;
 
 private:
@@ -94,6 +95,13 @@ private:
     ConfigPtr config_;
   };
 
+  RdsRouteConfigProviderImpl(const Json::Object& config, Runtime::Loader& runtime,
+                             Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+                             Runtime::RandomGenerator& random,
+                             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                             const std::string& stat_prefix, ThreadLocal::Instance& tls);
+  void registerInitTarget(Init::Manager& init_manager);
+
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   ThreadLocal::Instance& tls_;
@@ -102,6 +110,9 @@ private:
   bool initialized_{};
   uint64_t last_config_hash_{};
   RdsStats stats_;
+  std::function<void()> initialize_callback_;
+
+  friend class RouteConfigProviderUtil;
 };
 
 } // Router
