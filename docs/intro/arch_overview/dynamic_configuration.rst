@@ -29,7 +29,7 @@ SDS only
 --------
 
 The :ref:`service discovery service (SDS) API <config_cluster_manager_sds>` provides a more advanced
-mechanism by which Envoy can discovery members of an upstream cluster. Layered on top of a static
+mechanism by which Envoy can discover members of an upstream cluster. Layered on top of a static
 configuration, SDS allows an Envoy deployment to circumvent the limitations of DNS (maximum records
 in a response, etc.) as well as consume more information used in load balancing and routing (e.g.,
 canary status, zone, etc.).
