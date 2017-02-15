@@ -7,9 +7,8 @@ install:
 matrix:
   fast_finish: true
 env:
-  - TEST_TYPE=debug
-  - TEST_TYPE=normal
-  - TEST_TYPE=coverage
-  - TEST_TYPE=asan
   - TEST_TYPE=docs
+before_script:
+  - echo -e "Host github.com\n\tHostName github.com\n\tUser git\n\tIdentityFile .publishdocskey\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+  - openssl aes-256-cbc -K $encrypted_b1a4cc52fa4a_key -iv $encrypted_b1a4cc52fa4a_iv -in .publishdocskey.enc -out .publishdocskey -d
 script: ./ci/ci_steps.sh

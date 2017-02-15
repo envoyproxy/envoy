@@ -6,16 +6,35 @@ DOCS_DIR=generated/docs
 PUBLISH_DIR=../envoy-docs
 BUILD_SHA=`git rev-parse HEAD`
 
-if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ]
+if [ 0==0 ]
 then
-  git clone https://GH_TOKEN@github.com/lyft/envoy $PUBLISH_DIR
-  git -C $PUBLISH_DIR config user.name "Publish Docs"
-  git -C $PUBLISH_DIR config user.email GH_EMAIL
+  echo "Setting up Git Access"
+  chmod 600 .publishdocskey
+
+  # Add the SSH key so it's used on git commands
+  eval `ssh-agent -s`
+  ssh-add .publishdocskey
+
+  echo 'cloning'
+  git clone https://github.com/lyft/envoy $PUBLISH_DIR
+
   git -C $PUBLISH_DIR fetch
-  git -C $PUBLISH_DIR checkout -B gh-pages origin/gh-pages
+  git -C $PUBLISH_DIR checkout -B gh-pages-test origin/gh-pages
   rm -fr $PUBLISH_DIR/*
   cp -r $DOCS_DIR/* $PUBLISH_DIR
-  git -C $PUBLISH_DIR add .
-  git -C $PUBLISH_DIR commit -m "docs @$BUILD_SHA"
-  git -C $PUBLISH_DIR push origin gh-pages
+  cd $PUBLISH_DIR
+
+  git config user.name "lyft-buildnotify(travis)"
+  echo 'email'
+  git config user.email travis@travis.com
+  echo 'add'
+  git add .
+  echo 'commit'
+  git commit -m "docs @$BUILD_SHA"
+  echo 'set remote to ssh'
+   git remote add docs ssh://git@github.com:lyft/envoy
+  echo 'push'
+  yes yes | git push docs gh-pages-test
+else
+  echo "Ignoring branch for docs push"
 fi
