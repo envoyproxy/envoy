@@ -68,8 +68,7 @@ public:
    * @param domain specifies the rate limit domain.
    * @param descriptors specifies a list of descriptors to query.
    * @param context provides transport context so that upstream can construct proper relationship
-   * between
-   *        spans.
+   * between spans.
    */
   virtual void limit(RequestCallbacks& callbacks, const std::string& domain,
                      const std::vector<Descriptor>& descriptors,
