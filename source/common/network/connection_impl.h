@@ -100,7 +100,6 @@ private:
 
   virtual IoResult doReadFromSocket();
   virtual IoResult doWriteToSocket();
-  void onBufferChange(ConnectionBufferType type, uint64_t old_size, int64_t delta);
   virtual void onConnected();
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);

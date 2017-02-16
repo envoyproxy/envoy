@@ -47,8 +47,10 @@ void Filter::initiateCall(const HeaderMap& headers) {
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, config_->domain(), descriptors,
-                   headers.RequestId() ? headers.RequestId()->value().c_str() : EMPTY_STRING);
+    client_->limit(
+        *this, config_->domain(), descriptors,
+        {headers.RequestId() ? headers.RequestId()->value().c_str() : EMPTY_STRING,
+         headers.OtSpanContext() ? headers.OtSpanContext()->value().c_str() : EMPTY_STRING});
     initiating_call_ = false;
   }
 }
@@ -121,10 +123,10 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
                                           const HeaderMap& headers) const {
   for (const Router::RateLimitPolicyEntry& rate_limit :
        rate_limit_policy.getApplicableRateLimit(config_->stage())) {
-    const std::string& route_key = rate_limit.routeKey();
-    if (!route_key.empty() &&
+    const std::string& disable_key = rate_limit.disableKey();
+    if (!disable_key.empty() &&
         !config_->runtime().snapshot().featureEnabled(
-            fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
+            fmt::format("ratelimit.{}.http_filter_enabled", disable_key), 100)) {
       continue;
     }
     rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),

@@ -129,6 +129,7 @@ add_executable(envoy-test
   mocks/filesystem/mocks.cc
   mocks/grpc/mocks.cc
   mocks/http/mocks.cc
+  mocks/init/mocks.cc
   mocks/local_info/mocks.cc
   mocks/network/mocks.cc
   mocks/ratelimit/mocks.cc
@@ -150,6 +151,7 @@ add_executable(envoy-test
   server/http/admin_test.cc
   server/http/health_check_test.cc
   server/options_impl_test.cc
+  server/server_test.cc
   test_common/printers.cc
   test_common/utility.cc)
 

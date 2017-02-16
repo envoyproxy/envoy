@@ -2,6 +2,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
@@ -102,6 +103,16 @@ public:
    * @return the server's hot restarter.
    */
   virtual HotRestart& hotRestart() PURE;
+
+  /**
+   * @return the server's init manager. This can be used for extensions that need to initialize
+   *         after cluster manager init but before the server starts listening. All extensions
+   *         should register themselves during configuration load. initialize() will be called on
+   *         each registered target after cluster manager init but before the server starts
+   *         listening. Once all targets have initialized and invoked their callbacks, the server
+   *         will start listening.
+   */
+  virtual Init::Manager& initManager() PURE;
 
   /**
    * @return the server's CLI options.

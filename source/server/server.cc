@@ -20,6 +20,32 @@
 
 namespace Server {
 
+void InitManagerImpl::initialize(std::function<void()> callback) {
+  ASSERT(state_ == State::NotInitialized);
+  if (targets_.empty()) {
+    callback();
+    state_ = State::Initialized;
+  } else {
+    callback_ = callback;
+    state_ = State::Initializing;
+    for (auto target : targets_) {
+      target->initialize([this, target]() -> void {
+        ASSERT(std::find(targets_.begin(), targets_.end(), target) != targets_.end());
+        targets_.remove(target);
+        if (targets_.empty()) {
+          state_ = State::Initialized;
+          callback_();
+        }
+      });
+    }
+  }
+}
+
+void InitManagerImpl::registerTarget(Init::Target& target) {
+  ASSERT(state_ == State::NotInitialized);
+  targets_.push_back(&target);
+}
+
 InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter,
                            Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
@@ -50,6 +76,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
     initialize(options, hooks, component_factory);
   } catch (const EnvoyException& e) {
     log().critical("error initializing configuration '{}': {}", options.configPath(), e.what());
+    thread_local_.shutdownThread();
     exit(1);
   }
 }
@@ -212,28 +239,32 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
-  // if there are only static clusters this will fire immediately.
+  // this can fire immediately if all clusters have already initialized.
   clusterManager().setInitializedCb([this, &hooks]() -> void {
-    log().warn("all clusters initialized. starting workers");
-    for (const WorkerPtr& worker : workers_) {
-      try {
-        worker->initializeConfiguration(*config_, socket_map_);
-      } catch (const Network::CreateListenerException& e) {
-        // It is possible that we fail to start listening on a port, even though we were able to
-        // bind to it above. This happens when there is a race between two applications to listen
-        // on the same port. In general if we can't initialize the worker configuration just print
-        // the error and exit cleanly without crashing.
-        log().critical("shutting down due to error initializing worker configuration: {}",
-                       e.what());
-        shutdown();
-      }
-    }
-
-    // At this point we are ready to take traffic and all listening ports are up. Notify our parent
-    // if applicable that they can stop listening and drain.
-    restarter_.drainParentListeners();
-    hooks.onServerInitialized();
+    log().warn("all clusters initialized. initializing init manager");
+    init_manager_.initialize([this, &hooks]() -> void { startWorkers(hooks); });
   });
+}
+
+void InstanceImpl::startWorkers(TestHooks& hooks) {
+  log().warn("all dependencies initialized. starting workers");
+  for (const WorkerPtr& worker : workers_) {
+    try {
+      worker->initializeConfiguration(*config_, socket_map_);
+    } catch (const Network::CreateListenerException& e) {
+      // It is possible that we fail to start listening on a port, even though we were able to
+      // bind to it above. This happens when there is a race between two applications to listen
+      // on the same port. In general if we can't initialize the worker configuration just print
+      // the error and exit cleanly without crashing.
+      log().critical("shutting down due to error initializing worker configuration: {}", e.what());
+      shutdown();
+    }
+  }
+
+  // At this point we are ready to take traffic and all listening ports are up. Notify our parent
+  // if applicable that they can stop listening and drain.
+  restarter_.drainParentListeners();
+  hooks.onServerInitialized();
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,

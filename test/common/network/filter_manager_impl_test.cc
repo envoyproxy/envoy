@@ -9,6 +9,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -135,10 +136,9 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   manager.addReadFilter(ReadFilterPtr{new ::Filter::TcpProxy(tcp_proxy_config, cm)});
 
   RateLimit::RequestCallbacks* request_callbacks{};
-  EXPECT_CALL(
-      *rl_client,
-      limit(_, "foo",
-            testing::ContainerEq(std::vector<RateLimit::Descriptor>{{{{"hello", "world"}}}}), ""))
+  EXPECT_CALL(*rl_client, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                              {{{"hello", "world"}}}}),
+                                Tracing::EMPTY_CONTEXT))
       .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks = &callbacks; })));
 
