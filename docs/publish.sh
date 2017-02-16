@@ -23,20 +23,20 @@ then
   git clone git@github.com:lyft/envoy $PUBLISH_DIR
 
   git -C $PUBLISH_DIR fetch
-  git -C $PUBLISH_DIR checkout -B gh-pages-test origin/gh-pages
+  git -C $PUBLISH_DIR checkout -B gh-pages-test2 origin/gh-pages
   rm -fr $PUBLISH_DIR/*
   cp -r $DOCS_DIR/* $PUBLISH_DIR
   cd $PUBLISH_DIR
 
   git config user.name "lyft-buildnotify(travis)"
   echo 'email'
-  git config user.email travis@travis.com
+  git config user.email $GH_EMAIL
   echo 'add'
   git add .
   echo 'commit'
   git commit -m "docs @$BUILD_SHA"
   echo 'push'
-  git push origin gh-pages-test
+  git push origin gh-pages-test2
 else
   echo "Ignoring branch for docs push"
 fi
