@@ -5,6 +5,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 
 using testing::_;
 using testing::InSequence;
@@ -77,7 +78,7 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_CALL(*client_,
               limit(_, "foo", testing::ContainerEq(std::vector<Descriptor>{
                                   {{{"hello", "world"}, {"foo", "bar"}}}, {{{"foo2", "bar2"}}}}),
-                    ""))
+                    Tracing::EMPTY_CONTEXT))
       .WillOnce(WithArgs<0>(
           Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
 

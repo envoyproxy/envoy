@@ -1,5 +1,7 @@
 #include "ratelimit_impl.h"
 
+#include "envoy/tracing/context.h"
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/grpc/rpc_channel_impl.h"
@@ -35,10 +37,10 @@ void GrpcClientImpl::createRequest(pb::lyft::ratelimit::RateLimitRequest& reques
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
                            const std::vector<Descriptor>& descriptors,
-                           const std::string& request_id) {
+                           const Tracing::TransportContext& context) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
-  request_id_ = request_id;
+  context_ = context;
 
   pb::lyft::ratelimit::RateLimitRequest request;
   createRequest(request, domain, descriptors);
@@ -46,8 +48,12 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
 }
 
 void GrpcClientImpl::onPreRequestCustomizeHeaders(Http::HeaderMap& headers) {
-  if (!request_id_.empty()) {
-    headers.insertRequestId().value(request_id_);
+  if (!context_.request_id_.empty()) {
+    headers.insertRequestId().value(context_.request_id_);
+  }
+
+  if (!context_.span_context_.empty()) {
+    headers.insertOtSpanContext().value(context_.span_context_);
   }
 }
 
@@ -60,13 +66,11 @@ void GrpcClientImpl::onSuccess() {
 
   callbacks_->complete(status);
   callbacks_ = nullptr;
-  request_id_.clear();
 }
 
 void GrpcClientImpl::onFailure(const Optional<uint64_t>&, const std::string&) {
   callbacks_->complete(LimitStatus::Error);
   callbacks_ = nullptr;
-  request_id_.clear();
 }
 
 GrpcFactoryImpl::GrpcFactoryImpl(const Json::Object& config, Upstream::ClusterManager& cm)

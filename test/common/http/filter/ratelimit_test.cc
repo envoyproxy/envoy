@@ -8,6 +8,7 @@
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
@@ -145,13 +146,15 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0)).Times(1);
 
+  Tracing::TransportContext context{"requestid", "context"};
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                             {{{"descriptor_key", "descriptor_value"}}}}),
-                              "requestid"))
+                              context))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks_ = &callbacks; })));
 
   request_headers_.addViaCopy(Http::Headers::get().RequestId, "requestid");
+  request_headers_.addViaCopy(Http::Headers::get().OtSpanContext, "context");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
@@ -170,9 +173,10 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
+
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                             {{{"descriptor_key", "descriptor_value"}}}}),
-                              ""))
+                              Tracing::EMPTY_CONTEXT))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks) -> void {
         callbacks.complete(::RateLimit::LimitStatus::OK);
       })));
