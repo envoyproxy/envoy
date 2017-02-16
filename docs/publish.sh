@@ -6,13 +6,10 @@ DOCS_DIR=generated/docs
 PUBLISH_DIR=../envoy-docs
 BUILD_SHA=`git rev-parse HEAD`
 
-echo PR is $1
-echo Branch is $2
-
-if [ "$1" == "false" ] && [ "$2" == "master" ]
+if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ]
+if [ 0 == 0 ]
 then
-  # we are inside of a container so we need to set up ssh config to be able to push the docs
-  # to github.
+  # Set up ssh config to be able to push the docs to github.
   echo "Setting up ssh"
   mkdir -p ~/.ssh
   # point to the ssh key and disable strict host checking.
@@ -29,7 +26,7 @@ then
   git clone git@github.com:lyft/envoy $PUBLISH_DIR
 
   git -C $PUBLISH_DIR fetch
-  git -C $PUBLISH_DIR checkout -B gh-pages origin/gh-pages
+  git -C $PUBLISH_DIR checkout -B gh-pages-testout origin/gh-pages
   rm -fr $PUBLISH_DIR/*
   cp -r $DOCS_DIR/* $PUBLISH_DIR
   cd $PUBLISH_DIR
@@ -41,7 +38,7 @@ then
   echo 'commit'
   git commit -m "docs @$BUILD_SHA"
   echo 'push'
-  git push origin gh-pages
+  git push origin gh-pages-testout
 else
   echo "Ignoring PR branch for docs push"
 fi
