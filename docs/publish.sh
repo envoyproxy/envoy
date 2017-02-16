@@ -6,7 +6,10 @@ DOCS_DIR=generated/docs
 PUBLISH_DIR=../envoy-docs
 BUILD_SHA=`git rev-parse HEAD`
 
-if [ 0==0 ]
+echo PR is $1
+echo Branch is $2
+
+if [ "$1" == "false" ] && [ "$2" == "master" ]
 then
   echo "Setting up ssh"
   mkdir -p ~/.ssh
@@ -23,7 +26,7 @@ then
   git clone git@github.com:lyft/envoy $PUBLISH_DIR
 
   git -C $PUBLISH_DIR fetch
-  git -C $PUBLISH_DIR checkout -B gh-pages-test2 origin/gh-pages
+  git -C $PUBLISH_DIR checkout -B gh-pages origin/gh-pages
   rm -fr $PUBLISH_DIR/*
   cp -r $DOCS_DIR/* $PUBLISH_DIR
   cd $PUBLISH_DIR
@@ -36,7 +39,7 @@ then
   echo 'commit'
   git commit -m "docs @$BUILD_SHA"
   echo 'push'
-  git push origin gh-pages-test2
+  git push origin gh-pages
 else
-  echo "Ignoring branch for docs push"
+  echo "Ignoring PR branch for docs push"
 fi

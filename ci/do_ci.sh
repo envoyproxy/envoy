@@ -10,7 +10,7 @@ if [[ "$1" == "docs" ]]; then
   echo "docs build..."
   make docs
   # this target will run a script that will publish docs on a master commit.
-  ./docs/publish.sh
+  ./docs/publish.sh $2 $3
   exit 0
 fi
 
