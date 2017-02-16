@@ -1,10 +1,11 @@
 #pragma once
 
+#include "envoy/tracing/context.h"
 #include "envoy/tracing/http_tracer.h"
 
 namespace Tracing {
 
-bool operator==(const TransportContext& lhs, const TransportContext& rhs) {
+inline bool operator==(const TransportContext& lhs, const TransportContext& rhs) {
   return lhs.request_id_ == rhs.request_id_ && lhs.span_context_ == rhs.span_context_;
 }
 

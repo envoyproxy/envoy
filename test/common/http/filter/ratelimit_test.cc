@@ -8,6 +8,7 @@
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
@@ -21,10 +22,6 @@ using testing::WithArgs;
 
 namespace Http {
 namespace RateLimit {
-
-bool operator==(const Tracing::TransportContext& lhs, const Tracing::TransportContext& rhs) {
-  return lhs.request_id_ == rhs.request_id_ && lhs.span_context_ == rhs.span_context_;
-}
 
 class HttpRateLimitFilterTest : public testing::Test {
 public:
@@ -177,10 +174,9 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
-  Tracing::TransportContext empty_context;
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                             {{{"descriptor_key", "descriptor_value"}}}}),
-                              empty_context))
+                              Tracing::EMPTY_CONTEXT))
       .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks) -> void {
         callbacks.complete(::RateLimit::LimitStatus::OK);
       })));

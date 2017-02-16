@@ -7,4 +7,6 @@ struct TransportContext {
   std::string span_context_;
 };
 
+static const TransportContext EMPTY_CONTEXT = {"", ""};
+
 } // Tracing
