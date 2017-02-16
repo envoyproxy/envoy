@@ -6,8 +6,7 @@ DOCS_DIR=generated/docs
 PUBLISH_DIR=../envoy-docs
 BUILD_SHA=`git rev-parse HEAD`
 
-#if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ]
-if [ 0 == 0 ]
+if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ]
 then
   # Set up ssh config to be able to push the docs to github.
   echo "Setting up ssh"
