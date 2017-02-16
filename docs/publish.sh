@@ -11,8 +11,11 @@ echo Branch is $2
 
 if [ "$1" == "false" ] && [ "$2" == "master" ]
 then
+  # we are inside of a container so we need to set up ssh config to be able to push the docs
+  # to github.
   echo "Setting up ssh"
   mkdir -p ~/.ssh
+  # point to the ssh key and disable strict host checking.
   echo -e "Host github.com\n\tHostName github.com\n\tUser git\n\tIdentityFile .publishdocskey\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 
   echo "Setting up Git Access"
@@ -32,7 +35,6 @@ then
   cd $PUBLISH_DIR
 
   git config user.name "lyft-buildnotify(travis)"
-  echo 'email'
   git config user.email lyft-buildnotify@users.noreply.github.com
   echo 'add'
   git add .

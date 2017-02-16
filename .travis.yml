@@ -12,5 +12,6 @@ env:
   - TEST_TYPE=coverage
   - TEST_TYPE=asan
   - TEST_TYPE=docs
+# the before script decrypts the ssh key used to push updates to the gh-pages branch
 before_script: openssl aes-256-cbc -K $encrypted_b1a4cc52fa4a_key -iv $encrypted_b1a4cc52fa4a_iv -in .publishdocskey.enc -out .publishdocskey -d
 script: ./ci/ci_steps.sh

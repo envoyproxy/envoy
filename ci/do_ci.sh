@@ -10,6 +10,8 @@ if [[ "$1" == "docs" ]]; then
   echo "docs build..."
   make docs
   # this target will run a script that will publish docs on a master commit.
+  # $2 is $TRAVIS_PULL_REQUEST, and $3 is $TRAVIS_BRANCH. They were passed from the
+  # travis env into the docker container.
   ./docs/publish.sh $2 $3
   exit 0
 fi

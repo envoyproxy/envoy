@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ev
+set -e
 verify() {
   echo $1
   CONTAINER_ID="$(docker ps -aqf name=$1)"

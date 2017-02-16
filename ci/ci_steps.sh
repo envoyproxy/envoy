@@ -10,6 +10,7 @@ travis lint .travis.yml --skip-completion-check
 # Do a build matrix with different types of builds docs, coverage, normal, etc.
 if [$TEST_TYPE == "docs"]
 then
+  # the docs run needs the PR status and the branch name to be passed as arguments
   docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:$ENVOY_BUILD_SHA /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE $TRAVIS_PULL_REQUEST $TRAVIS_BRANCH"
 else
   docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:$ENVOY_BUILD_SHA /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
