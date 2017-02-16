@@ -79,6 +79,8 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
     lb_type_ = LoadBalancerType::LeastRequest;
   } else if (string_lb_type == "random") {
     lb_type_ = LoadBalancerType::Random;
+  } else if (string_lb_type == "ring_hash") {
+    lb_type_ = LoadBalancerType::RingHash;
   } else {
     throw EnvoyException(fmt::format("cluster: unknown LB type '{}'", string_lb_type));
   }

@@ -168,6 +168,15 @@ private:
 
   typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;
 
+  struct LoadBalancerContextImpl : public Upstream::LoadBalancerContext {
+    LoadBalancerContextImpl(const Optional<uint64_t>& hash) : hash_(hash) {}
+
+    // Upstream::LoadBalancerContext
+    const Optional<uint64_t>& hashKey() const override { return hash_; }
+
+    Optional<uint64_t> hash_;
+  };
+
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
 
   Http::AccessLog::ResponseFlag
@@ -185,6 +194,7 @@ private:
                                          Event::Dispatcher& dispatcher,
                                          Upstream::ResourcePriority priority) PURE;
   Upstream::ResourcePriority finalPriority();
+  Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
   void onRequestComplete();
   void onResetStream();
@@ -214,6 +224,7 @@ private:
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
   SystemTime downstream_request_complete_time_;
+  std::unique_ptr<LoadBalancerContextImpl> lb_context_;
 
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;

@@ -535,7 +535,15 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
           "additionalProperties" : false
         }
       },
-      "rate_limits" : {"type" : "array"}
+      "rate_limits" : {"type" : "array"},
+      "hash_policy" : {
+        "type" : "object",
+        "properties" : {
+          "header_name" : {"type" : "string"}
+        },
+        "required" : ["header_name"],
+        "additionalProperties" : false
+      }
     },
     "additionalProperties" : false
   }
@@ -983,7 +991,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       },
       "lb_type" : {
         "type" : "string",
-        "enum" : ["round_robin", "least_request", "random"]
+        "enum" : ["round_robin", "least_request", "random", "ring_hash"]
       },
       "hosts" : {
         "type" : "array",

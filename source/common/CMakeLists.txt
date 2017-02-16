@@ -114,6 +114,7 @@ add_library(
   upstream/load_balancer_impl.cc
   upstream/logical_dns_cluster.cc
   upstream/outlier_detection_impl.cc
+  upstream/ring_hash_lb.cc
   upstream/sds.cc
   upstream/upstream_impl.cc
   ${gen_git_sha_target})

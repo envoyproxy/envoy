@@ -1,6 +1,7 @@
 #include "cds_api_impl.h"
 #include "cluster_manager_impl.h"
 #include "load_balancer_impl.h"
+#include "ring_hash_lb.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
@@ -302,7 +303,8 @@ ClusterInfoPtr ClusterManagerImpl::get(const std::string& cluster) {
 }
 
 Http::ConnectionPool::Instance*
-ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority) {
+ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                                           LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager =
       tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
 
@@ -312,7 +314,7 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
     return nullptr;
   }
 
-  return entry->second->connPool(priority);
+  return entry->second->connPool(priority, context);
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& primary_cluster,
@@ -343,7 +345,7 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
     throw EnvoyException(fmt::format("unknown cluster '{}'", cluster));
   }
 
-  ConstHostPtr logical_host = entry->second->lb_->chooseHost();
+  ConstHostPtr logical_host = entry->second->lb_->chooseHost(nullptr);
   if (logical_host) {
     return logical_host->createConnection(cluster_manager.thread_local_dispatcher_);
   } else {
@@ -476,6 +478,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                                          parent.parent_.runtime_, parent.parent_.random_));
     break;
   }
+  case LoadBalancerType::RingHash: {
+    lb_.reset(new RingHashLoadBalancer(host_set_, cluster->stats(), parent.parent_.runtime_,
+                                       parent.parent_.random_));
+    break;
+  }
   }
 
   host_set_.addMemberUpdateCb(
@@ -498,8 +505,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
-    ResourcePriority priority) {
-  ConstHostPtr host = lb_->chooseHost();
+    ResourcePriority priority, LoadBalancerContext* context) {
+  ConstHostPtr host = lb_->chooseHost(context);
   if (!host) {
     cluster_info_->stats().upstream_cx_none_healthy_.inc();
     return nullptr;

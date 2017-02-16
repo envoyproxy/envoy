@@ -73,6 +73,20 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
   return matches;
 }
 
+HashPolicyImpl::HashPolicyImpl(const Json::Object& config)
+    : header_name_(config.getString("header_name")) {}
+
+Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) const {
+  Optional<uint64_t> hash;
+  const Http::HeaderEntry* header = headers.get(header_name_);
+  if (header) {
+    // TODO: Compile in murmur3/city/etc. and potentially allow the user to choose so we know
+    //       exactly what we are going to get.
+    hash.value(std::hash<std::string>()(header->value().c_str()));
+  }
+  return hash;
+}
+
 const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
@@ -150,6 +164,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
                                    header_map->getString("value", EMPTY_STRING),
                                    header_map->getBoolean("regex", false));
     }
+  }
+
+  if (route.hasObject("hash_policy")) {
+    hash_policy_.reset(new HashPolicyImpl(*route.getObject("hash_policy")));
   }
 }
 

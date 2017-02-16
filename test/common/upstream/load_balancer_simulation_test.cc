@@ -84,7 +84,7 @@ public:
       local_host_set_->updateHosts(originating_hosts, originating_hosts, per_zone_local,
                                    per_zone_local, empty_vector_, empty_vector_);
 
-      ConstHostPtr selected = lb.chooseHost();
+      ConstHostPtr selected = lb.chooseHost(nullptr);
       hits[selected->address()->asString()]++;
     }
 
