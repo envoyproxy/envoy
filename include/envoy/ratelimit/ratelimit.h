@@ -2,7 +2,7 @@
 
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/context.h"
 
 namespace RateLimit {
 

@@ -1,6 +1,6 @@
 #include "ratelimit_impl.h"
 
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/context.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"

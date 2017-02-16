@@ -74,7 +74,7 @@ TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
 TEST_F(RateLimitFilterTest, OK) {
   InSequence s;
 
-  Tracing::TransportContext empty_context{"", ""};
+  Tracing::TransportContext empty_context{};
   EXPECT_CALL(*client_,
               limit(_, "foo", testing::ContainerEq(std::vector<Descriptor>{
                                   {{{"hello", "world"}, {"foo", "bar"}}}, {{{"foo2", "bar2"}}}}),

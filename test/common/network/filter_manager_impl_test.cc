@@ -135,7 +135,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   manager.addReadFilter(ReadFilterPtr{new ::Filter::TcpProxy(tcp_proxy_config, cm)});
 
   RateLimit::RequestCallbacks* request_callbacks{};
-  Tracing::TransportContext context{"", ""};
+  Tracing::TransportContext context{};
   EXPECT_CALL(*rl_client, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
                                               {{{"hello", "world"}}}}),
                                 context))

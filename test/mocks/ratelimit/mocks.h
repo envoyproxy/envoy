@@ -1,7 +1,8 @@
 #pragma once
 
 #include "envoy/ratelimit/ratelimit.h"
-#include "envoy/tracing/http_tracer.h"
+
+#include "envoy/tracing/context.h"
 
 namespace RateLimit {
 
@@ -23,6 +24,11 @@ inline bool operator==(const DescriptorEntry& lhs, const DescriptorEntry& rhs) {
 
 inline bool operator==(const Descriptor& lhs, const Descriptor& rhs) {
   return lhs.entries_ == rhs.entries_;
+}
+
+inline bool operator()(const Tracing::TransportContext& lhs,
+                       const Tracing::TransportContext& rhs) const {
+  return lhs.request_id_ == rhs.request_id_ && lhs.span_context_ == rhs.span_context_;
 }
 
 } // RateLimit

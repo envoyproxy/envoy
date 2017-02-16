@@ -6,19 +6,6 @@
 
 namespace Tracing {
 
-/**
- * Transport tracing context.
- * It's used to set proper parent/child span relationship on Envoy calls, e.g., ratelimit call.
- */
-struct TransportContext {
-  std::string request_id_;
-  std::string span_context_;
-
-  bool operator==(const Tracing::TransportContext& rhs) const {
-    return request_id_ == rhs.request_id_ && span_context_ == rhs.span_context_;
-  }
-};
-
 /*
  * Tracing configuration, it carries additional data needed to populate the span.
  */

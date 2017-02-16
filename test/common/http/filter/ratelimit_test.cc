@@ -173,7 +173,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
-  Tracing::TransportContext empty_context{"", ""};
+  Tracing::TransportContext empty_context{};
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
                                             {{{"descriptor_key", "descriptor_value"}}}}),
                               empty_context))
