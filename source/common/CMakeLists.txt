@@ -1,4 +1,4 @@
-set(gen_git_sha_target ${CMAKE_CURRENT_BINARY_DIR}/version_generated.cc ../../include/envoy/tracing/context.h)
+set(gen_git_sha_target ${CMAKE_CURRENT_BINARY_DIR}/version_generated.cc)
 add_custom_target(
   gen_git_sha ALL
   COMMAND ${PROJECT_SOURCE_DIR}/tools/gen_git_sha.sh ${CMAKE_SOURCE_DIR} ${gen_git_sha_target})

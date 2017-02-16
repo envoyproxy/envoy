@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/ratelimit/ratelimit.h"
-
 #include "envoy/tracing/context.h"
 
 namespace RateLimit {
