@@ -8,6 +8,10 @@ BUILD_SHA=`git rev-parse HEAD`
 
 if [ 0==0 ]
 then
+  echo "Setting up ssh"
+  mkdir -p ~/.ssh
+  echo -e "Host github.com\n\tHostName github.com\n\tUser git\n\tIdentityFile .publishdocskey\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+
   echo "Setting up Git Access"
   chmod 600 .publishdocskey
 
@@ -34,7 +38,7 @@ then
   echo 'set remote to ssh'
    git remote add docs ssh://git@github.com:lyft/envoy
   echo 'push'
-  yes yes | git push docs gh-pages-test
+  git push docs gh-pages-test
 else
   echo "Ignoring branch for docs push"
 fi
