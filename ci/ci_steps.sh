@@ -8,7 +8,7 @@ set -e
 travis lint .travis.yml --skip-completion-check
 
 # Do a build matrix with different types of builds docs, coverage, normal, etc.
-if [$TEST_TYPE == "docs"]
+if [ $TEST_TYPE == "docs" ]
 then
   echo "docs build..."
   make docs
