@@ -30,7 +30,7 @@ then
 
   git config user.name "lyft-buildnotify(travis)"
   echo 'email'
-  git config user.email $GH_EMAIL
+  git config user.email lyft-buildnotify@users.noreply.github.com
   echo 'add'
   git add .
   echo 'commit'
