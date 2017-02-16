@@ -11,14 +11,14 @@ void SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
                                              ::RateLimit::Descriptor& descriptor,
                                              const std::string& local_service_cluster,
                                              const Http::HeaderMap&, const std::string&) const {
-  descriptor.entries_.push_back({"from_cluster", local_service_cluster});
+  descriptor.entries_.push_back({"source_cluster", local_service_cluster});
 }
 
 void DestinationClusterAction::populateDescriptor(const Router::RouteEntry& route,
                                                   ::RateLimit::Descriptor& descriptor,
                                                   const std::string&, const Http::HeaderMap&,
                                                   const std::string&) const {
-  descriptor.entries_.push_back({"to_cluster", route.clusterName()});
+  descriptor.entries_.push_back({"destination_cluster", route.clusterName()});
 }
 
 void RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
