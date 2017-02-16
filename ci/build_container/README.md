@@ -11,4 +11,4 @@ After you have made changes to `build_container.sh` and merge them to master:
     ```
     ~/envoy/ci/build_container $ DOCKER_USERNAME=user DOCKER_PASSWORD=pass ./update_build_container.sh
     ```
-3.  After you have done that, update `ci/ci_steps.sh` in a new PR to pull the new tagged version of `lyft/envoy-build` during CI runs. Any PRs that depend on this image change will have to merge master after the change to `ci/ci_steps.sh` has been merged to master.
+3.  After you have done that, update `ci/ci_steps.sh` in a new PR to pull the new tagged version of `lyft/envoy-build` during CI runs by updating the `ENVOY_BUILD_SHA` variable. Any PRs that depend on this image change will have to merge master after the change to `ci/ci_steps.sh` has been merged to master.
