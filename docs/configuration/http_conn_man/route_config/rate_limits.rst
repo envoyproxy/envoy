@@ -57,7 +57,7 @@ Source Cluster
 
 The following descriptor entry is appended to the descriptor:
 
-  * ("from_cluster", "<local service cluster>")
+  * ("source_cluster", "<local service cluster>")
 
 <local service cluster> is derived from the :option:`--service-cluster` option.
 
@@ -72,7 +72,7 @@ Destination Cluster
 
 The following descriptor entry is appended to the descriptor:
 
-  * ("to_cluster", "<routed target cluster>")
+  * ("destination_cluster", "<routed target cluster>")
 
 Once a request matches against a route table rule, a routed cluster is determined by one of the
 following :ref:`route table configuration <config_http_conn_man_route_table_route_cluster>`

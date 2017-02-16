@@ -220,7 +220,7 @@ TEST_F(RateLimitConfiguration, TestVirtualHost) {
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, "");
   }
-  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"to_cluster", "www2test"}}}}),
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"destination_cluster", "www2test"}}}}),
               testing::ContainerEq(descriptors));
 }
 
@@ -282,8 +282,8 @@ TEST_F(RateLimitConfiguration, TestMultipleRateLimits) {
   }
   EXPECT_THAT(std::vector<::RateLimit::Descriptor>(
                   {{{{"remote_address", address}}},
-                   {{{"to_cluster", "www2test"}}},
-                   {{{"to_cluster", "www2test"}, {"from_cluster", "service_cluster"}}}}),
+                   {{{"destination_cluster", "www2test"}}},
+                   {{{"destination_cluster", "www2test"}, {"source_cluster", "service_cluster"}}}}),
               testing::ContainerEq(descriptors));
 }
 
@@ -370,7 +370,7 @@ TEST_F(RateLimitPolicyEntryTest, SourceService) {
   SetUpTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
-  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"from_cluster", "service_cluster"}}}}),
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"source_cluster", "service_cluster"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -388,7 +388,7 @@ TEST_F(RateLimitPolicyEntryTest, DestinationService) {
   SetUpTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
-  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"to_cluster", "fake_cluster"}}}}),
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -469,8 +469,8 @@ TEST_F(RateLimitPolicyEntryTest, CompoundActions) {
   SetUpTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
-  EXPECT_THAT(std::vector<::RateLimit::Descriptor>(
-                  {{{{"to_cluster", "fake_cluster"}, {"from_cluster", "service_cluster"}}}}),
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"},
+                                                      {"source_cluster", "service_cluster"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
