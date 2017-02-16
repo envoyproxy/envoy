@@ -20,7 +20,7 @@ then
   ssh-add .publishdocskey
 
   echo 'cloning'
-  git clone https://github.com/lyft/envoy $PUBLISH_DIR
+  git clone git@github.com:lyft/envoy $PUBLISH_DIR
 
   git -C $PUBLISH_DIR fetch
   git -C $PUBLISH_DIR checkout -B gh-pages-test origin/gh-pages
@@ -35,10 +35,8 @@ then
   git add .
   echo 'commit'
   git commit -m "docs @$BUILD_SHA"
-  echo 'set remote to ssh'
-   git remote add docs ssh://git@github.com:lyft/envoy
   echo 'push'
-  git push docs gh-pages-test
+  git push origin gh-pages-test
 else
   echo "Ignoring branch for docs push"
 fi
