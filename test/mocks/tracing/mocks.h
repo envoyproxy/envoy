@@ -4,6 +4,10 @@
 
 namespace Tracing {
 
+bool operator==(const TransportContext& lhs, const TransportContext& rhs) {
+  return lhs.request_id_ == rhs.request_id_ && lhs.span_context_ == rhs.span_context_;
+}
+
 class MockConfig : public Config {
 public:
   MockConfig();
