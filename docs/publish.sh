@@ -25,7 +25,7 @@ then
   git clone git@github.com:lyft/envoy $PUBLISH_DIR
 
   git -C $PUBLISH_DIR fetch
-  git -C $PUBLISH_DIR checkout -B gh-pages-testout origin/gh-pages
+  git -C $PUBLISH_DIR checkout -B gh-pages origin/gh-pages
   rm -fr $PUBLISH_DIR/*
   cp -r $DOCS_DIR/* $PUBLISH_DIR
   cd $PUBLISH_DIR
@@ -37,7 +37,7 @@ then
   echo 'commit'
   git commit -m "docs @$BUILD_SHA"
   echo 'push'
-  git push origin gh-pages-testout
+  git push origin gh-pages
 else
   echo "Ignoring PR branch for docs push"
 fi

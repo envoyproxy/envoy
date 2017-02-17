@@ -14,7 +14,7 @@ env:
   - TEST_TYPE=docs
 # .publishdocskey.enc is an encoded ssh key used to push to our gh-pages branch.
 # travis encrypted the key, and set up two secret variables to decrypt the key:
-#  $encrypted_b1a4cc52fa4a_key, and $encrypted_b1a4cc52fa4a_iv. The command
+# $encrypted_b1a4cc52fa4a_key, and $encrypted_b1a4cc52fa4a_iv. The command
 # below uses those vars to decrypt the key.
 before_script: openssl aes-256-cbc -K $encrypted_b1a4cc52fa4a_key -iv $encrypted_b1a4cc52fa4a_iv -in .publishdocskey.enc -out .publishdocskey -d
 script: ./ci/ci_steps.sh
