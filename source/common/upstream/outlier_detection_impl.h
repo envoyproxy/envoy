@@ -20,8 +20,8 @@ public:
   uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
-  Optional<SystemTime> ejectionTime() override { return SystemTime(); }
-  Optional<SystemTime> lastUnejectionTime() override { return SystemTime(); }
+  Optional<SystemTime> ejectionTime() override { return Optional<SystemTime>(SystemTime()); }
+  Optional<SystemTime> lastUnejectionTime() override { return Optional<SystemTime>(SystemTime()); }
 };
 
 /**
