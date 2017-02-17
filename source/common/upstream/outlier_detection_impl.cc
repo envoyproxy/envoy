@@ -254,7 +254,7 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
   SystemTime now = time_source_.currentSystemTime();
   file_->write(fmt::format(
       json, AccessLogDateTimeFormatter::fromTime(now),
-      ((host->outlierDetector().lastUnejectionTime().valid())
+      ((host->outlierDetector().ejectionTime().valid())
            ? (std::chrono::duration_cast<std::chrono::seconds>(
                   now - host->outlierDetector().ejectionTime().value()).count())
            : -1),
@@ -268,6 +268,10 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
   }
 
   NOT_IMPLEMENTED;
+}
+
+int EventLoggerImpl::secsSinceLastAction(HostDescriptionPtr host) {
+
 }
 
 } // Outlier
