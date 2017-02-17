@@ -1656,13 +1656,18 @@ TEST(RouteMatcherTest, TestOpaqueOptions) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
 
-  EXPECT_EQ("testvalue",
-            config.route(genHeaders("api.lyft.com", "/", "GET"), 0)->routeEntry()->opaqueConfig()->getString("teststring"));
-  EXPECT_EQ(true,
-            config.route(genHeaders("api.lyft.com", "/", "GET"), 0)->routeEntry()->opaqueConfig()->getBoolean("testbool"));
-  EXPECT_EQ(1234,
-            config.route(genHeaders("api.lyft.com", "/", "GET"), 0)->routeEntry()->opaqueConfig()->getInteger("testnumber"));
+  EXPECT_EQ("testvalue", config.route(genHeaders("api.lyft.com", "/", "GET"), 0)
+                             ->routeEntry()
+                             ->opaqueConfig()
+                             ->getString("teststring"));
+  EXPECT_EQ(true, config.route(genHeaders("api.lyft.com", "/", "GET"), 0)
+                      ->routeEntry()
+                      ->opaqueConfig()
+                      ->getBoolean("testbool"));
+  EXPECT_EQ(1234, config.route(genHeaders("api.lyft.com", "/", "GET"), 0)
+                      ->routeEntry()
+                      ->opaqueConfig()
+                      ->getInteger("testnumber"));
 }
-
 
 } // Router
