@@ -8,6 +8,12 @@ BUILD_SHA=`git rev-parse HEAD`
 
 if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ]
 then
+  # .publishdocskey.enc is an encoded ssh key used to push to our gh-pages branch.
+  # travis encrypted the key, and set up two secret variables to decrypt the key:
+  # $encrypted_b1a4cc52fa4a_key, and $encrypted_b1a4cc52fa4a_iv. The command
+  # below uses those vars to decrypt the key.
+  openssl aes-256-cbc -K $encrypted_b1a4cc52fa4a_key -iv $encrypted_b1a4cc52fa4a_iv -in .publishdocskey.enc -out .publishdocskey -d
+
   # Set up ssh config to be able to push the docs to github.
   echo "Setting up ssh"
   mkdir -p ~/.ssh
