@@ -51,6 +51,12 @@ public:
   virtual Outlier::DetectorHostSink& outlierDetector() const PURE;
 
   /**
+   * @return the hostname associated with the host if any.
+   * Empty string "" indicates that hostname is not a DNS name.
+   */
+  virtual const std::string& hostName() const PURE;
+
+  /**
    * @return the address used to connect to the host.
    */
   virtual Network::Address::InstancePtr address() const PURE;

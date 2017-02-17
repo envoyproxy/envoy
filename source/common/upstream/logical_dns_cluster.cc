@@ -21,9 +21,8 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
   }
 
   dns_url_ = hosts_json[0]->getString("url");
-  Network::Utility::hostFromTcpUrl(dns_url_);
-  Network::Utility::portFromTcpUrl(dns_url_);
-
+  hostname_ = Network::Utility::hostAndPortFromTcpUrl(dns_url_);
+    
   // This must come before startResolve(), since the resolve callback relies on
   // tls_slot_ being initialized.
   tls.set(tls_slot_, [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr {
@@ -71,7 +70,7 @@ void LogicalDnsCluster::startResolve() {
             //       express a DNS name inside of an Address::Instance. For now this is OK but
             //       we might want to do better again later.
             logical_host_.reset(
-                new LogicalHost(info_, Network::Utility::resolveUrl("tcp://0.0.0.0:0"), *this));
+                                new LogicalHost(info_, "", Network::Utility::resolveUrl("tcp://0.0.0.0:0"), *this));
             HostVectorPtr new_hosts(new std::vector<HostPtr>());
             new_hosts->emplace_back(logical_host_);
             updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,

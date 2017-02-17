@@ -238,7 +238,7 @@ BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
                                         Http::CodecClient::Type type) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionPtr host_description{new Upstream::HostDescriptionImpl(
-      cluster, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
+                                                                                  cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
   return IntegrationCodecClientPtr{
       new IntegrationCodecClient(*dispatcher_, std::move(conn), host_description, type)};
 }

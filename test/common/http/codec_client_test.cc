@@ -49,7 +49,7 @@ public:
   Network::ReadFilterPtr filter_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionPtr host_{new Upstream::HostDescriptionImpl(
-      cluster_, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
+                                                                       cluster_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
 };
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
