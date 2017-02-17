@@ -27,9 +27,11 @@ public:
 
 class RingHashLoadBalancerTest : public testing::Test {
 public:
+  RingHashLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
+
   NiceMock<MockCluster> cluster_;
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_)};
+  ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   RingHashLoadBalancer lb_{cluster_, stats_, runtime_, random_};
