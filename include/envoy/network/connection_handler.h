@@ -49,12 +49,12 @@ public:
                               bool use_proxy_proto, bool use_orig_dst) PURE;
 
   /**
-   * Find a listener based on the provided socket name
-   * @param name supplies the name of the socket
+   * Find a listener based on the provided listener port value.
+   * @param port supplies the port value
    * @return a pointer to the listener or nullptr if not found.
    * Ownership of the listener is NOT transferred
    */
-  virtual Network::Listener* findListener(const std::string& socket_name) PURE;
+  virtual Network::Listener* findListenerByPort(uint32_t port) PURE;
 
   /**
    * Close and destroy all listeners.
