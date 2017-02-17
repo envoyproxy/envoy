@@ -102,7 +102,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       host_redirect_(route.getString("host_redirect", "")),
       path_redirect_(route.getString("path_redirect", "")), retry_policy_(route),
       rate_limit_policy_(route), shadow_policy_(route),
-      priority_(ConfigUtility::parsePriority(route)) {
+      priority_(ConfigUtility::parsePriority(route)),
+      opaque_config_(route.getObject("opaque_config")) {
 
   route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
 

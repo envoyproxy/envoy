@@ -213,6 +213,7 @@ public:
   std::chrono::milliseconds timeout() const override { return timeout_; }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
+  const Json::ObjectPtr& opaqueConfig() const override { return opaque_config_; }
 
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -256,6 +257,10 @@ private:
 
     const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
       return parent_->virtualCluster(headers);
+    }
+
+    const Json::ObjectPtr& opaqueConfig() const override {
+      return parent_->opaqueConfig();
     }
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
@@ -318,6 +323,7 @@ private:
   std::vector<ConfigUtility::HeaderData> config_headers_;
   std::vector<WeightedClusterEntryPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
+  const Json::ObjectPtr opaque_config_;
 };
 
 /**

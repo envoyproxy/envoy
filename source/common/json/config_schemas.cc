@@ -544,7 +544,8 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : ["header_name"],
         "additionalProperties" : false
-      }
+      },
+      "opaque_config" : {"type" : "any"}
     },
     "additionalProperties" : false
   }

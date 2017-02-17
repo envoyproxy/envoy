@@ -1628,4 +1628,41 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPath) {
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
 }
 
+TEST(RouteMatcherTest, TestOpaqueOptions) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "default",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/api/application_data",
+          "cluster": "ats",
+          "opaque_config": {
+              "teststring": "testvalue",
+              "testbool": true,
+              "testnumber": 1234
+          }
+        }]
+    }
+  ]
+
+}
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(*loader, runtime, cm, true);
+
+  EXPECT_EQ("testvalue",
+            config.route(genHeaders("api.lyft.com", "/", "GET"), 0)->routeEntry()->opaqueConfig()->getString("teststring"));
+  EXPECT_EQ(true,
+            config.route(genHeaders("api.lyft.com", "/", "GET"), 0)->routeEntry()->opaqueConfig()->getBoolean("testbool"));
+  EXPECT_EQ(1234,
+            config.route(genHeaders("api.lyft.com", "/", "GET"), 0)->routeEntry()->opaqueConfig()->getInteger("testnumber"));
+}
+
+
 } // Router

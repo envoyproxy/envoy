@@ -3,6 +3,7 @@
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/json/json_object.h"
 #include "envoy/upstream/resource_manager.h"
 
 namespace Router {
@@ -225,6 +226,11 @@ public:
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
+
+  /**
+   * @return const Json::ObjectPtr& the opaque configuration associated with the route
+   */
+  virtual const Json::ObjectPtr& opaqueConfig() const PURE;
 };
 
 /**

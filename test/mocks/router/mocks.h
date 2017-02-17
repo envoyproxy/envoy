@@ -148,6 +148,7 @@ public:
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
+  MOCK_CONST_METHOD0(opaqueConfig, const Json::ObjectPtr&());
 
   std::string cluster_name_{"fake_cluster"};
   TestVirtualCluster virtual_cluster_;
