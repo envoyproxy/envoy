@@ -399,7 +399,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EventLoggerImpl event_logger(log_manager, "foo", time_source);
 
   std::string log1;
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"cluster\": "
+  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                           "\"-1\", \"cluster\": "
                            "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
                            "\"eject\", \"type\": \"5xx\", \"num_ejections\": 0}\n"))
       .WillOnce(SaveArg<0>(&log1));
@@ -407,10 +408,10 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   Json::Factory::LoadFromString(log1);
 
   std::string log2;
-  EXPECT_CALL(*file,
-              write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"cluster\": \"fake_cluster\", "
-                    "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
-                    "\"num_ejections\": 0}\n")).WillOnce(SaveArg<0>(&log2));
+  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                           "\"0\", \"cluster\": \"fake_cluster\", "
+                           "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
+                           "\"num_ejections\": 0}\n")).WillOnce(SaveArg<0>(&log2));
   event_logger.logUneject(host);
   Json::Factory::LoadFromString(log2);
 }

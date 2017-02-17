@@ -31,6 +31,10 @@ void DetectorHostSinkImpl::eject(SystemTime ejection_time) {
   ejection_time_ = ejection_time;
 }
 
+void DetectorHostSinkImpl::uneject(SystemTime unejection_time) {
+  last_unejection_time_ = unejection_time;
+}
+
 void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
@@ -124,8 +128,8 @@ void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink,
   if ((base_eject_time * sink->numEjections()) <= (now - sink->ejectionTime())) {
     stats_.ejections_active_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+    sink->uneject(now);
     runCallbacks(host);
-
     if (event_logger_) {
       event_logger_->logUneject(host);
     }
@@ -142,7 +146,6 @@ void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
       stats_.ejections_active_.inc();
       host_sinks_[host]->eject(time_source_.currentSystemTime());
       runCallbacks(host);
-
       if (event_logger_) {
         event_logger_->logEject(host, type);
       }
@@ -214,6 +217,7 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
   static const std::string json =
     std::string("{{") +
     "\"time\": \"{}\", " +
+    "\"secs_since_last_action\": \"{}\", " +
     "\"cluster\": \"{}\", " +
     "\"upstream_url\": \"{}\", " +
     "\"action\": \"eject\", " +
@@ -221,9 +225,11 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
     "\"num_ejections\": {}" +
     "}}\n";
   // clang-format on
-
-  file_->write(fmt::format(json,
-                           AccessLogDateTimeFormatter::fromTime(time_source_.currentSystemTime()),
+  SystemTime now = time_source_.currentSystemTime();
+  file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
+                           ((host->outlierDetector().numEjections() == 1)
+                                ? ((now - host->outlierDetector().lastUnejectionTime()).count())
+                                : -1),
                            host->cluster().name(), host->address()->asString(), typeToString(type),
                            host->outlierDetector().numEjections()));
 }
@@ -234,16 +240,18 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
   static const std::string json =
     std::string("{{") +
     "\"time\": \"{}\", " +
+    "\"secs_since_last_action\": \"{}\", " +
     "\"cluster\": \"{}\", " +
     "\"upstream_url\": \"{}\", " +
     "\"action\": \"uneject\", " +
     "\"num_ejections\": {}" +
     "}}\n";
   // clang-format on
-
-  file_->write(fmt::format(
-      json, AccessLogDateTimeFormatter::fromTime(time_source_.currentSystemTime()),
-      host->cluster().name(), host->address()->asString(), host->outlierDetector().numEjections()));
+  SystemTime now = time_source_.currentSystemTime();
+  file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
+                           (now - host->outlierDetector().ejectionTime()).count(),
+                           host->cluster().name(), host->address()->asString(),
+                           host->outlierDetector().numEjections()));
 }
 
 std::string EventLoggerImpl::typeToString(EjectionType type) {
