@@ -59,6 +59,7 @@ being ejected and for what reasons. The log uses a JSON format with one object p
 
   {
     "time": "...",
+    "secs_since_last_action": "...",
     "cluster": "...",
     "upstream_url": "...",
     "action": "...",
@@ -68,6 +69,9 @@ being ejected and for what reasons. The log uses a JSON format with one object p
 
 time
   The time that the event took place.
+
+secs_since_last_action
+  The time that the last event took place. This time will be -1 for the first ejection.
 
 cluster
   The :ref:`cluster <config_cluster_manager_cluster>` that owns the ejected host.

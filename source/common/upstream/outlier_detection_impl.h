@@ -20,8 +20,8 @@ public:
   uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
-  SystemTime ejectionTime() override { return SystemTime(); }
-  SystemTime lastUnejectionTime() override { return SystemTime(); }
+  Optional<SystemTime> ejectionTime() override { return SystemTime(); }
+  Optional<SystemTime> lastUnejectionTime() override { return SystemTime(); }
 };
 
 /**
@@ -51,15 +51,15 @@ public:
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
   void putResponseTime(std::chrono::milliseconds) override {}
-  SystemTime ejectionTime() { return ejection_time_; }
-  SystemTime lastUnejectionTime() { return last_unejection_time_; }
+  Optional<SystemTime> ejectionTime() { return ejection_time_; }
+  Optional<SystemTime> lastUnejectionTime() { return last_unejection_time_; }
 
 private:
   std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
   std::atomic<uint32_t> consecutive_5xx_{0};
-  SystemTime ejection_time_;
-  SystemTime last_unejection_time_;
+  Optional<SystemTime> ejection_time_;
+  Optional<SystemTime> last_unejection_time_;
   uint32_t num_ejections_{};
 };
 

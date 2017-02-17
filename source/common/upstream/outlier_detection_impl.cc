@@ -28,11 +28,11 @@ void DetectorHostSinkImpl::eject(SystemTime ejection_time) {
   ASSERT(!host_.lock()->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   host_.lock()->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   num_ejections_++;
-  ejection_time_ = ejection_time;
+  ejection_time_.value(ejection_time);
 }
 
 void DetectorHostSinkImpl::uneject(SystemTime unejection_time) {
-  last_unejection_time_ = unejection_time;
+  last_unejection_time_.value(unejection_time);
 }
 
 void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
@@ -125,11 +125,12 @@ void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink,
   std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
       runtime_.snapshot().getInteger("outlier_detection.base_ejection_time_ms", 30000));
   ASSERT(sink->numEjections() > 0)
-  if ((base_eject_time * sink->numEjections()) <= (now - sink->ejectionTime())) {
+  if ((base_eject_time * sink->numEjections()) <= (now - sink->ejectionTime().value())) {
     stats_.ejections_active_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     sink->uneject(now);
     runCallbacks(host);
+
     if (event_logger_) {
       event_logger_->logUneject(host);
     }
@@ -146,6 +147,7 @@ void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
       stats_.ejections_active_.inc();
       host_sinks_[host]->eject(time_source_.currentSystemTime());
       runCallbacks(host);
+
       if (event_logger_) {
         event_logger_->logEject(host, type);
       }
@@ -227,9 +229,9 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
   // clang-format on
   SystemTime now = time_source_.currentSystemTime();
   file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
-                           ((host->outlierDetector().numEjections() == 1)
+                           ((host->outlierDetector().lastUnejectionTime().valid())
                                 ? (std::chrono::duration_cast<std::chrono::seconds>(
-                                       now - host->outlierDetector().lastUnejectionTime()).count())
+                                       now - host->outlierDetector().lastUnejectionTime().value()).count())
                                 : -1),
                            host->cluster().name(), host->address()->asString(), typeToString(type),
                            host->outlierDetector().numEjections()));
@@ -250,8 +252,10 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
   // clang-format on
   SystemTime now = time_source_.currentSystemTime();
   file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
-                           std::chrono::duration_cast<std::chrono::seconds>(
-                               now - host->outlierDetector().ejectionTime()).count(),
+                           ((host->outlierDetector().lastUnejectionTime().valid())
+                            ? (std::chrono::duration_cast<std::chrono::seconds>(
+                                   now - host->outlierDetector().ejectionTime().value()).count())
+                            : -1),
                            host->cluster().name(), host->address()->asString(),
                            host->outlierDetector().numEjections()));
 }

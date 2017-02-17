@@ -409,7 +409,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
 
   std::string log2;
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                           "\"0\", \"cluster\": \"fake_cluster\", "
+                           "\"-1\", \"cluster\": \"fake_cluster\", "
                            "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
                            "\"num_ejections\": 0}\n")).WillOnce(SaveArg<0>(&log2));
   event_logger.logUneject(host);
