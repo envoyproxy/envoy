@@ -6,14 +6,6 @@ set -e
 
 echo "building using $NUM_CPUS CPUs"
 
-if [[ "$1" == "docs" ]]; then
-  echo "docs build..."
-  make docs
-  # this target will run a script that will publish docs on a master commit.
-  docs/publish.sh
-  exit 0
-fi
-
 . "$(dirname "$0")"/build_setup.sh
 
 if [[ "$1" == "fix_format" ]]; then

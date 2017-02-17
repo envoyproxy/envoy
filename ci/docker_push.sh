@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ev
+set -e
 
 if [ "$TEST_TYPE" == "normal" ]
 then
