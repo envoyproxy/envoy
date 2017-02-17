@@ -228,7 +228,8 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
   SystemTime now = time_source_.currentSystemTime();
   file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
                            ((host->outlierDetector().numEjections() == 1)
-                                ? ((now - host->outlierDetector().lastUnejectionTime()).count())
+                                ? (std::chrono::duration_cast<std::chrono::seconds>(
+                                       now - host->outlierDetector().lastUnejectionTime()).count())
                                 : -1),
                            host->cluster().name(), host->address()->asString(), typeToString(type),
                            host->outlierDetector().numEjections()));
@@ -249,7 +250,8 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
   // clang-format on
   SystemTime now = time_source_.currentSystemTime();
   file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
-                           (now - host->outlierDetector().ejectionTime()).count(),
+                           std::chrono::duration_cast<std::chrono::seconds>(
+                               now - host->outlierDetector().ejectionTime()).count(),
                            host->cluster().name(), host->address()->asString(),
                            host->outlierDetector().numEjections()));
 }
