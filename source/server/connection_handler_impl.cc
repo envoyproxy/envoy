@@ -23,7 +23,7 @@ void ConnectionHandlerImpl::addListener(Network::FilterChainFactory& factory,
                                         bool use_proxy_proto, bool use_orig_dst) {
   ActiveListenerPtr l(
       new ActiveListener(*this, socket, factory, bind_to_port, use_proxy_proto, use_orig_dst));
-  listeners_.push_back(std::make_pair(socket.localAddress(), std::move(l)));
+  listeners_.emplace_back(socket.localAddress(), std::move(l));
 }
 
 void ConnectionHandlerImpl::addSslListener(Network::FilterChainFactory& factory,
@@ -32,7 +32,7 @@ void ConnectionHandlerImpl::addSslListener(Network::FilterChainFactory& factory,
                                            bool use_proxy_proto, bool use_orig_dst) {
   ActiveListenerPtr l(new SslActiveListener(*this, ssl_ctx, socket, factory, bind_to_port,
                                             use_proxy_proto, use_orig_dst));
-  listeners_.push_back(std::make_pair(socket.localAddress(), std::move(l)));
+  listeners_.emplace_back(socket.localAddress(), std::move(l));
 }
 
 void ConnectionHandlerImpl::closeConnections() {
@@ -86,6 +86,9 @@ ConnectionHandlerImpl::SslActiveListener::SslActiveListener(ConnectionHandlerImp
                      factory, socket.localAddress()->asString()) {}
 
 Network::Listener* ConnectionHandlerImpl::findListenerByPort(uint32_t port) {
+  // findListenerByPort is O(#listeners) operation, may need to add a map<port, listener>
+  // to improve performance to O(log #listeners); since the number of listeners is small
+  // linear performance might be adequate
   auto l = std::find_if(
       listeners_.begin(), listeners_.end(),
       [port](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
