@@ -23,7 +23,7 @@ void ConnectionHandlerImpl::addListener(Network::FilterChainFactory& factory,
                                         bool use_proxy_proto, bool use_orig_dst) {
   ActiveListenerPtr l(
       new ActiveListener(*this, socket, factory, bind_to_port, use_proxy_proto, use_orig_dst));
-  listeners_.insert(std::make_pair(socket.localAddress()->asString(), std::move(l)));
+  listeners_.push_back(std::make_pair(socket.localAddress(), std::move(l)));
 }
 
 void ConnectionHandlerImpl::addSslListener(Network::FilterChainFactory& factory,
@@ -32,7 +32,7 @@ void ConnectionHandlerImpl::addSslListener(Network::FilterChainFactory& factory,
                                            bool use_proxy_proto, bool use_orig_dst) {
   ActiveListenerPtr l(new SslActiveListener(*this, ssl_ctx, socket, factory, bind_to_port,
                                             use_proxy_proto, use_orig_dst));
-  listeners_.insert(std::make_pair(socket.localAddress()->asString(), std::move(l)));
+  listeners_.push_back(std::make_pair(socket.localAddress(), std::move(l)));
 }
 
 void ConnectionHandlerImpl::closeConnections() {
@@ -85,8 +85,12 @@ ConnectionHandlerImpl::SslActiveListener::SslActiveListener(ConnectionHandlerImp
                                  use_proxy_proto, use_orig_dst),
                      factory, socket.localAddress()->asString()) {}
 
-Network::Listener* ConnectionHandlerImpl::findListener(const std::string& socket_name) {
-  auto l = listeners_.find(socket_name);
+Network::Listener* ConnectionHandlerImpl::findListenerByPort(uint32_t port) {
+  auto l = std::find_if(
+      listeners_.begin(), listeners_.end(),
+      [port](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
+        return p.first->type() == Network::Address::Type::Ip && p.first->ip()->port() == port;
+      });
   return (l != listeners_.end()) ? l->second->listener_.get() : nullptr;
 }
 

@@ -215,7 +215,7 @@ public:
   MOCK_METHOD6(addSslListener, void(Network::FilterChainFactory& factory,
                                     Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                     bool bind_to_port, bool use_proxy_proto, bool use_orig_dst));
-  MOCK_METHOD1(findListener, Network::Listener*(const std::string& socket_name));
+  MOCK_METHOD1(findListenerByPort, Network::Listener*(uint32_t port));
   MOCK_METHOD0(closeListeners, void());
 };
 

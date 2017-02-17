@@ -63,7 +63,7 @@ public:
                       Network::ListenSocket& socket, bool bind_to_port, bool use_proxy_proto,
                       bool use_orig_dst) override;
 
-  Network::Listener* findListener(const std::string& socket_name) override;
+  Network::Listener* findListenerByPort(uint32_t port) override;
 
   void closeListeners() override;
 
@@ -138,7 +138,7 @@ private:
   spdlog::logger& logger_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::map<std::string, ActiveListenerPtr> listeners_;
+  std::list<std::pair<Network::Address::InstancePtr, ActiveListenerPtr>> listeners_;
   std::list<ActiveConnectionPtr> connections_;
   std::atomic<uint64_t> num_connections_{};
   Stats::Counter& watchdog_miss_counter_;

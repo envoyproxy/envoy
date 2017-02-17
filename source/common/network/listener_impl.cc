@@ -23,9 +23,9 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
 
   Address::InstancePtr final_local_address = listener->socket_.localAddress();
   if (listener->use_original_dst_ && final_local_address->type() == Address::Type::Ip) {
-    Address::InstancePtr orginal_local_address = listener->getOriginalDst(fd);
-    if (orginal_local_address) {
-      final_local_address = orginal_local_address;
+    Address::InstancePtr original_local_address = listener->getOriginalDst(fd);
+    if (original_local_address) {
+      final_local_address = original_local_address;
     }
 
     // A listener that has the use_original_dst flag set to true can still receive connections
@@ -34,7 +34,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
     // In this case the listener handles the connection directly and does not hand it off.
     if (listener->socket_.localAddress()->ip()->port() != final_local_address->ip()->port()) {
       ListenerImpl* new_listener = dynamic_cast<ListenerImpl*>(
-          listener->connection_handler_.findListener(final_local_address->asString()));
+          listener->connection_handler_.findListenerByPort(final_local_address->ip()->port()));
 
       if (new_listener != nullptr) {
         listener = new_listener;
