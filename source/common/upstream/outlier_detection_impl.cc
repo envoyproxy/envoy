@@ -228,14 +228,10 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
     "}}\n";
   // clang-format on
   SystemTime now = time_source_.currentSystemTime();
-  file_->write(
-      fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
-                  ((host->outlierDetector().lastUnejectionTime().valid())
-                       ? (std::chrono::duration_cast<std::chrono::seconds>(
-                              now - host->outlierDetector().lastUnejectionTime().value()).count())
-                       : -1),
-                  host->cluster().name(), host->address()->asString(), typeToString(type),
-                  host->outlierDetector().numEjections()));
+  file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
+                           secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), now),
+                           host->cluster().name(), host->address()->asString(), typeToString(type),
+                           host->outlierDetector().numEjections()));
 }
 
 void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
@@ -252,13 +248,10 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
     "}}\n";
   // clang-format on
   SystemTime now = time_source_.currentSystemTime();
-  file_->write(fmt::format(
-      json, AccessLogDateTimeFormatter::fromTime(now),
-      ((host->outlierDetector().ejectionTime().valid())
-           ? (std::chrono::duration_cast<std::chrono::seconds>(
-                  now - host->outlierDetector().ejectionTime().value()).count())
-           : -1),
-      host->cluster().name(), host->address()->asString(), host->outlierDetector().numEjections()));
+  file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
+                           secsSinceLastAction(host->outlierDetector().ejectionTime(), now),
+                           host->cluster().name(), host->address()->asString(),
+                           host->outlierDetector().numEjections()));
 }
 
 std::string EventLoggerImpl::typeToString(EjectionType type) {
@@ -270,8 +263,11 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
   NOT_IMPLEMENTED;
 }
 
-int EventLoggerImpl::secsSinceLastAction(HostDescriptionPtr host) {
-
+int EventLoggerImpl::secsSinceLastAction(Optional<SystemTime> lastActionTime, SystemTime now) {
+  if (lastActionTime.valid()) {
+    return std::chrono::duration_cast<std::chrono::seconds>(now - lastActionTime.value()).count();
+  }
+  return -1;
 }
 
 } // Outlier

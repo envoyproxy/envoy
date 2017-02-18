@@ -136,6 +136,7 @@ public:
 
 private:
   std::string typeToString(EjectionType type);
+  int secsSinceLastAction(Optional<SystemTime> lastActionTime, SystemTime now);
 
   Filesystem::FilePtr file_;
   SystemTimeSource& time_source_;
