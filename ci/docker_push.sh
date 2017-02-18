@@ -19,7 +19,8 @@ then
   then
       docker login -e $DOCKER_EMAIL -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
       docker push lyft/envoy:latest
-      test -z "$TRAVIS_COMMIT" || docker push lyft/envoy:$TRAVIS_COMMIT
+      docker tag lyft/envoy:latest lyft/envoy:$TRAVIS_COMMIT
+      docker push lyft/envoy:$TRAVIS_COMMIT
   else
       echo 'Ignoring PR branch for docker push.'
   fi
