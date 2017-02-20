@@ -88,7 +88,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostPtr host_{new Upstream::HostImpl(
-      cluster_, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")};
+      cluster_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")};
   TestConnPoolImpl pool_;
   std::vector<TestCodecClient> test_clients_;
   NiceMock<Runtime::MockLoader> runtime_;

@@ -13,7 +13,7 @@ namespace Upstream {
 
 static HostPtr newTestHost(Upstream::ClusterInfoPtr cluster, const std::string& url,
                            uint32_t weight = 1, const std::string& zone = "") {
-  return HostPtr{new HostImpl(cluster, Network::Utility::resolveUrl(url), false, weight, zone)};
+  return HostPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, weight, zone)};
 }
 
 /**

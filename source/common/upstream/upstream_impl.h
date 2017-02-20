@@ -41,7 +41,7 @@ public:
     }
   }
   const HostStats& stats() const override { return stats_; }
-  const std::string& hostName() const override { return hostname_; }
+  const std::string& hostname() const override { return hostname_; }
   Network::Address::InstancePtr address() const override { return address_; }
   const std::string& zone() const override { return zone_; }
 

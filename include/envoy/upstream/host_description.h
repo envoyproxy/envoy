@@ -54,7 +54,7 @@ public:
    * @return the hostname associated with the host if any.
    * Empty string "" indicates that hostname is not a DNS name.
    */
-  virtual const std::string& hostName() const PURE;
+  virtual const std::string& hostname() const PURE;
 
   /**
    * @return the address used to connect to the host.

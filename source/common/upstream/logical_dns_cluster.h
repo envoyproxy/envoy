@@ -63,7 +63,7 @@ private:
       return logical_host_->outlierDetector();
     }
     const HostStats& stats() const override { return logical_host_->stats(); }
-    const std::string& hostName() const override { return logical_host->hostName(); }
+    const std::string& hostname() const override { return logical_host_->hostname(); }
     Network::Address::InstancePtr address() const override { return address_; }
     const std::string& zone() const override { return EMPTY_STRING; }
 
