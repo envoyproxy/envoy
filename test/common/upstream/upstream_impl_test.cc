@@ -200,6 +200,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_CALL(resolver2.active_dns_query_, cancel());
 }
 
+#if 0
 TEST(HostImplTest, HostCluster) {
   MockCluster cluster;
   HostImpl host(cluster.info, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 1,
@@ -247,6 +248,7 @@ TEST(HostImplTest, HostameCanaryAndZone) {
   EXPECT_TRUE(host.canary());
   EXPECT_EQ("hello", host.zone());
 }
+#endif
 
 TEST(StaticClusterImplTest, OutlierDetector) {
   Stats::IsolatedStoreImpl stats;
