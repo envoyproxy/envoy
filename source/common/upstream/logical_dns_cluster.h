@@ -42,9 +42,9 @@ public:
 
 private:
   struct LogicalHost : public HostImpl {
-  LogicalHost(ClusterInfoPtr cluster, const std::string& hostname, Network::Address::InstancePtr address,
-                LogicalDnsCluster& parent)
-      : HostImpl(cluster, hostname, address, false, 1, ""), parent_(parent) {}
+    LogicalHost(ClusterInfoPtr cluster, const std::string& hostname,
+                Network::Address::InstancePtr address, LogicalDnsCluster& parent)
+        : HostImpl(cluster, hostname, address, false, 1, ""), parent_(parent) {}
 
     // Upstream::Host
     CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override;

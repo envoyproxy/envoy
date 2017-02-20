@@ -35,8 +35,8 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
     // In CF, discovery will only return hostnames for a service
     // while SDS expects only IPs. Possibly extend this with additional field called hostname?
     new_hosts.emplace_back(
-                           new HostImpl(info_, "", Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
-                                host->getString("ip_address"), host->getInteger("port"))},
+        new HostImpl(info_, "", Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
+                                    host->getString("ip_address"), host->getInteger("port"))},
                      canary, weight, zone));
   }
 

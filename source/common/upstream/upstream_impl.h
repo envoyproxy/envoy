@@ -25,8 +25,8 @@ namespace Upstream {
  */
 class HostDescriptionImpl : virtual public HostDescription {
 public:
- HostDescriptionImpl(ClusterInfoPtr cluster, const std::string& hostname, Network::Address::InstancePtr address, bool canary,
-                      const std::string& zone)
+  HostDescriptionImpl(ClusterInfoPtr cluster, const std::string& hostname,
+                      Network::Address::InstancePtr address, bool canary, const std::string& zone)
       : cluster_(cluster), hostname_(hostname), address_(address), canary_(canary), zone_(zone),
         stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {}
 
@@ -41,7 +41,7 @@ public:
     }
   }
   const HostStats& stats() const override { return stats_; }
-  const std::string& hostName() const override {return hostname_; }
+  const std::string& hostName() const override { return hostname_; }
   Network::Address::InstancePtr address() const override { return address_; }
   const std::string& zone() const override { return zone_; }
 
@@ -66,9 +66,10 @@ class HostImpl : public HostDescriptionImpl,
                  public Host,
                  public std::enable_shared_from_this<HostImpl> {
 public:
- HostImpl(ClusterInfoPtr cluster, const std::string& hostname, Network::Address::InstancePtr address, bool canary,
-           uint32_t initial_weight, const std::string& zone)
-     : HostDescriptionImpl(cluster, hostname, address, canary, zone) {
+  HostImpl(ClusterInfoPtr cluster, const std::string& hostname,
+           Network::Address::InstancePtr address, bool canary, uint32_t initial_weight,
+           const std::string& zone)
+      : HostDescriptionImpl(cluster, hostname, address, canary, zone) {
     weight(initial_weight);
   }
 

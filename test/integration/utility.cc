@@ -49,7 +49,7 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionPtr host_description{new Upstream::HostDescriptionImpl(
-                                                                                  cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
+      cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
   Http::CodecClientProd client(type,
                                dispatcher->createClientConnection(Network::Utility::resolveUrl(
                                    fmt::format("tcp://127.0.0.1:{}", port))),

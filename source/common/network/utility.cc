@@ -129,7 +129,6 @@ std::string Utility::hostAndPortFromTcpUrl(const std::string& url) {
   return url.substr(TCP_SCHEME.size());
 }
 
-
 Address::InstancePtr Utility::getLocalAddress() {
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;

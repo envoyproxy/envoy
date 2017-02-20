@@ -267,8 +267,8 @@ StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader
   std::vector<Json::ObjectPtr> hosts_json = config.getObjectArray("hosts");
   HostVectorPtr new_hosts(new std::vector<HostPtr>());
   for (Json::ObjectPtr& host : hosts_json) {
-    new_hosts->emplace_back(HostPtr{
-        new HostImpl(info_, "", Network::Utility::resolveUrl(host->getString("url")), false, 1, "")});
+    new_hosts->emplace_back(HostPtr{new HostImpl(
+        info_, "", Network::Utility::resolveUrl(host->getString("url")), false, 1, "")});
   }
 
   updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
@@ -421,9 +421,11 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           //       address that has port in it. We need to both support IPv6 as well as potentially
           //       move port handling into the DNS interface itself, which would work better for
           //       SRV.
-          new_hosts.emplace_back(new HostImpl(parent_.info_, hostname_, Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
-                                 address->ip()->addressAsString(), port_)},
-              false, 1, ""));
+          new_hosts.emplace_back(
+              new HostImpl(parent_.info_, hostname_,
+                           Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
+                               address->ip()->addressAsString(), port_)},
+                           false, 1, ""));
         }
 
         std::vector<HostPtr> hosts_added;
