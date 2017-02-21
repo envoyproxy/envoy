@@ -28,7 +28,7 @@ void DetectorHostSinkImpl::eject(SystemTime ejection_time) {
   ASSERT(!host_.lock()->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   host_.lock()->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   num_ejections_++;
-  ejection_time_.value(ejection_time);
+  last_ejection_time_.value(ejection_time);
 }
 
 void DetectorHostSinkImpl::uneject(SystemTime unejection_time) {
@@ -125,7 +125,7 @@ void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink,
   std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
       runtime_.snapshot().getInteger("outlier_detection.base_ejection_time_ms", 30000));
   ASSERT(sink->numEjections() > 0)
-  if ((base_eject_time * sink->numEjections()) <= (now - sink->ejectionTime().value())) {
+  if ((base_eject_time * sink->numEjections()) <= (now - sink->lastEjectionTime().value())) {
     stats_.ejections_active_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     sink->uneject(now);
@@ -249,7 +249,7 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
   // clang-format on
   SystemTime now = time_source_.currentSystemTime();
   file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
-                           secsSinceLastAction(host->outlierDetector().ejectionTime(), now),
+                           secsSinceLastAction(host->outlierDetector().lastEjectionTime(), now),
                            host->cluster().name(), host->address()->asString(),
                            host->outlierDetector().numEjections()));
 }

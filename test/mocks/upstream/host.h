@@ -17,7 +17,7 @@ public:
   MOCK_METHOD0(numEjections, uint32_t());
   MOCK_METHOD1(putHttpResponseCode, void(uint64_t code));
   MOCK_METHOD1(putResponseTime, void(std::chrono::milliseconds time));
-  MOCK_METHOD0(ejectionTime, Optional<SystemTime>());
+  MOCK_METHOD0(lastEjectionTime, Optional<SystemTime>());
   MOCK_METHOD0(lastUnejectionTime, Optional<SystemTime>());
 };
 

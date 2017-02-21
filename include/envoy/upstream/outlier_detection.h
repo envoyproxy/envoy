@@ -41,7 +41,7 @@ public:
    * Get the time of last ejection.
    * @return the last time this host was ejected
    */
-  virtual Optional<SystemTime> ejectionTime() PURE;
+  virtual Optional<SystemTime> lastEjectionTime() PURE;
 
   /**
    * Get the time of last unejection.
