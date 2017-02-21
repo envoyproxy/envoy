@@ -1628,7 +1628,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPath) {
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
 }
 
-TEST(RouteMatcherTest, TestOpaqueOptions) {
+TEST(RouteMatcherTest, TestOpaqueConfig) {
   std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -1637,37 +1637,29 @@ TEST(RouteMatcherTest, TestOpaqueOptions) {
       "domains": ["*"],
       "routes": [
         {
-          "prefix": "/api/application_data",
+          "prefix": "/api",
           "cluster": "ats",
-          "opaque_config": {
-              "teststring": "testvalue",
-              "testbool": true,
-              "testnumber": 1234
-          }
-        }]
+          "opaque_config" : [
+              { "name": "name1", "value": "value1" },
+              { "name": "name2", "value": "value2" }
+          ]
+        }
+      ]
     }
   ]
-
 }
-  )EOF";
+)EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
 
-  EXPECT_EQ("testvalue", config.route(genHeaders("api.lyft.com", "/", "GET"), 0)
-                             ->routeEntry()
-                             ->opaqueConfig()
-                             ->getString("teststring"));
-  EXPECT_EQ(true, config.route(genHeaders("api.lyft.com", "/", "GET"), 0)
-                      ->routeEntry()
-                      ->opaqueConfig()
-                      ->getBoolean("testbool"));
-  EXPECT_EQ(1234, config.route(genHeaders("api.lyft.com", "/", "GET"), 0)
-                      ->routeEntry()
-                      ->opaqueConfig()
-                      ->getInteger("testnumber"));
+  const std::unordered_map<std::string, std::string>& opaque_config = 
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->opaqueConfig();
+
+  EXPECT_EQ("value1", opaque_config.find("name1")->second);
+  EXPECT_EQ("value2", opaque_config.find("name2")->second);
 }
 
 } // Router

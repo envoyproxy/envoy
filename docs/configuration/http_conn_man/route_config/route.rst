@@ -27,7 +27,8 @@ next (e.g., redirect, forward, rewrite, etc.).
     "priority": "...",
     "headers": [],
     "rate_limits": [],
-    "hash_policy": "{...}"
+    "hash_policy": "{...}",
+    "opaque_config": []
   }
 
 prefix
@@ -138,6 +139,9 @@ priority
 
 :ref:`headers <config_http_conn_man_route_table_route_headers>`
   *(optional, array)* Specifies a set of headers that the route should match on.
+
+:ref:`opaque_config <config_http_conn_man_route_table_opaque_config>`
+  *(optional, array)* Specifies a set of optional route configuration values that can be accessed by filters.
 
 .. _config_http_conn_man_route_table_route_rate_limits:
 
@@ -334,3 +338,24 @@ header_name
   *(required, string)* The name of the request header that will be used to obtain the hash key. If
   the request header is not present, the load balancer will use a random number as the hash,
   effectively making the load balancing policy random.
+
+.. _config_http_conn_man_route_table_opaque_config:
+
+Opaque Config
+-------------
+
+Additional configuration can be provided to filters through the "Opaque Config" mechanism.  A
+list of Key/Value pairs are specified in the route config.  The configuration is uninterpreted
+by envoy and can be accessed within a user-defined filter.
+
+.. code-block:: json
+
+  [
+    {"name": "...", "value": "..."}
+  ]
+
+name
+  *(required, string)* A user defined configuration name
+
+value
+  *(required, string)* A user defined configuration value
