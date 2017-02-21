@@ -222,6 +222,7 @@ public:
 
 protected:
   const bool case_sensitive_;
+  const bool auto_host_rewrite_;
   const std::string prefix_rewrite_;
   const std::string host_rewrite_;
 

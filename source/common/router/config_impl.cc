@@ -92,6 +92,7 @@ const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 10
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
                                        Runtime::Loader& loader)
     : case_sensitive_(route.getBoolean("case_sensitive", true)),
+      auto_host_rewrite_(route.getBoolean("auto_host_rewrite", true)),
       prefix_rewrite_(route.getString("prefix_rewrite", "")),
       host_rewrite_(route.getString("host_rewrite", "")), vhost_(vhost),
       cluster_name_(route.getString("cluster", "")),
@@ -104,6 +105,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       priority_(ConfigUtility::parsePriority(route)) {
 
   route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
+
+  // Route can either have a host_rewrite with fixed host header or automatic host rewrite 
+  // based on the DNS name of the instance in the backing cluster.
+  if (auto_host_rewrite_ && !host_rewrite_.empty()) {
+    throw EnvoyException("routes cannot have both auto_host_rewrite and host_rewrite options set");
+  }
 
   bool have_weighted_clusters = route.hasObject("weighted_clusters");
   bool have_cluster =
