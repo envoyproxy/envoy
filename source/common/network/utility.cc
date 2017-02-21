@@ -2,7 +2,11 @@
 
 #include <arpa/inet.h>
 #include <ifaddrs.h>
+
+#if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
+#endif
+
 #include <netinet/ip.h>
 #include <sys/socket.h>
 
@@ -268,13 +272,26 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
 Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
+#ifdef SOL_IP
+  // TODO(mattklein123): IPv6 support. See github issue #1094.
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
+#else
+  int status = getsockname(fd, reinterpret_cast<sockaddr *>(&orig_addr), &addr_len);
+#endif
 
   if (status == 0) {
-    // TODO(mattklein123): IPv6 support. See github issue #1094.
-    ASSERT(orig_addr.ss_family == AF_INET);
-    return Address::InstanceConstSharedPtr{
+    switch(orig_addr.ss_family) {
+    case AF_INET:
+      return Address::InstanceConstSharedPtr{
         new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
+
+    case AF_INET6:
+      return Address::InstanceConstSharedPtr{
+        new Address::Ipv6Instance(*reinterpret_cast<sockaddr_in6*>(&orig_addr))};
+
+    default:
+      throw EnvoyException(fmt::format("invalid domain {}", orig_addr.ss_family));
+    }
   } else {
     return nullptr;
   }
