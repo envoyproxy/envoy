@@ -1,9 +1,12 @@
 # Developer use of CI Docker image
 
-The Docker image at `lyft/envoy-build:<hash>` is used for Travis CI checks, where `<hash>` is specified in
+The Docker image at [`lyft/envoy-build:<hash>`](https://hub.docker.com/r/lyft/envoy-build/) is used for Travis CI checks, where `<hash>` is specified in
 [ci_steps.sh](https://github.com/lyft/envoy/blob/master/ci/ci_steps.sh). Developers
 may work with `lyft/envoy-build:latest` to provide a self-contained environment for
-building Envoy binaries and running tests that reflects the latest built image.
+building Envoy binaries and running tests that reflects the latest built image. Moreover, the Docker
+image at [`lyft/envoy:<hash>`](https://hub.docker.com/r/lyft/envoy/) is an image that has an Envoy binary at `usr/local/bin/envoy`. The `<hash>`
+corresponds to the master commit at which the binary was compiled. Lastly, `lyft/envoy:latest` contains
+an Envoy binary built from the latest tip of master that passed tests.
 
 An example basic invocation to build a debug image and run all tests is:
 
