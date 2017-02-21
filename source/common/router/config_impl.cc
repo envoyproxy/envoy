@@ -106,7 +106,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
 
   route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
 
-  // Route can either have a host_rewrite with fixed host header or automatic host rewrite 
+  // Route can either have a host_rewrite with fixed host header or automatic host rewrite
   // based on the DNS name of the instance in the backing cluster.
   if (auto_host_rewrite_ && !host_rewrite_.empty()) {
     throw EnvoyException("routes cannot have both auto_host_rewrite and host_rewrite options set");

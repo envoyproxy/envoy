@@ -220,6 +220,11 @@ public:
    * @return const VirtualHost& the virtual host that owns the route.
    */
   virtual const VirtualHost& virtualHost() const PURE;
+
+  /**
+   * @return bool true if the Host header should be overwritten with the Upstream hostname.
+   */
+  virtual bool autoHostRewrite() const PURE;
 };
 
 /**

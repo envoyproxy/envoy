@@ -212,6 +212,7 @@ public:
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   const VirtualHost& virtualHost() const override { return vhost_; }
+  bool autoHostRewrite() const override { return auto_host_rewrite_; }
 
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -259,6 +260,7 @@ private:
     }
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
+    bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
 
     // Router::Route
     const RedirectEntry* redirectEntry() const override { return nullptr; }
