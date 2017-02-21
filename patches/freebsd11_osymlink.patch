@@ -1,0 +1,95 @@
+--- ./lib/libc/sys/open.2.orig	2016-09-28 16:25:57.000000000 -0700
++++ ./lib/libc/sys/open.2	2017-02-18 13:20:40.000000000 -0800
+@@ -115,6 +115,7 @@
+ O_FSYNC		synchronous writes
+ O_SYNC		synchronous writes
+ O_NOFOLLOW	do not follow symlinks
++O_SYMLINK	allow open of symlinks
+ O_NOCTTY	ignored
+ O_TTY_INIT	ignored
+ O_DIRECTORY	error if file is not a directory
+@@ -179,6 +180,14 @@
+ .Fn open
+ will fail.
+ .Pp
++If
++.Dv O_SYMLINK
++is used in the mask and the target file passed to
++.Fn open
++is a symbolic link then the
++.Fn open
++will be for the symbolic link itself, not what it links to.
++.Pp
+ When opening a file, a lock with
+ .Xr flock 2
+ semantics can be obtained by setting
+--- ./sys/kern/vfs_vnops.c.orig	2016-09-28 16:24:40.000000000 -0700
++++ ./sys/kern/vfs_vnops.c	2017-02-18 13:20:40.000000000 -0800
+@@ -266,8 +266,8 @@
+ 		}
+ 	} else {
+ 		ndp->ni_cnd.cn_nameiop = LOOKUP;
+-		ndp->ni_cnd.cn_flags = ISOPEN |
+-		    ((fmode & O_NOFOLLOW) ? NOFOLLOW : FOLLOW) | LOCKLEAF;
++		ndp->ni_cnd.cn_flags = ISOPEN | LOCKLEAF |
++		    ((fmode & (O_NOFOLLOW | O_SYMLINK)) ? NOFOLLOW : FOLLOW);
+ 		if (!(fmode & FWRITE))
+ 			ndp->ni_cnd.cn_flags |= LOCKSHARED;
+ 		if (!(vn_open_flags & VN_OPEN_NOAUDIT))
+@@ -303,7 +303,7 @@
+ 	struct flock lf;
+ 	int error, lock_flags, type;
+
+-	if (vp->v_type == VLNK)
++	if (vp->v_type == VLNK && fmode & O_NOFOLLOW)
+ 		return (EMLINK);
+ 	if (vp->v_type == VSOCK)
+ 		return (EOPNOTSUPP);
+@@ -313,6 +313,8 @@
+ 	if (fmode & (FWRITE | O_TRUNC)) {
+ 		if (vp->v_type == VDIR)
+ 			return (EISDIR);
++		if (vp->v_type == VLNK)
++			return (EMLINK);
+ 		accmode |= VWRITE;
+ 	}
+ 	if (fmode & FREAD)
+@@ -777,6 +779,8 @@
+ 	    uio->uio_td, td));
+ 	KASSERT(flags & FOF_OFFSET, ("No FOF_OFFSET"));
+ 	vp = fp->f_vnode;
++	if (vp->v_type == VLNK)
++		return (EOPNOTSUPP);
+ 	ioflag = 0;
+ 	if (fp->f_flag & FNONBLOCK)
+ 		ioflag |= IO_NDELAY;
+@@ -837,6 +841,8 @@
+ 	    uio->uio_td, td));
+ 	KASSERT(flags & FOF_OFFSET, ("No FOF_OFFSET"));
+ 	vp = fp->f_vnode;
++	if (vp->v_type == VLNK)
++		return (EOPNOTSUPP);
+ 	if (vp->v_type == VREG)
+ 		bwillwrite();
+ 	ioflag = IO_UNIT;
+@@ -1306,6 +1312,10 @@
+ 		error = EISDIR;
+ 		goto out;
+ 	}
++	if (vp->v_type == VLNK) {
++		error = EINVAL;
++		goto out;
++	}
+ #ifdef MAC
+ 	error = mac_vnode_check_write(active_cred, fp->f_cred, vp);
+ 	if (error)
+--- ./sys/sys/fcntl.h.orig	2016-09-28 16:24:41.000000000 -0700
++++ ./sys/sys/fcntl.h	2017-02-18 13:20:40.000000000 -0800
+@@ -131,6 +131,7 @@
+
+ #if __BSD_VISIBLE
+ #define	O_VERIFY	0x00200000	/* open only after verification */
++#define	O_SYMLINK	0x00400000	/* allow open of a symlink */
+ #endif
+
+ /*
