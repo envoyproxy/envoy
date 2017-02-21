@@ -112,6 +112,21 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
     TestLoadBalancerContext context(0);
     EXPECT_EQ(cluster_.hosts_[1], lb_.chooseHost(&context));
   }
+
+  cluster_.hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:81"),
+                     newTestHost(cluster_.info_, "tcp://127.0.0.1:82")};
+  cluster_.runCallbacks({}, {});
+
+  // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
+  // TODO: Compile in and use murmur3 or city so we know exactly what we are going to get.
+  // ring hash: host=127.0.0.1:81 hash=7701421856454313576
+  // ring hash: host=127.0.0.1:82 hash=8649315368077433379
+  // ring hash: host=127.0.0.1:81 hash=9887544217113020895
+  // ring hash: host=127.0.0.1:82 hash=10150910876324007731
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(cluster_.hosts_[0], lb_.chooseHost(&context));
+  }
 }
 
 } // Upstream

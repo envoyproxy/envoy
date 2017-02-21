@@ -73,8 +73,8 @@ ConstHostPtr RingHashLoadBalancer::Ring::chooseHost(const LoadBalancerContext* c
 void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
                                         const std::vector<HostPtr>& hosts) {
   log_trace("ring hash: building ring");
+  ring_.clear();
   if (hosts.empty()) {
-    ring_.clear();
     return;
   }
 

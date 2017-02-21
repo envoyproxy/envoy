@@ -151,7 +151,8 @@ public:
   /**
    * @return Optional<uint64_t> an optional hash value to route on given a set of HTTP headers.
    *         A hash value might not be returned if for example the specified HTTP header does not
-   *         exist. In the future we might add addtional support for hashing on origin address, etc.
+   *         exist. In the future we might add additional support for hashing on origin address,
+   *         etc.
    */
   virtual Optional<uint64_t> generateHash(const Http::HeaderMap& headers) const PURE;
 };
