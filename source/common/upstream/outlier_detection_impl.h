@@ -20,8 +20,11 @@ public:
   uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
-  Optional<SystemTime> lastEjectionTime() override { return Optional<SystemTime>(SystemTime()); }
-  Optional<SystemTime> lastUnejectionTime() override { return Optional<SystemTime>(SystemTime()); }
+  const Optional<SystemTime>& lastEjectionTime() override { return time_; }
+  const Optional<SystemTime>& lastUnejectionTime() override { return time_; }
+
+private:
+  Optional<SystemTime> time_;
 };
 
 /**
@@ -51,8 +54,8 @@ public:
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
   void putResponseTime(std::chrono::milliseconds) override {}
-  Optional<SystemTime> lastEjectionTime() { return last_ejection_time_; }
-  Optional<SystemTime> lastUnejectionTime() { return last_unejection_time_; }
+  const Optional<SystemTime>& lastEjectionTime() { return last_ejection_time_; }
+  const Optional<SystemTime>& lastUnejectionTime() { return last_unejection_time_; }
 
 private:
   std::weak_ptr<DetectorImpl> detector_;
@@ -136,7 +139,7 @@ public:
 
 private:
   std::string typeToString(EjectionType type);
-  int secsSinceLastAction(Optional<SystemTime> lastActionTime, SystemTime now);
+  int secsSinceLastAction(const Optional<SystemTime>& lastActionTime, SystemTime now);
 
   Filesystem::FilePtr file_;
   SystemTimeSource& time_source_;

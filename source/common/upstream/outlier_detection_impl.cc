@@ -263,7 +263,8 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
   NOT_IMPLEMENTED;
 }
 
-int EventLoggerImpl::secsSinceLastAction(Optional<SystemTime> lastActionTime, SystemTime now) {
+int EventLoggerImpl::secsSinceLastAction(const Optional<SystemTime>& lastActionTime,
+                                         SystemTime now) {
   if (lastActionTime.valid()) {
     return std::chrono::duration_cast<std::chrono::seconds>(now - lastActionTime.value()).count();
   }

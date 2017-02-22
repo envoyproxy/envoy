@@ -39,15 +39,15 @@ public:
 
   /**
    * Get the time of last ejection.
-   * @return the last time this host was ejected
+   * @return the last time this host was ejected, if the host has been ejected previously.
    */
-  virtual Optional<SystemTime> lastEjectionTime() PURE;
+  virtual const Optional<SystemTime>& lastEjectionTime() PURE;
 
   /**
    * Get the time of last unejection.
-   * @return the last time this host was unejected
+   * @return the last time this host was unejected, if the host has been unejected previously.
    */
-  virtual Optional<SystemTime> lastUnejectionTime() PURE;
+  virtual const Optional<SystemTime>& lastUnejectionTime() PURE;
 };
 
 typedef std::unique_ptr<DetectorHostSink> DetectorHostSinkPtr;

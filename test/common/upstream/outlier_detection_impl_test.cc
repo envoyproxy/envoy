@@ -1,3 +1,6 @@
+#include "envoy/common/optional.h"
+#include "envoy/common/time.h"
+
 #include "common/network/utility.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -394,11 +397,13 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster));
   NiceMock<MockSystemTimeSource> time_source;
+  Optional<SystemTime> time;
 
   EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
   EventLoggerImpl event_logger(log_manager, "foo", time_source);
 
   std::string log1;
+  EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(time));
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"-1\", \"cluster\": "
                            "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
@@ -408,6 +413,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   Json::Factory::LoadFromString(log1);
 
   std::string log2;
+  EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(time));
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"-1\", \"cluster\": \"fake_cluster\", "
                            "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "

@@ -71,7 +71,9 @@ time
   The time that the event took place.
 
 secs_since_last_action
-  The time that the last event took place. This time will be -1 for the first ejection.
+  The time in seconds since the last action (either an ejection or unejection)
+  took place. This time will be -1 for the first ejection given there is no
+  action before the first ejection.
 
 cluster
   The :ref:`cluster <config_cluster_manager_cluster>` that owns the ejected host.
