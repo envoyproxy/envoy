@@ -34,41 +34,6 @@
           }
         }
       ]
-    },
-    {
-      "port": 9090,
-      "filters": [
-        {
-          "type": "read",
-          "name": "http_connection_manager",
-          "config": {
-            "codec_type": "auto",
-            "stat_prefix": "ingress_http",
-            "route_config": {
-              "virtual_hosts": [
-                {
-                  "name": "service",
-                  "domains": ["*"],
-                  "routes": [
-                    {
-                      "timeout_ms": 0,
-                      "prefix": "/service",
-                      "cluster": "remote_local_service"
-                    }
-                  ]
-                }
-              ]
-            },
-            "filters": [
-              {
-                "type": "decoder",
-                "name": "router",
-                "config": {}
-              }
-            ]
-          }
-        }
-      ]
     }
   ],
   "admin": {
@@ -87,19 +52,8 @@
             "url": "tcp://127.0.0.1:8080"
           }
         ]
-      },
-      {
-        "name": "remote_local_service",
-        "connect_timeout_ms": 250,
-        "type": "strict_dns",
-        "lb_type": "round_robin",
-        "features" : "http2",
-        "hosts": [
-          {
-            "url": "tcp://127.0.0.1:80"
-          }
-        ]
       }
     ]
   }
 }
+

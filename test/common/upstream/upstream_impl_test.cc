@@ -202,7 +202,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_CALL(resolver2.active_dns_query_, cancel());
 }
 
-#if 0
+#if 0 // FIXME: error: invalid use of non-static member function???
 TEST(HostImplTest, HostCluster) {
   MockCluster cluster;
   HostImpl host(cluster.info, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 1,
