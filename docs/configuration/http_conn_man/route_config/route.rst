@@ -18,6 +18,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "path_redirect": "...",
     "prefix_rewrite": "...",
     "host_rewrite": "...",
+    "auto_host_rewrite": "...",
     "case_sensitive": "...",
     "timeout_ms": "...",
     "runtime": "{...}",
@@ -97,6 +98,15 @@ prefix_rewrite
 host_rewrite
   *(optional, string)* Indicates that during forwarding, the host header will be swapped with this
   value.
+
+.. _config_http_conn_man_route_table_route_auto_host_rewrite:
+
+auto_host_rewrite
+  *(optional, boolean)* Indicates that during forwarding, the host header will be swapped with the
+  hostname of the upstream host chosen by the cluster manager. This option is applicable only when
+  the destination cluster for a route is of type *strict_dns* or *logical_dns*. Setting this to true
+  with other cluster types has no effect. *auto_host_rewrite* and *host_rewrite* are mutually exclusive 
+  options. Only one can be specified.
 
 .. _config_http_conn_man_route_table_route_case_sensitive:
 
