@@ -704,7 +704,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   conn_pool_stream_handle_ = nullptr;
   request_encoder_ = &request_encoder;
   calling_encode_headers_ = true;
-  if (parent_.route_entry_->autoHostRewrite()) {
+  if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
     parent_.downstream_headers_->Host()->value(host->hostname());
   }
 

@@ -250,6 +250,26 @@ TEST(HostImplTest, HostameCanaryAndZone) {
   EXPECT_EQ("hello", host.zone());
 }
 
+TEST(StaticClusterImplTest, EmptyHostname) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
+  std::string json = R"EOF(
+  {
+    "name": "staticcluster",
+    "connect_timeout_ms": 250,
+    "type": "static",
+    "lb_type": "random",
+    "hosts": [{"url": "tcp://10.0.0.1:11001"}]
+  }
+  )EOF";
+
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
+  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  EXPECT_EQ("", cluster.hosts()[0]->hostname());
+}
+
 TEST(StaticClusterImplTest, OutlierDetector) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;

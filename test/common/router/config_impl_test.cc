@@ -412,6 +412,32 @@ TEST(RouteMatcherTest, Priority) {
   }
 }
 
+TEST(RouteMatcherTest, NoHostRewriteAndAutoRewrite) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "local_service",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "local_service",
+          "host_rewrite": "foo",
+          "auto_host_rewrite" : true
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
+}
+
 TEST(RouteMatcherTest, HeaderMatchedRouting) {
   std::string json = R"EOF(
 {
