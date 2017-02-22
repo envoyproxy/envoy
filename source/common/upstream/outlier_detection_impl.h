@@ -24,7 +24,7 @@ public:
   const Optional<SystemTime>& lastUnejectionTime() override { return time_; }
 
 private:
-  Optional<SystemTime> time_;
+  const Optional<SystemTime> time_;
 };
 
 /**
