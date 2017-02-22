@@ -117,7 +117,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
     },
     "max_requests_per_connection": 3,
     "http_codec_options": "no_compression",
-    "hosts": [{"url": "tcp://localhost:11001"},
+    "hosts": [{"url": "tcp://localhost1:11001"},
               {"url": "tcp://localhost2:11002"}]
   }
   )EOF";
@@ -153,6 +153,8 @@ TEST(StrictDnsClusterImplTest, Basic) {
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));
+  EXPECT_EQ("localhost1:11001", cluster.hosts()[0]->hostname());
+  EXPECT_EQ("localhost1:11001", cluster.hosts()[1]->hostname());
 
   resolver1.expectResolve(dns_resolver);
   resolver1.timer_->callback_();

@@ -223,7 +223,6 @@ public:
 
 protected:
   const bool case_sensitive_;
-  const bool auto_host_rewrite_;
   const std::string prefix_rewrite_;
   const std::string host_rewrite_;
 
@@ -304,6 +303,7 @@ private:
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
   const VirtualHostImpl& vhost_;
+  const bool auto_host_rewrite_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const std::chrono::milliseconds timeout_;

@@ -92,9 +92,9 @@ const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 10
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
                                        Runtime::Loader& loader)
     : case_sensitive_(route.getBoolean("case_sensitive", true)),
-      auto_host_rewrite_(route.getBoolean("auto_host_rewrite", true)),
       prefix_rewrite_(route.getString("prefix_rewrite", "")),
       host_rewrite_(route.getString("host_rewrite", "")), vhost_(vhost),
+      auto_host_rewrite_(route.getBoolean("auto_host_rewrite", false)),
       cluster_name_(route.getString("cluster", "")),
       cluster_header_name_(route.getString("cluster_header", "")),
       timeout_(route.getInteger("timeout_ms", DEFAULT_ROUTE_TIMEOUT_MS)),
