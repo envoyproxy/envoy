@@ -174,7 +174,7 @@ private:
     // Upstream::LoadBalancerContext
     const Optional<uint64_t>& hashKey() const override { return hash_; }
 
-    Optional<uint64_t> hash_;
+    const Optional<uint64_t> hash_;
   };
 
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };

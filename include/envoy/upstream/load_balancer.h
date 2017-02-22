@@ -6,8 +6,8 @@
 namespace Upstream {
 
 /**
- * Context passed to a load balancer to use when choosing a host. Not all load balancers make use
- * of all context information.
+ * Context information passed to a load balancer to use when choosing a host. Not all load
+ * balancers make use of all context information.
  */
 class LoadBalancerContext {
 public:

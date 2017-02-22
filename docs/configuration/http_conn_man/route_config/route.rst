@@ -321,4 +321,6 @@ Specifies the route's hashing policy if the upstream cluster uses a hashing :ref
    }
 
 header_name
-  *(required, string)* The name of the request header that will be used to obtain the hash key.
+  *(required, string)* The name of the request header that will be used to obtain the hash key. If
+  the request header is not present, the load balancer will use a random number as the hash,
+  effectively making the load balancing policy random.
