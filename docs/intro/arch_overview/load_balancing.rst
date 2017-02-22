@@ -43,7 +43,7 @@ when protocol routing is used that specifies a value to hash on. Currently the o
 mechanism is to hash via :ref:`HTTP header values <config_http_conn_man_route_table_hash_policy>` in
 the :ref:`HTTP router filter <arch_overview_http_routing>`. The default minimum ring size is
 specified in :ref:`runtime <config_cluster_manager_cluster_runtime_ring_hash>`. The minimum ring
-size is governs the replication factor for each host in the ring. For example, if the minimum ring
+size governs the replication factor for each host in the ring. For example, if the minimum ring
 size is 1024 and there are 16 hosts, each host will be replicated 64 times. The ring hash load
 balancer does not currently support weighting.
 
