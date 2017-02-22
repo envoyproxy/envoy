@@ -202,10 +202,9 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_CALL(resolver2.active_dns_query_, cancel());
 }
 
-#if 0 // FIXME: error: invalid use of non-static member function???
 TEST(HostImplTest, HostCluster) {
   MockCluster cluster;
-  HostImpl host(cluster.info, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 1,
+  HostImpl host(cluster.info_, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 1,
                 "");
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("", host.hostname());
@@ -217,19 +216,19 @@ TEST(HostImplTest, Weight) {
   MockCluster cluster;
 
   {
-    HostImpl host(cluster.info, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 0,
+    HostImpl host(cluster.info_, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 0,
                   "");
     EXPECT_EQ(1U, host.weight());
   }
 
   {
-    HostImpl host(cluster.info, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 101,
-                  "");
+    HostImpl host(cluster.info_, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false,
+                  101, "");
     EXPECT_EQ(100U, host.weight());
   }
 
   {
-    HostImpl host(cluster.info, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 50,
+    HostImpl host(cluster.info_, "", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 50,
                   "");
     EXPECT_EQ(50U, host.weight());
     host.weight(51);
@@ -243,14 +242,13 @@ TEST(HostImplTest, Weight) {
 
 TEST(HostImplTest, HostameCanaryAndZone) {
   MockCluster cluster;
-  HostImpl host(cluster.info, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), true,
-                1, "hello");
+  HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
+                true, 1, "hello");
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
   EXPECT_TRUE(host.canary());
   EXPECT_EQ("hello", host.zone());
 }
-#endif
 
 TEST(StaticClusterImplTest, OutlierDetector) {
   Stats::IsolatedStoreImpl stats;
