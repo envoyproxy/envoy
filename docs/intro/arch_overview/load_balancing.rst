@@ -32,6 +32,17 @@ weighted least request behavior is desired (generally if request durations are v
 length). We may add a true full scan weighted least request variant in the future to cover this use
 case.
 
+Ring hash
+^^^^^^^^^
+
+The ring/modulo hash load balancer implements consistent hashing to upstream hosts. The algorithm is
+based on mapping all hosts onto a circle such that any host set changes only affect 1/N requests.
+This technique is also commonly known as "ketama" hashing. The consistent hashing load balancer is
+only effective when protocol routing is used that specifies a value to hash on. Currently the only
+implemented mechanism is to hash via :ref:`HTTP header values
+<config_http_conn_man_route_table_hash_policy>` in the :ref:`HTTP router filter
+<arch_overview_http_routing>`.
+
 Random
 ^^^^^^
 
