@@ -195,6 +195,7 @@ private:
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
   HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)                                                 \
+  HEADER_FUNC(EnvoyUpstreamRequestTimeoutAltResponse)                                              \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
   HEADER_FUNC(Expect)                                                                              \
@@ -205,6 +206,7 @@ private:
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(Method)                                                                              \
+  HEADER_FUNC(OtSpanContext)                                                                       \
   HEADER_FUNC(Path)                                                                                \
   HEADER_FUNC(ProxyConnection)                                                                     \
   HEADER_FUNC(RequestId)                                                                           \

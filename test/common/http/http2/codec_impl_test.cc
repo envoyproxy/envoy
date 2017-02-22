@@ -10,6 +10,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 
@@ -200,6 +201,40 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   response_encoder->encodeData(world, false);
   EXPECT_CALL(response_decoder, decodeTrailers_(_));
   response_encoder->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
+}
+
+TEST_P(Http2CodecImplTest, DeferredReset) {
+  InSequence s;
+
+  // Buffer server data so we can make sure we don't get any window updates.
+  ON_CALL(client_connection_, write(_))
+      .WillByDefault(
+          Invoke([&](Buffer::Instance& data) -> void { server_wrapper_.buffer_.add(data); }));
+
+  // This will send a request that is bigger than the initial window size. When we then reset it,
+  // after attempting to flush we should reset the stream and drop the data we could not send.
+  MockStreamDecoder response_decoder;
+  StreamEncoder& request_encoder = client_.newStream(response_decoder);
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_encoder.encodeHeaders(request_headers, false);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  request_encoder.encodeData(body, true);
+  request_encoder.getStream().resetStream(StreamResetReason::LocalReset);
+
+  MockStreamDecoder request_decoder;
+  MockStreamCallbacks callbacks;
+  StreamEncoder* response_encoder;
+  EXPECT_CALL(server_callbacks_, newStream(_))
+      .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+        response_encoder = &encoder;
+        encoder.getStream().addCallbacks(callbacks);
+        return request_decoder;
+      }));
+  EXPECT_CALL(request_decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(request_decoder, decodeData(_, false)).Times(AtLeast(1));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteReset));
+  server_wrapper_.dispatch(Buffer::OwnedImpl(), server_);
 }
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTest, Http2CodecImplTest,

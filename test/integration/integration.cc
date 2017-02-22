@@ -1,4 +1,3 @@
-#include <gtest/gtest.h>
 #include "integration.h"
 
 #include "envoy/buffer/buffer.h"
@@ -7,6 +6,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
@@ -160,7 +160,8 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(uint32_t events) {
 
 IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher, uint32_t port)
     : callbacks_(new ConnectionCallbacks(*this)) {
-  connection_ = dispatcher.createClientConnection(fmt::format("tcp://127.0.0.1:{}", port));
+  connection_ = dispatcher.createClientConnection(
+      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", port)));
   connection_->addConnectionCallbacks(*callbacks_);
   connection_->addReadFilter(callbacks_);
   connection_->connect();
@@ -223,7 +224,8 @@ BaseIntegrationTest::BaseIntegrationTest()
 BaseIntegrationTest::~BaseIntegrationTest() {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
-  return dispatcher_->createClientConnection(fmt::format("tcp://127.0.0.1:{}", port));
+  return dispatcher_->createClientConnection(
+      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", port)));
 }
 
 IntegrationCodecClientPtr BaseIntegrationTest::makeHttpConnection(uint32_t port,
@@ -235,8 +237,8 @@ IntegrationCodecClientPtr
 BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
                                         Http::CodecClient::Type type) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionPtr host_description{
-      new Upstream::HostDescriptionImpl(cluster, "tcp://127.0.0.1:80", false, "")};
+  Upstream::HostDescriptionPtr host_description{new Upstream::HostDescriptionImpl(
+      cluster, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
   return IntegrationCodecClientPtr{
       new IntegrationCodecClient(*dispatcher_, std::move(conn), host_description, type)};
 }

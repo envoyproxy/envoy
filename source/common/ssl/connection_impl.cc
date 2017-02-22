@@ -11,8 +11,9 @@
 namespace Ssl {
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                               const std::string& remote_address, const std::string& local_address,
-                               Context& ctx, InitialState state)
+                               Network::Address::InstancePtr remote_address,
+                               Network::Address::InstancePtr local_address, Context& ctx,
+                               InitialState state)
     : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
   BIO* bio = BIO_new_socket(fd, 0);
@@ -222,16 +223,11 @@ std::string ConnectionImpl::uriPeerCertificateSAN() {
 
 // TODO: see if we can pass something more meaningful than EMPTY_STRING as localAddress
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
-                                           const std::string& url)
-    : ConnectionImpl(dispatcher, socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), url, EMPTY_STRING,
-                     ctx, InitialState::Client) {}
+                                           Network::Address::InstancePtr address)
+    : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
+                     null_local_address_, ctx, InitialState::Client) {}
 
-void ClientConnectionImpl::connect() {
-  Network::AddrInfoPtr addr_info =
-      Network::Utility::resolveTCP(Network::Utility::hostFromUrl(remote_address_),
-                                   Network::Utility::portFromUrl(remote_address_));
-  doConnect(addr_info->ai_addr, addr_info->ai_addrlen);
-}
+void ClientConnectionImpl::connect() { doConnect(); }
 
 void ConnectionImpl::closeSocket(uint32_t close_type) {
   if (handshake_complete_ && state() != State::Closed) {

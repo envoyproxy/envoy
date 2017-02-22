@@ -11,6 +11,7 @@
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/http/async_client_impl.h"
+#include "common/json/config_schemas.h"
 #include "common/router/shadow_writer_impl.h"
 
 namespace Upstream {
@@ -50,7 +51,8 @@ void ClusterManagerInitHelper::removeCluster(Cluster& cluster) {
     cluster_list = &secondary_init_clusters_;
   }
 
-  ASSERT(std::find(cluster_list->begin(), cluster_list->end(), &cluster) != cluster_list->end());
+  // It is possible that the cluster we are removing has already been initialized, and is not
+  // present in the initializer list. If so, this is fine.
   cluster_list->remove(&cluster);
   maybeFinishInitialize();
 }
@@ -130,6 +132,8 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
       thread_local_slot_(tls.allocateSlot()), local_info_(local_info),
       cm_stats_(generateStats(stats)) {
 
+  config.validateSchema(Json::Schema::CLUSTER_MANAGER_SCHEMA);
+
   if (config.hasObject("outlier_detection")) {
     std::string event_log_file_path =
         config.getObject("outlier_detection")->getString("event_log_path", "");
@@ -177,8 +181,10 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
                     new ThreadLocalClusterManagerImpl(*this, dispatcher, local_cluster_name)};
               });
 
-  // To avoid threading issues, for those clusters that start with hosts already in them (like
-  // the static cluster), we need to post an update onto each thread to notify them of the update.
+  // To avoid threading issues, for those clusters that start with hosts already in them (like the
+  // static cluster), we need to post an update onto each thread to notify them of the update. We
+  // also require this for dynamic clusters where an immediate resolve occurred in the cluster
+  // constructor, prior to the member update callback being configured.
   for (auto& cluster : primary_clusters_) {
     postInitializeCluster(*cluster.second.cluster_);
   }
@@ -209,6 +215,10 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const Json::Object& new_confi
       (!existing_cluster->second.added_via_api_ ||
        existing_cluster->second.config_hash_ == new_config.hash())) {
     return false;
+  }
+
+  if (existing_cluster != primary_clusters_.end()) {
+    init_helper_.removeCluster(*existing_cluster->second.cluster_);
   }
 
   loadCluster(new_config, true);
@@ -299,7 +309,7 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   // Select a host and create a connection pool for it if it does not already exist.
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry == cluster_manager.thread_local_clusters_.end()) {
-    throw EnvoyException(fmt::format("unknown cluster '{}'", cluster));
+    return nullptr;
   }
 
   return entry->second->connPool(priority);
@@ -376,6 +386,21 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
 
     thread_local_clusters_[cluster.first].reset(
         new ClusterEntry(*this, cluster.second.cluster_->info()));
+  }
+}
+
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImpl() {
+  ASSERT(thread_local_clusters_.empty());
+  ASSERT(host_http_conn_pool_map_.empty());
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
+    const std::vector<HostPtr>& hosts) {
+  for (const HostPtr& host : hosts) {
+    auto container = host_http_conn_pool_map_.find(host);
+    if (container != host_http_conn_pool_map_.end()) {
+      drainConnPools(host, container->second);
+    }
   }
 }
 
@@ -458,13 +483,17 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         // We need to go through and purge any connection pools for hosts that got deleted.
         // Even if two hosts actually point to the same address this will be safe, since if a
         // host is readded it will be a different physical HostPtr.
-        for (const HostPtr& old_host : hosts_removed) {
-          auto container = parent_.host_http_conn_pool_map_.find(old_host);
-          if (container != parent_.host_http_conn_pool_map_.end()) {
-            parent_.drainConnPools(old_host, container->second);
-          }
-        }
+        parent_.drainConnPools(hosts_removed);
       });
+}
+
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry() {
+  // We need to drain all connection pools for the cluster being removed. Then we can remove the
+  // cluster.
+  // TODO: Optimally, we would just fire member changed callbacks and remove all of the hosts
+  //       inside of the HostImpl destructor. That is a change with wide implications, so we are
+  //       going with a more targeted approach for now.
+  parent_.drainConnPools(host_set_.hosts());
 }
 
 Http::ConnectionPool::Instance*

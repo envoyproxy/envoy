@@ -17,11 +17,12 @@ public:
 
   static void mutateRequestHeaders(Http::HeaderMap& request_headers,
                                    Network::Connection& connection, ConnectionManagerConfig& config,
+                                   const Router::Config& route_config,
                                    Runtime::RandomGenerator& random, Runtime::Loader& runtime);
 
   static void mutateResponseHeaders(Http::HeaderMap& response_headers,
                                     const Http::HeaderMap& request_headers,
-                                    ConnectionManagerConfig& config);
+                                    const Router::Config& route_config);
 
 private:
   // NOTE: This is used for stable randomness in the case where the route table does not use any

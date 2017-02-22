@@ -22,7 +22,7 @@ void AccessLog::logMessage(const Message& message, const std::string&, bool full
   SystemTime now = std::chrono::system_clock::now();
   std::string log_line =
       fmt::format(log_format, AccessLogDateTimeFormatter::fromTime(now), message.toString(full),
-                  upstream_host ? upstream_host->url() : "-");
+                  upstream_host ? upstream_host->address()->asString() : "-");
 
   file_->write(log_line);
 }

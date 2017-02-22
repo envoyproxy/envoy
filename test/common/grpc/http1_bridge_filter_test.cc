@@ -6,6 +6,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -26,6 +27,30 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Http::Protocol protocol_{Http::Protocol::Http11};
 };
+
+TEST_F(GrpcHttp1BridgeFilterTest, NoRoute) {
+  protocol_ = Http::Protocol::Http2;
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+
+  Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "404"}};
+}
+
+TEST_F(GrpcHttp1BridgeFilterTest, NoCluster) {
+  protocol_ = Http::Protocol::Http2;
+  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+
+  Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "404"}};
+}
 
 TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
   protocol_ = Http::Protocol::Http2;

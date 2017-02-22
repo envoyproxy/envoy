@@ -13,6 +13,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -101,6 +102,7 @@ public:
   MOCK_METHOD1(getParentStats, void(HotRestart::GetParentStatsInfo&));
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());
+  MOCK_METHOD0(initManager, Init::Manager&());
   MOCK_METHOD0(options, Options&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());
   MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
@@ -131,6 +133,7 @@ public:
   testing::NiceMock<MockOptions> options_;
   testing::NiceMock<Runtime::MockRandomGenerator> random_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  testing::NiceMock<Init::MockManager> init_manager_;
 };
 
 } // Server

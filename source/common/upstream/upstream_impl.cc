@@ -12,7 +12,9 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/http/utility.h"
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
 #include "common/ssl/context_config_impl.h"
@@ -22,17 +24,17 @@ namespace Upstream {
 Outlier::DetectorHostSinkNullImpl HostDescriptionImpl::null_outlier_detector_;
 
 Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, url_), shared_from_this()};
+  return {createConnection(dispatcher, *cluster_, address_), shared_from_this()};
 }
 
 Network::ClientConnectionPtr HostImpl::createConnection(Event::Dispatcher& dispatcher,
                                                         const ClusterInfo& cluster,
-                                                        const std::string& url) {
+                                                        Network::Address::InstancePtr address) {
   if (cluster.sslContext()) {
     return Network::ClientConnectionPtr{
-        dispatcher.createSslClientConnection(*cluster.sslContext(), url)};
+        dispatcher.createSslClientConnection(*cluster.sslContext(), address)};
   } else {
-    return Network::ClientConnectionPtr{dispatcher.createClientConnection(url)};
+    return Network::ClientConnectionPtr{dispatcher.createClientConnection(address)};
   }
 }
 
@@ -93,6 +95,9 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
                                    const Optional<SdsConfig>& sds_config,
                                    const LocalInfo::LocalInfo& local_info,
                                    Outlier::EventLoggerPtr outlier_event_logger) {
+
+  cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
+
   std::unique_ptr<ClusterImplBase> new_cluster;
   std::string string_type = cluster.getString("type");
   if (string_type == "static") {
@@ -260,10 +265,8 @@ StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader
   std::vector<Json::ObjectPtr> hosts_json = config.getObjectArray("hosts");
   HostVectorPtr new_hosts(new std::vector<HostPtr>());
   for (Json::ObjectPtr& host : hosts_json) {
-    std::string url = host->getString("url");
-    // resolve the URL to make sure it's valid
-    Network::Utility::resolve(url);
-    new_hosts->emplace_back(HostPtr{new HostImpl(info_, url, false, 1, "")});
+    new_hosts->emplace_back(HostPtr{
+        new HostImpl(info_, Network::Utility::resolveUrl(host->getString("url")), false, 1, "")});
   }
 
   updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_, empty_host_lists_,
@@ -279,14 +282,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
 
   // Go through and see if the list we have is different from what we just got. If it is, we
   // make a new host list and raise a change notification. This uses an N^2 search given that
-  // this does not happen very often and the list sizes should be small.
+  // this does not happen very often and the list sizes should be small. We also check for
+  // duplicates here. It's possible for DNS to return the same address multiple times, and a bad
+  // SDS implementation could do the same thing.
+  std::unordered_set<std::string> host_addresses;
   std::vector<HostPtr> final_hosts;
   for (HostPtr host : new_hosts) {
+    if (host_addresses.count(host->address()->asString())) {
+      continue;
+    }
+    host_addresses.emplace(host->address()->asString());
+
     bool found = false;
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
-      // If we find a host matched based on URL, we keep it. However we do change weight inline so
-      // do that here.
-      if ((*i)->url() == host->url()) {
+      // If we find a host matched based on address, we keep it. However we do change weight inline
+      // so do that here.
+      if (*(*i)->address() == *host->address()) {
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
         }
@@ -356,6 +367,12 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
   for (Json::ObjectPtr& host : config.getObjectArray("hosts")) {
     resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, host->getString("url")));
   }
+  // We have to first construct resolve_targets_ before invoking startResolve(),
+  // since startResolve() might resolve immediately and relies on
+  // resolve_targets_ indirectly for performing host updates on resolution.
+  for (const ResolveTargetPtr& target : resolve_targets_) {
+    target->startResolve();
+  }
 }
 
 void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostPtr>& hosts_added,
@@ -375,12 +392,9 @@ void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostPtr>& hosts_adde
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,
                                                    Event::Dispatcher& dispatcher,
                                                    const std::string& url)
-    : parent_(parent), dns_address_(Network::Utility::hostFromUrl(url)),
-      port_(Network::Utility::portFromUrl(url)),
-      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
-
-  startResolve();
-}
+    : parent_(parent), dns_address_(Network::Utility::hostFromTcpUrl(url)),
+      port_(Network::Utility::portFromTcpUrl(url)),
+      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
@@ -392,16 +406,22 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   log_debug("starting async DNS resolution for {}", dns_address_);
   parent_.info_->stats().update_attempt_.inc();
 
-  active_query_ = &parent_.dns_resolver_.resolve(
-      dns_address_, [this](std::list<std::string>&& address_list) -> void {
+  active_query_ = parent_.dns_resolver_.resolve(
+      dns_address_, [this](std::list<Network::Address::InstancePtr>&& address_list) -> void {
         active_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
         std::vector<HostPtr> new_hosts;
-        for (const std::string& address : address_list) {
+        for (Network::Address::InstancePtr address : address_list) {
+          // TODO: Currently the DNS interface does not consider port. We need to make a new
+          //       address that has port in it. We need to both support IPv6 as well as potentially
+          //       move port handling into the DNS interface itself, which would work better for
+          //       SRV.
           new_hosts.emplace_back(new HostImpl(
-              parent_.info_, Network::Utility::urlForTcp(address, port_), false, 1, ""));
+              parent_.info_, Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
+                                 address->ip()->addressAsString(), port_)},
+              false, 1, ""));
         }
 
         std::vector<HostPtr> hosts_added;
@@ -419,20 +439,10 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           parent_.initialize_callback_();
           parent_.initialize_callback_ = nullptr;
         }
+        parent_.initialized_ = true;
 
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });
-}
-
-void HostDescriptionImpl::checkUrl() {
-  if (url_.find(Network::Utility::TCP_SCHEME) == 0) {
-    Network::Utility::hostFromUrl(url_);
-    Network::Utility::portFromUrl(url_);
-  } else if (url_.find(Network::Utility::UNIX_SCHEME) == 0) {
-    Network::Utility::pathFromUrl(url_);
-  } else {
-    throw EnvoyException(fmt::format("malformed url: {}", url_));
-  }
 }
 
 } // Upstream

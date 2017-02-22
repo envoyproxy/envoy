@@ -19,6 +19,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_BINARY_DIR})
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 include_directories(${ENVOY_NGHTTP2_INCLUDE_DIR})
+include_directories(SYSTEM ${ENVOY_CARES_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
 include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 
@@ -36,6 +37,7 @@ add_executable(envoy-test
   common/event/file_event_impl_test.cc
   common/filesystem/filesystem_impl_test.cc
   common/filesystem/watcher_impl_test.cc
+  common/grpc/codec_test.cc
   common/grpc/common_test.cc
   common/grpc/http1_bridge_filter_test.cc
   common/grpc/rpc_channel_impl_test.cc
@@ -69,6 +71,7 @@ add_executable(envoy-test
   common/mongo/codec_impl_test.cc
   common/mongo/proxy_test.cc
   common/mongo/utility_test.cc
+  common/network/address_impl_test.cc
   common/network/connection_impl_test.cc
   common/network/dns_impl_test.cc
   common/network/filter_manager_impl_test.cc
@@ -81,6 +84,7 @@ add_executable(envoy-test
   common/redis/conn_pool_impl_test.cc
   common/redis/proxy_filter_test.cc
   common/router/config_impl_test.cc
+  common/router/rds_impl_test.cc
   common/router/retry_state_impl_test.cc
   common/router/router_test.cc
   common/router/router_ratelimit_test.cc
@@ -125,6 +129,7 @@ add_executable(envoy-test
   mocks/filesystem/mocks.cc
   mocks/grpc/mocks.cc
   mocks/http/mocks.cc
+  mocks/init/mocks.cc
   mocks/local_info/mocks.cc
   mocks/network/mocks.cc
   mocks/ratelimit/mocks.cc
@@ -146,8 +151,15 @@ add_executable(envoy-test
   server/http/admin_test.cc
   server/http/health_check_test.cc
   server/options_impl_test.cc
+  server/server_test.cc
   test_common/printers.cc
   test_common/utility.cc)
+
+# The MOCK_METHOD* macros from gtest triggers this clang warning and it's hard
+# to work around, so we just ignore it.
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+  set_target_properties(envoy-test PROPERTIES COMPILE_FLAGS "-Wno-inconsistent-missing-override")
+endif()
 
 if (ENVOY_TCMALLOC)
   target_link_libraries(envoy-test tcmalloc_and_profiler)
@@ -160,6 +172,7 @@ target_link_libraries(envoy-test ssl)
 target_link_libraries(envoy-test crypto)
 target_link_libraries(envoy-test nghttp2)
 target_link_libraries(envoy-test lightstep_core_cxx11)
+target_link_libraries(envoy-test cares)
 target_link_libraries(envoy-test protobuf)
 target_link_libraries(envoy-test gmock)
 target_link_libraries(envoy-test pthread)

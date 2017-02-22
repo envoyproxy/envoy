@@ -11,6 +11,7 @@ target_link_libraries(envoy ssl)
 target_link_libraries(envoy crypto)
 target_link_libraries(envoy nghttp2)
 target_link_libraries(envoy lightstep_core_cxx11)
+target_link_libraries(envoy cares)
 target_link_libraries(envoy protobuf)
 target_link_libraries(envoy pthread)
 target_link_libraries(envoy anl)
@@ -19,6 +20,7 @@ target_link_libraries(envoy dl)
 
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
+include_directories(SYSTEM ${ENVOY_CARES_INCLUDE_DIR})
 
 set_target_properties(envoy PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT
                       "../precompiled/precompiled.h")

@@ -37,7 +37,8 @@ template <typename T> static T* remove_const(const void* object) {
 }
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent)
-    : parent_(parent), headers_(new HeaderMapImpl()) {}
+    : parent_(parent), headers_(new HeaderMapImpl()), local_end_stream_(false),
+      local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false) {}
 
 ConnectionImpl::StreamImpl::~StreamImpl() {}
 
@@ -113,7 +114,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   UNREFERENCED_PARAMETER(rc);
 }
 
-ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(size_t length, uint32_t* data_flags) {
+ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* data_flags) {
   if (pending_send_data_.length() == 0 && !local_end_stream_) {
     ASSERT(!data_deferred_);
     data_deferred_ = true;
@@ -187,6 +188,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // We want these frames to go out so we defer the reset until we send all of the frames that
   // end the local stream.
   if (local_end_stream_ && !local_end_stream_sent_) {
+    parent_.pending_deferred_reset_ = true;
     deferred_reset_.value(reason);
   } else {
     resetStreamWorker(reason);
@@ -342,9 +344,6 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   case NGHTTP2_DATA: {
     StreamImpl* stream = getStream(frame->hd.stream_id);
     stream->local_end_stream_sent_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
-    if (stream->local_end_stream_sent_ && stream->deferred_reset_.valid()) {
-      stream->resetStreamWorker(stream->deferred_reset_.value());
-    }
     break;
   }
   }
@@ -420,6 +419,28 @@ void ConnectionImpl::sendPendingFrames() {
   if (rc != 0) {
     ASSERT(rc == NGHTTP2_ERR_CALLBACK_FAILURE);
     throw CodecProtocolException(fmt::format("{}", nghttp2_strerror(rc)));
+  }
+
+  // See ConnectionImpl::StreamImpl::resetStream() for why we do this. This is an uncommon event,
+  // so iterating through every stream to find the ones that have a deferred reset is not a big
+  // deal. Furthermore, queueing a reset frame does not actually invoke the close stream callback.
+  // This is only done when the reset frame is sent. Thus, it's safe to work directly with the
+  // stream map.
+  // NOTE: The way we handle deferred reset is essentially best effort. If we intend to do a
+  //       deferred reset, we try to finish the stream, including writing any pending data frames.
+  //       If we cannot do this (potentially due to not enough window), we just reset the stream.
+  //       In general this behavior occurs only when we are trying to send immediate error messages
+  //       to short circuit requests. In the best effort case, we complete the stream before
+  //       resetting. In other cases, we just do the reset now which will blow away pending data
+  //       frames and release any memory associated with the stream.
+  if (pending_deferred_reset_) {
+    pending_deferred_reset_ = false;
+    for (auto& stream : active_streams_) {
+      if (stream->deferred_reset_.valid()) {
+        stream->resetStreamWorker(stream->deferred_reset_.value());
+      }
+    }
+    sendPendingFrames();
   }
 }
 

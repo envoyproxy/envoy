@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 #include "envoy/ssl/connection.h"
 
@@ -113,7 +114,7 @@ public:
   /**
    * @return The address of the remote client.
    */
-  virtual const std::string& remoteAddress() PURE;
+  virtual const Address::Instance& remoteAddress() PURE;
 
   /**
    * @return the local address of the connection. For client connections, this is the origin
@@ -121,7 +122,7 @@ public:
    * it can be different from the proxy address if the downstream connection has been redirected or
    * the proxy is operating in transparent mode.
    */
-  virtual const std::string& localAddress() PURE;
+  virtual const Address::Instance& localAddress() PURE;
 
   /**
    * Set the buffer stats to update when the connection's read/write buffers change. Note that

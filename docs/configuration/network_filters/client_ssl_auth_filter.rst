@@ -13,7 +13,7 @@ Client TLS authentication filter :ref:`architecture overview <arch_overview_ssl_
     "config": {
       "auth_api_cluster": "...",
       "stat_prefix": "...",
-      "refresh_interval_ms": "...",
+      "refresh_delay_ms": "...",
       "ip_white_list": []
     }
   }
@@ -28,10 +28,10 @@ stat_prefix
   *(required, string)* The prefix to use when emitting :ref:`statistics
   <config_network_filters_client_ssl_auth_stats>`.
 
-refresh_interval_ms
+refresh_delay_ms
   *(optional, integer)* Time in milliseconds between principal refreshes from the authentication
   service. Default is 60000 (60s). The actual fetch time will be this value plus a random jittered
-  value between 0-refresh_interval_ms milliseconds.
+  value between 0-refresh_delay_ms milliseconds.
 
 ip_white_list
   *(optional, array)* An optional list of IP address and subnet masks that should be white listed

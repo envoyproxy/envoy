@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/common/time.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/outlier_detection.h"
@@ -21,6 +20,11 @@ public:
   uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
+  const Optional<SystemTime>& lastEjectionTime() override { return time_; }
+  const Optional<SystemTime>& lastUnejectionTime() override { return time_; }
+
+private:
+  const Optional<SystemTime> time_;
 };
 
 /**
@@ -44,18 +48,21 @@ public:
       : detector_(detector), host_(host) {}
 
   void eject(SystemTime ejection_time);
-  SystemTime ejectionTime() { return ejection_time_; }
+  void uneject(SystemTime ejection_time);
 
   // Upstream::Outlier::DetectorHostSink
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
   void putResponseTime(std::chrono::milliseconds) override {}
+  const Optional<SystemTime>& lastEjectionTime() { return last_ejection_time_; }
+  const Optional<SystemTime>& lastUnejectionTime() { return last_unejection_time_; }
 
 private:
   std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
   std::atomic<uint32_t> consecutive_5xx_{0};
-  SystemTime ejection_time_;
+  Optional<SystemTime> last_ejection_time_;
+  Optional<SystemTime> last_unejection_time_;
   uint32_t num_ejections_{};
 };
 
@@ -132,6 +139,7 @@ public:
 
 private:
   std::string typeToString(EjectionType type);
+  int secsSinceLastAction(const Optional<SystemTime>& lastActionTime, SystemTime now);
 
   Filesystem::FilePtr file_;
   SystemTimeSource& time_source_;

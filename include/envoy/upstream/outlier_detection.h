@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 namespace Upstream {
 
@@ -34,6 +36,18 @@ public:
    * different operations including HTTP, Mongo, Redis, etc.).
    */
   virtual void putResponseTime(std::chrono::milliseconds time) PURE;
+
+  /**
+   * Get the time of last ejection.
+   * @return the last time this host was ejected, if the host has been ejected previously.
+   */
+  virtual const Optional<SystemTime>& lastEjectionTime() PURE;
+
+  /**
+   * Get the time of last unejection.
+   * @return the last time this host was unejected, if the host has been unejected previously.
+   */
+  virtual const Optional<SystemTime>& lastUnejectionTime() PURE;
 };
 
 typedef std::unique_ptr<DetectorHostSink> DetectorHostSinkPtr;

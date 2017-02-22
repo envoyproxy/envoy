@@ -19,6 +19,7 @@ namespace Router {
 // clang-format off
 #define ALL_ROUTER_STATS(COUNTER)                                                                  \
   COUNTER(no_route)                                                                                \
+  COUNTER(no_cluster)                                                                              \
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_total)
 // clang-format on
@@ -200,12 +201,14 @@ private:
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  const RouteEntry* route_entry_;
+  RoutePtr route_;
+  const RouteEntry* route_entry_{};
   Upstream::ClusterInfoPtr cluster_;
   std::string alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
+  Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   UpstreamRequestPtr upstream_request_;
   RetryStatePtr retry_state_;
   Http::HeaderMap* downstream_headers_{};

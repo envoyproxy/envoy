@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/http/headers.h"
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
 namespace Upstream {
@@ -21,7 +22,7 @@ CdsApiImpl::CdsApiImpl(const Json::Object& config, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
     : RestApiFetcher(cm, config.getObject("cluster")->getString("name"), dispatcher, random,
-                     std::chrono::milliseconds(config.getInteger("refresh_interval_ms", 30000))),
+                     std::chrono::milliseconds(config.getInteger("refresh_delay_ms", 30000))),
       local_info_(local_info),
       stats_({ALL_CDS_STATS(POOL_COUNTER_PREFIX(scope, "cluster_manager.cds."))}) {
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
@@ -40,6 +41,7 @@ void CdsApiImpl::createRequest(Http::Message& request) {
 void CdsApiImpl::parseResponse(const Http::Message& response) {
   log_debug("cds: parsing response");
   Json::ObjectPtr response_json = Json::Factory::LoadFromString(response.bodyAsString());
+  response_json->validateSchema(Json::Schema::CDS_SCHEMA);
   std::vector<Json::ObjectPtr> clusters = response_json->getObjectArray("clusters");
 
   // We need to keep track of which clusters we might need to remove.

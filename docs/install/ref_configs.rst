@@ -50,3 +50,15 @@ A few notes about the example configurations:
 * The configuration demonstrates the use of a :ref:`global rate limiting service
   <arch_overview_rate_limit>`. To disable this delete the :ref:`rate limit configuration
   <config_rate_limit_service>`.
+
+Smoketest configuration
+-----------------------
+
+A very minimal Envoy configuration that can be used to validate basic plain HTTP proxying is
+available in :repo:`configs/google_com_proxy.json`. This is not intended to represent a realistic
+Envoy deployment. To smoketest Envoy with this, run:
+
+.. code-block:: console
+
+  build/source/exe/envoy -c configs/google_com_proxy.json -l debug
+  curl -v localhost:10000

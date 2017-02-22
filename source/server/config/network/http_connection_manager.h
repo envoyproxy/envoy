@@ -81,7 +81,7 @@ public:
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return generate_request_id_; }
   const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
-  const Router::Config& routeConfig() override { return *route_config_; }
+  Router::RouteConfigProvider& routeConfigProvider() override { return *route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -89,7 +89,7 @@ public:
   const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
     return tracing_config_;
   }
-  const std::string& localAddress() override;
+  const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
 
   static void registerHttpFilterConfigFactory(HttpFilterConfigFactory& factory) {
@@ -121,7 +121,7 @@ private:
   Optional<Http::TracingConnectionManagerConfig> tracing_config_;
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;
-  Router::ConfigPtr route_config_;
+  Router::RouteConfigProviderPtr route_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   Http::TlsCachingDateProviderImpl date_provider_;

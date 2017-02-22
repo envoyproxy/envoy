@@ -12,7 +12,6 @@ using testing::SaveArg;
 namespace Http {
 
 MockConnectionManagerConfig::MockConnectionManagerConfig() {
-  ON_CALL(*this, routeConfig()).WillByDefault(ReturnRef(route_config_));
   ON_CALL(*this, generateRequestId()).WillByDefault(Return(true));
 }
 
@@ -68,11 +67,12 @@ MockFilterChainFactory::MockFilterChainFactory() {}
 MockFilterChainFactory::~MockFilterChainFactory() {}
 
 template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks) {
+  callbacks.route_.reset(new NiceMock<Router::MockRoute>());
   ON_CALL(callbacks, addResetStreamCallback(_))
       .WillByDefault(SaveArg<0>(&callbacks.reset_callback_));
   ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(callbacks.dispatcher_));
   ON_CALL(callbacks, requestInfo()).WillByDefault(ReturnRef(callbacks.request_info_));
-  ON_CALL(callbacks, route()).WillByDefault(Return(&callbacks.route_));
+  ON_CALL(callbacks, route()).WillByDefault(Return(callbacks.route_));
   ON_CALL(callbacks, downstreamAddress()).WillByDefault(ReturnRef(callbacks.downstream_address_));
 }
 
@@ -111,6 +111,9 @@ MockAsyncClient::~MockAsyncClient() {}
 
 MockAsyncClientCallbacks::MockAsyncClientCallbacks() {}
 MockAsyncClientCallbacks::~MockAsyncClientCallbacks() {}
+
+MockAsyncClientStreamCallbacks::MockAsyncClientStreamCallbacks() {}
+MockAsyncClientStreamCallbacks::~MockAsyncClientStreamCallbacks() {}
 
 MockAsyncClientRequest::MockAsyncClientRequest(MockAsyncClient* client) : client_(client) {}
 MockAsyncClientRequest::~MockAsyncClientRequest() { client_->onRequestDestroy(); }

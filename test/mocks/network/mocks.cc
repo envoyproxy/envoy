@@ -2,6 +2,9 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "common/network/address_impl.h"
+#include "common/network/utility.h"
+
 using testing::_;
 using testing::Invoke;
 using testing::Return;
@@ -41,7 +44,7 @@ template <class T> static void initializeMockConnection(T& connection) {
       .WillByDefault(Invoke([&connection](ConnectionCloseType) -> void {
         connection.raiseEvents(Network::ConnectionEvent::LocalClose);
       }));
-  ON_CALL(connection, remoteAddress()).WillByDefault(ReturnRef(connection.remote_address_));
+  ON_CALL(connection, remoteAddress()).WillByDefault(ReturnPointee(connection.remote_address_));
   ON_CALL(connection, id()).WillByDefault(Return(connection.next_id_));
   ON_CALL(connection, state()).WillByDefault(ReturnPointee(&connection.state_));
 
@@ -55,7 +58,7 @@ MockConnection::MockConnection() { initializeMockConnection(*this); }
 MockConnection::~MockConnection() {}
 
 MockClientConnection::MockClientConnection() {
-  remote_address_ = "tcp://10.0.0.1:443";
+  remote_address_ = Utility::resolveUrl("tcp://10.0.0.1:443");
   initializeMockConnection(*this);
 }
 
@@ -65,7 +68,7 @@ MockActiveDnsQuery::MockActiveDnsQuery() {}
 MockActiveDnsQuery::~MockActiveDnsQuery() {}
 
 MockDnsResolver::MockDnsResolver() {
-  ON_CALL(*this, resolve(_, _)).WillByDefault(ReturnRef(active_query_));
+  ON_CALL(*this, resolve(_, _)).WillByDefault(Return(&active_query_));
 }
 
 MockDnsResolver::~MockDnsResolver() {}
@@ -107,7 +110,10 @@ MockDrainDecision::~MockDrainDecision() {}
 MockFilterChainFactory::MockFilterChainFactory() {}
 MockFilterChainFactory::~MockFilterChainFactory() {}
 
-MockListenSocket::MockListenSocket() {}
+MockListenSocket::MockListenSocket() : local_address_(new Address::Ipv4Instance(80)) {
+  ON_CALL(*this, localAddress()).WillByDefault(Return(local_address_));
+}
+
 MockListenSocket::~MockListenSocket() {}
 
 MockListener::MockListener() {}

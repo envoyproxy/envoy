@@ -61,34 +61,23 @@ TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
 const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& connection) {
   for (const TcpProxyConfig::Route& route : routes_) {
     if (!route.source_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(
-            Network::Utility::portFromUrl(connection.remoteAddress()), route.source_port_ranges_)) {
-      continue; // no match, try next route
+        !Network::Utility::portInRangeList(connection.remoteAddress(), route.source_port_ranges_)) {
+      continue;
     }
 
-    if (!route.source_ips_.empty() &&
-        !route.source_ips_.contains(Network::Utility::hostFromUrl(connection.remoteAddress()))) {
-      continue; // no match, try next route
-    }
-
-    // If the route needs to match on destination address and port but they are not available
-    // (localAddress is empty), we skip it. The connection has a chance to match a different
-    // route that does not depend on destination address and port.
-    if ((!route.destination_port_ranges_.empty() || !route.destination_ips_.empty()) &&
-        connection.localAddress().empty()) {
+    if (!route.source_ips_.empty() && !route.source_ips_.contains(connection.remoteAddress())) {
       continue;
     }
 
     if (!route.destination_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(Network::Utility::portFromUrl(connection.localAddress()),
+        !Network::Utility::portInRangeList(connection.localAddress(),
                                            route.destination_port_ranges_)) {
-      continue; // no match, try next route
+      continue;
     }
 
     if (!route.destination_ips_.empty() &&
-        !route.destination_ips_.contains(
-            Network::Utility::hostFromUrl(connection.localAddress()))) {
-      continue; // no match, try next route
+        !route.destination_ips_.contains(connection.localAddress())) {
+      continue;
     }
 
     // if we made it past all checks, the route matches

@@ -51,7 +51,7 @@ path
   HTTP path that will be requested during health checking. For example */healthcheck*.
 
 send
-  *(sometimes required, object)* This parameter is required if the type is *tcp*. It specifies
+  *(sometimes required, array)* This parameter is required if the type is *tcp*. It specifies
   the bytes to send for a health check request. It is an array of hex byte strings specified
   as in the following example:
 
@@ -63,7 +63,7 @@ send
     ]
 
 receive
-  *(sometimes required, object)* This parameter is required if the type is *tcp*. It specified the
+  *(sometimes required, array)* This parameter is required if the type is *tcp*. It specified the
   bytes that are expected in a successful health check response. It is an array of hex byte strings
   specified similarly to the *send* parameter.
 

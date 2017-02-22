@@ -6,6 +6,7 @@
 #include "envoy/server/hot_restart.h"
 
 #include "common/local_info/local_info_impl.h"
+#include "common/network/utility.h"
 
 namespace Server {
 
@@ -22,56 +23,6 @@ public:
 };
 
 } // Server
-
-namespace Stats {
-
-/**
- * This is a variant of the isolated store that has locking across all operations so that it can
- * be used during the integration tests.
- */
-class TestIsolatedStoreImpl : public StoreRoot {
-public:
-  // Stats::Scope
-  Counter& counter(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
-    return store_.counter(name);
-  }
-  void deliverHistogramToSinks(const std::string&, uint64_t) override {}
-  void deliverTimingToSinks(const std::string&, std::chrono::milliseconds) override {}
-  Gauge& gauge(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
-    return store_.gauge(name);
-  }
-  Timer& timer(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
-    return store_.timer(name);
-  }
-
-  // Stats::Store
-  std::list<CounterPtr> counters() const override {
-    std::unique_lock<std::mutex> lock(lock_);
-    return store_.counters();
-  }
-  std::list<GaugePtr> gauges() const override {
-    std::unique_lock<std::mutex> lock(lock_);
-    return store_.gauges();
-  }
-  ScopePtr createScope(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
-    return store_.createScope(name);
-  }
-
-  // Stats::StoreRoot
-  void addSink(Sink&) override {}
-  void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
-  void shutdownThreading() override {}
-
-private:
-  mutable std::mutex lock_;
-  IsolatedStoreImpl store_;
-};
-
-} // Stats
 
 IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config_path) {
   IntegrationTestServerPtr server{new IntegrationTestServer(config_path)};
@@ -101,10 +52,10 @@ void IntegrationTestServer::threadRoutine() {
   Server::TestOptionsImpl options(config_path_);
   Server::TestHotRestart restarter;
   Thread::MutexBasicLockable lock;
-  Stats::TestIsolatedStoreImpl stats_store;
-  LocalInfo::LocalInfoImpl local_info("127.0.0.1", "zone_name", "cluster_name", "node_name");
+  LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(), "zone_name",
+                                      "cluster_name", "node_name");
   server_.reset(
-      new Server::InstanceImpl(options, *this, restarter, stats_store, lock, *this, local_info));
+      new Server::InstanceImpl(options, *this, restarter, stats_store_, lock, *this, local_info));
   server_->run();
   server_.reset();
 }

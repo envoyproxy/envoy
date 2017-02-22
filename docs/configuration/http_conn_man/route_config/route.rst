@@ -12,6 +12,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "prefix": "...",
     "path": "...",
     "cluster": "...",
+    "cluster_header": "...",
     "weighted_clusters" : "{...}",
     "host_redirect": "...",
     "path_redirect": "...",
@@ -40,30 +41,47 @@ path
 
 cluster
   *(sometimes required, string)* If the route is not a redirect (*host_redirect* and/or
-  *path_redirect* is not specified), one of *cluster* or *weighted_clusters* must be specified.
-  When a *cluster* is specified, its value indicates the upstream cluster to which the request
-  should be forwarded to.
+  *path_redirect* is not specified), one of *cluster*, *cluster_header*, or *weighted_clusters* must
+  be specified. When *cluster* is specified, its value indicates the upstream cluster to which the
+  request should be forwarded to.
+
+.. _config_http_conn_man_route_table_route_cluster_header:
+
+cluster_header
+  *(sometimes required, string)* If the route is not a redirect (*host_redirect* and/or
+  *path_redirect* is not specified), one of *cluster*, *cluster_header*, or *weighted_clusters* must
+  be specified. When *cluster_header* is specified, Envoy will determine the cluster to route to
+  by reading the value of the HTTP header named by *cluster_header* from the request headers.
+  If the header is not found or the referenced cluster does not exist, Envoy will return a 404
+  response.
+
+  .. attention::
+
+    Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1 *Host*
+    header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+
+.. _config_http_conn_man_route_table_route_config_weighted_clusters:
 
 :ref:`weighted_clusters <config_http_conn_man_route_table_route_weighted_clusters>`
   *(sometimes required, object)* If the route is not a redirect (*host_redirect* and/or
-  *path_redirect* is not specified), one of *cluster* or *weighted_clusters* must be specified.
-  With the *weighted_clusters* option, multiple upstream clusters can be specified for a given route.
-  The request is forwarded to one of the upstream clusters based on weights assigned
-  to each cluster. See :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split_percentages>`
+  *path_redirect* is not specified), one of *cluster*, *cluster_header*, or *weighted_clusters* must
+  be specified. With the *weighted_clusters* option, multiple upstream clusters can be specified for
+  a given route. The request is forwarded to one of the upstream clusters based on weights assigned
+  to each cluster. See :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split>`
   for additional documentation.
 
 .. _config_http_conn_man_route_table_route_host_redirect:
 
 host_redirect
   *(sometimes required, string)* Indicates that the route is a redirect rule. If there is a match,
-  A 302 redirect response will be sent which swaps the host portion of the URL with this value.
+  a 302 redirect response will be sent which swaps the host portion of the URL with this value.
   *path_redirect* can also be specified along with this option.
 
 .. _config_http_conn_man_route_table_route_path_redirect:
 
 path_redirect
   *(sometimes required, string)* Indicates that the route is a redirect rule. If there is a match,
-  A 302 redirect response will be sent which swaps the path portion of the URL with this value.
+  a 302 redirect response will be sent which swaps the path portion of the URL with this value.
   *host_redirect*  can also be specified along with this option.
 
 .. _config_http_conn_man_route_table_route_prefix_rewrite:

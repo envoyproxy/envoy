@@ -26,6 +26,7 @@ We welcome contributions from the community. Here are some guidelines.
 * Struct/Class member variables have a '\_' postfix (e.g., "int foo\_;").
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
+* 100 columns is the line limit.
 
 # Submitting a PR
 

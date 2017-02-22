@@ -9,6 +9,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -32,14 +33,10 @@ public:
 
 class LocalMockFilter : public MockFilter {
 public:
-  LocalMockFilter(const Upstream::HostDescription* host) : host_(host) {}
   ~LocalMockFilter() {
     // Make sure the upstream host is still valid in the filter destructor.
-    callbacks_->upstreamHost()->url();
+    callbacks_->upstreamHost()->address();
   }
-
-private:
-  const Upstream::HostDescription* host_;
 };
 
 TEST_F(NetworkFilterManagerTest, All) {
@@ -48,7 +45,7 @@ TEST_F(NetworkFilterManagerTest, All) {
   Upstream::HostDescription* host_description(new NiceMock<Upstream::MockHostDescription>());
   MockReadFilter* read_filter(new MockReadFilter());
   MockWriteFilter* write_filter(new MockWriteFilter());
-  MockFilter* filter(new LocalMockFilter(host_description));
+  MockFilter* filter(new LocalMockFilter());
 
   NiceMock<MockConnection> connection;
   FilterManagerImpl manager(connection, *this);
@@ -139,10 +136,9 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   manager.addReadFilter(ReadFilterPtr{new ::Filter::TcpProxy(tcp_proxy_config, cm)});
 
   RateLimit::RequestCallbacks* request_callbacks{};
-  EXPECT_CALL(
-      *rl_client,
-      limit(_, "foo",
-            testing::ContainerEq(std::vector<RateLimit::Descriptor>{{{{"hello", "world"}}}}), ""))
+  EXPECT_CALL(*rl_client, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                              {{{"hello", "world"}}}}),
+                                Tracing::EMPTY_CONTEXT))
       .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks)
                                        -> void { request_callbacks = &callbacks; })));
 
@@ -152,8 +148,8 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = upstream_connection;
-  conn_info.host_.reset(
-      new Upstream::HostImpl(cm.cluster_.info_, "tcp://127.0.0.1:80", false, 1, ""));
+  conn_info.host_.reset(new Upstream::HostImpl(
+      cm.cluster_.info_, Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
   EXPECT_CALL(cm, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
 
   request_callbacks->complete(RateLimit::LimitStatus::OK);

@@ -1,5 +1,6 @@
 #include "envoy/upstream/upstream.h"
 
+#include "common/network/utility.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
@@ -11,11 +12,13 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Pointee;
 using testing::Return;
 using testing::ReturnRef;
 using testing::ReturnNew;
@@ -158,6 +161,21 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   EXPECT_THROW(create(*loader), EnvoyException);
 }
 
+TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
+  std::string json = R"EOF(
+  {
+    "outlier_detection": {
+      "event_log_path": "foo"
+    },
+    "clusters": [],
+    "fake_property" : "fake_property"
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(create(*loader), Json::Exception);
+}
+
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
   std::string json = R"EOF(
   {
@@ -192,6 +210,8 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
 
   EXPECT_EQ(3UL, factory_.stats_.counter("cluster_manager.cluster_added").value());
   EXPECT_EQ(3UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
+
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, DuplicateCluster) {
@@ -269,9 +289,10 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(factory_.dispatcher_, createClientConnection_("tcp://127.0.0.1:11001"))
-      .WillOnce(Return(connection));
+  EXPECT_CALL(factory_.dispatcher_, createClientConnection_(PointeesEq(Network::Utility::resolveUrl(
+                                        "tcp://127.0.0.1:11001")))).WillOnce(Return(connection));
   create(*loader);
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
@@ -291,10 +312,10 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   create(*loader);
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
-  EXPECT_THROW(cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default),
-               EnvoyException);
+  EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default));
   EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello"), EnvoyException);
   EXPECT_THROW(cluster_manager_->httpAsyncClientForCluster("hello"), EnvoyException);
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, ShutdownOrder) {
@@ -427,9 +448,11 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
 
   EXPECT_CALL(initialized, ready());
   cluster3->initialize_callback_();
+
+  factory_.tls_.shutdownThread();
 }
 
-TEST_F(ClusterManagerImplTest, dynamicAddRemove) {
+TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   std::string json = R"EOF(
   {
     "clusters": []
@@ -480,7 +503,8 @@ TEST_F(ClusterManagerImplTest, dynamicAddRemove) {
 
   loader_api = Json::Factory::LoadFromString(json_api_3);
   MockCluster* cluster2 = new NiceMock<MockCluster>();
-  cluster2->hosts_ = {HostPtr{new HostImpl(cluster2->info_, "tcp://127.0.0.1:80", false, 1, "")}};
+  cluster2->hosts_ = {HostPtr{new HostImpl(
+      cluster2->info_, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize());
@@ -493,7 +517,9 @@ TEST_F(ClusterManagerImplTest, dynamicAddRemove) {
   EXPECT_EQ(cp,
             cluster_manager_->httpConnPoolForCluster("fake_cluster", ResourcePriority::Default));
 
-  // Now remove it.
+  // Now remove it. This should drain the connection pool.
+  Http::ConnectionPool::Instance::DrainedCb drained_cb;
+  EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   EXPECT_TRUE(cluster_manager_->removePrimaryCluster("fake_cluster"));
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().size());
@@ -501,13 +527,15 @@ TEST_F(ClusterManagerImplTest, dynamicAddRemove) {
   // Remove an unknown cluster.
   EXPECT_FALSE(cluster_manager_->removePrimaryCluster("foo"));
 
+  drained_cb();
+
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_added").value());
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_modified").value());
   EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_removed").value());
   EXPECT_EQ(0UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
 }
 
-TEST_F(ClusterManagerImplTest, addOrUpdatePrimaryClusterStaticExists) {
+TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   std::string json = R"EOF(
   {
     "clusters": [
@@ -543,6 +571,8 @@ TEST_F(ClusterManagerImplTest, addOrUpdatePrimaryClusterStaticExists) {
 
   // Attempt to remove a static cluster.
   EXPECT_FALSE(cluster_manager_->removePrimaryCluster("fake_cluster"));
+
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
@@ -565,7 +595,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(factory_.dns_resolver_, resolve(_, _))
-      .WillRepeatedly(DoAll(SaveArg<1>(&dns_callback), ReturnRef(active_dns_query)));
+      .WillRepeatedly(DoAll(SaveArg<1>(&dns_callback), Return(&active_dns_query)));
   create(*loader);
 
   // Test for no hosts returning the correct values before we have hosts.
@@ -579,7 +609,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback({"127.0.0.1", "127.0.0.2"});
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
   // initialize callback.
@@ -611,7 +641,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->callback_();
-  dns_callback({"127.0.0.2"});
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
   EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(2);
@@ -629,9 +659,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->callback_();
-  dns_callback({"127.0.0.2", "127.0.0.3"});
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   dns_timer_->callback_();
-  dns_callback({"127.0.0.2"});
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+
+  factory_.tls_.shutdownThread();
 }
 
 TEST(ClusterManagerInitHelper, ImmediateInitialize) {
@@ -673,6 +705,32 @@ TEST(ClusterManagerInitHelper, StaticSdsInitialize) {
 
   EXPECT_CALL(cm_initialized, ready());
   cluster1.initialize_callback_();
+}
+
+TEST(ClusterManagerInitHelper, UpdateAlreadyInitialized) {
+  InSequence s;
+  ClusterManagerInitHelper init_helper;
+
+  ReadyWatcher cm_initialized;
+  init_helper.setInitializedCb([&]() -> void { cm_initialized.ready(); });
+
+  NiceMock<MockCluster> cluster1;
+  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(cluster1, initialize());
+  init_helper.addCluster(cluster1);
+
+  NiceMock<MockCluster> cluster2;
+  ON_CALL(cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(cluster2, initialize());
+  init_helper.addCluster(cluster2);
+
+  init_helper.onStaticLoadComplete();
+
+  cluster1.initialize_callback_();
+  init_helper.removeCluster(cluster1);
+
+  EXPECT_CALL(cm_initialized, ready());
+  cluster2.initialize_callback_();
 }
 
 } // Upstream

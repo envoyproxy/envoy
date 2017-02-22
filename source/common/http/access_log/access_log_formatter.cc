@@ -144,7 +144,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
     }
 
     std::string length_str = token.substr(end_request + 2);
-    size_t length_value;
+    uint64_t length_value;
 
     if (!StringUtil::atoul(length_str.c_str(), length_value)) {
       throw EnvoyException(fmt::format("Length must be an integer, given: {}", length_str));
@@ -251,12 +251,11 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "UPSTREAM_HOST") {
     field_extractor_ = [](const RequestInfo& request_info) {
-      std::string upstream_host_url;
-      if (nullptr != request_info.upstreamHost()) {
-        upstream_host_url = request_info.upstreamHost()->url();
+      if (request_info.upstreamHost()) {
+        return request_info.upstreamHost()->address()->asString();
+      } else {
+        return std::string("-");
       }
-
-      return upstream_host_url.empty() ? "-" : upstream_host_url;
     };
   } else if (field_name == "UPSTREAM_CLUSTER") {
     field_extractor_ = [](const RequestInfo& request_info) {

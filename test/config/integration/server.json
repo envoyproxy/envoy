@@ -2,6 +2,7 @@
   "listeners": [
   {
     "port": 10000,
+    "use_original_dst": true,
     "filters": [
       { "type": "read", "name": "ratelimit",
         "config": {
@@ -25,10 +26,21 @@
         "access_log": [
         {
           "path": "/dev/null",
-          "filters": [
-            {"type": "status_code", "op": ">=", "value": 500},
-            {"type": "duration", "op": ">=", "value": 1000000}
-          ]
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
         },
         {
           "path": "/dev/null"
@@ -66,7 +78,7 @@
                   "rate_limits": [
                     {
                       "actions": [
-                        {"type": "service_to_service"}
+                        {"type": "destination_cluster"}
                       ]
                     }
                   ]
@@ -107,10 +119,21 @@
         "access_log": [
         {
           "path": "/dev/null",
-          "filters": [
-            {"type": "status_code", "op": ">=", "value": 500},
-            {"type": "duration", "op": ">=", "value": 1000000}
-          ]
+          "filter" : {
+            "type": "logical_or",
+            "filters": [
+              {
+                "type": "status_code",
+                "op": ">=",
+                "value": 500
+              },
+              {
+                "type": "duration",
+                "op": ">=",
+                "value": 1000000
+              }
+            ]
+          }
         },
         {
           "path": "/dev/null"
@@ -148,7 +171,7 @@
                   "rate_limits": [
                     {
                       "actions": [
-                        {"type": "service_to_service"}
+                        {"type": "destination_cluster"}
                       ]
                     }
                   ]
@@ -200,6 +223,25 @@
         }
       }
     ]
+  },
+  {
+    "port": 10005,
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "http1",
+        "stat_prefix": "rds_dummy",
+        "rds": {
+          "cluster": "rds",
+          "route_config_name": "foo"
+        },
+        "filters": [
+          { "type": "decoder", "name": "router", "config": {} }
+        ]
+      }
+    }]
   }],
 
   "admin": { "access_log_path": "/dev/null", "port": 10003 },
@@ -225,7 +267,23 @@
   },
 
   "cluster_manager": {
+    "cds": {
+      "cluster": {
+        "name": "cds",
+        "connect_timeout_ms": 250,
+        "type": "static",
+        "lb_type": "round_robin",
+        "hosts": [{"url": "tcp://127.0.0.1:12000"}]
+      }
+    },
     "clusters": [
+    {
+      "name": "rds",
+      "connect_timeout_ms": 250,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:12000"}]
+    },
     {
       "name": "cluster_1",
       "connect_timeout_ms": 250,
@@ -253,7 +311,6 @@
       "connect_timeout_ms": 250,
       "type": "strict_dns",
       "lb_type": "round_robin",
-      "_comment:": "this is expected to fail",
       "hosts": [{"url": "tcp://localhost:10010"}]
     }]
   }

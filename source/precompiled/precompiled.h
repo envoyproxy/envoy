@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <arpa/inet.h>
 #include <chrono>
 #include <cmath>
@@ -12,8 +14,10 @@
 #include <memory>
 #include <netdb.h>
 #include <netinet/tcp.h>
+#include <random>
 #include <regex>
 #include <signal.h>
+#include <sstream>
 #include <string.h>
 #include <sys/signalfd.h>
 #include <unistd.h>

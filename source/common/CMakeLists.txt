@@ -45,6 +45,7 @@ add_library(
   filter/ratelimit.cc
   filter/tcp_proxy.cc
   generated/ratelimit.pb.cc
+  grpc/codec.cc
   grpc/common.cc
   grpc/http1_bridge_filter.cc
   grpc/rpc_channel_impl.cc
@@ -75,6 +76,7 @@ add_library(
   mongo/codec_impl.cc
   mongo/proxy.cc
   mongo/utility.cc
+  network/address_impl.cc
   network/connection_impl.cc
   network/dns_impl.cc
   network/filter_manager_impl.cc
@@ -88,6 +90,7 @@ add_library(
   redis/conn_pool_impl.cc
   redis/proxy_filter.cc
   router/config_impl.cc
+  router/rds_impl.cc
   router/retry_state_impl.cc
   router/router.cc
   router/router_ratelimit.cc
@@ -122,6 +125,7 @@ if (NOT ENVOY_SANITIZE)
   include_directories(${ENVOY_GPERFTOOLS_INCLUDE_DIR})
 endif()
 
+include_directories(${ENVOY_CARES_INCLUDE_DIR})
 include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 include_directories(${ENVOY_NGHTTP2_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
