@@ -5,7 +5,6 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
-#include "envoy/ssl/connection.h"
 
 namespace Http {
 
@@ -111,11 +110,6 @@ public:
    * @return the trusted downstream address for the connection.
    */
   virtual const std::string& downstreamAddress() PURE;
-
-  /**
-   * @return the ssl connection information.
-   */
-  virtual Ssl::Connection* ssl();
 };
 
 /**

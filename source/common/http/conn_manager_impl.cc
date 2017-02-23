@@ -6,7 +6,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/drain_decision.h"
-#include "envoy/ssl/connection.h"
 #include "envoy/stats/stats.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -363,10 +362,6 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(HeaderMap& headers) {
 
 uint64_t ConnectionManagerImpl::ActiveStream::connectionId() {
   return connection_manager_.read_callbacks_->connection().id();
-}
-
-Ssl::Connection* ConnectionManagerImpl::ActiveStream::ssl() {
-  return connection_manager_.read_callbacks_->connection().ssl();
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
@@ -815,8 +810,6 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCal
 uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::connectionId() {
   return parent_.connectionId();
 }
-
-Ssl::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::ssl() { return parent_.ssl(); }
 
 Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
   return parent_.connection_manager_.read_callbacks_->connection().dispatcher();
