@@ -65,6 +65,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
       .WillOnce(Invoke([&](uint32_t) -> void {
         EXPECT_EQ("2ff7d57d2e5cb9cc0bfe56727a114de8039cabcc7658715db4e80e1a75e108ed",
                   server_connection->ssl()->sha256PeerCertificateDigest());
+        EXPECT_EQ("",
+              server_connection->ssl()->uriPeerCertificateSAN());
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();

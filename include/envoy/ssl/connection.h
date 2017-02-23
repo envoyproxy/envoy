@@ -18,8 +18,8 @@ public:
   virtual std::string sha256PeerCertificateDigest() PURE;
 
   /**
-   * @return the subject_alt_name.uri field of the peer certificate. Returns "" if there is no peer
-   *         certificate or the uri field is empty.
+   * @return the subject_alt_name.uri field of the peer certificate. Returns "" if there
+   *         is no peer certificate or the uri field is empty.
    */
   virtual std::string uriPeerCertificateSAN() PURE;
 };
