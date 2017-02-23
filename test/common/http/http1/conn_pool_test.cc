@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/codec_client.h"
 #include "common/http/http1/conn_pool.h"
+#include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -30,7 +31,8 @@ class ConnPoolImplForTest : public ConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterInfoPtr cluster)
       : ConnPoolImpl(dispatcher, Upstream::HostPtr{new Upstream::HostImpl(
-                                     cluster, "tcp://127.0.0.1:9000", false, 1, "")},
+                                     cluster, Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
+                                     false, 1, "")},
                      Upstream::ResourcePriority::Default),
         mock_dispatcher_(dispatcher) {}
 

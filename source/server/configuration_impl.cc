@@ -92,6 +92,10 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
       opts->access_token = server_.api().fileReadToEnd(driver->getString("access_token_file"));
       StringUtil::rtrim(opts->access_token);
 
+      if (server_.localInfo().clusterName().empty()) {
+        throw EnvoyException("cluster name must be defined if LightStep tracing is enabled. See "
+                             "--service-cluster option.");
+      }
       opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
       opts->guid_generator = [&rand]() { return rand.random(); };
 

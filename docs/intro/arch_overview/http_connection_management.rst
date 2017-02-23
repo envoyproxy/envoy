@@ -33,8 +33,7 @@ understand whether a stream originated on an HTTP/1.1 or HTTP/2 connection.
 HTTP access logging
 -------------------
 
-The HTTP connection manager supports extensible access
-logging with the following features:
+The HTTP connection manager supports extensible access logging with the following features:
 
 * Any number of access logs per connection manager.
 * Asynchronous IO flushing architecture. Access logging will never block the main network processing
@@ -46,3 +45,11 @@ logging with the following features:
 
 HTTP access log :ref:`configuration <config_http_conn_man_access_log>`.
 
+Route table configuration
+-------------------------
+
+Each :ref:`HTTP connection manager filter <config_http_conn_man>` has an associated :ref:`route
+table <arch_overview_http_routing>`. The route table can be specified in one of two ways:
+
+* Statically.
+* Dynamically via the :ref:`RDS API <config_http_conn_man_rds>`.

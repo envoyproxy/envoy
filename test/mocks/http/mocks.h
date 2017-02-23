@@ -72,16 +72,14 @@ public:
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(generateRequestId, bool());
   MOCK_METHOD0(idleTimeout, const Optional<std::chrono::milliseconds>&());
-  MOCK_METHOD0(routeConfig, Router::Config&());
+  MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider&());
   MOCK_METHOD0(serverName, const std::string&());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
-  MOCK_METHOD0(localAddress, const std::string&());
+  MOCK_METHOD0(localAddress, const Network::Address::Instance&());
   MOCK_METHOD0(userAgent, const Optional<std::string>&());
   MOCK_METHOD0(tracingConfig, const Optional<Http::TracingConnectionManagerConfig>&());
-
-  testing::NiceMock<Router::MockConfig> route_config_;
 };
 
 class MockConnectionCallbacks : public virtual ConnectionCallbacks {
@@ -200,7 +198,7 @@ public:
   std::function<void()> reset_callback_;
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<AccessLog::MockRequestInfo> request_info_;
-  testing::NiceMock<Router::MockRoute> route_;
+  std::shared_ptr<Router::MockRoute> route_;
   std::string downstream_address_;
 };
 
@@ -215,7 +213,7 @@ public:
   MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
-  MOCK_METHOD0(route, const Router::Route*());
+  MOCK_METHOD0(route, Router::RoutePtr());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
@@ -244,7 +242,7 @@ public:
   MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
-  MOCK_METHOD0(route, const Router::Route*());
+  MOCK_METHOD0(route, Router::RoutePtr());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
@@ -298,6 +296,9 @@ public:
 
   MOCK_METHOD3(send_, Request*(MessagePtr& request, Callbacks& callbacks,
                                const Optional<std::chrono::milliseconds>& timeout));
+
+  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks,
+                              const Optional<std::chrono::milliseconds>& timeout));
 };
 
 class MockAsyncClientCallbacks : public AsyncClient::Callbacks {
@@ -310,6 +311,22 @@ public:
   // Http::AsyncClient::Callbacks
   MOCK_METHOD1(onSuccess_, void(Message* response));
   MOCK_METHOD1(onFailure, void(Http::AsyncClient::FailureReason reason));
+};
+
+class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {
+public:
+  MockAsyncClientStreamCallbacks();
+  ~MockAsyncClientStreamCallbacks();
+
+  void onHeaders(HeaderMapPtr&& headers, bool end_stream) override {
+    onHeaders_(*headers, end_stream);
+  }
+  void onTrailers(HeaderMapPtr&& trailers) override { onTrailers_(*trailers); }
+
+  MOCK_METHOD2(onHeaders_, void(HeaderMap& headers, bool end_stream));
+  MOCK_METHOD2(onData, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD1(onTrailers_, void(HeaderMap& headers));
+  MOCK_METHOD0(onReset, void());
 };
 
 class MockAsyncClientRequest : public AsyncClient::Request {

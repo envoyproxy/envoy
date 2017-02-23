@@ -14,7 +14,11 @@
 
 namespace Http {
 
-void Utility::appendXff(HeaderMap& headers, const std::string& remote_address) {
+void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address) {
+  if (remote_address.type() != Network::Address::Type::Ip) {
+    return;
+  }
+
   // TODO PERF: Append and do not copy.
   HeaderEntry* header = headers.ForwardedFor();
   std::string forwarded_for = header ? header->value().c_str() : "";
@@ -22,7 +26,7 @@ void Utility::appendXff(HeaderMap& headers, const std::string& remote_address) {
     forwarded_for += ", ";
   }
 
-  forwarded_for += remote_address;
+  forwarded_for += remote_address.ip()->addressAsString();
   headers.insertForwardedFor().value(forwarded_for);
 }
 
@@ -79,7 +83,14 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
         std::string k = s.substr(first_non_space, equals_index - first_non_space);
         State* state = static_cast<State*>(context);
         if (k == state->key_) {
-          state->ret_ = s.substr(equals_index + 1, s.size() - 1);
+          std::string v = s.substr(equals_index + 1, s.size() - 1);
+
+          // Cookie values may be wrapped in double quotes.
+          // https://tools.ietf.org/html/rfc6265#section-4.1.1
+          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
+            v = v.substr(1, v.size() - 2);
+          }
+          state->ret_ = v;
           return;
         }
       }

@@ -33,13 +33,18 @@ public:
   void initialize() override {}
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
   void setInitializedCb(std::function<void()> callback) override {
-    initialize_callback_ = callback;
+    if (initialized_) {
+      callback();
+    } else {
+      initialize_callback_ = callback;
+    }
   }
 
 private:
   struct LogicalHost : public HostImpl {
-    LogicalHost(ClusterInfoPtr cluster, const std::string& url, LogicalDnsCluster& parent)
-        : HostImpl(cluster, url, false, 1, ""), parent_(parent) {}
+    LogicalHost(ClusterInfoPtr cluster, Network::Address::InstancePtr address,
+                LogicalDnsCluster& parent)
+        : HostImpl(cluster, address, false, 1, ""), parent_(parent) {}
 
     // Upstream::Host
     CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override;
@@ -48,8 +53,8 @@ private:
   };
 
   struct RealHostDescription : public HostDescription {
-    RealHostDescription(const std::string& url, ConstHostPtr logical_host)
-        : url_(url), logical_host_(logical_host) {}
+    RealHostDescription(Network::Address::InstancePtr address, ConstHostPtr logical_host)
+        : address_(address), logical_host_(logical_host) {}
 
     // Upstream:HostDescription
     bool canary() const override { return false; }
@@ -58,10 +63,10 @@ private:
       return logical_host_->outlierDetector();
     }
     const HostStats& stats() const override { return logical_host_->stats(); }
-    const std::string& url() const override { return url_; }
+    Network::Address::InstancePtr address() const override { return address_; }
     const std::string& zone() const override { return EMPTY_STRING; }
 
-    const std::string url_;
+    Network::Address::InstancePtr address_;
     ConstHostPtr logical_host_;
   };
 
@@ -69,7 +74,7 @@ private:
     // ThreadLocal::ThreadLocalObject
     void shutdown() override {}
 
-    std::string current_resolved_url_;
+    Network::Address::InstancePtr current_resolved_address_;
   };
 
   void startResolve();
@@ -79,9 +84,11 @@ private:
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;
   std::function<void()> initialize_callback_;
+  // Set once the first resolve completes.
+  bool initialized_;
   Event::TimerPtr resolve_timer_;
   std::string dns_url_;
-  std::string current_resolved_url_;
+  Network::Address::InstancePtr current_resolved_address_;
   HostPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
 };

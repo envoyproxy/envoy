@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "common/common/empty_string.h"
+#include "common/network/address_impl.h"
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {
@@ -42,6 +43,15 @@ std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
   }
 
   return output;
+}
+
+std::list<Network::Address::InstancePtr>
+TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
+  std::list<Network::Address::InstancePtr> ret;
+  for (auto address : addresses) {
+    ret.emplace_back(new Network::Address::Ipv4Instance(address));
+  }
+  return ret;
 }
 
 namespace Http {

@@ -33,6 +33,8 @@ public:
     } catch (const EnvoyException& ex) {
       throw EnvoyException(fmt::format("'{}' config failed. Error: {}", file_path, ex.what()));
     }
+
+    server_.thread_local_.shutdownThread();
   }
 
   NiceMock<Server::MockInstance> server_;

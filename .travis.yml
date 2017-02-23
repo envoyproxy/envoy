@@ -12,6 +12,4 @@ env:
   - TEST_TYPE=coverage
   - TEST_TYPE=asan
   - TEST_TYPE=docs
-script:
-  - travis lint .travis.yml --skip-completion-check
-  - docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
+script: ./ci/ci_steps.sh

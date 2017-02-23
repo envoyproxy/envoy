@@ -36,7 +36,7 @@ format
 .. _config_http_conn_man_access_log_filter_param:
 
 filter
-  *(optional, string)* :ref:`Filter <config_http_con_manager_access_log_filters>` which is used to
+  *(optional, object)* :ref:`Filter <config_http_con_manager_access_log_filters>` which is used to
   determine if the access log needs to be written.
 
 .. _config_http_con_manager_access_log_format:
@@ -175,7 +175,7 @@ Duration
 Filters on total request duration in milliseconds.
 
 op
-  *(required, string)* Comparison operator. Currently *>=* is the only supported operator.
+  *(required, string)* Comparison operator. Currently *>=* and *=* are the only supported operators.
 
 value
   *(required, integer)* Default value to compare against if runtime values is not available.
@@ -211,6 +211,31 @@ Traceable
 
 Filters for requests that are traceable. See the :ref:`tracing overview <arch_overview_tracing>` for
 more information on how a request becomes traceable.
+
+
+.. _config_http_con_manager_access_log_filters_runtime:
+
+Runtime
+^^^^^^^^^
+.. code-block:: json
+
+  {
+    "filter": {
+      "type": "runtime",
+      "key" : "..."
+    }
+  }
+
+Filters for random sampling of requests. Sampling pivots on the header
+:ref:`x-request-id<config_http_conn_man_headers_x-request-id>` being present. If
+:ref:`x-request-id<config_http_conn_man_headers_x-request-id>` is present, the filter will
+consistently sample across multiple hosts based on the runtime key value and the value extracted
+from :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`. If it is missing, the
+filter will randomly sample based on the runtime key value.
+
+key
+  *(required, string)* Runtime key to get the percentage of requests to be sampled.
+  This runtime control is specified in the range 0-100 and defaults to 0.
 
 And
 ^^^

@@ -55,21 +55,23 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ClientConnectionPtr DispatcherImpl::createClientConnection(const std::string& url) {
-  return Network::ClientConnectionImpl::create(*this, url);
+Network::ClientConnectionPtr
+DispatcherImpl::createClientConnection(Network::Address::InstancePtr address) {
+  return Network::ClientConnectionPtr{new Network::ClientConnectionImpl(*this, address)};
 }
 
-Network::ClientConnectionPtr DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                                                       const std::string& url) {
-  return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, url)};
+Network::ClientConnectionPtr
+DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
+                                          Network::Address::InstancePtr address) {
+  return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, address)};
 }
 
 Network::DnsResolverPtr DispatcherImpl::createDnsResolver() {
   return Network::DnsResolverPtr{new Network::DnsResolverImpl(*this)};
 }
 
-FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb) {
-  return FileEventPtr{new FileEventImpl(*this, fd, cb)};
+FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger) {
+  return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {

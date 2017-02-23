@@ -33,19 +33,21 @@ public:
 
   /**
    * Create a client connection.
-   * @param url supplies the URL to connect to.
+   * @param address supplies the address to connect to.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
-  virtual Network::ClientConnectionPtr createClientConnection(const std::string& url) PURE;
+  virtual Network::ClientConnectionPtr
+  createClientConnection(Network::Address::InstancePtr address) PURE;
 
   /**
    * Create an SSL client connection.
    * @param ssl_ctx supplies the SSL context to use.
-   * @param url supplies the URL to connect to.
+   * @param address supplies the address to connect to.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
-  virtual Network::ClientConnectionPtr createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                                                 const std::string& url) PURE;
+  virtual Network::ClientConnectionPtr
+  createSslClientConnection(Ssl::ClientContext& ssl_ctx,
+                            Network::Address::InstancePtr address) PURE;
 
   /**
    * Create an async DNS resolver. Only a single resolver can exist in the process at a time and it
@@ -59,8 +61,9 @@ public:
    * can be used for any file like interface (files, sockets, etc.).
    * @param fd supplies the fd to watch.
    * @param cb supplies the callback to fire when the file is ready.
+   * @param trigger specifies whether to edge or level trigger.
    */
-  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb) PURE;
+  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.

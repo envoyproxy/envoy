@@ -69,6 +69,24 @@ public:
 };
 
 /**
+ * Implementation of Init::Manager for use during post cluster manager init / pre listening.
+ */
+class InitManagerImpl : public Init::Manager {
+public:
+  void initialize(std::function<void()> callback);
+
+  // Init::Manager
+  void registerTarget(Init::Target& target) override;
+
+private:
+  enum class State { NotInitialized, Initializing, Initialized };
+
+  std::list<Init::Target*> targets_;
+  State state_{State::NotInitialized};
+  std::function<void()> callback_;
+};
+
+/**
  * This is the actual full standalone server which stiches together various common components.
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
@@ -95,6 +113,7 @@ public:
   int getListenSocketFd(uint32_t port) override;
   void getParentStats(HotRestart::GetParentStatsInfo& info) override;
   HotRestart& hotRestart() override { return restarter_; }
+  Init::Manager& initManager() override { return init_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
   rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) override {
@@ -118,6 +137,7 @@ private:
   void initializeStatSinks();
   void loadServerFlags(const Optional<std::string>& flags_path);
   uint64_t numConnections();
+  void startWorkers(TestHooks& hooks);
 
   Options& options_;
   HotRestart& restarter_;
@@ -143,6 +163,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
+  InitManagerImpl init_manager_;
 };
 
 } // Server

@@ -57,6 +57,7 @@ public:
   void complete(::RateLimit::LimitStatus status) override;
 
 private:
+  void initiateCall(const HeaderMap& headers);
   void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                                     std::vector<::RateLimit::Descriptor>& descriptors,
                                     const Router::RouteEntry* route_entry,

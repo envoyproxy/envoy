@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 
 namespace Network {
 
@@ -29,15 +30,16 @@ public:
    * @param address_list supplies the list of resolved IP addresses. The list will be empty if
    *                     the resolution failed.
    */
-  typedef std::function<void(std::list<std::string>&& address_list)> ResolveCb;
+  typedef std::function<void(std::list<Address::InstancePtr>&& address_list)> ResolveCb;
 
   /**
    * Initiate an async DNS resolution.
    * @param dns_name supplies the DNS name to lookup.
    * @param callback supplies the callback to invoke when the resolution is complete.
-   * @return a handle that can be used to cancel the resolution.
+   * @return if non-null, a handle that can be used to cancel the resolution.
+   *         This is only valid until the invocation of callback or ~DnsResolver().
    */
-  virtual ActiveDnsQuery& resolve(const std::string& dns_name, ResolveCb callback) PURE;
+  virtual ActiveDnsQuery* resolve(const std::string& dns_name, ResolveCb callback) PURE;
 };
 
 typedef std::unique_ptr<DnsResolver> DnsResolverPtr;

@@ -9,12 +9,12 @@ public:
   MockLocalInfo();
   ~MockLocalInfo();
 
-  MOCK_CONST_METHOD0(address, std::string&());
+  MOCK_CONST_METHOD0(address, Network::Address::InstancePtr());
   MOCK_CONST_METHOD0(zoneName, std::string&());
   MOCK_CONST_METHOD0(clusterName, std::string&());
   MOCK_CONST_METHOD0(nodeName, std::string&());
 
-  std::string address_{"127.0.0.1"};
+  Network::Address::InstancePtr address_;
   std::string zone_name_{"zone_name"};
   std::string cluster_name_{"cluster_name"};
   std::string node_name_{"node_name"};

@@ -10,6 +10,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/router/rds.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tracing/http_tracer.h"
@@ -159,9 +160,10 @@ public:
   virtual const Optional<std::chrono::milliseconds>& idleTimeout() PURE;
 
   /**
-   * @return const Router::Config& the route configuration for all connection manager requests.
+   * @return Router::RouteConfigProvider& the configuration provider used to acquire a route
+   *         config for each request flow.
    */
-  virtual const Router::Config& routeConfig() PURE;
+  virtual Router::RouteConfigProvider& routeConfigProvider() PURE;
 
   /**
    * @return const std::string& the server name to write into responses.
@@ -188,7 +190,7 @@ public:
    * @return local address.
    * Gives richer information in case of internal requests.
    */
-  virtual const std::string& localAddress() PURE;
+  virtual const Network::Address::Instance& localAddress() PURE;
 
   /**
    * @return custom user agent for internal requests for better debugging. Must be configured to
@@ -221,6 +223,8 @@ public:
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Store& stats);
   static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
                                                             Stats::Store& stats);
+  static void chargeTracingStats(const Tracing::Reason& tracing_reason,
+                                 ConnectionManagerTracingStats& tracing_stats);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -264,7 +268,7 @@ private:
     Ssl::Connection* ssl() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
-    const Router::Route* route() override;
+    Router::RoutePtr route() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     const std::string& downstreamAddress() override;
@@ -272,7 +276,6 @@ private:
     ActiveStream& parent_;
     bool headers_continued_{};
     bool stopped_{};
-    Optional<const Router::Route*> cached_route_;
   };
 
   /**
@@ -356,7 +359,6 @@ private:
     ~ActiveStream();
 
     void chargeStats(HeaderMap& headers);
-    void chargeTracingStats(const Tracing::Decision& tracing_decision);
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     uint64_t connectionId();
@@ -397,6 +399,7 @@ private:
     };
 
     ConnectionManagerImpl& connection_manager_;
+    Router::ConfigPtr snapped_route_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
@@ -414,6 +417,7 @@ private:
     State state_;
     AccessLog::RequestInfoImpl request_info_;
     std::string downstream_address_;
+    Optional<Router::RoutePtr> cached_route_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

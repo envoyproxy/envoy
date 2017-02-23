@@ -3,6 +3,7 @@
 #include "utility.h"
 
 #include "common/event/dispatcher_impl.h"
+#include "common/network/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -48,7 +49,7 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
-  return context_manager_->createSslServerContext(store(), cfg);
+  return context_manager_->createSslServerContext(test_server_->store(), cfg);
 }
 
 ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {
@@ -71,17 +72,17 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(alpn ? json_alpn : json_no_alpn);
   ContextConfigImpl cfg(*loader);
-  return context_manager_->createSslClientContext(store(), cfg);
+  return context_manager_->createSslClientContext(test_server_->store(), cfg);
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn) {
-  return dispatcher_->createSslClientConnection(alpn ? *client_ssl_ctx_alpn_
-                                                     : *client_ssl_ctx_no_alpn_,
-                                                fmt::format("tcp://127.0.0.1:10001"));
+  return dispatcher_->createSslClientConnection(
+      alpn ? *client_ssl_ctx_alpn_ : *client_ssl_ctx_no_alpn_,
+      Network::Utility::resolveUrl("tcp://127.0.0.1:10001"));
 }
 
 void SslIntegrationTest::checkStats() {
-  Stats::Counter& counter = store().counter("listener.10001.ssl.handshake");
+  Stats::Counter& counter = test_server_->store().counter("listener.10001.ssl.handshake");
   EXPECT_EQ(1U, counter.value());
   counter.reset();
 }

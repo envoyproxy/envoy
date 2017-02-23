@@ -28,3 +28,4 @@ Architecture overview
   mongo
   dynamo
   hot_restart
+  dynamic_configuration

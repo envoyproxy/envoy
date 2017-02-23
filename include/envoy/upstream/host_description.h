@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/network/address.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/outlier_detection.h"
 
@@ -50,9 +51,9 @@ public:
   virtual Outlier::DetectorHostSink& outlierDetector() const PURE;
 
   /**
-   * @return the URL used to connect to the host.
+   * @return the address used to connect to the host.
    */
-  virtual const std::string& url() const PURE;
+  virtual Network::Address::InstancePtr address() const PURE;
 
   /**
    * @return host specific stats.

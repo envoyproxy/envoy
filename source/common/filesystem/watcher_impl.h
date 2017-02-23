@@ -33,7 +33,6 @@ private:
 
   void onInotifyEvent();
 
-  Event::Dispatcher& dispatcher_;
   int inotify_fd_;
   Event::FileEventPtr inotify_event_;
   std::unordered_map<int, DirectoryWatch> callback_map_;

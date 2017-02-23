@@ -23,7 +23,7 @@ void ConnectionHandlerImpl::addListener(Network::FilterChainFactory& factory,
                                         bool use_proxy_proto, bool use_orig_dst) {
   ActiveListenerPtr l(
       new ActiveListener(*this, socket, factory, bind_to_port, use_proxy_proto, use_orig_dst));
-  listeners_.insert(std::make_pair(socket.name(), std::move(l)));
+  listeners_.emplace_back(socket.localAddress(), std::move(l));
 }
 
 void ConnectionHandlerImpl::addSslListener(Network::FilterChainFactory& factory,
@@ -32,7 +32,7 @@ void ConnectionHandlerImpl::addSslListener(Network::FilterChainFactory& factory,
                                            bool use_proxy_proto, bool use_orig_dst) {
   ActiveListenerPtr l(new SslActiveListener(*this, ssl_ctx, socket, factory, bind_to_port,
                                             use_proxy_proto, use_orig_dst));
-  listeners_.insert(std::make_pair(socket.name(), std::move(l)));
+  listeners_.emplace_back(socket.localAddress(), std::move(l));
 }
 
 void ConnectionHandlerImpl::closeConnections() {
@@ -64,7 +64,7 @@ ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& par
     : ActiveListener(parent, parent.dispatcher_->createListener(parent, socket, *this,
                                                                 parent.stats_store_, bind_to_port,
                                                                 use_proxy_proto, use_orig_dst),
-                     factory, socket.name()) {}
+                     factory, socket.localAddress()->asString()) {}
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
                                                       Network::ListenerPtr&& listener,
@@ -83,10 +83,17 @@ ConnectionHandlerImpl::SslActiveListener::SslActiveListener(ConnectionHandlerImp
     : ActiveListener(parent, parent.dispatcher_->createSslListener(
                                  parent, ssl_ctx, socket, *this, parent.stats_store_, bind_to_port,
                                  use_proxy_proto, use_orig_dst),
-                     factory, socket.name()) {}
+                     factory, socket.localAddress()->asString()) {}
 
-Network::Listener* ConnectionHandlerImpl::findListener(const std::string& socket_name) {
-  auto l = listeners_.find(socket_name);
+Network::Listener* ConnectionHandlerImpl::findListenerByPort(uint32_t port) {
+  // findListenerByPort is O(#listeners) operation, may need to add a map<port, listener>
+  // to improve performance to O(log #listeners); since the number of listeners is small
+  // linear performance might be adequate
+  auto l = std::find_if(
+      listeners_.begin(), listeners_.end(),
+      [port](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
+        return p.first->type() == Network::Address::Type::Ip && p.first->ip()->port() == port;
+      });
   return (l != listeners_.end()) ? l->second->listener_.get() : nullptr;
 }
 

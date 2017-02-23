@@ -4,7 +4,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
 
 namespace Http {

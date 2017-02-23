@@ -1,7 +1,9 @@
 #include "envoy/api/api.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+#include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/common.h"
@@ -9,6 +11,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -17,13 +20,13 @@ using testing::NiceMock;
 
 namespace Upstream {
 
-static std::list<std::string> hostListToURLs(const std::vector<HostPtr>& hosts) {
-  std::list<std::string> urls;
+static std::list<std::string> hostListToAddresses(const std::vector<HostPtr>& hosts) {
+  std::list<std::string> addresses;
   for (const HostPtr& host : hosts) {
-    urls.push_back(host->url());
+    addresses.push_back(host->address()->asString());
   }
 
-  return urls;
+  return addresses;
 }
 
 struct ResolverData {
@@ -35,9 +38,9 @@ struct ResolverData {
   void expectResolve(Network::MockDnsResolver& dns_resolver) {
     EXPECT_CALL(dns_resolver, resolve(_, _))
         .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                             -> Network::ActiveDnsQuery& {
+                             -> Network::ActiveDnsQuery* {
                                dns_callback_ = cb;
-                               return active_dns_query_;
+                               return &active_dns_query_;
                              }))
         .RetiresOnSaturation();
   }
@@ -46,6 +49,39 @@ struct ResolverData {
   Network::DnsResolver::ResolveCb dns_callback_;
   Network::MockActiveDnsQuery active_dns_query_;
 };
+
+TEST(StrictDnsClusterImplTest, ImmediateResolve) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Network::MockDnsResolver> dns_resolver;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  ReadyWatcher initialized;
+
+  std::string json = R"EOF(
+  {
+    "name": "name",
+    "connect_timeout_ms": 250,
+    "type": "strict_dns",
+    "lb_type": "round_robin",
+    "hosts": [{"url": "tcp://foo.bar.com:443"}]
+  }
+  )EOF";
+
+  EXPECT_CALL(initialized, ready());
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
+                           -> Network::ActiveDnsQuery* {
+                             cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+                             return nullptr;
+                           }));
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
+                               dispatcher);
+  cluster.setInitializedCb([&]() -> void { initialized.ready(); });
+  EXPECT_EQ(2UL, cluster.hosts().size());
+  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+}
 
 TEST(StrictDnsClusterImplTest, Basic) {
   Stats::IsolatedStoreImpl stats;
@@ -114,36 +150,37 @@ TEST(StrictDnsClusterImplTest, Basic) {
   resolver1.expectResolve(dns_resolver);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_({"127.0.0.1", "127.0.0.2"});
-  EXPECT_THAT(std::list<std::string>({"tcp://127.0.0.1:11001", "tcp://127.0.0.2:11001"}),
-              ContainerEq(hostListToURLs(cluster.hosts())));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+              ContainerEq(hostListToAddresses(cluster.hosts())));
 
   resolver1.expectResolve(dns_resolver);
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  resolver1.dns_callback_({"127.0.0.2", "127.0.0.1"});
-  EXPECT_THAT(std::list<std::string>({"tcp://127.0.0.1:11001", "tcp://127.0.0.2:11001"}),
-              ContainerEq(hostListToURLs(cluster.hosts())));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+  EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+              ContainerEq(hostListToAddresses(cluster.hosts())));
 
   resolver1.expectResolve(dns_resolver);
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  resolver1.dns_callback_({"127.0.0.2", "127.0.0.1"});
-  EXPECT_THAT(std::list<std::string>({"tcp://127.0.0.1:11001", "tcp://127.0.0.2:11001"}),
-              ContainerEq(hostListToURLs(cluster.hosts())));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+  EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+              ContainerEq(hostListToAddresses(cluster.hosts())));
 
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_({"127.0.0.3"});
-  EXPECT_THAT(std::list<std::string>({"tcp://127.0.0.3:11001"}),
-              ContainerEq(hostListToURLs(cluster.hosts())));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
+  EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001"}),
+              ContainerEq(hostListToAddresses(cluster.hosts())));
 
+  // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_({"10.0.0.1"});
-  EXPECT_THAT(std::list<std::string>({"tcp://127.0.0.3:11001", "tcp://10.0.0.1:11002"}),
-              ContainerEq(hostListToURLs(cluster.hosts())));
+  resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
+  EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
+              ContainerEq(hostListToAddresses(cluster.hosts())));
 
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
   EXPECT_EQ(0UL, cluster.hostsPerZone().size());
@@ -165,7 +202,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
 TEST(HostImplTest, HostCluster) {
   MockCluster cluster;
-  HostImpl host(cluster.info_, "tcp://10.0.0.1:1234", false, 1, "");
+  HostImpl host(cluster.info_, Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 1, "");
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_FALSE(host.canary());
   EXPECT_EQ("", host.zone());
@@ -175,17 +212,19 @@ TEST(HostImplTest, Weight) {
   MockCluster cluster;
 
   {
-    HostImpl host(cluster.info_, "tcp://10.0.0.1:1234", false, 0, "");
+    HostImpl host(cluster.info_, Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 0, "");
     EXPECT_EQ(1U, host.weight());
   }
 
   {
-    HostImpl host(cluster.info_, "tcp://10.0.0.1:1234", false, 101, "");
+    HostImpl host(cluster.info_, Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 101,
+                  "");
     EXPECT_EQ(100U, host.weight());
   }
 
   {
-    HostImpl host(cluster.info_, "tcp://10.0.0.1:1234", false, 50, "");
+    HostImpl host(cluster.info_, Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), false, 50,
+                  "");
     EXPECT_EQ(50U, host.weight());
     host.weight(51);
     EXPECT_EQ(51U, host.weight());
@@ -198,15 +237,11 @@ TEST(HostImplTest, Weight) {
 
 TEST(HostImplTest, CanaryAndZone) {
   MockCluster cluster;
-  HostImpl host(cluster.info_, "tcp://10.0.0.1:1234", true, 1, "hello");
+  HostImpl host(cluster.info_, Network::Utility::resolveUrl("tcp://10.0.0.1:1234"), true, 1,
+                "hello");
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_TRUE(host.canary());
   EXPECT_EQ("hello", host.zone());
-}
-
-TEST(HostImplTest, MalformedUrl) {
-  MockCluster cluster;
-  EXPECT_THROW(HostImpl(cluster.info_, "fake\\10.0.0.1:1234", false, 1, ""), EnvoyException);
 }
 
 TEST(StaticClusterImplTest, OutlierDetector) {
@@ -337,8 +372,8 @@ TEST(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(0U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->httpCodecOptions());
   EXPECT_EQ(LoadBalancerType::Random, cluster.info()->lbType());
-  EXPECT_THAT(std::list<std::string>({"tcp://10.0.0.1:11001", "tcp://10.0.0.2:11002"}),
-              ContainerEq(hostListToURLs(cluster.hosts())));
+  EXPECT_THAT(std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
+              ContainerEq(hostListToAddresses(cluster.hosts())));
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
   EXPECT_EQ(0UL, cluster.hostsPerZone().size());
   EXPECT_EQ(0UL, cluster.healthyHostsPerZone().size());
@@ -381,6 +416,22 @@ TEST(StaticClusterImplTest, UnsupportedFeature) {
 
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   EXPECT_THROW(StaticClusterImpl(*config, runtime, stats, ssl_context_manager), EnvoyException);
+}
+
+TEST(ClusterDefinitionTest, BadClusterConfig) {
+  std::string json = R"EOF(
+  {
+    "name": "cluster_1",
+    "connect_timeout_ms": 250,
+    "type": "static",
+    "lb_type": "round_robin",
+    "fake_type" : "expected_failure",
+    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
 }
 
 } // Upstream

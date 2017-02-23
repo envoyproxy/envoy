@@ -49,7 +49,8 @@ public:
    * callers do not need to worry about per thread synchronization. The load balancing policy that
    * is used is the one defined on the cluster when it was created.
    *
-   * Can return nullptr if there is no host available in the cluster.
+   * Can return nullptr if there is no host available in the cluster or if the cluster does not
+   * exist.
    */
   virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                                  ResourcePriority priority) PURE;

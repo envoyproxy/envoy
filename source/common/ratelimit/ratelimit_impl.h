@@ -2,6 +2,7 @@
 
 #include "envoy/grpc/rpc_channel.h"
 #include "envoy/ratelimit/ratelimit.h"
+#include "envoy/tracing/context.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/generated/ratelimit.pb.h"
@@ -21,7 +22,8 @@ public:
   // RateLimit::Client
   void cancel() override;
   void limit(RequestCallbacks& callbacks, const std::string& domain,
-             const std::vector<Descriptor>& descriptors, const std::string& request_id) override;
+             const std::vector<Descriptor>& descriptors,
+             const Tracing::TransportContext& context) override;
 
   // Grpc::RpcChannelCallbacks
   void onPreRequestCustomizeHeaders(Http::HeaderMap&) override;
@@ -33,7 +35,7 @@ private:
   pb::lyft::ratelimit::RateLimitService::Stub service_;
   RequestCallbacks* callbacks_{};
   pb::lyft::ratelimit::RateLimitResponse response_;
-  std::string request_id_;
+  Tracing::TransportContext context_;
 };
 
 class GrpcFactoryImpl : public ClientFactory, public Grpc::RpcChannelFactory {
@@ -57,7 +59,7 @@ public:
   // RateLimit::Client
   void cancel() override {}
   void limit(RequestCallbacks& callbacks, const std::string&, const std::vector<Descriptor>&,
-             const std::string&) override {
+             const Tracing::TransportContext&) override {
     callbacks.complete(LimitStatus::OK);
   }
 };

@@ -1,4 +1,6 @@
 #include "common/network/listener_impl.h"
+#include "common/network/address_impl.h"
+#include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -22,7 +24,7 @@ static void errorCallbackTest() {
       connection_handler, socket, listener_callbacks, stats_store, true, false, false);
 
   Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection("tcp://127.0.0.1:10000");
+      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
   client_connection->connect();
 
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
@@ -45,22 +47,18 @@ public:
                    ListenSocket& socket, ListenerCallbacks& cb, Stats::Store& stats_store,
                    bool bind_to_port, bool use_proxy_proto, bool use_orig_dst)
       : ListenerImpl(conn_handler, dispatcher, socket, cb, stats_store, bind_to_port,
-                     use_proxy_proto, use_orig_dst) {}
-  ~TestListenerImpl() {}
+                     use_proxy_proto, use_orig_dst) {
+    ON_CALL(*this, newConnection(_, _, _))
+        .WillByDefault(Invoke(
+            [this](int fd, Address::InstancePtr remote_address, Address::InstancePtr local_address)
+                -> void { ListenerImpl::newConnection(fd, remote_address, local_address); }
 
-  MOCK_METHOD1(getAddressPort_, uint16_t(sockaddr*));
-  MOCK_METHOD3(newConnection_, void(int, sockaddr*, sockaddr*));
-
-  void newConnection(int fd, sockaddr* remote_addr, sockaddr* local_addr) override {
-    newConnection_(fd, remote_addr, local_addr);
-  }
-  void newConnection(int fd, const std::string& remote_addr,
-                     const std::string& local_addr) override {
-    ListenerImpl::newConnection(fd, remote_addr, local_addr);
+            ));
   }
 
-protected:
-  uint16_t getAddressPort(sockaddr* sock) override { return getAddressPort_(sock); }
+  MOCK_METHOD1(getOriginalDst, Address::InstancePtr(int fd));
+  MOCK_METHOD3(newConnection, void(int fd, Address::InstancePtr remote_address,
+                                   Address::InstancePtr local_address));
 };
 
 TEST(ListenerImplTest, UseOriginalDst) {
@@ -68,25 +66,29 @@ TEST(ListenerImplTest, UseOriginalDst) {
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::TcpListenSocket socketDst(uint32_t(10001), false);
-  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
-  Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks,
+  Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
                                      stats_store, true, false, true);
+  Network::MockListenerCallbacks listener_callbacks2;
   Network::TestListenerImpl listenerDst(connection_handler, dispatcher, socketDst,
-                                        listener_callbacks, stats_store, false, false, false);
+                                        listener_callbacks2, stats_store, false, false, false);
 
   Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection("tcp://127.0.0.1:10000");
+      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
   client_connection->connect();
 
-  EXPECT_CALL(listener, getAddressPort_(_)).WillRepeatedly(Return(10001));
-  EXPECT_CALL(connection_handler, findListener("10001")).WillRepeatedly(Return(&listenerDst));
+  Address::InstancePtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
+  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
+  EXPECT_CALL(connection_handler, findListenerByPort(10001)).WillRepeatedly(Return(&listenerDst));
 
-  EXPECT_CALL(listener, newConnection_(_, _, _)).Times(0);
-  EXPECT_CALL(listenerDst, newConnection_(_, _, _))
-      .Times(1)
-      .WillOnce(Invoke([&](int, sockaddr*, sockaddr*) -> void {
+  EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
+  EXPECT_CALL(listenerDst, newConnection(_, _, _));
+  EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        EXPECT_EQ("127.0.0.1:10001", conn->localAddress().asString());
         client_connection->close(ConnectionCloseType::NoFlush);
+        conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
       }));
 

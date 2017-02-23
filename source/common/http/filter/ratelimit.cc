@@ -23,36 +23,44 @@ FilterConfig::FilterConfig(const Json::Object& config, const LocalInfo::LocalInf
 const Http::HeaderMapPtr Filter::TOO_MANY_REQUESTS_HEADER{new Http::HeaderMapImpl{
     {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}}};
 
+void Filter::initiateCall(const HeaderMap& headers) {
+  Router::RoutePtr route = callbacks_->route();
+  if (!route || !route->routeEntry()) {
+    return;
+  }
+
+  const Router::RouteEntry* route_entry = route->routeEntry();
+  cluster_ = config_->cm().get(route_entry->clusterName());
+  if (!cluster_) {
+    return;
+  }
+
+  std::vector<::RateLimit::Descriptor> descriptors;
+
+  // Get all applicable rate limit policy entries for the route.
+  populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
+
+  // Get all applicable rate limit policy entries for the virtual host.
+  populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
+                               route_entry, headers);
+
+  if (!descriptors.empty()) {
+    state_ = State::Calling;
+    initiating_call_ = true;
+    client_->limit(
+        *this, config_->domain(), descriptors,
+        {headers.RequestId() ? headers.RequestId()->value().c_str() : EMPTY_STRING,
+         headers.OtSpanContext() ? headers.OtSpanContext()->value().c_str() : EMPTY_STRING});
+    initiating_call_ = false;
+  }
+}
+
 FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
   if (!config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enabled", 100)) {
     return FilterHeadersStatus::Continue;
   }
 
-  const Router::Route* route = callbacks_->route();
-  if (route && route->routeEntry()) {
-    const Router::RouteEntry* route_entry = route->routeEntry();
-
-    // TODO: Cluster may not exist.
-    cluster_ = config_->cm().get(route_entry->clusterName());
-
-    std::vector<::RateLimit::Descriptor> descriptors;
-
-    // Get all applicable rate limit policy entries for the route.
-    populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
-
-    // Get all applicable rate limit policy entries for the virtual host.
-    populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
-                                 route_entry, headers);
-
-    if (!descriptors.empty()) {
-      state_ = State::Calling;
-      initiating_call_ = true;
-      client_->limit(*this, config_->domain(), descriptors,
-                     headers.RequestId() ? headers.RequestId()->value().c_str() : EMPTY_STRING);
-      initiating_call_ = false;
-    }
-  }
-
+  initiateCall(headers);
   return (state_ == State::Calling || state_ == State::Responded)
              ? FilterHeadersStatus::StopIteration
              : FilterHeadersStatus::Continue;
@@ -115,10 +123,10 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
                                           const HeaderMap& headers) const {
   for (const Router::RateLimitPolicyEntry& rate_limit :
        rate_limit_policy.getApplicableRateLimit(config_->stage())) {
-    const std::string& route_key = rate_limit.routeKey();
-    if (!route_key.empty() &&
+    const std::string& disable_key = rate_limit.disableKey();
+    if (!disable_key.empty() &&
         !config_->runtime().snapshot().featureEnabled(
-            fmt::format("ratelimit.{}.http_filter_enabled", route_key), 100)) {
+            fmt::format("ratelimit.{}.http_filter_enabled", disable_key), 100)) {
       continue;
     }
     rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),

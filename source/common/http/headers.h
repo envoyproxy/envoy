@@ -26,6 +26,8 @@ public:
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
+  const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
+      "x-envoy-upstream-rq-timeout-alt-response"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutMs{"x-envoy-upstream-rq-timeout-ms"};
   const LowerCaseString EnvoyUpstreamRequestPerTryTimeoutMs{
       "x-envoy-upstream-rq-per-try-timeout-ms"};
@@ -42,6 +44,7 @@ public:
   const LowerCaseString KeepAlive{"keep-alive"};
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
+  const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
   const LowerCaseString RequestId{"x-request-id"};
