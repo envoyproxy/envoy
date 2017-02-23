@@ -816,9 +816,7 @@ uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::connectionId() {
   return parent_.connectionId();
 }
 
-Ssl::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::ssl() {
-  return parent_.ssl();
-}
+Ssl::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::ssl() { return parent_.ssl(); }
 
 Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
   return parent_.connection_manager_.read_callbacks_->connection().dispatcher();

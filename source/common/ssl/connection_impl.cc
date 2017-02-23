@@ -207,13 +207,13 @@ std::string ConnectionImpl::uriPeerCertificateSAN() {
     // We only take the first item in altnames.
     GENERAL_NAME* altname = sk_GENERAL_NAME_value(altnames, 0);
     switch (altname->type) {
-      case GEN_URI:
-        result.append(reinterpret_cast<const char*>(
-                          ASN1_STRING_data(altname->d.uniformResourceIdentifier)));
-        break;
-      default:
-        // Default to empty.
-        break;
+    case GEN_URI:
+      result.append(
+          reinterpret_cast<const char*>(ASN1_STRING_data(altname->d.uniformResourceIdentifier)));
+      break;
+    default:
+      // Default to empty.
+      break;
     }
   }
 
