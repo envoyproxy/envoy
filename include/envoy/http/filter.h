@@ -115,7 +115,7 @@ public:
   /**
    * @return the ssl connection information.
    */
-  virtual const Ssl::Connection* ssl() PURE;
+  virtual Ssl::Connection* ssl();
 };
 
 /**
