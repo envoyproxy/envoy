@@ -88,7 +88,7 @@ TEST_F(LogicalDnsClusterTest, ImmediateResolve) {
   setup(json);
   EXPECT_EQ(1UL, cluster_->hosts().size());
   EXPECT_EQ(1UL, cluster_->healthyHosts().size());
-  EXPECT_EQ("foo.bar.com:443", cluster_->hosts()[0]->hostname());
+  EXPECT_EQ("foo.bar.com", cluster_->hosts()[0]->hostname());
   tls_.shutdownThread();
 }
 
