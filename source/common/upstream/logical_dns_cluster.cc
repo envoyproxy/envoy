@@ -21,7 +21,8 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
   }
 
   dns_url_ = hosts_json[0]->getString("url");
-  hostname_ = Network::Utility::hostAndPortFromTcpUrl(dns_url_);
+  hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
+  Network::Utility::portFromTcpUrl(dns_url_);
 
   // This must come before startResolve(), since the resolve callback relies on
   // tls_slot_ being initialized.

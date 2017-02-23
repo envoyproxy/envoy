@@ -956,6 +956,14 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   std::string dns_host{"scooby.doo"};
   std::string req_host{"foo.bar.com"};
 
+  Http::TestHeaderMapImpl incoming_headers;
+  HttpTestUtility::addDefaultHeaders(incoming_headers);
+  incoming_headers.Host()->value(req_host);
+
+  Http::TestHeaderMapImpl outgoing_headers;
+  HttpTestUtility::addDefaultHeaders(outgoing_headers);
+  outgoing_headers.Host()->value(dns_host);
+
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
 
@@ -966,24 +974,25 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
                              return nullptr;
                            }));
 
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&outgoing_headers), true));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
-
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
   EXPECT_CALL(*cm_.conn_pool_.host_, hostname()).WillRepeatedly(ReturnRef(dns_host));
 
-  Http::TestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  headers.Host()->value(req_host);
-  router_.decodeHeaders(headers, true);
-  EXPECT_EQ(dns_host, headers.Host()->value().c_str());
+  router_.decodeHeaders(incoming_headers, true);
+  EXPECT_EQ(dns_host, incoming_headers.Host()->value().c_str());
 }
 
 TEST_F(RouterTest, AutoHostRewriteDisabled) {
   NiceMock<Http::MockStreamEncoder> encoder;
   std::string req_host{"foo.bar.com"};
 
+  Http::TestHeaderMapImpl incoming_headers;
+  HttpTestUtility::addDefaultHeaders(incoming_headers);
+  incoming_headers.Host()->value(req_host);
+
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
 
@@ -994,17 +1003,14 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
                              return nullptr;
                            }));
 
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&incoming_headers), true));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
-
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(false));
 
-  Http::TestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  headers.Host()->value(req_host);
-  router_.decodeHeaders(headers, true);
-  EXPECT_EQ(req_host, headers.Host()->value().c_str());
+  router_.decodeHeaders(incoming_headers, true);
+  EXPECT_EQ(req_host, incoming_headers.Host()->value().c_str());
 }
 
 } // Router

@@ -121,14 +121,6 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   }
 }
 
-std::string Utility::hostAndPortFromTcpUrl(const std::string& url) {
-  if (url.find(TCP_SCHEME) != 0) {
-    throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
-  }
-
-  return url.substr(TCP_SCHEME.size());
-}
-
 Address::InstancePtr Utility::getLocalAddress() {
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;

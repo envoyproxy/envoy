@@ -222,7 +222,7 @@ public:
   virtual const VirtualHost& virtualHost() const PURE;
 
   /**
-   * @return bool true if the Host header should be overwritten with the Upstream hostname.
+   * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
 };

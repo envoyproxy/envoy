@@ -396,7 +396,6 @@ StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,
                                                    const std::string& url)
     : parent_(parent), dns_address_(Network::Utility::hostFromTcpUrl(url)),
       port_(Network::Utility::portFromTcpUrl(url)),
-      hostname_(Network::Utility::hostAndPortFromTcpUrl(url)),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
@@ -422,7 +421,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           //       move port handling into the DNS interface itself, which would work better for
           //       SRV.
           new_hosts.emplace_back(
-              new HostImpl(parent_.info_, hostname_,
+              new HostImpl(parent_.info_, dns_address_,
                            Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
                                address->ip()->addressAsString(), port_)},
                            false, 1, ""));

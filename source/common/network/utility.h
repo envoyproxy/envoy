@@ -74,13 +74,6 @@ public:
   static uint32_t portFromTcpUrl(const std::string& url);
 
   /**
-   * Parses the host:port from a TCP URL
-   * @param the URL to parse port from
-   * @return std::string of form host:port
-   */
-  static std::string hostAndPortFromTcpUrl(const std::string& url);
-
-  /**
    * @return the local IP address of the server
    */
   static Address::InstancePtr getLocalAddress();

@@ -318,7 +318,6 @@ private:
     Network::ActiveDnsQuery* active_query_{};
     std::string dns_address_;
     uint32_t port_;
-    std::string hostname_;
     Event::TimerPtr resolve_timer_;
     std::vector<HostPtr> hosts_;
   };
