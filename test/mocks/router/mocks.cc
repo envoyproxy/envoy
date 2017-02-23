@@ -41,6 +41,9 @@ MockVirtualHost::MockVirtualHost() {
 
 MockVirtualHost::~MockVirtualHost() {}
 
+MockHashPolicy::MockHashPolicy() {}
+MockHashPolicy::~MockHashPolicy() {}
+
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));

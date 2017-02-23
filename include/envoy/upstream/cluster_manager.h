@@ -3,6 +3,7 @@
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/json/json_object.h"
+#include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Upstream {
@@ -53,7 +54,8 @@ public:
    * exist.
    */
   virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
-                                                                 ResourcePriority priority) PURE;
+                                                                 ResourcePriority priority,
+                                                                 LoadBalancerContext* context) PURE;
 
   /**
    * Allocate a load balanced TCP connection for a cluster. The created connection is already

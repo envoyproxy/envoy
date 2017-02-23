@@ -141,6 +141,23 @@ public:
 };
 
 /**
+ * Route hash policy. I.e., if using a hashing load balancer, how the route should be hashed onto
+ * an upstream host.
+ */
+class HashPolicy {
+public:
+  virtual ~HashPolicy() {}
+
+  /**
+   * @return Optional<uint64_t> an optional hash value to route on given a set of HTTP headers.
+   *         A hash value might not be returned if for example the specified HTTP header does not
+   *         exist. In the future we might add additional support for hashing on origin address,
+   *         etc.
+   */
+  virtual Optional<uint64_t> generateHash(const Http::HeaderMap& headers) const PURE;
+};
+
+/**
  * An individual resolved route entry.
  */
 class RouteEntry {
@@ -159,6 +176,11 @@ public:
    * @param headers supplies the request headers, which may be modified during this call.
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers) const PURE;
+
+  /**
+   * @return const HashPolicy* the optional hash policy for the route.
+   */
+  virtual const HashPolicy* hashPolicy() const PURE;
 
   /**
    * @return the priority of the route.

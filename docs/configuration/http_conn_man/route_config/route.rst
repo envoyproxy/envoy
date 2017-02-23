@@ -25,7 +25,8 @@ next (e.g., redirect, forward, rewrite, etc.).
     "shadow": "{...}",
     "priority": "...",
     "headers": [],
-    "rate_limits": []
+    "rate_limits": [],
+    "hash_policy": "{...}"
   }
 
 prefix
@@ -133,6 +134,10 @@ priority
 :ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>`
   *(optional, array)* Specifies a set of rate limit configurations that could be applied to the
   route.
+
+:ref:`hash_policy <config_http_conn_man_route_table_hash_policy>`
+  *(optional, array)* Specifies the route's hashing policy if the upstream cluster uses a hashing
+  :ref:`load balancer <arch_overview_load_balancing_types>`.
 
 .. _config_http_conn_man_route_table_route_runtime:
 
@@ -300,3 +305,22 @@ runtime_key_prefix
 
   **Note:** If the sum of runtime weights exceed 100, the traffic splitting behavior
   is undefined (although the request will be routed to one of the clusters).
+
+.. _config_http_conn_man_route_table_hash_policy:
+
+Hash policy
+-----------
+
+Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
+<arch_overview_load_balancing_types>`.
+
+.. code-block:: json
+
+   {
+     "header_name": "..."
+   }
+
+header_name
+  *(required, string)* The name of the request header that will be used to obtain the hash key. If
+  the request header is not present, the load balancer will use a random number as the hash,
+  effectively making the load balancing policy random.

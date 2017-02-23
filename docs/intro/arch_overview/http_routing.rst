@@ -40,6 +40,7 @@ request. The router filter supports the following features:
   used by Envoy to generate additional statistics on top of the standard cluster level ones. Virtual
   clusters can use regex matching.
 * :ref:`Priority <arch_overview_http_routing_priority>` based routing.
+* :ref:`Hash policy <config_http_conn_man_route_table_hash_policy>` based routing.
 
 Route table
 -----------

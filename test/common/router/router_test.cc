@@ -104,7 +104,7 @@ TEST_F(RouterTest, ClusterNotFound) {
 
 TEST_F(RouterTest, PoolFailureWithPriority) {
   callbacks_.route_->route_entry_.virtual_cluster_.priority_ = Upstream::ResourcePriority::High;
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, nullptr));
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
@@ -130,6 +130,48 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   router_.decodeHeaders(headers, true);
 }
 
+TEST_F(RouterTest, HashPolicy) {
+  ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
+      .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_))
+      .WillOnce(Return(Optional<uint64_t>(10)));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(10UL, context->hashKey().value());
+            return &cm_.conn_pool_;
+          }));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  callbacks_.reset_callback_();
+}
+
+TEST_F(RouterTest, HashPolicyNoHash) {
+  ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
+      .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_))
+      .WillOnce(Return(Optional<uint64_t>()));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, nullptr));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  callbacks_.reset_callback_();
+}
+
 TEST_F(RouterTest, CancelBeforeBoundToPool) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
@@ -144,7 +186,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
 }
 
 TEST_F(RouterTest, NoHost) {
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _)).WillOnce(Return(nullptr));
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
@@ -355,7 +397,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::LocalReset);
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _)).WillOnce(Return(nullptr));
   Http::TestHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));

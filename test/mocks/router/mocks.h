@@ -121,6 +121,15 @@ public:
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
 };
 
+class MockHashPolicy : public HashPolicy {
+public:
+  MockHashPolicy();
+  ~MockHashPolicy();
+
+  // Router::HashPolicy
+  MOCK_CONST_METHOD1(generateHash, Optional<uint64_t>(const Http::HeaderMap& headers));
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -129,6 +138,7 @@ public:
   // Router::Config
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD1(finalizeRequestHeaders, void(Http::HeaderMap& headers));
+  MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(retryPolicy, const RetryPolicy&());
@@ -144,6 +154,7 @@ public:
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestShadowPolicy shadow_policy_;
   testing::NiceMock<MockVirtualHost> virtual_host_;
+  MockHashPolicy hash_policy_;
 };
 
 class MockRoute : public Route {
