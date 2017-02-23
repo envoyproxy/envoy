@@ -31,9 +31,6 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
       zone = host->getObject("tags")->getString("az", zone);
     }
 
-    // TODO: This will be a problem for CloudFoundry + service discovery
-    // In CF, discovery will only return hostnames for a service
-    // while SDS expects only IPs. Possibly extend this with additional field called hostname?
     new_hosts.emplace_back(
         new HostImpl(info_, "", Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
                                     host->getString("ip_address"), host->getInteger("port"))},
