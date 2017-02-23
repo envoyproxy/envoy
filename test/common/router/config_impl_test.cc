@@ -1655,7 +1655,7 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
 
-  const std::unordered_map<std::string, std::string>& opaque_config = 
+  const std::unordered_map<std::string, std::string>& opaque_config =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->opaqueConfig();
 
   EXPECT_EQ("value1", opaque_config.find("name1")->second);
