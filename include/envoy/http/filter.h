@@ -5,6 +5,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
+#include "envoy/ssl/connection.h"
 
 namespace Http {
 
@@ -72,6 +73,11 @@ public:
    * @return uint64_t the ID of the originating connection for logging purposes.
    */
   virtual uint64_t connectionId() PURE;
+
+  /**
+   * @return Ssl::Connection* the ssl connection.
+   */
+  virtual Ssl::Connection* ssl() PURE;
 
   /**
    * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
