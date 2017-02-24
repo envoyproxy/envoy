@@ -974,15 +974,17 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&outgoing_headers), true));
+  EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&outgoing_headers), true))
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+        encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+      }));
+
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
   EXPECT_CALL(*cm_.conn_pool_.host_, hostname()).WillRepeatedly(ReturnRef(dns_host));
-
   router_.decodeHeaders(incoming_headers, true);
-  EXPECT_EQ(dns_host, incoming_headers.Host()->value().c_str());
 }
 
 TEST_F(RouterTest, AutoHostRewriteDisabled) {
@@ -1003,14 +1005,16 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
                              return nullptr;
                            }));
 
-  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&incoming_headers), true));
+  EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&incoming_headers), true))
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+        encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+      }));
+
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(false));
-
   router_.decodeHeaders(incoming_headers, true);
-  EXPECT_EQ(req_host, incoming_headers.Host()->value().c_str());
 }
 
 } // Router
