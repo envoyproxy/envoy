@@ -427,7 +427,6 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([](HeaderMap& headers, bool) -> FilterHeadersStatus {
-        EXPECT_EQ(ssl_connection_.get(), filter->callbacks_->ssl());
         EXPECT_NE(nullptr, headers.ForwardedFor());
         EXPECT_STREQ("https", headers.ForwardedProto()->value().c_str());
         return FilterHeadersStatus::StopIteration;
@@ -451,6 +450,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
   EXPECT_CALL(*codec_, shutdownNotice());
   filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+  EXPECT_EQ(ssl_connection_.get(), filter->callbacks_->ssl());
 
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
