@@ -427,6 +427,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([](HeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_EQ(ssl_connection_.get(), filter->callbacks_->ssl());
         EXPECT_NE(nullptr, headers.ForwardedFor());
         EXPECT_STREQ("https", headers.ForwardedProto()->value().c_str());
         return FilterHeadersStatus::StopIteration;
