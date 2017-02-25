@@ -10,6 +10,7 @@
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
+#include "envoy/ssl/connection.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
@@ -159,6 +160,7 @@ private:
     reset_callback_ = callback;
   }
   uint64_t connectionId() override { return 0; }
+  Ssl::Connection* ssl() override { return nullptr; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RoutePtr route() override { return route_; }

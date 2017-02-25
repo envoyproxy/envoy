@@ -5,6 +5,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
+#include "envoy/ssl/connection.h"
 
 #include "common/http/conn_manager_impl.h"
 #include "common/http/header_map_impl.h"
@@ -211,6 +212,7 @@ public:
   // Http::StreamFilterCallbacks
   MOCK_METHOD1(addResetStreamCallback, void(std::function<void()> callback));
   MOCK_METHOD0(connectionId, uint64_t());
+  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
   MOCK_METHOD0(route, Router::RoutePtr());
@@ -240,6 +242,7 @@ public:
   // Http::StreamFilterCallbacks
   MOCK_METHOD1(addResetStreamCallback, void(std::function<void()> callback));
   MOCK_METHOD0(connectionId, uint64_t());
+  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
   MOCK_METHOD0(route, Router::RoutePtr());
