@@ -15,7 +15,7 @@ set(ENVOY_SPDLOG_INCLUDE_DIR "" CACHE FILEPATH "location of spdlog includes")
 set(ENVOY_HTTP_PARSER_INCLUDE_DIR "" CACHE FILEPATH "location of http-parser includes")
 
 # https://github.com/nghttp2/nghttp2
-# Last tested with 1.14.1
+# Last tested with 1.20.0
 set(ENVOY_NGHTTP2_INCLUDE_DIR "" CACHE FILEPATH "location of nghttp2 includes")
 
 # http://libevent.org/

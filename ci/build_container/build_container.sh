@@ -59,9 +59,9 @@ cd ..
 rm -fr gperftools*
 
 # nghttp2
-wget https://github.com/nghttp2/nghttp2/releases/download/v1.14.1/nghttp2-1.14.1.tar.gz
-tar xf nghttp2-1.14.1.tar.gz
-cd nghttp2-1.14.1
+wget https://github.com/nghttp2/nghttp2/releases/download/v1.20.0/nghttp2-1.20.0.tar.gz
+tar xf nghttp2-1.20.0.tar.gz
+cd nghttp2-1.20.0
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-lib-only
 make install
 cd ..
@@ -119,8 +119,8 @@ cd lightstep-tracer-cpp-0.33
 ./configure --disable-grpc --prefix=$THIRDPARTY_BUILD --enable-shared=no \
 	    protobuf_CFLAGS="-I$THIRDPARTY_BUILD/include" protobuf_LIBS="-L$THIRDPARTY_BUILD/lib -lprotobuf" PROTOC=$THIRDPARTY_BUILD/bin/protoc
 make install
-rm -rf lightstep-tracer-cpp-0.33
 cd ..
+rm -rf lightstep-tracer*
 
 # rapidjson
 wget -O rapidjson-1.1.0.tar.gz https://github.com/miloyip/rapidjson/archive/v1.1.0.tar.gz
@@ -134,7 +134,7 @@ cd googletest-release-1.8.0
 cmake -DCMAKE_INSTALL_PREFIX:PATH=$THIRDPARTY_BUILD .
 make install
 cd ..
-rm -fr googletest
+rm -fr googletest*
 
 # gcovr
 wget -O gcovr-3.3.tar.gz https://github.com/gcovr/gcovr/archive/3.3.tar.gz
