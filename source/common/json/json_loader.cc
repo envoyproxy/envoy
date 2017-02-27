@@ -182,6 +182,13 @@ public:
     }
   }
 
+  std::string asString() const {
+    if (!value_.IsString()) {
+      throw Exception(fmt::format("'{}' is not a string", name_));
+    }
+    return value_.GetString();
+  }
+
   bool empty() const override { return value_.IsObject() && value_.ObjectEmpty(); }
 
 private:

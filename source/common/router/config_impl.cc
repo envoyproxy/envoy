@@ -255,8 +255,8 @@ RouteEntryImplBase::parseOpaqueConfig(const Json::Object& route) {
   std::multimap<std::string, std::string> ret;
   if (route.hasObject("opaque_config")) {
     Json::ObjectPtr obj = route.getObject("opaque_config");
-    obj->iterate([&ret, &obj](const std::string& name, const Json::Object&) {
-      ret.emplace(name, obj->getString(name));
+    obj->iterate([&ret, &obj](const std::string& name, const Json::Object& value) {
+      ret.emplace(name, value.asString());
       return true;
     });
   }

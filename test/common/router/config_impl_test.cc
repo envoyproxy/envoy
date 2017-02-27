@@ -1641,7 +1641,8 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
           "cluster": "ats",
           "opaque_config" : {
               "name1": "value1",
-              "name2": "value2"
+              "name2": "value2",
+              "name1": "value3"
           }
         }
       ]
@@ -1658,7 +1659,13 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
   const std::multimap<std::string, std::string>& opaque_config =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->opaqueConfig();
 
-  EXPECT_EQ("value1", opaque_config.find("name1")->second);
+  EXPECT_EQ(2u, opaque_config.count("name1"));
+  auto range = opaque_config.equal_range("name1");
+  auto it = range.first;
+  EXPECT_EQ("value1", it->second);
+  ++it;
+  EXPECT_EQ("value3", it->second);
+
   EXPECT_EQ("value2", opaque_config.find("name2")->second);
 }
 
