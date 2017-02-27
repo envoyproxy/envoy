@@ -33,7 +33,6 @@ public:
   ~MockConnection();
 
   MOCK_METHOD0(sha256PeerCertificateDigest, std::string());
-  MOCK_METHOD0(uriSanPeerCertificate, std::string());
 };
 
 class MockClientContext : public ClientContext {

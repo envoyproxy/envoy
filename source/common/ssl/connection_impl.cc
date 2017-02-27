@@ -188,39 +188,6 @@ std::string ConnectionImpl::sha256PeerCertificateDigest() {
   return Hex::encode(computed_hash);
 }
 
-std::string ConnectionImpl::uriSanPeerCertificate() {
-  X509Ptr cert = X509Ptr(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    return "";
-  }
-
-  STACK_OF(GENERAL_NAME)* altnames = static_cast<STACK_OF(GENERAL_NAME)*>(
-      X509_get_ext_d2i(cert.get(), NID_subject_alt_name, nullptr, nullptr));
-
-  if (altnames == nullptr) {
-    return "";
-  }
-
-  std::string result = "";
-  int n = sk_GENERAL_NAME_num(altnames);
-  if (n > 0) {
-    // Only take the first item in altnames since we only set one uri in cert.
-    GENERAL_NAME* altname = sk_GENERAL_NAME_value(altnames, 0);
-    switch (altname->type) {
-    case GEN_URI:
-      result.append(
-          reinterpret_cast<const char*>(ASN1_STRING_data(altname->d.uniformResourceIdentifier)));
-      break;
-    default:
-      // Default to empty;
-      break;
-    }
-  }
-
-  sk_GENERAL_NAME_pop_free(altnames, GENERAL_NAME_free);
-  return result;
-}
-
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
                                            Network::Address::InstancePtr address)
     : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
