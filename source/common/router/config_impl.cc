@@ -250,14 +250,15 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
                      final_path);
 }
 
-std::unordered_map<std::string, std::string>
+std::multimap<std::string, std::string>
 RouteEntryImplBase::parseOpaqueConfig(const Json::Object& route) {
-  std::unordered_map<std::string, std::string> ret;
+  std::multimap<std::string, std::string> ret;
   if (route.hasObject("opaque_config")) {
-    std::vector<Json::ObjectPtr> kvs = route.getObjectArray("opaque_config");
-    for (const Json::ObjectPtr& kv : kvs) {
-      ret[kv->getString("name")] = kv->getString("value");
-    }
+    Json::ObjectPtr obj = route.getObject("opaque_config");
+    obj->iterate([&ret,&obj](const std::string& name, const Json::Object&) {
+      ret.emplace(name, obj->getString(name));
+      return true;
+    });
   }
   return ret;
 }

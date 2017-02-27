@@ -1639,10 +1639,10 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
         {
           "prefix": "/api",
           "cluster": "ats",
-          "opaque_config" : [
-              { "name": "name1", "value": "value1" },
-              { "name": "name2", "value": "value2" }
-          ]
+          "opaque_config" : {
+              "name1": "value1",
+              "name2": "value2"
+          }
         }
       ]
     }
@@ -1655,7 +1655,7 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
 
-  const std::unordered_map<std::string, std::string>& opaque_config =
+  const std::multimap<std::string, std::string>& opaque_config =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->opaqueConfig();
 
   EXPECT_EQ("value1", opaque_config.find("name1")->second);

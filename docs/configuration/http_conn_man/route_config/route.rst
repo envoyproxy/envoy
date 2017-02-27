@@ -345,13 +345,13 @@ Opaque Config
 -------------
 
 Additional configuration can be provided to filters through the "Opaque Config" mechanism.  A
-list of Key/Value pairs are specified in the route config.  The configuration is uninterpreted
+list of properties are specified in the route config.  The configuration is uninterpreted
 by envoy and can be accessed within a user-defined filter.
 
 .. code-block:: json
 
   [
-    {"name": "...", "value": "..."}
+    {"name": "value", ...}
   ]
 
 name

@@ -10,7 +10,7 @@ const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_po
 const AsyncStreamImpl::NullShadowPolicy AsyncStreamImpl::RouteEntryImpl::shadow_policy_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
-const std::unordered_map<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
+const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 
 AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
                                  Event::Dispatcher& dispatcher,

@@ -227,10 +227,10 @@ public:
   virtual bool autoHostRewrite() const PURE;
 
   /**
-   * @return const std::unordered_map<std::string, std::string> the opaque configuration associated
+   * @return const std::multimap<std::string, std::string> the opaque configuration associated
    *         with the route
    */
-  virtual const std::unordered_map<std::string, std::string>& opaqueConfig() const PURE;
+  virtual const std::multimap<std::string, std::string>& opaqueConfig() const PURE;
 };
 
 /**
