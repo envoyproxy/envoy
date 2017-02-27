@@ -347,7 +347,7 @@ Opaque Config
 Additional configuration can be provided to filters through the "Opaque Config" mechanism. A
 list of properties are specified in the route config. The configuration is uninterpreted
 by envoy and can be accessed within a user-defined filter. The configuration is a generic 
-string map.
+string map.  Nested objects are not supported.
 
 .. code-block:: json
 
