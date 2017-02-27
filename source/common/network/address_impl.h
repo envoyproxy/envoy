@@ -33,7 +33,7 @@ private:
 class Ipv4Instance : public InstanceBase {
 public:
   /**
-   * Construct from an existing unix IPv4 address.
+   * Construct from an existing unix IPv4 socket address (IP v4 address and port).
    */
   Ipv4Instance(const sockaddr_in* address);
 
@@ -69,10 +69,67 @@ private:
   struct IpHelper : public Ip {
     const std::string& addressAsString() const override { return friendly_address_; }
     const Ipv4* ipv4() const override { return &ipv4_; }
+    const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
     IpVersion version() const override { return IpVersion::v4; }
 
     Ipv4Helper ipv4_;
+    std::string friendly_address_;
+  };
+
+  IpHelper ip_;
+};
+
+/**
+ * Implementation of an IPv6 address.
+ */
+class Ipv6Instance : public InstanceBase {
+public:
+  /**
+   * Construct from an existing unix IPv6 socket address (IP v6 address and port).
+   */
+  Ipv6Instance(const sockaddr_in6& address);
+
+  /**
+   * Construct from a string IPv6 address such as "12:34::5". Port will be unset/0.
+   */
+  Ipv6Instance(const std::string& address);
+
+  /**
+   * Construct from a string IPv6 address such as "12:34::5" as well as a port.
+   */
+  Ipv6Instance(const std::string& address, uint32_t port);
+
+  /**
+   * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
+   * a port to any available address.
+   */
+  Ipv6Instance(uint32_t port);
+
+  // Network::Address::Instance
+  int bind(int fd) const override;
+  int connect(int fd) const override;
+  const Ip* ip() const override { return &ip_; }
+  int socket(SocketType type) const override;
+
+private:
+  struct Ipv6Helper : public Ipv6 {
+    std::string address() const override;
+    uint32_t port() const;
+
+    std::string makeFriendlyAddress() const;
+
+    sockaddr_in6 address_;
+  };
+
+  struct IpHelper : public Ip {
+    const std::string& addressAsString() const override { return friendly_address_; }
+    const Ipv4* ipv4() const override { return nullptr; }
+    const Ipv6* ipv6() const override { return &ipv6_; }
+    uint32_t port() const override { return ipv6_.port(); }
+    IpVersion version() const override { return IpVersion::v6; }
+
+    Ipv6Helper ipv6_;
     std::string friendly_address_;
   };
 

@@ -64,6 +64,70 @@ int Ipv4Instance::socket(SocketType type) const {
   return ::socket(AF_INET, flagsFromSocketType(type), 0);
 }
 
+std::string Ipv6Instance::Ipv6Helper::address() const {
+  return std::string(reinterpret_cast<const char*>(address_.sin6_addr.s6_addr),
+                     sizeof address_.sin6_addr.s6_addr);
+}
+
+uint32_t Ipv6Instance::Ipv6Helper::port() const {
+  return ntohs(address_.sin6_port);
+}
+
+std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
+  char str[INET6_ADDRSTRLEN];
+  if (nullptr == inet_ntop(AF_INET6, &address_.sin6_addr, str, INET6_ADDRSTRLEN)) {
+    // TODO: Consider pulling this out of ctor flow and into a static method used to construct
+    // instances, with the aim of being able to avoid exceptions in ctors. Discuss with Matt.
+    return "";
+  }
+  return str;
+}
+
+Ipv6Instance::Ipv6Instance(const sockaddr_in6& address) : InstanceBase(Type::Ip) {
+  ip_.ipv6_.address_ = address;
+  ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
+  friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
+}
+
+Ipv6Instance::Ipv6Instance(const std::string& address) : Ipv6Instance(address, 0) {}
+
+Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : InstanceBase(Type::Ip) {
+  memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
+  ip_.ipv6_.address_.sin6_family = AF_INET;
+  ip_.ipv6_.address_.sin6_port = htons(port);
+
+  // TODO: Consider pulling this out of ctor flow and into a static method used to construct
+  // instances, with the aim of being able to avoid exceptions in ctors. Discuss with Matt.
+  if (address != "") {
+    if (1 != inet_pton(AF_INET6, address.c_str(), &ip_.ipv6_.address_.sin6_addr)) {
+      throw EnvoyException(fmt::format("invalid ipv6 address '{}'", address));
+    }
+  } else {
+    ip_.ipv6_.address_.sin6_addr = in6addr_any;
+  }
+  // Just in case address is in a non-canonical format, format from network address.
+  ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
+  friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
+}
+
+Ipv6Instance::Ipv6Instance(uint32_t port) : Ipv6Instance("", port) {}
+
+int Ipv6Instance::bind(int fd) const {
+  return ::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
+                sizeof(ip_.ipv6_.address_));
+}
+
+int Ipv6Instance::connect(int fd) const {
+  return ::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
+                   sizeof(ip_.ipv6_.address_));
+}
+
+int Ipv6Instance::socket(SocketType type) const {
+  return ::socket(AF_INET, flagsFromSocketType(type), 0);
+}
+
+
+
 PipeInstance::PipeInstance(const sockaddr_un* address) : InstanceBase(Type::Pipe) {
   address_ = *address;
   friendly_name_ = address_.sun_path;
