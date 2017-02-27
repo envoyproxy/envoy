@@ -12,7 +12,7 @@ Envoy has the following requirements:
 * `cotire <https://github.com/sakra/cotire>`_ (last tested with 1.7.8)
 * `spdlog <https://github.com/gabime/spdlog>`_ (last tested with 0.11.0)
 * `http-parser <https://github.com/nodejs/http-parser>`_ (last tested with 2.7.0)
-* `nghttp2 <https://github.com/nghttp2/nghttp2>`_ (last tested with 1.14.1)
+* `nghttp2 <https://github.com/nghttp2/nghttp2>`_ (last tested with 1.20.0)
 * `libevent <http://libevent.org/>`_ (last tested with 2.0.22)
 * `tclap <http://tclap.sourceforge.net/>`_ (last tested with 1.2.1)
 * `gperftools <https://github.com/gperftools/gperftools>`_ (last tested with 2.5.0)
