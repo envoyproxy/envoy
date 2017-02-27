@@ -61,7 +61,7 @@ public:
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(zone, const std::string&());
 
-  std::string hostname_{};
+  std::string hostname_;
   Network::Address::InstancePtr address_;
   testing::NiceMock<Outlier::MockDetectorHostSink> outlier_detector_;
   testing::NiceMock<MockClusterInfo> cluster_;

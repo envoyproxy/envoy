@@ -953,18 +953,16 @@ TEST_F(RouterTest, CanaryStatusFalse) {
 
 TEST_F(RouterTest, AutoHostRewriteEnabled) {
   NiceMock<Http::MockStreamEncoder> encoder;
-  std::string dns_host{"scooby.doo"};
   std::string req_host{"foo.bar.com"};
 
   Http::TestHeaderMapImpl incoming_headers;
   HttpTestUtility::addDefaultHeaders(incoming_headers);
   incoming_headers.Host()->value(req_host);
 
+  cm_.conn_pool_.host_->hostname_ = "scooby.doo";
   Http::TestHeaderMapImpl outgoing_headers;
   HttpTestUtility::addDefaultHeaders(outgoing_headers);
-  outgoing_headers.Host()->value(dns_host);
-
-  ON_CALL(*cm_.conn_pool_.host_, hostname()).WillByDefault(ReturnRef(dns_host));
+  outgoing_headers.Host()->value(cm_.conn_pool_.host_->hostname_);
 
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
@@ -992,14 +990,13 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
 
 TEST_F(RouterTest, AutoHostRewriteDisabled) {
   NiceMock<Http::MockStreamEncoder> encoder;
-  std::string dns_host{"scooby.doo"};
   std::string req_host{"foo.bar.com"};
 
   Http::TestHeaderMapImpl incoming_headers;
   HttpTestUtility::addDefaultHeaders(incoming_headers);
   incoming_headers.Host()->value(req_host);
 
-  ON_CALL(*cm_.conn_pool_.host_, hostname()).WillByDefault(ReturnRef(dns_host));
+  cm_.conn_pool_.host_->hostname_ = "scooby.doo";
 
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));

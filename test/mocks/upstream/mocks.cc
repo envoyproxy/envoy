@@ -32,6 +32,7 @@ MockDetector::~MockDetector() {}
 
 MockHostDescription::MockHostDescription()
     : address_(Network::Utility::resolveUrl("tcp://10.0.0.1:443")) {
+  ON_CALL(*this, hostname()).WillByDefault(ReturnRef(hostname_));
   ON_CALL(*this, address()).WillByDefault(Return(address_));
   ON_CALL(*this, outlierDetector()).WillByDefault(ReturnRef(outlier_detector_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
