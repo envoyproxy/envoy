@@ -123,7 +123,8 @@ public:
   }
   ClusterInfoPtr get(const std::string& cluster) override;
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
-                                                         ResourcePriority priority) override;
+                                                         ResourcePriority priority,
+                                                         LoadBalancerContext* context) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removePrimaryCluster(const std::string& cluster) override;
@@ -150,7 +151,8 @@ private:
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoPtr cluster);
       ~ClusterEntry();
 
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority);
+      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
+                                               LoadBalancerContext* context);
 
       ThreadLocalClusterManagerImpl& parent_;
       HostSetImpl host_set_;

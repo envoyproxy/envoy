@@ -39,8 +39,8 @@ connect_timeout_ms
 
 lb_type
   *(required, string)* The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
-  when picking a host in the cluster. Possible options are *round_robin*, *least_request*, and
-  *random*.
+  when picking a host in the cluster. Possible options are *round_robin*, *least_request*,
+  *ring_hash*, and *random*.
 
 hosts
   *(sometimes required, array)* If the service discovery type is *static*, *strict_dns*, or

@@ -312,7 +312,7 @@ public:
       Upstream::MockHost::MockCreateConnectionData conn_info;
       conn_info.connection_ = upstream_connection_;
       conn_info.host_.reset(
-          new Upstream::HostImpl(cluster_manager_.cluster_.info_,
+          new Upstream::HostImpl(cluster_manager_.cluster_.info_, "",
                                  Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
       EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
       EXPECT_CALL(*upstream_connection_, addReadFilter(_))

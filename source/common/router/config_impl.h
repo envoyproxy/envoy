@@ -7,8 +7,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/json/json_loader.h"
-
 namespace Router {
 
 /**
@@ -169,6 +167,21 @@ private:
 };
 
 /**
+ * Implementation of HashPolicy that reads from the JSON route config and only currently supports
+ * hashing on an HTTP header.
+ */
+class HashPolicyImpl : public HashPolicy {
+public:
+  HashPolicyImpl(const Json::Object& config);
+
+  // Router::HashPolicy
+  Optional<uint64_t> generateHash(const Http::HeaderMap& headers) const override;
+
+private:
+  const Http::LowerCaseString header_name_;
+};
+
+/**
  * Base implementation for all route entries.
  */
 class RouteEntryImplBase : public RouteEntry,
@@ -189,6 +202,7 @@ public:
   // Router::RouteEntry
   const std::string& clusterName() const override;
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
+  const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
@@ -198,6 +212,7 @@ public:
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   const VirtualHost& virtualHost() const override { return vhost_; }
+  bool autoHostRewrite() const override { return auto_host_rewrite_; }
 
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -232,6 +247,7 @@ private:
       return parent_->finalizeRequestHeaders(headers);
     }
 
+    const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
@@ -243,6 +259,7 @@ private:
     }
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
+    bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
 
     // Router::Route
     const RedirectEntry* redirectEntry() const override { return nullptr; }
@@ -286,6 +303,7 @@ private:
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
   const VirtualHostImpl& vhost_;
+  const bool auto_host_rewrite_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const std::chrono::milliseconds timeout_;
@@ -299,6 +317,7 @@ private:
   const Upstream::ResourcePriority priority_;
   std::vector<ConfigUtility::HeaderData> config_headers_;
   std::vector<WeightedClusterEntryPtr> weighted_clusters_;
+  std::unique_ptr<const HashPolicyImpl> hash_policy_;
 };
 
 /**

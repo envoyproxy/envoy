@@ -191,9 +191,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // See if we need to set up for hashing.
+  if (route_entry_->hashPolicy()) {
+    Optional<uint64_t> hash = route_entry_->hashPolicy()->generateHash(headers);
+    if (hash.valid()) {
+      lb_context_.reset(new LoadBalancerContextImpl(hash));
+    }
+  }
+
   // Fetch a connection pool for the upstream cluster.
-  Http::ConnectionPool::Instance* conn_pool =
-      config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), finalPriority());
+  Http::ConnectionPool::Instance* conn_pool = getConnPool();
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
@@ -235,6 +242,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+Http::ConnectionPool::Instance* Filter::getConnPool() {
+  return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), finalPriority(),
+                                            lb_context_.get());
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
@@ -535,8 +547,7 @@ bool Filter::setupRetry(bool end_stream) {
 }
 
 void Filter::doRetry() {
-  Http::ConnectionPool::Instance* conn_pool =
-      config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), finalPriority());
+  Http::ConnectionPool::Instance* conn_pool = getConnPool();
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();
@@ -693,6 +704,10 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   conn_pool_stream_handle_ = nullptr;
   request_encoder_ = &request_encoder;
   calling_encode_headers_ = true;
+  if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
+    parent_.downstream_headers_->Host()->value(host->hostname());
+  }
+
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
                                 !buffered_request_body_ && encode_complete_ && !encode_trailers_);
   calling_encode_headers_ = false;

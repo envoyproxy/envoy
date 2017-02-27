@@ -115,14 +115,15 @@ bool LoadBalancerBase::earlyExitNonZoneRouting() {
   return false;
 }
 
-bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
+bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, ClusterStats& stats,
+                                        Runtime::Loader& runtime) {
   uint64_t global_panic_threshold =
-      std::min<uint64_t>(100, runtime_.snapshot().getInteger(RuntimePanicThreshold, 50));
+      std::min<uint64_t>(100, runtime.snapshot().getInteger(RuntimePanicThreshold, 50));
   double healthy_percent = 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
 
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
   if (healthy_percent < global_panic_threshold) {
-    stats_.lb_healthy_panic_.inc();
+    stats.lb_healthy_panic_.inc();
     return true;
   }
 
@@ -195,7 +196,8 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
 const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
   ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
 
-  if (host_set_.hosts().empty() || isGlobalPanic(host_set_)) {
+  if (host_set_.hosts().empty() ||
+      LoadBalancerUtility::isGlobalPanic(host_set_, stats_, runtime_)) {
     return host_set_.hosts();
   }
 
@@ -207,7 +209,8 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  if (local_host_set_->hosts().empty() || isGlobalPanic(*local_host_set_)) {
+  if (local_host_set_->hosts().empty() ||
+      LoadBalancerUtility::isGlobalPanic(*local_host_set_, stats_, runtime_)) {
     stats_.lb_local_cluster_not_ok_.inc();
     return host_set_.healthyHosts();
   }
@@ -215,7 +218,7 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
   return tryChooseLocalZoneHosts();
 }
 
-ConstHostPtr RoundRobinLoadBalancer::chooseHost() {
+ConstHostPtr RoundRobinLoadBalancer::chooseHost(const LoadBalancerContext*) {
   const std::vector<HostPtr>& hosts_to_use = hostsToUse();
   if (hosts_to_use.empty()) {
     return nullptr;
@@ -244,7 +247,7 @@ LeastRequestLoadBalancer::LeastRequestLoadBalancer(const HostSet& host_set,
       });
 }
 
-ConstHostPtr LeastRequestLoadBalancer::chooseHost() {
+ConstHostPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext*) {
   bool is_weight_imbalanced = stats_.max_host_weight_.value() != 1;
   bool is_weight_enabled = runtime_.snapshot().getInteger("upstream.weight_enabled", 1UL) != 0;
 
@@ -280,7 +283,7 @@ ConstHostPtr LeastRequestLoadBalancer::chooseHost() {
   }
 }
 
-ConstHostPtr RandomLoadBalancer::chooseHost() {
+ConstHostPtr RandomLoadBalancer::chooseHost(const LoadBalancerContext*) {
   const std::vector<HostPtr>& hosts_to_use = hostsToUse();
   if (hosts_to_use.empty()) {
     return nullptr;

@@ -59,7 +59,7 @@ public:
   }
 
   NiceMock<Runtime::MockLoader> runtime_;
-  Upstream::MockClusterManager cm_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -251,6 +251,7 @@ TEST_F(RdsImplTest, FailureArray) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
 
+  EXPECT_CALL(init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 

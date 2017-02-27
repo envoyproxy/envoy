@@ -111,6 +111,7 @@ private:
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
     void finalizeRequestHeaders(Http::HeaderMap&) const override {}
+    const Router::HashPolicy* hashPolicy() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
       return Upstream::ResourcePriority::Default;
     }
@@ -128,6 +129,7 @@ private:
       return nullptr;
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
+    bool autoHostRewrite() const override { return false; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;

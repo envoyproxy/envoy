@@ -134,6 +134,9 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_EQ(5UL, cluster_->healthyHostsPerZone()[1].size());
   EXPECT_EQ(4UL, cluster_->healthyHostsPerZone()[2].size());
 
+  // Hosts in SDS and static clusters should have empty hostname
+  EXPECT_EQ("", cluster_->hosts()[0]->hostname());
+
   HostPtr canary_host = findHost("10.0.16.43");
   EXPECT_TRUE(canary_host->canary());
   EXPECT_EQ("us-east-1d", canary_host->zone());

@@ -73,6 +73,20 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
   return matches;
 }
 
+HashPolicyImpl::HashPolicyImpl(const Json::Object& config)
+    : header_name_(config.getString("header_name")) {}
+
+Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) const {
+  Optional<uint64_t> hash;
+  const Http::HeaderEntry* header = headers.get(header_name_);
+  if (header) {
+    // TODO: Compile in murmur3/city/etc. and potentially allow the user to choose so we know
+    //       exactly what we are going to get.
+    hash.value(std::hash<std::string>()(header->value().c_str()));
+  }
+  return hash;
+}
+
 const uint64_t RouteEntryImplBase::WeightedClusterEntry::MAX_CLUSTER_WEIGHT = 100UL;
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json::Object& route,
@@ -80,6 +94,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
     : case_sensitive_(route.getBoolean("case_sensitive", true)),
       prefix_rewrite_(route.getString("prefix_rewrite", "")),
       host_rewrite_(route.getString("host_rewrite", "")), vhost_(vhost),
+      auto_host_rewrite_(route.getBoolean("auto_host_rewrite", false)),
       cluster_name_(route.getString("cluster", "")),
       cluster_header_name_(route.getString("cluster_header", "")),
       timeout_(route.getInteger("timeout_ms", DEFAULT_ROUTE_TIMEOUT_MS)),
@@ -90,6 +105,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       priority_(ConfigUtility::parsePriority(route)) {
 
   route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
+
+  // Route can either have a host_rewrite with fixed host header or automatic host rewrite
+  // based on the DNS name of the instance in the backing cluster.
+  if (auto_host_rewrite_ && !host_rewrite_.empty()) {
+    throw EnvoyException("routes cannot have both auto_host_rewrite and host_rewrite options set");
+  }
 
   bool have_weighted_clusters = route.hasObject("weighted_clusters");
   bool have_cluster =
@@ -150,6 +171,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
                                    header_map->getString("value", EMPTY_STRING),
                                    header_map->getBoolean("regex", false));
     }
+  }
+
+  if (route.hasObject("hash_policy")) {
+    hash_policy_.reset(new HashPolicyImpl(*route.getObject("hash_policy")));
   }
 }
 

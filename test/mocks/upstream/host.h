@@ -56,10 +56,12 @@ public:
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostSink&());
+  MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(address, Network::Address::InstancePtr());
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(zone, const std::string&());
 
+  std::string hostname_;
   Network::Address::InstancePtr address_;
   testing::NiceMock<Outlier::MockDetectorHostSink> outlier_detector_;
   testing::NiceMock<MockClusterInfo> cluster_;

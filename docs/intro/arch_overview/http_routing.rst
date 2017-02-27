@@ -22,7 +22,9 @@ request. The router filter supports the following features:
   level.
 * :ref:`Path <config_http_conn_man_route_table_route_path_redirect>`/:ref:`host
   <config_http_conn_man_route_table_route_host_redirect>` redirection at the route level.
-* :ref:`Host rewriting <config_http_conn_man_route_table_route_host_rewrite>`.
+* :ref:`Explicit host rewriting <config_http_conn_man_route_table_route_host_rewrite>`.
+* :ref:`Automatic host rewriting <config_http_conn_man_route_table_route_auto_host_rewrite>` based on
+  the DNS name of the selected upstream host.
 * :ref:`Prefix rewriting <config_http_conn_man_route_table_route_prefix_rewrite>`.
 * :ref:`Request retries <arch_overview_http_routing_retry>` specified either via HTTP header or via
   route configuration.
@@ -40,6 +42,7 @@ request. The router filter supports the following features:
   used by Envoy to generate additional statistics on top of the standard cluster level ones. Virtual
   clusters can use regex matching.
 * :ref:`Priority <arch_overview_http_routing_priority>` based routing.
+* :ref:`Hash policy <config_http_conn_man_route_table_hash_policy>` based routing.
 
 Route table
 -----------

@@ -104,7 +104,7 @@ TEST_F(RouterTest, ClusterNotFound) {
 
 TEST_F(RouterTest, PoolFailureWithPriority) {
   callbacks_.route_->route_entry_.virtual_cluster_.priority_ = Upstream::ResourcePriority::High;
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, nullptr));
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
@@ -130,6 +130,48 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   router_.decodeHeaders(headers, true);
 }
 
+TEST_F(RouterTest, HashPolicy) {
+  ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
+      .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_))
+      .WillOnce(Return(Optional<uint64_t>(10)));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(10UL, context->hashKey().value());
+            return &cm_.conn_pool_;
+          }));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  callbacks_.reset_callback_();
+}
+
+TEST_F(RouterTest, HashPolicyNoHash) {
+  ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
+      .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_))
+      .WillOnce(Return(Optional<uint64_t>()));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, nullptr));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  callbacks_.reset_callback_();
+}
+
 TEST_F(RouterTest, CancelBeforeBoundToPool) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
@@ -144,7 +186,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
 }
 
 TEST_F(RouterTest, NoHost) {
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _)).WillOnce(Return(nullptr));
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
@@ -355,7 +397,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::LocalReset);
 
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _)).WillOnce(Return(nullptr));
   Http::TestHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
@@ -907,6 +949,77 @@ TEST_F(RouterTest, CanaryStatusFalse) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
   EXPECT_EQ(0U, cm_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200").value());
+}
+
+TEST_F(RouterTest, AutoHostRewriteEnabled) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  std::string req_host{"foo.bar.com"};
+
+  Http::TestHeaderMapImpl incoming_headers;
+  HttpTestUtility::addDefaultHeaders(incoming_headers);
+  incoming_headers.Host()->value(req_host);
+
+  cm_.conn_pool_.host_->hostname_ = "scooby.doo";
+  Http::TestHeaderMapImpl outgoing_headers;
+  HttpTestUtility::addDefaultHeaders(outgoing_headers);
+  outgoing_headers.Host()->value(cm_.conn_pool_.host_->hostname_);
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+
+  // :authority header in the outgoing request should match the DNS name of
+  // the selected upstream host
+  EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&outgoing_headers), true))
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+        encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+      }));
+
+  EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+  EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
+  router_.decodeHeaders(incoming_headers, true);
+}
+
+TEST_F(RouterTest, AutoHostRewriteDisabled) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  std::string req_host{"foo.bar.com"};
+
+  Http::TestHeaderMapImpl incoming_headers;
+  HttpTestUtility::addDefaultHeaders(incoming_headers);
+  incoming_headers.Host()->value(req_host);
+
+  cm_.conn_pool_.host_->hostname_ = "scooby.doo";
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+
+  // :authority header in the outgoing request should match the :authority header of
+  // the incoming request
+  EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&incoming_headers), true))
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+        encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+      }));
+
+  EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+  EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(false));
+  router_.decodeHeaders(incoming_headers, true);
 }
 
 } // Router

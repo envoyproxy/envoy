@@ -13,7 +13,7 @@ namespace Upstream {
 
 static HostPtr newTestHost(Upstream::ClusterInfoPtr cluster, const std::string& url,
                            uint32_t weight = 1, const std::string& zone = "") {
-  return HostPtr{new HostImpl(cluster, Network::Utility::resolveUrl(url), false, weight, zone)};
+  return HostPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, weight, zone)};
 }
 
 /**
@@ -84,7 +84,7 @@ public:
       local_host_set_->updateHosts(originating_hosts, originating_hosts, per_zone_local,
                                    per_zone_local, empty_vector_, empty_vector_);
 
-      ConstHostPtr selected = lb.chooseHost();
+      ConstHostPtr selected = lb.chooseHost(nullptr);
       hits[selected->address()->asString()]++;
     }
 

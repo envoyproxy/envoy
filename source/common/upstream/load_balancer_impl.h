@@ -7,6 +7,19 @@
 namespace Upstream {
 
 /**
+ * Utilities common to all load balancers.
+ */
+class LoadBalancerUtility {
+public:
+  /**
+   * For the given host_set @return if we should be in a panic mode or not. For example, if the
+   * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
+   * requests to hosts regardless of whether they are healthy or not.
+   */
+  static bool isGlobalPanic(const HostSet& host_set, ClusterStats& stats, Runtime::Loader& runtime);
+};
+
+/**
  * Base class for all LB implementations.
  */
 class LoadBalancerBase {
@@ -31,13 +44,6 @@ private:
    * This gets recalculated on update callback.
    */
   bool earlyExitNonZoneRouting();
-
-  /**
-   * For the given host_set it @return if we should be in a panic mode or not.
-   * For example, if majority of hosts are unhealthy we'll be likely in a panic mode.
-   * In this case we'll route requests to hosts no matter if they are healthy or not.
-   */
-  bool isGlobalPanic(const HostSet& host_set);
 
   /**
    * Try to select upstream hosts from the same zone.
@@ -76,7 +82,7 @@ public:
       : LoadBalancerBase(host_set, local_host_set_, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
-  ConstHostPtr chooseHost() override;
+  ConstHostPtr chooseHost(const LoadBalancerContext* context) override;
 
 private:
   size_t rr_index_{};
@@ -102,7 +108,7 @@ public:
                            Runtime::RandomGenerator& random);
 
   // Upstream::LoadBalancer
-  ConstHostPtr chooseHost() override;
+  ConstHostPtr chooseHost(const LoadBalancerContext* context) override;
 
 private:
   HostPtr last_host_;
@@ -119,7 +125,7 @@ public:
       : LoadBalancerBase(host_set, local_host_set, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
-  ConstHostPtr chooseHost() override;
+  ConstHostPtr chooseHost(const LoadBalancerContext* context) override;
 };
 
 } // Upstream
