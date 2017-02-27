@@ -33,7 +33,7 @@ TEST_F(TcpStatsdSinkTest, All) {
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = connection;
   conn_info.host_.reset(
-      new Upstream::HostImpl(Upstream::ClusterInfoPtr{new Upstream::MockClusterInfo},
+      new Upstream::HostImpl(Upstream::ClusterInfoPtr{new Upstream::MockClusterInfo}, "",
                              Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
 
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("statsd")).WillOnce(Return(conn_info));

@@ -42,9 +42,9 @@ public:
 
 private:
   struct LogicalHost : public HostImpl {
-    LogicalHost(ClusterInfoPtr cluster, Network::Address::InstancePtr address,
-                LogicalDnsCluster& parent)
-        : HostImpl(cluster, address, false, 1, ""), parent_(parent) {}
+    LogicalHost(ClusterInfoPtr cluster, const std::string& hostname,
+                Network::Address::InstancePtr address, LogicalDnsCluster& parent)
+        : HostImpl(cluster, hostname, address, false, 1, ""), parent_(parent) {}
 
     // Upstream::Host
     CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override;
@@ -63,6 +63,7 @@ private:
       return logical_host_->outlierDetector();
     }
     const HostStats& stats() const override { return logical_host_->stats(); }
+    const std::string& hostname() const override { return logical_host_->hostname(); }
     Network::Address::InstancePtr address() const override { return address_; }
     const std::string& zone() const override { return EMPTY_STRING; }
 
@@ -88,6 +89,7 @@ private:
   bool initialized_;
   Event::TimerPtr resolve_timer_;
   std::string dns_url_;
+  std::string hostname_;
   Network::Address::InstancePtr current_resolved_address_;
   HostPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};

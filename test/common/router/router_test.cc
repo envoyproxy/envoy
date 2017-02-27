@@ -951,4 +951,75 @@ TEST_F(RouterTest, CanaryStatusFalse) {
   EXPECT_EQ(0U, cm_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200").value());
 }
 
+TEST_F(RouterTest, AutoHostRewriteEnabled) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  std::string req_host{"foo.bar.com"};
+
+  Http::TestHeaderMapImpl incoming_headers;
+  HttpTestUtility::addDefaultHeaders(incoming_headers);
+  incoming_headers.Host()->value(req_host);
+
+  cm_.conn_pool_.host_->hostname_ = "scooby.doo";
+  Http::TestHeaderMapImpl outgoing_headers;
+  HttpTestUtility::addDefaultHeaders(outgoing_headers);
+  outgoing_headers.Host()->value(cm_.conn_pool_.host_->hostname_);
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+
+  // :authority header in the outgoing request should match the DNS name of
+  // the selected upstream host
+  EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&outgoing_headers), true))
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+        encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+      }));
+
+  EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+  EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
+  router_.decodeHeaders(incoming_headers, true);
+}
+
+TEST_F(RouterTest, AutoHostRewriteDisabled) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  std::string req_host{"foo.bar.com"};
+
+  Http::TestHeaderMapImpl incoming_headers;
+  HttpTestUtility::addDefaultHeaders(incoming_headers);
+  incoming_headers.Host()->value(req_host);
+
+  cm_.conn_pool_.host_->hostname_ = "scooby.doo";
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+                             callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+                             return nullptr;
+                           }));
+
+  // :authority header in the outgoing request should match the :authority header of
+  // the incoming request
+  EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&incoming_headers), true))
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+        encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+      }));
+
+  EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+                           -> void { EXPECT_EQ(host_address_, host->address()); }));
+  EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(false));
+  router_.decodeHeaders(incoming_headers, true);
+}
+
 } // Router

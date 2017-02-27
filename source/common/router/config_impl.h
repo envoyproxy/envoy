@@ -212,6 +212,7 @@ public:
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   const VirtualHost& virtualHost() const override { return vhost_; }
+  bool autoHostRewrite() const override { return auto_host_rewrite_; }
 
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -258,6 +259,7 @@ private:
     }
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
+    bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
 
     // Router::Route
     const RedirectEntry* redirectEntry() const override { return nullptr; }
@@ -301,6 +303,7 @@ private:
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
   const VirtualHostImpl& vhost_;
+  const bool auto_host_rewrite_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const std::chrono::milliseconds timeout_;

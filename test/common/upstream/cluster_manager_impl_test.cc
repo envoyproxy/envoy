@@ -505,7 +505,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   loader_api = Json::Factory::LoadFromString(json_api_3);
   MockCluster* cluster2 = new NiceMock<MockCluster>();
   cluster2->hosts_ = {HostPtr{new HostImpl(
-      cluster2->info_, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
+      cluster2->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize());

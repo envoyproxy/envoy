@@ -30,10 +30,11 @@ namespace Http1 {
 class ConnPoolImplForTest : public ConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterInfoPtr cluster)
-      : ConnPoolImpl(dispatcher, Upstream::HostPtr{new Upstream::HostImpl(
-                                     cluster, Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
-                                     false, 1, "")},
-                     Upstream::ResourcePriority::Default),
+      : ConnPoolImpl(
+            dispatcher,
+            Upstream::HostPtr{new Upstream::HostImpl(
+                cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:9000"), false, 1, "")},
+            Upstream::ResourcePriority::Default),
         mock_dispatcher_(dispatcher) {}
 
   ~ConnPoolImplForTest() {
