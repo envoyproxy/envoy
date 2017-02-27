@@ -4,6 +4,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Upstream {
@@ -40,10 +41,16 @@ public:
   virtual ClusterInfoMap clusters() PURE;
 
   /**
-   * @return ClusterInfoPtr the cluster info with the given name or nullptr if it does not
+   * @return ClusterInfoPtr the thread local cluster with the given name or nullptr if it does not
    * exist. This is thread safe.
+   *
+   * NOTE: The pointer returned by this function is ONLY safe to use in the context of the owning
+   * call (or if the caller knows that the cluster is fully static and will never be deleted). In
+   * the case of dynamic clusters, subsequent event loop iterations may invalidate this pointer.
+   * If information about the cluster needs to be kept, use the ThreadLocalCluster::info() method to
+   * obtain cluster information that is safe to store.
    */
-  virtual ClusterInfoPtr get(const std::string& cluster) PURE;
+  virtual ThreadLocalCluster* get(const std::string& cluster) PURE;
 
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that

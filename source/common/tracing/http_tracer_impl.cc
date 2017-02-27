@@ -221,13 +221,15 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                                  std::unique_ptr<lightstep::TracerOptions> options)
-    : cm_(cluster_manager), cluster_(cm_.get(config.getString("collector_cluster"))),
+    : cm_(cluster_manager),
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       tls_(tls), runtime_(runtime), options_(std::move(options)), tls_slot_(tls.allocateSlot()) {
-  if (!cluster_) {
+  Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
+  if (!cluster) {
     throw EnvoyException(fmt::format("{} collector cluster is not defined on cluster manager level",
                                      config.getString("collector_cluster")));
   }
+  cluster_ = cluster->info();
 
   if (!(cluster_->features() & Upstream::ClusterInfo::Features::HTTP2)) {
     throw EnvoyException(

@@ -25,7 +25,8 @@ namespace Http {
 class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
-      : client_(*cm_.cluster_.info_, stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
+      : client_(*cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
+                cm_, runtime_, random_,
                 Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}) {
     message_->headers().insertMethod().value(std::string("GET"));
     message_->headers().insertHost().value(std::string("host"));
@@ -87,8 +88,12 @@ TEST_F(AsyncClientImplTest, BasicStream) {
   response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
   response_decoder_->decodeData(*body, true);
 
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("internal.upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200")
+                     .value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("internal.upstream_rq_200")
+          .value());
 }
 
 TEST_F(AsyncClientImplTest, Basic) {
@@ -118,8 +123,12 @@ TEST_F(AsyncClientImplTest, Basic) {
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
 
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("internal.upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200")
+                     .value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("internal.upstream_rq_200")
+          .value());
 }
 
 TEST_F(AsyncClientImplTest, Retry) {
@@ -438,7 +447,8 @@ TEST_F(AsyncClientImplTest, ImmediateReset) {
   client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>());
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503")
+                     .value());
 }
 
 TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
@@ -607,7 +617,8 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
   EXPECT_EQ(nullptr,
             client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>()));
 
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503")
+                     .value());
 }
 
 TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
@@ -623,7 +634,8 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
   EXPECT_EQ(nullptr,
             client_.send(std::move(message_), callbacks_, Optional<std::chrono::milliseconds>()));
 
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503")
+                     .value());
 }
 
 TEST_F(AsyncClientImplTest, StreamTimeout) {
@@ -648,9 +660,12 @@ TEST_F(AsyncClientImplTest, StreamTimeout) {
   stream->sendHeaders(message_->headers(), true);
   timer_->callback_();
 
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_timeout").value());
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_504")
+                     .value());
 }
 
 TEST_F(AsyncClientImplTest, RequestTimeout) {
@@ -669,9 +684,12 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
   client_.send(std::move(message_), callbacks_, std::chrono::milliseconds(40));
   timer_->callback_();
 
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_timeout").value());
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_504")
+                     .value());
 }
 
 TEST_F(AsyncClientImplTest, DisableTimer) {
@@ -751,8 +769,12 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
   stream->sendData(*body2, true);
   response_decoder_->decodeData(*body2, true);
 
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
-  EXPECT_EQ(1UL, cm_.cluster_.info_->stats_store_.counter("internal.upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200")
+                     .value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("internal.upstream_rq_200")
+          .value());
 }
 
 } // Http

@@ -121,7 +121,7 @@ public:
 
     return clusters_map;
   }
-  ClusterInfoPtr get(const std::string& cluster) override;
+  ThreadLocalCluster* get(const std::string& cluster) override;
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
                                                          ResourcePriority priority,
                                                          LoadBalancerContext* context) override;
@@ -147,12 +147,17 @@ private:
       uint64_t drains_remaining_{};
     };
 
-    struct ClusterEntry {
+    struct ClusterEntry : public ThreadLocalCluster {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoPtr cluster);
       ~ClusterEntry();
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
                                                LoadBalancerContext* context);
+
+      // Upstream::ThreadLocalCluster
+      const HostSet& hostSet() override { return host_set_; }
+      ClusterInfoPtr info() override { return cluster_info_; }
+      LoadBalancer& loadBalancer() override { return *lb_; }
 
       ThreadLocalClusterManagerImpl& parent_;
       HostSetImpl host_set_;

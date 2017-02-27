@@ -2,6 +2,8 @@
 
 #include "envoy/redis/conn_pool.h"
 
+#include "common/redis/codec_impl.h"
+
 namespace Redis {
 
 bool operator==(const RespValue& lhs, const RespValue& rhs);
@@ -12,6 +14,9 @@ public:
   ~MockEncoder();
 
   MOCK_METHOD2(encode, void(const RespValue& value, Buffer::Instance& out));
+
+private:
+  EncoderImpl real_encoder_;
 };
 
 class MockDecoder : public Decoder {

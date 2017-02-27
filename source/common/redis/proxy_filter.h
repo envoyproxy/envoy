@@ -28,8 +28,6 @@ private:
 /**
  * A redis multiplexing proxy filter. This filter will take incoming redis pipelined commands, and
  * mulitplex them onto a consistently hashed connection pool of backend servers.
- * TODO: When we actually support command splitting, better documentation of what we support and
- *       what we are doing.
  */
 class ProxyFilter : public Network::ReadFilter,
                     public DecoderCallbacks,
@@ -63,6 +61,7 @@ private:
     void onFailure() override { parent_.onFailure(*this); }
 
     ProxyFilter& parent_;
+    RespValuePtr pending_response_;
     ConnPool::ActiveRequest* request_handle_;
   };
 

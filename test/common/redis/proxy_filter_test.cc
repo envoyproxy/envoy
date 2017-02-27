@@ -9,6 +9,7 @@ using testing::_;
 using testing::ByRef;
 using testing::DoAll;
 using testing::Eq;
+using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
@@ -77,10 +78,14 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 };
 
-TEST_F(RedisProxyFilterTest, Basic) {
+TEST_F(RedisProxyFilterTest, OutOfOrderResponse) {
+  InSequence s;
+
   Buffer::OwnedImpl fake_data;
   ConnPool::MockActiveRequest request_handle1;
   ConnPool::ActiveRequestCallbacks* request_callbacks1;
+  ConnPool::MockActiveRequest request_handle2;
+  ConnPool::ActiveRequestCallbacks* request_callbacks2;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
       .WillOnce(Invoke([&](Buffer::Instance&) -> void {
         RespValuePtr request1(new RespValue());
@@ -88,11 +93,22 @@ TEST_F(RedisProxyFilterTest, Basic) {
             .WillOnce(
                 DoAll(WithArg<2>(SaveArgAddress(&request_callbacks1)), Return(&request_handle1)));
         decoder_callbacks_->onRespValue(std::move(request1));
+
+        RespValuePtr request2(new RespValue());
+        EXPECT_CALL(conn_pool_, makeRequest("", Ref(*request2), _))
+            .WillOnce(
+                DoAll(WithArg<2>(SaveArgAddress(&request_callbacks2)), Return(&request_handle2)));
+        decoder_callbacks_->onRespValue(std::move(request2));
       }));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_.onData(fake_data));
 
+  RespValuePtr response2(new RespValue());
+  RespValue* response2_ptr = response2.get();
+  request_callbacks2->onResponse(std::move(response2));
+
   RespValuePtr response1(new RespValue());
   EXPECT_CALL(*encoder_, encode(Ref(*response1), _));
+  EXPECT_CALL(*encoder_, encode(Ref(*response2_ptr), _));
   EXPECT_CALL(filter_callbacks_.connection_, write(_));
   request_callbacks1->onResponse(std::move(response1));
 
@@ -100,6 +116,8 @@ TEST_F(RedisProxyFilterTest, Basic) {
 }
 
 TEST_F(RedisProxyFilterTest, UpstreamFailure) {
+  InSequence s;
+
   Buffer::OwnedImpl fake_data;
   ConnPool::MockActiveRequest request_handle1;
   ConnPool::ActiveRequestCallbacks* request_callbacks1;
@@ -124,6 +142,8 @@ TEST_F(RedisProxyFilterTest, UpstreamFailure) {
 }
 
 TEST_F(RedisProxyFilterTest, DownstreamDisconnectWithActive) {
+  InSequence s;
+
   Buffer::OwnedImpl fake_data;
   ConnPool::MockActiveRequest request_handle1;
   ConnPool::ActiveRequestCallbacks* request_callbacks1;
@@ -142,13 +162,14 @@ TEST_F(RedisProxyFilterTest, DownstreamDisconnectWithActive) {
 }
 
 TEST_F(RedisProxyFilterTest, NoClient) {
+  InSequence s;
+
   Buffer::OwnedImpl fake_data;
+  RespValuePtr request1(new RespValue());
   EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
-      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
-        RespValuePtr request1(new RespValue());
-        EXPECT_CALL(conn_pool_, makeRequest("", Ref(*request1), _)).WillOnce(Return(nullptr));
-        decoder_callbacks_->onRespValue(std::move(request1));
-      }));
+      .WillOnce(Invoke([&](Buffer::Instance&)
+                           -> void { decoder_callbacks_->onRespValue(std::move(request1)); }));
+  EXPECT_CALL(conn_pool_, makeRequest("", Ref(*request1), _)).WillOnce(Return(nullptr));
 
   RespValue error;
   error.type(RespType::Error);
@@ -161,6 +182,8 @@ TEST_F(RedisProxyFilterTest, NoClient) {
 }
 
 TEST_F(RedisProxyFilterTest, ProtocolError) {
+  InSequence s;
+
   Buffer::OwnedImpl fake_data;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
       .WillOnce(Invoke([&](Buffer::Instance&) -> void { throw ProtocolError("error"); }));

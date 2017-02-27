@@ -290,13 +290,13 @@ void ClusterManagerImpl::loadCluster(const Json::Object& cluster, bool added_via
   }
 }
 
-ClusterInfoPtr ClusterManagerImpl::get(const std::string& cluster) {
+ThreadLocalCluster* ClusterManagerImpl::get(const std::string& cluster) {
   ThreadLocalClusterManagerImpl& cluster_manager =
       tls_.getTyped<ThreadLocalClusterManagerImpl>(thread_local_slot_);
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry != cluster_manager.thread_local_clusters_.end()) {
-    return entry->second->cluster_info_;
+    return entry->second.get();
   } else {
     return nullptr;
   }

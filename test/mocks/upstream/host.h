@@ -53,11 +53,11 @@ public:
   MockHostDescription();
   ~MockHostDescription();
 
+  MOCK_CONST_METHOD0(address, Network::Address::InstancePtr());
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostSink&());
   MOCK_CONST_METHOD0(hostname, const std::string&());
-  MOCK_CONST_METHOD0(address, Network::Address::InstancePtr());
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(zone, const std::string&());
 
@@ -79,21 +79,32 @@ public:
   MockHost();
   ~MockHost();
 
-  MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
-  MOCK_CONST_METHOD0(counters, std::list<Stats::CounterPtr>());
-  MOCK_CONST_METHOD0(gauges, std::list<Stats::GaugePtr>());
-  MOCK_CONST_METHOD0(healthy, bool());
-  MOCK_METHOD1(healthy, void(bool));
-  MOCK_CONST_METHOD0(stats, HostStats&());
-  MOCK_CONST_METHOD0(weight, uint32_t());
-  MOCK_METHOD1(weight, void(uint32_t new_weight));
-
   CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override {
     MockCreateConnectionData data = createConnection_(dispatcher);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_};
   }
 
+  void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) override {
+    setOutlierDetector_(outlier_detector);
+  }
+
+  MOCK_CONST_METHOD0(address, Network::Address::InstancePtr());
+  MOCK_CONST_METHOD0(canary, bool());
+  MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
+  MOCK_CONST_METHOD0(counters, std::list<Stats::CounterPtr>());
   MOCK_CONST_METHOD1(createConnection_, MockCreateConnectionData(Event::Dispatcher& dispatcher));
+  MOCK_CONST_METHOD0(gauges, std::list<Stats::GaugePtr>());
+  MOCK_METHOD1(healthFlagClear, void(HealthFlag flag));
+  MOCK_CONST_METHOD1(healthFlagGet, bool(HealthFlag flag));
+  MOCK_METHOD1(healthFlagSet, void(HealthFlag flag));
+  MOCK_CONST_METHOD0(healthy, bool());
+  MOCK_CONST_METHOD0(hostname, const std::string&());
+  MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostSink&());
+  MOCK_METHOD1(setOutlierDetector_, void(Outlier::DetectorHostSinkPtr& outlier_detector));
+  MOCK_CONST_METHOD0(stats, HostStats&());
+  MOCK_CONST_METHOD0(weight, uint32_t());
+  MOCK_METHOD1(weight, void(uint32_t new_weight));
+  MOCK_CONST_METHOD0(zone, const std::string&());
 };
 
 } // Upstream

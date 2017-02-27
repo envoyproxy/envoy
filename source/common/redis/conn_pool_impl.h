@@ -14,10 +14,11 @@ namespace ConnPool {
 // TODO: Stats
 // TODO: Connect timeout
 // TODO: Op timeout
+// TODO: Circuit breaking
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
 public:
-  static ClientPtr create(const std::string& cluster_name, Upstream::ClusterManager& cm,
+  static ClientPtr create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher,
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory);
 
   ~ClientImpl();
@@ -73,15 +74,13 @@ private:
 class ClientFactoryImpl : public ClientFactory {
 public:
   // Redis::ConnPool::ClientFactoryImpl
-  ClientPtr create(const std::string& cluster_name, Upstream::ClusterManager& cm) override;
+  ClientPtr create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher) override;
 
   static ClientFactoryImpl instance_;
 
 private:
   DecoderFactoryImpl decoder_factory_;
 };
-
-// TODO: Real hashing connection pool with N connections per upstream.
 
 class InstanceImpl : public Instance {
 public:
@@ -100,30 +99,41 @@ private:
     ThreadLocalActiveClient(ThreadLocalPool& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
-    void onEvent(uint32_t events) override { parent_.onEvent(*this, events); }
+    void onEvent(uint32_t events) override;
 
     ThreadLocalPool& parent_;
+    Upstream::ConstHostPtr host_;
     ClientPtr redis_client_;
   };
 
   typedef std::unique_ptr<ThreadLocalActiveClient> ThreadLocalActiveClientPtr;
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher)
-        : parent_(parent), dispatcher_(dispatcher) {}
+    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
+                    const std::string& cluster_name);
 
-    ActiveRequest* makeRequest(const RespValue& request, ActiveRequestCallbacks& callbacks);
-    void onEvent(ThreadLocalActiveClient& client, uint32_t events);
+    ActiveRequest* makeRequest(const std::string& hash_key, const RespValue& request,
+                               ActiveRequestCallbacks& callbacks);
+    void onHostsRemoved(const std::vector<Upstream::HostPtr>& hosts_removed);
 
     // ThreadLocal::ThreadLocalObject
     void shutdown() override;
 
     InstanceImpl& parent_;
     Event::Dispatcher& dispatcher_;
-    ThreadLocalActiveClientPtr client_;
+    Upstream::ThreadLocalCluster* cluster_;
+    std::unordered_map<Upstream::ConstHostPtr, ThreadLocalActiveClientPtr> client_map_;
   };
 
-  const std::string cluster_name_;
+  struct LbContextImpl : public Upstream::LoadBalancerContext {
+    LbContextImpl(const std::string& hash_key) : hash_key_(std::hash<std::string>()(hash_key)) {}
+
+    // Upstream::LoadBalancerContext
+    const Optional<uint64_t>& hashKey() const override { return hash_key_; }
+
+    const Optional<uint64_t> hash_key_;
+  };
+
   Upstream::ClusterManager& cm_;
   ClientFactory& client_factory_;
   ThreadLocal::Instance& tls_;

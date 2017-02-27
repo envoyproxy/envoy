@@ -51,8 +51,7 @@ public:
   virtual void addConnectionCallbacks(Network::ConnectionCallbacks& callbacks) PURE;
 
   /**
-   * Closes the underlying network connection. It is the callers responsibility to call
-   * failAllPendingRequests() if needed.
+   * Closes the underlying network connection.
    */
   virtual void close() PURE;
 
@@ -76,10 +75,9 @@ public:
   virtual ~ClientFactory() {}
 
   /**
-   * Create a client given an upstream cluster and a cluster manager.
-   * TODO: This interface will change when we actually support consistent hashing.
+   * Create a client given an upstream host.
    */
-  virtual ClientPtr create(const std::string& cluster_name, Upstream::ClusterManager& cm) PURE;
+  virtual ClientPtr create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher) PURE;
 };
 
 /**

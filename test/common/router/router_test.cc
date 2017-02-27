@@ -201,7 +201,7 @@ TEST_F(RouterTest, NoHost) {
 }
 
 TEST_F(RouterTest, MaintenanceMode) {
-  EXPECT_CALL(*cm_.cluster_.info_, maintenanceMode()).WillOnce(Return(true));
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, maintenanceMode()).WillOnce(Return(true));
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "16"}, {"content-type", "text/plain"}};
@@ -270,7 +270,9 @@ TEST_F(RouterTest, UpstreamTimeout) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   response_timeout_->callback_();
 
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_timeout").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
@@ -306,7 +308,9 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(204));
   response_timeout_->callback_();
 
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_timeout").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
@@ -344,7 +348,10 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   per_try_timeout_->callback_();
 
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_per_try_timeout").value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_per_try_timeout")
+          .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
 }
 
@@ -684,12 +691,17 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   Http::HeaderMapPtr response_headers2(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers2), true);
 
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("retry.upstream_rq_503").value());
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
-  EXPECT_EQ(
-      1U, cm_.cluster_.info_->stats_store_.counter("zone.zone_name.to_az.upstream_rq_200").value());
-  EXPECT_EQ(
-      1U, cm_.cluster_.info_->stats_store_.counter("zone.zone_name.to_az.upstream_rq_2xx").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("retry.upstream_rq_503")
+                .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("zone.zone_name.to_az.upstream_rq_200")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("zone.zone_name.to_az.upstream_rq_2xx")
+                    .value());
 }
 
 TEST_F(RouterTest, Shadow) {
@@ -764,14 +776,18 @@ TEST_F(RouterTest, AltStatName) {
   EXPECT_EQ(1U,
             stats_store_.counter("vhost.fake_vhost.vcluster.fake_virtual_cluster.upstream_rq_200")
                 .value());
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200").value());
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("alt_stat.upstream_rq_200").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200")
+                .value());
   EXPECT_EQ(
-      1U, cm_.cluster_.info_->stats_store_.counter("alt_stat.zone.zone_name.to_az.upstream_rq_200")
+      1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("alt_stat.upstream_rq_200")
               .value());
-  EXPECT_EQ(
-      1U, cm_.cluster_.info_->stats_store_.counter("alt_stat.zone.zone_name.to_az.upstream_rq_200")
-              .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("alt_stat.zone.zone_name.to_az.upstream_rq_200")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("alt_stat.zone.zone_name.to_az.upstream_rq_200")
+                    .value());
 }
 
 TEST_F(RouterTest, Redirect) {
@@ -919,7 +935,9 @@ TEST_F(RouterTest, CanaryStatusTrue) {
   ON_CALL(*cm_.conn_pool_.host_, canary()).WillByDefault(Return(true));
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200")
+                .value());
 }
 
 TEST_F(RouterTest, CanaryStatusFalse) {
@@ -948,7 +966,9 @@ TEST_F(RouterTest, CanaryStatusFalse) {
                                   {"x-envoy-virtual-cluster", "hello"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
-  EXPECT_EQ(0U, cm_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200").value());
+  EXPECT_EQ(0U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200")
+                .value());
 }
 
 TEST_F(RouterTest, AutoHostRewriteEnabled) {

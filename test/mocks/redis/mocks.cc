@@ -41,7 +41,12 @@ bool operator==(const RespValue& lhs, const RespValue& rhs) {
   NOT_IMPLEMENTED;
 }
 
-MockEncoder::MockEncoder() {}
+MockEncoder::MockEncoder() {
+  ON_CALL(*this, encode(_, _))
+      .WillByDefault(Invoke([this](const RespValue& value, Buffer::Instance& out)
+                                -> void { real_encoder_.encode(value, out); }));
+}
+
 MockEncoder::~MockEncoder() {}
 
 MockDecoder::MockDecoder() {}

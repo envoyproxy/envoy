@@ -27,9 +27,9 @@ TEST(TcpProxyConfigTest, NoRouteConfig) {
 
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
-  EXPECT_THROW(
-      TcpProxyConfig(*config, cluster_manager, cluster_manager.cluster_.info_->stats_store_),
-      EnvoyException);
+  EXPECT_THROW(TcpProxyConfig(*config, cluster_manager,
+                              cluster_manager.thread_local_cluster_.cluster_.info_->stats_store_),
+               EnvoyException);
 }
 
 TEST(TcpProxyConfigTest, NoCluster) {
@@ -49,9 +49,9 @@ TEST(TcpProxyConfigTest, NoCluster) {
   Json::ObjectPtr config = Json::Factory::LoadFromString(json);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   EXPECT_CALL(cluster_manager, get("fake_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(
-      TcpProxyConfig(*config, cluster_manager, cluster_manager.cluster_.info_->stats_store_),
-      EnvoyException);
+  EXPECT_THROW(TcpProxyConfig(*config, cluster_manager,
+                              cluster_manager.thread_local_cluster_.cluster_.info_->stats_store_),
+               EnvoyException);
 }
 
 TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
@@ -70,9 +70,9 @@ TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
 
   Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
-  EXPECT_THROW(
-      TcpProxyConfig(*json_config, cluster_manager, cluster_manager.cluster_.info_->stats_store_),
-      Json::Exception);
+  EXPECT_THROW(TcpProxyConfig(*json_config, cluster_manager,
+                              cluster_manager.thread_local_cluster_.cluster_.info_->stats_store_),
+               Json::Exception);
 }
 
 TEST(TcpProxyConfigTest, Routes) {
@@ -121,7 +121,8 @@ TEST(TcpProxyConfigTest, Routes) {
   Json::ObjectPtr json_config = Json::Factory::LoadFromString(json);
   NiceMock<Upstream::MockClusterManager> cm_;
 
-  TcpProxyConfig config_obj(*json_config, cm_, cm_.cluster_.info_->stats_store_);
+  TcpProxyConfig config_obj(*json_config, cm_,
+                            cm_.thread_local_cluster_.cluster_.info_->stats_store_);
 
   {
     // hit route with destination_ip (10.10.10.10/32)
@@ -276,7 +277,8 @@ TEST(TcpProxyConfigTest, EmptyRouteConfig) {
   Json::ObjectPtr json_config = Json::Factory::LoadFromString(json);
   NiceMock<Upstream::MockClusterManager> cm_;
 
-  TcpProxyConfig config_obj(*json_config, cm_, cm_.cluster_.info_->stats_store_);
+  TcpProxyConfig config_obj(*json_config, cm_,
+                            cm_.thread_local_cluster_.cluster_.info_->stats_store_);
 
   NiceMock<Network::MockConnection> connection;
   EXPECT_EQ(std::string(""), config_obj.getRouteFromEntries(connection));
@@ -299,8 +301,9 @@ public:
     )EOF";
 
     Json::ObjectPtr config = Json::Factory::LoadFromString(json);
-    config_.reset(new TcpProxyConfig(*config, cluster_manager_,
-                                     cluster_manager_.cluster_.info_->stats_store_));
+    config_.reset(
+        new TcpProxyConfig(*config, cluster_manager_,
+                           cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_));
   }
 
   void setup(bool return_connection) {
@@ -312,7 +315,7 @@ public:
       Upstream::MockHost::MockCreateConnectionData conn_info;
       conn_info.connection_ = upstream_connection_;
       conn_info.host_.reset(
-          new Upstream::HostImpl(cluster_manager_.cluster_.info_, "",
+          new Upstream::HostImpl(cluster_manager_.thread_local_cluster_.cluster_.info_, "",
                                  Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
       EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
       EXPECT_CALL(*upstream_connection_, addReadFilter(_))
@@ -403,7 +406,8 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   connect_timer_->callback_();
-  EXPECT_EQ(1U, cluster_manager_.cluster_.info_->stats_store_.counter("upstream_cx_connect_timeout")
+  EXPECT_EQ(1U, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_cx_connect_timeout")
                     .value());
 }
 
@@ -429,12 +433,13 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*connect_timer_, disableTimer());
   upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(1U, cluster_manager_.cluster_.info_->stats_store_.counter("upstream_cx_connect_fail")
+  EXPECT_EQ(1U, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_cx_connect_fail")
                     .value());
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
-  cluster_manager_.cluster_.info_->resource_manager_.reset(
+  cluster_manager_.thread_local_cluster_.cluster_.info_->resource_manager_.reset(
       new Upstream::ResourceManagerImpl(runtime_, "fake_key", 0, 0, 0, 0));
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
@@ -444,8 +449,9 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   filter_->onNewConnection();
 
-  EXPECT_EQ(1U,
-            cluster_manager_.cluster_.info_->stats_store_.counter("upstream_cx_overflow").value());
+  EXPECT_EQ(1U, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_cx_overflow")
+                    .value());
 }
 
 class TcpProxyRoutingTest : public testing::Test {
@@ -466,8 +472,9 @@ public:
     )EOF";
 
     Json::ObjectPtr config = Json::Factory::LoadFromString(json);
-    config_.reset(new TcpProxyConfig(*config, cluster_manager_,
-                                     cluster_manager_.cluster_.info_->stats_store_));
+    config_.reset(
+        new TcpProxyConfig(*config, cluster_manager_,
+                           cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_));
   }
 
   void setup() {
@@ -493,9 +500,6 @@ TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
   // port 10000 is outside the specified destination port range
   Network::Address::Ipv4Instance local_address("1.2.3.4", 10000);
   EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(local_address));
-
-  // getRouteFromEntries() returns an empty string if no route matches
-  EXPECT_CALL(cluster_manager_, get("")).WillRepeatedly(Return(nullptr));
 
   // Expect filter to stop iteration and close connection
   EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));

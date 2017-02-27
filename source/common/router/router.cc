@@ -160,8 +160,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
-  cluster_ = config_.cm_.get(route_entry_->clusterName());
-  if (!cluster_) {
+  Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
+  if (!cluster) {
     config_.stats_.no_cluster_.inc();
     stream_log_debug("unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
 
@@ -171,6 +171,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     callbacks_->encodeHeaders(std::move(response_headers), true);
     return Http::FilterHeadersStatus::StopIteration;
   }
+  cluster_ = cluster->info();
 
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);

@@ -481,7 +481,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(*cluster1, initialize());
   EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
 
-  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
 
   // Now try to update again but with the same hash (different white space).
@@ -511,7 +511,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(*cluster2, initialize());
   EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
 
-  EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().size());
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
   EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(cp));

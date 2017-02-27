@@ -772,7 +772,7 @@ TEST(RouteMatcherTest, ShadowClusterNotFound) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_CALL(cm, get("www2")).WillRepeatedly(Return(cm.cluster_.info_));
+  EXPECT_CALL(cm, get("www2")).WillRepeatedly(Return(&cm.thread_local_cluster_));
   EXPECT_CALL(cm, get("some_cluster")).WillRepeatedly(Return(nullptr));
 
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
@@ -1505,8 +1505,8 @@ TEST(RouteMatcherTest, TestWeightedClusterInvalidClusterName) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_CALL(cm, get("cluster1")).WillRepeatedly(Return(cm.cluster_.info_));
-  EXPECT_CALL(cm, get("cluster2")).WillRepeatedly(Return(cm.cluster_.info_));
+  EXPECT_CALL(cm, get("cluster1")).WillRepeatedly(Return(&cm.thread_local_cluster_));
+  EXPECT_CALL(cm, get("cluster2")).WillRepeatedly(Return(&cm.thread_local_cluster_));
   EXPECT_CALL(cm, get("cluster3-invalid")).WillRepeatedly(Return(nullptr));
 
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
