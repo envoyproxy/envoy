@@ -86,10 +86,24 @@ protected:
     Http2Callbacks();
     ~Http2Callbacks();
 
-    nghttp2_session_callbacks* callbacks() { return callbacks_; }
+    const nghttp2_session_callbacks* callbacks() { return callbacks_; }
 
   private:
     nghttp2_session_callbacks* callbacks_;
+  };
+
+  /**
+   * Wrapper for static nghttp2 session options.
+   */
+  class Http2Options {
+  public:
+    Http2Options();
+    ~Http2Options();
+
+    const nghttp2_option* options() { return options_; }
+
+  private:
+    nghttp2_option* options_;
   };
 
   /**
@@ -176,6 +190,7 @@ protected:
   void sendSettings(uint64_t codec_options);
 
   static Http2Callbacks http2_callbacks_;
+  static Http2Options http2_options_;
 
   std::list<StreamImplPtr> active_streams_;
   nghttp2_session* session_{};
