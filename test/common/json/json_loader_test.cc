@@ -208,4 +208,18 @@ TEST(JsonLoaderTest, Schema) {
   EXPECT_NO_THROW(json->validateSchema(valid_schema));
 }
 
+TEST(JsonLoaderTest, AsString) {
+  ObjectPtr json = Factory::LoadFromString("{\"name1\": \"value1\", \"name2\": true}");
+  json->iterate([&](const std::string& key, const Json::Object& value) {
+    EXPECT_TRUE(key == "name1" || key == "name2");
+
+    if (key == "name1") {
+      EXPECT_EQ("value1", value.asString());
+    } else {
+      EXPECT_THROW(value.asString(), Exception);
+    }
+    return true;
+  });
+}
+
 } // Json
