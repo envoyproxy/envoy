@@ -143,7 +143,7 @@ public:
   virtual void validateSchema(const std::string& schema) const PURE;
 
   /**
-   * @return the value of the object as a string 
+   * @return the value of the object as a string
    */
   virtual std::string asString() const PURE;
 
