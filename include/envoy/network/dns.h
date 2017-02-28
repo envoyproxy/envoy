@@ -39,7 +39,8 @@ public:
    * @return if non-null, a handle that can be used to cancel the resolution.
    *         This is only valid until the invocation of callback or ~DnsResolver().
    */
-  virtual ActiveDnsQuery* resolve(const std::string& dns_name, ResolveCb callback) PURE;
+  virtual ActiveDnsQuery* resolve(const std::string& dns_name, uint32_t port,
+                                  ResolveCb callback) PURE;
 };
 
 typedef std::unique_ptr<DnsResolver> DnsResolverPtr;

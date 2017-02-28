@@ -36,8 +36,8 @@ struct ResolverData {
   }
 
   void expectResolve(Network::MockDnsResolver& dns_resolver) {
-    EXPECT_CALL(dns_resolver, resolve(_, _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
+    EXPECT_CALL(dns_resolver, resolve(_, _, _))
+        .WillOnce(Invoke([&](const std::string&, uint32_t, Network::DnsResolver::ResolveCb cb)
                              -> Network::ActiveDnsQuery* {
                                dns_callback_ = cb;
                                return &active_dns_query_;
@@ -69,10 +69,10 @@ TEST(StrictDnsClusterImplTest, ImmediateResolve) {
   )EOF";
 
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", _, _))
+      .WillOnce(Invoke([&](const std::string&, uint32_t, Network::DnsResolver::ResolveCb cb)
                            -> Network::ActiveDnsQuery* {
-                             cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+                             cb(TestUtility::makeDnsResponse({"127.0.0.1:443", "127.0.0.2:443"}));
                              return nullptr;
                            }));
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
@@ -150,7 +150,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   resolver1.expectResolve(dns_resolver);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1:11001", "127.0.0.2:11001"}));
   EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));
   EXPECT_EQ("localhost1", cluster.hosts()[0]->hostname());
@@ -159,28 +159,28 @@ TEST(StrictDnsClusterImplTest, Basic) {
   resolver1.expectResolve(dns_resolver);
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2:11001", "127.0.0.1:11001"}));
   EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));
 
   resolver1.expectResolve(dns_resolver);
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
-  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2:11001", "127.0.0.1:11001"}));
   EXPECT_THAT(std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));
 
   resolver1.timer_->callback_();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3:11001"}));
   EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
+  resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1:11002", "10.0.0.1:11002"}));
   EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));
 

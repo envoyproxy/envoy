@@ -48,8 +48,11 @@ std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
 std::list<Network::Address::InstancePtr>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
   std::list<Network::Address::InstancePtr> ret;
-  for (auto address : addresses) {
-    ret.emplace_back(new Network::Address::Ipv4Instance(address));
+  for (auto& address : addresses) {
+    auto colon_index = address.find(':');
+    std::string host = address.substr(0, colon_index);
+    uint32_t port = std::stoi(address.substr(colon_index + 1));
+    ret.emplace_back(new Network::Address::Ipv4Instance(host, port));
   }
   return ret;
 }

@@ -595,8 +595,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Network::MockActiveDnsQuery active_dns_query;
-  EXPECT_CALL(factory_.dns_resolver_, resolve(_, _))
-      .WillRepeatedly(DoAll(SaveArg<1>(&dns_callback), Return(&active_dns_query)));
+  EXPECT_CALL(factory_.dns_resolver_, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(*loader);
 
   // Test for no hosts returning the correct values before we have hosts.
@@ -610,7 +610,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.1:11001", "127.0.0.2:11001"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
   // initialize callback.
@@ -642,7 +642,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->callback_();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2:11001"}));
   drained_cb();
   drained_cb = nullptr;
   EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(2);
@@ -660,9 +660,9 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->callback_();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2:11001", "127.0.0.3:11001"}));
   dns_timer_->callback_();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2:11001"}));
 
   factory_.tls_.shutdownThread();
 }
