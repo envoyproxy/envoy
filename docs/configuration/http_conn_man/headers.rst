@@ -162,3 +162,15 @@ following features are available:
   <config_http_conn_man_runtime_random_sampling>` runtime setting or via forced tracing using the
   :ref:`config_http_conn_man_headers_x-envoy-force-trace` and
   :ref:`config_http_conn_man_headers_x-client-trace-id` headers.
+
+.. _config_http_conn_man_headers_x-ot-span-context:
+
+x-ot-span-context
+_________________
+
+The *x-ot-span-context* HTTP header is used by Envoy to establish proper parent-child relationships
+between tracing spans. Envoy relies on data from *x-ot-span-context* header to extract the parent
+context for the current span. For example, an egress span is a child of ingress span (if there was an ingress call).
+Envoy injects the *x-ot-span-context* header on ingress call and passes it to the local service and
+then relies on the application to propagate *x-ot-span-context* on the egress call to an upstream.
+See more on tracing :ref:`here <arch_overview_tracing>`.
