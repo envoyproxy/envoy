@@ -64,8 +64,9 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](uint32_t) -> void {
-        EXPECT_EQ("2ff7d57d2e5cb9cc0bfe56727a114de8039cabcc7658715db4e80e1a75e108ed",
+        EXPECT_EQ("713631e537617511f51a206752038dd42f6b09907f33427735bf7a7114e67756",
                   server_connection->ssl()->sha256PeerCertificateDigest());
+        EXPECT_EQ("server1.example.com", server_connection->ssl()->uriSanPeerCertificate());
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();
