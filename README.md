@@ -11,8 +11,8 @@ https://lyft.github.io/envoy
 * [envoy-users](https://groups.google.com/forum/#!forum/envoy-users): General user discussion.
 * [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev): Envoy developer discussion (APIs,
   feature design, etc.).
-* [#lyft-envoy](http://webchat.freenode.net/?channels=lyft-envoy): IRC
-* [lyft/envoy](https://gitter.im/lyft/envoy): Gitter
+* [#lyft-envoy](http://webchat.freenode.net/?channels=lyft-envoy): IRC (synced to Gitter)
+* [lyft/envoy](https://gitter.im/lyft/envoy): Gitter (most people use Gitter)
 
 ## Reporting security vulnerabilities
 
