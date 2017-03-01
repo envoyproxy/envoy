@@ -171,6 +171,6 @@ _________________
 The *x-ot-span-context* HTTP header is used by Envoy to establish proper parent-child relationships
 between tracing spans. Envoy relies on data from the *x-ot-span-context* header to extract the parent
 context for the current span. For example, an egress span is a child of an ingress
-span (if there was the ingress span). Envoy injects the *x-ot-span-context* header on ingress requests and
+span (if the ingress span was present). Envoy injects the *x-ot-span-context* header on ingress requests and
 forwards it to the local service. Envoy relies on the application to propagate *x-ot-span-context* on
 the egress call to an upstream. See more on tracing :ref:`here <arch_overview_tracing>`.
