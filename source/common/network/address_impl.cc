@@ -66,15 +66,12 @@ int Ipv4Instance::socket(SocketType type) const {
 
 std::array<uint8_t, 16> Ipv6Instance::Ipv6Helper::address() const {
   std::array<uint8_t, 16> result;
-  std::copy(std::begin(address_.sin6_addr.s6_addr),
-            std::end(address_.sin6_addr.s6_addr),
+  std::copy(std::begin(address_.sin6_addr.s6_addr), std::end(address_.sin6_addr.s6_addr),
             std::begin(result));
   return result;
 }
 
-uint32_t Ipv6Instance::Ipv6Helper::port() const {
-  return ntohs(address_.sin6_port);
-}
+uint32_t Ipv6Instance::Ipv6Helper::port() const { return ntohs(address_.sin6_port); }
 
 std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
   char str[INET6_ADDRSTRLEN];
@@ -128,8 +125,6 @@ int Ipv6Instance::connect(int fd) const {
 int Ipv6Instance::socket(SocketType type) const {
   return ::socket(AF_INET, flagsFromSocketType(type), 0);
 }
-
-
 
 PipeInstance::PipeInstance(const sockaddr_un* address) : InstanceBase(Type::Pipe) {
   address_ = *address;
