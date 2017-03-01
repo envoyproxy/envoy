@@ -64,9 +64,12 @@ int Ipv4Instance::socket(SocketType type) const {
   return ::socket(AF_INET, flagsFromSocketType(type), 0);
 }
 
-std::string Ipv6Instance::Ipv6Helper::address() const {
-  return std::string(reinterpret_cast<const char*>(address_.sin6_addr.s6_addr),
-                     sizeof address_.sin6_addr.s6_addr);
+std::array<uint8_t, 16> Ipv6Instance::Ipv6Helper::address() const {
+  std::array<uint8_t, 16> result;
+  std::copy(std::begin(address_.sin6_addr.s6_addr),
+            std::end(address_.sin6_addr.s6_addr),
+            std::begin(result));
+  return result;
 }
 
 uint32_t Ipv6Instance::Ipv6Helper::port() const {

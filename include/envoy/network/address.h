@@ -28,7 +28,7 @@ public:
   /**
    * @return the 16-byte IPv6 address in network byte order.
    */
-  virtual std::string address() const PURE;
+  virtual std::array<uint8_t, 16> address() const PURE;
 };
 
 enum class IpVersion { v4, v6 };

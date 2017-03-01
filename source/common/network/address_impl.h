@@ -114,7 +114,7 @@ public:
 
 private:
   struct Ipv6Helper : public Ipv6 {
-    std::string address() const override;
+    std::array<uint8_t, 16> address() const override;
     uint32_t port() const;
 
     std::string makeFriendlyAddress() const;
