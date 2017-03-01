@@ -16,8 +16,8 @@ using testing::Invoke;
 
 namespace Ssl {
 
-void testUtil(std::string client_ctx_json, std::string server_ctx_json, std::string expected_digest,
-              std::string expected_uri) {
+static void testUtil(std::string client_ctx_json, std::string server_ctx_json,
+                     std::string expected_digest, std::string expected_uri) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
@@ -131,6 +131,7 @@ TEST(SslConnectionImplTest, ClientAuth) {
     "ca_cert_file": "test/common/ssl/test_data/ca.crt"
   }
   )EOF";
+
   testUtil(client_ctx_json, server_ctx_json,
            "2ff7d57d2e5cb9cc0bfe56727a114de8039cabcc7658715db4e80e1a75e108ed", "");
 }

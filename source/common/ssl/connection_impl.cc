@@ -201,7 +201,7 @@ std::string ConnectionImpl::uriSanPeerCertificate() {
     return "";
   }
 
-  std::string result = "";
+  std::string result;
   int n = sk_GENERAL_NAME_num(altnames);
   if (n > 0) {
     // Only take the first item in altnames since we only set one uri in cert.
