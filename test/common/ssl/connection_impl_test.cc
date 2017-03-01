@@ -102,6 +102,23 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   client_ctx_json = R"EOF(
   {
+    "cert_chain_file": "",
+    "private_key_file": ""
+  })EOF";
+
+  server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
+    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "ca_cert_file": ""
+  }
+  )EOF";
+
+  // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
+  testUtil(client_ctx_json, server_ctx_json, "", "");
+
+  client_ctx_json = R"EOF(
+  {
     "cert_chain_file": "test/common/ssl/test_data/approved.crt",
     "private_key_file": "test/common/ssl/test_data/private_key.pem"
   }
