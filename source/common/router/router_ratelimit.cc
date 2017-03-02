@@ -55,9 +55,9 @@ HeaderValueMatchAction::HeaderValueMatchAction(const Json::Object& action)
     : descriptor_value_(action.getString("descriptor_value")) {
   std::vector<Json::ObjectPtr> config_headers = action.getObjectArray("headers");
   for (const Json::ObjectPtr& header_map : config_headers) {
-    // allow header value to be empty, allows matching to be only based on header presence.
-    // Regex is an opt-in. Unless explicitly mentioned, we will use header values for exact string
-    // matches.
+    // An empty header value allows for matching to be only based on header presence.
+    // Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
+    // exact string matching.
     action_headers_.emplace_back(Http::LowerCaseString(header_map->getString("name")),
                                  header_map->getString("value", EMPTY_STRING),
                                  header_map->getBoolean("regex", false));

@@ -188,10 +188,9 @@ regex
   expression or not. Defaults to false. The regex grammar used in the value field
   is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
 
-The rate limit action will check the request's headers against all the specified
-headers in the action config. A match will happen if all the headers in the
-config are present in the request with the same values (or based on presence if the ``value``
-field is not in the config).
+The action will check the request's headers against all the specified headers in the action config.
+A match will happen if all the headers in the config are present in the request with the same
+values (or based on presence if the ``value`` field is not in the config).
 
 
 .. _config_http_conn_man_route_table_rate_limit_composing_actions:

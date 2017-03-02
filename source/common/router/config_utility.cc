@@ -36,4 +36,5 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
 
   return matches;
 }
-}
+
+} // Router
