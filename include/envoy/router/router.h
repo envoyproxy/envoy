@@ -225,6 +225,12 @@ public:
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
+
+  /**
+   * @return const std::multimap<std::string, std::string> the opaque configuration associated
+   *         with the route
+   */
+  virtual const std::multimap<std::string, std::string>& opaqueConfig() const PURE;
 };
 
 /**

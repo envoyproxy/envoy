@@ -128,6 +128,9 @@ private:
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
       return nullptr;
     }
+    const std::multimap<std::string, std::string>& opaqueConfig() const override {
+      return opaque_config_;
+    }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
 
@@ -135,6 +138,7 @@ private:
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
     static const NullVirtualHost virtual_host_;
+    static const std::multimap<std::string, std::string> opaque_config_;
 
     const std::string& cluster_name_;
     Optional<std::chrono::milliseconds> timeout_;

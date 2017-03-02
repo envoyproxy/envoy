@@ -102,7 +102,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
       host_redirect_(route.getString("host_redirect", "")),
       path_redirect_(route.getString("path_redirect", "")), retry_policy_(route),
       rate_limit_policy_(route), shadow_policy_(route),
-      priority_(ConfigUtility::parsePriority(route)) {
+      priority_(ConfigUtility::parsePriority(route)), opaque_config_(parseOpaqueConfig(route)) {
 
   route.validateSchema(Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA);
 
@@ -248,6 +248,19 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   ASSERT(headers.ForwardedProto());
   return fmt::format("{}://{}{}", headers.ForwardedProto()->value().c_str(), final_host,
                      final_path);
+}
+
+std::multimap<std::string, std::string>
+RouteEntryImplBase::parseOpaqueConfig(const Json::Object& route) {
+  std::multimap<std::string, std::string> ret;
+  if (route.hasObject("opaque_config")) {
+    Json::ObjectPtr obj = route.getObject("opaque_config");
+    obj->iterate([&ret, &obj](const std::string& name, const Json::Object& value) {
+      ret.emplace(name, value.asString());
+      return true;
+    });
+  }
+  return ret;
 }
 
 const RedirectEntry* RouteEntryImplBase::redirectEntry() const {
