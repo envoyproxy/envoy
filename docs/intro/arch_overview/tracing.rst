@@ -20,10 +20,13 @@ sources of latency. Envoy supports three features related to system wide tracing
   be used to join untrusted request IDs to the trusted internal
   :ref:`config_http_conn_man_headers_x-request-id`.
 
+Envoy relies on properly propagated :ref:`config_http_conn_man_headers_x-request-id` and
+:ref:`config_http_conn_man_headers_x-ot-span-context` HTTP headers for LightStep tracing functionality.
+
 How to initiate a trace
 -----------------------
 The HTTP connection manager that handles the request must have the :ref:`tracing
-<config_http_conn_man_tracing>` object set. There are several ways tracing can be 
+<config_http_conn_man_tracing>` object set. There are several ways tracing can be
 initiated:
 
 * By an external client via the :ref:`config_http_conn_man_headers_x-client-trace-id`
