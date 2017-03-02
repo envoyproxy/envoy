@@ -21,6 +21,7 @@ public:
 
   // Ssl::Connection
   std::string sha256PeerCertificateDigest() override;
+  std::string uriSanPeerCertificate() override;
 
 private:
   PostIoAction doHandshake();

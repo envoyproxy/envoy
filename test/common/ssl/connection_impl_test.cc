@@ -16,17 +16,10 @@ using testing::Invoke;
 
 namespace Ssl {
 
-TEST(SslConnectionImplTest, ClientAuth) {
+static void testUtil(std::string client_ctx_json, std::string server_ctx_json,
+                     std::string expected_digest, std::string expected_uri) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
-    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
-    "ca_cert_file": "test/common/ssl/test_data/ca.crt"
-  }
-  )EOF";
 
   Json::ObjectPtr server_ctx_loader = Json::Factory::LoadFromString(server_ctx_json);
   ContextConfigImpl server_ctx_config(*server_ctx_loader);
@@ -39,13 +32,6 @@ TEST(SslConnectionImplTest, ClientAuth) {
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createSslListener(
       connection_handler, *server_ctx, socket, callbacks, stats_store, true, false, false);
-
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "test/common/ssl/test_data/approved.crt",
-    "private_key_file": "test/common/ssl/test_data/private_key.pem"
-  }
-  )EOF";
 
   Json::ObjectPtr client_ctx_loader = Json::Factory::LoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
@@ -64,8 +50,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](uint32_t) -> void {
-        EXPECT_EQ("2ff7d57d2e5cb9cc0bfe56727a114de8039cabcc7658715db4e80e1a75e108ed",
-                  server_connection->ssl()->sha256PeerCertificateDigest());
+        EXPECT_EQ(expected_digest, server_connection->ssl()->sha256PeerCertificateDigest());
+        EXPECT_EQ(expected_uri, server_connection->ssl()->uriSanPeerCertificate());
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -73,6 +59,81 @@ TEST(SslConnectionImplTest, ClientAuth) {
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST(SslConnectionImplTest, ClientAuth) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "test/common/ssl/test_data/approved_with_uri_san.crt",
+    "private_key_file": "test/common/ssl/test_data/private_key_with_uri_san.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
+    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "ca_cert_file": "test/common/ssl/test_data/ca_with_uri_san.crt"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json,
+           "713631e537617511f51a206752038dd42f6b09907f33427735bf7a7114e67756",
+           "server1.example.com");
+
+  client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "test/common/ssl/test_data/approved_with_dns_san.crt",
+    "private_key_file": "test/common/ssl/test_data/private_key_with_dns_san.pem"
+  }
+  )EOF";
+
+  server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
+    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "ca_cert_file": "test/common/ssl/test_data/ca_with_dns_san.crt"
+  }
+  )EOF";
+
+  // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
+  testUtil(client_ctx_json, server_ctx_json,
+           "81c3db064120190839d8854dd70be13175f21ac05535a46fa89ab063ebdca7b3", "");
+
+  client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "",
+    "private_key_file": ""
+  })EOF";
+
+  server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
+    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "ca_cert_file": ""
+  }
+  )EOF";
+
+  // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
+  testUtil(client_ctx_json, server_ctx_json, "", "");
+
+  client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "test/common/ssl/test_data/approved.crt",
+    "private_key_file": "test/common/ssl/test_data/private_key.pem"
+  }
+  )EOF";
+
+  server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
+    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "ca_cert_file": "test/common/ssl/test_data/ca.crt"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json,
+           "2ff7d57d2e5cb9cc0bfe56727a114de8039cabcc7658715db4e80e1a75e108ed", "");
 }
 
 TEST(SslConnectionImplTest, ClientAuthBadVerification) {
