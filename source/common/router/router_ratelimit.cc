@@ -68,7 +68,6 @@ void HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
                                                 ::RateLimit::Descriptor& descriptor,
                                                 const std::string&, const Http::HeaderMap& headers,
                                                 const std::string&) const {
-
   if (ConfigUtility::matchHeaders(headers, action_headers_)) {
     descriptor.entries_.push_back({"header_match", descriptor_value_});
   }

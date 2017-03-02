@@ -306,7 +306,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitPolicyEntryMembers) {
   {
     "stage": 2,
     "disable_key": "no_ratelimit",
-    "actions":[
+    "actions": [
       {
         "type": "remote_address"
       }
@@ -323,7 +323,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitPolicyEntryMembers) {
 TEST_F(RateLimitPolicyEntryTest, RemoteAddress) {
   std::string json = R"EOF(
   {
-    "actions":[
+    "actions": [
       {
         "type": "remote_address"
       }
@@ -342,7 +342,7 @@ TEST_F(RateLimitPolicyEntryTest, RemoteAddress) {
 TEST_F(RateLimitPolicyEntryTest, NoAddress) {
   std::string json = R"EOF(
   {
-    "actions":[
+    "actions": [
       {
         "type": "remote_address"
       }
@@ -359,7 +359,7 @@ TEST_F(RateLimitPolicyEntryTest, NoAddress) {
 TEST_F(RateLimitPolicyEntryTest, SourceService) {
   std::string json = R"EOF(
   {
-    "actions":[
+    "actions": [
       {
         "type": "source_cluster"
       }
@@ -377,7 +377,7 @@ TEST_F(RateLimitPolicyEntryTest, SourceService) {
 TEST_F(RateLimitPolicyEntryTest, DestinationService) {
   std::string json = R"EOF(
   {
-    "actions":[
+    "actions": [
       {
         "type": "destination_cluster"
       }
@@ -399,7 +399,7 @@ TEST_F(RateLimitPolicyEntryTest, RequestHeaders) {
       {
         "type": "request_headers",
         "header_name": "x-header-name",
-        "descriptor_key" : "my_header_name"
+        "descriptor_key": "my_header_name"
       }
     ]
   }
@@ -420,7 +420,7 @@ TEST_F(RateLimitPolicyEntryTest, RequestHeadersNoMatch) {
       {
         "type": "request_headers",
         "header_name": "x-header",
-        "descriptor_key" : "my_header_name"
+        "descriptor_key": "my_header_name"
       }
     ]
   }
@@ -436,10 +436,10 @@ TEST_F(RateLimitPolicyEntryTest, RequestHeadersNoMatch) {
 TEST_F(RateLimitPolicyEntryTest, RateLimitKey) {
   std::string json = R"EOF(
   {
-    "actions":[
+    "actions": [
       {
         "type": "generic_key",
-        "descriptor_value" : "fake_key"
+        "descriptor_value": "fake_key"
       }
     ]
   }
@@ -455,15 +455,15 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitKey) {
 TEST_F(RateLimitPolicyEntryTest, HeadeValueMatch) {
   std::string json = R"EOF(
   {
-    "actions":[
+    "actions": [
       {
         "type": "header_value_match",
-        "descriptor_value" : "fake_value",
-        "headers" : [
+        "descriptor_value": "fake_value",
+        "headers": [
           {
-            "name" : "x-header-name",
-            "value" : "test_value",
-            "regex" : false
+            "name": "x-header-name",
+            "value": "test_value",
+            "regex": false
           }
         ]
       }
@@ -482,15 +482,15 @@ TEST_F(RateLimitPolicyEntryTest, HeadeValueMatch) {
 TEST_F(RateLimitPolicyEntryTest, HeadeValueMatchNoMatch) {
   std::string json = R"EOF(
   {
-    "actions":[
+    "actions": [
       {
         "type": "header_value_match",
-        "descriptor_value" : "fake_value",
-        "headers" : [
+        "descriptor_value": "fake_value",
+        "headers": [
           {
-            "name" : "x-header-name",
-            "value" : "test_value",
-            "regex" : false
+            "name": "x-header-name",
+            "value": "test_value",
+            "regex": false
           }
         ]
       }
@@ -508,9 +508,9 @@ TEST_F(RateLimitPolicyEntryTest, HeadeValueMatchNoMatch) {
 TEST_F(RateLimitPolicyEntryTest, CompoundActions) {
   std::string json = R"EOF(
   {
-    "actions":[
+    "actions": [
       {
-        "type" : "destination_cluster"
+        "type": "destination_cluster"
       },
       {
         "type": "source_cluster"
