@@ -43,8 +43,8 @@ Actions
 
 type
   *(required, string)* The type of rate limit action to perform. The currently supported action
-  types are *source_cluster*, *destination_cluster* , *request_headers*, *remote_address* and
-  *generic_key*.
+  types are *source_cluster*, *destination_cluster* , *request_headers*, *remote_address*,
+  *generic_key* and *header_value_match*.
 
 Source Cluster
 ^^^^^^^^^^^^^^
@@ -140,6 +140,60 @@ descriptor_value
 The following descriptor entry is appended to the descriptor:
 
     * ("generic_key", "<descriptor_value>")
+
+Header Value Match
+^^^^^^^^^^^^^^^^^^
+
+.. code-block:: json
+
+  {
+    "type": "header_value_match",
+    "descriptor_value" : "...",
+    "headers" : []
+  }
+
+
+descriptor_value
+    *(required, string)* The value to use in the descriptor entry.
+:ref:`headers<config_http_conn_man_route_table_rate_limit_headers>`
+    *(required, array)* Specifies a set of headers that the rate limit action should match on.
+
+The following descriptor entry is appended to the descriptor if the request matches the headers
+specified in the rate limit action config:
+
+    * ("header_match", "<descriptor_value>")
+
+
+.. _config_http_conn_man_route_table_rate_limit_headers:
+
+Headers
+"""""""
+
+.. code-block:: json
+
+  {
+      "name": "...",
+      "value": "...",
+      "regex": "..."
+  }
+
+
+name
+  *(required, string)* Specifies the name of the header in the request.
+
+value
+  *(optional, string)* Specifies the value of the header. If the value is absent a request that has
+  the *name* header will match, regardless of the header's value.
+
+regex
+  *(optional, boolean)* Specifies whether the header value is a regular
+  expression or not. Defaults to false. The regex grammar used in the value field
+  is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+
+The rate limit action will check the request's headers against all the specified
+headers in the header value match action config. A match will happen if all the headers in the
+config are present in the request with the same values (or based on presence if the ``value``
+field is not in the config).
 
 
 .. _config_http_conn_man_route_table_rate_limit_composing_actions:

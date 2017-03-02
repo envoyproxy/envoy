@@ -452,6 +452,33 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitKey) {
               testing::ContainerEq(descriptors_));
 }
 
+TEST_F(RateLimitPolicyEntryTest, HeadeValueMatch) {
+  std::string json = R"EOF(
+  {
+    "actions":[
+      {
+        "type": "header_value_match",
+        "descriptor_value" : "fake_value",
+        "headers" : [
+          {
+            "name" : "x-header-name",
+            "value" : "test_value",
+            "regex" : false
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  SetUpTest(json);
+  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
 TEST_F(RateLimitPolicyEntryTest, CompoundActions) {
   std::string json = R"EOF(
   {

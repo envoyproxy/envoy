@@ -611,6 +611,32 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : ["type", "descriptor_value"],
         "additionalProperties" : false
+      },
+      "header_value_match" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["header_value_match"]
+          },
+          "descriptor_value" : {"type" : "string"},
+          "headers" : {
+            "type" : "array",
+            "minItems" : 1,
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {"type" : "string"},
+                "value" : {"type" : "string"},
+                "regex" : {"type" : "boolean"}
+              },
+              "required" : ["name"],
+              "additionalProperties" : false
+            }
+          },
+          "required" : ["type", "descriptor_value", "headers"],
+          "additionalProperties" : false
+        }
       }
     },
     "type" : "object",
@@ -626,7 +652,8 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
             {"$ref" : "#/definitions/destination_cluster"},
             {"$ref" : "#/definitions/request_headers"},
             {"$ref" : "#/definitions/remote_address"},
-            {"$ref" : "#/definitions/generic_key"}
+            {"$ref" : "#/definitions/generic_key"},
+            {"$ref" : "#/definitions/header_value_match"}
           ]
         }
       }

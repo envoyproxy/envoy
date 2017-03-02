@@ -4,6 +4,7 @@
 #include "envoy/router/router_ratelimit.h"
 
 #include "common/http/filter/ratelimit.h"
+#include "common/router/config_utility.h"
 
 namespace Router {
 
@@ -74,6 +75,23 @@ public:
 
 private:
   const std::string descriptor_value_;
+};
+
+/**
+ * Action for header value match rate limiting.
+ */
+class HeaderValueMatchAction : public RateLimitAction {
+public:
+  HeaderValueMatchAction(const Json::Object& action);
+
+  // Router::RateLimitAction
+  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& remote_address) const override;
+
+private:
+  const std::string descriptor_value_;
+  std::vector<Router::ConfigUtility::HeaderData> action_headers_;
 };
 
 /*

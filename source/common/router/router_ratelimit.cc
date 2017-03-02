@@ -1,5 +1,6 @@
 #include "router_ratelimit.h"
 
+#include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
 
 namespace Router {
@@ -50,6 +51,29 @@ void GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
   descriptor.entries_.push_back({"generic_key", descriptor_value_});
 }
 
+HeaderValueMatchAction::HeaderValueMatchAction(const Json::Object& action)
+    : descriptor_value_(action.getString("descriptor_value")) {
+  std::vector<Json::ObjectPtr> config_headers = action.getObjectArray("headers");
+  for (const Json::ObjectPtr& header_map : config_headers) {
+    // allow header value to be empty, allows matching to be only based on header presence.
+    // Regex is an opt-in. Unless explicitly mentioned, we will use header values for exact string
+    // matches.
+    action_headers_.emplace_back(Http::LowerCaseString(header_map->getString("name")),
+                                 header_map->getString("value", EMPTY_STRING),
+                                 header_map->getBoolean("regex", false));
+  }
+}
+
+void HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
+                                                ::RateLimit::Descriptor& descriptor,
+                                                const std::string&, const Http::HeaderMap& headers,
+                                                const std::string&) const {
+
+  if (ConfigUtility::matchHeaders(headers, action_headers_)) {
+    descriptor.entries_.push_back({"header_match", descriptor_value_});
+  }
+}
+
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
     : disable_key_(config.getString("disable_key", "")), stage_(config.getInteger("stage", 0)) {
 
@@ -67,6 +91,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
       actions_.emplace_back(new RemoteAddressAction());
     } else if (type == "generic_key") {
       actions_.emplace_back(new GenericKeyAction(*action));
+    } else if (type == "header_value_match") {
+      actions_.emplace_back(new HeaderValueMatchAction(*action));
     } else {
       throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
     }
