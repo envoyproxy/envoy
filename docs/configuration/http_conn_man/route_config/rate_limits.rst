@@ -159,7 +159,7 @@ descriptor_value
     *(required, array)* Specifies a set of headers that the rate limit action should match on.
 
 The following descriptor entry is appended to the descriptor if the request matches the headers
-specified in the rate limit action config:
+specified in the action config:
 
     * ("header_match", "<descriptor_value>")
 
@@ -171,11 +171,9 @@ Headers
 
 .. code-block:: json
 
-  {
-      "name": "...",
-      "value": "...",
-      "regex": "..."
-  }
+  [
+    {"name": "...", "value": "...", "regex": "..."}
+  ]
 
 
 name
@@ -191,7 +189,7 @@ regex
   is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
 
 The rate limit action will check the request's headers against all the specified
-headers in the header value match action config. A match will happen if all the headers in the
+headers in the action config. A match will happen if all the headers in the
 config are present in the request with the same values (or based on presence if the ``value``
 field is not in the config).
 
