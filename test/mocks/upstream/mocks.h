@@ -50,6 +50,31 @@ public:
   std::function<void()> initialize_callback_;
 };
 
+class MockLoadBalancer : public LoadBalancer {
+public:
+  MockLoadBalancer();
+  ~MockLoadBalancer();
+
+  // Upstream::LoadBalancer
+  MOCK_METHOD1(chooseHost, ConstHostPtr(const LoadBalancerContext* context));
+
+  std::shared_ptr<MockHost> host_{new MockHost()};
+};
+
+class MockThreadLocalCluster : public ThreadLocalCluster {
+public:
+  MockThreadLocalCluster();
+  ~MockThreadLocalCluster();
+
+  // Upstream::ThreadLocalCluster
+  MOCK_METHOD0(hostSet, const HostSet&());
+  MOCK_METHOD0(info, ClusterInfoPtr());
+  MOCK_METHOD0(loadBalancer, LoadBalancer&());
+
+  NiceMock<MockCluster> cluster_;
+  NiceMock<MockLoadBalancer> lb_;
+};
+
 class MockClusterManager : public ClusterManager {
 public:
   MockClusterManager();
@@ -64,7 +89,7 @@ public:
   MOCK_METHOD1(addOrUpdatePrimaryCluster, bool(const Json::Object& config));
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, ClusterInfoMap());
-  MOCK_METHOD1(get, ClusterInfoPtr(const std::string& cluster));
+  MOCK_METHOD1(get, ThreadLocalCluster*(const std::string& cluster));
   MOCK_METHOD3(httpConnPoolForCluster,
                Http::ConnectionPool::Instance*(const std::string& cluster,
                                                ResourcePriority priority,
@@ -75,8 +100,8 @@ public:
   MOCK_METHOD0(shutdown, void());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
-  NiceMock<MockCluster> cluster_;
   NiceMock<Http::MockAsyncClient> async_client_;
+  NiceMock<MockThreadLocalCluster> thread_local_cluster_;
 };
 
 class MockHealthChecker : public HealthChecker {

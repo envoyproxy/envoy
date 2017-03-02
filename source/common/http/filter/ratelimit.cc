@@ -30,10 +30,11 @@ void Filter::initiateCall(const HeaderMap& headers) {
   }
 
   const Router::RouteEntry* route_entry = route->routeEntry();
-  cluster_ = config_->cm().get(route_entry->clusterName());
-  if (!cluster_) {
+  Upstream::ThreadLocalCluster* cluster = config_->cm().get(route_entry->clusterName());
+  if (!cluster) {
     return;
   }
+  cluster_ = cluster->info();
 
   std::vector<::RateLimit::Descriptor> descriptors;
 

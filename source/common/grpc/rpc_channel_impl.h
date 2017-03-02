@@ -25,7 +25,7 @@ class RpcChannelImpl : public RpcChannel, public Http::AsyncClient::Callbacks {
 public:
   RpcChannelImpl(Upstream::ClusterManager& cm, const std::string& cluster,
                  RpcChannelCallbacks& callbacks, const Optional<std::chrono::milliseconds>& timeout)
-      : cm_(cm), cluster_(cm.get(cluster)), callbacks_(callbacks), timeout_(timeout) {}
+      : cm_(cm), cluster_(cm.get(cluster)->info()), callbacks_(callbacks), timeout_(timeout) {}
 
   ~RpcChannelImpl() { ASSERT(!http_request_ && !grpc_method_ && !grpc_response_); }
 

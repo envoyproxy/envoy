@@ -79,13 +79,25 @@ MockCluster::MockCluster() {
 
 MockCluster::~MockCluster() {}
 
+MockLoadBalancer::MockLoadBalancer() { ON_CALL(*this, chooseHost(_)).WillByDefault(Return(host_)); }
+
+MockLoadBalancer::~MockLoadBalancer() {}
+
+MockThreadLocalCluster::MockThreadLocalCluster() {
+  ON_CALL(*this, hostSet()).WillByDefault(ReturnRef(cluster_));
+  ON_CALL(*this, info()).WillByDefault(Return(cluster_.info_));
+  ON_CALL(*this, loadBalancer()).WillByDefault(ReturnRef(lb_));
+}
+
+MockThreadLocalCluster::~MockThreadLocalCluster() {}
+
 MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpConnPoolForCluster(_, _, _)).WillByDefault(Return(&conn_pool_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault((ReturnRef(async_client_)));
 
   // Matches are LIFO so "" will match first.
-  ON_CALL(*this, get(_)).WillByDefault(Return(cluster_.info_));
+  ON_CALL(*this, get(_)).WillByDefault(Return(&thread_local_cluster_));
   ON_CALL(*this, get("")).WillByDefault(Return(nullptr));
 }
 

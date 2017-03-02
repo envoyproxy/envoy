@@ -39,22 +39,27 @@ void ProxyFilter::onEvent(uint32_t events) {
 }
 
 void ProxyFilter::onResponse(PendingRequest& request, RespValuePtr&& value) {
-  // TODO: Currently the connection pool is a single connection so out of order can't happen.
   ASSERT(!pending_requests_.empty());
-  ASSERT(&request == &pending_requests_.front());
-  UNREFERENCED_PARAMETER(request);
-  pending_requests_.pop_front();
-  encoder_->encode(*value, encoder_buffer_);
-  callbacks_->connection().write(encoder_buffer_);
+  request.pending_response_ = std::move(value);
+  request.request_handle_ = nullptr;
+
+  // The response we got might not be in order, so flush out what we can. (A new response may
+  // unlock several out of order responses).
+  while (!pending_requests_.empty() && pending_requests_.front().pending_response_) {
+    encoder_->encode(*pending_requests_.front().pending_response_, encoder_buffer_);
+    pending_requests_.pop_front();
+  }
+
+  if (encoder_buffer_.length() > 0) {
+    callbacks_->connection().write(encoder_buffer_);
+  }
 }
 
 void ProxyFilter::onFailure(PendingRequest& request) {
-  // TODO: Currently the connection pool is a single connection so out of order can't happen.
-  ASSERT(!pending_requests_.empty());
-  ASSERT(&request == &pending_requests_.front());
-  UNREFERENCED_PARAMETER(request);
-  pending_requests_.pop_front();
-  respondWithFailure("upstream connection error");
+  RespValuePtr error(new RespValue());
+  error->type(RespType::Error);
+  error->asString() = "upstream connection error";
+  onResponse(request, std::move(error));
 }
 
 Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data) {

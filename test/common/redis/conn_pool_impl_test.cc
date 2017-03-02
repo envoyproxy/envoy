@@ -8,6 +8,7 @@
 #include "test/mocks/upstream/mocks.h"
 
 using testing::_;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Ref;
@@ -28,19 +29,18 @@ public:
   void setup() {
     upstream_connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
+    std::shared_ptr<Upstream::MockHost> host(new Upstream::MockHost());
     conn_info.connection_ = upstream_connection_;
-    conn_info.host_.reset(new Upstream::HostImpl(
-        cm_.cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
-    EXPECT_CALL(cm_, tcpConnForCluster_("foo")).WillOnce(Return(conn_info));
+    EXPECT_CALL(*host, createConnection_(_)).WillOnce(Return(conn_info));
     EXPECT_CALL(*upstream_connection_, addReadFilter(_))
         .WillOnce(SaveArg<0>(&upstream_read_filter_));
     EXPECT_CALL(*upstream_connection_, connect());
     EXPECT_CALL(*upstream_connection_, noDelay(true));
-    client_ = ClientImpl::create(cluster_name_, cm_, EncoderPtr{encoder_}, *this);
+    client_ = ClientImpl::create(host, dispatcher_, EncoderPtr{encoder_}, *this);
   }
 
   const std::string cluster_name_{"foo"};
-  Upstream::MockClusterManager cm_;
+  Event::MockDispatcher dispatcher_;
   MockEncoder* encoder_{new MockEncoder()};
   MockDecoder* decoder_{new MockDecoder()};
   DecoderCallbacks* callbacks_{};
@@ -48,15 +48,6 @@ public:
   Network::ReadFilterPtr upstream_read_filter_;
   ClientPtr client_;
 };
-
-TEST_F(RedisClientImplTest, NoClient) {
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-  EXPECT_CALL(cm_, tcpConnForCluster_("foo")).WillOnce(Return(conn_info));
-  EXPECT_EQ(nullptr, ClientImpl::create(cluster_name_, cm_, EncoderPtr{encoder_}, *this));
-
-  // In this test decoder is not consumed so we need to delete it.
-  delete decoder_;
-}
 
 TEST_F(RedisClientImplTest, Basic) {
   setup();
@@ -162,33 +153,44 @@ TEST_F(RedisClientImplTest, ProtocolError) {
 
 TEST(RedisClientFactoryImplTest, Basic) {
   ClientFactoryImpl factory;
-  Upstream::MockClusterManager cm;
-  EXPECT_CALL(cm, tcpConnForCluster_("foo"));
-  EXPECT_EQ(nullptr, factory.create("foo", cm));
+  Upstream::MockHost::MockCreateConnectionData conn_info;
+  conn_info.connection_ = new NiceMock<Network::MockClientConnection>();
+  std::shared_ptr<Upstream::MockHost> host(new Upstream::MockHost());
+  EXPECT_CALL(*host, createConnection_(_)).WillOnce(Return(conn_info));
+  Event::MockDispatcher dispatcher;
+  ClientPtr client = factory.create(host, dispatcher);
+  client->close();
 }
 
 class RedisConnPoolImplTest : public testing::Test, public ClientFactory {
 public:
   // Redis::ConnPool::ClientFactory
-  ClientPtr create(const std::string& cluster_name, Upstream::ClusterManager& cm) override {
-    return ClientPtr{create_(cluster_name, cm)};
+  ClientPtr create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher) override {
+    return ClientPtr{create_(host, dispatcher)};
   }
 
-  MOCK_METHOD2(create_, Client*(const std::string& cluster_name, Upstream::ClusterManager& cm));
+  MOCK_METHOD2(create_, Client*(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher));
 
   const std::string cluster_name_{"foo"};
-  Upstream::MockClusterManager cm_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   InstanceImpl conn_pool_{cluster_name_, cm_, *this, tls_};
 };
 
 TEST_F(RedisConnPoolImplTest, Basic) {
+  InSequence s;
+
   RespValue value;
   MockActiveRequest active_request;
   MockActiveRequestCallbacks callbacks;
   MockClient* client = new NiceMock<MockClient>();
 
-  EXPECT_CALL(*this, create_("foo", _)).WillOnce(Return(client));
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](const Upstream::LoadBalancerContext* context) -> Upstream::ConstHostPtr {
+        EXPECT_EQ(context->hashKey().value(), std::hash<std::string>()("foo"));
+        return cm_.thread_local_cluster_.lb_.host_;
+      }));
+  EXPECT_CALL(*this, create_(_, _)).WillOnce(Return(client));
   EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
   ActiveRequest* request = conn_pool_.makeRequest("foo", value, callbacks);
   EXPECT_EQ(&active_request, request);
@@ -197,10 +199,45 @@ TEST_F(RedisConnPoolImplTest, Basic) {
   tls_.shutdownThread();
 };
 
-TEST_F(RedisConnPoolImplTest, NoClient) {
+TEST_F(RedisConnPoolImplTest, HostRemove) {
+  InSequence s;
+  MockActiveRequestCallbacks callbacks;
+
+  RespValue value;
+  std::shared_ptr<Upstream::Host> host1(new Upstream::MockHost());
+  std::shared_ptr<Upstream::Host> host2(new Upstream::MockHost());
+  MockClient* client1 = new NiceMock<MockClient>();
+  MockClient* client2 = new NiceMock<MockClient>();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(host1));
+  EXPECT_CALL(*this, create_(Eq(host1), _)).WillOnce(Return(client1));
+
+  MockActiveRequest active_request1;
+  EXPECT_CALL(*client1, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request1));
+  ActiveRequest* request1 = conn_pool_.makeRequest("foo", value, callbacks);
+  EXPECT_EQ(&active_request1, request1);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(host2));
+  EXPECT_CALL(*this, create_(Eq(host2), _)).WillOnce(Return(client2));
+
+  MockActiveRequest active_request2;
+  EXPECT_CALL(*client2, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request2));
+  ActiveRequest* request2 = conn_pool_.makeRequest("bar", value, callbacks);
+  EXPECT_EQ(&active_request2, request2);
+
+  EXPECT_CALL(*client2, close());
+  cm_.thread_local_cluster_.cluster_.runCallbacks({}, {host2});
+
+  EXPECT_CALL(*client1, close());
+  tls_.shutdownThread();
+}
+
+TEST_F(RedisConnPoolImplTest, NoHost) {
+  InSequence s;
+
   RespValue value;
   MockActiveRequestCallbacks callbacks;
-  EXPECT_CALL(*this, create_("foo", _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
   ActiveRequest* request = conn_pool_.makeRequest("foo", value, callbacks);
   EXPECT_EQ(nullptr, request);
 
@@ -208,12 +245,15 @@ TEST_F(RedisConnPoolImplTest, NoClient) {
 }
 
 TEST_F(RedisConnPoolImplTest, RemoteClose) {
+  InSequence s;
+
   RespValue value;
   MockActiveRequest active_request;
   MockActiveRequestCallbacks callbacks;
   MockClient* client = new NiceMock<MockClient>();
 
-  EXPECT_CALL(*this, create_("foo", _)).WillOnce(Return(client));
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_));
+  EXPECT_CALL(*this, create_(_, _)).WillOnce(Return(client));
   EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
   conn_pool_.makeRequest("foo", value, callbacks);
 

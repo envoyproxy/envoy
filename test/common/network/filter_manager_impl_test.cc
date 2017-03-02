@@ -148,8 +148,9 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = upstream_connection;
-  conn_info.host_.reset(new Upstream::HostImpl(
-      cm.cluster_.info_, "", Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, ""));
+  conn_info.host_.reset(new Upstream::HostImpl(cm.thread_local_cluster_.cluster_.info_, "",
+                                               Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1,
+                                               ""));
   EXPECT_CALL(cm, tcpConnForCluster_("fake_cluster")).WillOnce(Return(conn_info));
 
   request_callbacks->complete(RateLimit::LimitStatus::OK);

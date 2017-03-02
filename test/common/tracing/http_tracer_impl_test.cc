@@ -336,8 +336,8 @@ public:
   }
 
   void setupValidDriver() {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(cm_.cluster_.info_));
-    ON_CALL(*cm_.cluster_.info_, features())
+    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
     std::string valid_config = R"EOF(
@@ -395,8 +395,8 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config, but upstream cluster does not support http2.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(cm_.cluster_.info_));
-    ON_CALL(*cm_.cluster_.info_, features()).WillByDefault(Return(0));
+    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
 
     std::string valid_config = R"EOF(
       {"collector_cluster": "fake_cluster"}
@@ -407,8 +407,8 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
   }
 
   {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(cm_.cluster_.info_));
-    ON_CALL(*cm_.cluster_.info_, features())
+    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
     std::string valid_config = R"EOF(
@@ -515,16 +515,16 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
 
   callback->onSuccess(std::move(msg));
 
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("grpc.lightstep.collector.CollectorService.Report.success")
                     .value());
 
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
 
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("grpc.lightstep.collector.CollectorService.Report.failure")
                     .value());
-  EXPECT_EQ(2U, cm_.cluster_.info_->stats_store_
+  EXPECT_EQ(2U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("grpc.lightstep.collector.CollectorService.Report.total")
                     .value());
   EXPECT_EQ(2U, stats_.counter("tracing.lightstep.spans_sent").value());
@@ -589,10 +589,10 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
   // No trailers, gRPC is considered failed.
   callback->onSuccess(std::move(msg));
 
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("grpc.lightstep.collector.CollectorService.Report.failure")
                     .value());
-  EXPECT_EQ(1U, cm_.cluster_.info_->stats_store_
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("grpc.lightstep.collector.CollectorService.Report.total")
                     .value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());

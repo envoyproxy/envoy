@@ -126,9 +126,9 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
 Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   const std::string& cluster_name = config_->getRouteFromEntries(read_callbacks_->connection());
 
-  Upstream::ClusterInfoPtr cluster = cluster_manager_.get(cluster_name);
+  Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
 
-  if (cluster) {
+  if (thread_local_cluster) {
     conn_log_debug("Creating connection to cluster {}", read_callbacks_->connection(),
                    cluster_name);
   } else {
@@ -137,6 +137,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
+  Upstream::ClusterInfoPtr cluster = thread_local_cluster->info();
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
     cluster->stats().upstream_cx_overflow_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);

@@ -5,16 +5,11 @@
 namespace Redis {
 namespace ConnPool {
 
-ClientPtr ClientImpl::create(const std::string& cluster_name, Upstream::ClusterManager& cm,
+ClientPtr ClientImpl::create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory) {
 
-  Upstream::Host::CreateConnectionData data = cm.tcpConnForCluster(cluster_name);
-  if (!data.connection_) {
-    return nullptr;
-  }
-
   std::unique_ptr<ClientImpl> client(new ClientImpl(std::move(encoder), decoder_factory));
-  client->connection_ = std::move(data.connection_);
+  client->connection_ = host->createConnection(dispatcher).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
@@ -77,56 +72,78 @@ void ClientImpl::PendingRequest::cancel() {
 
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
-ClientPtr ClientFactoryImpl::create(const std::string& cluster_name, Upstream::ClusterManager& cm) {
-  return ClientImpl::create(cluster_name, cm, EncoderPtr{new EncoderImpl()}, decoder_factory_);
+ClientPtr ClientFactoryImpl::create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher) {
+  return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_);
 }
 
 InstanceImpl::InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
                            ClientFactory& client_factory, ThreadLocal::Instance& tls)
-    : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory), tls_(tls),
-      tls_slot_(tls.allocateSlot()) {
-  tls.set(tls_slot_, [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
-    return std::make_shared<ThreadLocalPool>(*this, dispatcher);
-  });
+    : cm_(cm), client_factory_(client_factory), tls_(tls), tls_slot_(tls.allocateSlot()) {
+  tls.set(tls_slot_,
+          [this, cluster_name](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
+            return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
+          });
 }
 
-ActiveRequest* InstanceImpl::makeRequest(const std::string&, const RespValue& value,
+ActiveRequest* InstanceImpl::makeRequest(const std::string& hash_key, const RespValue& value,
                                          ActiveRequestCallbacks& callbacks) {
-  return tls_.getTyped<ThreadLocalPool>(tls_slot_).makeRequest(value, callbacks);
+  return tls_.getTyped<ThreadLocalPool>(tls_slot_).makeRequest(hash_key, value, callbacks);
 }
 
-ActiveRequest* InstanceImpl::ThreadLocalPool::makeRequest(const RespValue& request,
-                                                          ActiveRequestCallbacks& callbacks) {
-  if (!client_) {
-    client_.reset(new ThreadLocalActiveClient(*this));
-    client_->redis_client_ = parent_.client_factory_.create(parent_.cluster_name_, parent_.cm_);
-    if (client_->redis_client_) {
-      client_->redis_client_->addConnectionCallbacks(*client_);
-    } else {
-      client_.reset();
+InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
+                                               const std::string& cluster_name)
+    : parent_(parent), dispatcher_(dispatcher), cluster_(parent_.cm_.get(cluster_name)) {
+
+  cluster_->hostSet().addMemberUpdateCb([this](const std::vector<Upstream::HostPtr>&,
+                                               const std::vector<Upstream::HostPtr>& hosts_removed)
+                                            -> void { onHostsRemoved(hosts_removed); });
+}
+
+void InstanceImpl::ThreadLocalPool::onHostsRemoved(
+    const std::vector<Upstream::HostPtr>& hosts_removed) {
+  for (auto host : hosts_removed) {
+    auto it = client_map_.find(host);
+    if (it != client_map_.end()) {
+      // We don't currently support any type of draining for redis connections. If a host is gone,
+      // we just close the connection. This will fail any pending requests.
+      it->second->redis_client_->close();
     }
   }
-
-  if (client_) {
-    // TODO: In the case of retry, this is broken. This client could be in the process of being
-    //       shut down. Since the entire pool implementation is going to get reworked to support
-    //       real pooling we won't worry about this now.
-    return client_->redis_client_->makeRequest(request, callbacks);
-  } else {
-    return nullptr;
-  }
 }
 
-void InstanceImpl::ThreadLocalPool::onEvent(ThreadLocalActiveClient&, uint32_t events) {
+ActiveRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_key,
+                                                          const RespValue& request,
+                                                          ActiveRequestCallbacks& callbacks) {
+  LbContextImpl lb_context(hash_key);
+  Upstream::ConstHostPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
+  if (!host) {
+    return nullptr;
+  }
+
+  ThreadLocalActiveClientPtr& client = client_map_[host];
+  if (!client) {
+    client.reset(new ThreadLocalActiveClient(*this));
+    client->host_ = host;
+    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_);
+    client->redis_client_->addConnectionCallbacks(*client);
+  }
+
+  return client->redis_client_->makeRequest(request, callbacks);
+}
+
+void InstanceImpl::ThreadLocalActiveClient::onEvent(uint32_t events) {
   if ((events & Network::ConnectionEvent::RemoteClose) ||
       (events & Network::ConnectionEvent::LocalClose)) {
-    dispatcher_.deferredDelete(std::move(client_));
+    auto client_to_delete = parent_.client_map_.find(host_);
+    ASSERT(client_to_delete != parent_.client_map_.end());
+    parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second));
+    parent_.client_map_.erase(client_to_delete);
   }
 }
 
 void InstanceImpl::ThreadLocalPool::shutdown() {
-  if (client_) {
-    client_->redis_client_->close();
+  while (!client_map_.empty()) {
+    client_map_.begin()->second->redis_client_->close();
   }
 }
 

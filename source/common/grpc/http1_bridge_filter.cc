@@ -101,10 +101,11 @@ void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
   }
 
   const Router::RouteEntry* route_entry = route->routeEntry();
-  cluster_ = cm_.get(route_entry->clusterName());
-  if (!cluster_) {
+  Upstream::ThreadLocalCluster* cluster = cm_.get(route_entry->clusterName());
+  if (!cluster) {
     return;
   }
+  cluster_ = cluster->info();
 
   std::vector<std::string> parts = StringUtil::split(headers.Path()->value().c_str(), '/');
   if (parts.size() != 2) {
