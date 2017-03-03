@@ -2,7 +2,6 @@
 
 #include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
-#include "common/json/json_validator.h"
 
 namespace Router {
 
@@ -70,10 +69,8 @@ void HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
-    : disable_key_(config.getString("disable_key", "")), stage_(config.getInteger("stage", 0)) {
-
-  config.validateSchema(Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA);
-
+    : Json::JsonValidator(config, Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA),
+      disable_key_(config.getString("disable_key", "")), stage_(config.getInteger("stage", 0)) {
   for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
     std::string type = action->getString("type");
     if (type == "source_cluster") {
@@ -115,9 +112,9 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config) {
           new RateLimitPolicyEntryImpl(*rate_limit));
 
       // Every rate limit policy is applicable to the default stage.
-      default_rate_limit_entries_.emplace_back(*rate_limit_policy_entry);
+      default_rate_limit_entries_reference_.emplace_back(*rate_limit_policy_entry);
 
-      // A non-zero value indicates a rate limit policy that applies to a non-default stage in
+      // A non-zero stage value indicates a rate limit policy that applies to a non-default stage in
       // addition to the default stage.
       int64_t stage = rate_limit_policy_entry->stage();
       if (stage != 0) {
@@ -134,7 +131,7 @@ RateLimitPolicyImpl::getApplicableRateLimit(int64_t stage) const {
   if (rate_limit_entries_.empty()) {
     return empty_rate_limit_;
   } else if (stage == 0) {
-    return default_rate_limit_entries_;
+    return default_rate_limit_entries_reference_;
   } else {
     std::unordered_map<int64_t, std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>::
         const_iterator stage_reference = rate_limit_entries_reference_.find(stage);

@@ -4,6 +4,7 @@
 #include "envoy/router/router_ratelimit.h"
 
 #include "common/http/filter/ratelimit.h"
+#include "common/json/json_validator.h"
 #include "common/router/config_utility.h"
 
 namespace Router {
@@ -97,15 +98,13 @@ private:
 /*
  * Implementation of RateLimitPolicyEntry that holds the action for the configuration.
  */
-class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
+class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry, Json::JsonValidator {
 public:
   RateLimitPolicyEntryImpl(const Json::Object& config);
 
   // Router::RateLimitPolicyEntry
   int64_t stage() const override { return stage_; }
   const std::string& disableKey() const override { return disable_key_; }
-
-  // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap&,
@@ -130,7 +129,9 @@ public:
 
 private:
   std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;
-  std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> default_rate_limit_entries_;
+  std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>
+      default_rate_limit_entries_reference_;
+  // Holds reference to rate limit policies applicable to non-default stage settings.
   std::unordered_map<int64_t, std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
       rate_limit_entries_reference_;
   static const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> empty_rate_limit_;

@@ -323,12 +323,17 @@ TEST_F(HttpRateLimitFilterTest, RateLimitStageTest) {
   std::string stage_filter_config = R"EOF(
   {
     "domain": "foo",
-    "stage": 1
+    "stage": 5
   }
   )EOF";
 
   SetUpTest(stage_filter_config);
   InSequence s;
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(5))
+      .Times(1);
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+              getApplicableRateLimit(5)).Times(1);
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
