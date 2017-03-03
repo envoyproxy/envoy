@@ -9,7 +9,7 @@ public:
   /*
    * Base class to inherit from to validate config schema before initializing member variables.
    */
-  JsonValidator(const Json::Object& config, const std::string schema) {
+  JsonValidator(const Json::Object& config, const std::string& schema) {
     config.validateSchema(schema);
   }
 };
