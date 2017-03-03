@@ -280,9 +280,9 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
   StaticLookupEntry::EntryCb cb = static_lookup_table_.find(key.c_str());
   if (cb) {
     // TODO(mattklein123): Currently, for all of the inline headers, we don't support appending. The
-    // only inline  header where we should be converting multiple headers into a comma delimited
-    // list is  XFF. This is not a crisis for now but we should allow an inline header to indicate
-    // that  it should be appended to. In that case, we would do an append here. We can do this in
+    // only inline header where we should be converting multiple headers into a comma delimited
+    // list is XFF. This is not a crisis for now but we should allow an inline header to indicate
+    // that it should be appended to. In that case, we would do an append here. We can do this in
     // a follow up.
     key.clear();
     StaticLookupResponse static_lookup_response = cb(*this);
