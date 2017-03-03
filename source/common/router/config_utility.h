@@ -15,7 +15,7 @@ namespace Router {
  */
 class ConfigUtility {
 public:
-  struct HeaderData : public Json::JsonValidator {
+  struct HeaderData : Json::JsonValidator {
     // An empty header value allows for matching to be only based on header presence.
     // Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
     // exact string matching.
