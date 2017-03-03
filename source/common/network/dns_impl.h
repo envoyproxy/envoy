@@ -22,11 +22,15 @@ public:
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver
-  ActiveDnsQuery* resolve(const std::string& dns_name, ResolveCb callback) override;
+  ActiveDnsQuery* resolve(const std::string& dns_name, uint32_t port, ResolveCb callback) override;
 
 private:
   friend class DnsResolverImplPeer;
+  struct SrvQueryTask;
   struct PendingResolution : public ActiveDnsQuery {
+    explicit PendingResolution(DnsResolverImpl* resolver, uint32_t port)
+        : resolver_(resolver), port_(port) {}
+
     // Network::ActiveDnsQuery
     void cancel() override {
       // c-ares only supports channel-wide cancellation, so we just allow the
@@ -36,7 +40,14 @@ private:
 
     // c-ares ares_gethostbyname() query callback.
     void onAresHostCallback(int status, hostent* hostent);
+    // c-areas ares_query SRV query callback.
+    void onAresSrvStartCallback(int status, unsigned char* buf, int len);
+    void onAresSrvFinishCallback(std::list<Address::InstancePtr>&& address_list);
 
+    // The resolver instance
+    DnsResolverImpl* resolver_;
+    // Port of the result address, 0 for SRV queries
+    uint32_t port_;
     // Caller supplied callback to invoke on query completion or error.
     ResolveCb callback_;
     // Does the object own itself? Resource reclamation occurs via self-deleting

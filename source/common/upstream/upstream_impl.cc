@@ -409,22 +409,15 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   parent_.info_->stats().update_attempt_.inc();
 
   active_query_ = parent_.dns_resolver_.resolve(
-      dns_address_, [this](std::list<Network::Address::InstancePtr>&& address_list) -> void {
+      dns_address_, port_, [this](std::list<Network::Address::InstancePtr>&& address_list) -> void {
         active_query_ = nullptr;
-        log_debug("async DNS resolution complete for {}", dns_address_);
+        log_debug("async DNS resolution complete for {}:{}", dns_address_, port_);
         parent_.info_->stats().update_success_.inc();
 
         std::vector<HostPtr> new_hosts;
         for (Network::Address::InstancePtr address : address_list) {
-          // TODO: Currently the DNS interface does not consider port. We need to make a new
-          //       address that has port in it. We need to both support IPv6 as well as potentially
-          //       move port handling into the DNS interface itself, which would work better for
-          //       SRV.
-          new_hosts.emplace_back(
-              new HostImpl(parent_.info_, dns_address_,
-                           Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
-                               address->ip()->addressAsString(), port_)},
-                           false, 1, ""));
+          // TODO: We need to support IPv6 as well
+          new_hosts.emplace_back(new HostImpl(parent_.info_, dns_address_, address, false, 1, ""));
         }
 
         std::vector<HostPtr> hosts_added;

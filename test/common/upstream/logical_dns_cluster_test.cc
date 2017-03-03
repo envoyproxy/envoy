@@ -27,8 +27,8 @@ public:
   }
 
   void expectResolve() {
-    EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
+    EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", _, _))
+        .WillOnce(Invoke([&](const std::string&, uint32_t, Network::DnsResolver::ResolveCb cb)
                              -> Network::ActiveDnsQuery* {
                                dns_callback_ = cb;
                                return &active_dns_query_;
@@ -78,8 +78,8 @@ TEST_F(LogicalDnsClusterTest, ImmediateResolve) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
+  EXPECT_CALL(dns_resolver_, resolve("foo.bar.com", 443, _))
+      .WillOnce(Invoke([&](const std::string&, uint32_t, Network::DnsResolver::ResolveCb cb)
                            -> Network::ActiveDnsQuery* {
                              EXPECT_CALL(*resolve_timer_, enableTimer(_));
                              cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
@@ -110,7 +110,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000)));
-  dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1:443", "127.0.0.2:443"}));
 
   EXPECT_EQ(1UL, cluster_->hosts().size());
   EXPECT_EQ(1UL, cluster_->healthyHosts().size());
@@ -129,7 +129,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   // Should not cause any changes.
   EXPECT_CALL(*resolve_timer_, enableTimer(_));
-  dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
+  dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1:443", "127.0.0.2:443", "127.0.0.3:443"}));
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
   EXPECT_CALL(dispatcher_, createClientConnection_(
@@ -147,7 +147,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   // Should cause a change.
   EXPECT_CALL(*resolve_timer_, enableTimer(_));
-  dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
+  dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3:443", "127.0.0.1:443", "127.0.0.2:443"}));
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
   EXPECT_CALL(dispatcher_, createClientConnection_(

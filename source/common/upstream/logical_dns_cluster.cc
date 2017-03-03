@@ -41,21 +41,20 @@ LogicalDnsCluster::~LogicalDnsCluster() {
 
 void LogicalDnsCluster::startResolve() {
   std::string dns_address = Network::Utility::hostFromTcpUrl(dns_url_);
-  log_debug("starting async DNS resolution for {}", dns_address);
+  uint32_t port = Network::Utility::portFromTcpUrl(dns_url_);
+  log_debug("starting async DNS resolution for {}:{}", dns_address, port);
   info_->stats().update_attempt_.inc();
 
   active_dns_query_ = dns_resolver_.resolve(
-      dns_address,
+      dns_address, port,
       [this, dns_address](std::list<Network::Address::InstancePtr>&& address_list) -> void {
         active_dns_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
 
         if (!address_list.empty()) {
-          // TODO: IPv6 support as well as moving port handling into the DNS interface.
-          Network::Address::InstancePtr new_address(
-              new Network::Address::Ipv4Instance(address_list.front()->ip()->addressAsString(),
-                                                 Network::Utility::portFromTcpUrl(dns_url_)));
+          // TODO: IPv6 support
+          Network::Address::InstancePtr new_address = address_list.front();
           if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
             current_resolved_address_ = new_address;
             // Capture URL to avoid a race with another update.
