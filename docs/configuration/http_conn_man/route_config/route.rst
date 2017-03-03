@@ -105,7 +105,7 @@ auto_host_rewrite
   *(optional, boolean)* Indicates that during forwarding, the host header will be swapped with the
   hostname of the upstream host chosen by the cluster manager. This option is applicable only when
   the destination cluster for a route is of type *strict_dns* or *logical_dns*. Setting this to true
-  with other cluster types has no effect. *auto_host_rewrite* and *host_rewrite* are mutually exclusive 
+  with other cluster types has no effect. *auto_host_rewrite* and *host_rewrite* are mutually exclusive
   options. Only one can be specified.
 
 .. _config_http_conn_man_route_table_route_case_sensitive:
@@ -137,7 +137,10 @@ priority
   <arch_overview_http_routing_priority>`.
 
 :ref:`headers <config_http_conn_man_route_table_route_headers>`
-  *(optional, array)* Specifies a set of headers that the route should match on.
+  *(optional, array)* Specifies a set of headers that the route should match on. The router will
+  check the request's headers against all the specified headers in the route config. A match will
+  happen if all the headers in the route are present in the request with the same values (or based
+  on presence if the ``value`` field is not in the config).
 
 .. _config_http_conn_man_route_table_route_rate_limits:
 
@@ -238,13 +241,13 @@ runtime_key
 Headers
 -------
 
-The router can match a request to a route based on headers specified in the route config.
-
 .. code-block:: json
 
-  [
-    {"name": "...", "value": "...", "regex": "..."}
-  ]
+  {
+    "name": "...",
+    "value": "...",
+    "regex": "..."
+  }
 
 name
   *(required, string)* Specifies the name of the header in the request.
@@ -257,10 +260,6 @@ regex
   *(optional, boolean)* Specifies whether the header value is a regular
   expression or not. Defaults to false. The regex grammar used in the value field
   is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-
-The router will check the request's headers against all the specified
-headers in the route config. A match will happen if all the headers in the route are present in
-the request with the same values (or based on presence if the ``value`` field is not in the config).
 
 .. attention::
 

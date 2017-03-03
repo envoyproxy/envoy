@@ -155,43 +155,16 @@ Header Value Match
 
 descriptor_value
     *(required, string)* The value to use in the descriptor entry.
-:ref:`headers<config_http_conn_man_route_table_rate_limit_headers>`
-    *(required, array)* Specifies a set of headers that the rate limit action should match on.
+:ref:`headers<config_http_conn_man_route_table_route_headers>`
+    *(required, array)* Specifies a set of headers that the rate limit action should match on. The
+    action will check the request's headers against all the specified headers in the config. A match
+    will happen if all the headers in the config are present in the request with the same values (or
+    based on presence if the ``value`` field is not in the config).
 
 The following descriptor entry is appended to the descriptor if the request matches the headers
 specified in the action config:
 
     * ("header_match", "<descriptor_value>")
-
-
-.. _config_http_conn_man_route_table_rate_limit_headers:
-
-Headers
-"""""""
-
-.. code-block:: json
-
-  [
-    {"name": "...", "value": "...", "regex": "..."}
-  ]
-
-
-name
-  *(required, string)* Specifies the name of the header in the request.
-
-value
-  *(optional, string)* Specifies the value of the header. If the value is absent a request that has
-  the *name* header will match, regardless of the header's value.
-
-regex
-  *(optional, boolean)* Specifies whether the header value is a regular
-  expression or not. Defaults to false. The regex grammar used in the value field
-  is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-
-The action will check the request's headers against all the specified headers in the action config.
-A match will happen if all the headers in the config are present in the request with the same
-values (or based on presence if the ``value`` field is not in the config).
-
 
 .. _config_http_conn_man_route_table_rate_limit_composing_actions:
 

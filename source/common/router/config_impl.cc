@@ -129,12 +129,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   if (route.hasObject("headers")) {
     std::vector<Json::ObjectPtr> config_headers = route.getObjectArray("headers");
     for (const Json::ObjectPtr& header_map : config_headers) {
-      // allow header value to be empty, allows matching to be only based on header presence.
-      // Regex is an opt-in. Unless explicitly mentioned, we will use header values for exact string
-      // matches.
-      config_headers_.emplace_back(Http::LowerCaseString(header_map->getString("name")),
-                                   header_map->getString("value", EMPTY_STRING),
-                                   header_map->getBoolean("regex", false));
+      config_headers_.push_back(*header_map);
     }
   }
 
