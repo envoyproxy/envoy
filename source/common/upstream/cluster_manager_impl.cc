@@ -498,8 +498,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
   // We need to drain all connection pools for the cluster being removed. Then we can remove the
   // cluster.
   //
-  // TODO(mklein123): Optimally, we would just fire member changed callbacks and remove all of the
-  // hosts inside of the HostImpl destructor. That is a change with wide implications, so we are
+  // TODO(mattklein123): Optimally, we would just fire member changed callbacks and remove all of
+  // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we are
   // going with a more targeted approach for now.
   parent_.drainConnPools(host_set_.hosts());
 }

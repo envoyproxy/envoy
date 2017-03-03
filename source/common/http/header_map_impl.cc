@@ -236,16 +236,18 @@ HeaderMapImpl::StaticLookupTable::find(const char* key) const {
 HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_headers_)); }
 
 HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() {
-  rhs.iterate([](const HeaderEntry& header, void* context) -> void {
-    // TODO(mklein123) PERF: Avoid copying here is not necessary.
-    HeaderString key_string;
-    key_string.setCopy(header.key().c_str(), header.key().size());
-    HeaderString value_string;
-    value_string.setCopy(header.value().c_str(), header.value().size());
+  rhs.iterate(
+      [](const HeaderEntry& header, void* context) -> void {
+        // TODO(mattklein123) PERF: Avoid copying here is not necessary.
+        HeaderString key_string;
+        key_string.setCopy(header.key().c_str(), header.key().size());
+        HeaderString value_string;
+        value_string.setCopy(header.value().c_str(), header.value().size());
 
-    static_cast<HeaderMapImpl*>(context)
-        ->addViaMove(std::move(key_string), std::move(value_string));
-  }, this);
+        static_cast<HeaderMapImpl*>(context)->addViaMove(std::move(key_string),
+                                                         std::move(value_string));
+      },
+      this);
 }
 
 HeaderMapImpl::HeaderMapImpl(
@@ -277,7 +279,7 @@ bool HeaderMapImpl::operator==(const HeaderMapImpl& rhs) const {
 void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
   StaticLookupEntry::EntryCb cb = static_lookup_table_.find(key.c_str());
   if (cb) {
-    // TODO(mklein123): Currently, for all of the inline headers, we don't support appending. The
+    // TODO(mattklein123): Currently, for all of the inline headers, we don't support appending. The
     // only inline  header where we should be converting multiple headers into a comma delimited
     // list is  XFF. This is not a crisis for now but we should allow an inline header to indicate
     // that  it should be appended to. In that case, we would do an append here. We can do this in

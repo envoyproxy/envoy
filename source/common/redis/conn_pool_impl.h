@@ -11,10 +11,10 @@
 namespace Redis {
 namespace ConnPool {
 
-// TODO(mklein123): Stats
-// TODO(mklein123): Connect timeout
-// TODO(mklein123): Op timeout
-// TODO(mklein123): Circuit breaking
+// TODO(mattklein123): Stats
+// TODO(mattklein123): Connect timeout
+// TODO(mattklein123): Op timeout
+// TODO(mattklein123): Circuit breaking
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
 public:

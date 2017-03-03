@@ -167,7 +167,7 @@ public:
     rapidjson::SchemaValidator schema_validator(schema_document);
 
     if (!value_.Accept(schema_validator)) {
-      // TODO(mklein123): Improve errors by switching to SAX API.
+      // TODO(mattklein123): Improve errors by switching to SAX API.
       rapidjson::StringBuffer schema_string_buffer;
       rapidjson::StringBuffer document_string_buffer;
 

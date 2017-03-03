@@ -58,7 +58,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       route_(std::make_shared<RouteImpl>(parent_.cluster_.name(), timeout)) {
 
   router_.setDecoderFilterCallbacks(*this);
-  // TODO(mklein123): Correctly set protocol in request info when we support access logging.
+  // TODO(mattklein123): Correctly set protocol in request info when we support access logging.
 }
 
 AsyncStreamImpl::~AsyncStreamImpl() { ASSERT(!reset_callback_); }
@@ -156,7 +156,7 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
   if (!remoteClosed() && request_->body()) {
     sendData(*request_->body(), true);
   }
-  // TODO(mklein123): Support request trailers.
+  // TODO(mattklein123): Support request trailers.
 }
 
 void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_)); }

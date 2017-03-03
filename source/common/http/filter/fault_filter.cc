@@ -37,7 +37,7 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
       }
     }
 
-    // TODO(mklein123): Throw error if invalid return code is provided
+    // TODO(mattklein123): Throw error if invalid return code is provided
     if (abort->hasObject("http_status")) {
       http_status_ = static_cast<uint64_t>(abort->getInteger("http_status"));
     } else {
@@ -148,7 +148,7 @@ void FaultFilter::postDelayInjection() {
 }
 
 void FaultFilter::abortWithHTTPStatus() {
-  // TODO(mklein123): check http status codes obtained from runtime
+  // TODO(mattklein123): check http status codes obtained from runtime
   Http::HeaderMapPtr response_headers{new HeaderMapImpl{
       {Headers::get().Status, std::to_string(config_->runtime().snapshot().getInteger(
                                   "fault.http.abort.http_status", config_->abortCode()))}}};
