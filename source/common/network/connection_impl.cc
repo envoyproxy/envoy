@@ -1,8 +1,8 @@
 #include "connection_impl.h"
 #include "utility.h"
 
-#include "envoy/event/timer.h"
 #include "envoy/common/exception.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
 #include "common/common/assert.h"
@@ -254,8 +254,8 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
     // use an ioctl() before every read to figure out how much data there is to read.
     //
-    // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the ioctl(). The
-    // extra syscall is not worth it.
+    // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
+    // ioctl(). The extra syscall is not worth it.
     int rc = read_buffer_.read(fd_, 16384);
     conn_log_trace("read returns: {}", *this, rc);
 

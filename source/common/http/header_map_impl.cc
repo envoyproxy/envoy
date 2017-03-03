@@ -189,7 +189,7 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
 }
 
 #define INLINE_HEADER_STATIC_MAP_ENTRY(name)                                                       \
-  add(Headers::get().name.get().c_str(), [](HeaderMapImpl & h) -> StaticLookupResponse {           \
+  add(Headers::get().name.get().c_str(), [](HeaderMapImpl& h) -> StaticLookupResponse {            \
     return {&h.inline_headers_.name##_, &Headers::get().name};                                     \
   });
 
