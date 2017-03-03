@@ -3,6 +3,7 @@
 #include "envoy/json/json_object.h"
 
 namespace Json {
+
 /**
  * Base class to inherit from to validate config schema before initializing member variables.
  */
