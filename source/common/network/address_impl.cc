@@ -75,12 +75,9 @@ uint32_t Ipv6Instance::Ipv6Helper::port() const { return ntohs(address_.sin6_por
 
 std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
   char str[INET6_ADDRSTRLEN];
-  if (nullptr == inet_ntop(AF_INET6, &address_.sin6_addr, str, INET6_ADDRSTRLEN)) {
-    // TODO: Consider pulling this out of ctor flow and into a static method used to construct
-    // instances, with the aim of being able to avoid exceptions in ctors. Discuss with Matt.
-    return "";
-  }
-  return str;
+  const char* ptr = inet_ntop(AF_INET6, &address_.sin6_addr, str, INET6_ADDRSTRLEN);
+  ASSERT(str == ptr);
+  return ptr;
 }
 
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address) : InstanceBase(Type::Ip) {
@@ -95,9 +92,6 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : Instance
   memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
   ip_.ipv6_.address_.sin6_family = AF_INET;
   ip_.ipv6_.address_.sin6_port = htons(port);
-
-  // TODO: Consider pulling this out of ctor flow and into a static method used to construct
-  // instances, with the aim of being able to avoid exceptions in ctors. Discuss with Matt.
   if (address != "") {
     if (1 != inet_pton(AF_INET6, address.c_str(), &ip_.ipv6_.address_.sin6_addr)) {
       throw EnvoyException(fmt::format("invalid ipv6 address '{}'", address));
