@@ -155,6 +155,7 @@ Header Value Match
 
 descriptor_value
     *(required, string)* The value to use in the descriptor entry.
+
 :ref:`headers<config_http_conn_man_route_table_route_headers>`
     *(required, array)* Specifies a set of headers that the rate limit action should match on. The
     action will check the request's headers against all the specified headers in the config. A match
