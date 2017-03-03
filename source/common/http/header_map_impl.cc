@@ -189,7 +189,7 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
 }
 
 #define INLINE_HEADER_STATIC_MAP_ENTRY(name)                                                       \
-  add(Headers::get().name.get().c_str(), [](HeaderMapImpl& h) -> StaticLookupResponse {            \
+  add(Headers::get().name.get().c_str(), [](HeaderMapImpl & h) -> StaticLookupResponse {           \
     return {&h.inline_headers_.name##_, &Headers::get().name};                                     \
   });
 
@@ -236,18 +236,16 @@ HeaderMapImpl::StaticLookupTable::find(const char* key) const {
 HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_headers_)); }
 
 HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() {
-  rhs.iterate(
-      [](const HeaderEntry& header, void* context) -> void {
-        // TODO(mattklein123) PERF: Avoid copying here is not necessary.
-        HeaderString key_string;
-        key_string.setCopy(header.key().c_str(), header.key().size());
-        HeaderString value_string;
-        value_string.setCopy(header.value().c_str(), header.value().size());
+  rhs.iterate([](const HeaderEntry& header, void* context) -> void {
+    // TODO(mattklein123) PERF: Avoid copying here is not necessary.
+    HeaderString key_string;
+    key_string.setCopy(header.key().c_str(), header.key().size());
+    HeaderString value_string;
+    value_string.setCopy(header.value().c_str(), header.value().size());
 
-        static_cast<HeaderMapImpl*>(context)->addViaMove(std::move(key_string),
-                                                         std::move(value_string));
-      },
-      this);
+    static_cast<HeaderMapImpl*>(context)
+        ->addViaMove(std::move(key_string), std::move(value_string));
+  }, this);
 }
 
 HeaderMapImpl::HeaderMapImpl(
