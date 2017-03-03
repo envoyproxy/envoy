@@ -543,7 +543,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
   }
   )EOF");
 
-const std::string Json::Schema::HEADER_MATCHING_CONFIGURATION_SCHEMA(R"EOF(
+const std::string Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA(R"EOF(
   {
     "$schema" : "http://json-schema.org/schema#",
     "type" : "object",
