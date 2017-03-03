@@ -57,8 +57,14 @@ upstream_cluster:
   cluster that the filter should match on. Fault injection will be
   restricted to requests bound to the specific upstream cluster.
 
-:ref:`headers <config_http_filters_fault_injection_headers>`
-  *(optional, array)* Specifies a set of headers that the filter should match on.
+:ref:`headers <config_http_conn_man_route_table_route_headers>`
+  *(optional, array)* Specifies a set of headers that the filter should match on. The fault
+  injection filter can be applied selectively to requests that match a set of headers specified in
+  the fault filter config. The chances of actual fault injection further depend on the values of
+  *abort_percent* and *fixed_delay_percent* parameters.The filter will check the request's headers
+  against all the specified headers in the filter config. A match will happen if all the headers in
+  the config are present in the request with the same values (or based on presence if the ``value``
+  field is not in the config).
 
 The abort and delay blocks can be omitted. If they are not specified in the
 configuration file, their respective values will be obtained from the
@@ -133,41 +139,6 @@ http.fault.delay.fixed_duration_ms
   *fixed_duration_ms* specified in the config will be used. If this field
   is missing from both the runtime and the config, no delays will be
   injected.
-
-.. _config_http_filters_fault_injection_headers:
-
-Headers
--------
-
-The fault injection filter can be applied selectively to requests that
-match a set of headers specified in the fault filter config. The chances of
-actual fault injection further depend on the values of *abort_percent* and
-*fixed_delay_percent* parameters. Each element of the array in the
-*headers* field should be in the following format:
-
-.. code-block:: json
-
-  [
-    {"name": "...", "value": "...", "regex": "..."}
-  ]
-
-name
-  *(required, string)* Specifies the name of the header in the request.
-
-value
-  *(optional, string)* Specifies the value of the header. If the value is
-  absent a request that has the *name* header will match, regardless of the
-  header's value.
-
-regex
-  *(optional, boolean)* Specifies whether the header value is a regular expression
-  or not. Defaults to false. The regex grammar used in the value field
-  is defined `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-
-The filter will check the request's headers against all the specified
-headers in the filter config. A match will happen if all the headers in the
-config are present in the request with the same values (or based on
-presence if the ``value`` field is not in the config).
 
 Statistics
 ----------

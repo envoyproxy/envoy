@@ -526,14 +526,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
         "type" : "array",
         "minItems" : 1,
         "items" : {
-          "type" : "object",
-          "properties" : {
-            "name" : {"type" : "string"},
-            "value" : {"type" : "string"},
-            "regex" : {"type" : "boolean"}
-          },
-          "required" : ["name"],
-          "additionalProperties" : false
+          "type" : "object"
         }
       },
       "rate_limits" : {"type" : "array"},
@@ -550,6 +543,20 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
         "additionalProperties" : true
       }
     },
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA(R"EOF(
+  {
+    "$schema" : "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties" : {
+      "name" : {"type" : "string"},
+      "value" : {"type" : "string"},
+      "regex" : {"type" : "boolean"}
+    },
+    "required" : ["name"],
     "additionalProperties" : false
   }
   )EOF");
@@ -615,6 +622,25 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : ["type", "descriptor_value"],
         "additionalProperties" : false
+      },
+      "header_value_match" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["header_value_match"]
+          },
+          "descriptor_value" : {"type" : "string"},
+          "headers" : {
+            "type" : "array",
+            "minItems" : 1,
+            "items" : {
+              "type" : "object"
+            }
+          },
+          "required" : ["type", "descriptor_value", "headers"],
+          "additionalProperties" : false
+        }
       }
     },
     "type" : "object",
@@ -630,7 +656,8 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
             {"$ref" : "#/definitions/destination_cluster"},
             {"$ref" : "#/definitions/request_headers"},
             {"$ref" : "#/definitions/remote_address"},
-            {"$ref" : "#/definitions/generic_key"}
+            {"$ref" : "#/definitions/generic_key"},
+            {"$ref" : "#/definitions/header_value_match"}
           ]
         }
       }
@@ -701,14 +728,7 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
         "type" : "array",
         "minItems" : 1,
         "items" : {
-          "type" : "object",
-          "properties" : {
-            "name" : {"type" : "string"},
-            "value" : {"type" : "string"},
-            "regex" : {"type" : "boolean"}
-          },
-          "required" : ["name"],
-          "additionalProperties" : false
+          "type" : "object"
         }
       }
     },
