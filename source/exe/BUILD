@@ -54,6 +54,8 @@ envoy_cc_library(
     deps = [
         ":envoy_common_lib",
         ":hot_restart_lib",
+        "//source/server/config_validation:hot_restart_lib",
+        "//source/server/config_validation:server_lib",
     ],
 )
 

@@ -147,13 +147,12 @@ public:
   /**
    * Allocate a cluster manager from configuration JSON.
    */
-  virtual ClusterManagerPtr clusterManagerFromJson(const Json::Object& config,
-                                                   Stats::Store& stats, ThreadLocal::Instance& tls,
+  virtual ClusterManagerPtr clusterManagerFromJson(const Json::Object& config, Stats::Store& stats,
+                                                   ThreadLocal::Instance& tls,
                                                    Runtime::Loader& runtime,
                                                    Runtime::RandomGenerator& random,
                                                    const LocalInfo::LocalInfo& local_info,
                                                    AccessLog::AccessLogManager& log_manager) PURE;
-
 
   /**
    * Allocate an HTTP connection pool.

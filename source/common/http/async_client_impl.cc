@@ -158,7 +158,8 @@ void AsyncStreamImpl::resetStream() {
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
                                    const Optional<std::chrono::milliseconds>& timeout)
-    : AsyncStreamImpl(parent, *this, timeout), request_(std::move(request)), callbacks_(callbacks) {}
+    : AsyncStreamImpl(parent, *this, timeout), request_(std::move(request)), callbacks_(callbacks) {
+}
 
 void AsyncRequestImpl::initialize() {
   sendHeaders(request_->headers(), !request_->body());

@@ -52,6 +52,7 @@ public:
   MOCK_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_METHOD0(restartEpoch, uint64_t());
   MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
+  MOCK_METHOD0(mode, Mode());
 
   std::string config_path_;
   std::string admin_address_path_;

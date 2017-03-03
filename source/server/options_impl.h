@@ -29,6 +29,7 @@ public:
   spdlog::level::level_enum logLevel() override { return log_level_; }
   std::chrono::seconds parentShutdownTime() override { return parent_shutdown_time_; }
   uint64_t restartEpoch() override { return restart_epoch_; }
+  Server::Mode mode() override { return mode_; }
   std::chrono::milliseconds fileFlushIntervalMsec() override { return file_flush_interval_msec_; }
 
 private:
@@ -44,4 +45,5 @@ private:
   std::chrono::milliseconds file_flush_interval_msec_;
   std::chrono::seconds drain_time_;
   std::chrono::seconds parent_shutdown_time_;
+  Server::Mode mode_;
 };

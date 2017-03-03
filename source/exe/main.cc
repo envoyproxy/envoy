@@ -8,6 +8,8 @@
 
 #include "exe/hot_restart.h"
 
+#include "server/config_validation/hot_restart.h"
+#include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
 #include "server/options_impl.h"
 #include "server/server.h"
@@ -33,10 +35,32 @@ public:
 
 } // Server
 
+int validateConfigAndExit(OptionsImpl& options, Server::ProdComponentFactory& component_factory,
+                          const LocalInfo::LocalInfoImpl& local_info) {
+  Server::ValidationHotRestart restarter;
+  Logger::Registry::initialize(options.logLevel(), restarter.logLock());
+  Stats::HeapRawStatDataAllocator alloc;
+  Stats::ThreadLocalStoreImpl stats_store(alloc);
+
+  Server::ValidationInstance server(options, restarter, stats_store, restarter.accessLogLock(),
+                                    component_factory, local_info);
+  std::cerr << "configuration '" << options.configPath() << "' OK" << std::endl;
+  server.shutdown();
+  return 0;
+}
+
 int main(int argc, char** argv) {
-  ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   OptionsImpl options(argc, argv, Server::SharedMemory::version(), spdlog::level::warn);
+  Server::ProdComponentFactory component_factory;
+  LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(), options.serviceZone(),
+                                      options.serviceClusterName(), options.serviceNodeName());
+
+  if (options.mode() != Server::Mode::Serve) {
+    return validateConfigAndExit(options, component_factory, local_info);
+  }
+
+  ares_library_init(ARES_LIB_INIT_ALL);
 
   std::unique_ptr<Server::HotRestartImpl> restarter;
   try {
@@ -49,9 +73,7 @@ int main(int argc, char** argv) {
   Logger::Registry::initialize(options.logLevel(), restarter->logLock());
   DefaultTestHooks default_test_hooks;
   Stats::ThreadLocalStoreImpl stats_store(*restarter);
-  Server::ProdComponentFactory component_factory;
-  LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(), options.serviceZone(),
-                                      options.serviceClusterName(), options.serviceNodeName());
+
   Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
                               restarter->accessLogLock(), component_factory, local_info);
   server.run();

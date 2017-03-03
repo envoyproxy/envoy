@@ -29,9 +29,10 @@ MockDrainManager::~MockDrainManager() {}
 MockHotRestart::MockHotRestart() {}
 MockHotRestart::~MockHotRestart() {}
 
-MockInstance::MockInstance() : ssl_context_manager_(runtime_loader_),
-    cluster_manager_factory_(runtime_loader_, stats_store_, thread_local_, random_, dns_resolver_,
-                             ssl_context_manager_, dispatcher_, local_info_) {
+MockInstance::MockInstance()
+    : ssl_context_manager_(runtime_loader_),
+      cluster_manager_factory_(runtime_loader_, stats_store_, thread_local_, random_, dns_resolver_,
+                               ssl_context_manager_, dispatcher_, local_info_) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, httpTracer()).WillByDefault(ReturnRef(http_tracer_));

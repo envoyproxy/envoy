@@ -22,10 +22,11 @@ namespace ConfigTest {
 
 class ConfigTest {
 public:
-  ConfigTest(const std::string& file_path) : options_(file_path),
-      cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
-                               server_.random(), server_.dnsResolver(), ssl_context_manager_,
-                               server_.dispatcher(), server_.localInfo()) {
+  ConfigTest(const std::string& file_path)
+      : options_(file_path),
+        cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
+                                 server_.random(), server_.dnsResolver(), ssl_context_manager_,
+                                 server_.dispatcher(), server_.localInfo()) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
