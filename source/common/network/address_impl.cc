@@ -92,7 +92,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : Instance
   memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
   ip_.ipv6_.address_.sin6_family = AF_INET;
   ip_.ipv6_.address_.sin6_port = htons(port);
-  if (address != "") {
+  if (!address.empty()) {
     if (1 != inet_pton(AF_INET6, address.c_str(), &ip_.ipv6_.address_.sin6_addr)) {
       throw EnvoyException(fmt::format("invalid ipv6 address '{}'", address));
     }
