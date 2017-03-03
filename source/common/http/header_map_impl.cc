@@ -237,7 +237,7 @@ HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_heade
 
 HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() {
   rhs.iterate([](const HeaderEntry& header, void* context) -> void {
-    // TODO PERF: Avoid copying here is not necessary.
+    // TODO(mklein123) PERF: Avoid copying here is not necessary.
     HeaderString key_string;
     key_string.setCopy(header.key().c_str(), header.key().size());
     HeaderString value_string;
@@ -277,11 +277,11 @@ bool HeaderMapImpl::operator==(const HeaderMapImpl& rhs) const {
 void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
   StaticLookupEntry::EntryCb cb = static_lookup_table_.find(key.c_str());
   if (cb) {
-    // TODO: Currently, for all of the inline headers, we don't support appending. The only inline
-    //       header where we should be converting multiple headers into a comma delimited list is
-    //       XFF. This is not a crisis for now but we should allow an inline header to indicate that
-    //       it should be appended to. In that case, we would do an append here. We can do this in
-    //       a follow up.
+    // TODO(mklein123): Currently, for all of the inline headers, we don't support appending. The
+    // only inline  header where we should be converting multiple headers into a comma delimited
+    // list is  XFF. This is not a crisis for now but we should allow an inline header to indicate
+    // that  it should be appended to. In that case, we would do an append here. We can do this in
+    // a follow up.
     key.clear();
     StaticLookupResponse static_lookup_response = cb(*this);
     maybeCreateInline(static_lookup_response.entry_, *static_lookup_response.key_,

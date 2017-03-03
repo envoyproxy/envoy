@@ -49,7 +49,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent*
       ASSERT(hostent->h_length == sizeof(in_addr));
       sockaddr_in address;
       memset(&address, 0, sizeof(address));
-      // TODO: IPv6 support.
+      // TODO(mklein123): IPv6 support.
       address.sin_family = AF_INET;
       address.sin_port = 0;
       address.sin_addr = *reinterpret_cast<in_addr*>(hostent->h_addr_list[i]);

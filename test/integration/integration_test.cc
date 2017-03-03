@@ -656,7 +656,7 @@ void BaseIntegrationTest::testUpstreamProtocolError() {
                   [&]() -> void {
                     fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
                   },
-                  // TODO: Waiting for exact amount of data is a hack. This needs to be fixed.
+                  // TODO(mklein123): Waiting for exact amount of data is a hack. This needs to be fixed.
                   [&]() -> void { fake_upstream_connection->waitForData(187); },
                   [&]() -> void { fake_upstream_connection->write("bad protocol data!"); },
                   [&]() -> void { fake_upstream_connection->waitForDisconnect(); },

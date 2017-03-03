@@ -80,8 +80,8 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) 
   Optional<uint64_t> hash;
   const Http::HeaderEntry* header = headers.get(header_name_);
   if (header) {
-    // TODO: Compile in murmur3/city/etc. and potentially allow the user to choose so we know
-    //       exactly what we are going to get.
+    // TODO(mklein123): Compile in murmur3/city/etc. and potentially allow the user to choose so we
+    // know exactly what we are going to get.
     hash.value(std::hash<std::string>()(header->value().c_str()));
   }
   return hash;

@@ -105,7 +105,8 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config) {
 const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
     RateLimitPolicyImpl::getApplicableRateLimit(int64_t) const {
   // Currently return all rate limit policy entries.
-  // TODO: Implement returning only rate limit policy entries that match the stage setting.
+  // TODO(mklein123): Implement returning only rate limit policy entries that match the stage
+  // setting.
   if (rate_limit_entries_.empty()) {
     return empty_rate_limit_;
   } else {

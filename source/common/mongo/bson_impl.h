@@ -145,7 +145,7 @@ private:
 
   /**
    * All of the possible variadic values that a field can be.
-   * TODO: Make this a C++11 union to save a little space and time.
+   * TODO(mklein123): Make this a C++11 union to save a little space and time.
    */
   struct Value {
     double double_value_;

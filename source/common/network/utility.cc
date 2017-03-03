@@ -59,7 +59,7 @@ bool IpList::contains(const Address::Instance& address) const {
   }
 
   for (const Ipv4Entry& entry : ipv4_list_) {
-    // TODO: IPv6 support
+    // TODO(mklein123): IPv6 support
     if ((ntohl(address.ip()->ipv4()->address()) & entry.ipv4_mask_) == entry.ipv4_address_) {
       return true;
     }
@@ -76,9 +76,9 @@ const std::string Utility::TCP_SCHEME = "tcp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 
 Address::InstancePtr Utility::resolveUrl(const std::string& url) {
-  // TODO: IPv6 support.
-  // TODO: We still support the legacy tcp:// and unix:// names. We should support/parse ip:// and
-  //       pipe:// as better names.
+  // TODO(mklein123): IPv6 support.
+  // TODO(mklein123): We still support the legacy tcp:// and unix:// names. We should support/parse
+  // ip:// and pipe:// as better names.
   if (url.find(TCP_SCHEME) == 0) {
     return Address::InstancePtr{
         new Address::Ipv4Instance(hostFromTcpUrl(url), portFromTcpUrl(url))};
@@ -184,7 +184,7 @@ Address::InstancePtr Utility::getOriginalDst(int fd) {
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
 
   if (status == 0) {
-    // TODO: IPv6 support
+    // TODO(mklein123): IPv6 support
     ASSERT(orig_addr.ss_family == AF_INET);
     return Address::InstancePtr{
         new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
