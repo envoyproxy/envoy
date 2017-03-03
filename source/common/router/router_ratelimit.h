@@ -129,8 +129,9 @@ public:
   getApplicableRateLimit(int64_t stage = 0) const override;
 
 private:
-  std::vector<std::vector<std::unique_ptr<RateLimitPolicyEntry>>> rate_limit_entries_;
-  std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
+  std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;
+  std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> default_rate_limit_entries_;
+  std::unordered_map<int64_t, std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
       rate_limit_entries_reference_;
   static const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> empty_rate_limit_;
 };

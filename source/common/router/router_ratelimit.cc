@@ -2,6 +2,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
+#include "common/json/json_validator.h"
 
 namespace Router {
 
@@ -109,28 +110,40 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config) {
   if (config.hasObject("rate_limits")) {
-    std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_policy;
-    std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limit_policy_reference;
     for (const Json::ObjectPtr& rate_limit : config.getObjectArray("rate_limits")) {
       std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
           new RateLimitPolicyEntryImpl(*rate_limit));
-      rate_limit_policy_reference.emplace_back(*rate_limit_policy_entry);
-      rate_limit_policy.emplace_back(std::move(rate_limit_policy_entry));
+
+      // Every rate limit policy is applicable to the default stage.
+      default_rate_limit_entries_.emplace_back(*rate_limit_policy_entry);
+
+      // A non-zero value indicates a rate limit policy that applies to a non-default stage in
+      // addition to the default stage.
+      int64_t stage = rate_limit_policy_entry->stage();
+      if (stage != 0) {
+        rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);
+      }
+
+      rate_limit_entries_.emplace_back(std::move(rate_limit_policy_entry));
     }
-    rate_limit_entries_.emplace_back(std::move(rate_limit_policy));
-    rate_limit_entries_reference_.emplace_back(rate_limit_policy_reference);
   }
 }
 
 const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
-    RateLimitPolicyImpl::getApplicableRateLimit(int64_t) const {
-  // Currently return all rate limit policy entries.
-  // TODO(mattklein123): Implement returning only rate limit policy entries that match the stage
-  // setting.
+RateLimitPolicyImpl::getApplicableRateLimit(int64_t stage) const {
   if (rate_limit_entries_.empty()) {
     return empty_rate_limit_;
+  } else if (stage == 0) {
+    return default_rate_limit_entries_;
   } else {
-    return rate_limit_entries_reference_[0];
+    std::unordered_map<int64_t, std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>::
+        const_iterator stage_reference = rate_limit_entries_reference_.find(stage);
+
+    if (stage_reference == rate_limit_entries_reference_.end()) {
+      return empty_rate_limit_;
+    } else {
+      return stage_reference->second;
+    }
   }
 }
 

@@ -99,7 +99,7 @@ public:
   const RouteEntry* route_;
 };
 
-TEST_F(RateLimitConfiguration, NoRateLimit) {
+TEST_F(RateLimitConfiguration, NoApplicableRateLimit) {
   std::string json = R"EOF(
   {
     "virtual_hosts": [
@@ -122,6 +122,33 @@ TEST_F(RateLimitConfiguration, NoRateLimit) {
           },
           {
             "prefix": "/bar",
+            "cluster": "www2"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  SetUpTest(json);
+
+  EXPECT_EQ(0U, config_->route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
+                    ->rateLimitPolicy()
+                    .getApplicableRateLimit(0)
+                    .size());
+}
+
+TEST_F(RateLimitConfiguration, NoRateLimitPolicy) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["www.lyft.com"],
+        "routes": [
+          {
+            "prefix": "/",
             "cluster": "www2"
           }
         ]
@@ -224,7 +251,7 @@ TEST_F(RateLimitConfiguration, TestVirtualHost) {
               testing::ContainerEq(descriptors));
 }
 
-TEST_F(RateLimitConfiguration, TestMultipleRateLimits) {
+TEST_F(RateLimitConfiguration, Stages) {
   std::string json = R"EOF(
   {
     "virtual_hosts": [
@@ -237,6 +264,7 @@ TEST_F(RateLimitConfiguration, TestMultipleRateLimits) {
             "cluster": "www2test",
             "rate_limits": [
               {
+                "stage": 1,
                 "actions": [
                   {
                     "type": "remote_address"
@@ -285,6 +313,19 @@ TEST_F(RateLimitConfiguration, TestMultipleRateLimits) {
                    {{{"destination_cluster", "www2test"}}},
                    {{{"destination_cluster", "www2test"}, {"source_cluster", "service_cluster"}}}}),
               testing::ContainerEq(descriptors));
+
+  descriptors.clear();
+  rate_limits = route_->rateLimitPolicy().getApplicableRateLimit(1);
+  EXPECT_EQ(1U, rate_limits.size());
+
+  for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
+    rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, address);
+  }
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
+              testing::ContainerEq(descriptors));
+
+  rate_limits = route_->rateLimitPolicy().getApplicableRateLimit(10);
+  EXPECT_TRUE(rate_limits.empty());
 }
 
 class RateLimitPolicyEntryTest : public testing::Test {

@@ -19,8 +19,6 @@ stage
   the rate limit configuration will apply for all rate limit filters set to default. The default
   value is 0.
 
-  **NOTE:** This functionality hasn't been implemented yet and stage values are currently ignored.
-
 disable_key
   *(optional, string)* The key to be set in runtime to disable this rate limit configuration.
 
