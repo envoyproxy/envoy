@@ -13,3 +13,7 @@ env:
   - TEST_TYPE=asan
   - TEST_TYPE=docs
 script: ./ci/ci_steps.sh
+
+branches:
+  only:
+    - master
