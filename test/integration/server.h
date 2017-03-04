@@ -9,6 +9,8 @@
 #include "server/server.h"
 #include "server/test_hooks.h"
 
+#include "test/test_common/utility.h"
+
 namespace Server {
 
 /**
@@ -139,7 +141,7 @@ private:
 
   const std::string config_path_;
   Thread::ThreadPtr thread_;
-  Thread::ConditionalInitializer server_initialized_;
+  ConditionalInitializer server_initialized_;
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};
   Stats::TestIsolatedStoreImpl stats_store_;

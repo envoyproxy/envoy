@@ -36,6 +36,7 @@ public:
   ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
+  LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
 };
 
 } // Upstream

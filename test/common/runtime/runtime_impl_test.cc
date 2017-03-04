@@ -35,12 +35,12 @@ TEST(UUID, sanityCheckOfUniqueness) {
 
 class RuntimeImplTest : public testing::Test {
 public:
-  void setup(const std::string& runtime_override_dir) {
+  void setup(const std::string& primary_dir, const std::string& override_dir) {
     EXPECT_CALL(dispatcher, createFilesystemWatcher_())
         .WillOnce(ReturnNew<NiceMock<Filesystem::MockWatcher>>());
 
-    loader.reset(new LoaderImpl(dispatcher, tls, "test/common/runtime/test_data/current", "envoy",
-                                runtime_override_dir, store, generator));
+    loader.reset(
+        new LoaderImpl(dispatcher, tls, primary_dir, "envoy", override_dir, store, generator));
   }
 
   Event::MockDispatcher dispatcher;
@@ -52,7 +52,7 @@ public:
 };
 
 TEST_F(RuntimeImplTest, All) {
-  setup("envoy_override");
+  setup("test/common/runtime/test_data/current", "envoy_override");
 
   // Basic string getting.
   EXPECT_EQ("world", loader->snapshot().get("file2"));
@@ -83,10 +83,21 @@ TEST_F(RuntimeImplTest, All) {
   EXPECT_EQ("hello override", loader->snapshot().get("file1"));
 }
 
+TEST_F(RuntimeImplTest, BadDirectory) { setup("/baddir", "/baddir"); }
+
 TEST_F(RuntimeImplTest, OverrideFolderDoesNotExist) {
-  setup("envoy_override_does_not_exist");
+  setup("test/common/runtime/test_data/current", "envoy_override_does_not_exist");
 
   EXPECT_EQ("hello", loader->snapshot().get("file1"));
+}
+
+TEST(NullRuntimeImplTest, All) {
+  MockRandomGenerator generator;
+  NullLoaderImpl loader(generator);
+  EXPECT_EQ("", loader.snapshot().get("foo"));
+  EXPECT_EQ(1UL, loader.snapshot().getInteger("foo", 1));
+  EXPECT_CALL(generator, random()).WillOnce(Return(49));
+  EXPECT_TRUE(loader.snapshot().featureEnabled("foo", 50));
 }
 
 } // Runtime

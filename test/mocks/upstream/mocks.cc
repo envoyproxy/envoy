@@ -57,7 +57,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke([this](ResourcePriority)
                                 -> Upstream::ResourceManager& { return *resource_manager_; }));
-  ON_CALL(*this, lbType()).WillByDefault(Return(Upstream::LoadBalancerType::RoundRobin));
+  ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
 }
 
 MockClusterInfo::~MockClusterInfo() {}

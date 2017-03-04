@@ -140,6 +140,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ(&cluster_->hosts()[0]->stats(), &data.host_description_->stats());
   EXPECT_EQ("127.0.0.1:443", data.host_description_->address()->asString());
   EXPECT_EQ("", data.host_description_->zone());
+  EXPECT_EQ("foo.bar.com", data.host_description_->hostname());
   data.host_description_->outlierDetector().putHttpResponseCode(200);
 
   expectResolve();
