@@ -56,7 +56,7 @@ TEST_F(FileEventImplTest, LevelTrigger) {
   int count = 2;
   Event::FileEventPtr file_event =
       dispatcher.createFileEvent(fds_[0], [&](uint32_t events) -> void {
-        if (--count == 0) {
+        if (count-- == 0) {
           dispatcher.exit();
           return;
         }

@@ -34,6 +34,8 @@ public:
     connection_->addReadFilter(Network::ReadFilterPtr{new ReadFilter(*this)});
   }
 
+  ~TestDnsServerQuery() { connection_->close(ConnectionCloseType::NoFlush); }
+
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(TestDnsServerQuery& parent) : parent_(parent) {}
