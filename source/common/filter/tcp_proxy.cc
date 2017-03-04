@@ -198,7 +198,7 @@ void TcpProxy::onDownstreamEvent(uint32_t event) {
   if ((event & Network::ConnectionEvent::RemoteClose ||
        event & Network::ConnectionEvent::LocalClose) &&
       upstream_connection_) {
-    // TODO(mattklein23): If we close without flushing here we may drop some data. The downstream
+    // TODO(mattklein123): If we close without flushing here we may drop some data. The downstream
     // connection is about to go away. So to support this we need to either have a way for the
     // downstream connection to stick around, or, we need to be able to pass this connection to a
     // flush worker which will attempt to flush the remaining data with a timeout.
