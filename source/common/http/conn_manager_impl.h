@@ -406,10 +406,10 @@ private:
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
     HeaderMapPtr response_headers_;
-    Buffer::InstancePtr buffered_response_data_; // TODO: buffer data stat
+    Buffer::InstancePtr buffered_response_data_; // TODO(mattklein123): buffer data stat
     HeaderMapPtr response_trailers_{};
     HeaderMapPtr request_headers_;
-    Buffer::InstancePtr buffered_request_data_; // TODO: buffer data stat
+    Buffer::InstancePtr buffered_request_data_; // TODO(mattklein123): buffer data stat
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;

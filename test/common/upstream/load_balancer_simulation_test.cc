@@ -41,7 +41,7 @@ public:
   void run(std::vector<uint32_t> originating_cluster, std::vector<uint32_t> all_destination_cluster,
            std::vector<uint32_t> healthy_destination_cluster) {
     local_host_set_ = new HostSetImpl();
-    // TODO: make load balancer per originating cluster host.
+    // TODO(mattklein123): make load balancer per originating cluster host.
     RandomLoadBalancer lb(cluster_, local_host_set_, stats_, runtime_, random_);
 
     HostListsPtr upstream_per_zone_hosts = generateHostsPerZone(healthy_destination_cluster);

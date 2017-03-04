@@ -214,7 +214,7 @@ void DetectorImpl::runCallbacks(HostPtr host) {
 }
 
 void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
-  // TODO: Log friendly host name (e.g., instance ID or DNS name).
+  // TODO(mattklein123): Log friendly host name (e.g., instance ID or DNS name).
   // clang-format off
   static const std::string json =
     std::string("{{") +
@@ -235,7 +235,7 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
 }
 
 void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
-  // TODO: Log friendly host name (e.g., instance ID or DNS name).
+  // TODO(mattklein123): Log friendly host name (e.g., instance ID or DNS name).
   // clang-format off
   static const std::string json =
     std::string("{{") +

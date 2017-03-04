@@ -206,7 +206,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       } else {
         ASSERT(current_value.value_->type() == RespType::BulkString);
         if (pending_integer_.integer_ >= 0) {
-          // TODO: reserve and define max length since we don't stream currently.
+          // TODO(mattklein123): reserve and define max length since we don't stream currently.
           state_ = State::BulkStringBody;
         } else {
           // Null bulk string. Switch type to null and move to value complete.

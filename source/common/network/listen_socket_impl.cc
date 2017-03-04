@@ -18,7 +18,7 @@ void ListenSocketImpl::doBind() {
 }
 
 TcpListenSocket::TcpListenSocket(uint32_t port, bool bind_to_port) {
-  // TODO: IPv6 support.
+  // TODO(mattklein123): IPv6 support.
   local_address_.reset(new Address::Ipv4Instance(port));
   fd_ = local_address_->socket(Address::SocketType::Stream);
   RELEASE_ASSERT(fd_ != -1);

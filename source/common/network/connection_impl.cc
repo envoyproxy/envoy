@@ -1,8 +1,8 @@
 #include "connection_impl.h"
 #include "utility.h"
 
-#include "envoy/event/timer.h"
 #include "envoy/common/exception.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
 #include "common/common/assert.h"
@@ -34,8 +34,8 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
-// TODO: Currently we don't populate local address for client connections. Nothing looks at this
-//       currently, but we may want to populate this later for logging purposes.
+// TODO(mattklein123): Currently we don't populate local address for client connections. Nothing
+// looks at this currently, but we may want to populate this later for logging purposes.
 const Address::InstancePtr
     ConnectionImpl::null_local_address_(new Address::Ipv4Instance("0.0.0.0"));
 
@@ -178,8 +178,9 @@ void ConnectionImpl::readDisable(bool disable) {
   // This allows us to still detect remote close in a timely manner. In practice there is a chance
   // that a bad client could send us a large amount of data on a HTTP/1.1 connection while we are
   // processing the current request.
-  // TODO: Add buffered data stats and potentially fail safe processing that disconnects or
-  //       applies back pressure to bad HTTP/1.1 clients.
+  //
+  // TODO(mattklein123): Add buffered data stats and potentially fail safe processing that
+  // disconnects or applies back pressure to bad HTTP/1.1 clients.
   if (disable) {
     ASSERT(read_enabled);
     state_ &= ~InternalState::ReadEnabled;
@@ -194,8 +195,8 @@ void ConnectionImpl::readDisable(bool disable) {
 
 void ConnectionImpl::raiseEvents(uint32_t events) {
   for (ConnectionCallbacks* callback : callbacks_) {
-    // TODO: If we close while raising a connected event we should not raise further connected
-    //       events.
+    // TODO(mattklein123): If we close while raising a connected event we should not raise further
+    // connected events.
     callback->onEvent(events);
   }
 }
@@ -252,8 +253,9 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
   do {
     // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
     // use an ioctl() before every read to figure out how much data there is to read.
-    // TODO PERF: Tune the read size and figure out a way of getting rid of the ioctl(). The extra
-    //            syscall is not worth it.
+    //
+    // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
+    // ioctl(). The extra syscall is not worth it.
     int rc = read_buffer_.read(fd_, 16384);
     conn_log_trace("read returns: {}", *this, rc);
 
