@@ -18,7 +18,20 @@ public:
   virtual uint32_t address() const PURE;
 };
 
-enum class IpVersion { v4 };
+/**
+ * Interface for an Ipv6 address.
+ */
+class Ipv6 {
+public:
+  virtual ~Ipv6() {}
+
+  /**
+   * @return the 16-byte IPv6 address in network byte order.
+   */
+  virtual std::array<uint8_t, 16> address() const PURE;
+};
+
+enum class IpVersion { v4, v6 };
 
 /**
  * Interface for a generic IP address.
@@ -36,6 +49,11 @@ public:
    * @return Ipv4 address data IFF type() == IpVersion::v4, otherwise nullptr.
    */
   virtual const Ipv4* ipv4() const PURE;
+
+  /**
+   * @return Ipv6 address data IFF type() == IpVersion::v6, otherwise nullptr.
+   */
+  virtual const Ipv6* ipv6() const PURE;
 
   /**
    * @return the port associated with the address. Port may be zero if not specified or applicable.
@@ -65,7 +83,8 @@ public:
    * @return a human readable string for the address.
    *
    * This string will be in the following format:
-   * For IP addresses: "1.2.3.4:80"
+   * For IPv4 addresses: "1.2.3.4:80"
+   * For IPv6 addresses: "[1234:5678::9]:443"
    * For pipe addresses: "/foo"
    */
   virtual const std::string& asString() const PURE;
