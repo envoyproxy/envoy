@@ -20,6 +20,7 @@ public:
 
 private:
   void assignEvents(uint32_t events);
+
   FileReadyCb cb_;
   event_base* base_;
   int fd_;

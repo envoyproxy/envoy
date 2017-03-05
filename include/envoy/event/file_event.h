@@ -7,6 +7,7 @@ namespace Event {
 struct FileReadyType {
   static const uint32_t Read = 0x1;
   static const uint32_t Write = 0x2;
+  static const uint32_t Closed = 0x4;
 };
 
 enum class FileTriggerType { Level, Edge };
