@@ -50,6 +50,8 @@ statsd_tcp_cluster_name
   listener. If specified, Envoy will connect to this cluster to flush :ref:`statistics
   <arch_overview_statistics>`.
 
+.. _config_overview_stats_flush_interval_ms:
+
 stats_flush_interval_ms
   *(optional, integer)* The time in milliseconds between flushes to configured stats sinks. For
   performance reasons Envoy latches counters and only flushes counters and gauges at a periodic

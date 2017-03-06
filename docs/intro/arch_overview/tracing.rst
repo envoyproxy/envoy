@@ -21,7 +21,8 @@ sources of latency. Envoy supports three features related to system wide tracing
   :ref:`config_http_conn_man_headers_x-request-id`.
 
 Envoy relies on properly propagated :ref:`config_http_conn_man_headers_x-request-id` and
-:ref:`config_http_conn_man_headers_x-ot-span-context` HTTP headers for LightStep tracing functionality.
+:ref:`config_http_conn_man_headers_x-ot-span-context` HTTP headers for LightStep tracing
+functionality.
 
 How to initiate a trace
 -----------------------
