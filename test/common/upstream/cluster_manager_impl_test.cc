@@ -337,6 +337,10 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   create(*loader);
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
+  EXPECT_EQ(cluster.info(), cluster_manager_->get("cluster_1")->info());
+  EXPECT_EQ(1UL, cluster_manager_->get("cluster_1")->hostSet().hosts().size());
+  EXPECT_EQ(cluster.hosts()[0],
+            cluster_manager_->get("cluster_1")->loadBalancer().chooseHost(nullptr));
 
   // Local reference, primary reference, thread local reference, host reference.
   EXPECT_EQ(4U, cluster.info().use_count());
@@ -370,6 +374,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   MockCluster* cluster1 = new NiceMock<MockCluster>();
   MockCluster* cluster2 = new NiceMock<MockCluster>();
   cluster2->info_->name_ = "fake_cluster2";
+  cluster2->info_->lb_type_ = LoadBalancerType::RingHash;
 
   // This part tests static init.
   InSequence s;

@@ -54,6 +54,23 @@ TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
   return ret;
 }
 
+void ConditionalInitializer::setReady() {
+  std::unique_lock<std::mutex> lock(mutex_);
+  EXPECT_FALSE(ready_);
+  ready_ = true;
+  cv_.notify_all();
+}
+
+void ConditionalInitializer::waitReady() {
+  std::unique_lock<std::mutex> lock(mutex_);
+  if (ready_) {
+    return;
+  }
+
+  cv_.wait(lock);
+  EXPECT_TRUE(ready_);
+}
+
 namespace Http {
 
 TestHeaderMapImpl::TestHeaderMapImpl() : HeaderMapImpl() {}

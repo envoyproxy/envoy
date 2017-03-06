@@ -73,7 +73,15 @@ public:
   }
 
   bool featureEnabled(const std::string& key, uint64_t default_value) const override {
-    return featureEnabled(key, default_value, generator_.random());
+    // Avoid PNRG if we know we don't need it.
+    uint64_t cutoff = std::min(getInteger(key, default_value), 100UL);
+    if (cutoff == 0) {
+      return false;
+    } else if (cutoff == 100) {
+      return true;
+    } else {
+      return generator_.random() % 100 < cutoff;
+    }
   }
 
   bool featureEnabled(const std::string& key, uint64_t default_value,

@@ -21,6 +21,11 @@ TEST(DateUtil, All) {
   EXPECT_TRUE(DateUtil::timePointValid(std::chrono::system_clock::now()));
 }
 
+TEST(ProdSystemTimeSourceTest, All) {
+  ProdSystemTimeSource source;
+  source.currentSystemTime();
+}
+
 TEST(StringUtil, caseInsensitiveCompare) {
   EXPECT_EQ(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "content-length"));
   EXPECT_LT(0, StringUtil::caseInsensitiveCompare("CONTENT-LENGTH", "blah"));

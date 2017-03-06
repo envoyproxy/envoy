@@ -101,6 +101,9 @@ TEST(NetworkFilterConfigTest, TcpProxy) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
+
+  EXPECT_EQ(nullptr, factory.tryCreateFilterFactory(NetworkFilterType::Both, "tcp_proxy",
+                                                    *json_config, server));
 }
 
 TEST(NetworkFilterConfigTest, ClientSslAuth) {
