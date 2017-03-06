@@ -15,6 +15,7 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
     : inotify_fd_(inotify_init1(IN_NONBLOCK)),
       inotify_event_(dispatcher.createFileEvent(inotify_fd_, [this](uint32_t events) -> void {
         ASSERT(events == Event::FileReadyType::Read);
+        UNREFERENCED_PARAMETER(events);
         onInotifyEvent();
       }, Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
 
