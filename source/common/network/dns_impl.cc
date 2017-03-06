@@ -98,7 +98,7 @@ void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
   if (it == events_.end()) {
     events_[fd] = dispatcher_.createFileEvent(fd, [this, fd](uint32_t events) {
       onEventCallback(fd, events);
-    }, Event::FileTriggerType::Level);
+    }, Event::FileTriggerType::Level, Event::FileReadyType::Read | Event::FileReadyType::Write);
   }
   events_[fd]->setEnabled((read ? Event::FileReadyType::Read : 0) |
                           (write ? Event::FileReadyType::Write : 0));

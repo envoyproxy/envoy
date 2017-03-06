@@ -12,7 +12,8 @@ namespace Event {
  */
 class FileEventImpl : public FileEvent, ImplBase {
 public:
-  FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb, FileTriggerType trigger);
+  FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb, FileTriggerType trigger,
+                uint32_t events);
 
   // Event::FileEvent
   void activate(uint32_t events) override;
@@ -20,6 +21,7 @@ public:
 
 private:
   void assignEvents(uint32_t events);
+
   FileReadyCb cb_;
   event_base* base_;
   int fd_;

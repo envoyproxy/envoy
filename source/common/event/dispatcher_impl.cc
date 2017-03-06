@@ -70,8 +70,9 @@ Network::DnsResolverPtr DispatcherImpl::createDnsResolver() {
   return Network::DnsResolverPtr{new Network::DnsResolverImpl(*this)};
 }
 
-FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger) {
-  return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger)};
+FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+                                             uint32_t events) {
+  return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {

@@ -27,10 +27,10 @@ ProxyProtocol::ActiveConnection::ActiveConnection(ProxyProtocol& parent,
                                                   ListenerImpl& listener)
     : parent_(parent), fd_(fd), listener_(listener), search_index_(1) {
   file_event_ = dispatcher.createFileEvent(fd, [this](uint32_t events) {
-    if (events & Event::FileReadyType::Read) {
-      onRead();
-    }
-  }, Event::FileTriggerType::Edge);
+    ASSERT(events == Event::FileReadyType::Read);
+    UNREFERENCED_PARAMETER(events);
+    onRead();
+  }, Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
 
 ProxyProtocol::ActiveConnection::~ActiveConnection() {
