@@ -129,6 +129,8 @@ x-envoy-upstream-canary
 If an upstream host sets this header, the router will use it to generate canary specific statistics.
 The output tree is documented :ref:`here <config_cluster_manager_cluster_stats_dynamic_http>`.
 
+.. _config_http_filters_router_x-envoy-upstream-rq-timeout-alt-response:
+
 x-envoy-upstream-rq-timeout-alt-response
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
