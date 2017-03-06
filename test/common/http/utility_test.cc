@@ -66,6 +66,13 @@ TEST(HttpUtility, appendXff) {
     Utility::appendXff(headers, address);
     EXPECT_EQ("10.0.0.1, 127.0.0.1", headers.get_("x-forwarded-for"));
   }
+
+  {
+    TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
+    Network::Address::PipeInstance address("/foo");
+    Utility::appendXff(headers, address);
+    EXPECT_EQ("10.0.0.1", headers.get_("x-forwarded-for"));
+  }
 }
 
 TEST(HttpUtility, createSslRedirectPath) {
@@ -102,8 +109,15 @@ TEST(HttpUtility, TwoAddressesInXFF) {
 }
 
 TEST(HttpUtility, EmptyXFF) {
-  TestHeaderMapImpl request_headers;
-  EXPECT_EQ("", Utility::getLastAddressFromXFF(request_headers));
+  {
+    TestHeaderMapImpl request_headers{{"x-forwarded-for", ""}};
+    EXPECT_EQ("", Utility::getLastAddressFromXFF(request_headers));
+  }
+
+  {
+    TestHeaderMapImpl request_headers;
+    EXPECT_EQ("", Utility::getLastAddressFromXFF(request_headers));
+  }
 }
 
 TEST(HttpUtility, OneAddressInXFF) {

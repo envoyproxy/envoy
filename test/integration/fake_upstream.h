@@ -12,6 +12,8 @@
 #include "common/stats/stats_impl.h"
 #include "server/connection_handler_impl.h"
 
+#include "test/test_common/utility.h"
+
 class FakeHttpConnection;
 
 /**
@@ -166,7 +168,7 @@ private:
 
   Ssl::ServerContext* ssl_ctx_{};
   Network::ListenSocketPtr socket_;
-  Thread::ConditionalInitializer server_initialized_;
+  ConditionalInitializer server_initialized_;
   Thread::ThreadPtr thread_;
   std::mutex lock_;
   std::condition_variable new_connection_event_;

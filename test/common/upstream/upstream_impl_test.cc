@@ -270,6 +270,26 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   EXPECT_EQ("", cluster.hosts()[0]->hostname());
 }
 
+TEST(StaticClusterImplTest, RingHash) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
+  std::string json = R"EOF(
+  {
+    "name": "staticcluster",
+    "connect_timeout_ms": 250,
+    "type": "static",
+    "lb_type": "ring_hash",
+    "hosts": [{"url": "tcp://10.0.0.1:11001"}]
+  }
+  )EOF";
+
+  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
+  EXPECT_EQ(1UL, cluster.healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::RingHash, cluster.info()->lbType());
+}
+
 TEST(StaticClusterImplTest, OutlierDetector) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
