@@ -11,7 +11,7 @@ Version history
   consistent hash routing :ref:`based on a policy <config_http_conn_man_route_table_hash_policy>`.
 * Vastly :ref:`enhanced global rate limit configuration <arch_overview_rate_limit>` via the HTTP
   rate limiting filter.
-* HTTP routing based to a cluster :ref:`retrieved from a header
+* HTTP routing to a cluster :ref:`retrieved from a header
   <config_http_conn_man_route_table_route_cluster_header>`.
 * :ref:`Weighted cluster <config_http_conn_man_route_table_route_config_weighted_clusters>` HTTP
   routing.
