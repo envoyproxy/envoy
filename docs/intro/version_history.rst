@@ -1,6 +1,30 @@
 Version history
 ---------------
 
+1.2.0
+=====
+
+* CDS API
+* Outlier detection
+* JSON config schema
+* Ring hash consistent load balancer
+* Enhanced global rate limit configuration
+* HTTP routing based on cluster header
+* Weighted cluster HTTP routing
+* Auto host rewrite during HTTP routing
+* Regex header matching during HTTP routing
+* HTTP access log runtime filter
+* Lightstep tracer parent/child span association
+* RDS API
+* x-envoy-upstream-rq-timeout-alt-response haeder
+* use_original_dst and bind_to_port listener options
+* TCP proxy filter routing
+* Configurable stats flush interval
+* Various third party library upgrades, including using boringssl as the default SSL provider
+* No longer maintain closed HTTP/2 streams for priority calculations. Leads to substantial memory
+  savings for large meshes.
+* Numerous small changes and fixes not listed here.
+
 1.1.0
 =====
 
