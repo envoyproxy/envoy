@@ -17,7 +17,7 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
         if (events & Event::FileReadyType::Read) {
           onInotifyEvent();
         }
-      }, Event::FileTriggerType::Edge)) {}
+      }, Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
 
 WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
 

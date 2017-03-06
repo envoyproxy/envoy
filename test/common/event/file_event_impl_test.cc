@@ -41,7 +41,7 @@ TEST_F(FileEventImplTest, EdgeTrigger) {
         if (events & FileReadyType::Write) {
           write_event.ready();
         }
-      }, FileTriggerType::Edge);
+      }, FileTriggerType::Edge, FileReadyType::Read | FileReadyType::Write);
 
   dispatcher.run(Event::Dispatcher::RunType::NonBlock);
 }
@@ -67,7 +67,7 @@ TEST_F(FileEventImplTest, LevelTrigger) {
         if (events & FileReadyType::Write) {
           write_event.ready();
         }
-      }, FileTriggerType::Level);
+      }, FileTriggerType::Level, FileReadyType::Read | FileReadyType::Write);
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
@@ -88,7 +88,7 @@ TEST_F(FileEventImplTest, SetEnabled) {
         if (events & FileReadyType::Write) {
           write_event.ready();
         }
-      }, FileTriggerType::Edge);
+      }, FileTriggerType::Edge, FileReadyType::Read | FileReadyType::Write);
 
   file_event->setEnabled(FileReadyType::Read);
   dispatcher.run(Event::Dispatcher::RunType::NonBlock);

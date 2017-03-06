@@ -182,7 +182,7 @@ void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance&
     if (events & Event::FileReadyType::Read) {
       onSocketEvent();
     }
-  }, Event::FileTriggerType::Edge);
+  }, Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   server_ = &server;
 }
 

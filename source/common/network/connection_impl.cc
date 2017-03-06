@@ -49,8 +49,11 @@ ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
   // condition and just crash.
   RELEASE_ASSERT(fd_ != -1);
 
-  file_event_ = dispatcher_.createFileEvent(
-      fd_, [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge);
+  // We never ask for both early close and read at the same time. If we are reading, we want to
+  // consume all available data.
+  file_event_ = dispatcher_.createFileEvent(fd_, [this](uint32_t events) -> void {
+    onFileEvent(events);
+  }, Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -193,6 +196,8 @@ void ConnectionImpl::readDisable(bool disable) {
   } else {
     ASSERT(!read_enabled);
     state_ |= InternalState::ReadEnabled;
+    // We never ask for both early close and read at the same time. If we are reading, we want to
+    // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
     if (read_buffer_.length() > 0) {
       file_event_->activate(Event::FileReadyType::Read);
@@ -257,7 +262,8 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     onReadReady();
   }
 
-  // Possible for a read event to close the socket.
+  // It's possible for a read event callback to close the socket (which will cause fd_ to be -1).
+  // In this case ignore write event processing.
   if (fd_ != -1 && (events & Event::FileReadyType::Write)) {
     onWriteReady();
   }

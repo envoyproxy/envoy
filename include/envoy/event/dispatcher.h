@@ -62,8 +62,11 @@ public:
    * @param fd supplies the fd to watch.
    * @param cb supplies the callback to fire when the file is ready.
    * @param trigger specifies whether to edge or level trigger.
+   * @param events supplies a logical OR of FileReadyType events that the file event should
+   *               initially listen on.
    */
-  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger) PURE;
+  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+                                       uint32_t events) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.
