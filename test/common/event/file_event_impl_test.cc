@@ -25,6 +25,38 @@ protected:
   int fds_[2];
 };
 
+TEST_F(FileEventImplTest, Activate) {
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_NE(-1, fd);
+
+  DispatcherImpl dispatcher;
+  ReadyWatcher read_event;
+  EXPECT_CALL(read_event, ready()).Times(1);
+  ReadyWatcher write_event;
+  EXPECT_CALL(write_event, ready()).Times(1);
+  ReadyWatcher closed_event;
+  EXPECT_CALL(closed_event, ready()).Times(1);
+
+  Event::FileEventPtr file_event = dispatcher.createFileEvent(fd, [&](uint32_t events) -> void {
+    if (events & FileReadyType::Read) {
+      read_event.ready();
+    }
+
+    if (events & FileReadyType::Write) {
+      write_event.ready();
+    }
+
+    if (events & FileReadyType::Closed) {
+      closed_event.ready();
+    }
+  }, FileTriggerType::Edge, FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed);
+
+  file_event->activate(FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed);
+  dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+
+  close(fd);
+}
+
 TEST_F(FileEventImplTest, EdgeTrigger) {
   DispatcherImpl dispatcher;
   ReadyWatcher read_event;

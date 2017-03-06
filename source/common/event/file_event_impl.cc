@@ -24,6 +24,10 @@ void FileEventImpl::activate(uint32_t events) {
     libevent_events |= EV_WRITE;
   }
 
+  if (events & FileReadyType::Closed) {
+    libevent_events |= EV_CLOSED;
+  }
+
   ASSERT(libevent_events);
   event_active(&raw_event_, libevent_events, 0);
 }
