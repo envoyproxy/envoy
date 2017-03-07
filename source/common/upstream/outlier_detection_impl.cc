@@ -53,16 +53,17 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
-DetectorConfig::DetectorConfig(const Json::ObjectPtr json_config) {
-  interval_ms_ = static_cast<uint64_t> json_config->getInteger("interval_ms", 10000);
+DetectorConfig::DetectorConfig(const Json::ObjectPtr& json_config) {
+  interval_ms_ = static_cast<uint64_t>(json_config->getInteger("interval_ms", 10000));
   base_ejection_time_ms_ =
-      static_cast<uint64_t> json_config->getInteger("base_ejection_time_ms", 30000);
-  consecutive_5xx_ = static_cast<uint64_t> json_config->getInteger("consecutive_5xx", 5);
-  max_ejection_percent_ = static_cast<uint64_t> json_config->getInteger("max_ejection_percent", 10);
-  enforcing_ = static_cast<uint64_t> json_config->getInteger("enforcing", 100);
+      static_cast<uint64_t>(json_config->getInteger("base_ejection_time_ms", 30000));
+  consecutive_5xx_ = static_cast<uint64_t>(json_config->getInteger("consecutive_5xx", 5));
+  max_ejection_percent_ =
+      static_cast<uint64_t>(json_config->getInteger("max_ejection_percent", 10));
+  enforcing_ = static_cast<uint64_t>(json_config->getInteger("enforcing", 100));
 }
 
-DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::ObjectPtr json_config,
+DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::ObjectPtr& json_config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                            SystemTimeSource& time_source, EventLoggerPtr event_logger)
     : config_(json_config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
@@ -80,7 +81,7 @@ DetectorImpl::~DetectorImpl() {
 }
 
 std::shared_ptr<DetectorImpl>
-DetectorImpl::create(const Cluster& cluster, const Json::ObjectPtr json_config,
+DetectorImpl::create(const Cluster& cluster, const Json::ObjectPtr& json_config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      SystemTimeSource& time_source, EventLoggerPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
