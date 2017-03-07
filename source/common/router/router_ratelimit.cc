@@ -1,5 +1,6 @@
 #include "router_ratelimit.h"
 
+#include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
 
@@ -107,30 +108,24 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
   }
 }
 
-RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config) {
+RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
+    : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
   if (config.hasObject("rate_limits")) {
-    // The supported number of stages is 0 through RateLimitPolicyImpl::MAX_STAGE_NUMBER
-    // inclusively.
-    for (size_t i = 0; i <= RateLimitPolicyImpl::MAX_STAGE_NUMBER; i++) {
-      std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_policy;
-      std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limit_policy_reference;
-      rate_limit_entries_reference_.emplace_back(rate_limit_policy_reference);
-      rate_limit_entries_.emplace_back(std::move(rate_limit_policy));
-    }
-
     for (const Json::ObjectPtr& rate_limit : config.getObjectArray("rate_limits")) {
       std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
           new RateLimitPolicyEntryImpl(*rate_limit));
       uint64_t stage = rate_limit_policy_entry->stage();
+      ASSERT(stage < rate_limit_entries_reference_.size());
       rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);
-      rate_limit_entries_[stage].emplace_back(std::move(rate_limit_policy_entry));
+      rate_limit_entries_.emplace_back(std::move(rate_limit_policy_entry));
     }
   }
 }
 
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>&
 RateLimitPolicyImpl::getApplicableRateLimit(uint64_t stage) const {
-  if (rate_limit_entries_.empty() || stage > RateLimitPolicyImpl::MAX_STAGE_NUMBER) {
+  ASSERT(stage <= RateLimitPolicyImpl::MAX_STAGE_NUMBER);
+  if (rate_limit_entries_.empty()) {
     return empty_rate_limit_;
   } else {
     return rate_limit_entries_reference_[stage];

@@ -55,7 +55,9 @@ Source Cluster
 
 The following descriptor entry is appended to the descriptor:
 
-  * ("source_cluster", "<local service cluster>")
+.. code-block:: cpp
+
+  ("source_cluster", "<local service cluster>")
 
 <local service cluster> is derived from the :option:`--service-cluster` option.
 
@@ -70,7 +72,9 @@ Destination Cluster
 
 The following descriptor entry is appended to the descriptor:
 
-  * ("destination_cluster", "<routed target cluster>")
+.. code-block:: cpp
+
+  ("destination_cluster", "<routed target cluster>")
 
 Once a request matches against a route table rule, a routed cluster is determined by one of the
 following :ref:`route table configuration <config_http_conn_man_route_table_route_cluster>`
@@ -104,7 +108,9 @@ descriptor_key
 The following descriptor entry is appended when a header contains a key that matches the
 *header_name*:
 
-  * ("<descriptor_key>", "<header_value_queried_from_header>")
+.. code-block:: cpp
+
+  ("<descriptor_key>", "<header_value_queried_from_header>")
 
 Remote Address
 ^^^^^^^^^^^^^^
@@ -118,8 +124,9 @@ Remote Address
 The following descriptor entry is appended to the descriptor and is populated using the trusted
 address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
 
-    * ("remote_address", "<:ref:`trusted address from x-forwarded-for
-      <config_http_conn_man_headers_x-forwarded-for>`>")
+.. code-block:: cpp
+
+  ("remote_address", "<trusted address from x-forwarded-for>")
 
 Generic Key
 ^^^^^^^^^^^
@@ -137,7 +144,9 @@ descriptor_value
 
 The following descriptor entry is appended to the descriptor:
 
-    * ("generic_key", "<descriptor_value>")
+.. code-block:: cpp
+
+  ("generic_key", "<descriptor_value>")
 
 Header Value Match
 ^^^^^^^^^^^^^^^^^^
@@ -163,7 +172,9 @@ descriptor_value
 The following descriptor entry is appended to the descriptor if the request matches the headers
 specified in the action config:
 
-    * ("header_match", "<descriptor_value>")
+.. code-block:: cpp
+
+  ("header_match", "<descriptor_value>")
 
 .. _config_http_conn_man_route_table_rate_limit_composing_actions:
 
@@ -176,7 +187,9 @@ will be populated in the order the actions are specified in the configuration.
 
 For example, to generate the following descriptor:
 
-  * ("generic_key", "some_value"), ("source_cluster", "from_cluster")
+.. code-block:: cpp
+
+  ("generic_key", "some_value"), ("source_cluster", "from_cluster")
 
 The configuration would be:
 
@@ -218,10 +231,14 @@ generate a few possible descriptors depending on what is present in the request.
 For a request with :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>` set and the
 trusted address is for example *127.0.0.1*, the following descriptor would be generated:
 
-  * ("generic_key", "some_value"), ("remote_address", "127.0.0.1"), ("source_cluster",
+.. code-block:: cpp
+
+  ("generic_key", "some_value"), ("remote_address", "127.0.0.1"), ("source_cluster",
     "from_cluster")
 
 If a request did not set :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`, the
 following descriptor would be generated:
 
-  * ("generic_key", "some_value"), ("source_cluster", "from_cluster")
+.. code-block:: cpp
+
+  ("generic_key", "some_value"), ("source_cluster", "from_cluster")

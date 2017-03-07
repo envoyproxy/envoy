@@ -323,7 +323,7 @@ TEST_F(RateLimitConfiguration, Stages) {
   EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
               testing::ContainerEq(descriptors));
 
-  rate_limits = route_->rateLimitPolicy().getApplicableRateLimit(11UL);
+  rate_limits = route_->rateLimitPolicy().getApplicableRateLimit(10UL);
   EXPECT_TRUE(rate_limits.empty());
 }
 
