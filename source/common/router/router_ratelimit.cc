@@ -122,7 +122,7 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
 
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>&
 RateLimitPolicyImpl::getApplicableRateLimit(uint64_t stage) const {
-  ASSERT(stage <= RateLimitPolicyImpl::MAX_STAGE_NUMBER);
+  ASSERT(stage < rate_limit_entries_reference_.size());
   return rate_limit_entries_reference_[stage];
 }
 
