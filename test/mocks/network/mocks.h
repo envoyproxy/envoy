@@ -57,6 +57,7 @@ public:
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(state, State());
   MOCK_METHOD1(write, void(Buffer::Instance& data));
+  MOCK_METHOD1(setReadBufferLimit, void(size_t limit));
 };
 
 /**
@@ -87,6 +88,7 @@ public:
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(state, State());
   MOCK_METHOD1(write, void(Buffer::Instance& data));
+  MOCK_METHOD1(setReadBufferLimit, void(size_t limit));
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
@@ -209,12 +211,14 @@ public:
   ~MockConnectionHandler();
 
   MOCK_METHOD0(numConnections, uint64_t());
-  MOCK_METHOD5(addListener,
+  MOCK_METHOD6(addListener,
                void(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                    bool bind_to_port, bool use_proxy_proto, bool use_orig_dst));
-  MOCK_METHOD6(addSslListener, void(Network::FilterChainFactory& factory,
-                                    Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-                                    bool bind_to_port, bool use_proxy_proto, bool use_orig_dst));
+                    bool bind_to_port, bool use_proxy_proto, bool use_orig_dst,
+                    size_t per_connection_buffer_limit_bytes));
+  MOCK_METHOD7(addSslListener,
+               void(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
+                    Network::ListenSocket& socket, bool bind_to_port, bool use_proxy_proto,
+                    bool use_orig_dst, size_t per_connection_buffer_limit_bytes));
   MOCK_METHOD1(findListenerByPort, Network::Listener*(uint32_t port));
   MOCK_METHOD0(closeListeners, void());
 };

@@ -95,6 +95,7 @@ private:
     Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
     bool useProxyProto() override { return use_proxy_proto_; }
     bool useOriginalDst() override { return use_original_dst_; }
+    size_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
 
     // Network::FilterChainFactory
     bool createFilterChain(Network::Connection& connection) override;
@@ -107,6 +108,7 @@ private:
     Ssl::ServerContextPtr ssl_context_;
     bool use_proxy_proto_{};
     bool use_original_dst_{};
+    size_t per_connection_buffer_limit_bytes_{};
     std::list<NetworkFilterFactoryCb> filter_factories_;
   };
 

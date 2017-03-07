@@ -79,6 +79,10 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
 
     if (slices_to_commit > 0) {
       read_buffer_.commit(slices, slices_to_commit);
+      if (shouldDrainReadBuffer()) {
+        setReadBufferReady();
+        keep_reading = false;
+      }
     }
   }
 

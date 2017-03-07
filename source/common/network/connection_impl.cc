@@ -270,7 +270,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 }
 
 ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
-  PostIoAction action;
+  PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   do {
     // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
@@ -288,15 +288,17 @@ ConnectionImpl::IoResult ConnectionImpl::doReadFromSocket() {
     } else if (rc == -1) {
       // Remote error (might be no data).
       conn_log_trace("read error: {}", *this, errno);
-      if (errno == EAGAIN) {
-        action = PostIoAction::KeepOpen;
-      } else {
+      if (errno != EAGAIN) {
         action = PostIoAction::Close;
       }
 
       break;
     } else {
       bytes_read += rc;
+      if (shouldDrainReadBuffer()) {
+        setReadBufferReady();
+        break;
+      }
     }
   } while (true);
 

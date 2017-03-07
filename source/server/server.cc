@@ -169,7 +169,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   original_start_time_ = info.original_start_time_;
   admin_.reset(
       new AdminImpl(initial_config.admin().accessLogPath(), initial_config.admin().port(), *this));
-  handler_.addListener(*admin_, admin_->socket(), true, false, false);
+  handler_.addListener(*admin_, admin_->socket(), true, false, false, 0);
 
   loadServerFlags(initial_config.flagsPath());
 

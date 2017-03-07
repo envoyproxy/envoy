@@ -146,6 +146,12 @@ public:
    * are installed.
    */
   virtual void write(Buffer::Instance& data) PURE;
+
+  /**
+   * Set a soft limit on the size of the read buffer prior to flushing to further stages in the
+   * processing pipeline.
+   */
+  virtual void setReadBufferLimit(size_t limit) PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

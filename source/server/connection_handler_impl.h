@@ -57,11 +57,12 @@ public:
   uint64_t numConnections() override { return num_connections_; }
 
   void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                   bool bind_to_port, bool use_proxy_proto, bool use_orig_dst) override;
+                   bool bind_to_port, bool use_proxy_proto, bool use_orig_dst,
+                   size_t per_connection_buffer_limit_bytes) override;
 
   void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
                       Network::ListenSocket& socket, bool bind_to_port, bool use_proxy_proto,
-                      bool use_orig_dst) override;
+                      bool use_orig_dst, size_t per_connection_buffer_limit_bytes) override;
 
   Network::Listener* findListenerByPort(uint32_t port) override;
 
@@ -74,7 +75,7 @@ private:
   struct ActiveListener : public Network::ListenerCallbacks {
     ActiveListener(ConnectionHandlerImpl& parent, Network::ListenSocket& socket,
                    Network::FilterChainFactory& factory, bool use_proxy_proto, bool bind_to_port,
-                   bool use_orig_dst);
+                   bool use_orig_dst, size_t per_connection_buffer_limit_bytes);
 
     ActiveListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                    Network::FilterChainFactory& factory, const std::string& stats_prefix);
@@ -94,7 +95,8 @@ private:
   struct SslActiveListener : public ActiveListener {
     SslActiveListener(ConnectionHandlerImpl& parent, Ssl::ServerContext& ssl_ctx,
                       Network::ListenSocket& socket, Network::FilterChainFactory& factory,
-                      bool use_proxy_proto, bool bind_to_port, bool use_orig_dst);
+                      bool use_proxy_proto, bool bind_to_port, bool use_orig_dst,
+                      size_t per_connection_buffer_limit_bytes);
   };
 
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;

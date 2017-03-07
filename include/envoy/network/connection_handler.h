@@ -28,9 +28,12 @@ public:
    * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
    * @param use_orig_dst if a connection was redirected to this port using iptables,
    *        allow the listener to hand it off to the listener associated to the original port
+   * @param per_connection_buffer_limit_bytes soft limit on size of the listener's new connection
+   *        read and write buffers.
    */
   virtual void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                           bool bind_to_port, bool use_proxy_proto, bool use_orig_dst) PURE;
+                           bool bind_to_port, bool use_proxy_proto, bool use_orig_dst,
+                           size_t per_connection_buffer_limit_bytes) PURE;
 
   /**
    * Adds listener to the handler.
@@ -43,10 +46,13 @@ public:
    * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
    * @param use_orig_dst if a connection was redirected to this port using iptables,
    *        allow the listener to hand it off to the listener associated to the original port
+   * @param per_connection_buffer_limit_bytes soft limit on size of the listener's new connection
+   *        read and write buffers.
    */
   virtual void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
                               Network::ListenSocket& socket, bool bind_to_port,
-                              bool use_proxy_proto, bool use_orig_dst) PURE;
+                              bool use_proxy_proto, bool use_orig_dst,
+                              size_t per_connection_buffer_limit_bytes) PURE;
 
   /**
    * Find a listener based on the provided listener port value.

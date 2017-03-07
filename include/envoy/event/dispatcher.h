@@ -86,13 +86,16 @@ public:
    * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
    * @param use_orig_dst if a connection was redirected to this port using iptables,
    *        allow the listener to hand it off to the listener associated to the original port
+   * @param per_connection_buffer_limit_bytes soft limit on size of the listener's new connection
+   *        read and write buffers.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
                                               Network::ListenSocket& socket,
                                               Network::ListenerCallbacks& cb,
                                               Stats::Store& stats_store, bool bind_to_port,
-                                              bool use_proxy_proto, bool use_orig_dst) PURE;
+                                              bool use_proxy_proto, bool use_orig_dst,
+                                              size_t per_connection_buffer_limit_bytes) PURE;
 
   /**
    * Create a listener on a specific port.
@@ -108,14 +111,15 @@ public:
    * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
    * @param use_orig_dst if a connection was redirected to this port using iptables,
    *        allow the listener to hand it off to the listener associated to the original port
+   * @param per_connection_buffer_limit_bytes soft limit on size of the listener's new connection
+   *        read and write buffers.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::ListenerPtr createSslListener(Network::ConnectionHandler& conn_handler,
-                                                 Ssl::ServerContext& ssl_ctx,
-                                                 Network::ListenSocket& socket,
-                                                 Network::ListenerCallbacks& cb,
-                                                 Stats::Store& stats_store, bool bind_to_port,
-                                                 bool use_proxy_proto, bool use_orig_dst) PURE;
+  virtual Network::ListenerPtr
+  createSslListener(Network::ConnectionHandler& conn_handler, Ssl::ServerContext& ssl_ctx,
+                    Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+                    Stats::Store& stats_store, bool bind_to_port, bool use_proxy_proto,
+                    bool use_orig_dst, size_t per_connection_buffer_limit_bytes) PURE;
 
   /**
    * Allocate a timer. @see Event::Timer for docs on how to use the timer.

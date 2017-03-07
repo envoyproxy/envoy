@@ -63,10 +63,12 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
 ListenerImpl::ListenerImpl(Network::ConnectionHandler& conn_handler,
                            Event::DispatcherImpl& dispatcher, ListenSocket& socket,
                            ListenerCallbacks& cb, Stats::Store& stats_store, bool bind_to_port,
-                           bool use_proxy_proto, bool use_orig_dst)
+                           bool use_proxy_proto, bool use_orig_dst,
+                           size_t per_connection_buffer_limit_bytes)
     : connection_handler_(conn_handler), dispatcher_(dispatcher), socket_(socket), cb_(cb),
       bind_to_port_(bind_to_port), use_proxy_proto_(use_proxy_proto), proxy_protocol_(stats_store),
-      use_original_dst_(use_orig_dst), listener_(nullptr) {
+      use_original_dst_(use_orig_dst),
+      per_connection_buffer_limit_bytes_(per_connection_buffer_limit_bytes), listener_(nullptr) {
 
   if (bind_to_port_) {
     listener_.reset(
@@ -90,6 +92,7 @@ void ListenerImpl::errorCallback(evconnlistener*, void*) {
 void ListenerImpl::newConnection(int fd, Address::InstancePtr remote_address,
                                  Address::InstancePtr local_address) {
   ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, fd, remote_address, local_address));
+  new_connection->setReadBufferLimit(per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
 
@@ -98,6 +101,7 @@ void SslListenerImpl::newConnection(int fd, Address::InstancePtr remote_address,
   ConnectionPtr new_connection(new Ssl::ConnectionImpl(dispatcher_, fd, remote_address,
                                                        local_address, ssl_ctx_,
                                                        Ssl::ConnectionImpl::InitialState::Server));
+  new_connection->setReadBufferLimit(per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
 
