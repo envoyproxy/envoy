@@ -43,6 +43,27 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
             DetectorImplFactory::createForCluster(cluster, *loader, dispatcher, runtime, nullptr));
 }
 
+TEST(OutlierDetectorImplFactoryTest, DetectorConfig) {
+  std::string json = R"EOF(
+  {
+    "outlier_detection": {
+      "interval_ms" : 100,
+      "base_eject_time_ms" : 10000,
+      "consecutive_5xx" : 10,
+      "max_ejection_percent" : 50,
+      "enforcing" : 10
+    }
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<MockCluster> cluster;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  EXPECT_NE(nullptr,
+            DetectorImplFactory::createForCluster(cluster, *loader, dispatcher, runtime, nullptr));
+}
+
 class CallbackChecker {
 public:
   MOCK_METHOD1(check, void(HostPtr host));

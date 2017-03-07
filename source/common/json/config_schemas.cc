@@ -1061,7 +1061,37 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
-      "outlier_detection" : {"type" : "object"}
+      "outlier_detection" : {
+        "type" : "object",
+        "properties" : {
+          "consecutive_5xx" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "interval_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "base_ejection_time_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "max_ejection_percent" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          },
+          "enforcing" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          }
+        },
+        "additionalProperties" : false
+     }
     },
     "required" : ["name", "type", "connect_timeout_ms", "lb_type"],
     "additionalProperties" : false

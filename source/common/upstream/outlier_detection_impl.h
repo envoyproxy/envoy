@@ -85,26 +85,48 @@ struct DetectionStats {
 };
 
 /**
+ * Configuration for the outlier detection.
+ */
+class DetectorConfig {
+public:
+  DetectorConfig(const Json::ObjectPtr json_config);
+
+  uint64_t intervalMs() { return interval_ms_; }
+  uint64_t baseEjectionTimeMs() { return base_ejection_time_ms_; }
+  uint64_t consecutive5xx() { return consecutive_5xx_; }
+  uint64_t maxEjectionPercent() { return max_ejection_percent_; }
+  uint64_t enforcing() { return enforcing_; }
+
+private:
+  uint64_t interval_ms_{};
+  uint64_t base_ejection_time_ms_{};
+  uint64_t consecutive_5xx_{};
+  uint64_t max_ejection_percent_{};
+  uint64_t enforcing_{};
+};
+
+/**
  * An implementation of an outlier detector. In the future we may support multiple outlier detection
  * implementations with different configuration. For now, as we iterate everything is contained
  * within this implementation.
  */
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
-  static std::shared_ptr<DetectorImpl> create(const Cluster& cluster, Event::Dispatcher& dispatcher,
-                                              Runtime::Loader& runtime,
-                                              SystemTimeSource& time_source,
-                                              EventLoggerPtr event_logger);
+  static std::shared_ptr<DetectorImpl>
+  create(const Cluster& cluster, const Json::ObjectPtr& json_config, Event::Dispatcher& dispatcher,
+         Runtime::Loader& runtime, SystemTimeSource& time_source, EventLoggerPtr event_logger);
   ~DetectorImpl();
 
   void onConsecutive5xx(HostPtr host);
   Runtime::Loader& runtime() { return runtime_; }
+  DetectorConfig& config() { return config_; }
 
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
 
 private:
-  DetectorImpl(const Cluster& cluster, Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+  DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
+               Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                SystemTimeSource& time_source, EventLoggerPtr event_logger);
 
   void addHostSink(HostPtr host);
@@ -117,6 +139,7 @@ private:
   void onIntervalTimer();
   void runCallbacks(HostPtr host);
 
+  DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
   SystemTimeSource& time_source_;
