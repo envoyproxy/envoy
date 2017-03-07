@@ -59,7 +59,7 @@ def sigchld_handler(signum, frame):
   """ Handler for SIGCHLD. Iterates through all of our known child processes and figures out whether
       the signal/exit was expected or not. Python doesn't have any of the native signal handlers
       ability to get the child process info directly from the signal handler so we need to iterate
-      through all child process and see what happened."""
+      through all child processes and see what happened."""
 
   print "got SIGCHLD"
 
@@ -92,12 +92,12 @@ def sigchld_handler(signum, frame):
       kill_all_and_exit = True
 
   if kill_all_and_exit:
-    print "Due to abnormal exit, force killing all child process and exiting"
+    print "Due to abnormal exit, force killing all child processes and exiting"
     force_kill_all_children()
 
   # Our last child died, so we have no purpose. Exit.
   if not pid_list:
-    print "exiting due to lack of child process"
+    print "exiting due to lack of child processes"
     sys.exit(0)
 
 
