@@ -153,6 +153,7 @@ add_executable(envoy-test
   server/http/health_check_test.cc
   server/options_impl_test.cc
   server/server_test.cc
+  test_common/network_utility.cc
   test_common/printers.cc
   test_common/utility.cc)
 

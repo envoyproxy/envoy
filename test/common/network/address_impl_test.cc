@@ -1,11 +1,63 @@
 #include "envoy/common/exception.h"
 
 #include "common/network/address_impl.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include <sys/un.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 namespace Network {
 namespace Address {
+namespace {
+class ScopedFdCloser {
+public:
+  ScopedFdCloser(int fd) : fd_(fd) {}
+  ~ScopedFdCloser() { close(fd_); }
+
+private:
+  int fd_;
+};
+
+void makeFdBlocking(int fd) {
+  const int flags = ::fcntl(fd, F_GETFL, 0);
+  ASSERT_GE(flags, 0);
+  ASSERT_EQ(::fcntl(fd, F_SETFL, flags & (~O_NONBLOCK)), 0);
+}
+
+void testSocketBindAndConnect(const Instance& loopbackPort) {
+  // Create a socket on which we'll listen for connections from clients.
+  const int listen_fd = loopbackPort.socket(SocketType::Stream);
+  ASSERT_GE(listen_fd, 0) << loopbackPort.asString();
+  ScopedFdCloser closer1(listen_fd);
+
+  // Bind the socket to the desired address and port.
+  int rc = loopbackPort.bind(listen_fd);
+  int err = errno;
+  ASSERT_EQ(rc, 0) << loopbackPort.asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
+
+  // Do a bare listen syscall. Not bothering to accept connections as that would
+  // require another thread.
+  ASSERT_EQ(::listen(listen_fd, 1), 0);
+
+  // Create a client socket and connect to the server.
+  const int client_fd = loopbackPort.socket(SocketType::Stream);
+  ASSERT_GE(client_fd, 0) << loopbackPort.asString();
+  ScopedFdCloser closer2(client_fd);
+
+  // Instance::socket creates a non-blocking socket, which that extends all the way to the
+  // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
+  // handshake can complete. For testing convenience, re-enable blocking on the socket
+  // so that connect will wait for the handshake to complete.
+  makeFdBlocking(client_fd);
+
+  // Connect to the server.
+  rc = loopbackPort.connect(client_fd);
+  err = errno;
+  ASSERT_EQ(rc, 0) << loopbackPort.asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
+}
+}
 
 TEST(Ipv4InstanceTest, SocketAddress) {
   sockaddr_in addr4;
@@ -53,6 +105,12 @@ TEST(Ipv4InstanceTest, BadAddress) {
   EXPECT_THROW(Ipv4Instance("bar", 1), EnvoyException);
 }
 
+TEST(Ipv4InstanceTest, SocketBindAndConnect) {
+  // Test listening on and connecting to an unused port on the IPv4 loopback address.
+  Ipv4Instance loopbackPort("127.0.0.1", ::Network::Test::getUnusedPort());
+  testSocketBindAndConnect(loopbackPort);
+}
+
 TEST(Ipv6InstanceTest, SocketAddress) {
   sockaddr_in6 addr6;
   addr6.sin6_family = AF_INET6;
@@ -97,6 +155,12 @@ TEST(Ipv6InstanceTest, PortOnly) {
 TEST(Ipv6InstanceTest, BadAddress) {
   EXPECT_THROW(Ipv6Instance("foo"), EnvoyException);
   EXPECT_THROW(Ipv6Instance("bar", 1), EnvoyException);
+}
+
+TEST(Ipv6InstanceTest, SocketBindAndConnect) {
+  // Test listening on and connecting to an unused port on the IPv4 loopback address.
+  Ipv6Instance loopbackPort("::1", ::Network::Test::getUnusedPort());
+  testSocketBindAndConnect(loopbackPort);
 }
 
 TEST(PipeInstanceTest, Basic) {
