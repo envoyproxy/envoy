@@ -33,14 +33,29 @@ information on outlier detection. The runtime parameters supported by outlier de
 same as the :ref:`static configuration parameters <config_cluster_manager_cluster_outlier_detection>`, namely
 
 outlier_detection.consecutive_5xx
+  :ref:`consecutive_5XX
+  <config_cluster_manager_cluster_outlier_detection_consecutive_5xx>`
+  setting in outlier detection
 
 outlier_detection.interval_ms
+  :ref:`interval_ms
+  <config_cluster_manager_cluster_outlier_detection_interval_ms>`
+  setting in outlier detection
 
 outlier_detection.base_ejection_time_ms
+  :ref:`base_ejection_time_ms
+  <config_cluster_manager_cluster_outlier_detection_base_ejection_time_ms>`
+  setting in outlier detection
 
 outlier_detection.max_ejection_percent
+  :ref:`max_ejection_percent
+  <config_cluster_manager_cluster_outlier_detection_max_ejection_percent>`
+  setting in outlier detection
 
 outlier_detection.enforcing
+  :ref:`enforcing
+  <config_cluster_manager_cluster_outlier_detection_enforcing>`
+  setting in outlier detection
 
 Core
 ----
