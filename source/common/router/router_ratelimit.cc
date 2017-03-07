@@ -6,8 +6,6 @@
 
 namespace Router {
 
-const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>
-    RateLimitPolicyImpl::empty_rate_limit_;
 const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
 
 void SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
@@ -125,11 +123,7 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>&
 RateLimitPolicyImpl::getApplicableRateLimit(uint64_t stage) const {
   ASSERT(stage <= RateLimitPolicyImpl::MAX_STAGE_NUMBER);
-  if (rate_limit_entries_.empty()) {
-    return empty_rate_limit_;
-  } else {
-    return rate_limit_entries_reference_[stage];
-  }
+  return rate_limit_entries_reference_[stage];
 }
 
 } // Router

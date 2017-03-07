@@ -131,7 +131,6 @@ private:
   std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;
   std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
       rate_limit_entries_reference_;
-  static const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> empty_rate_limit_;
   // The maximum stage number supported. This value should match the maximum stage number in
   // Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA and
   // Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA from common/json/config_schemas.cc.
