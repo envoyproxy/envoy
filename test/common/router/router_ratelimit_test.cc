@@ -302,20 +302,19 @@ TEST_F(RateLimitConfiguration, Stages) {
   route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry();
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route_->rateLimitPolicy().getApplicableRateLimit(0);
-  EXPECT_EQ(3U, rate_limits.size());
+  EXPECT_EQ(2U, rate_limits.size());
 
   std::vector<::RateLimit::Descriptor> descriptors;
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, address);
   }
   EXPECT_THAT(std::vector<::RateLimit::Descriptor>(
-                  {{{{"remote_address", address}}},
-                   {{{"destination_cluster", "www2test"}}},
+                  {{{{"destination_cluster", "www2test"}}},
                    {{{"destination_cluster", "www2test"}, {"source_cluster", "service_cluster"}}}}),
               testing::ContainerEq(descriptors));
 
   descriptors.clear();
-  rate_limits = route_->rateLimitPolicy().getApplicableRateLimit(1);
+  rate_limits = route_->rateLimitPolicy().getApplicableRateLimit(1UL);
   EXPECT_EQ(1U, rate_limits.size());
 
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
@@ -324,7 +323,7 @@ TEST_F(RateLimitConfiguration, Stages) {
   EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
               testing::ContainerEq(descriptors));
 
-  rate_limits = route_->rateLimitPolicy().getApplicableRateLimit(10);
+  rate_limits = route_->rateLimitPolicy().getApplicableRateLimit(11UL);
   EXPECT_TRUE(rate_limits.empty());
 }
 
@@ -357,7 +356,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitPolicyEntryMembers) {
 
   SetUpTest(json);
 
-  EXPECT_EQ(2, rate_limit_entry_->stage());
+  EXPECT_EQ(2UL, rate_limit_entry_->stage());
   EXPECT_EQ("no_ratelimit", rate_limit_entry_->disableKey());
 }
 

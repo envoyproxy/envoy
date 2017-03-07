@@ -645,7 +645,11 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
     },
     "type" : "object",
     "properties" : {
-      "stage" : {"type" : "integer"},
+      "stage" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "maximum" : 10
+      },
       "disable_key" : {"type" : "string"},
       "actions" : {
         "type" : "array",
@@ -756,7 +760,11 @@ const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
     "type" : "object",
     "properties" : {
       "domain" : {"type" : "string"},
-      "stage" : {"type" : "integer"}
+      "stage" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "maximum" : 10
+      }
     },
     "required" : ["domain"],
     "additionalProperties" : false

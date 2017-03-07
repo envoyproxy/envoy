@@ -103,7 +103,7 @@ public:
   RateLimitPolicyEntryImpl(const Json::Object& config);
 
   // Router::RateLimitPolicyEntry
-  int64_t stage() const override { return stage_; }
+  uint64_t stage() const override { return stage_; }
   const std::string& disableKey() const override { return disable_key_; }
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
@@ -112,7 +112,7 @@ public:
 
 private:
   const std::string disable_key_;
-  int64_t stage_;
+  uint64_t stage_;
   std::vector<RateLimitActionPtr> actions_;
 };
 
@@ -125,16 +125,16 @@ public:
 
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
-  getApplicableRateLimit(int64_t stage = 0) const override;
+  getApplicableRateLimit(uint64_t stage = 0) const override;
 
 private:
-  std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;
-  std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>
-      default_rate_limit_entries_reference_;
-  // Holds reference to rate limit policies applicable to non-default stage settings.
-  std::unordered_map<int64_t, std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
+  std::vector<std::vector<std::unique_ptr<RateLimitPolicyEntry>>> rate_limit_entries_;
+  std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
       rate_limit_entries_reference_;
   static const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> empty_rate_limit_;
+  // The maximum stage number supported. When changing this value, update the HTTP Rate Limit filter
+  // and Rate Limit configuration schemas to all match.
+  static const uint64_t MAX_STAGE_NUMBER;
 };
 
 } // Router

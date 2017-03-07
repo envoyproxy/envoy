@@ -28,8 +28,10 @@ domain
   *(required, string)* The rate limit domain to use when calling the rate limit service.
 
 stage
-  *(optional, integer)* If set, rate limit configurations will only be applied with the same stage
-  number. If not set, all rate limit configurations will be applied.
+  *(optional, integer)* Specifies the rate limit configurations to be applied with the same stage
+  number. If not set, the default stage number is 0.
+
+  **NOTE:** The filter supports a range of 0 - 10 inclusively for stage numbers.
 
 Statistics
 ----------

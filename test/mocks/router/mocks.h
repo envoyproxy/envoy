@@ -46,17 +46,15 @@ public:
   ~MockRateLimitPolicyEntry();
 
   // Router::RateLimitPolicyEntry
-  MOCK_CONST_METHOD0(stage, int64_t());
+  MOCK_CONST_METHOD0(stage, uint64_t());
   MOCK_CONST_METHOD0(disableKey, const std::string&());
-
-  // Router::RateLimitAction
   MOCK_CONST_METHOD5(populateDescriptors,
                      void(const RouteEntry& route,
                           std::vector<::RateLimit::Descriptor>& descriptors,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
                           const std::string& remote_address));
 
-  int64_t stage_{};
+  uint64_t stage_{};
   std::string disable_key_;
 };
 
@@ -68,7 +66,7 @@ public:
   // Router::RateLimitPolicy
   MOCK_CONST_METHOD1(
       getApplicableRateLimit,
-      std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(int64_t stage));
+      std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(uint64_t stage));
 
   std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };
