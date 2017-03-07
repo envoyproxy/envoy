@@ -14,10 +14,8 @@ DetectorPtr DetectorImplFactory::createForCluster(Cluster& cluster,
                                                   Event::Dispatcher& dispatcher,
                                                   Runtime::Loader& runtime,
                                                   EventLoggerPtr event_logger) {
-  // Right now we don't support any configuration but in order to make the config backwards
-  // compatible we just look for an empty object.
   if (cluster_config.hasObject("outlier_detection")) {
-    return DetectorImpl::create(cluster, cluster_config.getObject("outlier_detection", true),
+    return DetectorImpl::create(cluster, cluster_config.getObject("outlier_detection", false),
                                 dispatcher, runtime, ProdSystemTimeSource::instance_, event_logger);
   } else {
     return nullptr;
@@ -53,15 +51,14 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
-DetectorConfig::DetectorConfig(const Json::ObjectPtr& json_config) {
-  interval_ms_ = static_cast<uint64_t>(json_config->getInteger("interval_ms", 10000));
-  base_ejection_time_ms_ =
-      static_cast<uint64_t>(json_config->getInteger("base_ejection_time_ms", 30000));
-  consecutive_5xx_ = static_cast<uint64_t>(json_config->getInteger("consecutive_5xx", 5));
-  max_ejection_percent_ =
-      static_cast<uint64_t>(json_config->getInteger("max_ejection_percent", 10));
-  enforcing_ = static_cast<uint64_t>(json_config->getInteger("enforcing", 100));
-}
+DetectorConfig::DetectorConfig(const Json::ObjectPtr& json_config)
+    : interval_ms_(static_cast<uint64_t>(json_config->getInteger("interval_ms", 10000))),
+      base_ejection_time_ms_(
+          static_cast<uint64_t>(json_config->getInteger("base_ejection_time_ms", 30000))),
+      consecutive_5xx_(static_cast<uint64_t>(json_config->getInteger("consecutive_5xx", 5))),
+      max_ejection_percent_(
+          static_cast<uint64_t>(json_config->getInteger("max_ejection_percent", 10))),
+      enforcing_(static_cast<uint64_t>(json_config->getInteger("enforcing", 100))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::ObjectPtr& json_config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,

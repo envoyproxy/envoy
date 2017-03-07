@@ -43,27 +43,6 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
             DetectorImplFactory::createForCluster(cluster, *loader, dispatcher, runtime, nullptr));
 }
 
-TEST(OutlierDetectorImplFactoryTest, DetectorConfig) {
-  std::string json = R"EOF(
-  {
-    "outlier_detection": {
-      "interval_ms" : 100,
-      "base_eject_time_ms" : 10000,
-      "consecutive_5xx" : 10,
-      "max_ejection_percent" : 50,
-      "enforcing" : 10
-    }
-  }
-  )EOF";
-
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  NiceMock<MockCluster> cluster;
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockLoader> runtime;
-  EXPECT_NE(nullptr,
-            DetectorImplFactory::createForCluster(cluster, *loader, dispatcher, runtime, nullptr));
-}
-
 class CallbackChecker {
 public:
   MOCK_METHOD1(check, void(HostPtr host));
@@ -85,6 +64,28 @@ public:
   std::shared_ptr<MockEventLogger> event_logger_{new MockEventLogger()};
   Json::ObjectPtr loader_ = Json::Factory::LoadFromString("{}");
 };
+
+TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
+  std::string json = R"EOF(
+  {
+    "interval_ms" : 100,
+    "base_ejection_time_ms" : 10000,
+    "consecutive_5xx" : 10,
+    "max_ejection_percent" : 50,
+    "enforcing" : 10
+  }
+  )EOF";
+
+  Json::ObjectPtr custom_config = Json::Factory::LoadFromString(json);
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, custom_config, dispatcher_, runtime_, time_source_, event_logger_));
+
+  EXPECT_EQ(100UL, detector->config().intervalMs());
+  EXPECT_EQ(10000UL, detector->config().baseEjectionTimeMs());
+  EXPECT_EQ(10UL, detector->config().consecutive5xx());
+  EXPECT_EQ(50UL, detector->config().maxEjectionPercent());
+  EXPECT_EQ(10UL, detector->config().enforcing());
+}
 
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
