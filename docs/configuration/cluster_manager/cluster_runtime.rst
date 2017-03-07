@@ -29,26 +29,18 @@ Outlier detection
 -----------------
 
 See the outlier detection :ref:`architecture overview <arch_overview_outlier_detection>` for more
-information on outlier detection.
+information on outlier detection. The runtime parameters supported by outlier detection are the 
+same as the :ref:`static configuration parameters <config_cluster_manager_cluster_outlier_detection>`, namely
 
 outlier_detection.consecutive_5xx
-  The number of consecutive 5xx responses before a consecutive 5xx ejection occurs. Defaults to 5.
 
 outlier_detection.interval_ms
-  The time interval between ejection analysis sweeps. This can result in both new ejections as well
-  as hosts being returned to service. Defaults to 10000ms or 10s.
 
 outlier_detection.base_ejection_time_ms
-  The base time that a host is ejected for. The real time is equal to the base time multiplied by
-  the number of times the host has been ejected. Defaults to 30000ms or 30s.
 
 outlier_detection.max_ejection_percent
-  The maximum % of an upstream cluster that can be ejected due to outlier detection. Defaults to
-  10%.
 
 outlier_detection.enforcing
-  The % chance that a host will be actually ejected when an outlier status is detected. This setting
-  can be used to disable ejection or to ramp it up slowly. Defaults to 100.
 
 Core
 ----

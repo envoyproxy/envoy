@@ -20,14 +20,14 @@ ejection algorithm works as follows:
 
 #. A host is determined to be an outlier.
 #. Envoy checks to make sure the number of ejected hosts is below the allowed threshold (specified
-   via the :ref:`outlier_detection.max_ejection_percent
-   <config_cluster_manager_cluster_runtime_outlier_detection>` runtime value).
+   via the :ref:`outlier_detection.max_ejection_percent 
+   <config_cluster_manager_cluster_outlier_detection>` value.
    If the number of ejected hosts is above the threshold the host is not ejected.
 #. The host is ejected for some number of milliseconds. Ejection means that the host is marked
    unhealthy and will not be used during load balancing unless the load balancer is in a
    :ref:`panic <arch_overview_load_balancing_panic_threshold>` scenario. The number of milliseconds
    is equal to the :ref:`outlier_detection.base_ejection_time_ms
-   <config_cluster_manager_cluster_runtime_outlier_detection>` runtime value
+   <config_cluster_manager_cluster_outlier_detection>` value
    multiplied by the number of times the host has been ejected. This causes hosts to get ejected
    for longer and longer periods if they continue to fail.
 #. An ejected host will automatically be brought back into service after the ejection time has
@@ -46,7 +46,7 @@ If an upstream host returns some number of consecutive 5xx, it will be ejected. 
 case a 5xx means an actual 5xx respond code, or an event that would cause the HTTP router to return
 one on the upstream's behalf (reset, connection failure, etc.). The number of consecutive 5xx
 required for ejection is controlled by the :ref:`outlier_detection.consecutive_5xx
-<config_cluster_manager_cluster_runtime_outlier_detection>` runtime value.
+<config_cluster_manager_cluster_outlier_detection>` value.
 
 Ejection event logging
 ----------------------
