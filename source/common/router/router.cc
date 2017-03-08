@@ -192,11 +192,22 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // See if we need to set up for hashing.
-  if (route_entry_->hashPolicy()) {
-    Optional<uint64_t> hash = route_entry_->hashPolicy()->generateHash(headers);
-    if (hash.valid()) {
-      lb_context_.reset(new LoadBalancerContextImpl(hash));
+  // See if we need to setup load balancer context.
+  // Currently we support hash based routing or canary specific one.
+  if (route_entry_->hashPolicy() || headers.EnvoyLbHint()) {
+    Optional<uint64_t> hash;
+    if (route_entry_->hashPolicy()) {
+      hash = route_entry_->hashPolicy()->generateHash(headers);
+    }
+
+    bool prefer_canary = false;
+    if (headers.EnvoyLbHint()) {
+      prefer_canary = Http::Headers::get().EnvoyLbHintValues.PreferCanary ==
+                      headers.EnvoyLbHint()->value().c_str();
+    }
+
+    if (hash.valid() || prefer_canary) {
+      lb_context_.reset(new LoadBalancerContextImpl(hash, prefer_canary));
     }
   }
 

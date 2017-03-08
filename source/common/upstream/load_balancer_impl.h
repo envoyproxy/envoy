@@ -29,12 +29,17 @@ protected:
 
   /**
    * Pick the host list to use (healthy or all depending on how many in the set are not healthy).
+   * @param context provides load balancing context.
+   * @return list of hosts for routing.
    */
-  const std::vector<HostPtr>& hostsToUse();
+  const std::vector<HostPtr>& hostsToUse(const LoadBalancerContext* context);
 
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
+  // Host list containing canary instance. Ideally this contains single instance, but
+  // we may end up adding new canary instance before removing the old one, so we keep a list here.
+  std::vector<HostPtr> canary_host_;
 
 private:
   enum class ZoneRoutingState { NoZoneRouting, ZoneDirect, ZoneResidual };

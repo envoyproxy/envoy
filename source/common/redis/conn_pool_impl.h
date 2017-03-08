@@ -130,8 +130,10 @@ private:
 
     // Upstream::LoadBalancerContext
     const Optional<uint64_t>& hashKey() const override { return hash_key_; }
+    bool preferCanary() const override { return prefer_canary_; }
 
     const Optional<uint64_t> hash_key_;
+    bool prefer_canary_{};
   };
 
   Upstream::ClusterManager& cm_;
