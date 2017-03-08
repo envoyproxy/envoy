@@ -208,7 +208,7 @@ void DetectorImpl::onIntervalTimer() {
   SystemTime now = time_source_.currentSystemTime();
   std::unordered_map<HostPtr, double> valid_sr_hosts;
   std::vector<double> sr_data;
-  double sr_sum;
+  double sr_sum = 0;
 
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
