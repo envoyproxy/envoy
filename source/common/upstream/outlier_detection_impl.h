@@ -98,11 +98,11 @@ public:
   uint64_t enforcing() { return enforcing_; }
 
 private:
-  const uint64_t interval_ms_{};
-  const uint64_t base_ejection_time_ms_{};
-  const uint64_t consecutive_5xx_{};
-  const uint64_t max_ejection_percent_{};
-  const uint64_t enforcing_{};
+  const uint64_t interval_ms_;
+  const uint64_t base_ejection_time_ms_;
+  const uint64_t consecutive_5xx_;
+  const uint64_t max_ejection_percent_;
+  const uint64_t enforcing_;
 };
 
 /**
