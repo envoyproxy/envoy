@@ -41,7 +41,9 @@ class DetectorImpl;
 
 class SRAccumulatorImpl {
 public:
-  SRAccumulatorImpl() : current_sr_bucket_(new SRAccumulatorBucket()), backup_sr_bucket_(new SRAccumulatorBucket()) {};
+  SRAccumulatorImpl()
+      : current_sr_bucket_(new SRAccumulatorBucket()),
+        backup_sr_bucket_(new SRAccumulatorBucket()){};
   SRAccumulatorBucket* getCurrentWriter();
   Optional<double> getSR(uint64_t rq_volume_threshold);
 

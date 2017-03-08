@@ -218,8 +218,10 @@ void DetectorImpl::onIntervalTimer() {
     host.second->updateCurrentSRBucket();
 
     // If there are not enough hosts to begin with, don't do the work.
-    if (host_sinks_.size() >= runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold", 5)) {
-      Optional<double> host_sr = host.second->srAccumulator().getSR(runtime_.snapshot().getInteger("outlier_detection.rq_volume_threshold", 100));
+    if (host_sinks_.size() >=
+        runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold", 5)) {
+      Optional<double> host_sr = host.second->srAccumulator().getSR(
+          runtime_.snapshot().getInteger("outlier_detection.rq_volume_threshold", 100));
       if (host_sr.valid()) {
         valid_sr_hosts[host.first] = host_sr.value();
         sr_data.emplace_back(host_sr.value());
@@ -228,15 +230,16 @@ void DetectorImpl::onIntervalTimer() {
     }
   }
 
-  if (valid_sr_hosts.size() >= runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold", 5)) {
+  if (valid_sr_hosts.size() >=
+      runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold", 5)) {
 
     // Calculate the statistics (mean, stdev). We are using mean to detect outliers.
     double mean = sr_sum / sr_data.size();
     double stdev = 0;
-    std::for_each(sr_data.begin(), sr_data.end(), [&stdev, mean](double& v){ stdev += std::pow(v - mean, 2); });
+    std::for_each(sr_data.begin(), sr_data.end(),
+                  [&stdev, mean](double& v) { stdev += std::pow(v - mean, 2); });
     stdev /= sr_data.size();
     stdev = std::sqrt(stdev);
-
 
     for (auto host : valid_sr_hosts) {
       if (host.second < mean - (2 * stdev)) {
@@ -297,10 +300,10 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
 
 std::string EventLoggerImpl::typeToString(EjectionType type) {
   switch (type) {
-    case EjectionType::Consecutive5xx:
-      return "5xx";
-    case EjectionType::SuccessRate:
-      return "SR";
+  case EjectionType::Consecutive5xx:
+    return "5xx";
+  case EjectionType::SuccessRate:
+    return "SR";
   }
 
   NOT_IMPLEMENTED;
@@ -329,7 +332,8 @@ Optional<double> SRAccumulatorImpl::getSR(uint64_t rq_volume_thresh) {
     return Optional<double>();
   }
 
-  return Optional<double>(backup_sr_bucket_->success_rq_counter_ * 100 /backup_sr_bucket_->total_rq_counter_);
+  return Optional<double>(backup_sr_bucket_->success_rq_counter_ * 100 /
+                          backup_sr_bucket_->total_rq_counter_);
 }
 } // Outlier
 } // Upstream
