@@ -11,7 +11,7 @@ TLS context
     "private_key_file": "...",
     "ca_cert_file": "...",
     "verify_certificate_hash": "...",
-    "verify_subject_alt_name": "...",
+    "verify_subject_alt_name": [],
     "cipher_suites": "...",
     "sni": "..."
   }
@@ -41,8 +41,8 @@ verify_certificate_hash
   certificate.
 
 verify_subject_alt_name
-  *(optional, string)* If specified, Envoy will verify the server certificate's subject alt
-  name matches the specified value.
+  *(optional, array)* An optional list of subject alt names. If specified, Envoy will verify
+  that the server certificate's subject alt name matches one of the specified values.
 
 cipher_suites
   *(optional, string)* If specified, the TLS connection will only support the specified cipher list.

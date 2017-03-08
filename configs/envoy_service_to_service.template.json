@@ -319,7 +319,7 @@
         ,"sni": "{{ host['sni'] }}"
         {% endif -%}
         {% if host.get('verify_subject_alt_name', False) -%}
-        ,"verify_subject_alt_name": "{{ host['verify_subject_alt_name'] }}"
+        ,"verify_subject_alt_name": ["{{ host['verify_subject_alt_name'] }}"]
         {% endif -%}
       },
       "connect_timeout_ms": 1000,
@@ -392,7 +392,7 @@
       "features": "http2",
       "ssl_context": {
         "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt",
-        "verify_subject_alt_name": "collector-grpc.lightstep.com"
+        "verify_subject_alt_name": ["collector-grpc.lightstep.com"]
       },
       "connect_timeout_ms": 1000,
       "type": "logical_dns",

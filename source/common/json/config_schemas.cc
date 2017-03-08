@@ -970,7 +970,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
           "private_key_file" : {"type" : "string"},
           "ca_cert_file" : {"type" : "string"},
           "verify_certificate_hash" : {"type" : "string"},
-          "verify_subject_alt_name" : {"type" : "string"},
+          "verify_subject_alt_name" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
           "cipher_suites" : {"type" : "string"},
           "sni" : {"type" :"string"}
         },

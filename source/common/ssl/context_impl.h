@@ -44,13 +44,21 @@ public:
   bool verifyPeer(SSL* ssl) const;
 
   /**
+   * Performs subjectAltName verification
+   * @param ssl the certificate to verify
+   * @param subject_alt_names the configured subject_alt_names to match
+   * @return true if the verification succeeds
+   */
+  static bool verifySubjectAltName(X509* cert, const std::vector<std::string>& subject_alt_names);
+
+  /**
    * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
    * NOTE:  public for testing
    * @param san the subjectAltName to match
    * @param pattern the pattern to match against (*.example.com)
    * @return true if the san matches pattern
    */
-  static bool sanMatch(const std::string& san, const char* pattern);
+  static bool dNSNameMatch(const std::string& dnsName, const char* pattern);
 
   SslStats& stats() { return stats_; }
 
@@ -69,14 +77,6 @@ protected:
   static const unsigned char SERVER_SESSION_ID_CONTEXT;
 
   typedef CSmartPtr<SSL_CTX, SSL_CTX_free> SslCtxPtr;
-
-  /**
-   * Performs subjectAltName verification
-   * @param ssl the certificate to verify
-   * @param subject_alt_name the configured subject_alt_name to match
-   * @return true if the verification succeeds
-   */
-  static bool verifySubjectAltName(X509* cert, const std::string& subject_alt_name);
 
   /**
    * Verifies certificate hash for pinning. The hash is the SHA-256 has of the DER encoding of the
@@ -100,7 +100,7 @@ protected:
 
   ContextManagerImpl& parent_;
   SslCtxPtr ctx_;
-  std::string verify_subject_alt_name_;
+  std::vector<std::string> verify_subject_alt_name_;
   std::vector<uint8_t> verify_certificate_hash_;
   Stats::Scope& scope_;
   SslStats stats_;

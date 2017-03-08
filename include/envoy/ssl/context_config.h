@@ -44,9 +44,9 @@ public:
   virtual const std::string& privateKeyFile() const PURE;
 
   /**
-   * @return The subject alt name to be verified, if enabled. Otherwise, ""
+   * @return The subject alt names to be verified, if enabled. Otherwise, ""
    */
-  virtual const std::string& verifySubjectAltName() const PURE;
+  virtual const std::vector<std::string>& verifySubjectAltName() const PURE;
 
   /**
    * @return The hex string representation of the certificate hash to be verified, if enabled.
