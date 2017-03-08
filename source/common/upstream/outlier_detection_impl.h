@@ -94,7 +94,8 @@ private:
   COUNTER(ejections_total)                                                                         \
   GAUGE  (ejections_active)                                                                        \
   COUNTER(ejections_overflow)                                                                      \
-  COUNTER(ejections_consecutive_5xx)
+  COUNTER(ejections_consecutive_5xx)                                                               \
+  COUNTER(ejections_sr)
 // clang-format on
 
 /**

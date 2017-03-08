@@ -243,6 +243,7 @@ void DetectorImpl::onIntervalTimer() {
 
     for (auto host : valid_sr_hosts) {
       if (host.second < mean - (2 * stdev)) {
+        stats_.ejections_consecutive_5xx_.inc();
         ejectHost(host.first, EjectionType::SuccessRate);
       }
     }
