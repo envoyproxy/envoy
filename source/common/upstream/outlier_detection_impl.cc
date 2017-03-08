@@ -35,7 +35,12 @@ void DetectorHostSinkImpl::uneject(SystemTime unejection_time) {
   last_unejection_time_.value(unejection_time);
 }
 
+void DetectorHostSinkImpl::updateCurrentSRBucket() {
+  sr_accumulator_bucket_.store(sr_accumulator_.getCurrentWriter());
+}
+
 void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
+  sr_accumulator_bucket_.load()->total_rq_counter_++;
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
@@ -48,6 +53,7 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
+    sr_accumulator_bucket_.load()->success_rq_counter_++;
     consecutive_5xx_ = 0;
   }
 }
@@ -200,8 +206,43 @@ void DetectorImpl::onConsecutive5xxWorker(HostPtr host) {
 
 void DetectorImpl::onIntervalTimer() {
   SystemTime now = time_source_.currentSystemTime();
+  std::unordered_map<HostPtr, double> valid_sr_hosts;
+  std::vector<double> sr_data;
+  double sr_sum;
+
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
+
+    // Success Rate Outlier Detection
+    // First swap out the current bucket been written to, to keep data valid
+    host.second->updateCurrentSRBucket();
+
+    // If there are not enough hosts to begin with, don't do the work.
+    if (host_sinks_.size() >= runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold", 5)) {
+      Optional<double> host_sr = host.second->srAccumulator().getSR(runtime_.snapshot().getInteger("outlier_detection.rq_volume_threshold", 100));
+      if (host_sr.valid()) {
+        valid_sr_hosts[host.first] = host_sr.value();
+        sr_data.emplace_back(host_sr.value());
+        sr_sum += host_sr.value();
+      }
+    }
+  }
+
+  if (valid_sr_hosts.size() >= runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold", 5)) {
+
+    // Calculate the statistics (mean, stdev). We are using mean to detect outliers.
+    double mean = sr_sum / sr_data.size();
+    double stdev = 0;
+    std::for_each(sr_data.begin(), sr_data.end(), [&stdev, mean](double& v){ stdev += std::pow(v - mean, 2); });
+    stdev /= sr_data.size();
+    stdev = std::sqrt(stdev);
+
+
+    for (auto host : valid_sr_hosts) {
+      if (host.second < mean - (2 * stdev)) {
+        ejectHost(host.first, EjectionType::SuccessRate);
+      }
+    }
   }
 
   armIntervalTimer();
@@ -256,8 +297,10 @@ void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
 
 std::string EventLoggerImpl::typeToString(EjectionType type) {
   switch (type) {
-  case EjectionType::Consecutive5xx:
-    return "5xx";
+    case EjectionType::Consecutive5xx:
+      return "5xx";
+    case EjectionType::SuccessRate:
+      return "SR";
   }
 
   NOT_IMPLEMENTED;
@@ -271,5 +314,22 @@ int EventLoggerImpl::secsSinceLastAction(const Optional<SystemTime>& lastActionT
   return -1;
 }
 
+SRAccumulatorBucket* SRAccumulatorImpl::getCurrentWriter() {
+  // Right now current_ is being written to and backup_ is not. Flush the backup and swap
+  backup_sr_bucket_->success_rq_counter_ = 0;
+  backup_sr_bucket_->total_rq_counter_ = 0;
+
+  current_sr_bucket_.swap(backup_sr_bucket_);
+
+  return current_sr_bucket_.get();
+}
+
+Optional<double> SRAccumulatorImpl::getSR(uint64_t rq_volume_thresh) {
+  if (backup_sr_bucket_->total_rq_counter_ < rq_volume_thresh) {
+    return Optional<double>();
+  }
+
+  return Optional<double>(backup_sr_bucket_->success_rq_counter_ * 100 /backup_sr_bucket_->total_rq_counter_);
+}
 } // Outlier
 } // Upstream

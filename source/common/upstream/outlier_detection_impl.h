@@ -39,16 +39,32 @@ public:
 
 class DetectorImpl;
 
+class SRAccumulatorImpl {
+public:
+  SRAccumulatorImpl() : current_sr_bucket_(new SRAccumulatorBucket()), backup_sr_bucket_(new SRAccumulatorBucket()) {};
+  SRAccumulatorBucket* getCurrentWriter();
+  Optional<double> getSR(uint64_t rq_volume_threshold);
+
+private:
+  std::unique_ptr<SRAccumulatorBucket> current_sr_bucket_;
+  std::unique_ptr<SRAccumulatorBucket> backup_sr_bucket_;
+};
+
 /**
  * Implementation of DetectorHostSink for the generic detector.
  */
 class DetectorHostSinkImpl : public DetectorHostSink {
 public:
   DetectorHostSinkImpl(std::shared_ptr<DetectorImpl> detector, HostPtr host)
-      : detector_(detector), host_(host) {}
+      : detector_(detector), host_(host) {
+    // Point the sr_accumulator_bucket_ pointer to a bucket.
+    updateCurrentSRBucket();
+  }
 
   void eject(SystemTime ejection_time);
   void uneject(SystemTime ejection_time);
+  void updateCurrentSRBucket();
+  SRAccumulatorImpl& srAccumulator() { return sr_accumulator_; };
 
   // Upstream::Outlier::DetectorHostSink
   uint32_t numEjections() override { return num_ejections_; }
@@ -64,6 +80,8 @@ private:
   Optional<SystemTime> last_ejection_time_;
   Optional<SystemTime> last_unejection_time_;
   uint32_t num_ejections_{};
+  SRAccumulatorImpl sr_accumulator_;
+  std::atomic<SRAccumulatorBucket*> sr_accumulator_bucket_;
 };
 
 /**

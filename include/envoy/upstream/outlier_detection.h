@@ -52,7 +52,7 @@ public:
 
 typedef std::unique_ptr<DetectorHostSink> DetectorHostSinkPtr;
 
-enum class EjectionType { Consecutive5xx };
+enum class EjectionType { Consecutive5xx, SuccessRate };
 
 /**
  * Sink for outlier detection event logs.
@@ -99,5 +99,9 @@ public:
 
 typedef std::shared_ptr<Detector> DetectorPtr;
 
+struct SRAccumulatorBucket {
+  std::atomic<uint64_t> success_rq_counter_;
+  std::atomic<uint64_t> total_rq_counter_;
+};
 } // Outlier
 } // Upstream
