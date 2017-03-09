@@ -259,7 +259,7 @@ void DetectorImpl::onIntervalTimer() {
     stdev = std::sqrt(stdev);
 
     for (auto host : valid_sr_hosts) {
-      if (host.second < mean - (2 * stdev)) {
+      if (host.second < mean - (sr_stdev_factor_ * stdev)) {
         stats_.ejections_sr_.inc();
         ejectHost(host.first, EjectionType::SuccessRate);
       }

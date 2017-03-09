@@ -197,6 +197,8 @@ private:
   std::list<ChangeStateCb> callbacks_;
   std::unordered_map<HostPtr, DetectorHostSinkImpl*> host_sinks_;
   EventLoggerPtr event_logger_;
+  // Factor to multiply the stdev of a cluster's Success Rate for success rate outlier ejection.
+  static const uint64_t sr_stdev_factor_ = 2;
 };
 
 class EventLoggerImpl : public EventLogger {
