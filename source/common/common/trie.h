@@ -2,18 +2,39 @@
 
 #include <memory>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
+/**
+ * This is a general purpose trie. Keys and Values can be arbitrary classes
+ * provided they can be hashed. It supports both partial matches and exact
+ * matches.
+ *
+ * Note that Value must have a conversion constructor that will take nullptr.
+ */
 template <class Key, class Value, class Tokenizer> class TrieNode {
 public:
   TrieNode(Value value) : value_(value) {}
   TrieNode() : TrieNode(nullptr) {}
   ~TrieNode() {}
+
+  /**
+   * Insert a value into the trie.
+   * @param key the name associated with the value.
+   * @param value the value to store on the node associated with name
+   */
   void insert(const Key& key, Value value);
-  Value match(const Key& key) const;
+
+  /**
+   * Lookup a value by key.
+   * @param key the path name to look up
+   * @return a std::pair consisting of the value if found and a boolean
+   *         indicating if the match was exact.
+   */
+  std::pair<Value, bool> match(const Key& key) const;
 
 private:
-  Value match(std::vector<Key>& path_components) const;
+  std::pair<Value, bool> match(std::vector<Key>& path_components) const;
   void insert(std::vector<Key>& path_components, Value value);
   Value value() const { return value_; }
   void set_value(Value value) { value_ = value; }
@@ -49,25 +70,30 @@ void TrieNode<Key, Value, Tokenizer>::insert(std::vector<Key>& path_components, 
 }
 
 template <class Key, class Value, class Tokenizer>
-Value TrieNode<Key, Value, Tokenizer>::match(const Key& key) const {
+std::pair<Value, bool> TrieNode<Key, Value, Tokenizer>::match(const Key& key) const {
   std::vector<Key> path_components = tokenizer_.tokenize(key);
   return match(path_components);
 }
 
 template <class Key, class Value, class Tokenizer>
-Value TrieNode<Key, Value, Tokenizer>::match(std::vector<Key>& path_components) const {
+std::pair<Value, bool>
+TrieNode<Key, Value, Tokenizer>::match(std::vector<Key>& path_components) const {
+  // An exact match requires that we have a non-false value at the very end of
+  // our path traversal.
   if (path_components.size() == 0) {
-    return nullptr;
+    return std::make_pair(value_, value_ ? true : false);
   }
+  bool exact_match = false;
   Value value = value_;
   Key component = path_components[0];
   path_components.erase(path_components.begin());
   if (children_.find(component) != children_.end()) {
     const TrieNode<Key, Value, Tokenizer>* node = children_.find(component)->second.get();
-    Value new_value = node->match(path_components);
-    if (new_value) {
-      value = new_value;
+    std::pair<Value, bool> retval = node->match(path_components);
+    if (retval.first) {
+      value = retval.first;
+      exact_match = retval.second;
     }
   }
-  return value;
+  return std::make_pair(value, exact_match);
 }

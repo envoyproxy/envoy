@@ -31,33 +31,54 @@ TEST(TrieTest, BasicFunctionality) {
 
   std::string v1("This is the value");
   root.insert(".bar.com", &v1);
-  std::string* vp = root.match("baz.foo.bar.com");
-  ASSERT_NE(nullptr, vp);
-  EXPECT_STREQ("This is the value", vp->c_str());
+  auto vp = root.match("baz.foo.bar.com");
+  ASSERT_NE(nullptr, vp.first);
+  EXPECT_STREQ("This is the value", vp.first->c_str());
+  EXPECT_FALSE(vp.second);
 
   vp = root.match("baz.foo.bat.com");
-  EXPECT_EQ(nullptr, vp);
+  EXPECT_EQ(nullptr, vp.first);
+  EXPECT_FALSE(vp.second);
 
   std::string v2("This is the other value");
   root.insert(".foo.bat.com", &v2);
   vp = root.match("baz.foo.bat.com");
-  EXPECT_STREQ("This is the other value", vp->c_str());
+  EXPECT_STREQ("This is the other value", vp.first->c_str());
+  EXPECT_FALSE(vp.second);
 
   std::string v3("This is a third value");
   root.insert(".bat.com", &v3);
   vp = root.match("baz.foo.bat.com");
-  EXPECT_STREQ("This is the other value", vp->c_str());
+  EXPECT_STREQ("This is the other value", vp.first->c_str());
+  EXPECT_FALSE(vp.second);
   vp = root.match("foo.baz.bat.com");
-  EXPECT_STREQ("This is a third value", vp->c_str());
+  EXPECT_STREQ("This is a third value", vp.first->c_str());
+  EXPECT_FALSE(vp.second);
 
   std::string v4("This is #4");
   root.insert("-foo.bat.com", &v4);
   vp = root.match("baz.foo.bat.com");
-  EXPECT_STREQ("This is the other value", vp->c_str());
+  EXPECT_STREQ("This is the other value", vp.first->c_str());
+  EXPECT_FALSE(vp.second);
   vp = root.match("foo.baz.bat.com");
-  EXPECT_STREQ("This is a third value", vp->c_str());
+  EXPECT_STREQ("This is a third value", vp.first->c_str());
+  EXPECT_FALSE(vp.second);
   vp = root.match("abc-foo.bat.com");
-  EXPECT_STREQ("This is #4", vp->c_str());
+  EXPECT_STREQ("This is #4", vp.first->c_str());
+  EXPECT_FALSE(vp.second);
+
+  std::string v5("This is the fifth");
+  std::string v6("This is the sixth");
+  root.insert("foo.bar.baz.bat", &v5);
+  root.insert("xyz.foo.bar.baz.bat", &v6);
+  vp = root.match("foo.bar.baz.bat");
+  ASSERT_NE(nullptr, vp.first);
+  EXPECT_STREQ("This is the fifth", vp.first->c_str());
+  EXPECT_TRUE(vp.second);
+  vp = root.match("xyz.foo.bar.baz.bat");
+  ASSERT_NE(nullptr, vp.first);
+  EXPECT_STREQ("This is the sixth", vp.first->c_str());
+  EXPECT_TRUE(vp.second);
 }
 
 } // namespace

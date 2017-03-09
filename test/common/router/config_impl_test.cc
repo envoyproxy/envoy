@@ -200,11 +200,7 @@ TEST(RouteMatcherTest, TestRoutes) {
       "wildcard",
       config.route(genHeaders("foo-bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("wildcard2",
-            config.route(genHeaders("-bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("wildcard2",
             config.route(genHeaders("bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("instant-server",
-            config.route(genHeaders(".foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("instant-server",
             config.route(genHeaders("foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
 
