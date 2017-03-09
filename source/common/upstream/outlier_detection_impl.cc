@@ -243,7 +243,7 @@ void DetectorImpl::onIntervalTimer() {
 
     for (auto host : valid_sr_hosts) {
       if (host.second < mean - (2 * stdev)) {
-        stats_.ejections_consecutive_5xx_.inc();
+        stats_.ejections_sr_.inc();
         ejectHost(host.first, EjectionType::SuccessRate);
       }
     }
@@ -319,7 +319,7 @@ int EventLoggerImpl::secsSinceLastAction(const Optional<SystemTime>& lastActionT
 }
 
 SRAccumulatorBucket* SRAccumulatorImpl::getCurrentWriter() {
-  // Right now current_ is being written to and backup_ is not. Flush the backup and swap
+  // Right now current_ is being written to and backup_ is not. Flush the backup and swap.
   backup_sr_bucket_->success_rq_counter_ = 0;
   backup_sr_bucket_->total_rq_counter_ = 0;
 
@@ -336,5 +336,6 @@ Optional<double> SRAccumulatorImpl::getSR(uint64_t rq_volume_thresh) {
   return Optional<double>(backup_sr_bucket_->success_rq_counter_ * 100 /
                           backup_sr_bucket_->total_rq_counter_);
 }
+
 } // Outlier
 } // Upstream

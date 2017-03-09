@@ -37,20 +37,44 @@ public:
                                       EventLoggerPtr event_logger);
 };
 
-class DetectorImpl;
+struct SRAccumulatorBucket {
+  std::atomic<uint64_t> success_rq_counter_;
+  std::atomic<uint64_t> total_rq_counter_;
+};
 
+/**
+ * The S(uccess)R(ate)AccumulatorImpl uses the SRAccumulatorBucket to get per host Success Rate
+ * stats.
+ * This implementation has a fixed window size of time, and thus only needs a bucket to write to,
+ * and
+ * a bucket to accumulate/run stats over.
+ */
 class SRAccumulatorImpl {
 public:
   SRAccumulatorImpl()
       : current_sr_bucket_(new SRAccumulatorBucket()),
         backup_sr_bucket_(new SRAccumulatorBucket()){};
   SRAccumulatorBucket* getCurrentWriter();
+  /**
+   * This function returns the SR of a host over a window of time if the request volume is high
+   * enough. The underlying
+   * window of time could be dynamically adjusted. In the current implementation it is a fixed time
+   * window.
+   * @param rq_volume_threshold, the threshold of requests an accumulator has to have in order to be
+   * able to return
+   *        a significant SR value.
+   * @return a valid Optional<double> with the success rate. If there were not enough requests, an
+   * invalid Optional<double>
+   *         is returned.
+   */
   Optional<double> getSR(uint64_t rq_volume_threshold);
 
 private:
   std::unique_ptr<SRAccumulatorBucket> current_sr_bucket_;
   std::unique_ptr<SRAccumulatorBucket> backup_sr_bucket_;
 };
+
+class DetectorImpl;
 
 /**
  * Implementation of DetectorHostSink for the generic detector.

@@ -161,11 +161,30 @@ TEST_F(OutlierDetectorImplTest, BasicFlow) {
   interval_timer_->callback_();
   EXPECT_FALSE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
+  // Eject host again to cause an ejection after an unejection has taken place
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(200);
+  cluster_.hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+
+  EXPECT_CALL(time_source_, currentSystemTime())
+      .WillOnce(Return(SystemTime(std::chrono::milliseconds(40000))));
+  EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
+                       EjectionType::Consecutive5xx));
+  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
   cluster_.runCallbacks({}, cluster_.hosts_);
 
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
-  EXPECT_EQ(1UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx")
+  EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx")
                      .value());
 }
 

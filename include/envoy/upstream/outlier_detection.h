@@ -99,9 +99,5 @@ public:
 
 typedef std::shared_ptr<Detector> DetectorPtr;
 
-struct SRAccumulatorBucket {
-  std::atomic<uint64_t> success_rq_counter_;
-  std::atomic<uint64_t> total_rq_counter_;
-};
 } // Outlier
 } // Upstream
