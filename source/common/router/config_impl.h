@@ -1,5 +1,7 @@
 #pragma once
 
+#include <set>
+
 #include "router_ratelimit.h"
 
 #include "envoy/common/optional.h"
@@ -350,9 +352,13 @@ public:
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
+  void addWildcardVirtualHost(const std::string& domain_suffix, VirtualHostPtr virtual_host);
+  VirtualHostPtr findWildcardVirtualHost(const std::string& domain) const;
 
   std::unordered_map<std::string, VirtualHostPtr> virtual_hosts_;
   VirtualHostPtr default_virtual_host_;
+  std::map<uint32_t, std::unordered_map<std::string, VirtualHostPtr>, std::greater<uint32_t>>
+      wildcard_virtual_host_suffixes_;
   bool uses_runtime_{};
 };
 
