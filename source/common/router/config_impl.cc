@@ -432,11 +432,6 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
   priority_ = ConfigUtility::parsePriority(virtual_cluster);
 }
 
-void RouteMatcher::addWildcardVirtualHost(const std::string& domain_suffix,
-                                          VirtualHostPtr virtual_host) {
-  wildcard_virtual_host_suffixes_[domain_suffix.size()].emplace(domain_suffix, virtual_host);
-}
-
 VirtualHostPtr RouteMatcher::findWildcardVirtualHost(const std::string& domain) const {
   for (auto& iter : wildcard_virtual_host_suffixes_) {
     uint32_t i = iter.first;
@@ -467,8 +462,8 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
           throw EnvoyException(fmt::format("Only a single single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
-      } else if (domain[0] == '*') {
-        addWildcardVirtualHost(domain.substr(1), virtual_host);
+      } else if ('*' == domain[0]) {
+        wildcard_virtual_host_suffixes_[domain.size() - 1].emplace(domain.substr(1), virtual_host);
       } else {
         if (virtual_hosts_.find(domain) != virtual_hosts_.end()) {
           throw EnvoyException(fmt::format(

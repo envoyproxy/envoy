@@ -352,7 +352,6 @@ public:
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
-  void addWildcardVirtualHost(const std::string& domain_suffix, VirtualHostPtr virtual_host);
   VirtualHostPtr findWildcardVirtualHost(const std::string& domain) const;
 
   std::unordered_map<std::string, VirtualHostPtr> virtual_hosts_;

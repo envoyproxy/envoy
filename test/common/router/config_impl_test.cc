@@ -65,6 +65,16 @@ TEST(RouteMatcherTest, TestRoutes) {
       ]
     },
     {
+      "name": "wildcard2",
+      "domains": ["*.baz.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "wildcard2"
+        }
+      ]
+    },
+    {
       "name": "default",
       "domains": ["*"],
       "routes": [
@@ -189,14 +199,14 @@ TEST(RouteMatcherTest, TestRoutes) {
   EXPECT_EQ(
       "wildcard",
       config.route(genHeaders("foo-bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("wildcard2",
+            config.route(genHeaders("-bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("wildcard2",
+            config.route(genHeaders("bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("instant-server",
             config.route(genHeaders(".foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("instant-server",
             config.route(genHeaders("foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("instant-server",
-            config.route(genHeaders("-bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("instant-server",
-            config.route(genHeaders("bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
 
   // Timeout testing.
   EXPECT_EQ(std::chrono::milliseconds(30000),
