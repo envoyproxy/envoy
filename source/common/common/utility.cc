@@ -123,11 +123,6 @@ std::vector<std::string> StringUtil::tokenize(const std::string& source,
   if (pos < i) {
     tokens.push_back(source.substr(pos, i - pos));
   }
-  std::cerr << "Tokens:";
-  for (const auto& tok : tokens) {
-    std::cerr << " " << tok;
-  }
-  std::cerr << std::endl;
   return tokens;
 }
 
