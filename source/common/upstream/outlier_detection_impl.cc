@@ -217,6 +217,17 @@ void DetectorImpl::onConsecutive5xxWorker(HostPtr host) {
   ejectHost(host, EjectionType::Consecutive5xx);
 }
 
+double DetectorImpl::srEjectionThreshold(double sr_sum, std::vector<double>& sr_data) {
+  double mean = sr_sum / sr_data.size();
+  double stdev = 0;
+  std::for_each(sr_data.begin(), sr_data.end(),
+                [&stdev, mean](double& v) { stdev += std::pow(v - mean, 2); });
+  stdev /= sr_data.size();
+  stdev = std::sqrt(stdev);
+
+  return mean - (sr_stdev_factor_ * stdev);
+}
+
 void DetectorImpl::onIntervalTimer() {
   SystemTime now = time_source_.currentSystemTime();
   std::unordered_map<HostPtr, double> valid_sr_hosts;
@@ -249,17 +260,8 @@ void DetectorImpl::onIntervalTimer() {
   if (valid_sr_hosts.size() >=
       runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold",
                                      config_.rqVolumeThreshold())) {
-
-    // Calculate the statistics (mean, stdev). We are using mean to detect outliers.
-    double mean = sr_sum / sr_data.size();
-    double stdev = 0;
-    std::for_each(sr_data.begin(), sr_data.end(),
-                  [&stdev, mean](double& v) { stdev += std::pow(v - mean, 2); });
-    stdev /= sr_data.size();
-    stdev = std::sqrt(stdev);
-
     for (auto host : valid_sr_hosts) {
-      if (host.second < mean - (sr_stdev_factor_ * stdev)) {
+      if (host.second < srEjectionThreshold(sr_sum, sr_data)) {
         stats_.ejections_sr_.inc();
         ejectHost(host.first, EjectionType::SuccessRate);
       }

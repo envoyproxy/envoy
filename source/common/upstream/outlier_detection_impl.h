@@ -187,6 +187,7 @@ private:
   void onConsecutive5xxWorker(HostPtr host);
   void onIntervalTimer();
   void runCallbacks(HostPtr host);
+  double srEjectionThreshold(double sr_sum, std::vector<double>& sr_data);
 
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
