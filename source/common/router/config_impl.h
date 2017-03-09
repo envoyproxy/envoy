@@ -7,9 +7,31 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/trie.h"
 #include "common/router/config_utility.h"
 
 namespace Router {
+class DomainTokenizer {
+public:
+  std::vector<std::string> tokenize(std::string str) const {
+    std::vector<std::string> tokens;
+    while (str.size() > 0) {
+      size_t next = std::min(str.find('-'), str.find('.'));
+      if (next == std::string::npos) {
+        tokens.push_back(str);
+        str.clear();
+        break;
+      }
+      if (next > 0) {
+        tokens.push_back(str.substr(0, next));
+      }
+      tokens.push_back(str.substr(next, 1));
+      str.erase(0, next + 1);
+    }
+    std::reverse(tokens.begin(), tokens.end());
+    return tokens;
+  }
+};
 
 /**
  * Base interface for something that matches a header.
@@ -350,12 +372,10 @@ public:
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
-  VirtualHostPtr findWildcardVirtualHost(const std::string& domain) const;
 
   std::unordered_map<std::string, VirtualHostPtr> virtual_hosts_;
   VirtualHostPtr default_virtual_host_;
-  std::map<uint32_t, std::unordered_map<std::string, VirtualHostPtr>, std::greater<uint32_t>>
-      wildcard_virtual_host_suffixes_;
+  TrieNode<std::string, VirtualHostPtr, DomainTokenizer> wildcard_virtual_host_suffixes_;
   bool uses_runtime_{};
 };
 

@@ -432,20 +432,6 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
   priority_ = ConfigUtility::parsePriority(virtual_cluster);
 }
 
-VirtualHostPtr RouteMatcher::findWildcardVirtualHost(const std::string& domain) const {
-  for (auto& iter : wildcard_virtual_host_suffixes_) {
-    uint32_t i = iter.first;
-    const auto& wildcard_map = iter.second;
-    // >= because *.foo.com shouldn't match .foo.com.
-    if (i >= domain.size() ||
-        wildcard_map.find(domain.substr(domain.size() - i)) == wildcard_map.end()) {
-      continue;
-    }
-    return wildcard_map.find(domain.substr(domain.size() - i))->second;
-  }
-  return nullptr;
-}
-
 RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
                            Upstream::ClusterManager& cm, bool validate_clusters) {
 
@@ -463,7 +449,7 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
         }
         default_virtual_host_ = virtual_host;
       } else if ('*' == domain[0]) {
-        wildcard_virtual_host_suffixes_[domain.size() - 1].emplace(domain.substr(1), virtual_host);
+        wildcard_virtual_host_suffixes_.insert(domain.substr(1), virtual_host);
       } else {
         if (virtual_hosts_.find(domain) != virtual_hosts_.end()) {
           throw EnvoyException(fmt::format(
@@ -506,11 +492,9 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   auto iter = virtual_hosts_.find(headers.Host()->value().c_str());
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
-  } else if (!wildcard_virtual_host_suffixes_.empty()) {
-    VirtualHostPtr vhost = findWildcardVirtualHost(headers.Host()->value().c_str());
-    if (vhost != nullptr) {
-      return vhost.get();
-    }
+  } else if (VirtualHostPtr vhost =
+                 wildcard_virtual_host_suffixes_.match(headers.Host()->value().c_str())) {
+    return vhost.get();
   }
   return default_virtual_host_.get();
 }
