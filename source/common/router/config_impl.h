@@ -1,7 +1,5 @@
 #pragma once
 
-#include <set>
-
 #include "router_ratelimit.h"
 
 #include "envoy/common/optional.h"
