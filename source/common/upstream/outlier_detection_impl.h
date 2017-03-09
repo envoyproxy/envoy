@@ -89,7 +89,7 @@ struct DetectionStats {
  */
 class DetectorConfig {
 public:
-  DetectorConfig(const Json::ObjectPtr& json_config);
+  DetectorConfig(const Json::Object& json_config);
 
   uint64_t intervalMs() { return interval_ms_; }
   uint64_t baseEjectionTimeMs() { return base_ejection_time_ms_; }
@@ -113,7 +113,7 @@ private:
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
   static std::shared_ptr<DetectorImpl>
-  create(const Cluster& cluster, const Json::ObjectPtr& json_config, Event::Dispatcher& dispatcher,
+  create(const Cluster& cluster, const Json::Object& json_config, Event::Dispatcher& dispatcher,
          Runtime::Loader& runtime, SystemTimeSource& time_source, EventLoggerPtr event_logger);
   ~DetectorImpl();
 
@@ -125,7 +125,7 @@ public:
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
 
 private:
-  DetectorImpl(const Cluster& cluster, const Json::ObjectPtr& json_config,
+  DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                SystemTimeSource& time_source, EventLoggerPtr event_logger);
 
