@@ -14,7 +14,7 @@ namespace Server {
 
 // Increment this whenever there is a shared memory / RPC change that will prevent a hot restart
 // from working. Operations code can then cope with this and do a full restart.
-const uint64_t SharedMemory::VERSION = 4;
+const uint64_t SharedMemory::VERSION = 5;
 
 SharedMemory& SharedMemory::initialize(Options& options) {
   int flags = O_RDWR;
@@ -51,6 +51,16 @@ SharedMemory& SharedMemory::initialize(Options& options) {
   } else {
     RELEASE_ASSERT(shmem->size_ == sizeof(SharedMemory));
     RELEASE_ASSERT(shmem->version_ == VERSION);
+  }
+
+  // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
+  // initialized. The startup logic is quite compicated, and it's not worth trying to handle this
+  // in a finer way. This will cause the startup to fail with an error code early, without
+  // affecting any currently running processes. The process runner should try again later with some
+  // back off and with the same hot restart epoch number..
+  uint64_t old_flags = shmem->flags_.fetch_or(Flags::INITIALIZING);
+  if (old_flags & Flags::INITIALIZING) {
+    throw EnvoyException("previous envoy process is still initializing");
   }
 
   return *shmem;
@@ -142,13 +152,14 @@ sockaddr_un HotRestartImpl::createDomainSocketAddress(uint64_t id) {
 }
 
 void HotRestartImpl::drainParentListeners() {
-  if (options_.restartEpoch() == 0) {
-    return;
+  if (options_.restartEpoch() > 0) {
+    // No reply expected.
+    RpcBase rpc(RpcMessageType::DrainListenersRequest);
+    sendMessage(parent_address_, rpc);
   }
 
-  // No reply expected.
-  RpcBase rpc(RpcMessageType::DrainListenersRequest);
-  sendMessage(parent_address_, rpc);
+  // At this point we are initialized and a new Envoy can startup if needed.
+  shmem_.flags_ &= ~SharedMemory::Flags::INITIALIZING;
 }
 
 int HotRestartImpl::duplicateParentListenSocket(uint32_t port) {
