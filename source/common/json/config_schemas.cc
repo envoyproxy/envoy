@@ -1069,6 +1069,16 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "exclusiveMinimum" : true
           },
+          "significant_host_threshold" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "rq_volume_threshold" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
           "interval_ms" : {
             "type" : "integer",
             "minimum" : 0,

@@ -64,7 +64,11 @@ DetectorConfig::DetectorConfig(const Json::Object& json_config)
       consecutive_5xx_(static_cast<uint64_t>(json_config.getInteger("consecutive_5xx", 5))),
       max_ejection_percent_(
           static_cast<uint64_t>(json_config.getInteger("max_ejection_percent", 10))),
-      enforcing_(static_cast<uint64_t>(json_config.getInteger("enforcing", 100))) {}
+      enforcing_(static_cast<uint64_t>(json_config.getInteger("enforcing", 100))),
+      significant_host_threshold_(
+          static_cast<uint64_t>(json_config.getInteger("significant_host_threshold", 5))),
+      rq_volume_threshold_(
+          static_cast<uint64_t>(json_config.getInteger("rq_volume_threshold", 100))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
@@ -228,9 +232,12 @@ void DetectorImpl::onIntervalTimer() {
 
     // If there are not enough hosts to begin with, don't do the work.
     if (host_sinks_.size() >=
-        runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold", 5)) {
-      Optional<double> host_sr = host.second->srAccumulator().getSR(
-          runtime_.snapshot().getInteger("outlier_detection.rq_volume_threshold", 100));
+        runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold",
+                                       config_.significantHostThreshold())) {
+
+      Optional<double> host_sr = host.second->srAccumulator().getSR(runtime_.snapshot().getInteger(
+          "outlier_detection.rq_volume_threshold", config_.rqVolumeThreshold()));
+
       if (host_sr.valid()) {
         valid_sr_hosts[host.first] = host_sr.value();
         sr_data.emplace_back(host_sr.value());
@@ -240,7 +247,8 @@ void DetectorImpl::onIntervalTimer() {
   }
 
   if (valid_sr_hosts.size() >=
-      runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold", 5)) {
+      runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold",
+                                     config_.rqVolumeThreshold())) {
 
     // Calculate the statistics (mean, stdev). We are using mean to detect outliers.
     double mean = sr_sum / sr_data.size();
@@ -337,8 +345,8 @@ SRAccumulatorBucket* SRAccumulatorImpl::getCurrentWriter() {
   return current_sr_bucket_.get();
 }
 
-Optional<double> SRAccumulatorImpl::getSR(uint64_t rq_volume_thresh) {
-  if (backup_sr_bucket_->total_rq_counter_ < rq_volume_thresh) {
+Optional<double> SRAccumulatorImpl::getSR(uint64_t rq_volume_threshold) {
+  if (backup_sr_bucket_->total_rq_counter_ < rq_volume_threshold) {
     return Optional<double>();
   }
 

@@ -53,7 +53,7 @@ class SRAccumulatorImpl {
 public:
   SRAccumulatorImpl()
       : current_sr_bucket_(new SRAccumulatorBucket()),
-        backup_sr_bucket_(new SRAccumulatorBucket()) {};
+        backup_sr_bucket_(new SRAccumulatorBucket()){};
   SRAccumulatorBucket* getCurrentWriter();
   /**
    * This function returns the SR of a host over a window of time if the request volume is high
@@ -141,6 +141,8 @@ public:
   uint64_t consecutive5xx() { return consecutive_5xx_; }
   uint64_t maxEjectionPercent() { return max_ejection_percent_; }
   uint64_t enforcing() { return enforcing_; }
+  uint64_t significantHostThreshold() { return significant_host_threshold_; }
+  uint64_t rqVolumeThreshold() { return rq_volume_threshold_; }
 
 private:
   const uint64_t interval_ms_;
@@ -148,6 +150,8 @@ private:
   const uint64_t consecutive_5xx_;
   const uint64_t max_ejection_percent_;
   const uint64_t enforcing_;
+  const uint64_t significant_host_threshold_;
+  const uint64_t rq_volume_threshold_;
 };
 
 /**
