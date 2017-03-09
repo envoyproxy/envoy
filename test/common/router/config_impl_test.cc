@@ -649,6 +649,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
     route->routeEntry()->shadowPolicy();
     route->routeEntry()->virtualCluster(headers);
     route->routeEntry()->virtualHost();
+    route->routeEntry()->virtualHost().rateLimitPolicy();
   }
 }
 

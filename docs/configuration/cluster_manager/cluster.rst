@@ -138,9 +138,40 @@ dns_refresh_rate_ms
 
 outlier_detection
   *(optional, object)* If specified, outlier detection will be enabled for this upstream cluster.
-  Currently the presence of the empty object enables it and there are no options. See the
-  :ref:`architecture overview <arch_overview_outlier_detection>` for more information on outlier
-  detection.
+  See the :ref:`architecture overview <arch_overview_outlier_detection>` for more information on outlier
+  detection. The following configuration values are supported:
+
+  .. _config_cluster_manager_cluster_outlier_detection_consecutive_5xx:
+
+  consecutive_5xx
+    The number of consecutive 5xx responses before a consecutive 5xx ejection occurs. Defaults to 5.
+
+  .. _config_cluster_manager_cluster_outlier_detection_interval_ms:
+
+  interval_ms
+    The time interval between ejection analysis sweeps. This can result in both new ejections as well
+    as hosts being returned to service. Defaults to 10000ms or 10s.
+
+  .. _config_cluster_manager_cluster_outlier_detection_base_ejection_time_ms:
+
+  base_ejection_time_ms
+    The base time that a host is ejected for. The real time is equal to the base time multiplied by
+    the number of times the host has been ejected. Defaults to 30000ms or 30s.
+
+  .. _config_cluster_manager_cluster_outlier_detection_max_ejection_percent:
+
+  max_ejection_percent
+    The maximum % of an upstream cluster that can be ejected due to outlier detection. Defaults to 10%.
+
+  .. _config_cluster_manager_cluster_outlier_detection_enforcing:
+
+  enforcing
+    The % chance that a host will be actually ejected when an outlier status is detected. This setting
+    can be used to disable ejection or to ramp it up slowly. Defaults to 100.
+
+  Each of the above configuration values can be overridden via 
+  :ref:`runtime values <config_cluster_manager_cluster_runtime_outlier_detection>`.
+
 
 .. toctree::
   :hidden:

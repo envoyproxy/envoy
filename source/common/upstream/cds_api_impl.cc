@@ -49,13 +49,15 @@ void CdsApiImpl::parseResponse(const Http::Message& response) {
   for (auto& cluster : clusters) {
     std::string cluster_name = cluster->getString("name");
     clusters_to_remove.erase(cluster_name);
-    log().info("cds: add/update cluster '{}'", cluster_name);
-    cm_.addOrUpdatePrimaryCluster(*cluster);
+    if (cm_.addOrUpdatePrimaryCluster(*cluster)) {
+      log().info("cds: add/update cluster '{}'", cluster_name);
+    }
   }
 
   for (auto cluster : clusters_to_remove) {
-    log().info("cds: remove cluster '{}'", cluster.first);
-    cm_.removePrimaryCluster(cluster.first);
+    if (cm_.removePrimaryCluster(cluster.first)) {
+      log().info("cds: remove cluster '{}'", cluster.first);
+    }
   }
 
   stats_.update_success_.inc();

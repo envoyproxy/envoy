@@ -4,6 +4,7 @@
 #include "envoy/router/router_ratelimit.h"
 
 #include "common/http/filter/ratelimit.h"
+#include "common/json/json_validator.h"
 #include "common/router/config_utility.h"
 
 namespace Router {
@@ -97,15 +98,13 @@ private:
 /*
  * Implementation of RateLimitPolicyEntry that holds the action for the configuration.
  */
-class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
+class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry, Json::JsonValidator {
 public:
   RateLimitPolicyEntryImpl(const Json::Object& config);
 
   // Router::RateLimitPolicyEntry
-  int64_t stage() const override { return stage_; }
+  uint64_t stage() const override { return stage_; }
   const std::string& disableKey() const override { return disable_key_; }
-
-  // Router::RateLimitAction
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap&,
@@ -113,7 +112,7 @@ public:
 
 private:
   const std::string disable_key_;
-  int64_t stage_;
+  uint64_t stage_;
   std::vector<RateLimitActionPtr> actions_;
 };
 
@@ -126,13 +125,16 @@ public:
 
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
-  getApplicableRateLimit(int64_t stage = 0) const override;
+  getApplicableRateLimit(uint64_t stage = 0) const override;
 
 private:
-  std::vector<std::vector<std::unique_ptr<RateLimitPolicyEntry>>> rate_limit_entries_;
+  std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;
   std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
       rate_limit_entries_reference_;
-  static const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> empty_rate_limit_;
+  // The maximum stage number supported. This value should match the maximum stage number in
+  // Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA and
+  // Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA from common/json/config_schemas.cc.
+  static const uint64_t MAX_STAGE_NUMBER;
 };
 
 } // Router

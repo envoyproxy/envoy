@@ -7,7 +7,9 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/http/header_map_impl.h"
+#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+#include "common/json/json_validator.h"
 
 namespace Http {
 namespace RateLimit {
@@ -15,21 +17,25 @@ namespace RateLimit {
 /**
  * Global configuration for the HTTP rate limit filter.
  */
-class FilterConfig {
+class FilterConfig : Json::JsonValidator {
 public:
   FilterConfig(const Json::Object& config, const LocalInfo::LocalInfo& local_info,
-               Stats::Store& global_store, Runtime::Loader& runtime, Upstream::ClusterManager& cm);
+               Stats::Store& global_store, Runtime::Loader& runtime, Upstream::ClusterManager& cm)
+      : Json::JsonValidator(config, Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA),
+        domain_(config.getString("domain")),
+        stage_(static_cast<uint64_t>(config.getInteger("stage", 0))), local_info_(local_info),
+        global_store_(global_store), runtime_(runtime), cm_(cm) {}
 
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
-  int64_t stage() const { return stage_; }
+  uint64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Store& globalStore() { return global_store_; }
   Upstream::ClusterManager& cm() { return cm_; }
 
 private:
   const std::string domain_;
-  int64_t stage_;
+  uint64_t stage_;
   const LocalInfo::LocalInfo& local_info_;
   Stats::Store& global_store_;
   Runtime::Loader& runtime_;

@@ -53,7 +53,8 @@ TEST_F(RingHashLoadBalancerTest, Basic) {
   cluster_.runCallbacks({}, {});
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
-  // TODO: Compile in and use murmur3 or city so we know exactly what we are going to get.
+  // TODO(mattklein123): Compile in and use murmur3 or city so we know exactly
+  // what we are going to get.
   // ring hash: host=127.0.0.1:85 hash=1358027074129602068
   // ring hash: host=127.0.0.1:83 hash=4361834613929391114
   // ring hash: host=127.0.0.1:84 hash=7224494972555149682
@@ -103,7 +104,8 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
   cluster_.runCallbacks({}, {});
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
-  // TODO: Compile in and use murmur3 or city so we know exactly what we are going to get.
+  // TODO(mattklein123): Compile in and use murmur3 or city so we know exactly
+  // what we are going to get.
   // ring hash: host=127.0.0.1:81 hash=7701421856454313576
   // ring hash: host=127.0.0.1:81 hash=9887544217113020895
   // ring hash: host=127.0.0.1:80 hash=15427156902705414897
@@ -118,7 +120,8 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
   cluster_.runCallbacks({}, {});
 
   // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
-  // TODO: Compile in and use murmur3 or city so we know exactly what we are going to get.
+  // TODO(mattklein123): Compile in and use murmur3 or city so we know exactly
+  // what we are going to get.
   // ring hash: host=127.0.0.1:81 hash=7701421856454313576
   // ring hash: host=127.0.0.1:82 hash=8649315368077433379
   // ring hash: host=127.0.0.1:81 hash=9887544217113020895

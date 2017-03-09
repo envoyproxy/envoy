@@ -50,7 +50,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       final_remote_address.reset(
           new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(remote_addr)));
     } else {
-      // TODO: IPv6 support.
+      // TODO(mattklein123): IPv6 support.
       ASSERT(remote_addr->sa_family == AF_UNIX);
       final_remote_address.reset(
           new Address::PipeInstance(reinterpret_cast<sockaddr_un*>(remote_addr)));

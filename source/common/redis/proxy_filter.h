@@ -9,8 +9,8 @@
 
 namespace Redis {
 
-// TODO: Stats
-// TODO: Actual multiplexing, command verification, and splitting
+// TODO(mattklein123): Stats
+// TODO(mattklein123): Actual multiplexing, command verification, and splitting
 
 /**
  * Configuration for the redis proxy filter.

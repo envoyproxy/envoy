@@ -49,7 +49,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent*
       ASSERT(hostent->h_length == sizeof(in_addr));
       sockaddr_in address;
       memset(&address, 0, sizeof(address));
-      // TODO: IPv6 support.
+      // TODO(mattklein123): IPv6 support.
       address.sin_family = AF_INET;
       address.sin_port = 0;
       address.sin_addr = *reinterpret_cast<in_addr*>(hostent->h_addr_list[i]);
@@ -98,7 +98,7 @@ void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
   if (it == events_.end()) {
     events_[fd] = dispatcher_.createFileEvent(fd, [this, fd](uint32_t events) {
       onEventCallback(fd, events);
-    }, Event::FileTriggerType::Level);
+    }, Event::FileTriggerType::Level, Event::FileReadyType::Read | Event::FileReadyType::Write);
   }
   events_[fd]->setEnabled((read ? Event::FileReadyType::Read : 0) |
                           (write ? Event::FileReadyType::Write : 0));

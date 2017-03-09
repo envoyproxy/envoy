@@ -51,10 +51,10 @@ public:
   }
 
   const std::string filter_config = R"EOF(
-    {
-      "domain": "foo"
-    }
-    )EOF";
+  {
+    "domain": "foo"
+  }
+  )EOF";
 
   FilterConfigPtr config_;
   ::RateLimit::MockClient* client_;
@@ -317,6 +317,20 @@ TEST_F(HttpRateLimitFilterTest, VirtualHostRateLimitDisabledForRouteKey) {
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+}
+
+TEST_F(HttpRateLimitFilterTest, ConfigValueTest) {
+  std::string stage_filter_config = R"EOF(
+  {
+    "domain": "foo",
+    "stage": 5
+  }
+  )EOF";
+
+  SetUpTest(stage_filter_config);
+
+  EXPECT_EQ(5UL, config_->stage());
+  EXPECT_EQ("foo", config_->domain());
 }
 
 } // RateLimit

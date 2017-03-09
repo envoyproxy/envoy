@@ -728,8 +728,8 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doHeaders(complete() && !bufferedData() && !trailers());
   }
 
-  // TODO: If a filter returns StopIterationNoBuffer and then does a continue, we won't be able to
-  //       end the stream if there is no buffered data. Need to handle this.
+  // TODO(mattklein123): If a filter returns StopIterationNoBuffer and then does a continue, we
+  // won't be able to end the stream if there is no buffered data. Need to handle this.
   if (bufferedData()) {
     doData(complete() && !trailers());
   }

@@ -19,7 +19,7 @@ set(ENVOY_HTTP_PARSER_INCLUDE_DIR "" CACHE FILEPATH "location of http-parser inc
 set(ENVOY_NGHTTP2_INCLUDE_DIR "" CACHE FILEPATH "location of nghttp2 includes")
 
 # http://libevent.org/
-# Last tested with 2.0.22
+# Last tested with 2.1.8
 set(ENVOY_LIBEVENT_INCLUDE_DIR "" CACHE FILEPATH "location of libevent includes")
 
 # http://tclap.sourceforge.net/

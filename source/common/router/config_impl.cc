@@ -45,8 +45,8 @@ Optional<uint64_t> HashPolicyImpl::generateHash(const Http::HeaderMap& headers) 
   Optional<uint64_t> hash;
   const Http::HeaderEntry* header = headers.get(header_name_);
   if (header) {
-    // TODO: Compile in murmur3/city/etc. and potentially allow the user to choose so we know
-    //       exactly what we are going to get.
+    // TODO(mattklein123): Compile in murmur3/city/etc. and potentially allow the user to choose so
+    // we know exactly what we are going to get.
     hash.value(std::hash<std::string>()(header->value().c_str()));
   }
   return hash;
@@ -344,7 +344,7 @@ void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const 
 
 RoutePtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value)) {
-    // TODO PERF: Avoid copy.
+    // TODO(mattklein123) PERF: Avoid copy.
     std::string path = headers.Path()->value().c_str();
     size_t query_string_start = path.find("?");
 

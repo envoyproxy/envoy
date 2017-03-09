@@ -1,12 +1,12 @@
 #include "router_ratelimit.h"
 
+#include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
 
 namespace Router {
 
-const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>
-    RateLimitPolicyImpl::empty_rate_limit_;
+const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
 
 void SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
                                              ::RateLimit::Descriptor& descriptor,
@@ -69,10 +69,9 @@ void HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
-    : disable_key_(config.getString("disable_key", "")), stage_(config.getInteger("stage", 0)) {
-
-  config.validateSchema(Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA);
-
+    : Json::JsonValidator(config, Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA),
+      disable_key_(config.getString("disable_key", "")),
+      stage_(static_cast<uint64_t>(config.getInteger("stage", 0))) {
   for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
     std::string type = action->getString("type");
     if (type == "source_cluster") {
@@ -107,30 +106,24 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
   }
 }
 
-RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config) {
+RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
+    : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
   if (config.hasObject("rate_limits")) {
-    std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_policy;
-    std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limit_policy_reference;
     for (const Json::ObjectPtr& rate_limit : config.getObjectArray("rate_limits")) {
       std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
           new RateLimitPolicyEntryImpl(*rate_limit));
-      rate_limit_policy_reference.emplace_back(*rate_limit_policy_entry);
-      rate_limit_policy.emplace_back(std::move(rate_limit_policy_entry));
+      uint64_t stage = rate_limit_policy_entry->stage();
+      ASSERT(stage < rate_limit_entries_reference_.size());
+      rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);
+      rate_limit_entries_.emplace_back(std::move(rate_limit_policy_entry));
     }
-    rate_limit_entries_.emplace_back(std::move(rate_limit_policy));
-    rate_limit_entries_reference_.emplace_back(rate_limit_policy_reference);
   }
 }
 
-const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
-    RateLimitPolicyImpl::getApplicableRateLimit(int64_t) const {
-  // Currently return all rate limit policy entries.
-  // TODO: Implement returning only rate limit policy entries that match the stage setting.
-  if (rate_limit_entries_.empty()) {
-    return empty_rate_limit_;
-  } else {
-    return rate_limit_entries_reference_[0];
-  }
+const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>&
+RateLimitPolicyImpl::getApplicableRateLimit(uint64_t stage) const {
+  ASSERT(stage < rate_limit_entries_reference_.size());
+  return rate_limit_entries_reference_[stage];
 }
 
 } // Router

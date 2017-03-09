@@ -22,21 +22,4 @@ void Thread::join() {
   UNREFERENCED_PARAMETER(rc);
 }
 
-void ConditionalInitializer::setReady() {
-  std::unique_lock<std::mutex> lock(mutex_);
-  ASSERT(!ready_);
-  ready_ = true;
-  cv_.notify_all();
-}
-
-void ConditionalInitializer::waitReady() {
-  std::unique_lock<std::mutex> lock(mutex_);
-  if (ready_) {
-    return;
-  }
-
-  cv_.wait(lock);
-  ASSERT(ready_);
-}
-
 } // Thread

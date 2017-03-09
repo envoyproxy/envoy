@@ -52,7 +52,8 @@ void LogicalDnsCluster::startResolve() {
         info_->stats().update_success_.inc();
 
         if (!address_list.empty()) {
-          // TODO: IPv6 support as well as moving port handling into the DNS interface.
+          // TODO(mattklein123): IPv6 support as well as moving port handling into the DNS
+          // interface.
           Network::Address::InstancePtr new_address(
               new Network::Address::Ipv4Instance(address_list.front()->ip()->addressAsString(),
                                                  Network::Utility::portFromTcpUrl(dns_url_)));
@@ -66,10 +67,10 @@ void LogicalDnsCluster::startResolve() {
           }
 
           if (!logical_host_) {
-            // TODO: The logical host is only used in /clusters admin output. We used to show
-            //       the friendly DNS name in that output, but currently there is no way to
-            //       express a DNS name inside of an Address::Instance. For now this is OK but
-            //       we might want to do better again later.
+            // TODO(mattklein123): The logical host is only used in /clusters admin output. We used
+            // to show the friendly DNS name in that output, but currently there is no way to
+            // express a DNS name inside of an Address::Instance. For now this is OK but we might
+            // want to do better again later.
             logical_host_.reset(new LogicalHost(
                 info_, hostname_, Network::Utility::resolveUrl("tcp://0.0.0.0:0"), *this));
             HostVectorPtr new_hosts(new std::vector<HostPtr>());

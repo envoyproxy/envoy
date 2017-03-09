@@ -14,11 +14,9 @@ DetectorPtr DetectorImplFactory::createForCluster(Cluster& cluster,
                                                   Event::Dispatcher& dispatcher,
                                                   Runtime::Loader& runtime,
                                                   EventLoggerPtr event_logger) {
-  // Right now we don't support any configuration but in order to make the config backwards
-  // compatible we just look for an empty object.
   if (cluster_config.hasObject("outlier_detection")) {
-    return DetectorImpl::create(cluster, dispatcher, runtime, ProdSystemTimeSource::instance_,
-                                event_logger);
+    return DetectorImpl::create(cluster, *cluster_config.getObject("outlier_detection"), dispatcher,
+                                runtime, ProdSystemTimeSource::instance_, event_logger);
   } else {
     return nullptr;
   }
@@ -49,7 +47,8 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
     }
 
     if (++consecutive_5xx_ ==
-        detector->runtime().snapshot().getInteger("outlier_detection.consecutive_5xx", 5)) {
+        detector->runtime().snapshot().getInteger("outlier_detection.consecutive_5xx",
+                                                  detector->config().consecutive5xx())) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
@@ -58,10 +57,19 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
-DetectorImpl::DetectorImpl(const Cluster& cluster, Event::Dispatcher& dispatcher,
-                           Runtime::Loader& runtime, SystemTimeSource& time_source,
-                           EventLoggerPtr event_logger)
-    : dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
+DetectorConfig::DetectorConfig(const Json::Object& json_config)
+    : interval_ms_(static_cast<uint64_t>(json_config.getInteger("interval_ms", 10000))),
+      base_ejection_time_ms_(
+          static_cast<uint64_t>(json_config.getInteger("base_ejection_time_ms", 30000))),
+      consecutive_5xx_(static_cast<uint64_t>(json_config.getInteger("consecutive_5xx", 5))),
+      max_ejection_percent_(
+          static_cast<uint64_t>(json_config.getInteger("max_ejection_percent", 10))),
+      enforcing_(static_cast<uint64_t>(json_config.getInteger("enforcing", 100))) {}
+
+DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
+                           Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                           SystemTimeSource& time_source, EventLoggerPtr event_logger)
+    : config_(json_config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger) {}
@@ -75,13 +83,12 @@ DetectorImpl::~DetectorImpl() {
   }
 }
 
-std::shared_ptr<DetectorImpl> DetectorImpl::create(const Cluster& cluster,
-                                                   Event::Dispatcher& dispatcher,
-                                                   Runtime::Loader& runtime,
-                                                   SystemTimeSource& time_source,
-                                                   EventLoggerPtr event_logger) {
+std::shared_ptr<DetectorImpl>
+DetectorImpl::create(const Cluster& cluster, const Json::Object& json_config,
+                     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                     SystemTimeSource& time_source, EventLoggerPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
-      new DetectorImpl(cluster, dispatcher, runtime, time_source, event_logger));
+      new DetectorImpl(cluster, json_config, dispatcher, runtime, time_source, event_logger));
   detector->initialize(cluster);
   return detector;
 }
@@ -120,7 +127,7 @@ void DetectorImpl::addHostSink(HostPtr host) {
 
 void DetectorImpl::armIntervalTimer() {
   interval_timer_->enableTimer(std::chrono::milliseconds(
-      runtime_.snapshot().getInteger("outlier_detection.interval_ms", 10000)));
+      runtime_.snapshot().getInteger("outlier_detection.interval_ms", config_.intervalMs())));
 }
 
 void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink, SystemTime now) {
@@ -128,8 +135,9 @@ void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink,
     return;
   }
 
-  std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
-      runtime_.snapshot().getInteger("outlier_detection.base_ejection_time_ms", 30000));
+  std::chrono::milliseconds base_eject_time =
+      std::chrono::milliseconds(runtime_.snapshot().getInteger(
+          "outlier_detection.base_ejection_time_ms", config_.baseEjectionTimeMs()));
   ASSERT(sink->numEjections() > 0)
   if ((base_eject_time * sink->numEjections()) <= (now - sink->lastEjectionTime().value())) {
     stats_.ejections_active_.dec();
@@ -145,11 +153,12 @@ void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink,
 
 void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
-      100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent", 10));
+      100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
+                                          config_.maxEjectionPercent()));
   double ejected_percent = 100.0 * stats_.ejections_active_.value() / host_sinks_.size();
   if (ejected_percent < max_ejection_percent) {
     stats_.ejections_total_.inc();
-    if (runtime_.snapshot().featureEnabled("outlier_detection.enforcing", 100)) {
+    if (runtime_.snapshot().featureEnabled("outlier_detection.enforcing", config_.enforcing())) {
       stats_.ejections_active_.inc();
       host_sinks_[host]->eject(time_source_.currentSystemTime());
       runCallbacks(host);
@@ -259,7 +268,7 @@ void DetectorImpl::runCallbacks(HostPtr host) {
 }
 
 void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
-  // TODO: Log friendly host name (e.g., instance ID or DNS name).
+  // TODO(mattklein123): Log friendly host name (e.g., instance ID or DNS name).
   // clang-format off
   static const std::string json =
     std::string("{{") +
@@ -280,7 +289,7 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
 }
 
 void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
-  // TODO: Log friendly host name (e.g., instance ID or DNS name).
+  // TODO(mattklein123): Log friendly host name (e.g., instance ID or DNS name).
   // clang-format off
   static const std::string json =
     std::string("{{") +
