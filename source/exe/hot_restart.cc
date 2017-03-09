@@ -57,7 +57,7 @@ SharedMemory& SharedMemory::initialize(Options& options) {
   // initialized. The startup logic is quite compicated, and it's not worth trying to handle this
   // in a finer way. This will cause the startup to fail with an error code early, without
   // affecting any currently running processes. The process runner should try again later with some
-  // back off and with the same hot restart epoch number..
+  // back off and with the same hot restart epoch number.
   uint64_t old_flags = shmem->flags_.fetch_or(Flags::INITIALIZING);
   if (old_flags & Flags::INITIALIZING) {
     throw EnvoyException("previous envoy process is still initializing");
