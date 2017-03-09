@@ -109,6 +109,13 @@ public:
   static std::string subspan(const std::string& source, size_t start, size_t end);
 
   /**
+   * Tokenize a string. Note that token separaters are retained in the output.
+   * @param source supplies the string to split.
+   * @param splitters supplies characters to split on.
+   */
+  static std::vector<std::string> tokenize(const std::string& source, std::string splitters);
+
+  /**
    * @return true if @param source ends with @param end.
    */
   static bool endsWith(const std::string& source, const std::string& end);

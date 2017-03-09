@@ -12,6 +12,9 @@
  *
  * Note that Value must have a conversion constructor that will take nullptr.
  */
+// TODO(tschroed): It's possible for Key to be a different type from the
+// internal path component. E.g. a uint32_t IPv4 prefix can be tokenized to
+// uint8_t components. Likewise a string representation of same.
 template <class Key, class Value, class Tokenizer> class TrieNode {
 public:
   TrieNode(Value value) : value_(value) {}
@@ -23,7 +26,7 @@ public:
    * @param key the name associated with the value.
    * @param value the value to store on the node associated with name
    */
-  void insert(const Key& key, Value value);
+  void emplace(const Key& key, Value value);
 
   /**
    * Lookup a value by key.
@@ -31,11 +34,11 @@ public:
    * @return a std::pair consisting of the value if found and a boolean
    *         indicating if the match was exact.
    */
-  std::pair<Value, bool> match(const Key& key) const;
+  std::pair<Value, bool> find(const Key& key) const;
 
 private:
-  std::pair<Value, bool> match(std::vector<Key>& path_components) const;
-  void insert(std::vector<Key>& path_components, Value value);
+  std::pair<Value, bool> find(std::vector<Key>& path_components) const;
+  void emplace(std::vector<Key>& path_components, Value value);
   Value value() const { return value_; }
   void set_value(Value value) { value_ = value; }
 
@@ -47,49 +50,58 @@ private:
 };
 
 template <class Key, class Value, class Tokenizer>
-void TrieNode<Key, Value, Tokenizer>::insert(const Key& key, Value value) {
+void TrieNode<Key, Value, Tokenizer>::emplace(const Key& key, Value value) {
   std::vector<Key> path_components = tokenizer_.tokenize(key);
-  insert(path_components, value);
+  // Keys come in big endian but we reverse them for vector iteration
+  // efficiency.
+  std::reverse(path_components.begin(), path_components.end());
+  emplace(path_components, value);
 }
 
 template <class Key, class Value, class Tokenizer>
-void TrieNode<Key, Value, Tokenizer>::insert(std::vector<Key>& path_components, Value value) {
-  Key name(path_components[0]);
-  path_components.erase(path_components.begin());
+void TrieNode<Key, Value, Tokenizer>::emplace(std::vector<Key>& path_components, Value value) {
+  if (path_components.empty()) {
+    return;
+  }
+  Key name(path_components.back());
+  path_components.pop_back();
   if (children_.find(name) == children_.end()) {
     std::unique_ptr<TrieNode<Key, Value, Tokenizer>> node(
         new TrieNode<Key, Value, Tokenizer>(nullptr));
     children_[name] = std::move(node);
   }
   TrieNode<Key, Value, Tokenizer>* node = children_[name].get();
-  if (path_components.size() == 0) {
+  if (path_components.empty()) {
     node->set_value(value);
   } else {
-    node->insert(path_components, value);
+    node->emplace(path_components, value);
   }
 }
 
 template <class Key, class Value, class Tokenizer>
-std::pair<Value, bool> TrieNode<Key, Value, Tokenizer>::match(const Key& key) const {
+std::pair<Value, bool> TrieNode<Key, Value, Tokenizer>::find(const Key& key) const {
   std::vector<Key> path_components = tokenizer_.tokenize(key);
-  return match(path_components);
+  // Keys come in big endian but we reverse them for vector iteration
+  // efficiency.
+  std::reverse(path_components.begin(), path_components.end());
+  return find(path_components);
 }
 
 template <class Key, class Value, class Tokenizer>
 std::pair<Value, bool>
-TrieNode<Key, Value, Tokenizer>::match(std::vector<Key>& path_components) const {
-  // An exact match requires that we have a non-false value at the very end of
-  // our path traversal.
-  if (path_components.size() == 0) {
+TrieNode<Key, Value, Tokenizer>::find(std::vector<Key>& path_components) const {
+  if (path_components.empty()) {
+    // An exact match requires that we have a non-false value at the very end of
+    // our path traversal.
     return std::make_pair(value_, value_ ? true : false);
   }
   bool exact_match = false;
   Value value = value_;
-  Key component = path_components[0];
-  path_components.erase(path_components.begin());
+  Key component(path_components.back());
+  path_components.pop_back();
   if (children_.find(component) != children_.end()) {
     const TrieNode<Key, Value, Tokenizer>* node = children_.find(component)->second.get();
-    std::pair<Value, bool> retval = node->match(path_components);
+    std::pair<Value, bool> retval = node->find(path_components);
     if (retval.first) {
       value = retval.first;
       exact_match = retval.second;

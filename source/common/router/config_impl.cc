@@ -449,7 +449,7 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
         }
         default_virtual_host_ = virtual_host;
       } else if ('*' == domain[0]) {
-        wildcard_virtual_host_suffixes_.insert(domain.substr(1), virtual_host);
+        wildcard_virtual_host_suffixes_.emplace(domain.substr(1), virtual_host);
       } else {
         if (virtual_hosts_.find(domain) != virtual_hosts_.end()) {
           throw EnvoyException(fmt::format(
@@ -493,7 +493,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
   } else if (VirtualHostPtr vhost =
-                 wildcard_virtual_host_suffixes_.match(headers.Host()->value().c_str()).first) {
+                 wildcard_virtual_host_suffixes_.find(headers.Host()->value().c_str()).first) {
     return vhost.get();
   }
   return default_virtual_host_.get();
