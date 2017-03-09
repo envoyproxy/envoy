@@ -77,10 +77,11 @@ TEST_F(RoundRobinLoadBalancerTest, SelectCanaryHost) {
   cluster_.runCallbacks(added, removed);
 
   Optional<uint64_t> no_hash;
-  Upstream::LoadBalancerContext* context = new TestLoadBalancerContext(no_hash, true);
+  std::unique_ptr<Upstream::LoadBalancerContext> context(
+      new TestLoadBalancerContext(no_hash, true));
   // Select canary host consequently.
-  EXPECT_EQ(added[0], lb_->chooseHost(context));
-  EXPECT_EQ(added[0], lb_->chooseHost(context));
+  EXPECT_EQ(added[0], lb_->chooseHost(context.get()));
+  EXPECT_EQ(added[0], lb_->chooseHost(context.get()));
 
   // Remove canary host and run again.
   std::vector<HostPtr> no_added;
@@ -88,8 +89,8 @@ TEST_F(RoundRobinLoadBalancerTest, SelectCanaryHost) {
   cluster_.runCallbacks(no_added, remove_canary);
 
   // Provide context for canary, but no canary to route to.
-  EXPECT_EQ(cluster_.healthy_hosts_[2], lb_->chooseHost(context));
-  EXPECT_EQ(cluster_.healthy_hosts_[3], lb_->chooseHost(context));
+  EXPECT_EQ(cluster_.healthy_hosts_[2], lb_->chooseHost(context.get()));
+  EXPECT_EQ(cluster_.healthy_hosts_[3], lb_->chooseHost(context.get()));
 
   // Provide null context, normal RR will be applied.
   EXPECT_EQ(cluster_.healthy_hosts_[4], lb_->chooseHost(nullptr));
