@@ -7,7 +7,7 @@
 namespace {
 
 struct ReverseDomainTokenizer {
-  std::vector<std::string> tokenize(std::string str) const {
+  std::vector<std::string> tokenize(const std::string& str) const {
     std::vector<std::string> tokens(StringUtil::tokenize(str, "-."));
     std::reverse(tokens.begin(), tokens.end());
     return tokens;

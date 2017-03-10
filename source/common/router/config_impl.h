@@ -14,8 +14,11 @@
 #include "common/router/config_utility.h"
 
 namespace Router {
+// This is used to split a domain suffix into a series of path components (tokens) for placing in a
+// trie. E.g. ".foo.com" becomes {"com", ".", "foo", "."}. This is necessary because domain name
+// components proceed from most to least significant as right to left.
 struct ReverseDomainTokenizer {
-  std::vector<std::string> tokenize(std::string str) const {
+  std::vector<std::string> tokenize(const std::string& str) const {
     std::vector<std::string> tokens(StringUtil::tokenize(str, "-."));
     std::reverse(tokens.begin(), tokens.end());
     return tokens;

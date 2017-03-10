@@ -108,6 +108,29 @@ TEST(StringUtil, split) {
   EXPECT_EQ((std::vector<std::string>{"hello", "world"}), StringUtil::split("hello,world", ','));
 }
 
+TEST(StringUtil, tokenize) {
+  EXPECT_EQ(std::vector<std::string>{"."}, StringUtil::tokenize(".", "."));
+  EXPECT_EQ(std::vector<std::string>{"."}, StringUtil::tokenize(".", ".-"));
+  EXPECT_EQ(std::vector<std::string>{"."}, StringUtil::tokenize(".", "-."));
+
+  EXPECT_EQ((std::vector<std::string>{".", "-"}), StringUtil::tokenize(".-", "-."));
+  EXPECT_EQ((std::vector<std::string>{"dotdash", ".", "-"}),
+            StringUtil::tokenize("dotdash.-", "-."));
+
+  EXPECT_EQ((std::vector<std::string>{".", "dot"}), StringUtil::tokenize(".dot", "-."));
+  EXPECT_EQ((std::vector<std::string>{"dot", "."}), StringUtil::tokenize("dot.", "-."));
+  EXPECT_EQ((std::vector<std::string>{".", "dot", "-", "dash"}),
+            StringUtil::tokenize(".dot-dash", "-."));
+  EXPECT_EQ((std::vector<std::string>{"dot", ".", "dash", "-"}),
+            StringUtil::tokenize("dot.dash-", "-."));
+  EXPECT_EQ((std::vector<std::string>{"dot", ".", "dash", "-", "fin"}),
+            StringUtil::tokenize("dot.dash-fin", "-."));
+
+  EXPECT_EQ(std::vector<std::string>{"monolith"}, StringUtil::tokenize("monolith", "-."));
+  EXPECT_EQ(std::vector<std::string>{"foo.bar.baz"}, StringUtil::tokenize("foo.bar.baz", ""));
+  EXPECT_EQ(std::vector<std::string>{}, StringUtil::tokenize("", "-."));
+}
+
 TEST(StringUtil, endsWith) {
   EXPECT_TRUE(StringUtil::endsWith("test", "st"));
   EXPECT_TRUE(StringUtil::endsWith("t", "t"));

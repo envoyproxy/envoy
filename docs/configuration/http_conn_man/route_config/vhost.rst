@@ -26,10 +26,12 @@ name
 
 domains
   *(required, array)* A list of domains (host/authority header) that will be matched to this
-  virtual host. Currently, wildcard matching of the form "\*.foo.com" is not supported, however
+  virtual host. In addition to wildcard matching of the form "\*.foo.com" and "\*-bar.foo.com",
   a special entry "\*" is allowed which will match any host/authority header. Only a single virtual
-  host in the entire route configuration can match on "\*". A domain must be unique across all
-  virtual hosts or the config will fail to load.
+  host in the entire route configuration can match on "\*". It is legal to specify overlapping
+  wildcard matches such as "\*.foo.com\" and "\*.bar.foo.com". The most specific will be used.
+
+  A domain must be unique across all virtual hosts or the config will fail to load.
 
 :ref:`routes <config_http_conn_man_route_table_route>`
   *(required, array)* The list of routes that will be matched, in order, for incoming requests.

@@ -103,7 +103,7 @@ std::string StringUtil::subspan(const std::string& source, size_t start, size_t 
 }
 
 std::vector<std::string> StringUtil::tokenize(const std::string& source,
-                                              const std::string splitters) {
+                                              const std::string& splitters) {
   bool charmap[256] = {false};
   for (size_t i = 0; i < splitters.size(); i++) {
     charmap[static_cast<uint8_t>(splitters[i])] = true;

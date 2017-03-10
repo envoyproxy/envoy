@@ -113,7 +113,7 @@ public:
    * @param source supplies the string to split.
    * @param splitters supplies characters to split on.
    */
-  static std::vector<std::string> tokenize(const std::string& source, const std::string splitters);
+  static std::vector<std::string> tokenize(const std::string& source, const std::string& splitters);
 
   /**
    * @return true if @param source ends with @param end.
