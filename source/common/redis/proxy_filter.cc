@@ -6,10 +6,8 @@
 namespace Redis {
 
 ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm)
-    : cluster_name_{config.getString("cluster_name")} {
-
-  config.validateSchema(Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA);
-
+    : Json::Validator(config, Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA),
+      cluster_name_{config.getString("cluster_name")} {
   if (!cm.get(cluster_name_)) {
     throw EnvoyException(
         fmt::format("redis filter config: unknown cluster name '{}'", cluster_name_));
@@ -21,11 +19,8 @@ ProxyFilter::~ProxyFilter() { ASSERT(pending_requests_.empty()); }
 void ProxyFilter::onRespValue(RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
-  request.request_handle_ = conn_pool_.makeRequest("", *value, request);
-  if (!request.request_handle_) {
-    respondWithFailure("no healthy upstream");
-    pending_requests_.pop_back();
-  }
+  request.request_handle_ = splitter_.makeRequest(*value, request);
+  // The splitter can immediately respond.
 }
 
 void ProxyFilter::onEvent(uint32_t events) {
@@ -55,30 +50,19 @@ void ProxyFilter::onResponse(PendingRequest& request, RespValuePtr&& value) {
   }
 }
 
-void ProxyFilter::onFailure(PendingRequest& request) {
-  RespValuePtr error(new RespValue());
-  error->type(RespType::Error);
-  error->asString() = "upstream connection error";
-  onResponse(request, std::move(error));
-}
-
 Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
     return Network::FilterStatus::Continue;
   } catch (ProtocolError&) {
-    respondWithFailure("downstream protocol error");
+    RespValue error;
+    error.type(RespType::Error);
+    error.asString() = "downstream protocol error";
+    encoder_->encode(error, encoder_buffer_);
+    callbacks_->connection().write(encoder_buffer_);
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
-}
-
-void ProxyFilter::respondWithFailure(const std::string& message) {
-  RespValue error;
-  error.type(RespType::Error);
-  error.asString() = message;
-  encoder_->encode(error, encoder_buffer_);
-  callbacks_->connection().write(encoder_buffer_);
 }
 
 } // Redis

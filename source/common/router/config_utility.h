@@ -15,12 +15,12 @@ namespace Router {
  */
 class ConfigUtility {
 public:
-  struct HeaderData : Json::JsonValidator {
+  struct HeaderData : Json::Validator {
     // An empty header value allows for matching to be only based on header presence.
     // Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
     // exact string matching.
     HeaderData(const Json::Object& config)
-        : Json::JsonValidator(config, Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA),
+        : Json::Validator(config, Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA),
           name_(config.getString("name")), value_(config.getString("value", EMPTY_STRING)),
           regex_pattern_(value_, std::regex::optimize),
           is_regex_(config.getBoolean("regex", false)) {}

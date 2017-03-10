@@ -98,7 +98,7 @@ private:
 /*
  * Implementation of RateLimitPolicyEntry that holds the action for the configuration.
  */
-class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry, Json::JsonValidator {
+class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry, Json::Validator {
 public:
   RateLimitPolicyEntryImpl(const Json::Object& config);
 

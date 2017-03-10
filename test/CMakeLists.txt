@@ -82,6 +82,7 @@ add_executable(envoy-test
   common/network/utility_test.cc
   common/ratelimit/ratelimit_impl_test.cc
   common/redis/codec_impl_test.cc
+  common/redis/command_splitter_impl_test.cc
   common/redis/conn_pool_impl_test.cc
   common/redis/proxy_filter_test.cc
   common/router/config_impl_test.cc
