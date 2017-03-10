@@ -20,7 +20,7 @@ public:
 
   /**
    * @return bool whether we should prefer canary routing or not. In majority of the cases
-   * this should be false.
+   *         this should be false.
    */
   virtual bool preferCanary() const PURE;
 };
