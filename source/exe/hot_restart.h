@@ -20,6 +20,10 @@ public:
   static std::string version();
 
 private:
+  struct Flags {
+    static const uint64_t INITIALIZING = 0x1;
+  };
+
   SharedMemory() {}
 
   /**
@@ -37,6 +41,7 @@ private:
 
   uint64_t size_;
   uint64_t version_;
+  std::atomic<uint64_t> flags_;
   pthread_mutex_t log_lock_;
   pthread_mutex_t access_log_lock_;
   pthread_mutex_t stat_lock_;
