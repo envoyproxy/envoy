@@ -1,5 +1,5 @@
 #!/bin/bash
-ENVOY_BUILD_SHA=d3a3d93f304fe1cf28023b293913649e2024f297
+ENVOY_BUILD_SHA=e49093e7e3c571aaab9633df0f4b9ecf6d6351b2
 
 # Script that lists all the steps take by the CI system when doing Envoy builds.
 set -e
