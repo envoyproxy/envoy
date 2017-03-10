@@ -38,18 +38,19 @@ public:
    * @return a std::pair consisting of the value if found and a boolean
    *         indicating if the match was exact.
    */
-  std::pair<Value, bool> find(const Key& key) const;
+  std::pair<Value*, bool> find(const Key& key) const;
 
 private:
-  std::pair<Value, bool> find(std::vector<Key>& path_components) const;
+  std::pair<Value*, bool> find(std::vector<Key>& path_components) const;
   void emplace(std::vector<Key>& path_components, const Value& value);
-  Value value() const { return value_; }
   void set_value(const Value& value) { value_ = value; }
 
   // By holding pointers to the TriedNodes we don't have to worry that they're
   // incomplete types.
   std::unordered_map<Key, std::unique_ptr<TrieNode<Key, Value, Tokenizer>>> children_;
-  Value value_;
+  // value_ is being held as an opaque value and mutating it doesn't mutate the
+  // container.
+  mutable Value value_;
   Tokenizer tokenizer_;
 };
 
@@ -83,7 +84,7 @@ void TrieNode<Key, Value, Tokenizer>::emplace(std::vector<Key>& path_components,
 }
 
 template <class Key, class Value, class Tokenizer>
-std::pair<Value, bool> TrieNode<Key, Value, Tokenizer>::find(const Key& key) const {
+std::pair<Value*, bool> TrieNode<Key, Value, Tokenizer>::find(const Key& key) const {
   std::vector<Key> path_components = tokenizer_.tokenize(key);
   reverseComponentVector(path_components);
   return find(path_components);
@@ -91,21 +92,21 @@ std::pair<Value, bool> TrieNode<Key, Value, Tokenizer>::find(const Key& key) con
 
 // TODO(tschroed): Make this iterative rather than recursive.
 template <class Key, class Value, class Tokenizer>
-std::pair<Value, bool>
+std::pair<Value*, bool>
 TrieNode<Key, Value, Tokenizer>::find(std::vector<Key>& path_components) const {
   if (path_components.empty()) {
     // An exact match requires that we have a non-false value at the very end of
     // our path traversal.
-    return std::make_pair(value_, value_ ? true : false);
+    return std::make_pair(&value_, value_ ? true : false);
   }
   bool exact_match = false;
-  Value value = value_;
+  Value* value = &value_;
   Key component(path_components.back());
   path_components.pop_back();
   if (children_.find(component) != children_.end()) {
     const TrieNode<Key, Value, Tokenizer>* node = children_.find(component)->second.get();
-    std::pair<Value, bool> retval = node->find(path_components);
-    if (retval.first) {
+    std::pair<Value*, bool> retval = node->find(path_components);
+    if (*retval.first) {
       value = retval.first;
       exact_match = retval.second;
     }

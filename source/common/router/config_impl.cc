@@ -493,7 +493,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
   } else if (VirtualHostPtr vhost =
-                 wildcard_virtual_host_suffixes_.find(headers.Host()->value().c_str()).first) {
+                 *wildcard_virtual_host_suffixes_.find(headers.Host()->value().c_str()).first) {
     return vhost.get();
   }
   return default_virtual_host_.get();

@@ -96,7 +96,7 @@ public:
   static size_t strlcpy(char* dst, const char* src, size_t size);
 
   /**
-   * Split a string.
+   * Split a string. The split character is not included in the results.
    * @param source supplies the string to split.
    * @param split supplies the char to split on.
    */
@@ -109,7 +109,9 @@ public:
   static std::string subspan(const std::string& source, size_t start, size_t end);
 
   /**
-   * Tokenize a string. Note that token separaters are retained in the output.
+   * Tokenize a string. Note that token separaters are retained in the output as
+   * separate tokens. This is distinct from ::split() which does not retain the
+   * split character.
    * @param source supplies the string to split.
    * @param splitters supplies characters to split on.
    */
