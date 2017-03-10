@@ -27,9 +27,23 @@ Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatc
   return {createConnection(dispatcher, *cluster_, address_), shared_from_this()};
 }
 
+Host::CreateConnectionData
+HostImpl::createConnectionWithNewPort(uint16_t port, Event::Dispatcher& dispatcher) const {
+  return {createConnection(dispatcher, *cluster_, address_, port), shared_from_this()};
+}
+
 Network::ClientConnectionPtr HostImpl::createConnection(Event::Dispatcher& dispatcher,
                                                         const ClusterInfo& cluster,
-                                                        Network::Address::InstancePtr address) {
+                                                        Network::Address::InstancePtr _address,
+                                                        uint16_t port) {
+  Network::Address::InstancePtr address;
+  if (port != 0) {
+    auto ptr = _address->withPort(port);
+    address.reset(ptr.release());
+  } else {
+    address = std::move(_address);
+  }
+
   if (cluster.sslContext()) {
     return Network::ClientConnectionPtr{
         dispatcher.createSslClientConnection(*cluster.sslContext(), address)};

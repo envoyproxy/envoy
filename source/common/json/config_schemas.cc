@@ -938,6 +938,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "type" : "string",
             "enum" : ["http", "tcp"]
           },
+          "port": {
+            "type" : "integer",
+            "minimum" : 1,
+            "exclusiveMinimum" : true
+          },
           "timeout_ms" : {
             "type" : "integer",
             "minimum" : 0,

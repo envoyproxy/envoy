@@ -162,7 +162,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster, const Json:
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      path_(config.getString("path")) {
+      path_(config.getString("path")), port_(config.getInteger("port", 0)) {
   if (config.hasObject("service_name")) {
     service_name_.value(config.getString("service_name"));
   }
@@ -224,7 +224,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   parent_.stats_.attempt_.inc();
 
   if (!client_) {
-    Upstream::Host::CreateConnectionData conn = host_->createConnection(parent_.dispatcher_);
+    Upstream::Host::CreateConnectionData conn =
+        parent_.port_ != 0 ? host_->createConnectionWithNewPort(parent_.port_, parent_.dispatcher_)
+                           : host_->createConnection(parent_.dispatcher_);
     client_.reset(parent_.createCodecClient(conn));
     client_->addConnectionCallbacks(*this);
     expect_reset_ = false;

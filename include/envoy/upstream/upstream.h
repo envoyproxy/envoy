@@ -42,6 +42,18 @@ public:
   virtual CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const PURE;
 
   /**
+   * Create a connection for this host on a specific port.
+   * @param dispatcher supplies the owning dispatcher.
+   * @return the connection data which includes the raw network connection as well as the *real*
+   *         host that backs it. The reason why a 2nd host is returned is that some hosts are
+   *         logical and wrap multiple real network destinations. In this case, a different host
+   *         will be returned along with the connection vs. the host the method was called on.
+   *         If it matters, callers should not assume that the returned host will be the same.
+   */
+  virtual CreateConnectionData
+  createConnectionWithNewPort(uint16_t port, Event::Dispatcher& dispatcher) const PURE;
+
+  /**
    * @return host specific gauges.
    */
   virtual std::list<Stats::GaugePtr> gauges() const PURE;

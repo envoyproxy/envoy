@@ -59,6 +59,8 @@ public:
   const Ip* ip() const override { return &ip_; }
   int socket(SocketType type) const override;
 
+  std::unique_ptr<Instance> withPort(uint16_t port) const override { return ip_.withPort(port); }
+
 private:
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }
@@ -72,6 +74,11 @@ private:
     const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
     IpVersion version() const override { return IpVersion::v4; }
+
+    std::unique_ptr<Instance> withPort(uint16_t port) const {
+      return std::unique_ptr<Instance>(
+          new Ipv4Instance(friendly_address_, static_cast<uint32_t>(port)));
+    }
 
     Ipv4Helper ipv4_;
     std::string friendly_address_;
@@ -112,6 +119,8 @@ public:
   const Ip* ip() const override { return &ip_; }
   int socket(SocketType type) const override;
 
+  std::unique_ptr<Instance> withPort(uint16_t port) const override { return ip_.withPort(port); }
+
 private:
   struct Ipv6Helper : public Ipv6 {
     std::array<uint8_t, 16> address() const override;
@@ -128,6 +137,12 @@ private:
     const Ipv6* ipv6() const override { return &ipv6_; }
     uint32_t port() const override { return ipv6_.port(); }
     IpVersion version() const override { return IpVersion::v6; }
+
+    std::unique_ptr<Instance> withPort(uint16_t port) const {
+      auto cpy = ipv6_.address_;
+      cpy.sin6_port = htons(port);
+      return std::unique_ptr<Instance>(new Ipv6Instance(cpy));
+    }
 
     Ipv6Helper ipv6_;
     std::string friendly_address_;
@@ -156,6 +171,10 @@ public:
   int connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
   int socket(SocketType type) const override;
+
+  std::unique_ptr<Instance> withPort(uint16_t) const override {
+    throw std::logic_error("Cannot have a Pipe with a port.");
+  }
 
 private:
   sockaddr_un address_;
