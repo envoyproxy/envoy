@@ -11,8 +11,9 @@
 namespace Http {
 namespace RateLimit {
 
-const Http::HeaderMapPtr Filter::TOO_MANY_REQUESTS_HEADER{new Http::HeaderMapImpl{
-    {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}}};
+const std::unique_ptr<const Http::HeaderMap> Filter::TOO_MANY_REQUESTS_HEADER{
+    new Http::HeaderMapImpl{
+        {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}}};
 
 void Filter::initiateCall(const HeaderMap& headers) {
   Router::RoutePtr route = callbacks_->route();

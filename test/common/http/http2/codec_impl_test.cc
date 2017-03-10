@@ -62,6 +62,72 @@ public:
   ConnectionWrapper server_wrapper_;
 };
 
+TEST_P(Http2CodecImplTest, ExpectContinueHeadersOnlyResponse) {
+  MockStreamDecoder response_decoder;
+  StreamEncoder& request_encoder = client_.newStream(response_decoder);
+
+  MockStreamDecoder request_decoder;
+  StreamEncoder* response_encoder;
+  EXPECT_CALL(server_callbacks_, newStream(_))
+      .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+        response_encoder = &encoder;
+        return request_decoder;
+      }));
+
+  TestHeaderMapImpl request_headers;
+  request_headers.addViaCopy("expect", "100-continue");
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&continue_headers), false));
+  request_encoder.encodeHeaders(request_headers, false);
+
+  EXPECT_CALL(request_decoder, decodeData(_, true));
+  Buffer::OwnedImpl hello("hello");
+  request_encoder.encodeData(hello, true);
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&response_headers), true));
+  response_encoder->encodeHeaders(response_headers, true);
+}
+
+TEST_P(Http2CodecImplTest, ExpectContinueTrailersResponse) {
+  MockStreamDecoder response_decoder;
+  StreamEncoder& request_encoder = client_.newStream(response_decoder);
+
+  MockStreamDecoder request_decoder;
+  StreamEncoder* response_encoder;
+  EXPECT_CALL(server_callbacks_, newStream(_))
+      .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+        response_encoder = &encoder;
+        return request_decoder;
+      }));
+
+  TestHeaderMapImpl request_headers;
+  request_headers.addViaCopy("expect", "100-continue");
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder, decodeHeaders_(_, false));
+
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&continue_headers), false));
+  request_encoder.encodeHeaders(request_headers, false);
+
+  EXPECT_CALL(request_decoder, decodeData(_, true));
+  Buffer::OwnedImpl hello("hello");
+  request_encoder.encodeData(hello, true);
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&response_headers), false));
+  response_encoder->encodeHeaders(response_headers, false);
+
+  TestHeaderMapImpl response_trailers{{"foo", "bar"}};
+  EXPECT_CALL(response_decoder, decodeTrailers_(HeaderMapEqual(&response_trailers)));
+  response_encoder->encodeTrailers(response_trailers);
+}
+
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
   MockStreamDecoder response_decoder;
   StreamEncoder& request_encoder = client_.newStream(response_decoder);
