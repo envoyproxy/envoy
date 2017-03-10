@@ -7,17 +7,51 @@
 
 namespace Ssl {
 
-TEST(SslContextImplTest, TestSanMatching) {
-  EXPECT_TRUE(ContextImpl::sanMatch("lyft.com", "lyft.com"));
-  EXPECT_TRUE(ContextImpl::sanMatch("a.lyft.com", "*.lyft.com"));
-  EXPECT_TRUE(ContextImpl::sanMatch("a.b.lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::sanMatch("foo.test.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::sanMatch("lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::sanMatch("alyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::sanMatch("alyft.com", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::sanMatch("lyft.com", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::sanMatch("", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::sanMatch("lyft.com", ""));
+TEST(SslContextImplTest, TestdNSNameMatching) {
+  EXPECT_TRUE(ContextImpl::dNSNameMatch("lyft.com", "lyft.com"));
+  EXPECT_TRUE(ContextImpl::dNSNameMatch("a.lyft.com", "*.lyft.com"));
+  EXPECT_TRUE(ContextImpl::dNSNameMatch("a.b.lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(ContextImpl::dNSNameMatch("foo.test.com", "*.lyft.com"));
+  EXPECT_FALSE(ContextImpl::dNSNameMatch("lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(ContextImpl::dNSNameMatch("alyft.com", "*.lyft.com"));
+  EXPECT_FALSE(ContextImpl::dNSNameMatch("alyft.com", "*lyft.com"));
+  EXPECT_FALSE(ContextImpl::dNSNameMatch("lyft.com", "*lyft.com"));
+  EXPECT_FALSE(ContextImpl::dNSNameMatch("", "*lyft.com"));
+  EXPECT_FALSE(ContextImpl::dNSNameMatch("lyft.com", ""));
+}
+
+TEST(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
+  FILE* fp = fopen("test/common/ssl/test_data/san_dns.crt", "r");
+  EXPECT_TRUE(fp != nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  std::vector<std::string> verify_subject_alt_name = {"foo.com", "test.com"};
+  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name));
+  if (cert) {
+    X509_free(cert);
+  }
+}
+
+TEST(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
+  FILE* fp = fopen("test/common/ssl/test_data/san_uri.crt", "r");
+  EXPECT_TRUE(fp != nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  std::vector<std::string> verify_subject_alt_name = {"istio:account.test.com",
+                                                      "istio:account2.test.com"};
+  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name));
+  if (cert) {
+    X509_free(cert);
+  }
+}
+
+TEST(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
+  FILE* fp = fopen("test/common/ssl/test_data/san_dns.crt", "r");
+  EXPECT_TRUE(fp != nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  std::vector<std::string> verify_subject_alt_name = {"foo", "bar"};
+  EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name));
+  if (cert) {
+    X509_free(cert);
+  }
 }
 
 TEST(SslContextImplTest, TestCipherSuites) {

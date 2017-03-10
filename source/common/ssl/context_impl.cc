@@ -248,7 +248,8 @@ bool ContextImpl::verifyPeer(SSL* ssl) const {
   return verified;
 }
 
-bool ContextImpl::verifySubjectAltName(X509* cert, const std::string& subject_alt_name) {
+bool ContextImpl::verifySubjectAltName(X509* cert,
+                                       const std::vector<std::string>& subject_alt_names) {
   bool verified = false;
 
   STACK_OF(GENERAL_NAME)* altnames = static_cast<STACK_OF(GENERAL_NAME)*>(
@@ -262,9 +263,20 @@ bool ContextImpl::verifySubjectAltName(X509* cert, const std::string& subject_al
       if (altname->type == GEN_DNS) {
         ASN1_STRING* str = altname->d.dNSName;
         char* dns_name = reinterpret_cast<char*>(ASN1_STRING_data(str));
-        if (sanMatch(subject_alt_name, dns_name)) {
-          verified = true;
-          break;
+        for (auto& config_san : subject_alt_names) {
+          if (dNSNameMatch(config_san, dns_name)) {
+            verified = true;
+            break;
+          }
+        }
+      } else if (altname->type == GEN_URI) {
+        ASN1_STRING* str = altname->d.uniformResourceIdentifier;
+        char* crt_san = reinterpret_cast<char*>(ASN1_STRING_data(str));
+        for (auto& config_san : subject_alt_names) {
+          if (config_san.compare(crt_san) == 0) {
+            verified = true;
+            break;
+          }
         }
       }
     }
@@ -275,16 +287,16 @@ bool ContextImpl::verifySubjectAltName(X509* cert, const std::string& subject_al
   return verified;
 }
 
-bool ContextImpl::sanMatch(const std::string& san, const char* pattern) {
-  if (san == pattern) {
+bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) {
+  if (dNSName == pattern) {
     return true;
   }
 
   size_t pattern_len = strlen(pattern);
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
-    if (san.length() > pattern_len - 1) {
-      size_t off = san.length() - pattern_len + 1;
-      return san.compare(off, pattern_len - 1, pattern + 1) == 0;
+    if (dNSName.length() > pattern_len - 1) {
+      size_t off = dNSName.length() - pattern_len + 1;
+      return dNSName.compare(off, pattern_len - 1, pattern + 1) == 0;
     }
   }
 
