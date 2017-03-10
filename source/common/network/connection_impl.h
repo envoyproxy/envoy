@@ -85,9 +85,10 @@ protected:
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
   }
   // Mark read buffer ready to read in the event loop. This is used when yielding following
-  // shouldDrainReadBuffer(). TODO(htuch): While this is the basis for also yielding to other
-  // connections to provide some fair sharing of CPU resources, the underlying event loop does not
-  // make any fairness guarantees. Reconsider how to make fairness happen.
+  // shouldDrainReadBuffer().
+  // TODO(htuch): While this is the basis for also yielding to other connections to provide some
+  // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
+  // Reconsider how to make fairness happen.
   void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
 
   static const Address::InstancePtr null_local_address_;
