@@ -46,7 +46,7 @@ public:
   /**
    * @return The subject alt names to be verified, if enabled. Otherwise, ""
    */
-  virtual const std::vector<std::string>& verifySubjectAltName() const PURE;
+  virtual const std::vector<std::string>& verifySubjectAltNameList() const PURE;
 
   /**
    * @return The hex string representation of the certificate hash to be verified, if enabled.

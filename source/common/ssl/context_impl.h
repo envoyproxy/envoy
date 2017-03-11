@@ -100,7 +100,7 @@ protected:
 
   ContextManagerImpl& parent_;
   SslCtxPtr ctx_;
-  std::vector<std::string> verify_subject_alt_name_;
+  std::vector<std::string> verify_subject_alt_name_list_;
   std::vector<uint8_t> verify_certificate_hash_;
   Stats::Scope& scope_;
   SslStats stats_;

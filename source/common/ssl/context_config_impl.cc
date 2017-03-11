@@ -24,7 +24,7 @@ ContextConfigImpl::ContextConfigImpl(const Json::Object& config) {
     private_key_file_ = config.getString("private_key_file");
   }
   if (config.hasObject("verify_subject_alt_name")) {
-    verify_subject_alt_name_ = config.getStringArray("verify_subject_alt_name");
+    verify_subject_alt_name_list_ = config.getStringArray("verify_subject_alt_name");
   }
   verify_certificate_hash_ = config.getString("verify_certificate_hash", "");
   server_name_indication_ = config.getString("sni", "");

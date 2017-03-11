@@ -29,6 +29,7 @@ TEST(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
   if (cert) {
     X509_free(cert);
   }
+  fclose(fp);
 }
 
 TEST(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
@@ -41,6 +42,7 @@ TEST(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
   if (cert) {
     X509_free(cert);
   }
+  fclose(fp);
 }
 
 TEST(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
@@ -52,6 +54,7 @@ TEST(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
   if (cert) {
     X509_free(cert);
   }
+  fclose(fp);
 }
 
 TEST(SslContextImplTest, TestCipherSuites) {

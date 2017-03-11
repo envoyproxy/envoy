@@ -106,7 +106,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
     }
   }
 
-  verify_subject_alt_name_ = config.verifySubjectAltName();
+  verify_subject_alt_name_list_ = config.verifySubjectAltNameList();
 
   if (!config.verifyCertificateHash().empty()) {
     std::string hash = config.verifyCertificateHash();
@@ -231,8 +231,8 @@ bool ContextImpl::verifyPeer(SSL* ssl) const {
     stats_.no_certificate_.inc();
   }
 
-  if (!verify_subject_alt_name_.empty()) {
-    if (cert.get() == nullptr || !verifySubjectAltName(cert.get(), verify_subject_alt_name_)) {
+  if (!verify_subject_alt_name_list_.empty()) {
+    if (cert.get() == nullptr || !verifySubjectAltName(cert.get(), verify_subject_alt_name_list_)) {
       stats_.fail_verify_san_.inc();
       verified = false;
     }
@@ -257,7 +257,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
 
   if (altnames) {
     int n = sk_GENERAL_NAME_num(altnames);
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < n && !verified; i++) {
       GENERAL_NAME* altname = sk_GENERAL_NAME_value(altnames, i);
 
       if (altname->type == GEN_DNS) {
