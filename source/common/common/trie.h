@@ -70,12 +70,14 @@ void TrieNode<Key, Value, Tokenizer>::emplace(std::vector<Key>& path_components,
   }
   Key name(path_components.back());
   path_components.pop_back();
+  TrieNode<Key, Value, Tokenizer>* node = nullptr;
+  auto it = children_.find(name);
   if (children_.find(name) == children_.end()) {
-    std::unique_ptr<TrieNode<Key, Value, Tokenizer>> node(
-        new TrieNode<Key, Value, Tokenizer>(nullptr));
-    children_[name].reset(node.release());
+    node = new TrieNode<Key, Value, Tokenizer>(nullptr);
+    children_.emplace(name, std::move(std::unique_ptr<TrieNode<Key, Value, Tokenizer>>(node)));
+  } else {
+    node = it->second.get();
   }
-  TrieNode<Key, Value, Tokenizer>* node = children_[name].get();
   if (path_components.empty()) {
     node->set_value(value);
   } else {
@@ -103,8 +105,9 @@ TrieNode<Key, Value, Tokenizer>::find(std::vector<Key>& path_components) const {
   Value* value = &value_;
   Key component(path_components.back());
   path_components.pop_back();
-  if (children_.find(component) != children_.end()) {
-    const TrieNode<Key, Value, Tokenizer>* node = children_.find(component)->second.get();
+  auto it = children_.find(component);
+  if (it != children_.end()) {
+    const TrieNode<Key, Value, Tokenizer>* node = it->second.get();
     std::pair<Value*, bool> retval = node->find(path_components);
     if (*retval.first) {
       value = retval.first;
