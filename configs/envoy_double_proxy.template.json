@@ -131,7 +131,7 @@
       "ssl_context": {
         "cert_chain_file": "/etc/envoy/envoy-double-proxy.pem",
         "private_key_file": "/etc/envoy/envoy-double-proxy.key",
-        "verify_subject_alt_name": "front-proxy.yourcompany.net"
+        "verify_subject_alt_name": ["front-proxy.yourcompany.net"]
       },
       "hosts": [{"url": "tcp://front-proxy.yourcompany.net:9400"}]
     },
@@ -140,7 +140,7 @@
       "features": "http2",
       "ssl_context": {
         "ca_cert_file": "/etc/ssl/certs/ca-certificates.crt",
-        "verify_subject_alt_name": "collector-grpc.lightstep.com"
+        "verify_subject_alt_name": ["collector-grpc.lightstep.com"]
       },
       "connect_timeout_ms": 1000,
       "type": "logical_dns",
