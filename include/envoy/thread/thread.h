@@ -12,6 +12,7 @@ public:
   virtual ~BasicLockable() {}
 
   virtual void lock() PURE;
+  virtual bool try_lock() PURE;
   virtual void unlock() PURE;
 };
 
