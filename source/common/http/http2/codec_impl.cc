@@ -333,7 +333,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           stream->waiting_for_final_headers_ = false;
 
           // This can only happen in the client case in a response, when we received a 1xx to
-          // start out with. In this case, raise as headers. nghttp2 message checking guarentees
+          // start out with. In this case, raise as headers. nghttp2 message checking guarantees
           // proper flow here.
           // TODO(mattklein123): Higher layers don't currently deal with a double decodeHeaders()
           // call and will probably crash. We do this for testing the server case. We correctly
