@@ -31,7 +31,7 @@ void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
     secondary_init_clusters_.push_back(&cluster);
     if (started_secondary_initialize_) {
       // This can happen if we get a second CDS update that adds new clusters after we have
-      // already started secondary init. In this, just immediately initialize.
+      // already started secondary init. In this case, just immediately initialize.
       cluster.initialize();
     }
   }
