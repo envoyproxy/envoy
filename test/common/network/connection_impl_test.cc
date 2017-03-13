@@ -67,8 +67,9 @@ TEST(ConnectionImplTest, BufferStats) {
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(
-      connection_handler, socket, listener_callbacks, stats_store, true, false, false, 0);
+  Network::ListenerPtr listener =
+      dispatcher.createListener(connection_handler, socket, listener_callbacks, stats_store,
+                                Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
@@ -130,8 +131,8 @@ TEST(ConnectionImplTest, BufferStats) {
 
 class ReadBufferLimitTest : public testing::Test {
 public:
-  void readBufferLimitTest(size_t read_buffer_limit, size_t expected_chunk_size) {
-    const size_t buffer_size = 256 * 1024;
+  void readBufferLimitTest(uint32_t read_buffer_limit, size_t expected_chunk_size) {
+    const uint32_t buffer_size = 256 * 1024;
 
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
@@ -139,8 +140,11 @@ public:
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
     Network::ListenerPtr listener =
-        dispatcher.createListener(connection_handler, socket, listener_callbacks, stats_store, true,
-                                  false, false, read_buffer_limit);
+        dispatcher.createListener(connection_handler, socket, listener_callbacks, stats_store,
+                                  {.bind_to_port_ = true,
+                                   .use_proxy_proto_ = false,
+                                   .use_original_dst_ = false,
+                                   .per_connection_buffer_limit_bytes_ = read_buffer_limit});
 
     Network::ClientConnectionPtr client_connection =
         dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));

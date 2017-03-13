@@ -211,14 +211,12 @@ public:
   ~MockConnectionHandler();
 
   MOCK_METHOD0(numConnections, uint64_t());
-  MOCK_METHOD6(addListener,
+  MOCK_METHOD3(addListener,
                void(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                    bool bind_to_port, bool use_proxy_proto, bool use_orig_dst,
-                    size_t per_connection_buffer_limit_bytes));
-  MOCK_METHOD7(addSslListener,
-               void(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                    Network::ListenSocket& socket, bool bind_to_port, bool use_proxy_proto,
-                    bool use_orig_dst, size_t per_connection_buffer_limit_bytes));
+                    const Network::ListenerOptions& listener_options));
+  MOCK_METHOD4(addSslListener, void(Network::FilterChainFactory& factory,
+                                    Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
+                                    const Network::ListenerOptions& listener_options));
   MOCK_METHOD1(findListenerByPort, Network::Listener*(uint32_t port));
   MOCK_METHOD0(closeListeners, void());
 };

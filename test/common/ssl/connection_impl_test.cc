@@ -32,8 +32,9 @@ static void testUtil(std::string client_ctx_json, std::string server_ctx_json,
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createSslListener(
-      connection_handler, *server_ctx, socket, callbacks, stats_store, true, false, false, 0);
+  Network::ListenerPtr listener =
+      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
+                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Json::ObjectPtr client_ctx_loader = Json::Factory::LoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
@@ -160,8 +161,9 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createSslListener(
-      connection_handler, *server_ctx, socket, callbacks, stats_store, true, false, false, 0);
+  Network::ListenerPtr listener =
+      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
+                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   std::string client_ctx_json = R"EOF(
   {
@@ -216,8 +218,9 @@ TEST(SslConnectionImplTest, SslError) {
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createSslListener(
-      connection_handler, *server_ctx, socket, callbacks, stats_store, true, false, false, 0);
+  Network::ListenerPtr listener =
+      dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
+                                   Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection(Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
@@ -244,8 +247,8 @@ TEST(SslConnectionImplTest, SslError) {
 
 class SslReadBufferLimitTest : public testing::Test {
 public:
-  void readBufferLimitTest(size_t read_buffer_limit, size_t expected_chunk_size) {
-    const size_t buffer_size = 256 * 1024;
+  void readBufferLimitTest(uint32_t read_buffer_limit, size_t expected_chunk_size) {
+    const uint32_t buffer_size = 256 * 1024;
 
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
@@ -266,9 +269,12 @@ public:
     ContextManagerImpl manager(runtime);
     ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
-    Network::ListenerPtr listener =
-        dispatcher.createSslListener(connection_handler, *server_ctx, socket, listener_callbacks,
-                                     stats_store, true, false, false, read_buffer_limit);
+    Network::ListenerPtr listener = dispatcher.createSslListener(
+        connection_handler, *server_ctx, socket, listener_callbacks, stats_store,
+        {.bind_to_port_ = true,
+         .use_proxy_proto_ = false,
+         .use_original_dst_ = false,
+         .per_connection_buffer_limit_bytes_ = read_buffer_limit});
 
     std::string client_ctx_json = R"EOF(
     {

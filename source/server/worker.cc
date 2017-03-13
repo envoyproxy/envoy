@@ -20,18 +20,17 @@ Worker::~Worker() {}
 void Worker::initializeConfiguration(Server::Configuration::Main& config,
                                      const SocketMap& socket_map) {
   for (const Server::Configuration::ListenerPtr& listener : config.listeners()) {
-    bool bind_to_port = listener->bindToPort();
-    bool use_proxy_proto = listener->useProxyProto();
-    bool use_orig_dst = listener->useOriginalDst();
-    size_t per_connection_buffer_limit_bytes = listener->perConnectionBufferLimitBytes();
+    const Network::ListenerOptions listener_options = {
+        .bind_to_port_ = listener->bindToPort(),
+        .use_proxy_proto_ = listener->useProxyProto(),
+        .use_original_dst_ = listener->useOriginalDst(),
+        .per_connection_buffer_limit_bytes_ = listener->perConnectionBufferLimitBytes()};
     if (listener->sslContext()) {
       handler_->addSslListener(listener->filterChainFactory(), *listener->sslContext(),
-                               *socket_map.at(listener.get()), bind_to_port, use_proxy_proto,
-                               use_orig_dst, per_connection_buffer_limit_bytes);
+                               *socket_map.at(listener.get()), listener_options);
     } else {
       handler_->addListener(listener->filterChainFactory(), *socket_map.at(listener.get()),
-                            bind_to_port, use_proxy_proto, use_orig_dst,
-                            per_connection_buffer_limit_bytes);
+                            listener_options);
     }
   }
 

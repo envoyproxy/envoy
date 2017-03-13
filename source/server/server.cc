@@ -7,6 +7,7 @@
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
+#include "envoy/network/listener.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -169,7 +170,8 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   original_start_time_ = info.original_start_time_;
   admin_.reset(
       new AdminImpl(initial_config.admin().accessLogPath(), initial_config.admin().port(), *this));
-  handler_.addListener(*admin_, admin_->socket(), true, false, false, 0);
+  handler_.addListener(*admin_, admin_->socket(),
+                       Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   loadServerFlags(initial_config.flagsPath());
 

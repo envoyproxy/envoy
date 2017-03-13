@@ -21,38 +21,20 @@ public:
    * Adds listener to the handler.
    * @param factory supplies the configuration factory for new connections.
    * @param socket supplies the already bound socket to listen on.
-   * @param bind_to_port specifies if the listener should actually bind to the port.
-   *        a listener that doesn't bind can only receive connections redirected from
-   *        other listeners that set use_origin_dst to true
-   * @param use_proxy_proto whether to use the PROXY Protocol V1
-   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
-   * @param use_orig_dst if a connection was redirected to this port using iptables,
-   *        allow the listener to hand it off to the listener associated to the original port
-   * @param per_connection_buffer_limit_bytes soft limit on size of the listener's new connection
-   *        read and write buffers.
+   * @param listener_options listener configuration options.
    */
   virtual void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                           bool bind_to_port, bool use_proxy_proto, bool use_orig_dst,
-                           size_t per_connection_buffer_limit_bytes) PURE;
+                           const Network::ListenerOptions& listener_options) PURE;
 
   /**
    * Adds listener to the handler.
    * @param factory supplies the configuration factory for new connections.
    * @param socket supplies the already bound socket to listen on.
-   * @param bind_to_port specifies if the listener should actually bind to the port.
-   *        a listener that doesn't bind can only receive connections redirected from
-   *        other listeners that set use_origin_dst to true
-   * @param use_proxy_proto whether to use the PROXY Protocol V1
-   * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
-   * @param use_orig_dst if a connection was redirected to this port using iptables,
-   *        allow the listener to hand it off to the listener associated to the original port
-   * @param per_connection_buffer_limit_bytes soft limit on size of the listener's new connection
-   *        read and write buffers.
+   * @param listener_options listener configuration options.
    */
   virtual void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                              Network::ListenSocket& socket, bool bind_to_port,
-                              bool use_proxy_proto, bool use_orig_dst,
-                              size_t per_connection_buffer_limit_bytes) PURE;
+                              Network::ListenSocket& socket,
+                              const Network::ListenerOptions& listener_options) PURE;
 
   /**
    * Find a listener based on the provided listener port value.

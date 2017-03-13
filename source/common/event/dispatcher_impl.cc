@@ -79,27 +79,22 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
 }
 
-Network::ListenerPtr DispatcherImpl::createListener(Network::ConnectionHandler& conn_handler,
-                                                    Network::ListenSocket& socket,
-                                                    Network::ListenerCallbacks& cb,
-                                                    Stats::Store& stats_store, bool bind_to_port,
-                                                    bool use_proxy_proto, bool use_orig_dst,
-                                                    size_t per_connection_buffer_limit_bytes) {
+Network::ListenerPtr
+DispatcherImpl::createListener(Network::ConnectionHandler& conn_handler,
+                               Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+                               Stats::Store& stats_store,
+                               const Network::ListenerOptions& listener_options) {
   return Network::ListenerPtr{
-      new Network::ListenerImpl(conn_handler, *this, socket, cb, stats_store, bind_to_port,
-                                use_proxy_proto, use_orig_dst, per_connection_buffer_limit_bytes)};
+      new Network::ListenerImpl(conn_handler, *this, socket, cb, stats_store, listener_options)};
 }
 
-Network::ListenerPtr DispatcherImpl::createSslListener(Network::ConnectionHandler& conn_handler,
-                                                       Ssl::ServerContext& ssl_ctx,
-                                                       Network::ListenSocket& socket,
-                                                       Network::ListenerCallbacks& cb,
-                                                       Stats::Store& stats_store, bool bind_to_port,
-                                                       bool use_proxy_proto, bool use_orig_dst,
-                                                       size_t per_connection_buffer_limit_bytes) {
-  return Network::ListenerPtr{new Network::SslListenerImpl(
-      conn_handler, *this, ssl_ctx, socket, cb, stats_store, bind_to_port, use_proxy_proto,
-      use_orig_dst, per_connection_buffer_limit_bytes)};
+Network::ListenerPtr
+DispatcherImpl::createSslListener(Network::ConnectionHandler& conn_handler,
+                                  Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
+                                  Network::ListenerCallbacks& cb, Stats::Store& stats_store,
+                                  const Network::ListenerOptions& listener_options) {
+  return Network::ListenerPtr{new Network::SslListenerImpl(conn_handler, *this, ssl_ctx, socket, cb,
+                                                           stats_store, listener_options)};
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return TimerPtr{new TimerImpl(*this, cb)}; }

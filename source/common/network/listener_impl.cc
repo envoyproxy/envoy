@@ -62,13 +62,14 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
 
 ListenerImpl::ListenerImpl(Network::ConnectionHandler& conn_handler,
                            Event::DispatcherImpl& dispatcher, ListenSocket& socket,
-                           ListenerCallbacks& cb, Stats::Store& stats_store, bool bind_to_port,
-                           bool use_proxy_proto, bool use_orig_dst,
-                           size_t per_connection_buffer_limit_bytes)
+                           ListenerCallbacks& cb, Stats::Store& stats_store,
+                           const Network::ListenerOptions& listener_options)
     : connection_handler_(conn_handler), dispatcher_(dispatcher), socket_(socket), cb_(cb),
-      bind_to_port_(bind_to_port), use_proxy_proto_(use_proxy_proto), proxy_protocol_(stats_store),
-      use_original_dst_(use_orig_dst),
-      per_connection_buffer_limit_bytes_(per_connection_buffer_limit_bytes), listener_(nullptr) {
+      bind_to_port_(listener_options.bind_to_port_),
+      use_proxy_proto_(listener_options.use_proxy_proto_), proxy_protocol_(stats_store),
+      use_original_dst_(listener_options.use_original_dst_),
+      per_connection_buffer_limit_bytes_(listener_options.per_connection_buffer_limit_bytes_),
+      listener_(nullptr) {
 
   if (bind_to_port_) {
     listener_.reset(

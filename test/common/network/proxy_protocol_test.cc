@@ -17,8 +17,12 @@ namespace Network {
 class ProxyProtocolTest : public testing::Test {
 public:
   ProxyProtocolTest()
-      : socket_(uint32_t(1234), true), listener_(connection_handler_, dispatcher_, socket_,
-                                                 callbacks_, stats_store_, true, true, false, 0) {
+      : socket_(uint32_t(1234), true),
+        listener_(connection_handler_, dispatcher_, socket_, callbacks_, stats_store_,
+                  {.bind_to_port_ = true,
+                   .use_proxy_proto_ = true,
+                   .use_original_dst_ = false,
+                   .per_connection_buffer_limit_bytes_ = 0}) {
     conn_ = dispatcher_.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:1234"));
     conn_->addConnectionCallbacks(connection_callbacks_);
     conn_->connect();

@@ -19,22 +19,17 @@ ConnectionHandlerImpl::ConnectionHandlerImpl(Stats::Store& stats_store, spdlog::
 ConnectionHandlerImpl::~ConnectionHandlerImpl() { closeConnections(); }
 
 void ConnectionHandlerImpl::addListener(Network::FilterChainFactory& factory,
-                                        Network::ListenSocket& socket, bool bind_to_port,
-                                        bool use_proxy_proto, bool use_orig_dst,
-                                        size_t per_connection_buffer_limit_bytes) {
-  ActiveListenerPtr l(new ActiveListener(*this, socket, factory, bind_to_port, use_proxy_proto,
-                                         use_orig_dst, per_connection_buffer_limit_bytes));
+                                        Network::ListenSocket& socket,
+                                        const Network::ListenerOptions& listener_options) {
+  ActiveListenerPtr l(new ActiveListener(*this, socket, factory, listener_options));
   listeners_.emplace_back(socket.localAddress(), std::move(l));
 }
 
 void ConnectionHandlerImpl::addSslListener(Network::FilterChainFactory& factory,
                                            Ssl::ServerContext& ssl_ctx,
-                                           Network::ListenSocket& socket, bool bind_to_port,
-                                           bool use_proxy_proto, bool use_orig_dst,
-                                           size_t per_connection_buffer_limit_bytes) {
-  ActiveListenerPtr l(new SslActiveListener(*this, ssl_ctx, socket, factory, bind_to_port,
-                                            use_proxy_proto, use_orig_dst,
-                                            per_connection_buffer_limit_bytes));
+                                           Network::ListenSocket& socket,
+                                           const Network::ListenerOptions& listener_options) {
+  ActiveListenerPtr l(new SslActiveListener(*this, ssl_ctx, socket, factory, listener_options));
   listeners_.emplace_back(socket.localAddress(), std::move(l));
 }
 
@@ -59,15 +54,11 @@ void ConnectionHandlerImpl::removeConnection(ActiveConnection& connection) {
   num_connections_--;
 }
 
-ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
-                                                      Network::ListenSocket& socket,
-                                                      Network::FilterChainFactory& factory,
-                                                      bool bind_to_port, bool use_proxy_proto,
-                                                      bool use_orig_dst,
-                                                      size_t per_connection_buffer_limit_bytes)
+ConnectionHandlerImpl::ActiveListener::ActiveListener(
+    ConnectionHandlerImpl& parent, Network::ListenSocket& socket,
+    Network::FilterChainFactory& factory, const Network::ListenerOptions& listener_options)
     : ActiveListener(parent, parent.dispatcher_->createListener(
-                                 parent, socket, *this, parent.stats_store_, bind_to_port,
-                                 use_proxy_proto, use_orig_dst, per_connection_buffer_limit_bytes),
+                                 parent, socket, *this, parent.stats_store_, listener_options),
                      factory, socket.localAddress()->asString()) {}
 
 ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& parent,
@@ -80,11 +71,10 @@ ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& par
 
 ConnectionHandlerImpl::SslActiveListener::SslActiveListener(
     ConnectionHandlerImpl& parent, Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-    Network::FilterChainFactory& factory, bool bind_to_port, bool use_proxy_proto,
-    bool use_orig_dst, size_t per_connection_buffer_limit_bytes)
-    : ActiveListener(parent, parent.dispatcher_->createSslListener(
-                                 parent, ssl_ctx, socket, *this, parent.stats_store_, bind_to_port,
-                                 use_proxy_proto, use_orig_dst, per_connection_buffer_limit_bytes),
+    Network::FilterChainFactory& factory, const Network::ListenerOptions& listener_options)
+    : ActiveListener(parent,
+                     parent.dispatcher_->createSslListener(parent, ssl_ctx, socket, *this,
+                                                           parent.stats_store_, listener_options),
                      factory, socket.localAddress()->asString()) {}
 
 Network::Listener* ConnectionHandlerImpl::findListenerByPort(uint32_t port) {

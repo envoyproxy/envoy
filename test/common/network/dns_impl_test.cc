@@ -199,7 +199,10 @@ public:
     server_.reset(new TestDnsServer());
     socket_.reset(new Network::TcpListenSocket(uint32_t(10000), true));
     listener_ = dispatcher_.createListener(connection_handler_, *socket_, *server_, stats_store_,
-                                           true, false, false, 0);
+                                           {.bind_to_port_ = true,
+                                            .use_proxy_proto_ = false,
+                                            .use_original_dst_ = false,
+                                            .per_connection_buffer_limit_bytes_ = 0});
   }
 
 protected:

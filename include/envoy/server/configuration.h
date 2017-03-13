@@ -52,10 +52,10 @@ public:
   virtual bool useOriginalDst() PURE;
 
   /**
-   * @return size_t providing a soft limit on size of the listener's new connection read and write
+   * @return uint32_t providing a soft limit on size of the listener's new connection read and write
    *         buffers.
    */
-  virtual size_t perConnectionBufferLimitBytes() PURE;
+  virtual uint32_t perConnectionBufferLimitBytes() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;
