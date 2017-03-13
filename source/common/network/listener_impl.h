@@ -20,7 +20,7 @@ class ListenerImpl : public Listener {
 public:
   ListenerImpl(Network::ConnectionHandler& conn_handler, Event::DispatcherImpl& dispatcher,
                ListenSocket& socket, ListenerCallbacks& cb, Stats::Store& stats_store,
-               bool bind_to_port, bool use_proxy_proto, bool use_orig_dst);
+               const ListenerOptions& listener_options);
 
   /**
    * Accept/process a new connection.
@@ -43,10 +43,8 @@ protected:
   Event::DispatcherImpl& dispatcher_;
   ListenSocket& socket_;
   ListenerCallbacks& cb_;
-  const bool bind_to_port_;
-  const bool use_proxy_proto_;
   ProxyProtocol proxy_protocol_;
-  const bool use_original_dst_;
+  const ListenerOptions options_;
 
 private:
   static void errorCallback(evconnlistener* listener, void* context);
@@ -59,10 +57,8 @@ class SslListenerImpl : public ListenerImpl {
 public:
   SslListenerImpl(Network::ConnectionHandler& conn_handler, Event::DispatcherImpl& dispatcher,
                   Ssl::Context& ssl_ctx, ListenSocket& socket, ListenerCallbacks& cb,
-                  Stats::Store& stats_store, bool bind_to_port, bool use_proxy_proto,
-                  bool use_orig_dst)
-      : ListenerImpl(conn_handler, dispatcher, socket, cb, stats_store, bind_to_port,
-                     use_proxy_proto, use_orig_dst),
+                  Stats::Store& stats_store, const Network::ListenerOptions& listener_options)
+      : ListenerImpl(conn_handler, dispatcher, socket, cb, stats_store, listener_options),
         ssl_ctx_(ssl_ctx) {}
 
   // ListenerImpl

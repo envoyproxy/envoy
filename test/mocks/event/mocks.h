@@ -44,20 +44,19 @@ public:
 
   Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
                                       Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                      Stats::Store& stats_store, bool bind_to_port,
-                                      bool use_proxy_proto, bool use_original_dst) override {
-    return Network::ListenerPtr{createListener_(conn_handler, socket, cb, stats_store, bind_to_port,
-                                                use_proxy_proto, use_original_dst)};
+                                      Stats::Store& stats_store,
+                                      const Network::ListenerOptions& listener_options) override {
+    return Network::ListenerPtr{
+        createListener_(conn_handler, socket, cb, stats_store, listener_options)};
   }
 
-  Network::ListenerPtr createSslListener(Network::ConnectionHandler& conn_handler,
-                                         Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-                                         Network::ListenerCallbacks& cb, Stats::Store& stats_store,
-                                         bool bind_to_port, bool use_proxy_proto,
-                                         bool use_original_dst) override {
-    return Network::ListenerPtr{createSslListener_(conn_handler, ssl_ctx, socket, cb, stats_store,
-                                                   bind_to_port, use_proxy_proto,
-                                                   use_original_dst)};
+  Network::ListenerPtr
+  createSslListener(Network::ConnectionHandler& conn_handler, Ssl::ServerContext& ssl_ctx,
+                    Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
+                    Stats::Store& stats_store,
+                    const Network::ListenerOptions& listener_options) override {
+    return Network::ListenerPtr{
+        createSslListener_(conn_handler, ssl_ctx, socket, cb, stats_store, listener_options)};
   }
 
   TimerPtr createTimer(TimerCb cb) override { return TimerPtr{createTimer_(cb)}; }
@@ -84,16 +83,16 @@ public:
   MOCK_METHOD4(createFileEvent_,
                FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
-  MOCK_METHOD7(createListener_,
+  MOCK_METHOD5(createListener_,
                Network::Listener*(Network::ConnectionHandler& conn_handler,
                                   Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                  Stats::Store& stats_store, bool bind_to_port,
-                                  bool use_proxy_proto, bool use_original_dst));
-  MOCK_METHOD8(createSslListener_,
+                                  Stats::Store& stats_store,
+                                  const Network::ListenerOptions& listener_options));
+  MOCK_METHOD6(createSslListener_,
                Network::Listener*(Network::ConnectionHandler& conn_handler,
                                   Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                   Network::ListenerCallbacks& cb, Stats::Store& stats_store,
-                                  bool bind_to_port, bool use_proxy_proto, bool use_original_dst));
+                                  const Network::ListenerOptions& listener_options));
   MOCK_METHOD1(createTimer_, Timer*(TimerCb cb));
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletablePtr& to_delete));
   MOCK_METHOD0(exit, void());

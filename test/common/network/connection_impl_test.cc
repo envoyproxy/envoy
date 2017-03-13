@@ -67,8 +67,9 @@ TEST(ConnectionImplTest, BufferStats) {
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(
-      connection_handler, socket, listener_callbacks, stats_store, true, false, false);
+  Network::ListenerPtr listener =
+      dispatcher.createListener(connection_handler, socket, listener_callbacks, stats_store,
+                                Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
@@ -127,6 +128,69 @@ TEST(ConnectionImplTest, BufferStats) {
   client_connection->write(data);
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
+
+class ReadBufferLimitTest : public testing::Test {
+public:
+  void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
+    const uint32_t buffer_size = 256 * 1024;
+
+    Stats::IsolatedStoreImpl stats_store;
+    Event::DispatcherImpl dispatcher;
+    Network::TcpListenSocket socket(uint32_t(10000), true);
+    Network::MockListenerCallbacks listener_callbacks;
+    Network::MockConnectionHandler connection_handler;
+    Network::ListenerPtr listener =
+        dispatcher.createListener(connection_handler, socket, listener_callbacks, stats_store,
+                                  {.bind_to_port_ = true,
+                                   .use_proxy_proto_ = false,
+                                   .use_original_dst_ = false,
+                                   .per_connection_buffer_limit_bytes_ = read_buffer_limit});
+
+    Network::ClientConnectionPtr client_connection =
+        dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
+    client_connection->connect();
+
+    Network::ConnectionPtr server_connection;
+    std::shared_ptr<MockReadFilter> read_filter(new MockReadFilter());
+    EXPECT_CALL(listener_callbacks, onNewConnection_(_))
+        .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+          server_connection = std::move(conn);
+          server_connection->addReadFilter(read_filter);
+          EXPECT_EQ("", server_connection->nextProtocol());
+        }));
+
+    uint32_t filter_seen = 0;
+
+    EXPECT_CALL(*read_filter, onNewConnection());
+    EXPECT_CALL(*read_filter, onData(_))
+        .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> FilterStatus {
+          EXPECT_EQ(expected_chunk_size, data.length());
+          filter_seen += data.length();
+          data.drain(data.length());
+          if (filter_seen == buffer_size) {
+            server_connection->close(ConnectionCloseType::FlushWrite);
+          }
+          return FilterStatus::StopIteration;
+        }));
+
+    MockConnectionCallbacks client_callbacks;
+    client_connection->addConnectionCallbacks(client_callbacks);
+    EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::RemoteClose))
+        .WillOnce(Invoke([&](uint32_t) -> void {
+          EXPECT_EQ(buffer_size, filter_seen);
+          dispatcher.exit();
+        }));
+
+    Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
+    client_connection->write(data);
+    dispatcher.run(Event::Dispatcher::RunType::Block);
+  }
+};
+
+TEST_F(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
+
+TEST_F(ReadBufferLimitTest, SomeLimit) { readBufferLimitTest(32 * 1024, 32 * 1024); }
 
 TEST(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   Event::DispatcherImpl dispatcher;

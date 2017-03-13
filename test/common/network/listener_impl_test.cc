@@ -20,8 +20,12 @@ static void errorCallbackTest() {
   Network::TcpListenSocket socket(uint32_t(10000), true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher.createListener(
-      connection_handler, socket, listener_callbacks, stats_store, true, false, false);
+  Network::ListenerPtr listener =
+      dispatcher.createListener(connection_handler, socket, listener_callbacks, stats_store,
+                                {.bind_to_port_ = true,
+                                 .use_proxy_proto_ = false,
+                                 .use_original_dst_ = false,
+                                 .per_connection_buffer_limit_bytes_ = 0});
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
@@ -45,9 +49,8 @@ class TestListenerImpl : public ListenerImpl {
 public:
   TestListenerImpl(Network::ConnectionHandler& conn_handler, Event::DispatcherImpl& dispatcher,
                    ListenSocket& socket, ListenerCallbacks& cb, Stats::Store& stats_store,
-                   bool bind_to_port, bool use_proxy_proto, bool use_orig_dst)
-      : ListenerImpl(conn_handler, dispatcher, socket, cb, stats_store, bind_to_port,
-                     use_proxy_proto, use_orig_dst) {
+                   const Network::ListenerOptions& listener_options)
+      : ListenerImpl(conn_handler, dispatcher, socket, cb, stats_store, listener_options) {
     ON_CALL(*this, newConnection(_, _, _))
         .WillByDefault(Invoke(
             [this](int fd, Address::InstancePtr remote_address, Address::InstancePtr local_address)
@@ -69,10 +72,14 @@ TEST(ListenerImplTest, UseOriginalDst) {
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
-                                     stats_store, true, false, true);
+                                     stats_store, {.bind_to_port_ = true,
+                                                   .use_proxy_proto_ = false,
+                                                   .use_original_dst_ = true,
+                                                   .per_connection_buffer_limit_bytes_ = 0});
   Network::MockListenerCallbacks listener_callbacks2;
   Network::TestListenerImpl listenerDst(connection_handler, dispatcher, socketDst,
-                                        listener_callbacks2, stats_store, false, false, false);
+                                        listener_callbacks2, stats_store,
+                                        Network::ListenerOptions());
 
   Network::ClientConnectionPtr client_connection =
       dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
