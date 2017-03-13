@@ -29,8 +29,15 @@ void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
   } else {
     ASSERT(cluster.initializePhase() == Cluster::InitializePhase::Secondary);
     secondary_init_clusters_.push_back(&cluster);
+    if (started_secondary_initialize_) {
+      // This can happen if we get a second CDS update that adds new clusters after we have
+      // already started secondary init. In this case, just immediately initialize.
+      cluster.initialize();
+    }
   }
 
+  log().info("cm init: adding: cluster={} primary={} secondary={}", cluster.info()->name(),
+             primary_init_clusters_.size(), secondary_init_clusters_.size());
   cluster.setInitializedCb([&cluster, this]() -> void {
     ASSERT(state_ != State::AllClustersInitialized);
     removeCluster(cluster);
@@ -55,6 +62,8 @@ void ClusterManagerInitHelper::removeCluster(Cluster& cluster) {
   // It is possible that the cluster we are removing has already been initialized, and is not
   // present in the initializer list. If so, this is fine.
   cluster_list->remove(&cluster);
+  log().info("cm init: removing: cluster={} primary={} secondary={}", cluster.info()->name(),
+             primary_init_clusters_.size(), secondary_init_clusters_.size());
   maybeFinishInitialize();
 }
 
@@ -75,6 +84,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // initialize on them. This is only done once.
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
+      log().info("cm init: initializing secondary clusters");
       started_secondary_initialize_ = true;
       for (Cluster* cluster : secondary_init_clusters_) {
         cluster->initialize();
@@ -88,6 +98,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // directly to initialized.
   started_secondary_initialize_ = false;
   if (state_ == State::WaitingForStaticInitialize && cds_) {
+    log().info("cm init: initializing cds");
     state_ = State::WaitingForCdsInitialize;
     cds_->initialize();
   } else {

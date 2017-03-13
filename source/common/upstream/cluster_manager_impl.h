@@ -52,7 +52,7 @@ private:
  * This is a helper class used during cluster management initialization. Dealing with primary
  * clusters, secondary clusters, and CDS, is quite complicated, so this makes it easier to test.
  */
-class ClusterManagerInitHelper {
+class ClusterManagerInitHelper : Logger::Loggable<Logger::Id::upstream> {
 public:
   void addCluster(Cluster& cluster);
   void onStaticLoadComplete();
