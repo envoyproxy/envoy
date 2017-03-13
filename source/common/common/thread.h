@@ -35,6 +35,7 @@ typedef std::unique_ptr<Thread> ThreadPtr;
 class MutexBasicLockable : public BasicLockable {
 public:
   void lock() override { mutex_.lock(); }
+  bool try_lock() override { return mutex_.try_lock(); }
   void unlock() override { mutex_.unlock(); }
 
 private:
