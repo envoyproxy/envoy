@@ -28,7 +28,7 @@ struct ListenerOptions {
     return {.bind_to_port_ = true,
             .use_proxy_proto_ = false,
             .use_original_dst_ = false,
-            .per_connection_buffer_limit_bytes_ = false};
+            .per_connection_buffer_limit_bytes_ = 0};
   }
 };
 

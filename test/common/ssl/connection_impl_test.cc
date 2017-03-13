@@ -247,7 +247,7 @@ TEST(SslConnectionImplTest, SslError) {
 
 class SslReadBufferLimitTest : public testing::Test {
 public:
-  void readBufferLimitTest(uint32_t read_buffer_limit, size_t expected_chunk_size) {
+  void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
 
     Stats::IsolatedStoreImpl stats_store;
@@ -300,7 +300,7 @@ public:
           EXPECT_EQ("", server_connection->nextProtocol());
         }));
 
-    size_t filter_seen = 0;
+    uint32_t filter_seen = 0;
 
     EXPECT_CALL(*read_filter, onNewConnection());
     EXPECT_CALL(*read_filter, onData(_))

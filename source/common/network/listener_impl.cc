@@ -22,7 +22,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
   Address::InstancePtr final_local_address = listener->socket_.localAddress();
-  if (listener->use_original_dst_ && final_local_address->type() == Address::Type::Ip) {
+  if (listener->options_.use_original_dst_ && final_local_address->type() == Address::Type::Ip) {
     Address::InstancePtr original_local_address = listener->getOriginalDst(fd);
     if (original_local_address) {
       final_local_address = original_local_address;
@@ -42,7 +42,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
     }
   }
 
-  if (listener->use_proxy_proto_) {
+  if (listener->options_.use_proxy_proto_) {
     listener->proxy_protocol_.newConnection(listener->dispatcher_, fd, *listener);
   } else {
     Address::InstancePtr final_remote_address;
@@ -65,13 +65,9 @@ ListenerImpl::ListenerImpl(Network::ConnectionHandler& conn_handler,
                            ListenerCallbacks& cb, Stats::Store& stats_store,
                            const Network::ListenerOptions& listener_options)
     : connection_handler_(conn_handler), dispatcher_(dispatcher), socket_(socket), cb_(cb),
-      bind_to_port_(listener_options.bind_to_port_),
-      use_proxy_proto_(listener_options.use_proxy_proto_), proxy_protocol_(stats_store),
-      use_original_dst_(listener_options.use_original_dst_),
-      per_connection_buffer_limit_bytes_(listener_options.per_connection_buffer_limit_bytes_),
-      listener_(nullptr) {
+      proxy_protocol_(stats_store), options_(listener_options), listener_(nullptr) {
 
-  if (bind_to_port_) {
+  if (options_.bind_to_port_) {
     listener_.reset(
         evconnlistener_new(&dispatcher_.base(), listenCallback, this, 0, -1, socket.fd()));
 
@@ -93,7 +89,7 @@ void ListenerImpl::errorCallback(evconnlistener*, void*) {
 void ListenerImpl::newConnection(int fd, Address::InstancePtr remote_address,
                                  Address::InstancePtr local_address) {
   ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, fd, remote_address, local_address));
-  new_connection->setReadBufferLimit(per_connection_buffer_limit_bytes_);
+  new_connection->setReadBufferLimit(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
 
@@ -102,7 +98,7 @@ void SslListenerImpl::newConnection(int fd, Address::InstancePtr remote_address,
   ConnectionPtr new_connection(new Ssl::ConnectionImpl(dispatcher_, fd, remote_address,
                                                        local_address, ssl_ctx_,
                                                        Ssl::ConnectionImpl::InitialState::Server));
-  new_connection->setReadBufferLimit(per_connection_buffer_limit_bytes_);
+  new_connection->setReadBufferLimit(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
 

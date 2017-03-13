@@ -63,7 +63,7 @@ public:
   Ssl::Connection* ssl() override { return nullptr; }
   State state() override;
   void write(Buffer::Instance& data) override;
-  void setReadBufferLimit(size_t limit) override { read_buffer_limit_ = limit; }
+  void setReadBufferLimit(uint32_t limit) override { read_buffer_limit_ = limit; }
 
   // Network::BufferSource
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }
@@ -98,7 +98,7 @@ protected:
   Address::InstancePtr local_address_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
-  size_t read_buffer_limit_ = 0;
+  uint32_t read_buffer_limit_ = 0;
 
 private:
   // clang-format off

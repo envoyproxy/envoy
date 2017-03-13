@@ -43,11 +43,8 @@ protected:
   Event::DispatcherImpl& dispatcher_;
   ListenSocket& socket_;
   ListenerCallbacks& cb_;
-  const bool bind_to_port_;
-  const bool use_proxy_proto_;
   ProxyProtocol proxy_protocol_;
-  const bool use_original_dst_;
-  const size_t per_connection_buffer_limit_bytes_;
+  const ListenerOptions options_;
 
 private:
   static void errorCallback(evconnlistener* listener, void* context);
