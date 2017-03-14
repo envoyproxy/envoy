@@ -27,15 +27,15 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
 
   Network::Listener* listener = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks;
-  EXPECT_CALL(*dispatcher, createListener_(_, _, _, _, _, _, _))
+  EXPECT_CALL(*dispatcher, createListener_(_, _, _, _, _))
       .WillOnce(Invoke([&](Network::ConnectionHandler&, Network::ListenSocket&,
-                           Network::ListenerCallbacks& cb, Stats::Store&, bool, bool, bool)
-                           -> Network::Listener* {
-                             listener_callbacks = &cb;
-                             return listener;
+                           Network::ListenerCallbacks& cb, Stats::Store&,
+                           const Network::ListenerOptions&) -> Network::Listener* {
+        listener_callbacks = &cb;
+        return listener;
 
-                           }));
-  handler.addListener(factory, socket, true, false, false);
+      }));
+  handler.addListener(factory, socket, Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
   EXPECT_CALL(factory, createFilterChain(_));
@@ -59,15 +59,15 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
 
   Network::Listener* listener = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks;
-  EXPECT_CALL(*dispatcher, createListener_(_, _, _, _, _, _, _))
+  EXPECT_CALL(*dispatcher, createListener_(_, _, _, _, _))
       .WillOnce(Invoke([&](Network::ConnectionHandler&, Network::ListenSocket&,
-                           Network::ListenerCallbacks& cb, Stats::Store&, bool, bool, bool)
-                           -> Network::Listener* {
-                             listener_callbacks = &cb;
-                             return listener;
+                           Network::ListenerCallbacks& cb, Stats::Store&,
+                           const Network::ListenerOptions&) -> Network::Listener* {
+        listener_callbacks = &cb;
+        return listener;
 
-                           }));
-  handler.addListener(factory, socket, true, false, false);
+      }));
+  handler.addListener(factory, socket, Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
   EXPECT_CALL(factory, createFilterChain(_)).WillOnce(Return(false));

@@ -45,6 +45,7 @@ private:
   pthread_mutex_t log_lock_;
   pthread_mutex_t access_log_lock_;
   pthread_mutex_t stat_lock_;
+  pthread_mutex_t init_lock_;
   std::array<Stats::RawStatData, 16384> stats_slots_;
 
   friend class HotRestartImpl;
@@ -66,6 +67,20 @@ public:
     if (rc == EOWNERDEAD) {
       pthread_mutex_consistent(&mutex_);
     }
+  }
+
+  bool try_lock() override {
+    int rc = pthread_mutex_trylock(&mutex_);
+    if (rc == EBUSY) {
+      return false;
+    }
+
+    ASSERT(rc == 0 || rc == EOWNERDEAD);
+    if (rc == EOWNERDEAD) {
+      pthread_mutex_consistent(&mutex_);
+    }
+
+    return true;
   }
 
   void unlock() override {
@@ -169,6 +184,7 @@ private:
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
   ProcessSharedMutex stat_lock_;
+  ProcessSharedMutex init_lock_;
   int my_domain_socket_{-1};
   sockaddr_un parent_address_;
   sockaddr_un child_address_;

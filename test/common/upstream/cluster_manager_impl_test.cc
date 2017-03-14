@@ -739,4 +739,35 @@ TEST(ClusterManagerInitHelper, UpdateAlreadyInitialized) {
   cluster2.initialize_callback_();
 }
 
+TEST(ClusterManagerInitHelper, AddSecondaryAfterSecondaryInit) {
+  InSequence s;
+  ClusterManagerInitHelper init_helper;
+
+  ReadyWatcher cm_initialized;
+  init_helper.setInitializedCb([&]() -> void { cm_initialized.ready(); });
+
+  NiceMock<MockCluster> cluster1;
+  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(cluster1, initialize());
+  init_helper.addCluster(cluster1);
+
+  NiceMock<MockCluster> cluster2;
+  ON_CALL(cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  init_helper.addCluster(cluster2);
+
+  init_helper.onStaticLoadComplete();
+
+  EXPECT_CALL(cluster2, initialize());
+  cluster1.initialize_callback_();
+
+  NiceMock<MockCluster> cluster3;
+  ON_CALL(cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  EXPECT_CALL(cluster3, initialize());
+  init_helper.addCluster(cluster3);
+
+  cluster3.initialize_callback_();
+  EXPECT_CALL(cm_initialized, ready());
+  cluster2.initialize_callback_();
+}
+
 } // Upstream

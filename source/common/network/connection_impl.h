@@ -63,6 +63,7 @@ public:
   Ssl::Connection* ssl() override { return nullptr; }
   State state() override;
   void write(Buffer::Instance& data) override;
+  void setReadBufferLimit(uint32_t limit) override { read_buffer_limit_ = limit; }
 
   // Network::BufferSource
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }
@@ -79,6 +80,16 @@ protected:
   virtual void closeSocket(uint32_t close_type);
   void doConnect();
   void raiseEvents(uint32_t events);
+  // Should the read buffer be drained?
+  bool shouldDrainReadBuffer() {
+    return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
+  }
+  // Mark read buffer ready to read in the event loop. This is used when yielding following
+  // shouldDrainReadBuffer().
+  // TODO(htuch): While this is the basis for also yielding to other connections to provide some
+  // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
+  // Reconsider how to make fairness happen.
+  void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
 
   static const Address::InstancePtr null_local_address_;
 
@@ -87,6 +98,7 @@ protected:
   Address::InstancePtr local_address_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
+  uint32_t read_buffer_limit_ = 0;
 
 private:
   // clang-format off
