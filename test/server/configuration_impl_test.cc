@@ -146,6 +146,41 @@ TEST(ConfigurationImplTest, SetListenerPerConnectionBufferLimit) {
   EXPECT_EQ(8192U, config.listeners().back()->perConnectionBufferLimitBytes());
 }
 
+TEST(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
+  std::string json = R"EOF(
+  {
+    "listeners" : [],
+    "cluster_manager": {
+      "clusters": [
+        {
+          "name": "test_cluster",
+          "type": "static",
+          "connect_timeout_ms": 1,
+          "per_connection_buffer_limit_bytes": 8192,
+          "lb_type": "round_robin",
+          "hosts": []
+        }
+      ]
+    }
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  MainImpl config(server);
+  config.initialize(*loader);
+
+  ASSERT_EQ(1U, config.clusterManager().clusters().count("test_cluster"));
+  EXPECT_EQ(8192U, config.clusterManager()
+                       .clusters()
+                       .find("test_cluster")
+                       ->second.get()
+                       .info()
+                       ->perConnectionBufferLimitBytes());
+  server.thread_local_.shutdownThread();
+}
+
 TEST(ConfigurationImplTest, BadListenerConfig) {
   std::string json = R"EOF(
   {

@@ -60,6 +60,8 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
     : runtime_(runtime), name_(config.getString("name")),
       max_requests_per_connection_(config.getInteger("max_requests_per_connection", 0)),
       connect_timeout_(std::chrono::milliseconds(config.getInteger("connect_timeout_ms"))),
+      per_connection_buffer_limit_bytes_(
+          config.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024)),
       stats_scope_(stats.createScope(fmt::format("cluster.{}.", name_))),
       stats_(generateStats(*stats_scope_)), features_(parseFeatures(config)),
       http_codec_options_(Http::Utility::parseCodecOptions(config)),

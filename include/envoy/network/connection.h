@@ -152,6 +152,11 @@ public:
    * processing pipeline.
    */
   virtual void setReadBufferLimit(uint32_t limit) PURE;
+
+  /**
+   * Get the value set with setReadBufferLimit.
+   */
+  virtual uint32_t readBufferLimit() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

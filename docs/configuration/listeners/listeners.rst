@@ -14,7 +14,8 @@ Each individual listener configuration has the following format:
     "ssl_context": "{...}",
     "bind_to_port": "...",
     "use_proxy_proto": "...",
-    "use_original_dst": "..."
+    "use_original_dst": "...",
+    "per_connection_buffer_limit_bytes": "..."
   }
 
 port

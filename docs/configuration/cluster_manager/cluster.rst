@@ -9,6 +9,7 @@ Cluster
     "name": "...",
     "type": "...",
     "connect_timeout_ms": "...",
+    "per_connection_buffer_limit_bytes": "...",
     "lb_type": "...",
     "hosts": [],
     "service_name": "...",
@@ -36,6 +37,10 @@ type
 connect_timeout_ms
   *(required, integer)* The timeout for new network connections to hosts in the cluster specified
   in milliseconds.
+
+per_connection_buffer_limit_bytes
+  *(optional, integer)* Soft limit on size of the cluster's connections read and write buffers.
+  If unspecified, an implementation defined default is applied (1MB).
 
 lb_type
   *(required, string)* The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
@@ -171,7 +176,6 @@ outlier_detection
 
   Each of the above configuration values can be overridden via 
   :ref:`runtime values <config_cluster_manager_cluster_runtime_outlier_detection>`.
-
 
 .. toctree::
   :hidden:

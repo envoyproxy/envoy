@@ -358,7 +358,13 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 
   ConstHostPtr logical_host = entry->second->lb_->chooseHost(nullptr);
   if (logical_host) {
-    return logical_host->createConnection(cluster_manager.thread_local_dispatcher_);
+    Host::CreateConnectionData conn_data =
+        logical_host->createConnection(cluster_manager.thread_local_dispatcher_);
+    if (conn_data.connection_ != nullptr) {
+      conn_data.connection_->setReadBufferLimit(
+          entry->second->cluster_info_->perConnectionBufferLimitBytes());
+    }
+    return conn_data;
   } else {
     entry->second->cluster_info_->stats().upstream_cx_none_healthy_.inc();
     return {nullptr, nullptr};
