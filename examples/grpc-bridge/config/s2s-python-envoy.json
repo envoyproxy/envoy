@@ -1,7 +1,7 @@
 {
   "listeners": [
     {
-      "port": 9001,
+      "address": "tcp://127.0.0.1:9001",
       "filters": [
         {
           "type": "read",

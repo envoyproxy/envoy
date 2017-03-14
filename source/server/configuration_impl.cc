@@ -114,9 +114,9 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { return listeners_; }
 
 MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
-    : parent_(parent), port_(json.getInteger("port")),
-      scope_(parent_.server_.stats().createScope(fmt::format("listener.{}.", port_))) {
-  log().info("  port={}", port_);
+    : parent_(parent), address_(json.getString("address")),
+      scope_(parent_.server_.stats().createScope(fmt::format("listener.{}.", address_))) {
+  log().info("  address={}", address_);
 
   json.validateSchema(Json::Schema::LISTENER_SCHEMA);
 

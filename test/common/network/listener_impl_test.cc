@@ -67,8 +67,8 @@ public:
 TEST(ListenerImplTest, UseOriginalDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
-  Network::TcpListenSocket socketDst(uint32_t(10001), false);
+  Network::TcpListenSocket socket("tcp://127.0.0.1:10000", true);
+  Network::TcpListenSocket socketDst("tcp://127.0.0.1:10001", false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
@@ -87,7 +87,8 @@ TEST(ListenerImplTest, UseOriginalDst) {
 
   Address::InstancePtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
-  EXPECT_CALL(connection_handler, findListenerByPort(10001)).WillRepeatedly(Return(&listenerDst));
+  EXPECT_CALL(connection_handler, findListenerByAddress(alt_address))
+      .WillRepeatedly(Return(&listenerDst));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
   EXPECT_CALL(listenerDst, newConnection(_, _, _));

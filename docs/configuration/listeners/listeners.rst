@@ -9,7 +9,7 @@ Each individual listener configuration has the following format:
 .. code-block:: json
 
   {
-    "port": "...",
+    "address": "...",
     "filters": [],
     "ssl_context": "{...}",
     "bind_to_port": "...",
@@ -18,9 +18,9 @@ Each individual listener configuration has the following format:
     "per_connection_buffer_limit_bytes": "..."
   }
 
-port
-  *(required, integer)* The TCP port that the listener should listen on. Currently only TCP
-  listeners are supported which bind to all local interfaces.
+address
+  *(required, string)* The address that the listener should listen on. Currently only TCP
+  listeners are supported.
 
 :ref:`filters <config_listener_filters>`
   *(required, array)* A list of individual :ref:`network filters <arch_overview_network_filters>`

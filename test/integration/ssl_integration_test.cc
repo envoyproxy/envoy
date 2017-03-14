@@ -82,7 +82,8 @@ Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool al
 }
 
 void SslIntegrationTest::checkStats() {
-  Stats::Counter& counter = test_server_->store().counter("listener.10001.ssl.handshake");
+  Stats::Counter& counter =
+      test_server_->store().counter("listener.tcp://127.0.0.1:10001.ssl.handshake");
   EXPECT_EQ(1U, counter.value());
   counter.reset();
 }

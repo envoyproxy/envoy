@@ -1,7 +1,7 @@
 {
   "listeners": [
   {
-    "port": 10000,
+    "address": "tcp://127.0.0.1:10000",
     "use_original_dst": true,
     "filters": [
       { "type": "read", "name": "ratelimit",
@@ -15,7 +15,7 @@
     ]
   },
   {
-    "port": 10001,
+    "address": "tcp://127.0.0.1:10001",
     "filters": [
     {
       "type": "read",
@@ -108,7 +108,7 @@
     }]
   },
   {
-    "port": 10002,
+    "address": "tcp://127.0.0.1:10002",
     "filters": [
     {
       "type": "read",
@@ -207,7 +207,7 @@
     }]
   },
   {
-    "port": 10004,
+    "address": "tcp://127.0.0.1:10004",
     "filters": [
       { "type": "read", "name":
         "tcp_proxy",
@@ -225,7 +225,7 @@
     ]
   },
   {
-    "port": 10005,
+    "address": "tcp://127.0.0.1:10005",
     "filters": [
     {
       "type": "read",

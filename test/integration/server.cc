@@ -14,7 +14,7 @@ class TestHotRestart : public HotRestart {
 public:
   // Server::HotRestart
   void drainParentListeners() override {}
-  int duplicateParentListenSocket(uint32_t) override { return -1; }
+  int duplicateParentListenSocket(std::string) override { return -1; }
   void getParentStats(GetParentStatsInfo& info) override { memset(&info, 0, sizeof(info)); }
   void initialize(Event::Dispatcher&, Server::Instance&) override {}
   void shutdownParentAdmin(ShutdownParentAdminInfo&) override {}
