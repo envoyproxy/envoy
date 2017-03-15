@@ -46,12 +46,12 @@ public:
   virtual const std::string& addressAsString() const PURE;
 
   /**
-   * @return Ipv4 address data IFF type() == IpVersion::v4, otherwise nullptr.
+   * @return Ipv4 address data IFF version() == IpVersion::v4, otherwise nullptr.
    */
   virtual const Ipv4* ipv4() const PURE;
 
   /**
-   * @return Ipv6 address data IFF type() == IpVersion::v6, otherwise nullptr.
+   * @return Ipv6 address data IFF version() == IpVersion::v6, otherwise nullptr.
    */
   virtual const Ipv6* ipv6() const PURE;
 
@@ -124,6 +124,105 @@ public:
 };
 
 typedef std::shared_ptr<const Instance> InstancePtr;
+
+/*
+ * Parse an internet host address (IPv4 or IPv6) and create an Instance from it.
+ * The address must not include a port number.
+ * @param ipAddr string to be parsed as an internet address.
+ * @return pointer to the Instance, or nullptr if unable to parse the address.
+ */
+InstancePtr parseInternetAddress(const std::string& ipAddr);
+
+/*
+ * A range of internet addresses, consisting of an Ip address and a count of leading
+ * bits included in the mask. Other than those leading bits, all of the other bits
+ * of the Ip address are zero.
+ */
+class IpRange {
+public:
+  /**
+   * Constructs an uninitialized range: length == -1, and there is no associated address.
+   */
+  IpRange();
+
+  /**
+   * Copies an existing IpRange.
+   */
+  IpRange(const IpRange& other);
+
+  /**
+   * Overwrites this with other.
+   */
+  IpRange& operator=(const IpRange& other);
+
+  /**
+   * @return Ipv4 address data IFF length >= 0 and version() == IpVersion::v4, otherwise nullptr.
+   */
+  const Ipv4* ipv4() const;
+
+  /**
+   * @return Ipv6 address data IFF length >= 0 and version() == IpVersion::v6, otherwise nullptr.
+   */
+  const Ipv6* ipv6() const;
+
+  /**
+   * @return the number of bits of the address that are included in the mask.
+   * -1 if uninitialized or invalid, else in the range 0 to 32 for IPv4, and 0 to 128 for IPv6.
+   */
+  int length() const;
+
+  /**
+   * @return the version of IP address.
+   */
+  IpVersion version() const;
+
+  /**
+   * @return true if the address argument is in the range of this object.
+   * false if not, including if the range is uninitialized or if the argument is not of the
+   * same IpVersion.
+   */
+  bool isInRange(const InstancePtr& address) const;
+
+  /**
+   * @return a human readable string for the range.
+   *
+   * This string will be in the following format:
+   * For IPv4 ranges: "1.2.3.4/32" or "10.240.0.0/16"
+   * For IPv6 ranges: "1234:5678::f/128" or "1234:5678::/64"
+   */
+  std::string asString() const;
+
+  /**
+   * @return true if this instance is valid; address != nullptr && length is appropriate
+   * for the IP version (these are checked during construction, and reduced down to a
+   * check of the length).
+   */
+  bool isValid() const { return length_ >= 0; }
+
+  /**
+   * @return an IpRange instance with the specified address and length, modified so that
+   * the only bits that might be non-zero are in the high-order length bits, and so that
+   * length is in the appropriate range (0 to 32 for IPv4, 0 to 128 for IPv6). If the
+   * the address or length is invalid, then the range will be invalid (i.e. length == -1).
+   */
+  static IpRange construct(const InstancePtr& address, int length);
+  static IpRange construct(const std::string& address, int length);
+
+  /**
+   * Constructs an IpRange from a string with this format (same as returned
+   * by IpRange::asString above):
+   *      <address>/<length>    e.g. "10.240.0.0/16" or "1234:5678::/64"
+   * @return an IpRange instance with the specified address and length if parsed successfully,
+   * else with no address and a length of -1.
+   */
+  static IpRange construct(const std::string& range);
+
+private:
+  IpRange(const InstancePtr& address, int length);
+
+  InstancePtr address_;
+  int length_;
+};
 
 } // Address
 } // Network

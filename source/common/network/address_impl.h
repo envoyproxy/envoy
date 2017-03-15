@@ -137,6 +137,18 @@ private:
 };
 
 /**
+ * Given an IP address and a length of high order bits to keep, returns an address
+ * where those high order bits are unmodified, and the remaining bits are all zero.
+ * length_io is reduced to be at most 32 for IPv4 address and at most 128 for IPv6
+ * addresses. If the address is invalid or the length is less than zero, then *length_io
+ * is set to -1 and nullptr is returned.
+ * @return a pointer to an address where the high order *length_io bits are unmodified
+ * from address, and *length_io is in the range 0 to N, where N is the number of bits
+ * in an address of the IP version (i.e. address->ip()->version()).
+ */
+InstancePtr truncateIpAddressAndLength(const InstancePtr& address, int* length_io);
+
+/**
  * Implementation of a pipe address (unix domain socket on unix).
  */
 class PipeInstance : public InstanceBase {
