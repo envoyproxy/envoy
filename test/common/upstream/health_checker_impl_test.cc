@@ -12,6 +12,7 @@
 #include "test/test_common/utility.h"
 
 using testing::_;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -23,12 +24,12 @@ class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {
 public:
   using HttpHealthCheckerImpl::HttpHealthCheckerImpl;
 
-  Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData&) override {
-    return createCodecClient_();
+  Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& conn_data) override {
+    return createCodecClient_(conn_data);
   };
 
   // HttpHealthCheckerImpl
-  MOCK_METHOD0(createCodecClient_, Http::CodecClient*());
+  MOCK_METHOD1(createCodecClient_, Http::CodecClient*(Upstream::Host::CreateConnectionData&));
 };
 
 class HttpHealthCheckerImplTest : public testing::Test {
@@ -41,7 +42,6 @@ public:
     Http::MockClientConnection* codec_{};
     Stats::IsolatedStoreImpl stats_store_;
     Network::MockClientConnection* client_connection_{};
-    Http::CodecClient* codec_client_{};
     NiceMock<Http::MockStreamEncoder> request_encoder_;
     Http::StreamDecoder* stream_response_callbacks_{};
   };
@@ -104,14 +104,15 @@ public:
   void expectClientCreate(size_t index) {
     TestSession& test_session = *test_sessions_[index];
 
-    test_session.codec_ = new NiceMock<Http::MockClientConnection>();
+    auto* codec = test_session.codec_ = new NiceMock<Http::MockClientConnection>();
     test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
+    auto create_codec_client = [codec](Upstream::Host::CreateConnectionData& conn_data) {
+      return new CodecClientForTest(std::move(conn_data.connection_), codec, nullptr, nullptr);
+    };
 
-    Network::ClientConnectionPtr connection{test_session.client_connection_};
-    test_session.codec_client_ =
-        new CodecClientForTest(std::move(connection), test_session.codec_, nullptr, nullptr);
-    EXPECT_CALL(*health_checker_, createCodecClient_())
-        .WillOnce(Return(test_session.codec_client_));
+    EXPECT_CALL(dispatcher_, createClientConnection_(_))
+        .WillOnce(Return(test_session.client_connection_));
+    EXPECT_CALL(*health_checker_, createCodecClient_(_)).WillOnce(Invoke(create_codec_client));
   }
 
   void expectStreamCreate(size_t index) {

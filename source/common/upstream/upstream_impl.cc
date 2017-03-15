@@ -33,9 +33,7 @@ Network::ClientConnectionPtr HostImpl::createConnection(Event::Dispatcher& dispa
   Network::ClientConnectionPtr connection =
       cluster.sslContext() ? dispatcher.createSslClientConnection(*cluster.sslContext(), address)
                            : dispatcher.createClientConnection(address);
-  if (connection) {
-    connection->setReadBufferLimit(cluster.perConnectionBufferLimitBytes());
-  }
+  connection->setReadBufferLimit(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
 
