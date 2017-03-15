@@ -46,7 +46,8 @@ external_virtual_hosts = [
         {
             'name': 'dynamodb_iad', 'domain': '*',
             'remote_address': 'dynamodb.us-east-1.amazonaws.com:443',
-            'verify_subject_alt_name': 'dynamodb.us-east-1.amazonaws.com', 'ssl': True
+            'verify_subject_alt_name': [ 'dynamodb.us-east-1.amazonaws.com' ],
+            'ssl': True
         }
     ],
     'is_amzn_service': True,

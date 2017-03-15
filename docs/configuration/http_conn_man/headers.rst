@@ -166,7 +166,7 @@ following features are available:
 .. _config_http_conn_man_headers_x-ot-span-context:
 
 x-ot-span-context
-_________________
+-----------------
 
 The *x-ot-span-context* HTTP header is used by Envoy to establish proper parent-child relationships
 between tracing spans for LightStep tracing. *x-ot-span-context* is a Base64 encoded

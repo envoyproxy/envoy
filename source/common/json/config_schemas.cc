@@ -13,7 +13,12 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
           "alt_alpn_protocols": {"type" : "string"},
           "ca_cert_file" : {"type" : "string"},
           "verify_certificate_hash" : {"type" : "string"},
-          "verify_subject_alt_name" : {"type" : "string"},
+          "verify_subject_alt_name" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
           "cipher_suites" : {"type" : "string"}
         },
         "required": ["cert_chain_file", "private_key_file"],
@@ -42,7 +47,12 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
        "ssl_context" : {"$ref" : "#/definitions/ssl_context"},
        "bind_to_port" : {"type": "boolean"},
        "use_proxy_proto" : {"type" : "boolean"},
-       "use_original_dst" : {"type" : "boolean"}
+       "use_original_dst" : {"type" : "boolean"},
+       "per_connection_buffer_limit_bytes" : {
+         "type" : "integer",
+         "minimum" : 0,
+         "exclusiveMinimum" : true
+       }
     },
     "required": ["port", "filters"],
     "additionalProperties": false
@@ -1003,7 +1013,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
           "private_key_file" : {"type" : "string"},
           "ca_cert_file" : {"type" : "string"},
           "verify_certificate_hash" : {"type" : "string"},
-          "verify_subject_alt_name" : {"type" : "string"},
+          "verify_subject_alt_name" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
           "cipher_suites" : {"type" : "string"},
           "sni" : {"type" :"string"}
         },

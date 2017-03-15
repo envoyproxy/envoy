@@ -50,6 +50,12 @@ public:
    *         allow the listener to hand it off to the listener associated to the original port
    */
   virtual bool useOriginalDst() PURE;
+
+  /**
+   * @return uint32_t providing a soft limit on size of the listener's new connection read and write
+   *         buffers.
+   */
+  virtual uint32_t perConnectionBufferLimitBytes() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;

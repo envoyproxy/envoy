@@ -14,7 +14,7 @@ namespace Server {
 
 // Increment this whenever there is a shared memory / RPC change that will prevent a hot restart
 // from working. Operations code can then cope with this and do a full restart.
-const uint64_t SharedMemory::VERSION = 4;
+const uint64_t SharedMemory::VERSION = 6;
 
 SharedMemory& SharedMemory::initialize(Options& options) {
   int flags = O_RDWR;
@@ -48,9 +48,20 @@ SharedMemory& SharedMemory::initialize(Options& options) {
     shmem->initializeMutex(shmem->log_lock_);
     shmem->initializeMutex(shmem->access_log_lock_);
     shmem->initializeMutex(shmem->stat_lock_);
+    shmem->initializeMutex(shmem->init_lock_);
   } else {
     RELEASE_ASSERT(shmem->size_ == sizeof(SharedMemory));
     RELEASE_ASSERT(shmem->version_ == VERSION);
+  }
+
+  // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
+  // initialized. The startup logic is quite compicated, and it's not worth trying to handle this
+  // in a finer way. This will cause the startup to fail with an error code early, without
+  // affecting any currently running processes. The process runner should try again later with some
+  // back off and with the same hot restart epoch number.
+  uint64_t old_flags = shmem->flags_.fetch_or(Flags::INITIALIZING);
+  if (old_flags & Flags::INITIALIZING) {
+    throw EnvoyException("previous envoy process is still initializing");
   }
 
   return *shmem;
@@ -68,7 +79,8 @@ std::string SharedMemory::version() { return fmt::format("{}.{}", VERSION, sizeo
 
 HotRestartImpl::HotRestartImpl(Options& options)
     : options_(options), shmem_(SharedMemory::initialize(options)), log_lock_(shmem_.log_lock_),
-      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_) {
+      access_log_lock_(shmem_.access_log_lock_), stat_lock_(shmem_.stat_lock_),
+      init_lock_(shmem_.init_lock_) {
 
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
@@ -142,13 +154,14 @@ sockaddr_un HotRestartImpl::createDomainSocketAddress(uint64_t id) {
 }
 
 void HotRestartImpl::drainParentListeners() {
-  if (options_.restartEpoch() == 0) {
-    return;
+  if (options_.restartEpoch() > 0) {
+    // No reply expected.
+    RpcBase rpc(RpcMessageType::DrainListenersRequest);
+    sendMessage(parent_address_, rpc);
   }
 
-  // No reply expected.
-  RpcBase rpc(RpcMessageType::DrainListenersRequest);
-  sendMessage(parent_address_, rpc);
+  // At this point we are initialized and a new Envoy can startup if needed.
+  shmem_.flags_ &= ~SharedMemory::Flags::INITIALIZING;
 }
 
 int HotRestartImpl::duplicateParentListenSocket(uint32_t port) {
@@ -165,8 +178,27 @@ int HotRestartImpl::duplicateParentListenSocket(uint32_t port) {
 }
 
 void HotRestartImpl::getParentStats(GetParentStatsInfo& info) {
+  // There exists a race condition during hot restart involving fetching parent stats. It looks like
+  // this:
+  // 1) There currently exist 2 Envoy processes (draining has not completed): P0 and P1.
+  // 2) New process (P2) comes up and passes the INITIALIZING check.
+  // 3) P2 proceeds to the parent admin shutdown phase.
+  // 4) This races with P1 fetching parent stats from P0.
+  // 5) Calling receiveTypedRpc() below picks up the wrong message.
+  //
+  // There are not any great solutions to this problem. We could potentially guard this using flags,
+  // but this is a legitimate race condition even under normal restart conditions, so exiting P2
+  // with an error is not great. We could also rework all of this code so that P0<->P1 and P1<->P2
+  // communication occur over different socket pairs. This could work, but is a large change. We
+  // could also potentially use connection oriented sockets and accept connections from our child,
+  // and connect to our parent, but again, this becomes complicated.
+  //
+  // Instead, we guard this condition with a lock. However, to avoid deadlock, we must try_lock()
+  // in this path, since this call runs in the same thread as the event loop that is receiving
+  // messages. If try_lock() fails it is sufficient to not return any parent stats.
+  std::unique_lock<Thread::BasicLockable> lock(init_lock_, std::defer_lock);
   memset(&info, 0, sizeof(info));
-  if (options_.restartEpoch() == 0 || parent_terminated_) {
+  if (options_.restartEpoch() == 0 || parent_terminated_ || !lock.try_lock()) {
     return;
   }
 
@@ -351,6 +383,8 @@ void HotRestartImpl::onSocketEvent() {
 }
 
 void HotRestartImpl::shutdownParentAdmin(ShutdownParentAdminInfo& info) {
+  // See large comment in getParentStats() on why this operation is locked.
+  std::unique_lock<Thread::BasicLockable> lock(init_lock_);
   if (options_.restartEpoch() == 0) {
     return;
   }

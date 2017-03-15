@@ -129,6 +129,8 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json)
   bind_to_port_ = json.getBoolean("bind_to_port", true);
   use_proxy_proto_ = json.getBoolean("use_proxy_proto", false);
   use_original_dst_ = json.getBoolean("use_original_dst", false);
+  per_connection_buffer_limit_bytes_ =
+      json.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024);
 
   std::vector<Json::ObjectPtr> filters = json.getObjectArray("filters");
   for (size_t i = 0; i < filters.size(); i++) {
