@@ -27,14 +27,14 @@ Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatc
   return {createConnection(dispatcher, *cluster_, address_), shared_from_this()};
 }
 
-Network::ClientConnectionPtr
-HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                           Network::Address::InstancePtr address) const {
+Network::ClientConnectionPtr HostImpl::createConnection(Event::Dispatcher& dispatcher,
+                                                        const ClusterInfo& cluster,
+                                                        Network::Address::InstancePtr address) {
   Network::ClientConnectionPtr connection =
       cluster.sslContext() ? dispatcher.createSslClientConnection(*cluster.sslContext(), address)
                            : dispatcher.createClientConnection(address);
-  if (cluster_) {
-    connection->setReadBufferLimit(cluster_->perConnectionBufferLimitBytes());
+  if (connection) {
+    connection->setReadBufferLimit(cluster.perConnectionBufferLimitBytes());
   }
   return connection;
 }

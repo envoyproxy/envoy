@@ -88,9 +88,9 @@ public:
   void weight(uint32_t new_weight) override;
 
 protected:
-  Network::ClientConnectionPtr createConnection(Event::Dispatcher& dispatcher,
-                                                const ClusterInfo& cluster,
-                                                Network::Address::InstancePtr address) const;
+  static Network::ClientConnectionPtr createConnection(Event::Dispatcher& dispatcher,
+                                                       const ClusterInfo& cluster,
+                                                       Network::Address::InstancePtr address);
 
 private:
   std::atomic<uint64_t> health_flags_{};
