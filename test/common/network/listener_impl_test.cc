@@ -64,13 +64,14 @@ public:
                                    Address::InstancePtr local_address));
 };
 
-TEST(ListenerImplTest, UseOriginalDst) {
+TEST(ListenerImplTest, NormalRedirect) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket("tcp://127.0.0.1:10000", true);
   Network::TcpListenSocket socketDst("tcp://127.0.0.1:10001", false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
+  // The traffic should redirect from binding listener to the virtual listener.
   Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
                                      stats_store, {.bind_to_port_ = true,
                                                    .use_proxy_proto_ = false,
@@ -95,6 +96,83 @@ TEST(ListenerImplTest, UseOriginalDst) {
   EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ("127.0.0.1:10001", conn->localAddress().asString());
+        client_connection->close(ConnectionCloseType::NoFlush);
+        conn->close(ConnectionCloseType::NoFlush);
+        dispatcher.exit();
+      }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST(ListenerImplTest, FallbackToWildcardListener) {
+  Stats::IsolatedStoreImpl stats_store;
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket("tcp://127.0.0.1:10000", true);
+  Network::TcpListenSocket socketDst("tcp://0.0.0.0:10001", false);
+  Network::MockListenerCallbacks listener_callbacks1;
+  Network::MockConnectionHandler connection_handler;
+  // The virtual listener of exact address does not exist, fall back to wild card virtual listener.
+  Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
+                                     stats_store, {.bind_to_port_ = true,
+                                                   .use_proxy_proto_ = false,
+                                                   .use_original_dst_ = true,
+                                                   .per_connection_buffer_limit_bytes_ = 0});
+  Network::MockListenerCallbacks listener_callbacks2;
+  Network::TestListenerImpl listenerDst(connection_handler, dispatcher, socketDst,
+                                        listener_callbacks2, stats_store,
+                                        Network::ListenerOptions());
+
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  client_connection->connect();
+
+  Address::InstancePtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
+  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
+  EXPECT_CALL(connection_handler, findListenerByAddress(alt_address))
+      .WillRepeatedly(Return(&listenerDst));
+
+  EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
+  EXPECT_CALL(listenerDst, newConnection(_, _, _));
+  EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        client_connection->close(ConnectionCloseType::NoFlush);
+        conn->close(ConnectionCloseType::NoFlush);
+        dispatcher.exit();
+      }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
+TEST(ListenerImplTest, UseOriginalDst) {
+  Stats::IsolatedStoreImpl stats_store;
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket("tcp://127.0.0.1:10000", true);
+  Network::TcpListenSocket socketDst("tcp://127.0.0.1:10001", false);
+  Network::MockListenerCallbacks listener_callbacks1;
+  Network::MockConnectionHandler connection_handler;
+  // Do not redirect since use_original_dst is false.
+  Network::TestListenerImpl listener(connection_handler, dispatcher, socket, listener_callbacks1,
+                                     stats_store, {.bind_to_port_ = true,
+                                                   .use_proxy_proto_ = false,
+                                                   .use_original_dst_ = false,
+                                                   .per_connection_buffer_limit_bytes_ = 0});
+  Network::MockListenerCallbacks listener_callbacks2;
+  Network::TestListenerImpl listenerDst(connection_handler, dispatcher, socketDst,
+                                        listener_callbacks2, stats_store,
+                                        Network::ListenerOptions());
+
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  client_connection->connect();
+
+  Address::InstancePtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
+  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
+  EXPECT_CALL(connection_handler, findListenerByAddress(alt_address))
+      .WillRepeatedly(Return(&listener));
+
+  EXPECT_CALL(listener, newConnection(_, _, _)).Times(1);
+  EXPECT_CALL(listener_callbacks1, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();

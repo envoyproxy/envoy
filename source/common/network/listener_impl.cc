@@ -38,7 +38,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
      * the address returned by getOriginalDst() match the listener address. In this case the
      * listener handles the connection directly and does not hand it off.
      */
-    if (listener->socket_.localAddress()->asString() != final_local_address->asString()) {
+    if (listener->socket_.localAddress() != final_local_address) {
       ListenerImpl* new_listener = dynamic_cast<ListenerImpl*>(
           listener->connection_handler_.findListenerByAddress(final_local_address));
 
@@ -61,8 +61,8 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       final_remote_address.reset(
           new Address::PipeInstance(reinterpret_cast<sockaddr_un*>(remote_addr)));
     }
-
-    listener->newConnection(fd, final_remote_address, final_local_address);
+           final_local_address->asString().c_str());
+           listener->newConnection(fd, final_remote_address, final_local_address);
   }
 }
 
