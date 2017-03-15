@@ -21,3 +21,24 @@ available to turn on debug builds, address sanitizer, etc.).
 * :repo:`CMakeLists.txt`
 * :repo:`common.cmake`
 * :repo:`thirdparty.cmake`
+
+(Experimental) Building with Bazel_
+
+Follow the instruction_ to install Bazel, then run following command to build Envoy:
+
+.. code-block:: console
+
+  bazel build //:envoy
+
+The built binary will be at `bazel-bin/envoy`
+
+To run tests, run following command:
+
+.. code-block:: console
+
+  bazel test //:envoy-test
+
+Note not all tests pass with Bazel yet.
+
+.. _Bazel: https://bazel.build/
+.. _instruction: https://bazel.build/versions/master/docs/install.html
