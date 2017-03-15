@@ -1,0 +1,9 @@
+bind(
+    name = "googletest_main",
+    actual = "//ci/prebuilt:googletest_main"
+)
+
+bind(
+    name = "spdlog",
+    actual = "//ci/prebuilt:spdlog"
+)

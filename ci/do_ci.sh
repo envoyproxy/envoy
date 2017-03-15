@@ -6,6 +6,26 @@ set -e
 
 echo "building using $NUM_CPUS CPUs"
 
+if [[ "$1" == "bazel.debug" ]]; then
+  echo "debug bazel build with tests..."
+  cd ci
+  ln -sf /thirdparty prebuilt
+  ln -sf /thirdparty_build prebuilt
+  # Not sandboxing, since non-privileged Docker can't do nested namespaces.
+  echo "Building..."
+  export CC=gcc-4.9
+  export CXX=g++-4.9
+  TEST_TMPDIR=/source/build USER=bazel bazel build --strategy=CppCompile=standalone \
+    --strategy=CppLink=standalone --verbose_failures --package_path %workspace%:.. \
+    //source/...
+  echo "Testing..."
+  TEST_TMPDIR=/source/build USER=bazel bazel test --strategy=CppCompile=standalone \
+    --strategy=CppLink=standalone --strategy=TestRunner=standalone \
+    --verbose_failures --test_output=all --package_path %workspace%:.. \
+    //test/...
+  exit 0
+fi
+
 . "$(dirname "$0")"/build_setup.sh
 
 if [[ "$1" == "fix_format" ]]; then
