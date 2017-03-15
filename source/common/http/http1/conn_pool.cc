@@ -264,7 +264,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.conn_connect_ms_ =
       parent_.host_->cluster().stats().upstream_cx_connect_ms_.allocateSpan();
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(parent_.dispatcher_);
-  data.connection_->setReadBufferLimit(parent_.host_->cluster().perConnectionBufferLimitBytes());
   real_host_description_ = data.host_description_;
   codec_client_ = parent_.createCodecClient(data);
   codec_client_->addConnectionCallbacks(*this);

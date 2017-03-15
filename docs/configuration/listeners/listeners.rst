@@ -55,7 +55,7 @@ use_original_dst
 
 per_connection_buffer_limit_bytes
   *(optional, integer)* Soft limit on size of the listener's new connection read and write buffers.
-  If unspecified, an implementation defined default is applied (1MB).
+  If unspecified, an implementation defined default is applied (1MiB).
 
 .. toctree::
   :hidden:

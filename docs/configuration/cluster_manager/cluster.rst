@@ -40,7 +40,7 @@ connect_timeout_ms
 
 per_connection_buffer_limit_bytes
   *(optional, integer)* Soft limit on size of the cluster's connections read and write buffers.
-  If unspecified, an implementation defined default is applied (1MB).
+  If unspecified, an implementation defined default is applied (1MiB).
 
 lb_type
   *(required, string)* The :ref:`load balancer type <arch_overview_load_balancing_types>` to use

@@ -27,15 +27,16 @@ Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatc
   return {createConnection(dispatcher, *cluster_, address_), shared_from_this()};
 }
 
-Network::ClientConnectionPtr HostImpl::createConnection(Event::Dispatcher& dispatcher,
-                                                        const ClusterInfo& cluster,
-                                                        Network::Address::InstancePtr address) {
-  if (cluster.sslContext()) {
-    return Network::ClientConnectionPtr{
-        dispatcher.createSslClientConnection(*cluster.sslContext(), address)};
-  } else {
-    return Network::ClientConnectionPtr{dispatcher.createClientConnection(address)};
+Network::ClientConnectionPtr
+HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+                           Network::Address::InstancePtr address) const {
+  Network::ClientConnectionPtr connection =
+      cluster.sslContext() ? dispatcher.createSslClientConnection(*cluster.sslContext(), address)
+                           : dispatcher.createClientConnection(address);
+  if (cluster_) {
+    connection->setReadBufferLimit(cluster_->perConnectionBufferLimitBytes());
   }
+  return connection;
 }
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(100U, new_weight)); }
