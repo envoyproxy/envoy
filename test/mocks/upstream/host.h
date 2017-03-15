@@ -84,6 +84,13 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_};
   }
 
+  // XXX: mock me
+  CreateConnectionData createConnectionWithNewPort(uint16_t,
+                                                   Event::Dispatcher& dispatcher) const override {
+    MockCreateConnectionData data = createConnection_(dispatcher);
+    return {Network::ClientConnectionPtr{data.connection_}, data.host_};
+  }
+
   void setOutlierDetector(Outlier::DetectorHostSinkPtr&& outlier_detector) override {
     setOutlierDetector_(outlier_detector);
   }

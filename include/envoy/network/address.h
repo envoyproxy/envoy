@@ -90,6 +90,12 @@ public:
   virtual const std::string& asString() const PURE;
 
   /**
+   * @param port
+   * @return returns the same address but bound on the given port.
+   */
+  virtual std::unique_ptr<Instance> withPort(uint16_t port) const PURE;
+
+  /**
    * Bind a socket to this address. The socket should have been created with a call to socket() on
    * this object.
    * @param fd supplies the platform socket handle.

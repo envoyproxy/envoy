@@ -76,6 +76,8 @@ public:
   // Upstream::Host
   std::list<Stats::CounterPtr> counters() const override { return stats_store_.counters(); }
   CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override;
+  CreateConnectionData createConnectionWithNewPort(uint16_t port,
+                                                   Event::Dispatcher& dispatcher) const override;
   std::list<Stats::GaugePtr> gauges() const override { return stats_store_.gauges(); }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
@@ -90,7 +92,8 @@ public:
 protected:
   static Network::ClientConnectionPtr createConnection(Event::Dispatcher& dispatcher,
                                                        const ClusterInfo& cluster,
-                                                       Network::Address::InstancePtr address);
+                                                       Network::Address::InstancePtr address,
+                                                       uint16_t port = 0);
 
 private:
   std::atomic<uint64_t> health_flags_{};

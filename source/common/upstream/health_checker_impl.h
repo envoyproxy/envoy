@@ -153,6 +153,7 @@ private:
                              const std::vector<HostPtr>& hosts_removed) override;
 
   const std::string path_;
+  const uint16_t port_;
   std::unordered_map<HostPtr, HttpActiveHealthCheckSessionPtr> active_sessions_;
   Optional<std::string> service_name_;
 };
