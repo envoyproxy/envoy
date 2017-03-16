@@ -134,26 +134,27 @@ typedef std::shared_ptr<const Instance> InstancePtr;
 InstancePtr parseInternetAddress(const std::string& ipAddr);
 
 /*
- * A range of internet addresses, consisting of an Ip address and a count of leading
- * bits included in the mask. Other than those leading bits, all of the other bits
- * of the Ip address are zero.
+ * A "Classless Inter-Domain Routing" range of internet addresses, aka a CIDR range, consisting
+ * of an Ip address and a count of leading bits included in the mask. Other than those leading
+ * bits, all of the other bits of the Ip address are zero. For more info, see RFC1519 or
+ * https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing.
  */
-class IpRange {
+class CidrRange {
 public:
   /**
    * Constructs an uninitialized range: length == -1, and there is no associated address.
    */
-  IpRange();
+  CidrRange();
 
   /**
-   * Copies an existing IpRange.
+   * Copies an existing CidrRange.
    */
-  IpRange(const IpRange& other);
+  CidrRange(const CidrRange& other);
 
   /**
    * Overwrites this with other.
    */
-  IpRange& operator=(const IpRange& other);
+  CidrRange& operator=(const CidrRange& other);
 
   /**
    * @return Ipv4 address data IFF length >= 0 and version() == IpVersion::v4, otherwise nullptr.
@@ -200,25 +201,25 @@ public:
   bool isValid() const { return length_ >= 0; }
 
   /**
-   * @return an IpRange instance with the specified address and length, modified so that
+   * @return an CidrRange instance with the specified address and length, modified so that
    * the only bits that might be non-zero are in the high-order length bits, and so that
    * length is in the appropriate range (0 to 32 for IPv4, 0 to 128 for IPv6). If the
    * the address or length is invalid, then the range will be invalid (i.e. length == -1).
    */
-  static IpRange construct(const InstancePtr& address, int length);
-  static IpRange construct(const std::string& address, int length);
+  static CidrRange construct(const InstancePtr& address, int length);
+  static CidrRange construct(const std::string& address, int length);
 
   /**
-   * Constructs an IpRange from a string with this format (same as returned
-   * by IpRange::asString above):
+   * Constructs an CidrRange from a string with this format (same as returned
+   * by CidrRange::asString above):
    *      <address>/<length>    e.g. "10.240.0.0/16" or "1234:5678::/64"
-   * @return an IpRange instance with the specified address and length if parsed successfully,
+   * @return an CidrRange instance with the specified address and length if parsed successfully,
    * else with no address and a length of -1.
    */
-  static IpRange construct(const std::string& range);
+  static CidrRange construct(const std::string& range);
 
 private:
-  IpRange(const InstancePtr& address, int length);
+  CidrRange(const InstancePtr& address, int length);
 
   InstancePtr address_;
   int length_;

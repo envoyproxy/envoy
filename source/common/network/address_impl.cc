@@ -160,9 +160,9 @@ InstancePtr parseInternetAddress(const std::string& ipAddr) {
   return nullptr;
 }
 
-IpRange::IpRange() : length_(-1) {}
+CidrRange::CidrRange() : length_(-1) {}
 
-IpRange::IpRange(const InstancePtr& address, int length) : address_(address), length_(length) {
+CidrRange::CidrRange(const InstancePtr& address, int length) : address_(address), length_(length) {
   // This is a private ctor, so only checking these asserts in debug builds.
   if (address_ == nullptr) {
     ASSERT(length_ == -1);
@@ -172,45 +172,45 @@ IpRange::IpRange(const InstancePtr& address, int length) : address_(address), le
   }
 }
 
-IpRange::IpRange(const IpRange& other) : address_(other.address_), length_(other.length_) {}
+CidrRange::CidrRange(const CidrRange& other) : address_(other.address_), length_(other.length_) {}
 
-IpRange& IpRange::operator=(const IpRange& other) {
+CidrRange& CidrRange::operator=(const CidrRange& other) {
   address_ = other.address_;
   length_ = other.length_;
   return *this;
 }
 
-const Ipv4* IpRange::ipv4() const {
+const Ipv4* CidrRange::ipv4() const {
   if (address_ != nullptr) {
     return address_->ip()->ipv4();
   }
   return nullptr;
 }
 
-const Ipv6* IpRange::ipv6() const {
+const Ipv6* CidrRange::ipv6() const {
   if (address_ != nullptr) {
     return address_->ip()->ipv6();
   }
   return nullptr;
 }
 
-int IpRange::length() const { return length_; }
+int CidrRange::length() const { return length_; }
 
-IpVersion IpRange::version() const {
+IpVersion CidrRange::version() const {
   if (address_ != nullptr) {
     return address_->ip()->version();
   }
   return IpVersion::v4;
 }
 
-bool IpRange::isInRange(const InstancePtr& address) const {
+bool CidrRange::isInRange(const InstancePtr& address) const {
   if (address == nullptr || length_ < 0 || address->type() != Type::Ip ||
       address->ip()->version() != version()) {
     return false;
   }
-  // Make an IpRange from the address, of the same length as this. If the two ranges have
+  // Make an CidrRange from the address, of the same length as this. If the two ranges have
   // the same address, then the address is in this range.
-  IpRange other = construct(address, length_);
+  CidrRange other = construct(address, length_);
   ASSERT(length() == other.length());
   ASSERT(version() == other.version());
   if (version() == IpVersion::v4) {
@@ -220,7 +220,7 @@ bool IpRange::isInRange(const InstancePtr& address) const {
   }
 }
 
-std::string IpRange::asString() const {
+std::string CidrRange::asString() const {
   if (address_ == nullptr) {
     return "/-1";
   } else {
@@ -293,16 +293,16 @@ InstancePtr truncateIpAddressAndLength(const InstancePtr& address, int* length_i
   return nullptr; // UNREACHED
 }
 
-IpRange IpRange::construct(const InstancePtr& address, int length) {
+CidrRange CidrRange::construct(const InstancePtr& address, int length) {
   InstancePtr ptr = truncateIpAddressAndLength(address, &length);
-  return IpRange(ptr, length);
+  return CidrRange(ptr, length);
 }
 
-IpRange IpRange::construct(const std::string& address, int length) {
+CidrRange CidrRange::construct(const std::string& address, int length) {
   return construct(parseInternetAddress(address), length);
 }
 
-IpRange IpRange::construct(const std::string& range) {
+CidrRange CidrRange::construct(const std::string& range) {
   std::vector<std::string> parts = StringUtil::split(range, '/');
   if (parts.size() == 2) {
     InstancePtr ptr = parseInternetAddress(parts[0]);
@@ -316,7 +316,7 @@ IpRange IpRange::construct(const std::string& range) {
       }
     }
   }
-  return IpRange(nullptr, -1);
+  return CidrRange(nullptr, -1);
 }
 
 } // Address
