@@ -15,14 +15,14 @@ if [[ "$1" == "bazel.debug" ]]; then
   echo "Building..."
   export CC=gcc-4.9
   export CXX=g++-4.9
-  TEST_TMPDIR=/source/build USER=bazel bazel build --strategy=CppCompile=standalone \
-    --strategy=CppLink=standalone --verbose_failures --package_path %workspace%:.. \
-    //source/...
+  export USER=bazel
+  export TEST_TMPDIR=/source
+  BAZEL_OPTIONS="--strategy=CppCompile=standalone --strategy=CppLink=standalone \
+    --strategy=TestRunner=standalone --verbose_failures --package_path %workspace%:.."
+  [[ "$BAZEL_INTERACTIVE" == "1" ]] && BAZEL_BATCH="" || BAZEL_BATCH="--batch"
+  bazel $BAZEL_BATCH build $BAZEL_OPTIONS //source/...
   echo "Testing..."
-  TEST_TMPDIR=/source/build USER=bazel bazel test --strategy=CppCompile=standalone \
-    --strategy=CppLink=standalone --strategy=TestRunner=standalone \
-    --verbose_failures --test_output=all --package_path %workspace%:.. \
-    //test/...
+  bazel $BAZEL_BATCH test $BAZEL_OPTIONS --test_output=all //test/...
   exit 0
 fi
 
