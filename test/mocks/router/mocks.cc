@@ -46,6 +46,7 @@ MockHashPolicy::~MockHashPolicy() {}
 
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
+  ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
   ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(retry_policy_));
   ON_CALL(*this, shadowPolicy()).WillByDefault(ReturnRef(shadow_policy_));
