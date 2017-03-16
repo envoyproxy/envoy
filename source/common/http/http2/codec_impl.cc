@@ -1,13 +1,17 @@
 #include "codec_impl.h"
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
 #include "common/common/assert.h"
+#include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 
 namespace Http {
 namespace Http2 {
@@ -28,6 +32,9 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
 ConnectionImpl::Http2Options ConnectionImpl::http2_options_;
+const std::unique_ptr<const Http::HeaderMap> ConnectionImpl::CONTINUE_HEADER{
+    new Http::HeaderMapImpl{
+        {Http::Headers::get().Status, std::to_string(enumToInt(Code::Continue))}}};
 
 /**
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
@@ -39,7 +46,8 @@ template <typename T> static T* remove_const(const void* object) {
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent)
     : parent_(parent), headers_(new HeaderMapImpl()), local_end_stream_(false),
-      local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false) {}
+      local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
+      waiting_for_non_informational_headers_(false) {}
 
 ConnectionImpl::StreamImpl::~StreamImpl() {}
 
@@ -283,17 +291,63 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       stream->headers_->addViaMove(std::move(key), std::move(stream->cookies_));
     }
 
-    if (frame->headers.cat == NGHTTP2_HCAT_REQUEST || frame->headers.cat == NGHTTP2_HCAT_RESPONSE) {
-      stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
-    } else {
-      ASSERT(frame->headers.cat == NGHTTP2_HCAT_HEADERS);
-      ASSERT(stream->remote_end_stream_);
+    if (frame->headers.cat == NGHTTP2_HCAT_REQUEST && stream->headers_->Expect() &&
+        0 == StringUtil::caseInsensitiveCompare(stream->headers_->Expect()->value().c_str(),
+                                                Headers::get().ExpectValues._100Continue.c_str())) {
+      // Deal with expect: 100-continue here since higher layers are never going to do anything
+      // other than say to continue so that we can respond before request complete if necessary.
+      std::vector<nghttp2_nv> final_headers;
+      StreamImpl::buildHeaders(final_headers, *CONTINUE_HEADER);
+      int rc = nghttp2_submit_headers(session_, 0, stream->stream_id_, nullptr, &final_headers[0],
+                                      final_headers.size(), nullptr);
+      ASSERT(rc == 0);
+      UNREFERENCED_PARAMETER(rc);
 
-      // It's possible that we are waiting to send a deferred reset, so only raise trailers if local
-      // is not complete.
-      if (!stream->deferred_reset_.valid()) {
-        stream->decoder_->decodeTrailers(std::move(stream->headers_));
+      stream->headers_->removeExpect();
+    }
+
+    switch (frame->headers.cat) {
+    case NGHTTP2_HCAT_RESPONSE: {
+      if (CodeUtility::is1xx(Http::Utility::getResponseStatus(*stream->headers_))) {
+        stream->waiting_for_non_informational_headers_ = true;
       }
+
+      // Fall through.
+    }
+
+    case NGHTTP2_HCAT_REQUEST: {
+      stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
+      break;
+    }
+
+    case NGHTTP2_HCAT_HEADERS: {
+      // It's possible that we are waiting to send a deferred reset, so only raise headers/trailers
+      // if local is not complete.
+      if (!stream->deferred_reset_.valid()) {
+        if (!stream->waiting_for_non_informational_headers_) {
+          ASSERT(stream->remote_end_stream_);
+          stream->decoder_->decodeTrailers(std::move(stream->headers_));
+        } else {
+          ASSERT(!nghttp2_session_check_server_session(session_));
+          stream->waiting_for_non_informational_headers_ = false;
+
+          // This can only happen in the client case in a response, when we received a 1xx to
+          // start out with. In this case, raise as headers. nghttp2 message checking guarantees
+          // proper flow here.
+          // TODO(mattklein123): Higher layers don't currently deal with a double decodeHeaders()
+          // call and will probably crash. We do this in the client path for testing when the server
+          // responds with 1xx. In the future, if needed, we can properly handle 1xx in higher layer
+          // code, or just eat it.
+          stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
+        }
+      }
+
+      break;
+    }
+
+    default:
+      // We do not currently support push.
+      NOT_IMPLEMENTED;
     }
 
     stream->headers_.reset();

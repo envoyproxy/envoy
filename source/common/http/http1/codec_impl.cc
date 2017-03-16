@@ -393,9 +393,8 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
     const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
     headers->insertMethod().value(method_string, strlen(method_string));
 
-    // Deal with expect: 100-continue here since a) only HTTP/1.1 has this, b) higher layers are
-    // never going to do anything other than say to continue since we can response before request
-    // complete if necessary.
+    // Deal with expect: 100-continue here since higher layers are never going to do anything other
+    // than say to continue so that we can respond before request complete if necessary.
     if (headers->Expect() &&
         0 == StringUtil::caseInsensitiveCompare(headers->Expect()->value().c_str(),
                                                 Headers::get().ExpectValues._100Continue.c_str())) {

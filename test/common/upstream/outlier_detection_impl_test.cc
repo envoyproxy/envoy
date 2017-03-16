@@ -77,6 +77,7 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
   )EOF";
 
   Json::ObjectPtr custom_config = Json::Factory::LoadFromString(json);
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100)));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
       cluster_, *custom_config, dispatcher_, runtime_, time_source_, event_logger_));
 

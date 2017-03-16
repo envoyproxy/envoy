@@ -55,7 +55,7 @@ SharedMemory& SharedMemory::initialize(Options& options) {
   }
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
-  // initialized. The startup logic is quite compicated, and it's not worth trying to handle this
+  // initialized. The startup logic is quite complicated, and it's not worth trying to handle this
   // in a finer way. This will cause the startup to fail with an error code early, without
   // affecting any currently running processes. The process runner should try again later with some
   // back off and with the same hot restart epoch number.

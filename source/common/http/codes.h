@@ -62,6 +62,7 @@ public:
    */
   static const char* toString(Code code);
 
+  static bool is1xx(uint64_t code) { return code >= 100 && code < 200; }
   static bool is2xx(uint64_t code) { return code >= 200 && code < 300; }
   static bool is3xx(uint64_t code) { return code >= 300 && code < 400; }
   static bool is4xx(uint64_t code) { return code >= 400 && code < 500; }
