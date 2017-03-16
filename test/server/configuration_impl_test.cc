@@ -151,7 +151,7 @@ TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
   {
     "listeners" : [
       {
-        "port" : 1234,
+        "address": "tcp://127.0.0.1:1234",
         "filters" : [],
         "ssl_context" : {
           "cert_chain_file" : "test/common/ssl/test_data/approved_with_uri_san.crt",
