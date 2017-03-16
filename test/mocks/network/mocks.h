@@ -219,7 +219,8 @@ public:
   MOCK_METHOD4(addSslListener, void(Network::FilterChainFactory& factory,
                                     Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
                                     const Network::ListenerOptions& listener_options));
-  MOCK_METHOD1(findListenerByAddress, Network::Listener*(Network::Address::InstancePtr address));
+  MOCK_METHOD1(findListenerByAddress,
+               Network::Listener*(const Network::Address::InstancePtr& address));
   MOCK_METHOD0(closeListeners, void());
 };
 

@@ -110,7 +110,7 @@ public:
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool fail) override;
-  int getListenSocketFd(std::string address) override;
+  int getListenSocketFd(const std::string& address) override;
   void getParentStats(HotRestart::GetParentStatsInfo& info) override;
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }

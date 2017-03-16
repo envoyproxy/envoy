@@ -78,13 +78,13 @@ ConnectionHandlerImpl::SslActiveListener::SslActiveListener(
                      factory, socket.localAddress()->asString()) {}
 
 Network::Listener*
-ConnectionHandlerImpl::findListenerByAddress(Network::Address::InstancePtr address) {
+ConnectionHandlerImpl::findListenerByAddress(const Network::Address::InstancePtr& address) {
   // This is a linear operation, may need to add a map<address, listener> to improve performance.
   // However, linear performance might be adequate since the number of listeners is small.
   auto listener =
       std::find_if(listeners_.begin(), listeners_.end(),
                    [address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
-                     return p.first->type() == Network::Address::Type::Ip && p.first == address;
+                     return p.first->type() == Network::Address::Type::Ip && *(p.first) == *address;
                    });
 
   // If there is exact address match, return the corresponding listener.
@@ -93,6 +93,7 @@ ConnectionHandlerImpl::findListenerByAddress(Network::Address::InstancePtr addre
   }
 
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
+  // TODO(wattli): consolidate with previous search for more efficiency.
   listener =
       std::find_if(listeners_.begin(), listeners_.end(),
                    [address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {

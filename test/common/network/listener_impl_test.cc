@@ -143,7 +143,7 @@ TEST(ListenerImplTest, FallbackToWildcardListener) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-TEST(ListenerImplTest, UseOriginalDst) {
+TEST(ListenerImplTest, UseActualDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket("tcp://127.0.0.1:10000", true);
@@ -171,6 +171,7 @@ TEST(ListenerImplTest, UseOriginalDst) {
       .WillRepeatedly(Return(&listener));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(1);
+  EXPECT_CALL(listenerDst, newConnection(_, _, _)).Times(0);
   EXPECT_CALL(listener_callbacks1, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         client_connection->close(ConnectionCloseType::NoFlush);

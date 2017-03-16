@@ -122,5 +122,7 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
       }));
   handler.addListener(factory, socket2, Network::ListenerOptions::listenerOptionsWithBindToPort());
 
+  EXPECT_EQ(listener, handler.findListenerByAddress(alt_address));
+  EXPECT_EQ(listener2, handler.findListenerByAddress(alt_address2));
   EXPECT_EQ(listener2, handler.findListenerByAddress(alt_address3));
 }

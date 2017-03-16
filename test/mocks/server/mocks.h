@@ -69,7 +69,7 @@ public:
 
   // Server::HotRestart
   MOCK_METHOD0(drainParentListeners, void());
-  MOCK_METHOD1(duplicateParentListenSocket, int(std::string address));
+  MOCK_METHOD1(duplicateParentListenSocket, int(const std::string& address));
   MOCK_METHOD1(getParentStats, void(GetParentStatsInfo& info));
   MOCK_METHOD2(initialize, void(Event::Dispatcher& dispatcher, Server::Instance& server));
   MOCK_METHOD1(shutdownParentAdmin, void(ShutdownParentAdminInfo& info));
@@ -98,7 +98,7 @@ public:
   MOCK_METHOD0(drainManager, DrainManager&());
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD1(failHealthcheck, void(bool fail));
-  MOCK_METHOD1(getListenSocketFd, int(std::string address));
+  MOCK_METHOD1(getListenSocketFd, int(const std::string& address));
   MOCK_METHOD1(getParentStats, void(HotRestart::GetParentStatsInfo&));
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());

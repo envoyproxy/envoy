@@ -86,7 +86,7 @@ public:
    * @param address supplies the address to look up.
    * @return the fd or -1 if there is no listening socket for the address.
    */
-  virtual int getListenSocketFd(std::string address) PURE;
+  virtual int getListenSocketFd(const std::string& address) PURE;
 
   /**
    * Fetch server stats specific to this process vs. global shared stats in a hot restart scenario.

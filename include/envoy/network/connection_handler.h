@@ -42,7 +42,8 @@ public:
    * @return a pointer to the listener or nullptr if not found.
    * Ownership of the listener is NOT transferred
    */
-  virtual Network::Listener* findListenerByAddress(Network::Address::InstancePtr address) PURE;
+  virtual Network::Listener*
+  findListenerByAddress(const Network::Address::InstancePtr& address) PURE;
 
   /**
    * Close and destroy all listeners.

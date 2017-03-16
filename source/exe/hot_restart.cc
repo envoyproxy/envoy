@@ -164,7 +164,7 @@ void HotRestartImpl::drainParentListeners() {
   shmem_.flags_ &= ~SharedMemory::Flags::INITIALIZING;
 }
 
-int HotRestartImpl::duplicateParentListenSocket(std::string address) {
+int HotRestartImpl::duplicateParentListenSocket(const std::string& address) {
   if (options_.restartEpoch() == 0) {
     return -1;
   }
@@ -173,7 +173,7 @@ int HotRestartImpl::duplicateParentListenSocket(std::string address) {
   if (address.length() >= sizeof(rpc.address_)) {
     return -1;
   }
-  memcpy(rpc.address_, address.c_str(), address.length() + 1);
+  StringUtil::strlcpy(rpc.address_, address.c_str(), address.length());
   sendMessage(parent_address_, rpc);
   RpcGetListenSocketReply* reply =
       receiveTypedRpc<RpcGetListenSocketReply, RpcMessageType::GetListenSocketReply>();

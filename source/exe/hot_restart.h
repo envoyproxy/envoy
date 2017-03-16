@@ -107,7 +107,7 @@ public:
 
   // Server::HotRestart
   void drainParentListeners() override;
-  int duplicateParentListenSocket(std::string address) override;
+  int duplicateParentListenSocket(const std::string& address) override;
   void getParentStats(GetParentStatsInfo& info) override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   void shutdownParentAdmin(ShutdownParentAdminInfo& info) override;

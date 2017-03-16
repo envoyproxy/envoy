@@ -135,10 +135,9 @@ void InstanceImpl::flushStats() {
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
-int InstanceImpl::getListenSocketFd(std::string address) {
+int InstanceImpl::getListenSocketFd(const std::string& address) {
   Network::Address::InstancePtr addr = Network::Utility::resolveUrl(address);
   for (const auto& entry : socket_map_) {
-    // TODO(mattklein123): UDS listeners.
     if (entry.second->localAddress()->asString() == addr->asString()) {
       return entry.second->fd();
     }
