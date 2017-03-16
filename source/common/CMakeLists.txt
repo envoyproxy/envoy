@@ -77,6 +77,7 @@ add_library(
   mongo/proxy.cc
   mongo/utility.cc
   network/address_impl.cc
+  network/cidr_range.cc
   network/connection_impl.cc
   network/dns_impl.cc
   network/filter_manager_impl.cc

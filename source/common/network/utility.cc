@@ -178,6 +178,18 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
   return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
 }
 
+Address::InstancePtr Utility::getIpv4AnyAddress() {
+  // Initialized on first call in a thread-safe manner.
+  static Address::InstancePtr any(new Address::Ipv4Instance(static_cast<uint32_t>(0)));
+  return any;
+}
+
+Address::InstancePtr Utility::getIpv6AnyAddress() {
+  // Initialized on first call in a thread-safe manner.
+  static Address::InstancePtr any(new Address::Ipv6Instance(static_cast<uint32_t>(0)));
+  return any;
+}
+
 Address::InstancePtr Utility::getOriginalDst(int fd) {
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
