@@ -52,10 +52,26 @@ outlier_detection.max_ejection_percent
   <config_cluster_manager_cluster_outlier_detection_max_ejection_percent>`
   setting in outlier detection
 
-outlier_detection.enforcing
-  :ref:`enforcing
-  <config_cluster_manager_cluster_outlier_detection_enforcing>`
+outlier_detection.enforcing_consecutive_5xx
+  :ref:`enforcing_consecutive_5xx
+  <config_cluster_manager_cluster_outlier_detection_enforcing_consecutive_5xx>`
   setting in outlier detection
+
+outlier_detection.enforcing_sr
+  :ref:`enforcing_sr
+  <config_cluster_manager_cluster_outlier_detection_enforcing_sr>`
+  setting in outlier detection
+
+outlier_detection.significant_host_threshold
+  :ref:`significant_host_threshold
+  <config_cluster_manager_cluster_outlier_detection_significant_host_threshold>`
+  setting in outlier detection
+
+outlier_detection.rq_volume_threshold
+  :ref:`rq_volume_threshold
+  <config_cluster_manager_cluster_outlier_detection_rq_volume_threshold>`
+  setting in outlier detection
+
 
 Core
 ----

@@ -1109,7 +1109,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "maximum" : 100
           },
-          "enforcing" : {
+          "enforcing_consecutive_5xx" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          },
+          "enforcing_sr" : {
             "type" : "integer",
             "minimum" : 0,
             "maximum" : 100

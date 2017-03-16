@@ -163,11 +163,32 @@ outlier_detection
   max_ejection_percent
     The maximum % of an upstream cluster that can be ejected due to outlier detection. Defaults to 10%.
 
-  .. _config_cluster_manager_cluster_outlier_detection_enforcing:
+  .. _config_cluster_manager_cluster_outlier_detection_enforcing_consecutive_5xx:
 
-  enforcing
-    The % chance that a host will be actually ejected when an outlier status is detected. This setting
-    can be used to disable ejection or to ramp it up slowly. Defaults to 100.
+  enforcing_consecutive_5xx
+    The % chance that a host will be actually ejected when an outlier status is detected through
+    consecutive 5xx. This setting can be used to disable ejection or to ramp it up slowly. Defaults to 100.
+
+  .. _config_cluster_manager_cluster_outlier_detection_enforcing_sr:
+
+  enforcing_sr
+    The % chance that a host will be actually ejected when an outlier status is detected through
+    success rate statistics. This setting can be used to disable ejection or to ramp it up slowly.
+    Defaults to 100.
+
+  .. _config_cluster_manager_cluster_outlier_detection_significant_host_threshold:
+
+  significant_host_threshold
+    The number of hosts in a cluster that must have enough request volume to detect success rate outliers.
+    If the number of hosts is less than this setting, outlier detection via success rate statistics is not
+    performed for any host in the cluster. Defaults to 5.
+
+  .. _config_cluster_manager_cluster_outlier_detection_rq_volume_threshold:
+
+  rq_volume_threshold:
+    The number of total requests that must be collected in one interval to include this host in success rate
+    based outlier detection. If the volume is lower than this setting, outlier detection via success rate
+    statistics is not performed for that host. Defaults to 100.
 
   Each of the above configuration values can be overridden via 
   :ref:`runtime values <config_cluster_manager_cluster_runtime_outlier_detection>`.

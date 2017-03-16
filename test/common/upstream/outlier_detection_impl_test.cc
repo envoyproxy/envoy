@@ -51,12 +51,16 @@ public:
 class OutlierDetectorImplTest : public testing::Test {
 public:
   OutlierDetectorImplTest() {
-    ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing", 100))
+    ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
+        .WillByDefault(Return(true));
+    ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_sr", 100))
         .WillByDefault(Return(true));
   }
 
   NiceMock<MockCluster> cluster_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Event
+
+           ::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* interval_timer_ = new Event::MockTimer(&dispatcher_);
   CallbackChecker checker_;
@@ -72,7 +76,8 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
     "base_ejection_time_ms" : 10000,
     "consecutive_5xx" : 10,
     "max_ejection_percent" : 50,
-    "enforcing" : 10
+    "enforcing_consecutive_5xx" : 10,
+    "enforcing_sr": 20
   }
   )EOF";
 
@@ -84,7 +89,8 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
   EXPECT_EQ(10000UL, detector->config().baseEjectionTimeMs());
   EXPECT_EQ(10UL, detector->config().consecutive5xx());
   EXPECT_EQ(50UL, detector->config().maxEjectionPercent());
-  EXPECT_EQ(10UL, detector->config().enforcing());
+  EXPECT_EQ(10UL, detector->config().enforcingConsecutive5xx());
+  EXPECT_EQ(20UL, detector->config().enforcingSR());
 }
 
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
@@ -302,7 +308,7 @@ TEST_F(OutlierDetectorImplTest, NotEnforcing) {
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
 
-  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing", 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
       .WillByDefault(Return(false));
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
   EXPECT_FALSE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));

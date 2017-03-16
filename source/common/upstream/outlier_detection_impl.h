@@ -140,18 +140,20 @@ public:
   uint64_t baseEjectionTimeMs() { return base_ejection_time_ms_; }
   uint64_t consecutive5xx() { return consecutive_5xx_; }
   uint64_t maxEjectionPercent() { return max_ejection_percent_; }
-  uint64_t enforcing() { return enforcing_; }
   uint64_t significantHostThreshold() { return significant_host_threshold_; }
   uint64_t rqVolumeThreshold() { return rq_volume_threshold_; }
+  uint64_t enforcingConsecutive5xx() { return enforcing_consecutive_5xx_; }
+  uint64_t enforcingSR() { return enforcing_sr_; }
 
 private:
   const uint64_t interval_ms_;
   const uint64_t base_ejection_time_ms_;
   const uint64_t consecutive_5xx_;
   const uint64_t max_ejection_percent_;
-  const uint64_t enforcing_;
   const uint64_t significant_host_threshold_;
   const uint64_t rq_volume_threshold_;
+  const uint64_t enforcing_consecutive_5xx_;
+  const uint64_t enforcing_sr_;
 };
 
 /**
@@ -188,6 +190,7 @@ private:
   void onIntervalTimer();
   void runCallbacks(HostPtr host);
   double srEjectionThreshold(double sr_sum, std::vector<double>& sr_data);
+  bool enforceEjection(EjectionType type);
 
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;

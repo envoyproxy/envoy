@@ -64,11 +64,13 @@ DetectorConfig::DetectorConfig(const Json::Object& json_config)
       consecutive_5xx_(static_cast<uint64_t>(json_config.getInteger("consecutive_5xx", 5))),
       max_ejection_percent_(
           static_cast<uint64_t>(json_config.getInteger("max_ejection_percent", 10))),
-      enforcing_(static_cast<uint64_t>(json_config.getInteger("enforcing", 100))),
       significant_host_threshold_(
           static_cast<uint64_t>(json_config.getInteger("significant_host_threshold", 5))),
       rq_volume_threshold_(
-          static_cast<uint64_t>(json_config.getInteger("rq_volume_threshold", 100))) {}
+          static_cast<uint64_t>(json_config.getInteger("rq_volume_threshold", 100))),
+      enforcing_consecutive_5xx_(
+          static_cast<uint64_t>(json_config.getInteger("enforcing_consecutive_5xx", 100))),
+      enforcing_sr_(static_cast<uint64_t>(json_config.getInteger("enforcing_sr", 100))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
@@ -155,6 +157,19 @@ void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink,
   }
 }
 
+bool DetectorImpl::enforceEjection(EjectionType type) {
+  switch (type) {
+  case EjectionType::Consecutive5xx:
+    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_consecutive_5xx",
+                                              config_.enforcingConsecutive5xx());
+  case EjectionType::SuccessRate:
+    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_sr",
+                                              config_.enforcingSR());
+  }
+
+  NOT_IMPLEMENTED;
+}
+
 void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
@@ -162,7 +177,7 @@ void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
   double ejected_percent = 100.0 * stats_.ejections_active_.value() / host_sinks_.size();
   if (ejected_percent < max_ejection_percent) {
     stats_.ejections_total_.inc();
-    if (runtime_.snapshot().featureEnabled("outlier_detection.enforcing", config_.enforcing())) {
+    if (enforceEjection(type)) {
       stats_.ejections_active_.inc();
       host_sinks_[host]->eject(time_source_.currentSystemTime());
       runCallbacks(host);
