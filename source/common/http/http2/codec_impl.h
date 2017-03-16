@@ -157,7 +157,7 @@ protected:
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
     bool data_deferred_ : 1;
-    bool waiting_for_final_headers_ : 1;
+    bool waiting_for_non_informational_headers_ : 1;
   };
 
   typedef std::unique_ptr<StreamImpl> StreamImplPtr;

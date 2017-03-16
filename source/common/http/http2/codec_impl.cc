@@ -47,7 +47,7 @@ template <typename T> static T* remove_const(const void* object) {
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent)
     : parent_(parent), headers_(new HeaderMapImpl()), local_end_stream_(false),
       local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
-      waiting_for_final_headers_(false) {}
+      waiting_for_non_informational_headers_(false) {}
 
 ConnectionImpl::StreamImpl::~StreamImpl() {}
 
@@ -308,9 +308,8 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     switch (frame->headers.cat) {
     case NGHTTP2_HCAT_RESPONSE: {
-      uint64_t response_code = Http::Utility::getResponseStatus(*stream->headers_);
-      if (CodeUtility::is1xx(response_code)) {
-        stream->waiting_for_final_headers_ = true;
+      if (CodeUtility::is1xx(Http::Utility::getResponseStatus(*stream->headers_))) {
+        stream->waiting_for_non_informational_headers_ = true;
       }
 
       // Fall through.
@@ -325,20 +324,20 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       // It's possible that we are waiting to send a deferred reset, so only raise headers/trailers
       // if local is not complete.
       if (!stream->deferred_reset_.valid()) {
-        if (!stream->waiting_for_final_headers_) {
+        if (!stream->waiting_for_non_informational_headers_) {
           ASSERT(stream->remote_end_stream_);
           stream->decoder_->decodeTrailers(std::move(stream->headers_));
         } else {
           ASSERT(!nghttp2_session_check_server_session(session_));
-          stream->waiting_for_final_headers_ = false;
+          stream->waiting_for_non_informational_headers_ = false;
 
           // This can only happen in the client case in a response, when we received a 1xx to
           // start out with. In this case, raise as headers. nghttp2 message checking guarantees
           // proper flow here.
           // TODO(mattklein123): Higher layers don't currently deal with a double decodeHeaders()
-          // call and will probably crash. We do this for testing the server case. We correctly
-          // handle the server case. In the future, if needed, we can properly handle 1xx in higher
-          // layer code, or just eat it.
+          // call and will probably crash. We do this in the client path for testing when the server
+          // responds with 1xx. In the future, if needed, we can properly handle 1xx in higher layer
+          // code, or just eat it.
           stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
         }
       }
