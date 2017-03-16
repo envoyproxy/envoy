@@ -1037,6 +1037,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
+      "per_connection_buffer_limit_bytes" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
       "lb_type" : {
         "type" : "string",
         "enum" : ["round_robin", "least_request", "random", "ring_hash"]

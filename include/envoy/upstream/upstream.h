@@ -222,6 +222,11 @@ public:
   virtual std::chrono::milliseconds connectTimeout() const PURE;
 
   /**
+   * @return soft limit on size of the cluster's connections read and write buffers.
+   */
+  virtual uint32_t perConnectionBufferLimitBytes() const PURE;
+
+  /**
    * @return uint64_t features supported by the cluster. @see Features.
    */
   virtual uint64_t features() const PURE;

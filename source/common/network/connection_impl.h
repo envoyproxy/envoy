@@ -64,6 +64,7 @@ public:
   State state() override;
   void write(Buffer::Instance& data) override;
   void setReadBufferLimit(uint32_t limit) override { read_buffer_limit_ = limit; }
+  uint32_t readBufferLimit() const override { return read_buffer_limit_; }
 
   // Network::BufferSource
   Buffer::Instance& getReadBuffer() override { return read_buffer_; }
