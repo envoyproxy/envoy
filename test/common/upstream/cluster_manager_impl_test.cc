@@ -319,6 +319,34 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   factory_.tls_.shutdownThread();
 }
 
+/**
+ * Test that buffer limits are set on new TCP connections.
+ */
+TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "per_connection_buffer_limit_bytes": 8192,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    }]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  create(*loader);
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setReadBufferLimit(8192));
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_)).WillOnce(Return(connection));
+  auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1");
+  EXPECT_EQ(connection, conn_data.connection_.get());
+  factory_.tls_.shutdownThread();
+}
+
 TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   std::string json = R"EOF(
   {
