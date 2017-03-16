@@ -61,8 +61,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       final_remote_address.reset(
           new Address::PipeInstance(reinterpret_cast<sockaddr_un*>(remote_addr)));
     }
-           final_local_address->asString().c_str());
-           listener->newConnection(fd, final_remote_address, final_local_address);
+    listener->newConnection(fd, final_remote_address, final_local_address);
   }
 }
 

@@ -46,9 +46,9 @@ public:
   virtual const std::string& addressAsString() const PURE;
 
   /**
-   * @return whether this addrss is wild card, i.e., '0.0.0.0'.
+   * @return whether this adderss is wild card, i.e., '0.0.0.0'.
    */
-  virtual bool isWildcard() const PURE;
+  virtual bool isAnyAddress() const PURE;
 
   /**
    * @return Ipv4 address data IFF type() == IpVersion::v4, otherwise nullptr.

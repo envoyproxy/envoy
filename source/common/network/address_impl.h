@@ -68,7 +68,7 @@ private:
 
   struct IpHelper : public Ip {
     const std::string& addressAsString() const override { return friendly_address_; }
-    bool isWildcard() const override { return friendly_address_ == "0.0.0.0"; }
+    bool isAnyAddress() const override { return friendly_address_ == "0.0.0.0"; }
     const Ipv4* ipv4() const override { return &ipv4_; }
     const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
@@ -125,7 +125,7 @@ private:
 
   struct IpHelper : public Ip {
     const std::string& addressAsString() const override { return friendly_address_; }
-    bool isWildcard() const override { return false; }
+    bool isAnyAddress() const override { return friendly_address_ == "::"; }
     const Ipv4* ipv4() const override { return nullptr; }
     const Ipv6* ipv6() const override { return &ipv6_; }
     uint32_t port() const override { return ipv6_.port(); }

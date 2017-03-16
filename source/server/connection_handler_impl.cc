@@ -98,7 +98,7 @@ ConnectionHandlerImpl::findListenerByAddress(Network::Address::InstancePtr addre
                    [address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
                      return p.first->type() == Network::Address::Type::Ip &&
                             p.first->ip()->port() == address->ip()->port() &&
-                            p.first->ip()->isWildcard();
+                            p.first->ip()->isAnyAddress();
                    });
   return (listener != listeners_.end()) ? listener->second->listener_.get() : nullptr;
 }
