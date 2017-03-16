@@ -173,7 +173,7 @@ int HotRestartImpl::duplicateParentListenSocket(const std::string& address) {
   if (address.length() >= sizeof(rpc.address_)) {
     return -1;
   }
-  StringUtil::strlcpy(rpc.address_, address.c_str(), address.length() + 1);
+  StringUtil::strlcpy(rpc.address_, address.c_str(), sizeof(rpc.address_));
   sendMessage(parent_address_, rpc);
   RpcGetListenSocketReply* reply =
       receiveTypedRpc<RpcGetListenSocketReply, RpcMessageType::GetListenSocketReply>();
