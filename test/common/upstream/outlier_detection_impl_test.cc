@@ -58,9 +58,7 @@ public:
   }
 
   NiceMock<MockCluster> cluster_;
-  NiceMock<Event
-
-           ::MockDispatcher> dispatcher_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* interval_timer_ = new Event::MockTimer(&dispatcher_);
   CallbackChecker checker_;
@@ -141,7 +139,7 @@ TEST_F(OutlierDetectorImplTest, DestroyHostInUse) {
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
 }
 
-TEST_F(OutlierDetectorImplTest, BasicFlow) {
+TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   cluster_.hosts_ = {HostPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
@@ -215,6 +213,83 @@ TEST_F(OutlierDetectorImplTest, BasicFlow) {
   EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
   EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx")
                      .value());
+}
+
+TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
+  EXPECT_CALL(cluster_, addMemberUpdateCb(_));
+  cluster_.hosts_ = {HostPtr{new HostImpl(
+    cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  std::shared_ptr<DetectorImpl> detector(
+    DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
+  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+
+  for (int i = 81; i < 85; ++i) {
+    cluster_.hosts_.push_back(HostPtr{new HostImpl(
+      cluster_.info_, "", Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", i)), false, 1, "")});
+  }
+
+  cluster_.runCallbacks({cluster_.hosts_[1], cluster_.hosts_[2], cluster_.hosts_[3], cluster_.hosts_[4]}, {});
+
+  // Cause a consecutive SR error on one host. First have 4 of the hosts have perfect SR.
+  for (uint64_t i = 0; i < cluster_.hosts_.size() - 1; i++) {
+    for (int j = 0; j < 200; j++) {
+      cluster_.hosts_[i]->outlierDetector().putHttpResponseCode(200);
+    }
+  }
+
+  for (int i = 0; i < 100; i++) {
+    cluster_.hosts_[4]->outlierDetector().putHttpResponseCode(200);
+    cluster_.hosts_[4]->outlierDetector().putHttpResponseCode(503);
+  }
+
+  EXPECT_CALL(time_source_, currentSystemTime())
+    .Times(2).WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(10000))));
+  EXPECT_CALL(checker_, check(cluster_.hosts_[4]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4]),
+                       EjectionType::SuccessRate));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_TRUE(cluster_.hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  // Interval that doesn't bring the host back in.
+  EXPECT_CALL(time_source_, currentSystemTime())
+    .WillOnce(Return(SystemTime(std::chrono::milliseconds(19999))));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_TRUE(cluster_.hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  // Interval that does bring the host back in.
+  EXPECT_CALL(time_source_, currentSystemTime())
+    .WillOnce(Return(SystemTime(std::chrono::milliseconds(50001))));
+  EXPECT_CALL(checker_, check(cluster_.hosts_[4]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_FALSE(cluster_.hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  // Give 4 hosts enough request volume but not to the 5th. Should not cause an ejection.
+  for (uint64_t i = 0; i < cluster_.hosts_.size() - 1; i++) {
+    for (int j = 0; j < 150; j++) {
+      cluster_.hosts_[i]->outlierDetector().putHttpResponseCode(200);
+    }
+  }
+
+  for (int i = 0; i < 25; i++) {
+    cluster_.hosts_[4]->outlierDetector().putHttpResponseCode(200);
+    cluster_.hosts_[4]->outlierDetector().putHttpResponseCode(503);
+  }
+
+  EXPECT_CALL(time_source_, currentSystemTime())
+    .WillOnce(Return(SystemTime(std::chrono::milliseconds(60001))));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 }
 
 TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
@@ -477,9 +552,9 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"30\", \"cluster\": "
                            "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"5xx\", \"num_ejections\": 0}\n"))
+                           "\"eject\", \"type\": \"SR\", \"num_ejections\": 0}\n"))
       .WillOnce(SaveArg<0>(&log3));
-  event_logger.logEject(host, EjectionType::Consecutive5xx);
+  event_logger.logEject(host, EjectionType::SuccessRate);
   Json::Factory::LoadFromString(log3);
 
   std::string log4;

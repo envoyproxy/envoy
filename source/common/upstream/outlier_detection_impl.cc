@@ -248,7 +248,6 @@ void DetectorImpl::onIntervalTimer() {
   std::unordered_map<HostPtr, double> valid_sr_hosts;
   std::vector<double> sr_data;
   double sr_sum = 0;
-
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
 
@@ -260,7 +259,6 @@ void DetectorImpl::onIntervalTimer() {
     if (host_sinks_.size() >=
         runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold",
                                        config_.significantHostThreshold())) {
-
       Optional<double> host_sr = host.second->srAccumulator().getSR(runtime_.snapshot().getInteger(
           "outlier_detection.rq_volume_threshold", config_.rqVolumeThreshold()));
 
@@ -274,9 +272,10 @@ void DetectorImpl::onIntervalTimer() {
 
   if (valid_sr_hosts.size() >=
       runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold",
-                                     config_.rqVolumeThreshold())) {
+                                     config_.significantHostThreshold())) {
+    double ejection_threshold = srEjectionThreshold(sr_sum, sr_data);
     for (auto host : valid_sr_hosts) {
-      if (host.second < srEjectionThreshold(sr_sum, sr_data)) {
+      if (host.second < ejection_threshold) {
         stats_.ejections_sr_.inc();
         ejectHost(host.first, EjectionType::SuccessRate);
       }

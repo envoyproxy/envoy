@@ -202,7 +202,7 @@ private:
   std::unordered_map<HostPtr, DetectorHostSinkImpl*> host_sinks_;
   EventLoggerPtr event_logger_;
   // Factor to multiply the stdev of a cluster's Success Rate for success rate outlier ejection.
-  static const uint64_t sr_stdev_factor_ = 2;
+  static constexpr double sr_stdev_factor_ = 1.9;
 };
 
 class EventLoggerImpl : public EventLogger {
