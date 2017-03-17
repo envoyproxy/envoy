@@ -91,9 +91,7 @@ private:
 
     // Server::Configuration::Listener
     Network::FilterChainFactory& filterChainFactory() override { return *this; }
-    Network::Address::InstancePtr address() override {
-      return Network::Utility::resolveUrl(address_);
-    }
+    Network::Address::InstancePtr address() override { return address_; }
     bool bindToPort() override { return bind_to_port_; }
     Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
     bool useProxyProto() override { return use_proxy_proto_; }
@@ -105,7 +103,7 @@ private:
 
   private:
     MainImpl& parent_;
-    const std::string address_;
+    Network::Address::InstancePtr address_;
     bool bind_to_port_{};
     Stats::ScopePtr scope_;
     Ssl::ServerContextPtr ssl_context_;
