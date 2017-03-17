@@ -110,6 +110,9 @@ std::string CodeUtility::groupStringForResponseCode(Code response_code) {
 const char* CodeUtility::toString(Code code) {
   // clang-format off
   switch (code) {
+  // 1xx
+  case Code::Continue:                      return "Continue";
+
   // 2xx
   case Code::OK:                            return "OK";
   case Code::Created:                       return "Created";

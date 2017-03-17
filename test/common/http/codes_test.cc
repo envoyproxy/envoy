@@ -83,8 +83,8 @@ TEST_F(CodeUtilityTest, Canary) {
 
 TEST_F(CodeUtilityTest, All) {
   std::vector<std::pair<Code, std::string>> testSet = {
-      std::make_pair(Code::OK, "OK"), std::make_pair(Code::Created, "Created"),
-      std::make_pair(Code::Accepted, "Accepted"),
+      std::make_pair(Code::Continue, "Continue"), std::make_pair(Code::OK, "OK"),
+      std::make_pair(Code::Created, "Created"), std::make_pair(Code::Accepted, "Accepted"),
       std::make_pair(Code::NonAuthoritativeInformation, "Non-Authoritative Information"),
       std::make_pair(Code::NoContent, "No Content"),
       std::make_pair(Code::ResetContent, "Reset Content"),
@@ -133,7 +133,8 @@ TEST_F(CodeUtilityTest, All) {
       std::make_pair(Code::InsufficientStorage, "Insufficient Storage"),
       std::make_pair(Code::LoopDetected, "Loop Detected"),
       std::make_pair(Code::NotExtended, "Not Extended"),
-      std::make_pair(Code::NetworkAuthenticationRequired, "Network Authentication Required")};
+      std::make_pair(Code::NetworkAuthenticationRequired, "Network Authentication Required"),
+      std::make_pair(static_cast<Code>(600), "Unknown")};
 
   for (const auto& testCase : testSet) {
     EXPECT_EQ(testCase.second, CodeUtility::toString(testCase.first));

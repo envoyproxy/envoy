@@ -160,6 +160,9 @@ public:
 
   // Upstream::ClusterInfo
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
+  uint32_t perConnectionBufferLimitBytes() const override {
+    return per_connection_buffer_limit_bytes_;
+  }
   uint64_t features() const override { return features_; }
   uint64_t httpCodecOptions() const override { return http_codec_options_; }
   LoadBalancerType lbType() const override { return lb_type_; }
@@ -189,6 +192,7 @@ private:
   const std::string name_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
+  const uint32_t per_connection_buffer_limit_bytes_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
   Ssl::ClientContextPtr ssl_ctx_;

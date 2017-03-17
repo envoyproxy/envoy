@@ -189,6 +189,23 @@ TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
 }
 
 /**
+ * Test that buffer limits are set.
+ */
+TEST_F(Http1ConnPoolImplTest, VerifyBufferLimits) {
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(8192));
+  EXPECT_CALL(*conn_pool_.test_clients_.back().connection_, setReadBufferLimit(8192));
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+  EXPECT_NE(nullptr, handle);
+
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
  * Tests a request that generates a new connection, completes, and then a second request that uses
  * the same connection.
  */

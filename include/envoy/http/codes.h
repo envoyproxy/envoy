@@ -8,6 +8,8 @@ namespace Http {
  */
 enum class Code {
   // clang-format off
+  Continue                      = 100,
+
   OK                            = 200,
   Created                       = 201,
   Accepted                      = 202,

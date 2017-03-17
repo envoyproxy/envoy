@@ -19,6 +19,7 @@ public:
 
   // Upstream::ClusterInfo
   MOCK_CONST_METHOD0(connectTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(httpCodecOptions, uint64_t());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
