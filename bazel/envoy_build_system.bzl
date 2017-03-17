@@ -3,9 +3,17 @@ def envoy_external_dep_path(dep):
     return "//external:%s" % dep
 
 ENVOY_COPTS = [
-    "-fno-omit-frame-pointer", "-Wall", "-Wextra", "-Werror", "-Wnon-virtual-dtor",
-    "-Woverloaded-virtual", "-Wold-style-cast", "-std=c++0x",
-    "-includesource/precompiled/precompiled.h", "-iquote", "include", "-iquote", "source"
+    "-fno-omit-frame-pointer",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-Wnon-virtual-dtor",
+    "-Woverloaded-virtual",
+    "-Wold-style-cast",
+    "-std=c++0x",
+    "-includesource/precompiled/precompiled.h",
+    "-iquoteinclude",
+    "-iquotesource",
 ]
 
 # Envoy C++ library targets should be specified with this function.

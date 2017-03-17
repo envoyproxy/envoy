@@ -61,7 +61,7 @@ cc_library(
 
 def spdlog_repositories():
     BUILD = """
-package(default_visibility=["//visibility:public"])
+package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "spdlog",
@@ -69,16 +69,17 @@ cc_library(
         "include/**/*.h",
         "include/**/*.cc",
     ]),
-    strip_include_prefix = "include"
+    strip_include_prefix = "include",
 )
 """
 
     native.new_git_repository(
         name = "spdlog_git",
-        remote = "https://github.com/gabime/spdlog.git",
+        build_file_content = BUILD,
         # v0.11.0 release
         commit = "1f1f6a5f3b424203a429e9cb78e6548037adefa8",
-        build_file_content = BUILD,)
+        remote = "https://github.com/gabime/spdlog.git",
+    )
 
 def envoy_dependencies():
     googletest_repositories()
