@@ -12,7 +12,8 @@ namespace Address {
 
 CidrRange::CidrRange() : length_(-1) {}
 
-CidrRange::CidrRange(InstancePtr address, int length) : address_(std::move(address)), length_(length) {
+CidrRange::CidrRange(InstancePtr address, int length)
+    : address_(std::move(address)), length_(length) {
   // This is a private ctor, so only checking these asserts in debug builds.
   if (address_ == nullptr) {
     ASSERT(length_ == -1);
