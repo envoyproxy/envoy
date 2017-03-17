@@ -144,15 +144,15 @@ int PipeInstance::socket(SocketType type) const {
   return ::socket(AF_UNIX, flagsFromSocketType(type), 0);
 }
 
-InstancePtr parseInternetAddress(const std::string& ipAddr) {
+InstancePtr parseInternetAddress(const std::string& ip_addr) {
   sockaddr_in sa4;
-  if (inet_pton(AF_INET, ipAddr.c_str(), &sa4.sin_addr) == 1) {
+  if (inet_pton(AF_INET, ip_addr.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
     sa4.sin_port = 0;
     return InstancePtr(new Ipv4Instance(&sa4));
   }
   sockaddr_in6 sa6;
-  if (inet_pton(AF_INET6, ipAddr.c_str(), &sa6.sin6_addr) == 1) {
+  if (inet_pton(AF_INET6, ip_addr.c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = 0;
     return InstancePtr(new Ipv6Instance(sa6));

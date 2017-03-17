@@ -139,10 +139,10 @@ private:
 /*
  * Parse an internet host address (IPv4 or IPv6) and create an Instance from it.
  * The address must not include a port number.
- * @param ipAddr string to be parsed as an internet address.
+ * @param ip_addr string to be parsed as an internet address.
  * @return pointer to the Instance, or nullptr if unable to parse the address.
  */
-InstancePtr parseInternetAddress(const std::string& ipAddr);
+InstancePtr parseInternetAddress(const std::string& ip_addr);
 
 /**
  * Implementation of a pipe address (unix domain socket on unix).
