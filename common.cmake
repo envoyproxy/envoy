@@ -6,19 +6,24 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   endif()
 endif()
 
+option(ENVOY_DEBUG "build debug binaries" ON)
 option(ENVOY_CODE_COVERAGE "build with code coverage intrumentation" OFF)
+
 if (ENVOY_CODE_COVERAGE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
   add_definitions(-DCOVERAGE)
 endif()
 
-option(ENVOY_DEBUG "build debug binaries" ON)
-if (ENVOY_DEBUG)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+if (ENVOY_DEBUG AND NOT ENVOY_CODE_COVERAGE)
   add_definitions(-DDEBUG)
 else()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
   add_definitions(-DNDEBUG)
+endif()
+
+if (ENVOY_DEBUG OR ENVOY_CODE_COVERAGE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+else()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 endif()
 
 option(ENVOY_SANITIZE "build with address sanitizer" OFF)
