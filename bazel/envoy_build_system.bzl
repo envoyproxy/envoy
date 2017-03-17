@@ -19,16 +19,20 @@ def envoy_external_dep_path(dep):
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(name,
                      srcs = [],
-                     public_hdrs = [],
                      hdrs = [],
+                     public_hdrs = [],
+                     copts = [],
+                     alwayslink = None,
+                     visibility = None,
                      external_deps = [],
-                     deps = [],
-                     copts = []):
+                     deps = []):
     native.cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs + public_hdrs,
         copts = ENVOY_COPTS + copts,
+        alwayslink = alwayslink,
+        visibility = visibility,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             "//source/precompiled:precompiled_includes",
         ],
