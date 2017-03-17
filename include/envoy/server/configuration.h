@@ -25,7 +25,7 @@ public:
   /**
    * @return std::string the address.
    */
-  virtual const std::string& address() PURE;
+  virtual Network::Address::InstancePtr address() PURE;
 
   /**
    * @return Ssl::ServerContext* the SSL context

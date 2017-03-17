@@ -207,14 +207,16 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
     // used for testing.
 
     // First we try to get the socket from our parent if applicable.
-    int fd = restarter_.duplicateParentListenSocket(listener->address());
+
+    ASSERT(listener->address()->type() == Network::Address::Type::Ip);
+    std::string addr = fmt::format("tcp://{}", listener->address()->asString());
+    int fd = restarter_.duplicateParentListenSocket(addr);
     if (fd != -1) {
-      log().info("obtained socket for address {} from parent", listener->address());
-      socket_map_[listener.get()].reset(
-          new Network::TcpListenSocket(fd, Network::Utility::resolveUrl(listener->address())));
+      log().info("obtained socket for address {} from parent", addr);
+      socket_map_[listener.get()].reset(new Network::TcpListenSocket(fd, listener->address()));
     } else {
-      socket_map_[listener.get()].reset(new Network::TcpListenSocket(
-          Network::Utility::resolveUrl(listener->address()), listener->bindToPort()));
+      socket_map_[listener.get()].reset(
+          new Network::TcpListenSocket(listener->address(), listener->bindToPort()));
     }
   }
 
