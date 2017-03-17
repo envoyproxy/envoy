@@ -1,4 +1,5 @@
 /build
+/build_*
 /docs/landing_source/.bundle
 /generated
 /bazel-*
