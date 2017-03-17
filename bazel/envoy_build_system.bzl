@@ -31,11 +31,11 @@ def envoy_cc_library(name,
         srcs = srcs,
         hdrs = hdrs + public_hdrs,
         copts = ENVOY_COPTS + copts,
-        alwayslink = alwayslink,
         visibility = visibility,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             "//source/precompiled:precompiled_includes",
         ],
+        alwayslink = alwayslink,
     )
 
 # Envoy C++ test targets should be specified with this function.
