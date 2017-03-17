@@ -100,6 +100,8 @@ generate_config('configs', 'envoy_double_proxy.template.json',
 # optional external service ports: built from external_virtual_hosts above. Each external host
 #                                  that Envoy proxies to listens on its own port.
 # optional mongo ports: built from mongos_servers above.
+# TODO(wattli): investigate why a bad config (with port but not address) can
+# pass the test.
 generate_config('configs', 'envoy_service_to_service.template.json',
                 '{}/envoy_service_to_service.json'.format(sys.argv[1]),
                 internal_virtual_hosts=service_to_service_envoy_clusters,
