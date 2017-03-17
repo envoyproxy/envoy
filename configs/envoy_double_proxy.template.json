@@ -79,11 +79,11 @@
   "listeners": [
     {# TCP listener for external port 443 (SSL). Assumes a TCP LB in front such as ELB which
        supports proxy proto. #}
-    {{ listener("tcp://127.0.0.1:9300",True,True) }},
+    {{ listener("tcp://0.0.0.0:9300",True,True) }},
 
     {# TCP listener for external port 80 (non-SSL). Assumes a TCP LB in front such as ELB which
        supports proxy proto. #}
-    {{ listener("tcp://127.0.0.1:9301",False,True) }}
+    {{ listener("tcp://0.0.0.0:9301",False,True) }}
   ],
 
   "admin": { "access_log_path": "/var/log/envoy/admin_access.log",

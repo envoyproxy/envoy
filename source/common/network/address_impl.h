@@ -126,7 +126,7 @@ private:
   struct IpHelper : public Ip {
     const std::string& addressAsString() const override { return friendly_address_; }
     bool isAnyAddress() const override {
-      return memcmp(&ipv6_.address_.sin6_addr, &in6addr_any, sizeof(struct in6_addr));
+      return 0 == memcmp(&ipv6_.address_.sin6_addr, &in6addr_any, sizeof(struct in6_addr));
     }
     const Ipv4* ipv4() const override { return nullptr; }
     const Ipv6* ipv6() const override { return &ipv6_; }

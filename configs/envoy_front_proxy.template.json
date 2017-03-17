@@ -72,12 +72,12 @@
   "listeners": [
     {# TCP listeners for public HTTP/HTTPS endpoints. Assumes a TCP LB in front such as ELB which
        supports proxy proto. #}
-    {{ listener("tcp://127.0.0.1:9300", ssl=True, proxy_proto=True, router_file='envoy_router.template.json') }},
-    {{ listener("tcp://127.0.0.1:9301", ssl=False, proxy_proto=True, router_file='envoy_router.template.json') }},
+    {{ listener("tcp://0.0.0.0:9300", ssl=True, proxy_proto=True, router_file='envoy_router.template.json') }},
+    {{ listener("tcp://0.0.0.0:9301", ssl=False, proxy_proto=True, router_file='envoy_router.template.json') }},
 
     {# TCP listener for backhaul traffic from the double proxy.
        See envoy_double_proxy.template.json #}
-    {{ listener("tcp://127.0.0.1:9400", ssl=True, proxy_proto=False, pin_double_proxy_client=True,
+    {{ listener("tcp://0.0.0.0:9400", ssl=True, proxy_proto=False, pin_double_proxy_client=True,
                 router_file='envoy_router.template.json') }}
   ],
 

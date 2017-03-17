@@ -35,6 +35,7 @@ TEST(Ipv4InstanceTest, AddressAndPort) {
   EXPECT_EQ("127.0.0.1:80", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("127.0.0.1", address.ip()->addressAsString());
+  EXPECT_EQ(false, address.ip()->isAnyAddress());
   EXPECT_EQ(80U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
 }
@@ -44,6 +45,7 @@ TEST(Ipv4InstanceTest, PortOnly) {
   EXPECT_EQ("0.0.0.0:443", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("0.0.0.0", address.ip()->addressAsString());
+  EXPECT_EQ(true, address.ip()->isAnyAddress());
   EXPECT_EQ(443U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
 }
@@ -63,6 +65,7 @@ TEST(Ipv6InstanceTest, SocketAddress) {
   EXPECT_EQ("[1:23::ef]:32000", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("1:23::ef", address.ip()->addressAsString());
+  EXPECT_EQ(false, address.ip()->isAnyAddress());
   EXPECT_EQ(32000U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
 }
@@ -90,6 +93,7 @@ TEST(Ipv6InstanceTest, PortOnly) {
   EXPECT_EQ("[::]:443", address.asString());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("::", address.ip()->addressAsString());
+  EXPECT_EQ(true, address.ip()->isAnyAddress());
   EXPECT_EQ(443U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
 }

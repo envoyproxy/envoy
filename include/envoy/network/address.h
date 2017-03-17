@@ -46,7 +46,7 @@ public:
   virtual const std::string& addressAsString() const PURE;
 
   /**
-   * @return whether this adderss is wild card, i.e., '0.0.0.0'.
+   * @return whether this address is wild card, i.e., '0.0.0.0'.
    */
   virtual bool isAnyAddress() const PURE;
 
