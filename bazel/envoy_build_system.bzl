@@ -1,7 +1,3 @@
-# References to Envoy external dependencies should be wrapped with this function.
-def envoy_external_dep_path(dep):
-    return "//external:%s" % dep
-
 ENVOY_COPTS = [
     "-fno-omit-frame-pointer",
     "-Wall",
@@ -16,6 +12,10 @@ ENVOY_COPTS = [
     "-iquotesource",
 ]
 
+# References to Envoy external dependencies should be wrapped with this function.
+def envoy_external_dep_path(dep):
+    return "//external:%s" % dep
+
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(name,
                      srcs = [],
@@ -28,9 +28,10 @@ def envoy_cc_library(name,
         name = name,
         srcs = srcs,
         hdrs = hdrs + public_hdrs,
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] +
-               ["//source/precompiled:precompiled_includes"],
         copts = ENVOY_COPTS + copts,
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
+            "//source/precompiled:precompiled_includes",
+        ],
     )
 
 # Envoy C++ test targets should be specified with this function.
@@ -40,8 +41,10 @@ def envoy_cc_test(name,
     native.cc_test(
         name = name,
         srcs = srcs,
-        deps = deps + ["//source/precompiled:precompiled_includes",
-                       "//test/precompiled:precompiled_includes"],
         copts = ENVOY_COPTS + ["-includetest/precompiled/precompiled_test.h"],
-        linkopts = ["-pthread"]
+        linkopts = ["-pthread"],
+        deps = deps + [
+            "//source/precompiled:precompiled_includes",
+            "//test/precompiled:precompiled_includes",
+        ],
     )

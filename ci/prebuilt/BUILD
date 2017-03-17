@@ -17,8 +17,8 @@ cc_library(
 cc_library(
     name = "spdlog",
     hdrs = glob([
-        "thirdparty/spdlog-0.11.0/include/**/*.h",
         "thirdparty/spdlog-0.11.0/include/**/*.cc",
+        "thirdparty/spdlog-0.11.0/include/**/*.h",
     ]),
     strip_include_prefix = "thirdparty/spdlog-0.11.0/include",
 )

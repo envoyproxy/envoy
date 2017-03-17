@@ -1,7 +1,7 @@
-# The build rules below for external dependencies build rules are maintained
-# on a best effort basis. The rules are provided for developer convenience. For production builds,
-# we recommend building the libraries according to their canonical build systems and expressing the
-# dependencies in a manner similar to ci/WORKSPACE.
+# The build rules below for external dependencies build rules are maintained on a best effort basis.
+# The rules are provided for developer convenience. For production builds, we recommend building the
+# libraries according to their canonical build systems and expressing the dependencies in a manner
+# similar to ci/WORKSPACE.
 
 def googletest_repositories():
     BUILD = """
@@ -29,11 +29,11 @@ cc_library(
         "googletest/src/gtest-all.cc",
     ],
     hdrs = glob([
-        "googletest/include/**/*.h",
         "googlemock/include/**/*.h",
+        "googlemock/src/*.cc",
+        "googletest/include/**/*.h",
         "googletest/src/*.cc",
         "googletest/src/*.h",
-        "googlemock/src/*.cc",
     ]),
     includes = [
         "googlemock",
@@ -66,8 +66,8 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "spdlog",
     hdrs = glob([
-        "include/**/*.h",
         "include/**/*.cc",
+        "include/**/*.h",
     ]),
     strip_include_prefix = "include",
 )

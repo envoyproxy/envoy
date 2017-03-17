@@ -6,7 +6,5 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    deps = [
-        "//include/envoy/common:time_includes",
-    ],
+    deps = ["//include/envoy/common:time_includes"],
 )
