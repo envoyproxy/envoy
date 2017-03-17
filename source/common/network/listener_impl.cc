@@ -37,7 +37,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
     // listener handles the connection directly and does not hand it off.
     if (listener->socket_.localAddress() != final_local_address) {
       ListenerImpl* new_listener = dynamic_cast<ListenerImpl*>(
-          listener->connection_handler_.findListenerByAddress(final_local_address));
+          listener->connection_handler_.findListenerByAddress(*final_local_address));
 
       if (new_listener != nullptr) {
         listener = new_listener;

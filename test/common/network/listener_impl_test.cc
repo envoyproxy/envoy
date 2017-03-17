@@ -7,6 +7,8 @@
 #include "test/mocks/server/mocks.h"
 
 using testing::_;
+using testing::ByRef;
+using testing::Eq;
 using testing::Invoke;
 using testing::Return;
 
@@ -67,8 +69,8 @@ public:
 TEST(ListenerImplTest, NormalRedirect) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket("tcp://127.0.0.1:10000", true);
-  Network::TcpListenSocket socketDst("tcp://127.0.0.1:10001", false);
+  Network::TcpListenSocket socket(Utility::resolveUrl("tcp://127.0.0.1:10000"), true);
+  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://127.0.0.1:10001"), false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // The traffic should redirect from binding listener to the virtual listener.
@@ -88,7 +90,7 @@ TEST(ListenerImplTest, NormalRedirect) {
 
   Address::InstancePtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
-  EXPECT_CALL(connection_handler, findListenerByAddress(alt_address))
+  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
       .WillRepeatedly(Return(&listenerDst));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
@@ -107,8 +109,8 @@ TEST(ListenerImplTest, NormalRedirect) {
 TEST(ListenerImplTest, FallbackToWildcardListener) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket("tcp://127.0.0.1:10000", true);
-  Network::TcpListenSocket socketDst("tcp://0.0.0.0:10001", false);
+  Network::TcpListenSocket socket(Utility::resolveUrl("tcp://127.0.0.1:10000"), true);
+  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://0.0.0.0:10001"), false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // The virtual listener of exact address does not exist, fall back to wild card virtual listener.
@@ -128,7 +130,7 @@ TEST(ListenerImplTest, FallbackToWildcardListener) {
 
   Address::InstancePtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
-  EXPECT_CALL(connection_handler, findListenerByAddress(alt_address))
+  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
       .WillRepeatedly(Return(&listenerDst));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
@@ -146,8 +148,8 @@ TEST(ListenerImplTest, FallbackToWildcardListener) {
 TEST(ListenerImplTest, UseActualDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket("tcp://127.0.0.1:10000", true);
-  Network::TcpListenSocket socketDst("tcp://127.0.0.1:10001", false);
+  Network::TcpListenSocket socket(Utility::resolveUrl("tcp://127.0.0.1:10000"), true);
+  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://127.0.0.1:10001"), false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
@@ -167,7 +169,7 @@ TEST(ListenerImplTest, UseActualDst) {
 
   Address::InstancePtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
-  EXPECT_CALL(connection_handler, findListenerByAddress(alt_address))
+  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
       .WillRepeatedly(Return(&listener));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(1);

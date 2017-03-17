@@ -210,10 +210,11 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
     int fd = restarter_.duplicateParentListenSocket(listener->address());
     if (fd != -1) {
       log().info("obtained socket for address {} from parent", listener->address());
-      socket_map_[listener.get()].reset(new Network::TcpListenSocket(fd, listener->address()));
-    } else {
       socket_map_[listener.get()].reset(
-          new Network::TcpListenSocket(listener->address(), listener->bindToPort()));
+          new Network::TcpListenSocket(fd, Network::Utility::resolveUrl(listener->address())));
+    } else {
+      socket_map_[listener.get()].reset(new Network::TcpListenSocket(
+          Network::Utility::resolveUrl(listener->address()), listener->bindToPort()));
     }
   }
 

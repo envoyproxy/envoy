@@ -19,9 +19,9 @@ void ListenSocketImpl::doBind() {
 }
 
 // TODO(wattli): remove this once the admin port is updated with address.
-TcpListenSocket::TcpListenSocket(const std::string& address, bool bind_to_port) {
+TcpListenSocket::TcpListenSocket(const Address::InstancePtr& address, bool bind_to_port) {
   // TODO(mattklein123): IPv6 support.
-  local_address_ = Utility::resolveUrl(address);
+  local_address_ = address;
   fd_ = local_address_->socket(Address::SocketType::Stream);
   RELEASE_ASSERT(fd_ != -1);
 
@@ -54,9 +54,9 @@ TcpListenSocket::TcpListenSocket(int fd, uint32_t port) {
   local_address_.reset(new Address::Ipv4Instance(port));
 }
 
-TcpListenSocket::TcpListenSocket(int fd, const std::string& address) {
+TcpListenSocket::TcpListenSocket(int fd, const Address::InstancePtr& address) {
   fd_ = fd;
-  local_address_ = Utility::resolveUrl(address);
+  local_address_ = address;
 }
 
 UdsListenSocket::UdsListenSocket(const std::string& uds_path) {

@@ -78,14 +78,14 @@ ConnectionHandlerImpl::SslActiveListener::SslActiveListener(
                      factory, socket.localAddress()->asString()) {}
 
 Network::Listener*
-ConnectionHandlerImpl::findListenerByAddress(const Network::Address::InstancePtr& address) {
+ConnectionHandlerImpl::findListenerByAddress(const Network::Address::Instance& address) {
   // This is a linear operation, may need to add a map<address, listener> to improve performance.
   // However, linear performance might be adequate since the number of listeners is small.
-  auto listener =
-      std::find_if(listeners_.begin(), listeners_.end(),
-                   [address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
-                     return p.first->type() == Network::Address::Type::Ip && *(p.first) == *address;
-                   });
+  auto listener = std::find_if(
+      listeners_.begin(), listeners_.end(),
+      [&address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
+        return p.first->type() == Network::Address::Type::Ip && *(p.first) == address;
+      });
 
   // If there is exact address match, return the corresponding listener.
   if (listener != listeners_.end()) {
@@ -94,13 +94,12 @@ ConnectionHandlerImpl::findListenerByAddress(const Network::Address::InstancePtr
 
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // TODO(wattli): consolidate with previous search for more efficiency.
-  listener =
-      std::find_if(listeners_.begin(), listeners_.end(),
-                   [address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
-                     return p.first->type() == Network::Address::Type::Ip &&
-                            p.first->ip()->port() == address->ip()->port() &&
-                            p.first->ip()->isAnyAddress();
-                   });
+  listener = std::find_if(
+      listeners_.begin(), listeners_.end(),
+      [&address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
+        return p.first->type() == Network::Address::Type::Ip &&
+               p.first->ip()->port() == address.ip()->port() && p.first->ip()->isAnyAddress();
+      });
   return (listener != listeners_.end()) ? listener->second->listener_.get() : nullptr;
 }
 

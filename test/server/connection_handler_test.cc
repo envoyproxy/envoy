@@ -9,6 +9,7 @@
 #include "test/mocks/server/mocks.h"
 
 using testing::_;
+using testing::ByRef;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -103,7 +104,7 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
       }));
   handler.addListener(factory, socket, Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-  EXPECT_EQ(listener, handler.findListenerByAddress(alt_address));
+  EXPECT_EQ(listener, handler.findListenerByAddress(ByRef(*alt_address)));
 
   Network::MockListenSocket socket2;
   Network::Address::InstancePtr alt_address2(new Network::Address::Ipv4Instance("0.0.0.0", 10001));
@@ -122,7 +123,7 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
       }));
   handler.addListener(factory, socket2, Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-  EXPECT_EQ(listener, handler.findListenerByAddress(alt_address));
-  EXPECT_EQ(listener2, handler.findListenerByAddress(alt_address2));
-  EXPECT_EQ(listener2, handler.findListenerByAddress(alt_address3));
+  EXPECT_EQ(listener, handler.findListenerByAddress(ByRef(*alt_address)));
+  EXPECT_EQ(listener2, handler.findListenerByAddress(ByRef(*alt_address2)));
+  EXPECT_EQ(listener2, handler.findListenerByAddress(ByRef(*alt_address3)));
 }
