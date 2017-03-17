@@ -4,9 +4,9 @@
 
 set -e
 
-echo "building using $NUM_CPUS CPUs"
-
 . "$(dirname "$0")"/build_setup.sh
+
+echo "building using $NUM_CPUS CPUs"
 
 if [[ "$1" == "fix_format" ]]; then
   echo "fix_format..."
