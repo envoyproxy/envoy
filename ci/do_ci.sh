@@ -4,8 +4,6 @@
 
 set -e
 
-echo "building using $NUM_CPUS CPUs"
-
 if [[ "$1" == "bazel.debug" ]]; then
   echo "debug bazel build with tests..."
   cd ci
@@ -27,6 +25,8 @@ if [[ "$1" == "bazel.debug" ]]; then
 fi
 
 . "$(dirname "$0")"/build_setup.sh
+
+echo "building using $NUM_CPUS CPUs"
 
 if [[ "$1" == "fix_format" ]]; then
   echo "fix_format..."
