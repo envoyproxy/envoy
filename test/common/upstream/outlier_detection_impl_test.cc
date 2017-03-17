@@ -218,18 +218,20 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
 TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   cluster_.hosts_ = {HostPtr{new HostImpl(
-    cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
+      cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
-    DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
+      DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
   detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
 
   for (int i = 81; i < 85; ++i) {
     cluster_.hosts_.push_back(HostPtr{new HostImpl(
-      cluster_.info_, "", Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", i)), false, 1, "")});
+        cluster_.info_, "", Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", i)),
+        false, 1, "")});
   }
 
-  cluster_.runCallbacks({cluster_.hosts_[1], cluster_.hosts_[2], cluster_.hosts_[3], cluster_.hosts_[4]}, {});
+  cluster_.runCallbacks(
+      {cluster_.hosts_[1], cluster_.hosts_[2], cluster_.hosts_[3], cluster_.hosts_[4]}, {});
 
   // Cause a consecutive SR error on one host. First have 4 of the hosts have perfect SR.
   for (uint64_t i = 0; i < cluster_.hosts_.size() - 1; i++) {
@@ -244,7 +246,8 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
   }
 
   EXPECT_CALL(time_source_, currentSystemTime())
-    .Times(2).WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(10000))));
+      .Times(2)
+      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(10000))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4]),
@@ -256,7 +259,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
 
   // Interval that doesn't bring the host back in.
   EXPECT_CALL(time_source_, currentSystemTime())
-    .WillOnce(Return(SystemTime(std::chrono::milliseconds(19999))));
+      .WillOnce(Return(SystemTime(std::chrono::milliseconds(19999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_TRUE(cluster_.hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -264,7 +267,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
 
   // Interval that does bring the host back in.
   EXPECT_CALL(time_source_, currentSystemTime())
-    .WillOnce(Return(SystemTime(std::chrono::milliseconds(50001))));
+      .WillOnce(Return(SystemTime(std::chrono::milliseconds(50001))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4])));
@@ -286,7 +289,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
   }
 
   EXPECT_CALL(time_source_, currentSystemTime())
-    .WillOnce(Return(SystemTime(std::chrono::milliseconds(60001))));
+      .WillOnce(Return(SystemTime(std::chrono::milliseconds(60001))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
