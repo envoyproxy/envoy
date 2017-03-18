@@ -1,7 +1,7 @@
 {
   "listeners": [
     {
-      "port": 9211,
+      "address": "tcp://0.0.0.0:9211",
       "filters": [
         {
           "type": "read",

@@ -107,7 +107,7 @@ public:
 
   // Server::HotRestart
   void drainParentListeners() override;
-  int duplicateParentListenSocket(uint32_t port) override;
+  int duplicateParentListenSocket(const std::string& address) override;
   void getParentStats(GetParentStatsInfo& info) override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   void shutdownParentAdmin(ShutdownParentAdminInfo& info) override;
@@ -142,7 +142,7 @@ private:
   struct RpcGetListenSocketRequest : public RpcBase {
     RpcGetListenSocketRequest() : RpcBase(RpcMessageType::GetListenSocketRequest, sizeof(*this)) {}
 
-    uint32_t port_;
+    char address_[256];
   };
 
   struct RpcGetListenSocketReply : public RpcBase {

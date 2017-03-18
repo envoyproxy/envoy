@@ -23,9 +23,9 @@ public:
   virtual Network::FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * @return uint64_t the port.
+   * @return std::string the address.
    */
-  virtual uint64_t port() PURE;
+  virtual Network::Address::InstancePtr address() PURE;
 
   /**
    * @return Ssl::ServerContext* the SSL context
@@ -46,8 +46,8 @@ public:
   virtual bool bindToPort() PURE;
 
   /**
-   * @return bool if a connection was redirected to this listener port using iptables,
-   *         allow the listener to hand it off to the listener associated to the original port
+   * @return bool if a connection was redirected to this listener address using iptables,
+   *         allow the listener to hand it off to the listener associated to the original address
    */
   virtual bool useOriginalDst() PURE;
 

@@ -1,7 +1,7 @@
 {
   "listeners": [
   {
-    "port": 10001,
+    "address": "tcp://127.0.0.1:10001",
     "ssl_context": {
       "ca_cert_file": "./test/config/integration/certs/cacert.pem",
       "cert_chain_file": "./test/config/integration/certs/servercert.pem",

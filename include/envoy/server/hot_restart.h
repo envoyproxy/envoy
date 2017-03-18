@@ -37,7 +37,7 @@ public:
    * @param port supplies the port of the socket to duplicate.
    * @return int the fd or -1 if there is no bound listen port in the parent.
    */
-  virtual int duplicateParentListenSocket(uint32_t port) PURE;
+  virtual int duplicateParentListenSocket(const std::string& address) PURE;
 
   /**
    * Retrieve stats from our parent process.
