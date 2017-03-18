@@ -13,7 +13,12 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
           "alt_alpn_protocols": {"type" : "string"},
           "ca_cert_file" : {"type" : "string"},
           "verify_certificate_hash" : {"type" : "string"},
-          "verify_subject_alt_name" : {"type" : "string"},
+          "verify_subject_alt_name" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
           "cipher_suites" : {"type" : "string"}
         },
         "required": ["cert_chain_file", "private_key_file"],
@@ -34,7 +39,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
     },
     "type" : "object",
     "properties": {
-       "port": {"type": "number"},
+       "address": {"type": "string"},
        "filters" : {
          "type" : "array",
          "items": {"$ref" : "#/definitions/filters"}
@@ -49,7 +54,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
          "exclusiveMinimum" : true
        }
     },
-    "required": ["port", "filters"],
+    "required": ["address", "filters"],
     "additionalProperties": false
   }
   )EOF");
@@ -1028,6 +1033,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "enum" : ["static", "strict_dns", "logical_dns", "sds"]
       },
       "connect_timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "per_connection_buffer_limit_bytes" : {
         "type" : "integer",
         "minimum" : 0,
         "exclusiveMinimum" : true

@@ -7,6 +7,7 @@
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
+#include "common/network/utility.h"
 
 namespace Server {
 namespace Configuration {
@@ -90,7 +91,7 @@ private:
 
     // Server::Configuration::Listener
     Network::FilterChainFactory& filterChainFactory() override { return *this; }
-    uint64_t port() override { return port_; }
+    Network::Address::InstancePtr address() override { return address_; }
     bool bindToPort() override { return bind_to_port_; }
     Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
     bool useProxyProto() override { return use_proxy_proto_; }
@@ -102,7 +103,7 @@ private:
 
   private:
     MainImpl& parent_;
-    uint64_t port_;
+    Network::Address::InstancePtr address_;
     bool bind_to_port_{};
     Stats::ScopePtr scope_;
     Ssl::ServerContextPtr ssl_context_;

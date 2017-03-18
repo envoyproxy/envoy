@@ -5,6 +5,7 @@
 
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
+#include "common/network/utility.h"
 
 namespace Network {
 
@@ -14,6 +15,22 @@ void ListenSocketImpl::doBind() {
     close();
     throw EnvoyException(
         fmt::format("cannot bind '{}': {}", local_address_->asString(), strerror(errno)));
+  }
+}
+
+// TODO(wattli): remove this once the admin port is updated with address.
+TcpListenSocket::TcpListenSocket(Address::InstancePtr address, bool bind_to_port) {
+  // TODO(mattklein123): IPv6 support.
+  local_address_ = address;
+  fd_ = local_address_->socket(Address::SocketType::Stream);
+  RELEASE_ASSERT(fd_ != -1);
+
+  int on = 1;
+  int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+  RELEASE_ASSERT(rc != -1);
+
+  if (bind_to_port) {
+    doBind();
   }
 }
 
@@ -35,6 +52,11 @@ TcpListenSocket::TcpListenSocket(uint32_t port, bool bind_to_port) {
 TcpListenSocket::TcpListenSocket(int fd, uint32_t port) {
   fd_ = fd;
   local_address_.reset(new Address::Ipv4Instance(port));
+}
+
+TcpListenSocket::TcpListenSocket(int fd, Address::InstancePtr address) {
+  fd_ = fd;
+  local_address_ = address;
 }
 
 UdsListenSocket::UdsListenSocket(const std::string& uds_path) {

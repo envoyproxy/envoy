@@ -33,8 +33,10 @@ protected:
  */
 class TcpListenSocket : public ListenSocketImpl {
 public:
+  TcpListenSocket(Address::InstancePtr address, bool bind_to_port);
   TcpListenSocket(uint32_t port, bool bind_to_port);
   TcpListenSocket(int fd, uint32_t port);
+  TcpListenSocket(int fd, Address::InstancePtr address);
 };
 
 typedef std::unique_ptr<TcpListenSocket> TcpListenSocketPtr;

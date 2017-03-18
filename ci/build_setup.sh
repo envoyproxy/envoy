@@ -24,8 +24,8 @@ else
   EXTRA_CMAKE_FLAGS="-DENVOY_DEBUG:BOOL=OFF"
 fi
 
-mkdir -p build
-cd build
+mkdir -p build_"$1"
+cd build_"$1"
 
 cmake \
 $EXTRA_CMAKE_FLAGS \

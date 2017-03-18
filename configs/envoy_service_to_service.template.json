@@ -1,9 +1,9 @@
 {% import 'routing_helper.template.json' as helper -%}
 {% import 'access_log_format_helper.template.json' as access_log_helper -%}
 
-{% macro ingress_listener(port) %}
+{% macro ingress_listener(address) %}
 {
-  "port": {{ port }},
+  "address": {{ address }},
   "filters": [
   {
     "type": "read",
@@ -90,9 +90,9 @@
 
 {
   "listeners": [
-  {{ ingress_listener(9211) }},
+  {{ ingress_listener("tcp://0.0.0.0:9211") }},
   {
-    "port": 9001,
+    "address": "tcp://0.0.0.0:9001",
     "filters": [
     {
       "type": "read",
@@ -161,7 +161,7 @@
 
   {% for mapping in external_virtual_hosts -%}
   {
-    "port": {{ mapping['port'] }},
+    "address": {{ mapping['address'] }},
     "filters": [
     {
       "type": "read",
@@ -220,7 +220,7 @@
 
   {% for key, value in mongos_servers.iteritems() -%}
   {
-    "port": {{ value['port'] }},
+    "address": {{ value['address'] }},
     "filters": [
     {% if value.get('ratelimit', False) %}
     {

@@ -1,5 +1,10 @@
 /build
+/build_*
 /docs/landing_source/.bundle
 /generated
+/bazel-*
+/ci/bazel-*
+/ci/prebuilt/thirdparty
+/ci/prebuilt/thirdparty_build
 cscope.*
 BROWSE

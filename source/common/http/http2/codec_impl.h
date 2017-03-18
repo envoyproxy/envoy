@@ -122,7 +122,7 @@ protected:
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
     int onDataSourceSend(const uint8_t* framehd, size_t length);
     void resetStreamWorker(StreamResetReason reason);
-    void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
+    static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                nghttp2_data_provider* provider) PURE;
@@ -157,6 +157,7 @@ protected:
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
     bool data_deferred_ : 1;
+    bool waiting_for_non_informational_headers_ : 1;
   };
 
   typedef std::unique_ptr<StreamImpl> StreamImplPtr;
@@ -210,6 +211,8 @@ private:
   // For now just set all window sizes (stream and connection) to 256MiB. We can adjust later if
   // needed.
   static const uint64_t DEFAULT_WINDOW_SIZE = 256 * 1024 * 1024;
+
+  static const std::unique_ptr<const Http::HeaderMap> CONTINUE_HEADER;
 
   Network::Connection& connection_;
   bool dispatching_ : 1;

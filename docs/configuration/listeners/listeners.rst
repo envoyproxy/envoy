@@ -9,17 +9,19 @@ Each individual listener configuration has the following format:
 .. code-block:: json
 
   {
-    "port": "...",
+    "address": "...",
     "filters": [],
     "ssl_context": "{...}",
     "bind_to_port": "...",
     "use_proxy_proto": "...",
-    "use_original_dst": "..."
+    "use_original_dst": "...",
+    "per_connection_buffer_limit_bytes": "..."
   }
 
-port
-  *(required, integer)* The TCP port that the listener should listen on. Currently only TCP
-  listeners are supported which bind to all local interfaces.
+address
+  *(required, string)* The address that the listener should listen on. Currently only TCP
+  listeners are supported, e.g., "tcp://127.0.0.1:80". Note, "tcp://0.0.0.0:80" is the wild card
+  match for any IPv4 address with port 80.
 
 :ref:`filters <config_listener_filters>`
   *(required, array)* A list of individual :ref:`network filters <arch_overview_network_filters>`
@@ -54,7 +56,7 @@ use_original_dst
 
 per_connection_buffer_limit_bytes
   *(optional, integer)* Soft limit on size of the listener's new connection read and write buffers.
-  If unspecified, an implementation defined default is applied (1MB).
+  If unspecified, an implementation defined default is applied (1MiB).
 
 .. toctree::
   :hidden:

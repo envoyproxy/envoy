@@ -42,8 +42,8 @@ void ConnectionHandlerImpl::closeConnections() {
 }
 
 void ConnectionHandlerImpl::closeListeners() {
-  for (auto& l : listeners_) {
-    l.second->listener_.reset();
+  for (auto& listener : listeners_) {
+    listener.second->listener_.reset();
   }
 }
 
@@ -77,16 +77,30 @@ ConnectionHandlerImpl::SslActiveListener::SslActiveListener(
                                                            parent.stats_store_, listener_options),
                      factory, socket.localAddress()->asString()) {}
 
-Network::Listener* ConnectionHandlerImpl::findListenerByPort(uint32_t port) {
-  // findListenerByPort is O(#listeners) operation, may need to add a map<port, listener>
-  // to improve performance to O(log #listeners); since the number of listeners is small
-  // linear performance might be adequate
-  auto l = std::find_if(
+Network::Listener*
+ConnectionHandlerImpl::findListenerByAddress(const Network::Address::Instance& address) {
+  // This is a linear operation, may need to add a map<address, listener> to improve performance.
+  // However, linear performance might be adequate since the number of listeners is small.
+  auto listener = std::find_if(
       listeners_.begin(), listeners_.end(),
-      [port](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
-        return p.first->type() == Network::Address::Type::Ip && p.first->ip()->port() == port;
+      [&address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
+        return p.first->type() == Network::Address::Type::Ip && *(p.first) == address;
       });
-  return (l != listeners_.end()) ? l->second->listener_.get() : nullptr;
+
+  // If there is exact address match, return the corresponding listener.
+  if (listener != listeners_.end()) {
+    return listener->second->listener_.get();
+  }
+
+  // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
+  // TODO(wattli): consolidate with previous search for more efficiency.
+  listener = std::find_if(
+      listeners_.begin(), listeners_.end(),
+      [&address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
+        return p.first->type() == Network::Address::Type::Ip &&
+               p.first->ip()->port() == address.ip()->port() && p.first->ip()->isAnyAddress();
+      });
+  return (listener != listeners_.end()) ? listener->second->listener_.get() : nullptr;
 }
 
 void ConnectionHandlerImpl::ActiveListener::onNewConnection(

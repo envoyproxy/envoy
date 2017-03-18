@@ -30,12 +30,11 @@ Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatc
 Network::ClientConnectionPtr HostImpl::createConnection(Event::Dispatcher& dispatcher,
                                                         const ClusterInfo& cluster,
                                                         Network::Address::InstancePtr address) {
-  if (cluster.sslContext()) {
-    return Network::ClientConnectionPtr{
-        dispatcher.createSslClientConnection(*cluster.sslContext(), address)};
-  } else {
-    return Network::ClientConnectionPtr{dispatcher.createClientConnection(address)};
-  }
+  Network::ClientConnectionPtr connection =
+      cluster.sslContext() ? dispatcher.createSslClientConnection(*cluster.sslContext(), address)
+                           : dispatcher.createClientConnection(address);
+  connection->setReadBufferLimit(cluster.perConnectionBufferLimitBytes());
+  return connection;
 }
 
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(100U, new_weight)); }
@@ -60,6 +59,8 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
     : runtime_(runtime), name_(config.getString("name")),
       max_requests_per_connection_(config.getInteger("max_requests_per_connection", 0)),
       connect_timeout_(std::chrono::milliseconds(config.getInteger("connect_timeout_ms"))),
+      per_connection_buffer_limit_bytes_(
+          config.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024)),
       stats_scope_(stats.createScope(fmt::format("cluster.{}.", name_))),
       stats_(generateStats(*stats_scope_)), features_(parseFeatures(config)),
       http_codec_options_(Http::Utility::parseCodecOptions(config)),

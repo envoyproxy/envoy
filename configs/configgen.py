@@ -41,12 +41,13 @@ service_to_service_envoy_clusters = {
 external_virtual_hosts = [
 {
     'name': 'dynamodb_iad',
-    'port': 9204,
+    'address': "tcp://127.0.0.1:9204",
     'hosts': [
         {
             'name': 'dynamodb_iad', 'domain': '*',
             'remote_address': 'dynamodb.us-east-1.amazonaws.com:443',
-            'verify_subject_alt_name': 'dynamodb.us-east-1.amazonaws.com', 'ssl': True
+            'verify_subject_alt_name': [ 'dynamodb.us-east-1.amazonaws.com' ],
+            'ssl': True
         }
     ],
     'is_amzn_service': True,
@@ -60,7 +61,7 @@ external_virtual_hosts = [
 # as it demonstrates how to setup TCP proxy and the network rate limit filter.
 mongos_servers = {
     'somedb': {
-        'port': 27019,
+        'address': "tcp://127.0.0.1:27019",
         'hosts': [
             "router1.yourcompany.net:27817",
             "router2.yourcompany.net:27817",

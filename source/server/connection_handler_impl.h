@@ -63,7 +63,7 @@ public:
                       Network::ListenSocket& socket,
                       const Network::ListenerOptions& listener_options) override;
 
-  Network::Listener* findListenerByPort(uint32_t port) override;
+  Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
 
   void closeListeners() override;
 
