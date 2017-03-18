@@ -201,6 +201,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyBufferLimits) {
   EXPECT_NE(nullptr, handle);
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
+  EXPECT_CALL(callbacks.pool_failure_, ready());
   conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }
