@@ -91,16 +91,16 @@ public:
   static bool isLoopbackAddress(const Address::Instance& address);
 
   /**
-   * @return a address that represents the IPv4 wildcard address (i.e. "0.0.0.0"). Used
-   * during binding to indicate that incoming connections to any local IPv4 address
-   * are to be received.
+   * @return Address::InstancePtr an address that represents the IPv4 wildcard address
+   *         (i.e. "0.0.0.0"). Used during binding to indicate that incoming connections to any
+   *         local IPv4 address are to be accepted.
    */
   static Address::InstancePtr getIpv4AnyAddress();
 
   /**
-   * @return a address that represents the IPv6 wildcard address (i.e. "::"). Used
-   * during binding to indicate that incoming connections to any local IPv6 address
-   * are to be received.
+   * @return Address::InstancePtr an address that represents the IPv6 wildcard address (i.e. "::").
+   *         Used during binding to indicate that incoming connections to any local IPv6 address
+   *         are to be accepted.
    */
   static Address::InstancePtr getIpv6AnyAddress();
 
