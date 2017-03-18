@@ -25,14 +25,13 @@ docker pull lyft/envoy-build:latest && docker run -t -i -u root:root -v <SOURCE_
 
 This bind mounts `<SOURCE_DIR>`, which allows for changes on the local
 filesystem to be consumed and outputs build artifacts in `<SOURCE_DIR>/build`.
-The static Envoy binary can be found in `<SOURCE_DIR>/build/source/exe/envoy`.
+The static Envoy binary can be found in `<SOURCE_DIR>/build_debug/source/exe/envoy`.
 
 The `do_ci.sh` targets are:
 
 * `asan` &mdash; build and run tests with [AddressSanitizer](https://github.com/google/sanitizers/wiki/AddressSanitizer).
-* `coverage` &mdash; build and run tests, generating coverage information in `<SOURCE_DIR>/build/coverage.html`.
+* `coverage` &mdash; build and run tests, generating coverage information in `<SOURCE_DIR>/build_coverage/coverage.html`.
 * `debug` &mdash; build debug binary and run tests.
-* `docs` &mdash; build documentation, generated docs are found in `<SOURCE_DIR>/generated`.
 * `fix_format`&mdash; run `clang-format` 3.6 on entire source tree.
 * `normal` &mdash; build unstripped optimized binary and run tests .
 * `server_only` &mdash; build stripped optimized binary only.
