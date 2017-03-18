@@ -30,3 +30,8 @@
   abort();
 
 #define NOT_IMPLEMENTED PANIC("not implemented")
+
+// NOT_REACHED is for spots the compiler insists on having a return, but where we know that it
+// shouldn't be possible to arrive there, assuming no horrendous bugs). For example, after a
+// switch (some_enum) with all enum values included in the cases.
+#define NOT_REACHED PANIC("not reached")

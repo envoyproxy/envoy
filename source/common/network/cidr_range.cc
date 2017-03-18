@@ -131,7 +131,6 @@ InstancePtr CidrRange::truncateIpAddressAndLength(InstancePtr address, int* leng
       return address;
     } else if (length == 0) {
       // Create an Ipv4Instance with only a port, which will thus have the any address.
-      // TODO( Consider adding a Utility::AnyIpv4Address() static method to return such an instance.
       return InstancePtr(new Ipv4Instance(uint32_t(0)));
     }
     // Need to mask out the unused bits, and create an Ipv4Instance with this address.
@@ -151,7 +150,6 @@ InstancePtr CidrRange::truncateIpAddressAndLength(InstancePtr address, int* leng
       return address;
     } else if (length == 0) {
       // Create an Ipv6Instance with only a port, which will thus have the any address.
-      // TODO Consider adding an Any6() static method to return such an instance.
       return InstancePtr(new Ipv6Instance(uint32_t(0)));
     }
     // We need to mask out the unused bits, but we don't have a uint128_t available.
@@ -179,7 +177,7 @@ InstancePtr CidrRange::truncateIpAddressAndLength(InstancePtr address, int* leng
     return InstancePtr(new Ipv6Instance(sa6));
   }
   }
-  return nullptr; // UNREACHED
+  NOT_REACHED
 }
 
 } // Address
