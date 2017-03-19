@@ -51,6 +51,15 @@ private:
   bool ready_{false};
 };
 
+class ScopedFdCloser {
+public:
+  ScopedFdCloser(int fd);
+  ~ScopedFdCloser();
+
+private:
+  int fd_;
+};
+
 namespace Http {
 
 /**
