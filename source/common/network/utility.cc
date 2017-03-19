@@ -1,5 +1,3 @@
-#include "utility.h"
-
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
@@ -7,6 +5,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/utility.h"
 
 #include <ifaddrs.h>
 #include <linux/netfilter_ipv4.h>

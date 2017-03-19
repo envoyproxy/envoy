@@ -1,9 +1,8 @@
-#include "connection_impl.h"
-
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
 #include "common/network/utility.h"
+#include "common/ssl/connection_impl.h"
 
 #include "openssl/err.h"
 #include "openssl/x509v3.h"

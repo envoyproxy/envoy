@@ -1,6 +1,6 @@
 #pragma once
 
-#include "assert.h"
+#include "common/common/assert.h"
 
 /**
  * Mixin class that allows an object contained in a unique pointer to be easily linked and unlinked

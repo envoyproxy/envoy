@@ -1,12 +1,11 @@
 #pragma once
 
-#include "libevent.h"
-
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection_handler.h"
 
 #include "common/common/logger.h"
+#include "common/event/libevent.h"
 
 namespace Event {
 

@@ -1,8 +1,7 @@
-#include "filter_manager_impl.h"
-
 #include "envoy/network/connection.h"
 
 #include "common/common/assert.h"
+#include "common/network/filter_manager_impl.h"
 
 namespace Network {
 

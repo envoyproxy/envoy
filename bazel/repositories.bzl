@@ -3,6 +3,131 @@
 # libraries according to their canonical build systems and expressing the dependencies in a manner
 # similar to ci/WORKSPACE.
 
+def ares_repositories():
+    BUILD = """
+cc_library(
+    name = "ares",
+    srcs = [
+        "ares__close_sockets.c",
+        "ares__get_hostent.c",
+        "ares__read_line.c",
+        "ares__timeval.c",
+        "ares_cancel.c",
+        "ares_create_query.c",
+        "ares_data.c",
+        "ares_destroy.c",
+        "ares_expand_name.c",
+        "ares_expand_string.c",
+        "ares_fds.c",
+        "ares_free_hostent.c",
+        "ares_free_string.c",
+        "ares_getenv.c",
+        "ares_gethostbyaddr.c",
+        "ares_gethostbyname.c",
+        "ares_getnameinfo.c",
+        "ares_getopt.c",
+        "ares_getsock.c",
+        "ares_init.c",
+        "ares_library_init.c",
+        "ares_llist.c",
+        "ares_mkquery.c",
+        "ares_nowarn.c",
+        "ares_options.c",
+        "ares_parse_a_reply.c",
+        "ares_parse_aaaa_reply.c",
+        "ares_parse_mx_reply.c",
+        "ares_parse_naptr_reply.c",
+        "ares_parse_ns_reply.c",
+        "ares_parse_ptr_reply.c",
+        "ares_parse_soa_reply.c",
+        "ares_parse_srv_reply.c",
+        "ares_parse_txt_reply.c",
+        "ares_platform.c",
+        "ares_process.c",
+        "ares_query.c",
+        "ares_search.c",
+        "ares_send.c",
+        "ares_strcasecmp.c",
+        "ares_strdup.c",
+        "ares_strerror.c",
+        "ares_timeout.c",
+        "ares_version.c",
+        "ares_writev.c",
+        "bitncmp.c",
+        "inet_net_pton.c",
+        "inet_ntop.c",
+        "windows_port.c",
+    ],
+    hdrs = [
+        "ares.h",
+        "ares_build.h",
+        "ares_config.h",
+        "ares_data.h",
+        "ares_dns.h",
+        "ares_getenv.h",
+        "ares_getopt.h",
+        "ares_inet_net_pton.h",
+        "ares_iphlpapi.h",
+        "ares_ipv6.h",
+        "ares_library_init.h",
+        "ares_llist.h",
+        "ares_nowarn.h",
+        "ares_platform.h",
+        "ares_private.h",
+        "ares_rules.h",
+        "ares_setup.h",
+        "ares_strcasecmp.h",
+        "ares_strdup.h",
+        "ares_version.h",
+        "ares_writev.h",
+        "bitncmp.h",
+        "nameser.h",
+        "setup_once.h",
+    ],
+    copts = [
+        "-DHAVE_CONFIG_H",
+    ],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "config",
+    # This list must not contain ares_config.h.
+    srcs = glob(["**/*.m4"]),
+    outs = ["ares_config.h"],
+    # There is some serious evil here. buildconf needs to be invoked in its source location, where
+    # it also generates temp files (no option to place in TMPDIR). Also, configure does a cd
+    # relative dance that doesn't play nice with the symlink execroot in the Bazel build. So,
+    # disable sandboxing and do some fragile stuff with the build dirs.
+    # TODO(htuch): Figure out a cleaner way to handle this.
+    cmd = "pushd ../../external/cares_git; ./buildconf; ./configure; " +
+          "cp -f ares_config.h ../../execroot/envoy/$@",
+    local = 1,
+)
+
+genrule(
+    name = "ares_build",
+    srcs = ["ares_build.h.dist"],
+    outs = ["ares_build.h"],
+    cmd = "cp $(SRCS) $@",
+)
+"""
+
+    native.new_git_repository(
+        name = "cares_git",
+        remote = "https://github.com/c-ares/c-ares.git",
+        commit = "7691f773af79bf75a62d1863fd0f13ebf9dc51b1", # v1.12.0
+        build_file_content = BUILD,
+    )
+
+def boringssl_repositories():
+    native.git_repository(
+        name = "boringssl",
+        commit = "bfd36df3da38dbf8828e712f42fbab2a0034bc40",  # 2017-02-02
+        remote = "https://boringssl.googlesource.com/boringssl",
+    )
+
 def googletest_repositories():
     BUILD = """
 cc_library(
@@ -26,20 +151,123 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
 )
-
-cc_library(
-    name = "googletest_main",
-    srcs = ["googlemock/src/gmock_main.cc"],
-    visibility = ["//visibility:public"],
-    deps = [":googletest"],
-)
 """
     native.new_git_repository(
-        name = "googletest",
+        name = "googletest_git",
         build_file_content = BUILD,
         # v1.8.0 release
         commit = "ec44c6c1675c25b9827aacd08c02433cccde7780",
         remote = "https://github.com/google/googletest.git",
+    )
+
+def libevent_repositories():
+    BUILD = """
+genrule(
+    name = "config",
+    srcs = glob(["**/*"]),
+    outs = ["config.h"],
+    cmd = "TMPDIR=$(@D) $(location configure) --enable-shared=no --disable-libevent-regress " +
+          "--disable-openssl && cp config.h $@",
+    tools = ["configure"],
+)
+
+genrule(
+    name = "event-config",
+    srcs = [
+        "config.h",
+        "make-event-config.sed",
+    ],
+    outs = ["include/event2/event-config.h"],
+    cmd = "sed -f $(location make-event-config.sed) < $(location config.h) > $@",
+)
+
+event_srcs = [
+    "buffer.c",
+    "bufferevent.c",
+    "bufferevent_filter.c",
+    "bufferevent_pair.c",
+    "bufferevent_ratelim.c",
+    "bufferevent_sock.c",
+    "epoll.c",
+    "evdns.c",
+    "event.c",
+    "event_tagging.c",
+    "evmap.c",
+    "evrpc.c",
+    "evthread.c",
+    "evutil.c",
+    "evutil_rand.c",
+    "evutil_time.c",
+    "http.c",
+    "listener.c",
+    "log.c",
+    "poll.c",
+    "select.c",
+    "signal.c",
+    "strlcpy.c",
+    ":event-config",
+] + glob(["*.h"])
+
+event_pthread_srcs = [
+    "evthread_pthread.c",
+    ":event-config",
+]
+
+cc_library(
+    name = "event",
+    srcs = event_srcs,
+    hdrs = glob(["include/**/*.h"]) + [
+        "arc4random.c",  # arc4random.c is included by evutil_rand.c
+        "bufferevent-internal.h",
+        "defer-internal.h",
+        "evbuffer-internal.h",
+        "event-internal.h",
+        "evthread-internal.h",
+        "http-internal.h",
+        "iocp-internal.h",
+        "ipv6-internal.h",
+        "log-internal.h",
+        "minheap-internal.h",
+        "mm-internal.h",
+        "strlcpy-internal.h",
+        "util-internal.h",
+        "compat/sys/queue.h",
+    ],
+    copts = [
+        "-w",
+        "-DHAVE_CONFIG_H",
+    ],
+    includes = [
+        "compat",
+        "include",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "event_pthreads",
+    srcs = event_pthread_srcs + ["include/event2/thread.h"],
+    hdrs = [
+        "compat/sys/queue.h",
+        "evthread-internal.h",
+    ],
+    copts = [
+        "-w",
+        "-DHAVE_CONFIG_H",
+    ],
+    includes = [
+        "compat",
+        "include",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [":event"],
+)"""
+
+    native.new_http_archive(
+        name = "libevent_git",
+        url = "https://github.com/libevent/libevent/releases/download/release-2.1.8-stable/libevent-2.1.8-stable.tar.gz",
+        strip_prefix = "libevent-2.1.8-stable",
+        build_file_content = BUILD,
     )
 
 def spdlog_repositories():
@@ -64,6 +292,56 @@ cc_library(
         remote = "https://github.com/gabime/spdlog.git",
     )
 
+def tclap_repositories():
+    BUILD = """
+cc_library(
+    name = "tclap",
+    hdrs = [
+        "include/tclap/Arg.h",
+        "include/tclap/ArgException.h",
+        "include/tclap/ArgTraits.h",
+        "include/tclap/CmdLine.h",
+        "include/tclap/CmdLineInterface.h",
+        "include/tclap/CmdLineOutput.h",
+        "include/tclap/Constraint.h",
+        "include/tclap/DocBookOutput.h",
+        "include/tclap/HelpVisitor.h",
+        "include/tclap/IgnoreRestVisitor.h",
+        "include/tclap/MultiArg.h",
+        "include/tclap/MultiSwitchArg.h",
+        "include/tclap/OptionalUnlabeledTracker.h",
+        "include/tclap/StandardTraits.h",
+        "include/tclap/StdOutput.h",
+        "include/tclap/SwitchArg.h",
+        "include/tclap/UnlabeledMultiArg.h",
+        "include/tclap/UnlabeledValueArg.h",
+        "include/tclap/ValueArg.h",
+        "include/tclap/ValuesConstraint.h",
+        "include/tclap/VersionVisitor.h",
+        "include/tclap/Visitor.h",
+        "include/tclap/XorHandler.h",
+        "include/tclap/ZshCompletionOutput.h",
+    ],
+    defines = [
+        "HAVE_LONG_LONG=1",
+        "HAVE_SSTREAM=1",
+    ],
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+"""
+
+    native.new_http_archive(
+        name = "tclap_archive",
+        url = "https://storage.googleapis.com/istio-build-deps/tclap-1.2.1.tar.gz",
+        strip_prefix = "tclap-1.2.1",
+        build_file_content = BUILD,
+    )
+
 def envoy_dependencies():
+    ares_repositories()
+    boringssl_repositories()
     googletest_repositories()
+    libevent_repositories()
     spdlog_repositories()
+    tclap_repositories()

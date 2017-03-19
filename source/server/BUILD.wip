@@ -1,0 +1,15 @@
+package(default_visibility = ["//visibility:public"])
+
+load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+
+envoy_cc_library(
+    name = "options_lib",
+    srcs = ["options_impl.cc"],
+    hdrs = ["options_impl.h"],
+    external_deps = ["tclap"],
+    deps = [
+        "//include/envoy/server:options_includes",
+        "//source/common/common:macros_lib",
+        "//source/common/common:version_lib",
+    ],
+)

@@ -1,7 +1,7 @@
-#include "hex.h"
-#include "utility.h"
-
 #include "envoy/common/exception.h"
+
+#include "common/common/hex.h"
+#include "common/common/utility.h"
 
 std::string Hex::encode(const uint8_t* data, size_t length) {
   static const char* const digits = "0123456789abcdef";

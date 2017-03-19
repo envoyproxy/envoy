@@ -1,6 +1,3 @@
-#include "connection_impl.h"
-#include "utility.h"
-
 #include "envoy/common/exception.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
@@ -10,6 +7,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 
 namespace Network {

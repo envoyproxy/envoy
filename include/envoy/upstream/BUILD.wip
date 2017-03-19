@@ -1,0 +1,23 @@
+package(default_visibility = ["//visibility:public"])
+
+load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+
+envoy_cc_library(
+    name = "host_description_includes",
+    hdrs = ["host_description.h"],
+    deps = [
+        ":outlier_detection_includes",
+        "//include/envoy/network:address_includes",
+        "//include/envoy/stats:stats_macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "outlier_detection_includes",
+    hdrs = ["outlier_detection.h"],
+    deps = [
+        "//include/envoy/common:base_includes",
+        "//include/envoy/common:optional_includes",
+        "//include/envoy/common:time_includes",
+    ],
+)

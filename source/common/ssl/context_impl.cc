@@ -1,10 +1,9 @@
-#include "context_impl.h"
-
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
 #include "common/common/hex.h"
+#include "common/ssl/context_impl.h"
 
 #include "openssl/x509v3.h"
 

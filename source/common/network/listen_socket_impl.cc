@@ -1,10 +1,8 @@
-#include "listen_socket_impl.h"
-#include "utility.h"
-
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 
 namespace Network {

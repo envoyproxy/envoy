@@ -1,8 +1,7 @@
 #pragma once
 
-#include "context_impl.h"
-
 #include "common/network/connection_impl.h"
+#include "common/ssl/context_impl.h"
 
 namespace Ssl {
 

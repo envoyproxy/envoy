@@ -1,8 +1,8 @@
 #pragma once
 
-#include "event_impl_base.h"
-
 #include "envoy/event/signal.h"
+
+#include "common/event/event_impl_base.h"
 
 namespace Event {
 

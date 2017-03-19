@@ -9,3 +9,4 @@
 BUILD
 cscope.*
 BROWSE
+.deps
