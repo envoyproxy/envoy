@@ -11,15 +11,6 @@
 namespace Network {
 namespace Address {
 namespace {
-class ScopedFdCloser {
-public:
-  ScopedFdCloser(int fd) : fd_(fd) {}
-  ~ScopedFdCloser() { close(fd_); }
-
-private:
-  int fd_;
-};
-
 void makeFdBlocking(int fd) {
   const int flags = ::fcntl(fd, F_GETFL, 0);
   ASSERT_GE(flags, 0);

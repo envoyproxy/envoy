@@ -71,6 +71,9 @@ void ConditionalInitializer::waitReady() {
   EXPECT_TRUE(ready_);
 }
 
+ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
+ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
+
 namespace Http {
 
 TestHeaderMapImpl::TestHeaderMapImpl() : HeaderMapImpl() {}
