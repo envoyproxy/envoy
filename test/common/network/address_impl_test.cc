@@ -100,8 +100,10 @@ TEST(Ipv4InstanceTest, BadAddress) {
 
 TEST(Ipv4InstanceTest, SocketBindAndConnect) {
   // Test listening on and connecting to an unused port on the IPv4 loopback address.
-  Ipv4Instance loopbackPort("127.0.0.1", ::Network::Test::getUnusedPort());
-  testSocketBindAndConnect(loopbackPort);
+  InstancePtr addrPort(new Ipv4Instance("127.0.0.1", 0));
+  addrPort = Network::Test::checkPortAvailability(addrPort, SocketType::Stream);
+  ASSERT_FALSE(addrPort == nullptr);
+  testSocketBindAndConnect(*addrPort);
 }
 
 TEST(Ipv6InstanceTest, SocketAddress) {
@@ -154,8 +156,10 @@ TEST(Ipv6InstanceTest, BadAddress) {
 
 TEST(Ipv6InstanceTest, SocketBindAndConnect) {
   // Test listening on and connecting to an unused port on the IPv4 loopback address.
-  Ipv6Instance loopbackPort("::1", ::Network::Test::getUnusedPort());
-  testSocketBindAndConnect(loopbackPort);
+  InstancePtr addrPort(new Ipv6Instance("::1", 0));
+  addrPort = Network::Test::checkPortAvailability(addrPort, SocketType::Stream);
+  ASSERT_FALSE(addrPort == nullptr);
+  testSocketBindAndConnect(*addrPort);
 }
 
 TEST(PipeInstanceTest, Basic) {
