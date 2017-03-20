@@ -136,7 +136,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
 
   uint64_t total_bytes_written = 0;
   bool keep_writing = true;
-  while (write_buffer_.length() && keep_writing) {
+  while ((write_buffer_.length() > 0) && keep_writing) {
     // Protect against stack overflow if the buffer has a very large buffer chain.
     // TODO(mattklein123): The current evbuffer Buffer::Instance implementation will iterate through
     // the entire chain each time this is called to determine how many slices would be needed. In
@@ -178,6 +178,8 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
       }
     }
 
+    // Draining must be done within the inner loop, otherwise we will keep getting the same slices
+    // at the beginning of the buffer.
     if (inner_bytes_written > 0) {
       write_buffer_.drain(inner_bytes_written);
     }
