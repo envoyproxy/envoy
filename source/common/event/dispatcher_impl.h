@@ -36,11 +36,11 @@ public:
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::ConnectionHandler& conn_handler,
                                       Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                                      Stats::Store& stats_store,
+                                      Stats::Scope& scope,
                                       const Network::ListenerOptions& listener_options) override;
   Network::ListenerPtr createSslListener(Network::ConnectionHandler& conn_handler,
                                          Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-                                         Network::ListenerCallbacks& cb, Stats::Store& stats_store,
+                                         Network::ListenerCallbacks& cb, Stats::Scope& scope,
                                          const Network::ListenerOptions& listener_options) override;
   TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;

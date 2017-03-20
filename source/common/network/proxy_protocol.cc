@@ -14,8 +14,8 @@ namespace Network {
 
 const std::string ProxyProtocol::ActiveConnection::PROXY_TCP4 = "PROXY TCP4 ";
 
-ProxyProtocol::ProxyProtocol(Stats::Store& stats_store)
-    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(stats_store))} {}
+ProxyProtocol::ProxyProtocol(Stats::Scope& scope)
+    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {}
 
 void ProxyProtocol::newConnection(Event::Dispatcher& dispatcher, int fd, ListenerImpl& listener) {
   std::unique_ptr<ActiveConnection> p{new ActiveConnection(*this, dispatcher, fd, listener)};

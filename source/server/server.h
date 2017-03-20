@@ -154,6 +154,7 @@ private:
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   std::unique_ptr<Configuration::Main> config_;
   std::list<WorkerPtr> workers_;
+  Stats::ScopePtr admin_scope_;
   std::unique_ptr<AdminImpl> admin_;
   Event::SignalEventPtr sigterm_;
   Event::SignalEventPtr sig_usr_1_;

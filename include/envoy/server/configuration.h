@@ -56,6 +56,11 @@ public:
    *         buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope to use for all listener specific stats.
+   */
+  virtual Stats::Scope& scope() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;

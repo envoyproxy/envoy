@@ -213,12 +213,13 @@ public:
   ~MockConnectionHandler();
 
   MOCK_METHOD0(numConnections, uint64_t());
-  MOCK_METHOD3(addListener,
+  MOCK_METHOD4(addListener,
                void(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
+                    Stats::Scope& scope, const Network::ListenerOptions& listener_options));
+  MOCK_METHOD5(addSslListener,
+               void(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
+                    Network::ListenSocket& socket, Stats::Scope& scope,
                     const Network::ListenerOptions& listener_options));
-  MOCK_METHOD4(addSslListener, void(Network::FilterChainFactory& factory,
-                                    Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-                                    const Network::ListenerOptions& listener_options));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
   MOCK_METHOD0(closeListeners, void());
