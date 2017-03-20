@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 SCRIPT_DIR=`dirname $0`
 BUILD_DIR=$2/configgen
 if [ ! -d $BUILD_DIR/venv ]; then

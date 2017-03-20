@@ -22,7 +22,8 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& access_log_path, uint32_t port, Server::Instance& server);
+  AdminImpl(const std::string& access_log_path, const std::string& address,
+            Server::Instance& server);
 
   Http::Code runCallback(const std::string& path, Buffer::Instance& response);
   Network::ListenSocket& socket() { return *socket_; }

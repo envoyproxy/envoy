@@ -142,9 +142,9 @@ public:
   virtual const std::string& accessLogPath() PURE;
 
   /**
-   * @return uint32_t the server admin HTTP port.
+   * @return const std::string& the server address.
    */
-  virtual uint32_t port() PURE;
+  virtual const std::string& address() PURE;
 };
 
 /**

@@ -180,7 +180,7 @@ bool MainImpl::ListenerConfig::createFilterChain(Network::Connection& connection
 InitialImpl::InitialImpl(const Json::Object& json) {
   Json::ObjectPtr admin = json.getObject("admin");
   admin_.access_log_path_ = admin->getString("access_log_path");
-  admin_.port_ = admin->getInteger("port");
+  admin_.address_ = admin->getString("address");
 
   if (json.hasObject("flags_path")) {
     flags_path_.value(json.getString("flags_path"));
