@@ -134,47 +134,56 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     }
   }
 
-  if (write_buffer_.length() == 0) {
-    return {PostIoAction::KeepOpen, 0};
-  }
+  uint64_t total_bytes_written = 0;
+  bool keep_writing = true;
+  while (write_buffer_.length() && keep_writing) {
+    // Protect against stack overflow if the buffer has a very large buffer chain.
+    // TODO(mattklein123): The current evbuffer Buffer::Instance implementation will iterate through
+    // the entire chain each time this is called to determine how many slices would be needed. In
+    // this case, we don't care, and only want to fill up to MAX_SLICES. When we swap out evbuffer
+    // we can change this behavior.
+    // TODO(mattklein123): As it relates to our fairness efforts, we might want to limit the number
+    // of iterations of this loop, either by pure iterations, bytes written, etc.
+    const uint64_t MAX_SLICES = 32;
+    Buffer::RawSlice slices[MAX_SLICES];
+    uint64_t num_slices = std::min(MAX_SLICES, write_buffer_.getRawSlices(slices, MAX_SLICES));
 
-  uint64_t num_slices = write_buffer_.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  write_buffer_.getRawSlices(slices, num_slices);
+    uint64_t inner_bytes_written = 0;
+    for (uint64_t i = 0; i < num_slices; i++) {
+      // SSL_write() requires that if a previous call returns SSL_ERROR_WANT_WRITE, we need to call
+      // it again with the same parameters. Most implementations keep track of the last write size.
+      // In our case we don't need to do that because: a) SSL_write() will not write partial
+      // buffers. b) We only move() into the write buffer, which means that it's impossible for a
+      // particular chain to increase in size. So as long as we start writing where we left off we
+      // are guaranteed to call SSL_write() with the same parameters.
+      int rc = SSL_write(ssl_.get(), slices[i].mem_, slices[i].len_);
+      conn_log_trace("ssl write returns: {}", *this, rc);
+      if (rc > 0) {
+        inner_bytes_written += rc;
+        total_bytes_written += rc;
+      } else {
+        int err = SSL_get_error(ssl_.get(), rc);
+        switch (err) {
+        case SSL_ERROR_WANT_WRITE:
+          keep_writing = false;
+          break;
+        case SSL_ERROR_WANT_READ:
+        // Renegotiation has started. We don't handle renegotiation so just fall through.
+        default:
+          drainErrorQueue();
+          return {PostIoAction::Close, total_bytes_written};
+        }
 
-  uint64_t bytes_written = 0;
-  for (uint64_t i = 0; i < num_slices; i++) {
-    // SSL_write() requires that if a previous call returns SSL_ERROR_WANT_WRITE, we need to call
-    // it again with the same parameters. Most implementations keep track of the last write size.
-    // In our case we don't need to do that because: a) SSL_write() will not write partial buffers.
-    // b) We only move() into the write buffer, which means that it's impossible for a particular
-    // chain to increase in size. So as long as we start writing where we left off we are guaranteed
-    // to call SSL_write() with the same parameters.
-    int rc = SSL_write(ssl_.get(), slices[i].mem_, slices[i].len_);
-    conn_log_trace("ssl write returns: {}", *this, rc);
-    if (rc > 0) {
-      bytes_written += rc;
-    } else {
-      int err = SSL_get_error(ssl_.get(), rc);
-      switch (err) {
-      case SSL_ERROR_WANT_WRITE:
         break;
-      case SSL_ERROR_WANT_READ:
-      // Renegotiation has started. We don't handle renegotiation so just fall through.
-      default:
-        drainErrorQueue();
-        return {PostIoAction::Close, bytes_written};
       }
+    }
 
-      break;
+    if (inner_bytes_written > 0) {
+      write_buffer_.drain(inner_bytes_written);
     }
   }
 
-  if (bytes_written > 0) {
-    write_buffer_.drain(bytes_written);
-  }
-
-  return {PostIoAction::KeepOpen, bytes_written};
+  return {PostIoAction::KeepOpen, total_bytes_written};
 }
 
 void ConnectionImpl::onConnected() { ASSERT(!handshake_complete_); }
