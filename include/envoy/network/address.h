@@ -51,12 +51,12 @@ public:
   virtual bool isAnyAddress() const PURE;
 
   /**
-   * @return Ipv4 address data IFF type() == IpVersion::v4, otherwise nullptr.
+   * @return Ipv4 address data IFF version() == IpVersion::v4, otherwise nullptr.
    */
   virtual const Ipv4* ipv4() const PURE;
 
   /**
-   * @return Ipv6 address data IFF type() == IpVersion::v6, otherwise nullptr.
+   * @return Ipv6 address data IFF version() == IpVersion::v6, otherwise nullptr.
    */
   virtual const Ipv6* ipv6() const PURE;
 
