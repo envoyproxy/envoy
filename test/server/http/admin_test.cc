@@ -13,7 +13,8 @@ class AdminFilterTest : public testing::Test {
 public:
   // TODO(mattklein123): Switch to mocks and do not bind to a real port.
   AdminFilterTest()
-      : admin_("/dev/null", 9002, server_), filter_(admin_), request_headers_{{":path", "/"}} {
+      : admin_("/dev/null", Network::Utility::resolveUrl("tcp://127.0.0.1:9002"), server_),
+        filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -44,4 +45,4 @@ TEST_F(AdminFilterTest, Trailers) {
   filter_.decodeTrailers(request_headers_);
 }
 
-} // Server
+} // namespace Server

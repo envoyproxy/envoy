@@ -3,7 +3,7 @@
 
 {% macro ingress_listener(address) %}
 {
-  "address": {{ address }},
+  "address": "{{ address }}",
   "filters": [
   {
     "type": "read",
@@ -161,7 +161,7 @@
 
   {% for mapping in external_virtual_hosts -%}
   {
-    "address": {{ mapping['address'] }},
+    "address": "{{ mapping['address'] }}",
     "filters": [
     {
       "type": "read",
@@ -220,7 +220,7 @@
 
   {% for key, value in mongos_servers.iteritems() -%}
   {
-    "address": {{ value['address'] }},
+    "address": "{{ value['address'] }}",
     "filters": [
     {% if value.get('ratelimit', False) %}
     {
@@ -260,7 +260,7 @@
   ],
 
   "admin": { "access_log_path": "/var/log/envoy/admin_access.log",
-             "port": 9901 },
+             "address": "tcp://0.0.0.0:9901" },
   "flags_path": "/etc/envoy/flags",
   "statsd_tcp_cluster_name": "statsd",
 

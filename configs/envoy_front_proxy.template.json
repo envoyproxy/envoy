@@ -2,7 +2,7 @@
 
 {% macro listener(address) %}
   {
-    "address": {{ address }},
+    "address": "{{ address }}",
     {% if kwargs['ssl'] -%}
     "ssl_context": {
       "alpn_protocols": "h2,http/1.1",
@@ -82,7 +82,7 @@
   ],
 
   "admin": { "access_log_path": "/var/log/envoy/admin_access.log",
-             "port": 9901 },
+             "address": "tcp://0.0.0.0:9901" },
   "flags_path": "/etc/envoy/flags",
   "statsd_tcp_cluster_name": "statsd",
 

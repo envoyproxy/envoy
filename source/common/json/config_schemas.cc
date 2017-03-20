@@ -899,9 +899,9 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "type" : "object",
         "properties" : {
           "access_log_path" : {"type" : "string"},
-          "port" : {"type" : "integer"}
+          "address" : {"type" : "string"}
         },
-        "required" : ["access_log_path", "port"],
+        "required" : ["access_log_path", "address"],
         "additionalProperties" : false
       },
       "cluster_manager" : {"type" : "object"},

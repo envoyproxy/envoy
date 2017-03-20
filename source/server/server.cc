@@ -162,15 +162,15 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   Json::ObjectPtr config_json = Json::Factory::LoadFromFile(options.configPath());
   config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
-  log().info("admin port: {}", initial_config.admin().port());
+  log().info("admin address: {}", initial_config.admin().address()->asString());
 
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   drain_manager_->startParentShutdownSequence();
   original_start_time_ = info.original_start_time_;
-  admin_.reset(
-      new AdminImpl(initial_config.admin().accessLogPath(), initial_config.admin().port(), *this));
+  admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
+                             initial_config.admin().address(), *this));
   handler_.addListener(*admin_, admin_->socket(),
                        Network::ListenerOptions::listenerOptionsWithBindToPort());
 

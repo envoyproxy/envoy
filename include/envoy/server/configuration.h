@@ -23,7 +23,7 @@ public:
   virtual Network::FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * @return std::string the address.
+   * @return Network::Address::InstancePtr the address.
    */
   virtual Network::Address::InstancePtr address() PURE;
 
@@ -142,9 +142,9 @@ public:
   virtual const std::string& accessLogPath() PURE;
 
   /**
-   * @return uint32_t the server admin HTTP port.
+   * @return Network::Address::InstancePtr the server address.
    */
-  virtual uint32_t port() PURE;
+  virtual Network::Address::InstancePtr address() PURE;
 };
 
 /**
