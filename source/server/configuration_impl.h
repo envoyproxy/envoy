@@ -156,10 +156,10 @@ private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
     const std::string& accessLogPath() override { return access_log_path_; }
-    const std::string& address() override { return address_; }
+    Network::Address::InstancePtr address() override { return address_; }
 
     std::string access_log_path_;
-    std::string address_;
+    Network::Address::InstancePtr address_;
   };
 
   struct RuntimeImpl : public Runtime {

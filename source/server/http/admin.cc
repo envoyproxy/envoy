@@ -295,10 +295,9 @@ void AdminFilter::onComplete() {
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
     : config_(new Router::NullConfigImpl()) {}
 
-AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& address,
+AdminImpl::AdminImpl(const std::string& access_log_path, Network::Address::InstancePtr address,
                      Server::Instance& server)
-    : server_(server),
-      socket_(new Network::TcpListenSocket(Network::Utility::resolveUrl(address), true)),
+    : server_(server), socket_(new Network::TcpListenSocket(address, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),

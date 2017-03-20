@@ -162,7 +162,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   Json::ObjectPtr config_json = Json::Factory::LoadFromFile(options.configPath());
   config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
-  log().info("admin address: {}", initial_config.admin().address());
+  log().info("admin address: {}", initial_config.admin().address()->asString());
 
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;

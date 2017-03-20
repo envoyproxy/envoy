@@ -22,7 +22,7 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& access_log_path, const std::string& address,
+  AdminImpl(const std::string& access_log_path, Network::Address::InstancePtr address,
             Server::Instance& server);
 
   Http::Code runCallback(const std::string& path, Buffer::Instance& response);
