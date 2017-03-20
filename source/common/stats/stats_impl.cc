@@ -26,6 +26,7 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
 void RawStatData::initialize(const std::string& name) {
   ASSERT(!initialized());
   ASSERT(name.size() <= MAX_NAME_SIZE);
+  ASSERT(std::string::npos == name.find(':'));
   ref_count_ = 1;
   StringUtil::strlcpy(name_, name.substr(0, MAX_NAME_SIZE).c_str(), MAX_NAME_SIZE + 1);
 }

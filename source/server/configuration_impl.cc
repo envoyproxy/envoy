@@ -114,10 +114,15 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { return listeners_; }
 
 MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json) : parent_(parent) {
-  std::string addr = json.getString("address");
-  address_ = Network::Utility::resolveUrl(addr);
-  scope_ = parent_.server_.stats().createScope(fmt::format("listener.{}.", addr));
-  log().info("  address={}", addr);
+  address_ = Network::Utility::resolveUrl(json.getString("address"));
+
+  // ':' is a reserved char in statsd. Do the translation here to avoid costly inline translations
+  // later.
+  std::string final_stat_name = fmt::format("listener.{}.", address_->asString());
+  std::replace(final_stat_name.begin(), final_stat_name.end(), ':', '_');
+
+  scope_ = parent_.server_.stats().createScope(final_stat_name);
+  log().info("  address={}", address_->asString());
 
   json.validateSchema(Json::Schema::LISTENER_SCHEMA);
 

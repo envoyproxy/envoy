@@ -82,19 +82,19 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 Network::ListenerPtr
 DispatcherImpl::createListener(Network::ConnectionHandler& conn_handler,
                                Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                               Stats::Store& stats_store,
+                               Stats::Scope& scope,
                                const Network::ListenerOptions& listener_options) {
   return Network::ListenerPtr{
-      new Network::ListenerImpl(conn_handler, *this, socket, cb, stats_store, listener_options)};
+      new Network::ListenerImpl(conn_handler, *this, socket, cb, scope, listener_options)};
 }
 
 Network::ListenerPtr
 DispatcherImpl::createSslListener(Network::ConnectionHandler& conn_handler,
                                   Ssl::ServerContext& ssl_ctx, Network::ListenSocket& socket,
-                                  Network::ListenerCallbacks& cb, Stats::Store& stats_store,
+                                  Network::ListenerCallbacks& cb, Stats::Scope& scope,
                                   const Network::ListenerOptions& listener_options) {
   return Network::ListenerPtr{new Network::SslListenerImpl(conn_handler, *this, ssl_ctx, socket, cb,
-                                                           stats_store, listener_options)};
+                                                           scope, listener_options)};
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return TimerPtr{new TimerImpl(*this, cb)}; }

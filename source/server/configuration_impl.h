@@ -97,6 +97,7 @@ private:
     bool useProxyProto() override { return use_proxy_proto_; }
     bool useOriginalDst() override { return use_original_dst_; }
     uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
+    Stats::Scope& scope() override { return *scope_; }
 
     // Network::FilterChainFactory
     bool createFilterChain(Network::Connection& connection) override;

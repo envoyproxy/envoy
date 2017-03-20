@@ -19,7 +19,7 @@ namespace Network {
 class ListenerImpl : public Listener {
 public:
   ListenerImpl(Network::ConnectionHandler& conn_handler, Event::DispatcherImpl& dispatcher,
-               ListenSocket& socket, ListenerCallbacks& cb, Stats::Store& stats_store,
+               ListenSocket& socket, ListenerCallbacks& cb, Stats::Scope& scope,
                const ListenerOptions& listener_options);
 
   /**
@@ -57,8 +57,8 @@ class SslListenerImpl : public ListenerImpl {
 public:
   SslListenerImpl(Network::ConnectionHandler& conn_handler, Event::DispatcherImpl& dispatcher,
                   Ssl::Context& ssl_ctx, ListenSocket& socket, ListenerCallbacks& cb,
-                  Stats::Store& stats_store, const Network::ListenerOptions& listener_options)
-      : ListenerImpl(conn_handler, dispatcher, socket, cb, stats_store, listener_options),
+                  Stats::Scope& scope, const Network::ListenerOptions& listener_options)
+      : ListenerImpl(conn_handler, dispatcher, socket, cb, scope, listener_options),
         ssl_ctx_(ssl_ctx) {}
 
   // ListenerImpl

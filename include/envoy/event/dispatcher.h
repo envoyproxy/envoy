@@ -78,13 +78,13 @@ public:
    * @param conn_handler supplies the handler for connections received by the listener
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
-   * @param stats_store supplies the Stats::Store to use.
+   * @param scope supplies the Stats::Scope to use.
    * @param listener_options listener configuration options.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr
   createListener(Network::ConnectionHandler& conn_handler, Network::ListenSocket& socket,
-                 Network::ListenerCallbacks& cb, Stats::Store& stats_store,
+                 Network::ListenerCallbacks& cb, Stats::Scope& scope,
                  const Network::ListenerOptions& listener_options) PURE;
 
   /**
@@ -93,15 +93,14 @@ public:
    * @param ssl_ctx supplies the SSL context to use.
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
-   * @param stats_store supplies the Stats::Store to use.
+   * @param scope supplies the Stats::Scope to use.
    * @param listener_options listener configuration options.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr
   createSslListener(Network::ConnectionHandler& conn_handler, Ssl::ServerContext& ssl_ctx,
                     Network::ListenSocket& socket, Network::ListenerCallbacks& cb,
-                    Stats::Store& stats_store,
-                    const Network::ListenerOptions& listener_options) PURE;
+                    Stats::Scope& scope, const Network::ListenerOptions& listener_options) PURE;
 
   /**
    * Allocate a timer. @see Event::Timer for docs on how to use the timer.

@@ -64,10 +64,10 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
 
 ListenerImpl::ListenerImpl(Network::ConnectionHandler& conn_handler,
                            Event::DispatcherImpl& dispatcher, ListenSocket& socket,
-                           ListenerCallbacks& cb, Stats::Store& stats_store,
+                           ListenerCallbacks& cb, Stats::Scope& scope,
                            const Network::ListenerOptions& listener_options)
     : connection_handler_(conn_handler), dispatcher_(dispatcher), socket_(socket), cb_(cb),
-      proxy_protocol_(stats_store), options_(listener_options), listener_(nullptr) {
+      proxy_protocol_(scope), options_(listener_options), listener_(nullptr) {
 
   if (options_.bind_to_port_) {
     listener_.reset(

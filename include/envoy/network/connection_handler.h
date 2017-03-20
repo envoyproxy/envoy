@@ -21,19 +21,22 @@ public:
    * Adds listener to the handler.
    * @param factory supplies the configuration factory for new connections.
    * @param socket supplies the already bound socket to listen on.
+   * @param scope supplies the stats scope to use for listener specific stats.
    * @param listener_options listener configuration options.
    */
   virtual void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
+                           Stats::Scope& scope,
                            const Network::ListenerOptions& listener_options) PURE;
 
   /**
    * Adds listener to the handler.
    * @param factory supplies the configuration factory for new connections.
    * @param socket supplies the already bound socket to listen on.
+   * @param scope supplies the stats scope to use for listener specific stats.
    * @param listener_options listener configuration options.
    */
   virtual void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                              Network::ListenSocket& socket,
+                              Network::ListenSocket& socket, Stats::Scope& scope,
                               const Network::ListenerOptions& listener_options) PURE;
 
   /**

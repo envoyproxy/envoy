@@ -171,7 +171,8 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   original_start_time_ = info.original_start_time_;
   admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
                              initial_config.admin().address(), *this));
-  handler_.addListener(*admin_, admin_->socket(),
+  admin_scope_ = stats_store_.createScope("listener.admin.");
+  handler_.addListener(*admin_, admin_->socket(), *admin_scope_,
                        Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   loadServerFlags(initial_config.flagsPath());
