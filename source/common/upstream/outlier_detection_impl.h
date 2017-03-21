@@ -51,7 +51,7 @@ class SRAccumulatorImpl {
 public:
   SRAccumulatorImpl()
       : current_sr_bucket_(new SRAccumulatorBucket()),
-        backup_sr_bucket_(new SRAccumulatorBucket()){};
+        backup_sr_bucket_(new SRAccumulatorBucket()) {};
   SRAccumulatorBucket* getCurrentWriter();
   /**
    * This function returns the SR of a host over a window of time if the request volume is high
