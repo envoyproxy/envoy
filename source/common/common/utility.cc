@@ -102,6 +102,30 @@ std::string StringUtil::subspan(const std::string& source, size_t start, size_t 
   return source.substr(start, end - start);
 }
 
+std::vector<std::string> StringUtil::tokenize(const std::string& source,
+                                              const std::string& splitters) {
+  bool charmap[256] = {false};
+  for (size_t i = 0; i < splitters.size(); i++) {
+    charmap[static_cast<uint8_t>(splitters[i])] = true;
+  }
+  size_t strlen = source.size();
+  std::vector<std::string> tokens;
+  size_t pos, i;
+  for (pos = 0, i = 0; i < strlen; i++) {
+    if (charmap[static_cast<uint8_t>(source[i])]) {
+      if (i > pos) { // Don't want to double-capture the splitter character if it leads.
+        tokens.push_back(source.substr(pos, i - pos));
+      }
+      tokens.push_back(source.substr(i, 1));
+      pos = i + 1;
+    }
+  }
+  if (pos < i) {
+    tokens.push_back(source.substr(pos, i - pos));
+  }
+  return tokens;
+}
+
 std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   static DateFormatter date_format("%Y-%m-%dT%H:%M:%S");
 

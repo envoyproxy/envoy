@@ -448,6 +448,8 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
           throw EnvoyException(fmt::format("Only a single single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
+      } else if ('*' == domain[0]) {
+        wildcard_virtual_host_suffixes_.emplace(domain.substr(1), virtual_host);
       } else {
         if (virtual_hosts_.find(domain) != virtual_hosts_.end()) {
           throw EnvoyException(fmt::format(
@@ -490,11 +492,11 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   auto iter = virtual_hosts_.find(headers.Host()->value().c_str());
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
-  } else if (default_virtual_host_) {
-    return default_virtual_host_.get();
+  } else if (VirtualHostPtr vhost =
+                 *wildcard_virtual_host_suffixes_.find(headers.Host()->value().c_str()).first) {
+    return vhost.get();
   }
-
-  return nullptr;
+  return default_virtual_host_.get();
 }
 
 RoutePtr RouteMatcher::route(const Http::HeaderMap& headers, uint64_t random_value) const {
