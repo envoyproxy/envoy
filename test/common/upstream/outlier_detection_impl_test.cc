@@ -57,6 +57,23 @@ public:
         .WillByDefault(Return(true));
   }
 
+  void loadRq(std::vector<HostPtr>& hosts, int num_rq) {
+    for (uint64_t i = 0; i < hosts.size() - 1; i++) {
+      for (int j = 0; j < num_rq; j++) {
+        hosts[i]->outlierDetector().putHttpResponseCode(200);
+      }
+    }
+  }
+
+  void loadRq(HostPtr host, int num_rq, int failure_mod) {
+    for (int i = 0; i < num_rq; i++) {
+      host->outlierDetector().putHttpResponseCode(200);
+      if (i % failure_mod == 0) {
+        host->outlierDetector().putHttpResponseCode(503);
+      }
+    }
+  }
+
   NiceMock<MockCluster> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -235,16 +252,8 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
       {cluster_.hosts_[1], cluster_.hosts_[2], cluster_.hosts_[3], cluster_.hosts_[4]}, {});
 
   // Cause a consecutive SR error on one host. First have 4 of the hosts have perfect SR.
-  for (uint64_t i = 0; i < cluster_.hosts_.size() - 1; i++) {
-    for (int j = 0; j < 200; j++) {
-      cluster_.hosts_[i]->outlierDetector().putHttpResponseCode(200);
-    }
-  }
-
-  for (int i = 0; i < 100; i++) {
-    cluster_.hosts_[4]->outlierDetector().putHttpResponseCode(200);
-    cluster_.hosts_[4]->outlierDetector().putHttpResponseCode(503);
-  }
+  loadRq(cluster_.hosts_, 200);
+  loadRq(cluster_.hosts_[4], 100, 1);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .Times(2)
@@ -278,16 +287,8 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
   // Give 4 hosts enough request volume but not to the 5th. Should not cause an ejection.
-  for (uint64_t i = 0; i < cluster_.hosts_.size() - 1; i++) {
-    for (int j = 0; j < 150; j++) {
-      cluster_.hosts_[i]->outlierDetector().putHttpResponseCode(200);
-    }
-  }
-
-  for (int i = 0; i < 25; i++) {
-    cluster_.hosts_[4]->outlierDetector().putHttpResponseCode(200);
-    cluster_.hosts_[4]->outlierDetector().putHttpResponseCode(503);
-  }
+  loadRq(cluster_.hosts_, 150);
+  loadRq(cluster_.hosts_[4], 25, 1);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .WillOnce(Return(SystemTime(std::chrono::milliseconds(60001))));
