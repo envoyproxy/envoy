@@ -23,9 +23,9 @@ public:
   virtual Network::FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * @return uint64_t the port.
+   * @return Network::Address::InstancePtr the address.
    */
-  virtual uint64_t port() PURE;
+  virtual Network::Address::InstancePtr address() PURE;
 
   /**
    * @return Ssl::ServerContext* the SSL context
@@ -46,8 +46,8 @@ public:
   virtual bool bindToPort() PURE;
 
   /**
-   * @return bool if a connection was redirected to this listener port using iptables,
-   *         allow the listener to hand it off to the listener associated to the original port
+   * @return bool if a connection was redirected to this listener address using iptables,
+   *         allow the listener to hand it off to the listener associated to the original address
    */
   virtual bool useOriginalDst() PURE;
 
@@ -56,6 +56,11 @@ public:
    *         buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope to use for all listener specific stats.
+   */
+  virtual Stats::Scope& scope() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;
@@ -142,9 +147,9 @@ public:
   virtual const std::string& accessLogPath() PURE;
 
   /**
-   * @return uint32_t the server admin HTTP port.
+   * @return Network::Address::InstancePtr the server address.
    */
-  virtual uint32_t port() PURE;
+  virtual Network::Address::InstancePtr address() PURE;
 };
 
 /**

@@ -126,6 +126,26 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+/**
+ * Test that buffer limits are set.
+ */
+TEST_F(Http2ConnPoolImplTest, VerifyBufferLimits) {
+  expectClientCreate();
+  EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(8192));
+  EXPECT_CALL(*test_clients_.back().connection_, setReadBufferLimit(8192));
+
+  ActiveTestRequest r1(*this, 0);
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  expectClientConnect(0);
+  EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
+  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
+
+  test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
 TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
   InSequence s;
 

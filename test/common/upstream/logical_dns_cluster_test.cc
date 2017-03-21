@@ -120,7 +120,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   HostPtr logical_host = cluster_->hosts()[0];
 
   EXPECT_CALL(dispatcher_, createClientConnection_(
-                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443"))));
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443"))))
+      .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   logical_host->createConnection(dispatcher_);
   logical_host->outlierDetector().putHttpResponseCode(200);
 
@@ -133,7 +134,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
   EXPECT_CALL(dispatcher_, createClientConnection_(
-                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443"))));
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443"))))
+      .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   Host::CreateConnectionData data = logical_host->createConnection(dispatcher_);
   EXPECT_FALSE(data.host_description_->canary());
   EXPECT_EQ(&cluster_->hosts()[0]->cluster(), &data.host_description_->cluster());
@@ -152,7 +154,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
   EXPECT_CALL(dispatcher_, createClientConnection_(
-                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443"))));
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443"))))
+      .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   logical_host->createConnection(dispatcher_);
 
   expectResolve();
@@ -164,7 +167,8 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 
   EXPECT_EQ(logical_host, cluster_->hosts()[0]);
   EXPECT_CALL(dispatcher_, createClientConnection_(
-                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443"))));
+                               PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443"))))
+      .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   logical_host->createConnection(dispatcher_);
 
   // Make sure we cancel.

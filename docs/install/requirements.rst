@@ -19,7 +19,7 @@ Envoy has the following requirements:
 * `boringSSL <https://boringssl.googlesource.com/boringssl>`_ (last tested with sha b87c80300647c2c0311c1489a104470e099f1531).
   Envoy is built against BoringSSL but `openssl <https://www.openssl.org>`_ should still work.
 * `protobuf <https://github.com/google/protobuf>`_ (last tested with 3.0.0)
-* `lightstep-tracer-cpp <https://github.com/lightstep/lightstep-tracer-cpp/>`_ (last tested with 0.33)
+* `lightstep-tracer-cpp <https://github.com/lightstep/lightstep-tracer-cpp/>`_ (last tested with 0.36)
 * `rapidjson <https://github.com/miloyip/rapidjson/>`_ (last tested with 1.1.0)
 * `c-ares <https://github.com/c-ares/c-ares>`_ (last tested with 1.12.0)
 

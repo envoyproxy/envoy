@@ -231,6 +231,12 @@ void ConnectionImpl::write(Buffer::Instance& data) {
 
   if (data.length() > 0) {
     conn_log_trace("writing {} bytes", *this, data.length());
+    // TODO(mattklein123): All data currently gets moved from the source buffer to the write buffer.
+    // This can lead to inefficient behavior if writing a bunch of small chunks. In this case, it
+    // would likely be more efficient to copy data below a certain size. VERY IMPORTANT: If this is
+    // ever changed, read the comment in Ssl::ConnectionImpl::doWriteToSocket() VERY carefully.
+    // That code assumes that we never change existing write_buffer_ chain elements between calls
+    // to SSL_write(). That code will have to change if we ever copy here.
     write_buffer_.move(data);
     if (!(state_ & InternalState::Connecting)) {
       file_event_->activate(Event::FileReadyType::Write);

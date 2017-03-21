@@ -28,13 +28,16 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       final_local_address = original_local_address;
     }
 
-    // A listener that has the use_original_dst flag set to true can still receive connections
-    // that are NOT redirected using iptables. If a connection was not redirected,
-    // the address and port returned by getOriginalDst() match the listener port.
-    // In this case the listener handles the connection directly and does not hand it off.
-    if (listener->socket_.localAddress()->ip()->port() != final_local_address->ip()->port()) {
+    // Hands off redirected connections (from iptables) to the listener associated with the
+    // original destination address. If there is no listener associated with the original
+    // destination address, the connection is handled by the listener that receives it.
+    // Note: A listener that has the use_original_dst flag set to true can still receive.
+    // connections that are NOT redirected using iptables. If a connection was not redirected,
+    // the address returned by getOriginalDst() match the listener address. In this case the
+    // listener handles the connection directly and does not hand it off.
+    if (listener->socket_.localAddress() != final_local_address) {
       ListenerImpl* new_listener = dynamic_cast<ListenerImpl*>(
-          listener->connection_handler_.findListenerByPort(final_local_address->ip()->port()));
+          listener->connection_handler_.findListenerByAddress(*final_local_address));
 
       if (new_listener != nullptr) {
         listener = new_listener;
@@ -55,17 +58,16 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       final_remote_address.reset(
           new Address::PipeInstance(reinterpret_cast<sockaddr_un*>(remote_addr)));
     }
-
     listener->newConnection(fd, final_remote_address, final_local_address);
   }
 }
 
 ListenerImpl::ListenerImpl(Network::ConnectionHandler& conn_handler,
                            Event::DispatcherImpl& dispatcher, ListenSocket& socket,
-                           ListenerCallbacks& cb, Stats::Store& stats_store,
+                           ListenerCallbacks& cb, Stats::Scope& scope,
                            const Network::ListenerOptions& listener_options)
     : connection_handler_(conn_handler), dispatcher_(dispatcher), socket_(socket), cb_(cb),
-      proxy_protocol_(stats_store), options_(listener_options), listener_(nullptr) {
+      proxy_protocol_(scope), options_(listener_options), listener_(nullptr) {
 
   if (options_.bind_to_port_) {
     listener_.reset(

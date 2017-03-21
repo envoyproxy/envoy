@@ -1,8 +1,8 @@
 {% import 'routing_helper.template.json' as helper -%}
 
-{% macro listener(port) %}
+{% macro listener(address) %}
   {
-    "port": {{ port }},
+    "address": "{{ address }}",
     {% if kwargs['ssl'] -%}
     "ssl_context": {
       "alpn_protocols": "h2,http/1.1",
@@ -72,17 +72,17 @@
   "listeners": [
     {# TCP listeners for public HTTP/HTTPS endpoints. Assumes a TCP LB in front such as ELB which
        supports proxy proto. #}
-    {{ listener(9300, ssl=True, proxy_proto=True, router_file='envoy_router.template.json') }},
-    {{ listener(9301, ssl=False, proxy_proto=True, router_file='envoy_router.template.json') }},
+    {{ listener("tcp://0.0.0.0:9300", ssl=True, proxy_proto=True, router_file='envoy_router.template.json') }},
+    {{ listener("tcp://0.0.0.0:9301", ssl=False, proxy_proto=True, router_file='envoy_router.template.json') }},
 
     {# TCP listener for backhaul traffic from the double proxy.
        See envoy_double_proxy.template.json #}
-    {{ listener(9400, ssl=True, proxy_proto=False, pin_double_proxy_client=True,
+    {{ listener("tcp://0.0.0.0:9400", ssl=True, proxy_proto=False, pin_double_proxy_client=True,
                 router_file='envoy_router.template.json') }}
   ],
 
   "admin": { "access_log_path": "/var/log/envoy/admin_access.log",
-             "port": 9901 },
+             "address": "tcp://0.0.0.0:9901" },
   "flags_path": "/etc/envoy/flags",
   "statsd_tcp_cluster_name": "statsd",
 

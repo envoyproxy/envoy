@@ -1,7 +1,7 @@
 {
   "listeners": [
     {
-      "port": 9001,
+      "address": "tcp://127.0.0.1:9001",
       "filters": [
         {
           "type": "read",
@@ -52,7 +52,7 @@
   ],
   "admin": {
     "access_log_path": "/var/log/envoy/admin_access.log",
-    "port": 9901
+    "address": "tcp://0.0.0.0:9901"
   },
   "cluster_manager": {
     "clusters": [

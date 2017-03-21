@@ -57,7 +57,7 @@ If you have not cloned the envoy repo, clone it with ``git clone git@github.com:
 or ``git clone https://github.com/lyft/envoy.git``::
 
     $ pwd
-    envoy/example
+    envoy/examples/front-proxy
     $ docker-compose up --build -d
     $ docker-compose ps
             Name                       Command               State      Ports

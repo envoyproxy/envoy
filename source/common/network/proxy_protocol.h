@@ -66,7 +66,7 @@ public:
     char buf_[MAX_PROXY_PROTO_LEN];
   };
 
-  ProxyProtocol(Stats::Store& stats_store);
+  ProxyProtocol(Stats::Scope& scope);
 
   void newConnection(Event::Dispatcher& dispatcher, int fd, ListenerImpl& listener);
 

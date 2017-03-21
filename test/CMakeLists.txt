@@ -72,6 +72,7 @@ add_executable(envoy-test
   common/mongo/proxy_test.cc
   common/mongo/utility_test.cc
   common/network/address_impl_test.cc
+  common/network/cidr_range_test.cc
   common/network/connection_impl_test.cc
   common/network/dns_impl_test.cc
   common/network/filter_manager_impl_test.cc
@@ -153,6 +154,7 @@ add_executable(envoy-test
   server/http/health_check_test.cc
   server/options_impl_test.cc
   server/server_test.cc
+  test_common/network_utility.cc
   test_common/printers.cc
   test_common/utility.cc)
 

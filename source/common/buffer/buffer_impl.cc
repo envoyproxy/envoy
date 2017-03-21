@@ -6,6 +6,15 @@
 
 namespace Buffer {
 
+// RawSlice is the same structure as evbuffer_iovec. This was put into place to avoid leaking
+// libevent into most code since we will likely replace evbuffer with our own implementation at
+// some point. However, we can avoid a bunch of copies since the structure is the same.
+static_assert(sizeof(RawSlice) == sizeof(evbuffer_iovec), "RawSlice != evbuffer_iovec");
+static_assert(offsetof(RawSlice, mem_) == offsetof(evbuffer_iovec, iov_base),
+              "RawSlice != evbuffer_iovec");
+static_assert(offsetof(RawSlice, len_) == offsetof(evbuffer_iovec, iov_len),
+              "RawSlice != evbuffer_iovec");
+
 void OwnedImpl::add(const void* data, uint64_t size) { evbuffer_add(buffer_.get(), data, size); }
 
 void OwnedImpl::add(const std::string& data) {
@@ -22,12 +31,8 @@ void OwnedImpl::add(const Instance& data) {
 }
 
 void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
-  evbuffer_iovec local_iovecs[num_iovecs];
-  for (uint64_t i = 0; i < num_iovecs; i++) {
-    local_iovecs[i].iov_len = iovecs[i].len_;
-    local_iovecs[i].iov_base = iovecs[i].mem_;
-  }
-  int rc = evbuffer_commit_space(buffer_.get(), local_iovecs, num_iovecs);
+  int rc =
+      evbuffer_commit_space(buffer_.get(), reinterpret_cast<evbuffer_iovec*>(iovecs), num_iovecs);
   ASSERT(rc == 0);
   UNREFERENCED_PARAMETER(rc);
 }
@@ -40,13 +45,8 @@ void OwnedImpl::drain(uint64_t size) {
 }
 
 uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
-  evbuffer_iovec iovecs[out_size];
-  uint64_t needed_size = evbuffer_peek(buffer_.get(), -1, nullptr, iovecs, out_size);
-  for (uint64_t i = 0; i < std::min(out_size, needed_size); i++) {
-    out[i].mem_ = iovecs[i].iov_base;
-    out[i].len_ = iovecs[i].iov_len;
-  }
-  return needed_size;
+  return evbuffer_peek(buffer_.get(), -1, nullptr, reinterpret_cast<evbuffer_iovec*>(out),
+                       out_size);
 }
 
 uint64_t OwnedImpl::length() const { return evbuffer_get_length(buffer_.get()); }
@@ -79,13 +79,9 @@ int OwnedImpl::read(int fd, uint64_t max_length) {
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
-  evbuffer_iovec local_iovecs[num_iovecs];
-  uint64_t ret = evbuffer_reserve_space(buffer_.get(), length, local_iovecs, num_iovecs);
+  uint64_t ret = evbuffer_reserve_space(buffer_.get(), length,
+                                        reinterpret_cast<evbuffer_iovec*>(iovecs), num_iovecs);
   ASSERT(ret >= 1);
-  for (uint64_t i = 0; i < ret; i++) {
-    iovecs[i].len_ = local_iovecs[i].iov_len;
-    iovecs[i].mem_ = local_iovecs[i].iov_base;
-  }
   return ret;
 }
 

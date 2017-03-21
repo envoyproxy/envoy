@@ -16,6 +16,7 @@
 #include "common/common/version.h"
 #include "common/json/config_schemas.h"
 #include "common/memory/stats.h"
+#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/statsd.h"
 
@@ -134,10 +135,10 @@ void InstanceImpl::flushStats() {
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
-int InstanceImpl::getListenSocketFd(uint32_t port) {
+int InstanceImpl::getListenSocketFd(const std::string& address) {
+  Network::Address::InstancePtr addr = Network::Utility::resolveUrl(address);
   for (const auto& entry : socket_map_) {
-    // TODO(mattklein123): UDS listeners.
-    if (entry.second->localAddress()->ip()->port() == port) {
+    if (entry.second->localAddress()->asString() == addr->asString()) {
       return entry.second->fd();
     }
   }
@@ -161,16 +162,17 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   Json::ObjectPtr config_json = Json::Factory::LoadFromFile(options.configPath());
   config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
-  log().info("admin port: {}", initial_config.admin().port());
+  log().info("admin address: {}", initial_config.admin().address()->asString());
 
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   drain_manager_->startParentShutdownSequence();
   original_start_time_ = info.original_start_time_;
-  admin_.reset(
-      new AdminImpl(initial_config.admin().accessLogPath(), initial_config.admin().port(), *this));
-  handler_.addListener(*admin_, admin_->socket(),
+  admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
+                             initial_config.admin().address(), *this));
+  admin_scope_ = stats_store_.createScope("listener.admin.");
+  handler_.addListener(*admin_, admin_->socket(), *admin_scope_,
                        Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   loadServerFlags(initial_config.flagsPath());
@@ -206,13 +208,16 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
     // used for testing.
 
     // First we try to get the socket from our parent if applicable.
-    int fd = restarter_.duplicateParentListenSocket(listener->port());
+
+    ASSERT(listener->address()->type() == Network::Address::Type::Ip);
+    std::string addr = fmt::format("tcp://{}", listener->address()->asString());
+    int fd = restarter_.duplicateParentListenSocket(addr);
     if (fd != -1) {
-      log().info("obtained socket for port {} from parent", listener->port());
-      socket_map_[listener.get()].reset(new Network::TcpListenSocket(fd, listener->port()));
+      log().info("obtained socket for address {} from parent", addr);
+      socket_map_[listener.get()].reset(new Network::TcpListenSocket(fd, listener->address()));
     } else {
       socket_map_[listener.get()].reset(
-          new Network::TcpListenSocket(listener->port(), listener->bindToPort()));
+          new Network::TcpListenSocket(listener->address(), listener->bindToPort()));
     }
   }
 

@@ -82,11 +82,11 @@ public:
   virtual void failHealthcheck(bool fail) PURE;
 
   /**
-   * Fetch a listen socket fd based on the listening port.
-   * @param port supplies the port to look up.
-   * @return the fd or -1 if there is no listening socket for the port.
+   * Fetch a listen socket fd based on the listening address.
+   * @param address supplies the address to look up.
+   * @return the fd or -1 if there is no listening socket for the address.
    */
-  virtual int getListenSocketFd(uint32_t port) PURE;
+  virtual int getListenSocketFd(const std::string& address) PURE;
 
   /**
    * Fetch server stats specific to this process vs. global shared stats in a hot restart scenario.

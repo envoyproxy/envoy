@@ -78,7 +78,7 @@ TEST(ConfigurationImplTest, EmptyFilter) {
   {
     "listeners" : [
       {
-        "port" : 1234,
+        "address": "tcp://127.0.0.1:1234",
         "filters": []
       }
     ],
@@ -102,7 +102,7 @@ TEST(ConfigurationImplTest, DefaultListenerPerConnectionBufferLimit) {
   {
     "listeners" : [
       {
-        "port" : 1234,
+        "address": "tcp://127.0.0.1:1234",
         "filters": []
       }
     ],
@@ -126,7 +126,7 @@ TEST(ConfigurationImplTest, SetListenerPerConnectionBufferLimit) {
   {
     "listeners" : [
       {
-        "port" : 1234,
+        "address": "tcp://127.0.0.1:1234",
         "filters": [],
         "per_connection_buffer_limit_bytes": 8192
       }
@@ -151,7 +151,7 @@ TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
   {
     "listeners" : [
       {
-        "port" : 1234,
+        "address": "tcp://127.0.0.1:1234",
         "filters" : [],
         "ssl_context" : {
           "cert_chain_file" : "test/common/ssl/test_data/approved_with_uri_san.crt",
@@ -178,12 +178,47 @@ TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
   EXPECT_TRUE(config.listeners().back()->sslContext() != nullptr);
 }
 
+TEST(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
+  std::string json = R"EOF(
+  {
+    "listeners" : [],
+    "cluster_manager": {
+      "clusters": [
+        {
+          "name": "test_cluster",
+          "type": "static",
+          "connect_timeout_ms": 1,
+          "per_connection_buffer_limit_bytes": 8192,
+          "lb_type": "round_robin",
+          "hosts": []
+        }
+      ]
+    }
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  MainImpl config(server);
+  config.initialize(*loader);
+
+  ASSERT_EQ(1U, config.clusterManager().clusters().count("test_cluster"));
+  EXPECT_EQ(8192U, config.clusterManager()
+                       .clusters()
+                       .find("test_cluster")
+                       ->second.get()
+                       .info()
+                       ->perConnectionBufferLimitBytes());
+  server.thread_local_.shutdownThread();
+}
+
 TEST(ConfigurationImplTest, BadListenerConfig) {
   std::string json = R"EOF(
   {
     "listeners" : [
       {
-        "port" : 1234,
+        "address": "tcp://127.0.0.1:1234",
         "filters": [],
         "test": "a"
       }
@@ -206,7 +241,7 @@ TEST(ConfigurationImplTest, BadFilterConfig) {
   {
     "listeners" : [
       {
-        "port" : 1234,
+        "address": "tcp://127.0.0.1:1234",
         "filters": [
           {
             "type" : "type",
@@ -234,7 +269,7 @@ TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
   {
     "listeners" : [
       {
-        "port" : 1234,
+        "address": "tcp://127.0.0.1:1234",
         "filters": []
       }
     ],
@@ -265,7 +300,7 @@ TEST(ConfigurationImplTest, UnsupportedDriverType) {
   {
     "listeners" : [
       {
-        "port" : 1234,
+        "address": "tcp://127.0.0.1:1234",
         "filters": []
       }
     ],

@@ -90,7 +90,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address) : Ipv6Instance(address, 0
 
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : InstanceBase(Type::Ip) {
   memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
-  ip_.ipv6_.address_.sin6_family = AF_INET;
+  ip_.ipv6_.address_.sin6_family = AF_INET6;
   ip_.ipv6_.address_.sin6_port = htons(port);
   if (!address.empty()) {
     if (1 != inet_pton(AF_INET6, address.c_str(), &ip_.ipv6_.address_.sin6_addr)) {
@@ -117,7 +117,7 @@ int Ipv6Instance::connect(int fd) const {
 }
 
 int Ipv6Instance::socket(SocketType type) const {
-  return ::socket(AF_INET, flagsFromSocketType(type), 0);
+  return ::socket(AF_INET6, flagsFromSocketType(type), 0);
 }
 
 PipeInstance::PipeInstance(const sockaddr_un* address) : InstanceBase(Type::Pipe) {
@@ -142,6 +142,22 @@ int PipeInstance::connect(int fd) const {
 
 int PipeInstance::socket(SocketType type) const {
   return ::socket(AF_UNIX, flagsFromSocketType(type), 0);
+}
+
+InstancePtr parseInternetAddress(const std::string& ip_addr) {
+  sockaddr_in sa4;
+  if (inet_pton(AF_INET, ip_addr.c_str(), &sa4.sin_addr) == 1) {
+    sa4.sin_family = AF_INET;
+    sa4.sin_port = 0;
+    return InstancePtr(new Ipv4Instance(&sa4));
+  }
+  sockaddr_in6 sa6;
+  if (inet_pton(AF_INET6, ip_addr.c_str(), &sa6.sin6_addr) == 1) {
+    sa6.sin6_family = AF_INET6;
+    sa6.sin6_port = 0;
+    return InstancePtr(new Ipv6Instance(sa6));
+  }
+  return nullptr;
 }
 
 } // Address

@@ -39,7 +39,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
     },
     "type" : "object",
     "properties": {
-       "port": {"type": "number"},
+       "address": {"type": "string"},
        "filters" : {
          "type" : "array",
          "items": {"$ref" : "#/definitions/filters"}
@@ -54,7 +54,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
          "exclusiveMinimum" : true
        }
     },
-    "required": ["port", "filters"],
+    "required": ["address", "filters"],
     "additionalProperties": false
   }
   )EOF");
@@ -899,9 +899,9 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "type" : "object",
         "properties" : {
           "access_log_path" : {"type" : "string"},
-          "port" : {"type" : "integer"}
+          "address" : {"type" : "string"}
         },
-        "required" : ["access_log_path", "port"],
+        "required" : ["access_log_path", "address"],
         "additionalProperties" : false
       },
       "cluster_manager" : {"type" : "object"},
@@ -1033,6 +1033,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "enum" : ["static", "strict_dns", "logical_dns", "sds"]
       },
       "connect_timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "per_connection_buffer_limit_bytes" : {
         "type" : "integer",
         "minimum" : 0,
         "exclusiveMinimum" : true

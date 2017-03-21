@@ -1,13 +1,13 @@
 {
   "listeners": [
   {
-    "port": 10000,
+    "address": "tcp://127.0.0.1:10000",
     "filters": [
       { "type": "read", "name": "echo", "config": {} }
     ]
   },
   {
-    "port": 10001,
+    "address": "tcp://127.0.0.1:10001",
     "filters": [
     {
       "type": "read",
@@ -88,7 +88,7 @@
     }]
   },
   {
-    "port": 10002,
+    "address": "tcp://127.0.0.1:10002",
     "filters": [
     {
       "type": "read",
@@ -175,7 +175,7 @@
     }]
   },
   {
-    "port": 10004,
+    "address": "tcp://127.0.0.1:10004",
     "filters": [
       { "type": "read", "name":
         "tcp_proxy",
@@ -193,7 +193,7 @@
     ]
   }],
 
-  "admin": { "access_log_path": "/dev/null", "port": 10003 },
+  "admin": { "access_log_path": "/dev/null", "address": "tcp://127.0.0.1:10003" },
   "statsd_local_udp_port": 8125,
   "statsd_tcp_cluster_name": "statsd",
   "tracing": {

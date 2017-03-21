@@ -110,7 +110,7 @@ public:
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool fail) override;
-  int getListenSocketFd(uint32_t port) override;
+  int getListenSocketFd(const std::string& address) override;
   void getParentStats(HotRestart::GetParentStatsInfo& info) override;
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
@@ -154,6 +154,7 @@ private:
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   std::unique_ptr<Configuration::Main> config_;
   std::list<WorkerPtr> workers_;
+  Stats::ScopePtr admin_scope_;
   std::unique_ptr<AdminImpl> admin_;
   Event::SignalEventPtr sigterm_;
   Event::SignalEventPtr sig_usr_1_;
