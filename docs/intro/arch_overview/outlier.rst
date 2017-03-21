@@ -56,7 +56,7 @@ interval ejects hosts based on statistical outlier detection. Success Rate outli
 calculated for a host if its request volume over the aggregation interval is less than the
 :ref:`outlier_detection.rq_volume_threshold<config_cluster_manager_cluster_outlier_detection_rq_volume_threshold>`
 value. Moreover, detection will not be performed for a cluster if the number of hosts
-with enough request volume in an interval is less than the
+with the minimum required request volume in an interval is less than the
 :ref:`outlier_detection.significant_host_threshold<config_cluster_manager_cluster_outlier_detection_significant_host_threshold>`
 value.
 

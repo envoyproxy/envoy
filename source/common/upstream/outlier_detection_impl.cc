@@ -167,7 +167,7 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
                                               config_.enforcingSR());
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
@@ -232,7 +232,7 @@ void DetectorImpl::onConsecutive5xxWorker(HostPtr host) {
   ejectHost(host, EjectionType::Consecutive5xx);
 }
 
-double DetectorImpl::srEjectionThreshold(double sr_sum, std::vector<double>& sr_data) {
+double Utility::srEjectionThreshold(double sr_sum, std::vector<double>& sr_data) {
   double mean = sr_sum / sr_data.size();
   double stdev = 0;
   std::for_each(sr_data.begin(), sr_data.end(),
@@ -240,7 +240,7 @@ double DetectorImpl::srEjectionThreshold(double sr_sum, std::vector<double>& sr_
   stdev /= sr_data.size();
   stdev = std::sqrt(stdev);
 
-  return mean - (sr_stdev_factor_ * stdev);
+  return mean - (SR_STDEV_FACTOR * stdev);
 }
 
 void DetectorImpl::onIntervalTimer() {
@@ -251,8 +251,8 @@ void DetectorImpl::onIntervalTimer() {
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
 
-    // Success Rate Outlier Detection
-    // First swap out the current bucket been written to, to keep data valid
+    // Success Rate Outlier Detection.
+    // First swap out the current bucket been written to, to keep data valid.
     host.second->updateCurrentSRBucket();
 
     // If there are not enough hosts to begin with, don't do the work.
@@ -273,7 +273,7 @@ void DetectorImpl::onIntervalTimer() {
   if (valid_sr_hosts.size() >=
       runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold",
                                      config_.significantHostThreshold())) {
-    double ejection_threshold = srEjectionThreshold(sr_sum, sr_data);
+    double ejection_threshold = Utility::srEjectionThreshold(sr_sum, sr_data);
     for (auto host : valid_sr_hosts) {
       if (host.second < ejection_threshold) {
         stats_.ejections_sr_.inc();
@@ -340,7 +340,7 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
     return "SR";
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 int EventLoggerImpl::secsSinceLastAction(const Optional<SystemTime>& lastActionTime,

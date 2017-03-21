@@ -191,9 +191,10 @@ outlier_detection
   .. _config_cluster_manager_cluster_outlier_detection_rq_volume_threshold:
 
   rq_volume_threshold:
-    The number of total requests that must be collected in one interval to include this host in success rate
-    based outlier detection. If the volume is lower than this setting, outlier detection via success rate
-    statistics is not performed for that host. Defaults to 100.
+    The minimum number of total requests that must be collected in one interval
+    (as defined by :ref:`interval_ms <config_cluster_manager_cluster_outlier_detection_interval_ms>` above)
+    to include this host in success rate based outlier detection. If the volume is lower than this setting,
+    outlier detection via success rate statistics is not performed for that host. Defaults to 100.
 
   Each of the above configuration values can be overridden via 
   :ref:`runtime values <config_cluster_manager_cluster_runtime_outlier_detection>`.

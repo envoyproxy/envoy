@@ -44,10 +44,8 @@ struct SRAccumulatorBucket {
 
 /**
  * The S(uccess)R(ate)AccumulatorImpl uses the SRAccumulatorBucket to get per host Success Rate
- * stats.
- * This implementation has a fixed window size of time, and thus only needs a bucket to write to,
- * and
- * a bucket to accumulate/run stats over.
+ * stats. This implementation has a fixed window size of time, and thus only needs a
+ * bucket to write to, and a bucket to accumulate/run stats over.
  */
 class SRAccumulatorImpl {
 public:
@@ -61,11 +59,9 @@ public:
    * window of time could be dynamically adjusted. In the current implementation it is a fixed time
    * window.
    * @param rq_volume_threshold, the threshold of requests an accumulator has to have in order to be
-   * able to return
-   *        a significant SR value.
+   * able to return a significant SR value.
    * @return a valid Optional<double> with the success rate. If there were not enough requests, an
-   * invalid Optional<double>
-   *         is returned.
+   * invalid Optional<double> is returned.
    */
   Optional<double> getSR(uint64_t rq_volume_threshold);
 
@@ -189,7 +185,6 @@ private:
   void onConsecutive5xxWorker(HostPtr host);
   void onIntervalTimer();
   void runCallbacks(HostPtr host);
-  double srEjectionThreshold(double sr_sum, std::vector<double>& sr_data);
   bool enforceEjection(EjectionType type);
 
   DetectorConfig config_;
@@ -201,8 +196,6 @@ private:
   std::list<ChangeStateCb> callbacks_;
   std::unordered_map<HostPtr, DetectorHostSinkImpl*> host_sinks_;
   EventLoggerPtr event_logger_;
-  // Factor to multiply the stdev of a cluster's Success Rate for success rate outlier ejection.
-  static constexpr double sr_stdev_factor_ = 1.9;
 };
 
 class EventLoggerImpl : public EventLogger {
@@ -221,6 +214,26 @@ private:
 
   Filesystem::FilePtr file_;
   SystemTimeSource& time_source_;
+};
+
+/**
+ * Utilities for Outlier Detection
+ */
+class Utility {
+public:
+  /**
+   * This function returns the Success Rate trheshold for Success Rate outlier detection. If a
+   * host's
+   * Success Rate is under this threshold the host is an outlier.
+   * @param sr_sum is the sum of the data in the sr_data vector.
+   * @param sr_data is the vector containing the individual success rate data points.
+   * @return the Success Rate threshold.
+   */
+  static double srEjectionThreshold(double sr_sum, std::vector<double>& sr_data);
+
+private:
+  // Factor to multiply the stdev of a cluster's Success Rate for success rate outlier ejection.
+  static constexpr double SR_STDEV_FACTOR = 1.9;
 };
 
 } // Outlier

@@ -571,5 +571,12 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   Json::Factory::LoadFromString(log4);
 }
 
+TEST(OutlierUtility, SRThreshold) {
+  std::vector<double> data = {50, 100, 100, 100, 100};
+  double sum = std::accumulate(data.begin(), data.end(), 0.0);
+
+  EXPECT_EQ(Utility::srEjectionThreshold(sum, data), 52);
+}
+
 } // Outlier
 } // Upstream

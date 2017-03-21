@@ -72,7 +72,6 @@ outlier_detection.rq_volume_threshold
   <config_cluster_manager_cluster_outlier_detection_rq_volume_threshold>`
   setting in outlier detection
 
-
 Core
 ----
 
