@@ -17,6 +17,12 @@ public:
    * @return const Optional<uint64_t>& the optional hash key to use during load balancing.
    */
   virtual const Optional<uint64_t>& hashKey() const PURE;
+
+  /**
+   * @return bool whether we should prefer canary routing or not. In majority of the cases
+   *         this should be false.
+   */
+  virtual bool preferCanary() const PURE;
 };
 
 /**

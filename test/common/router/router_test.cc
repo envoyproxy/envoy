@@ -140,12 +140,33 @@ TEST_F(RouterTest, HashPolicy) {
           Invoke([&](const std::string&, Upstream::ResourcePriority,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             EXPECT_EQ(10UL, context->hashKey().value());
+            EXPECT_FALSE(context->preferCanary());
             return &cm_.conn_pool_;
           }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  callbacks_.reset_callback_();
+}
+
+TEST_F(RouterTest, CanaryRouting) {
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(true, context->preferCanary());
+            return &cm_.conn_pool_;
+          }));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-lb-hint", "canary"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 

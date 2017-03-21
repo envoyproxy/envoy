@@ -3,6 +3,7 @@
 #include "common/upstream/ring_hash_lb.h"
 
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/mocks.h"
 
 using testing::_;
@@ -14,16 +15,6 @@ namespace Upstream {
 static HostPtr newTestHost(Upstream::ClusterInfoPtr cluster, const std::string& url) {
   return HostPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, 1, "")};
 }
-
-class TestLoadBalancerContext : public LoadBalancerContext {
-public:
-  TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
-
-  // Upstream::LoadBalancerContext
-  const Optional<uint64_t>& hashKey() const override { return hash_key_; }
-
-  Optional<uint64_t> hash_key_;
-};
 
 class RingHashLoadBalancerTest : public testing::Test {
 public:

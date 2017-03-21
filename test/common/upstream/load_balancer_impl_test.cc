@@ -3,6 +3,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/mocks.h"
 
 using testing::NiceMock;
@@ -11,8 +12,8 @@ using testing::Return;
 namespace Upstream {
 
 static HostPtr newTestHost(Upstream::ClusterInfoPtr cluster, const std::string& url,
-                           uint32_t weight = 1) {
-  return HostPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, weight, "")};
+                           uint32_t weight = 1, bool canary = false) {
+  return HostPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url), canary, weight, "")};
 }
 
 class RoundRobinLoadBalancerTest : public testing::Test {
@@ -57,6 +58,42 @@ TEST_F(RoundRobinLoadBalancerTest, Normal) {
                              newTestHost(cluster_.info_, "tcp://127.0.0.1:81")};
   cluster_.hosts_ = cluster_.healthy_hosts_;
   EXPECT_EQ(cluster_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+}
+
+TEST_F(RoundRobinLoadBalancerTest, SelectCanaryHost) {
+  init(false);
+  cluster_.healthy_hosts_ = {newTestHost(cluster_.info_, "tcp://127.0.0.1:80", 1, false),
+                             newTestHost(cluster_.info_, "tcp://127.0.0.1:81", 1, false),
+                             newTestHost(cluster_.info_, "tcp://127.0.0.1:82", 1, false),
+                             newTestHost(cluster_.info_, "tcp://127.0.0.1:83", 1, false),
+                             newTestHost(cluster_.info_, "tcp://127.0.0.1:84", 1, false)};
+  cluster_.hosts_ = cluster_.healthy_hosts_;
+
+  // Add new canary host.
+  std::vector<HostPtr> added{newTestHost(cluster_.info_, "tcp://127.0.0.1:86", 1, true)};
+  // Do not remove anything.
+  std::vector<HostPtr> removed;
+
+  cluster_.runCallbacks(added, removed);
+
+  Optional<uint64_t> no_hash;
+  std::unique_ptr<Upstream::LoadBalancerContext> context(
+      new TestLoadBalancerContext(no_hash, true));
+  // Select canary host consequently.
+  EXPECT_EQ(added[0], lb_->chooseHost(context.get()));
+  EXPECT_EQ(added[0], lb_->chooseHost(context.get()));
+
+  // Remove canary host and run again.
+  std::vector<HostPtr> no_added;
+  std::vector<HostPtr> remove_canary{added[0]};
+  cluster_.runCallbacks(no_added, remove_canary);
+
+  // Provide context for canary, but no canary to route to.
+  EXPECT_EQ(cluster_.healthy_hosts_[2], lb_->chooseHost(context.get()));
+  EXPECT_EQ(cluster_.healthy_hosts_[3], lb_->chooseHost(context.get()));
+
+  // Provide null context, normal RR will be applied.
+  EXPECT_EQ(cluster_.healthy_hosts_[4], lb_->chooseHost(nullptr));
 }
 
 TEST_F(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {

@@ -188,6 +188,7 @@ private:
   HEADER_FUNC(EnvoyExternalAddress)                                                                \
   HEADER_FUNC(EnvoyForceTrace)                                                                     \
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
+  HEADER_FUNC(EnvoyLbHint)                                                                         \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \

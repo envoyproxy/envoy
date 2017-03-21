@@ -21,6 +21,7 @@ public:
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
+  const LowerCaseString EnvoyLbHint{"x-envoy-lb-hint"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
@@ -96,6 +97,10 @@ public:
   struct {
     const std::string EnvoyHealthChecker{"Envoy/HC"};
   } UserAgentValues;
+
+  struct {
+    const std::string PreferCanary{"canary"};
+  } EnvoyLbHintValues;
 
   static Headers& get() {
     static Headers instance;

@@ -17,13 +17,36 @@ LoadBalancerBase::LoadBalancerBase(const HostSet& host_set, const HostSet* local
                                    Runtime::RandomGenerator& random)
     : stats_(stats), runtime_(runtime), random_(random), host_set_(host_set),
       local_host_set_(local_host_set) {
+  // Regenerate AZ routing caching structures only if local_host_set is available.
   if (local_host_set_) {
     host_set_.addMemberUpdateCb([this](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
                                     -> void { regenerateZoneRoutingStructures(); });
+
     local_host_set_->addMemberUpdateCb(
         [this](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
             -> void { regenerateZoneRoutingStructures(); });
   }
+
+  // Update current canary host.
+  host_set_.addMemberUpdateCb([this](const std::vector<HostPtr>& hosts_added,
+                                     const std::vector<HostPtr>& hosts_removed) -> void {
+    if (!canary_host_.empty()) {
+      for (const HostPtr& removed_host : hosts_removed) {
+        auto remove_iter = std::find(canary_host_.begin(), canary_host_.end(), removed_host);
+        if (remove_iter != canary_host_.end()) {
+          canary_host_.erase(remove_iter);
+          break;
+        }
+      }
+    }
+
+    for (const HostPtr& added_host : hosts_added) {
+      if (added_host->canary()) {
+        canary_host_.push_back(added_host);
+        break;
+      }
+    }
+  });
 }
 
 void LoadBalancerBase::regenerateZoneRoutingStructures() {
@@ -193,12 +216,17 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
   return host_set_.healthyHostsPerZone()[i];
 }
 
-const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
+const std::vector<HostPtr>& LoadBalancerBase::hostsToUse(const LoadBalancerContext* context) {
   ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
 
   if (host_set_.hosts().empty() ||
       LoadBalancerUtility::isGlobalPanic(host_set_, stats_, runtime_)) {
     return host_set_.hosts();
+  }
+
+  // If canary host was not found, just skip canary routing.
+  if (context && context->preferCanary() && !canary_host_.empty()) {
+    return canary_host_;
   }
 
   if (zone_routing_state_ == ZoneRoutingState::NoZoneRouting) {
@@ -218,8 +246,8 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
   return tryChooseLocalZoneHosts();
 }
 
-ConstHostPtr RoundRobinLoadBalancer::chooseHost(const LoadBalancerContext*) {
-  const std::vector<HostPtr>& hosts_to_use = hostsToUse();
+ConstHostPtr RoundRobinLoadBalancer::chooseHost(const LoadBalancerContext* context) {
+  const std::vector<HostPtr>& hosts_to_use = hostsToUse(context);
   if (hosts_to_use.empty()) {
     return nullptr;
   }
@@ -247,7 +275,7 @@ LeastRequestLoadBalancer::LeastRequestLoadBalancer(const HostSet& host_set,
       });
 }
 
-ConstHostPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext*) {
+ConstHostPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext* context) {
   bool is_weight_imbalanced = stats_.max_host_weight_.value() != 1;
   bool is_weight_enabled = runtime_.snapshot().getInteger("upstream.weight_enabled", 1UL) != 0;
 
@@ -261,7 +289,7 @@ ConstHostPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext*) {
     last_host_.reset();
   }
 
-  const std::vector<HostPtr>& hosts_to_use = hostsToUse();
+  const std::vector<HostPtr>& hosts_to_use = hostsToUse(context);
   if (hosts_to_use.empty()) {
     return nullptr;
   }
@@ -283,8 +311,8 @@ ConstHostPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext*) {
   }
 }
 
-ConstHostPtr RandomLoadBalancer::chooseHost(const LoadBalancerContext*) {
-  const std::vector<HostPtr>& hosts_to_use = hostsToUse();
+ConstHostPtr RandomLoadBalancer::chooseHost(const LoadBalancerContext* context) {
+  const std::vector<HostPtr>& hosts_to_use = hostsToUse(context);
   if (hosts_to_use.empty()) {
     return nullptr;
   }

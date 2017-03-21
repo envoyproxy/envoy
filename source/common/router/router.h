@@ -169,12 +169,15 @@ private:
   typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;
 
   struct LoadBalancerContextImpl : public Upstream::LoadBalancerContext {
-    LoadBalancerContextImpl(const Optional<uint64_t>& hash) : hash_(hash) {}
+    LoadBalancerContextImpl(const Optional<uint64_t>& hash, bool prefer_canary)
+        : hash_(hash), prefer_canary_(prefer_canary) {}
 
     // Upstream::LoadBalancerContext
     const Optional<uint64_t>& hashKey() const override { return hash_; }
+    bool preferCanary() const override { return prefer_canary_; }
 
     const Optional<uint64_t> hash_;
+    const bool prefer_canary_;
   };
 
   enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
