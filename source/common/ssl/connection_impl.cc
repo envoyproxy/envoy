@@ -134,22 +134,21 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     }
   }
 
+  uint64_t original_buffer_length = write_buffer_.length();
   uint64_t total_bytes_written = 0;
   bool keep_writing = true;
-  while ((write_buffer_.length() > 0) && keep_writing) {
+  while ((original_buffer_length != total_bytes_written) && keep_writing) {
     // Protect against stack overflow if the buffer has a very large buffer chain.
-    // TODO(mattklein123): The current evbuffer Buffer::Instance implementation will iterate through
-    // the entire chain each time this is called to determine how many slices would be needed. In
-    // this case, we don't care, and only want to fill up to MAX_SLICES. When we swap out evbuffer
-    // we can change this behavior.
+    // TODO(mattklein123): See the comment on getRawSlices() for why we have to also check
+    // original_buffer_length != total_bytes_written during loop iteration.
     // TODO(mattklein123): As it relates to our fairness efforts, we might want to limit the number
     // of iterations of this loop, either by pure iterations, bytes written, etc.
     const uint64_t MAX_SLICES = 32;
     Buffer::RawSlice slices[MAX_SLICES];
-    uint64_t num_slices = std::min(MAX_SLICES, write_buffer_.getRawSlices(slices, MAX_SLICES));
+    uint64_t num_slices = write_buffer_.getRawSlices(slices, MAX_SLICES);
 
     uint64_t inner_bytes_written = 0;
-    for (uint64_t i = 0; i < num_slices; i++) {
+    for (uint64_t i = 0; (i < num_slices) && (original_buffer_length != total_bytes_written); i++) {
       // SSL_write() requires that if a previous call returns SSL_ERROR_WANT_WRITE, we need to call
       // it again with the same parameters. Most implementations keep track of the last write size.
       // In our case we don't need to do that because: a) SSL_write() will not write partial
