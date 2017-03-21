@@ -2,6 +2,7 @@
 
 #ifdef TCMALLOC
 
+#include "common/common/assert.h"
 #include "gperftools/heap-profiler.h"
 #include "gperftools/profiler.h"
 
@@ -9,7 +10,9 @@ namespace Profiler {
 
 bool Cpu::profilerEnabled() { return ProfilingIsEnabledForAllThreads(); }
 
-void Cpu::startProfiler(const std::string& output_path) { ProfilerStart(output_path.c_str()); }
+bool Cpu::startProfiler(const std::string& output_path) {
+  return ProfilerStart(output_path.c_str());
+}
 
 void Cpu::stopProfiler() { ProfilerStop(); }
 
@@ -27,7 +30,7 @@ void Heap::forceLink() {
 namespace Profiler {
 
 bool Cpu::profilerEnabled() { return false; }
-void Cpu::startProfiler(const std::string&) {}
+bool Cpu::startProfiler(const std::string&) {}
 void Cpu::stopProfiler() {}
 
 } // Profiler

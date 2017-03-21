@@ -22,8 +22,8 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& access_log_path, Network::Address::InstancePtr address,
-            Server::Instance& server);
+  AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
+            Network::Address::InstancePtr address, Server::Instance& server);
 
   Http::Code runCallback(const std::string& path, Buffer::Instance& response);
   Network::ListenSocket& socket() { return *socket_; }
@@ -111,6 +111,9 @@ private:
 
   Server::Instance& server_;
   std::list<Http::AccessLog::InstancePtr> access_logs_;
+  // TO DO: Remove default value after making profiler_path a configurable
+  // parameter via the Envoy config JSON
+  std::string profiler_path_ = "/var/log/envoy/envoy.prof";
   Network::ListenSocketPtr socket_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;

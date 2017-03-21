@@ -15,7 +15,7 @@ public:
   /**
    * Start the profiler and write to the specified path.
    */
-  static void startProfiler(const std::string& output_path);
+  static bool startProfiler(const std::string& output_path);
 
   /**
    * Stop the profiler.

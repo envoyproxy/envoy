@@ -899,6 +899,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "type" : "object",
         "properties" : {
           "access_log_path" : {"type" : "string"},
+          "profiler_path" : {"type" : "string"},
           "address" : {"type" : "string"}
         },
         "required" : ["access_log_path", "address"],
