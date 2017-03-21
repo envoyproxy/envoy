@@ -145,7 +145,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     // of iterations of this loop, either by pure iterations, bytes written, etc.
     const uint64_t MAX_SLICES = 32;
     Buffer::RawSlice slices[MAX_SLICES];
-    uint64_t num_slices = std::min(MAX_SLICES, write_buffer_.getRawSlices(slices, MAX_SLICES));
+    uint64_t num_slices = write_buffer_.getRawSlices(slices, MAX_SLICES);
 
     uint64_t inner_bytes_written = 0;
     for (uint64_t i = 0; (i < num_slices) && (original_buffer_length != total_bytes_written); i++) {
