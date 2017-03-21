@@ -248,7 +248,7 @@ TEST(SslConnectionImplTest, SslError) {
 class SslReadBufferLimitTest : public testing::Test {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
-                           uint32_t write_size, uint32_t num_writes) {
+                           uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
     Network::TcpListenSocket socket(uint32_t(10000), true);
@@ -325,6 +325,16 @@ public:
 
     for (uint32_t i = 0; i < num_writes; i++) {
       Buffer::OwnedImpl data(std::string(write_size, 'a'));
+
+      // Incredibly contrived way of making sure that the write buffer has an empty chain in it.
+      if (reserve_write_space) {
+        Buffer::RawSlice iovecs[2];
+        EXPECT_EQ(2UL, data.reserve(16384, iovecs, 2));
+        iovecs[0].len_ = 0;
+        iovecs[1].len_ = 0;
+        data.commit(iovecs, 2);
+      }
+
       client_connection->write(data);
     }
 
@@ -332,14 +342,18 @@ public:
   }
 };
 
-TEST_F(SslReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1); }
+TEST_F(SslReadBufferLimitTest, NoLimit) {
+  readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1, false);
+}
+
+TEST_F(SslReadBufferLimitTest, NoLimitReserveSpace) { readBufferLimitTest(0, 512, 512, 1, true); }
 
 TEST_F(SslReadBufferLimitTest, NoLimitSmallWrites) {
-  readBufferLimitTest(0, 256 * 1024, 1, 256 * 1024);
+  readBufferLimitTest(0, 256 * 1024, 1, 256 * 1024, false);
 }
 
 TEST_F(SslReadBufferLimitTest, SomeLimit) {
-  readBufferLimitTest(32 * 1024, 32 * 1024, 256 * 1024, 1);
+  readBufferLimitTest(32 * 1024, 32 * 1024, 256 * 1024, 1, false);
 }
 
 } // Ssl

@@ -59,6 +59,13 @@ public:
    * @return the actual number of slices needed, which may be greater than out_size. Passing
    *         nullptr for out and 0 for out_size will just return the size of the array needed
    *         to capture all of the slice data.
+   * TODO(mattklein123): WARNING: The underlying implementation of this function currently uses
+   * libevent's evbuffer. It has the infuriating property where calling getRawSlices(nullptr, 0)
+   * will return the slices that include all of the buffer data, but not any empty slices at the
+   * end. However, calling getRawSlices(iovec, SOME_CONST), WILL return potentially empty slices
+   * beyond the end of the buffer. Code that is trying to avoid stack overflow by limiting the
+   * number of returned slices needs to deal with this. When we get rid of evbuffer we can rework
+   * all of this.
    */
   virtual uint64_t getRawSlices(RawSlice* out, uint64_t out_size) const PURE;
 
