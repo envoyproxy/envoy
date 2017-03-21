@@ -55,9 +55,8 @@ public:
   SRAccumulatorBucket* getCurrentWriter();
   /**
    * This function returns the SR of a host over a window of time if the request volume is high
-   * enough. The underlying
-   * window of time could be dynamically adjusted. In the current implementation it is a fixed time
-   * window.
+   * enough. The underlying window of time could be dynamically adjusted. In the current
+   * implementation it is a fixed time window.
    * @param rq_volume_threshold, the threshold of requests an accumulator has to have in order to be
    * able to return a significant SR value.
    * @return a valid Optional<double> with the success rate. If there were not enough requests, an
