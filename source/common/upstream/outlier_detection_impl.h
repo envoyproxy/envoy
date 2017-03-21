@@ -51,16 +51,17 @@ class SRAccumulatorImpl {
 public:
   SRAccumulatorImpl()
       : current_sr_bucket_(new SRAccumulatorBucket()),
-        backup_sr_bucket_(new SRAccumulatorBucket()){};
+        backup_sr_bucket_(new SRAccumulatorBucket()) {}
+
   SRAccumulatorBucket* getCurrentWriter();
   /**
    * This function returns the SR of a host over a window of time if the request volume is high
    * enough. The underlying window of time could be dynamically adjusted. In the current
    * implementation it is a fixed time window.
-   * @param rq_volume_threshold, the threshold of requests an accumulator has to have in order to be
-   * able to return a significant SR value.
+   * @param rq_volume_threshold the threshold of requests an accumulator has to have in order to be
+   *                            able to return a significant SR value.
    * @return a valid Optional<double> with the success rate. If there were not enough requests, an
-   * invalid Optional<double> is returned.
+   *         invalid Optional<double> is returned.
    */
   Optional<double> getSR(uint64_t rq_volume_threshold);
 
@@ -222,8 +223,7 @@ class Utility {
 public:
   /**
    * This function returns the Success Rate trheshold for Success Rate outlier detection. If a
-   * host's
-   * Success Rate is under this threshold the host is an outlier.
+   * host's Success Rate is under this threshold the host is an outlier.
    * @param sr_sum is the sum of the data in the sr_data vector.
    * @param sr_data is the vector containing the individual success rate data points.
    * @return the Success Rate threshold.
@@ -232,7 +232,7 @@ public:
 
 private:
   // Factor to multiply the stdev of a cluster's Success Rate for success rate outlier ejection.
-  static constexpr double SR_STDEV_FACTOR = 1.9;
+  static const double SR_STDEV_FACTOR;
 };
 
 } // Outlier

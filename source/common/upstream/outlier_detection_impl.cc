@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "outlier_detection_impl.h"
 
 #include "envoy/event/dispatcher.h"
@@ -232,6 +233,8 @@ void DetectorImpl::onConsecutive5xxWorker(HostPtr host) {
   ejectHost(host, EjectionType::Consecutive5xx);
 }
 
+const double Utility::SR_STDEV_FACTOR = 1.9;
+
 double Utility::srEjectionThreshold(double sr_sum, std::vector<double>& sr_data) {
   double mean = sr_sum / sr_data.size();
   double stdev = 0;
@@ -246,8 +249,15 @@ double Utility::srEjectionThreshold(double sr_sum, std::vector<double>& sr_data)
 void DetectorImpl::onIntervalTimer() {
   SystemTime now = time_source_.currentSystemTime();
   std::unordered_map<HostPtr, double> valid_sr_hosts;
+  uint64_t significant_host_threshold = runtime_.snapshot().getInteger(
+      "outlier_detection.significant_host_threshold", config_.significantHostThreshold());
+  uint64_t rq_volume_threshold = runtime_.snapshot().getInteger(
+      "outlier_detection.rq_volume_threshold", config_.rqVolumeThreshold());
   std::vector<double> sr_data;
   double sr_sum = 0;
+  // reserve upper bound of vector size to avoid reallocation.
+  sr_data.reserve(host_sinks_.size());
+
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
 
@@ -256,11 +266,8 @@ void DetectorImpl::onIntervalTimer() {
     host.second->updateCurrentSRBucket();
 
     // If there are not enough hosts to begin with, don't do the work.
-    if (host_sinks_.size() >=
-        runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold",
-                                       config_.significantHostThreshold())) {
-      Optional<double> host_sr = host.second->srAccumulator().getSR(runtime_.snapshot().getInteger(
-          "outlier_detection.rq_volume_threshold", config_.rqVolumeThreshold()));
+    if (host_sinks_.size() >= significant_host_threshold) {
+      Optional<double> host_sr = host.second->srAccumulator().getSR(rq_volume_threshold);
 
       if (host_sr.valid()) {
         valid_sr_hosts[host.first] = host_sr.value();
@@ -270,9 +277,7 @@ void DetectorImpl::onIntervalTimer() {
     }
   }
 
-  if (valid_sr_hosts.size() >=
-      runtime_.snapshot().getInteger("outlier_detection.significant_host_threshold",
-                                     config_.significantHostThreshold())) {
+  if (valid_sr_hosts.size() >= significant_host_threshold) {
     double ejection_threshold = Utility::srEjectionThreshold(sr_sum, sr_data);
     for (auto host : valid_sr_hosts) {
       if (host.second < ejection_threshold) {

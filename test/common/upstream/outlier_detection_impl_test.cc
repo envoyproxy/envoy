@@ -57,18 +57,23 @@ public:
         .WillByDefault(Return(true));
   }
 
-  void loadRq(std::vector<HostPtr>& hosts, int num_rq) {
-    for (uint64_t i = 0; i < hosts.size() - 1; i++) {
+  void loadRq(std::vector<HostPtr>& hosts, int num_rq, bool success) {
+    for (uint64_t i = 0; i < hosts.size(); i++) {
       for (int j = 0; j < num_rq; j++) {
-        hosts[i]->outlierDetector().putHttpResponseCode(200);
+        if (success) {
+          hosts[i]->outlierDetector().putHttpResponseCode(200);
+        } else {
+          hosts[i]->outlierDetector().putHttpResponseCode(503);
+        }
       }
     }
   }
 
-  void loadRq(HostPtr host, int num_rq, int failure_mod) {
+  void loadRq(HostPtr host, int num_rq, bool success) {
     for (int i = 0; i < num_rq; i++) {
-      host->outlierDetector().putHttpResponseCode(200);
-      if (i % failure_mod == 0) {
+      if (success) {
+        host->outlierDetector().putHttpResponseCode(200);
+      } else {
         host->outlierDetector().putHttpResponseCode(503);
       }
     }
@@ -118,10 +123,7 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
   detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
 
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 4, false);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
@@ -129,7 +131,7 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
                        EjectionType::Consecutive5xx));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 1, false);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
@@ -150,11 +152,7 @@ TEST_F(OutlierDetectorImplTest, DestroyHostInUse) {
 
   detector.reset();
 
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 5, false);
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
@@ -171,13 +169,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   cluster_.runCallbacks({cluster_.hosts_[1]}, {});
 
   // Cause a consecutive 5xx error.
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(200);
+  loadRq(cluster_.hosts_[0], 1, false);
+  loadRq(cluster_.hosts_[0], 1, true);
   cluster_.hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 4, false);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
@@ -185,7 +180,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
                        EjectionType::Consecutive5xx));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 1, false);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
@@ -207,13 +202,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_FALSE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   // Eject host again to cause an ejection after an unejection has taken place
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(200);
+  loadRq(cluster_.hosts_[0], 1, false);
+  loadRq(cluster_.hosts_[0], 1, true);
   cluster_.hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 4, false);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .WillOnce(Return(SystemTime(std::chrono::milliseconds(40000))));
@@ -221,7 +213,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
                        EjectionType::Consecutive5xx));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 1, false);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
@@ -235,25 +227,29 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
 
 TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(
-      cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
+  cluster_.hosts_ = {
+      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+                           false, 1, "")},
+      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:81"),
+                           false, 1, "")},
+      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:82"),
+                           false, 1, "")},
+      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:83"),
+                           false, 1, "")},
+      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:84"),
+                           false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
   detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
 
-  for (int i = 81; i < 85; ++i) {
-    cluster_.hosts_.push_back(HostPtr{new HostImpl(
-        cluster_.info_, "", Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", i)),
-        false, 1, "")});
-  }
-
-  cluster_.runCallbacks(
-      {cluster_.hosts_[1], cluster_.hosts_[2], cluster_.hosts_[3], cluster_.hosts_[4]}, {});
+  // Turn off 5xx detection to test SR detection in isolation.
+  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
+      .WillByDefault(Return(false));
 
   // Cause a consecutive SR error on one host. First have 4 of the hosts have perfect SR.
-  loadRq(cluster_.hosts_, 200);
-  loadRq(cluster_.hosts_[4], 100, 1);
+  loadRq(cluster_.hosts_, 200, true);
+  loadRq(cluster_.hosts_[4], 200, false);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .Times(2)
@@ -287,8 +283,8 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
   // Give 4 hosts enough request volume but not to the 5th. Should not cause an ejection.
-  loadRq(cluster_.hosts_, 150);
-  loadRq(cluster_.hosts_[4], 25, 1);
+  loadRq(cluster_.hosts_, 25, true);
+  loadRq(cluster_.hosts_[4], 25, false);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .WillOnce(Return(SystemTime(std::chrono::milliseconds(60001))));
@@ -306,10 +302,7 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
   detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
 
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 4, false);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
@@ -317,7 +310,7 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
                        EjectionType::Consecutive5xx));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 1, false);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
@@ -348,10 +341,7 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
   ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.max_ejection_percent", _))
       .WillByDefault(Return(1));
 
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 4, false);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
@@ -362,11 +352,7 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
-  cluster_.hosts_[1]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[1]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[1]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[1]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[1]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[1], 5, false);
   EXPECT_FALSE(cluster_.hosts_[1]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
@@ -383,14 +369,11 @@ TEST_F(OutlierDetectorImplTest, NotEnforcing) {
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
   detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
 
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 4, false);
 
   ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
       .WillByDefault(Return(false));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 1, false);
   EXPECT_FALSE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
@@ -408,14 +391,11 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
   detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
 
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 4, false);
 
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 1, false);
 
   // Remove before the cross thread event comes in.
   std::vector<HostPtr> old_hosts = std::move(cluster_.hosts_);
@@ -434,14 +414,11 @@ TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
   detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
 
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 4, false);
 
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 1, false);
 
   // Destroy before the cross thread event comes in.
   std::weak_ptr<DetectorImpl> weak_detector = detector;
@@ -461,14 +438,11 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
   detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
 
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 4, false);
 
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 1, false);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
@@ -495,10 +469,7 @@ TEST_F(OutlierDetectorImplTest, Consecutive5xxAlreadyEjected) {
   detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
 
   // Cause a consecutive 5xx error.
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 4, false);
 
   EXPECT_CALL(time_source_, currentSystemTime())
       .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
@@ -506,16 +477,12 @@ TEST_F(OutlierDetectorImplTest, Consecutive5xxAlreadyEjected) {
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
                        EjectionType::Consecutive5xx));
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 1, false);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   // Cause another consecutive 5xx error.
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(200);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
-  cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
+  loadRq(cluster_.hosts_[0], 1, true);
+  loadRq(cluster_.hosts_[0], 5, false);
 }
 
 TEST(OutlierDetectionEventLoggerImplTest, All) {
