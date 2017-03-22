@@ -35,11 +35,9 @@ stage
   **NOTE:** The filter supports a range of 0 - 10 inclusively for stage numbers.
 
 request_type
-  *(optional, string)* The types of requests that the filter should apply to. The supported
-  types are *internal*, *external* or *both*. If not specified, the filter will default to *both*.
-  A request is internal, if
-  :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` respects RFC1918 or is a
-  loopback address.
+  *(optional, string)* The type of requests the filter should apply to. The supported
+  types are *internal*, *external* or *both*. The filter defaults to *both*, and it
+  will apply to all requests.
 
 Statistics
 ----------
