@@ -1,6 +1,4 @@
-#include "address_impl.h"
-#include "listener_impl.h"
-#include "proxy_protocol.h"
+#include "common/network/proxy_protocol.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
@@ -8,6 +6,8 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/empty_string.h"
+#include "common/network/address_impl.h"
+#include "common/network/listener_impl.h"
 #include "common/network/utility.h"
 
 namespace Network {

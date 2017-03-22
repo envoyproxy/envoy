@@ -1,13 +1,12 @@
 #pragma once
 
-#include "filter_manager_impl.h"
-
 #include "envoy/network/connection.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
+#include "common/network/filter_manager_impl.h"
 
 namespace Network {
 
