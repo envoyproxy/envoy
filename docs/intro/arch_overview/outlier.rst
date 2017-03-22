@@ -51,13 +51,13 @@ required for ejection is controlled by the :ref:`outlier_detection.consecutive_5
 Success Rate
 ^^^^^^^^^^^^
 
-Success Rate based outlier ejection aggregates success rate data from every host in a cluster, and at a given
-interval ejects hosts based on statistical outlier detection. Success Rate outlier ejection will not be
+Success Rate based outlier ejection aggregates success rate data from every host in a cluster. Then at given
+intervals ejects hosts based on statistical outlier detection. Success Rate outlier ejection will not be
 calculated for a host if its request volume over the aggregation interval is less than the
-:ref:`outlier_detection.rq_volume_threshold<config_cluster_manager_cluster_outlier_detection_rq_volume_threshold>`
+:ref:`outlier_detection.success_rate_request_volume<config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
 value. Moreover, detection will not be performed for a cluster if the number of hosts
 with the minimum required request volume in an interval is less than the
-:ref:`outlier_detection.significant_host_threshold<config_cluster_manager_cluster_outlier_detection_significant_host_threshold>`
+:ref:`outlier_detection.success_rate_minimum_hosts<config_cluster_manager_cluster_outlier_detection_success_rate_minimum_hosts>`
 value.
 
 Ejection event logging

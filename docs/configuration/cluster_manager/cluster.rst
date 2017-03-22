@@ -174,23 +174,23 @@ outlier_detection
     The % chance that a host will be actually ejected when an outlier status is detected through
     consecutive 5xx. This setting can be used to disable ejection or to ramp it up slowly. Defaults to 100.
 
-  .. _config_cluster_manager_cluster_outlier_detection_enforcing_sr:
+  .. _config_cluster_manager_cluster_outlier_detection_enforcing_success_rate:
 
-  enforcing_sr
+  enforcing_success_rate
     The % chance that a host will be actually ejected when an outlier status is detected through
     success rate statistics. This setting can be used to disable ejection or to ramp it up slowly.
     Defaults to 100.
 
-  .. _config_cluster_manager_cluster_outlier_detection_significant_host_threshold:
+  .. _config_cluster_manager_cluster_outlier_detection_success_rate_minimum_hosts:
 
-  significant_host_threshold
+  success_rate_minimum_hosts
     The number of hosts in a cluster that must have enough request volume to detect success rate outliers.
     If the number of hosts is less than this setting, outlier detection via success rate statistics is not
     performed for any host in the cluster. Defaults to 5.
 
-  .. _config_cluster_manager_cluster_outlier_detection_rq_volume_threshold:
+  .. _config_cluster_manager_cluster_outlier_detection_success_rate_request_volume:
 
-  rq_volume_threshold:
+  success_rate_request_volume
     The minimum number of total requests that must be collected in one interval
     (as defined by :ref:`interval_ms <config_cluster_manager_cluster_outlier_detection_interval_ms>` above)
     to include this host in success rate based outlier detection. If the volume is lower than this setting,

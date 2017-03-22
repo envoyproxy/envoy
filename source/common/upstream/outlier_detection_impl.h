@@ -37,37 +37,41 @@ public:
                                       EventLoggerPtr event_logger);
 };
 
-struct SRAccumulatorBucket {
-  std::atomic<uint64_t> success_rq_counter_;
-  std::atomic<uint64_t> total_rq_counter_;
+struct SuccessRateAccumulatorBucket {
+  std::atomic<uint64_t> success_request_counter_;
+  std::atomic<uint64_t> total_request_counter_;
 };
 
 /**
- * The S(uccess)R(ate)AccumulatorImpl uses the SRAccumulatorBucket to get per host Success Rate
+ * The SuccessRateAccumulator uses the SuccessRateAccumulatorBucket to get per host success rate
  * stats. This implementation has a fixed window size of time, and thus only needs a
  * bucket to write to, and a bucket to accumulate/run stats over.
  */
-class SRAccumulatorImpl {
+class SuccessRateAccumulator {
 public:
-  SRAccumulatorImpl()
-      : current_sr_bucket_(new SRAccumulatorBucket()),
-        backup_sr_bucket_(new SRAccumulatorBucket()) {}
+  SuccessRateAccumulator()
+      : current_success_rate_bucket_(new SuccessRateAccumulatorBucket()),
+        backup_success_rate_bucket_(new SuccessRateAccumulatorBucket()) {}
 
-  SRAccumulatorBucket* getCurrentWriter();
   /**
-   * This function returns the SR of a host over a window of time if the request volume is high
-   * enough. The underlying window of time could be dynamically adjusted. In the current
+   * This function updates the bucket to write data to.
+   * @return a pointer to the SuccessRateAccumulatorBucket.
+   */
+  SuccessRateAccumulatorBucket* updateCurrentWriter();
+  /**
+   * This function returns the success rate of a host over a window of time if the request volume is
+   * high enough. The underlying window of time could be dynamically adjusted. In the current
    * implementation it is a fixed time window.
-   * @param rq_volume_threshold the threshold of requests an accumulator has to have in order to be
-   *                            able to return a significant SR value.
+   * @param request_volume_threshold the threshold of requests an accumulator has to have in order
+   *                                 to be able to return a significant success rate value.
    * @return a valid Optional<double> with the success rate. If there were not enough requests, an
    *         invalid Optional<double> is returned.
    */
-  Optional<double> getSR(uint64_t rq_volume_threshold);
+  Optional<double> getSuccessRate(uint64_t success_rate_request_volume);
 
 private:
-  std::unique_ptr<SRAccumulatorBucket> current_sr_bucket_;
-  std::unique_ptr<SRAccumulatorBucket> backup_sr_bucket_;
+  std::unique_ptr<SuccessRateAccumulatorBucket> current_success_rate_bucket_;
+  std::unique_ptr<SuccessRateAccumulatorBucket> backup_success_rate_bucket_;
 };
 
 class DetectorImpl;
@@ -80,13 +84,13 @@ public:
   DetectorHostSinkImpl(std::shared_ptr<DetectorImpl> detector, HostPtr host)
       : detector_(detector), host_(host) {
     // Point the sr_accumulator_bucket_ pointer to a bucket.
-    updateCurrentSRBucket();
+    updateCurrentSuccessRateBucket();
   }
 
   void eject(SystemTime ejection_time);
   void uneject(SystemTime ejection_time);
-  void updateCurrentSRBucket();
-  SRAccumulatorImpl& srAccumulator() { return sr_accumulator_; };
+  void updateCurrentSuccessRateBucket();
+  SuccessRateAccumulator& successRateAccumulator() { return success_rate_accumulator_; };
 
   // Upstream::Outlier::DetectorHostSink
   uint32_t numEjections() override { return num_ejections_; }
@@ -102,8 +106,8 @@ private:
   Optional<SystemTime> last_ejection_time_;
   Optional<SystemTime> last_unejection_time_;
   uint32_t num_ejections_{};
-  SRAccumulatorImpl sr_accumulator_;
-  std::atomic<SRAccumulatorBucket*> sr_accumulator_bucket_;
+  SuccessRateAccumulator success_rate_accumulator_;
+  std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
 };
 
 /**
@@ -115,7 +119,7 @@ private:
   GAUGE  (ejections_active)                                                                        \
   COUNTER(ejections_overflow)                                                                      \
   COUNTER(ejections_consecutive_5xx)                                                               \
-  COUNTER(ejections_sr)
+  COUNTER(ejections_success_rate)
 // clang-format on
 
 /**
@@ -136,20 +140,20 @@ public:
   uint64_t baseEjectionTimeMs() { return base_ejection_time_ms_; }
   uint64_t consecutive5xx() { return consecutive_5xx_; }
   uint64_t maxEjectionPercent() { return max_ejection_percent_; }
-  uint64_t significantHostThreshold() { return significant_host_threshold_; }
-  uint64_t rqVolumeThreshold() { return rq_volume_threshold_; }
+  uint64_t successRateMinimumHosts() { return success_rate_minimum_hosts_; }
+  uint64_t successRateRequestVolume() { return success_rate_request_volume_; }
   uint64_t enforcingConsecutive5xx() { return enforcing_consecutive_5xx_; }
-  uint64_t enforcingSR() { return enforcing_sr_; }
+  uint64_t enforcingSuccessRate() { return enforcing_success_rate_; }
 
 private:
   const uint64_t interval_ms_;
   const uint64_t base_ejection_time_ms_;
   const uint64_t consecutive_5xx_;
   const uint64_t max_ejection_percent_;
-  const uint64_t significant_host_threshold_;
-  const uint64_t rq_volume_threshold_;
+  const uint64_t success_rate_minimum_hosts_;
+  const uint64_t success_rate_request_volume_;
   const uint64_t enforcing_consecutive_5xx_;
-  const uint64_t enforcing_sr_;
+  const uint64_t enforcing_success_rate_;
 };
 
 /**
@@ -222,17 +226,18 @@ private:
 class Utility {
 public:
   /**
-   * This function returns the Success Rate trheshold for Success Rate outlier detection. If a
-   * host's Success Rate is under this threshold the host is an outlier.
-   * @param sr_sum is the sum of the data in the sr_data vector.
-   * @param sr_data is the vector containing the individual success rate data points.
-   * @return the Success Rate threshold.
+   * This function returns the success rate threshold for success rate outlier detection. If a
+   * host's success rate is under this threshold the host is an outlier.
+   * @param success_rate_sum is the sum of the data in the success_rate_data vector.
+   * @param success_rate_data is the vector containing the individual success rate data points.
+   * @return the success rate threshold.
    */
-  static double srEjectionThreshold(double sr_sum, std::vector<double>& sr_data);
+  static double successRateEjectionThreshold(double success_rate_sum,
+                                             std::vector<double>& success_rate_data);
 
 private:
-  // Factor to multiply the stdev of a cluster's Success Rate for success rate outlier ejection.
-  static const double SR_STDEV_FACTOR;
+  // Factor to multiply the stdev of a cluster's success rate for success rate outlier ejection.
+  static const double SUCCESS_RATE_STDEV_FACTOR;
 };
 
 } // Outlier

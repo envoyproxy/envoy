@@ -1,4 +1,4 @@
-#include <cstdint>
+#include <algorithm>
 #include "outlier_detection_impl.h"
 
 #include "envoy/event/dispatcher.h"
@@ -34,12 +34,12 @@ void DetectorHostSinkImpl::uneject(SystemTime unejection_time) {
   last_unejection_time_.value(unejection_time);
 }
 
-void DetectorHostSinkImpl::updateCurrentSRBucket() {
-  sr_accumulator_bucket_.store(sr_accumulator_.getCurrentWriter());
+void DetectorHostSinkImpl::updateCurrentSuccessRateBucket() {
+  success_rate_accumulator_bucket_.store(success_rate_accumulator_.updateCurrentWriter());
 }
 
 void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
-  sr_accumulator_bucket_.load()->total_rq_counter_++;
+  success_rate_accumulator_bucket_.load()->total_request_counter_++;
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
@@ -53,7 +53,7 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
-    sr_accumulator_bucket_.load()->success_rq_counter_++;
+    success_rate_accumulator_bucket_.load()->success_request_counter_++;
     consecutive_5xx_ = 0;
   }
 }
@@ -65,13 +65,14 @@ DetectorConfig::DetectorConfig(const Json::Object& json_config)
       consecutive_5xx_(static_cast<uint64_t>(json_config.getInteger("consecutive_5xx", 5))),
       max_ejection_percent_(
           static_cast<uint64_t>(json_config.getInteger("max_ejection_percent", 10))),
-      significant_host_threshold_(
-          static_cast<uint64_t>(json_config.getInteger("significant_host_threshold", 5))),
-      rq_volume_threshold_(
-          static_cast<uint64_t>(json_config.getInteger("rq_volume_threshold", 100))),
+      success_rate_minimum_hosts_(
+          static_cast<uint64_t>(json_config.getInteger("success_rate_minimum_hosts", 5))),
+      success_rate_request_volume_(
+          static_cast<uint64_t>(json_config.getInteger("success_rate_request_volume", 100))),
       enforcing_consecutive_5xx_(
           static_cast<uint64_t>(json_config.getInteger("enforcing_consecutive_5xx", 100))),
-      enforcing_sr_(static_cast<uint64_t>(json_config.getInteger("enforcing_sr", 100))) {}
+      enforcing_success_rate_(
+          static_cast<uint64_t>(json_config.getInteger("enforcing_success_rate", 100))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
@@ -164,8 +165,8 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
     return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_consecutive_5xx",
                                               config_.enforcingConsecutive5xx());
   case EjectionType::SuccessRate:
-    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_sr",
-                                              config_.enforcingSR());
+    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_success_rate",
+                                              config_.enforcingSuccessRate());
   }
 
   NOT_REACHED;
@@ -233,58 +234,79 @@ void DetectorImpl::onConsecutive5xxWorker(HostPtr host) {
   ejectHost(host, EjectionType::Consecutive5xx);
 }
 
-const double Utility::SR_STDEV_FACTOR = 1.9;
+const double Utility::SUCCESS_RATE_STDEV_FACTOR = 1.9;
 
-double Utility::srEjectionThreshold(double sr_sum, std::vector<double>& sr_data) {
-  double mean = sr_sum / sr_data.size();
-  double stdev = 0;
-  std::for_each(sr_data.begin(), sr_data.end(),
-                [&stdev, mean](double& v) { stdev += std::pow(v - mean, 2); });
-  stdev /= sr_data.size();
-  stdev = std::sqrt(stdev);
+double Utility::successRateEjectionThreshold(double success_rate_sum,
+                                             std::vector<double>& success_rate_data) {
+  // This function is using mean and standard deviation as statistical measures for outlier
+  // detection. First the mean is calculated by dividing the sum of success rate data over the
+  // number of data points. Then variance is calculated by taking the mean of the
+  // squared difference of data points to the mean of the data. Then standard deviation is
+  // calculated by taking the square root of the variance. Then the outlier threshold is
+  // calculated as the difference between the mean and the product of the standard
+  // deviation and a constant factor.
+  //
+  // For example with a data set that looks like success_rate_data = {50, 100, 100, 100, 100} the
+  // math would work as follows:
+  // success_rate_sum = 450
+  // mean = 90
+  // variance = 400
+  // stdev = 20
+  // threshold returned = 52
+  double mean = success_rate_sum / success_rate_data.size();
+  double variance = 0;
+  std::for_each(success_rate_data.begin(), success_rate_data.end(),
+                [&variance, mean](double& v) { variance += std::pow(v - mean, 2); });
+  variance /= success_rate_data.size();
+  double stdev = std::sqrt(variance);
 
-  return mean - (SR_STDEV_FACTOR * stdev);
+  return mean - (SUCCESS_RATE_STDEV_FACTOR * stdev);
 }
 
 void DetectorImpl::onIntervalTimer() {
   SystemTime now = time_source_.currentSystemTime();
-  std::unordered_map<HostPtr, double> valid_sr_hosts;
-  uint64_t significant_host_threshold = runtime_.snapshot().getInteger(
-      "outlier_detection.significant_host_threshold", config_.significantHostThreshold());
-  uint64_t rq_volume_threshold = runtime_.snapshot().getInteger(
-      "outlier_detection.rq_volume_threshold", config_.rqVolumeThreshold());
-  std::vector<double> sr_data;
-  double sr_sum = 0;
 
-  if (host_sinks_.size() >= significant_host_threshold) {
+  // data for success rate outlier ejection
+  std::unordered_map<HostPtr, double> valid_success_rate_hosts;
+  uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
+      "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
+  uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
+      "outlier_detection.success_rate_request_volume", config_.successRateRequestVolume());
+  std::vector<double> success_rate_data;
+  double success_rate_sum = 0;
+
+  if (host_sinks_.size() >= success_rate_minimum_hosts) {
     // reserve upper bound of vector size to avoid reallocation.
-    sr_data.reserve(host_sinks_.size());
+    success_rate_data.reserve(host_sinks_.size());
   }
 
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
 
-    // Success Rate Outlier Detection.
-    // First swap out the current bucket been written to, to keep data valid.
-    host.second->updateCurrentSRBucket();
+    host.second->updateCurrentSuccessRateBucket();
 
     // If there are not enough hosts to begin with, don't do the work.
-    if (host_sinks_.size() >= significant_host_threshold) {
-      Optional<double> host_sr = host.second->srAccumulator().getSR(rq_volume_threshold);
+    if (host_sinks_.size() >= success_rate_minimum_hosts) {
+      // Don't do work if host is already ejected.
+      if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+        Optional<double> host_success_rate =
+            host.second->successRateAccumulator().getSuccessRate(success_rate_request_volume);
 
-      if (host_sr.valid()) {
-        valid_sr_hosts[host.first] = host_sr.value();
-        sr_data.emplace_back(host_sr.value());
-        sr_sum += host_sr.value();
+        if (host_success_rate.valid()) {
+          valid_success_rate_hosts[host.first] = host_success_rate.value();
+          success_rate_data.emplace_back(host_success_rate.value());
+          success_rate_sum += host_success_rate.value();
+        }
       }
     }
   }
 
-  if (valid_sr_hosts.size() >= significant_host_threshold) {
-    double ejection_threshold = Utility::srEjectionThreshold(sr_sum, sr_data);
-    for (auto host : valid_sr_hosts) {
+  if (valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
+    double ejection_threshold =
+        Utility::successRateEjectionThreshold(success_rate_sum, success_rate_data);
+    for (auto host : valid_success_rate_hosts) {
       if (host.second < ejection_threshold) {
-        stats_.ejections_sr_.inc();
+        stats_.ejections_success_rate_.inc();
         ejectHost(host.first, EjectionType::SuccessRate);
       }
     }
@@ -345,7 +367,7 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
   case EjectionType::Consecutive5xx:
     return "5xx";
   case EjectionType::SuccessRate:
-    return "SR";
+    return "SuccessRate";
   }
 
   NOT_REACHED;
@@ -359,23 +381,23 @@ int EventLoggerImpl::secsSinceLastAction(const Optional<SystemTime>& lastActionT
   return -1;
 }
 
-SRAccumulatorBucket* SRAccumulatorImpl::getCurrentWriter() {
-  // Right now current_ is being written to and backup_ is not. Flush the backup and swap.
-  backup_sr_bucket_->success_rq_counter_ = 0;
-  backup_sr_bucket_->total_rq_counter_ = 0;
+SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
+  // Right now current is being written to and backup is not. Flush the backup and swap.
+  backup_success_rate_bucket_->success_request_counter_ = 0;
+  backup_success_rate_bucket_->total_request_counter_ = 0;
 
-  current_sr_bucket_.swap(backup_sr_bucket_);
+  current_success_rate_bucket_.swap(backup_success_rate_bucket_);
 
-  return current_sr_bucket_.get();
+  return current_success_rate_bucket_.get();
 }
 
-Optional<double> SRAccumulatorImpl::getSR(uint64_t rq_volume_threshold) {
-  if (backup_sr_bucket_->total_rq_counter_ < rq_volume_threshold) {
+Optional<double> SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_request_volume) {
+  if (backup_success_rate_bucket_->total_request_counter_ < success_rate_request_volume) {
     return Optional<double>();
   }
 
-  return Optional<double>(backup_sr_bucket_->success_rq_counter_ * 100 /
-                          backup_sr_bucket_->total_rq_counter_);
+  return Optional<double>(backup_success_rate_bucket_->success_request_counter_ * 100 /
+                          backup_success_rate_bucket_->total_request_counter_);
 }
 
 } // Outlier

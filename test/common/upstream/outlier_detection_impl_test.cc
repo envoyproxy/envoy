@@ -53,7 +53,7 @@ public:
   OutlierDetectorImplTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
         .WillByDefault(Return(true));
-    ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_sr", 100))
+    ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_success_rate", 100))
         .WillByDefault(Return(true));
   }
 
@@ -87,7 +87,7 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
     "consecutive_5xx" : 10,
     "max_ejection_percent" : 50,
     "enforcing_consecutive_5xx" : 10,
-    "enforcing_sr": 20
+    "enforcing_success_rate": 20
   }
   )EOF";
 
@@ -101,7 +101,7 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
   EXPECT_EQ(10UL, detector->config().consecutive5xx());
   EXPECT_EQ(50UL, detector->config().maxEjectionPercent());
   EXPECT_EQ(10UL, detector->config().enforcingConsecutive5xx());
-  EXPECT_EQ(20UL, detector->config().enforcingSR());
+  EXPECT_EQ(20UL, detector->config().enforcingSuccessRate());
 }
 
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
@@ -215,7 +215,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
                      .value());
 }
 
-TEST_F(OutlierDetectorImplTest, BasicFlowSR) {
+TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   cluster_.hosts_ = {
       HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
@@ -522,7 +522,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"30\", \"cluster\": "
                            "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"SR\", \"num_ejections\": 0}\n"))
+                           "\"eject\", \"type\": \"SuccessRate\", \"num_ejections\": 0}\n"))
       .WillOnce(SaveArg<0>(&log3));
   event_logger.logEject(host, EjectionType::SuccessRate);
   Json::Factory::LoadFromString(log3);
@@ -541,7 +541,7 @@ TEST(OutlierUtility, SRThreshold) {
   std::vector<double> data = {50, 100, 100, 100, 100};
   double sum = std::accumulate(data.begin(), data.end(), 0.0);
 
-  EXPECT_EQ(Utility::srEjectionThreshold(sum, data), 52);
+  EXPECT_EQ(Utility::successRateEjectionThreshold(sum, data), 52);
 }
 
 } // Outlier

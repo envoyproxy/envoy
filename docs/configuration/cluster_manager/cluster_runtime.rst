@@ -57,19 +57,19 @@ outlier_detection.enforcing_consecutive_5xx
   <config_cluster_manager_cluster_outlier_detection_enforcing_consecutive_5xx>`
   setting in outlier detection
 
-outlier_detection.enforcing_sr
-  :ref:`enforcing_sr
-  <config_cluster_manager_cluster_outlier_detection_enforcing_sr>`
+outlier_detection.enforcing_success_rate
+  :ref:`enforcing_success_rate
+  <config_cluster_manager_cluster_outlier_detection_enforcing_success_rate>`
   setting in outlier detection
 
-outlier_detection.significant_host_threshold
-  :ref:`significant_host_threshold
-  <config_cluster_manager_cluster_outlier_detection_significant_host_threshold>`
+outlier_detection.success_rate_minimum_hosts
+  :ref:`success_rate_minimum_hosts
+  <config_cluster_manager_cluster_outlier_detection_success_rate_minimum_hosts>`
   setting in outlier detection
 
-outlier_detection.rq_volume_threshold
-  :ref:`rq_volume_threshold
-  <config_cluster_manager_cluster_outlier_detection_rq_volume_threshold>`
+outlier_detection.success_rate_request_volume
+  :ref:`success_rate_request_volume
+  <config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
   setting in outlier detection
 
 Core
