@@ -2,7 +2,6 @@
 
 #ifdef TCMALLOC
 
-#include "common/common/assert.h"
 #include "gperftools/heap-profiler.h"
 #include "gperftools/profiler.h"
 

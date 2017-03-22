@@ -28,7 +28,6 @@ public:
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestHeaderMapImpl request_headers_;
-  Http::TestHeaderMapImpl profiler_headers_;
 };
 
 TEST_F(AdminFilterTest, HeaderOnly) {
