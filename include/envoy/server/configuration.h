@@ -147,6 +147,11 @@ public:
   virtual const std::string& accessLogPath() PURE;
 
   /**
+   * @return const std::string& profiler output path.
+   */
+  virtual const std::string& profilePath() PURE;
+
+  /**
    * @return Network::Address::InstanceConstSharedPtr the server address.
    */
   virtual Network::Address::InstanceConstSharedPtr address() PURE;

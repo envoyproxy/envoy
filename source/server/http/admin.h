@@ -22,8 +22,8 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& access_log_path, Network::Address::InstanceConstSharedPtr address,
-            Server::Instance& server);
+  AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
+            Network::Address::InstanceConstSharedPtr address, Server::Instance& server);
 
   Http::Code runCallback(const std::string& path, Buffer::Instance& response);
   Network::ListenSocket& socket() { return *socket_; }
@@ -113,6 +113,7 @@ private:
 
   Server::Instance& server_;
   std::list<Http::AccessLog::InstanceSharedPtr> access_logs_;
+  const std::string profile_path_;
   Network::ListenSocketPtr socket_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;

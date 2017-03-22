@@ -163,7 +163,11 @@ Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Buffer::Instanc
 
   bool enable = query_params.begin()->second == "y";
   if (enable && !Profiler::Cpu::profilerEnabled()) {
-    Profiler::Cpu::startProfiler("/var/log/envoy/envoy.prof");
+    if (!Profiler::Cpu::startProfiler(profile_path_)) {
+      response.add("failure to start the profiler");
+      return Http::Code::InternalServerError;
+    }
+
   } else if (!enable && Profiler::Cpu::profilerEnabled()) {
     Profiler::Cpu::stopProfiler();
   }
@@ -295,9 +299,10 @@ void AdminFilter::onComplete() {
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
     : config_(new Router::NullConfigImpl()) {}
 
-AdminImpl::AdminImpl(const std::string& access_log_path,
+AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
                      Network::Address::InstanceConstSharedPtr address, Server::Instance& server)
-    : server_(server), socket_(new Network::TcpListenSocket(address, true)),
+    : server_(server), profile_path_(profile_path),
+      socket_(new Network::TcpListenSocket(address, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),

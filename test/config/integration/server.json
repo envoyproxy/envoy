@@ -244,7 +244,7 @@
     }]
   }],
 
-  "admin": { "access_log_path": "/dev/null", "address": "tcp://127.0.0.1:10003" },
+  "admin": { "access_log_path": "/dev/null", "profile_path": "/tmp/envoy.prof", "address": "tcp://127.0.0.1:10003" },
   "flags_path": "/invalid_flags",
   "statsd_local_udp_port": 8125,
   "statsd_tcp_cluster_name": "statsd",
