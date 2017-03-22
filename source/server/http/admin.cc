@@ -163,9 +163,9 @@ Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Buffer::Instanc
 
   bool enable = query_params.begin()->second == "y";
   if (enable && !Profiler::Cpu::profilerEnabled()) {
-    if (!Profiler::Cpu::startProfiler(profiler_path_)) {
-      response.add("?enable=<y|n>\n");
-      return Http::Code::BadRequest;
+    if (!Profiler::Cpu::startProfiler(profile_path_)) {
+      response.add("failure to start the profiler");
+      return Http::Code::InternalServerError;
     }
 
   } else if (!enable && Profiler::Cpu::profilerEnabled()) {
@@ -299,9 +299,10 @@ void AdminFilter::onComplete() {
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
     : config_(new Router::NullConfigImpl()) {}
 
-AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
+AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
                      Network::Address::InstancePtr address, Server::Instance& server)
-    : server_(server), socket_(new Network::TcpListenSocket(address, true)),
+    : server_(server), profile_path_(profile_path),
+      socket_(new Network::TcpListenSocket(address, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),
@@ -321,7 +322,6 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/server_info", "print server version/status information",
            MAKE_HANDLER(handlerServerInfo)},
           {"/stats", "print server stats", MAKE_HANDLER(handlerStats)}} {
-  profiler_path_ = profiler_path;
   access_logs_.emplace_back(new Http::AccessLog::InstanceImpl(
       access_log_path, {}, Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
       server.accessLogManager()));

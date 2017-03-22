@@ -147,9 +147,9 @@ public:
   virtual const std::string& accessLogPath() PURE;
 
   /**
-   * @return const std::string& the admin profiler path.
+   * @return const std::string& profiler output path.
    */
-  virtual const std::string& profilerPath() PURE;
+  virtual const std::string& profilePath() PURE;
 
   /**
    * @return Network::Address::InstancePtr the server address.
