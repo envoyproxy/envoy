@@ -263,10 +263,7 @@ double Utility::successRateEjectionThreshold(double success_rate_sum,
   return mean - (SUCCESS_RATE_STDEV_FACTOR * stdev);
 }
 
-void DetectorImpl::onIntervalTimer() {
-  SystemTime now = time_source_.currentSystemTime();
-
-  // data for success rate outlier ejection
+void DetectorImpl::successRateEjections() {
   std::unordered_map<HostPtr, double> valid_success_rate_hosts;
   uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
       "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
@@ -281,13 +278,11 @@ void DetectorImpl::onIntervalTimer() {
   }
 
   for (auto host : host_sinks_) {
-    checkHostForUneject(host.first, host.second, now);
-
     host.second->updateCurrentSuccessRateBucket();
 
     // If there are not enough hosts to begin with, don't do the work.
     if (host_sinks_.size() >= success_rate_minimum_hosts) {
-      // Don't do work if host is already ejected.
+      // Don't do work if the host is already ejected.
       if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
         Optional<double> host_success_rate =
             host.second->successRateAccumulator().getSuccessRate(success_rate_request_volume);
@@ -311,6 +306,16 @@ void DetectorImpl::onIntervalTimer() {
       }
     }
   }
+}
+
+void DetectorImpl::onIntervalTimer() {
+  SystemTime now = time_source_.currentSystemTime();
+
+  for (auto host : host_sinks_) {
+    checkHostForUneject(host.first, host.second, now);
+  }
+
+  successRateEjections();
 
   armIntervalTimer();
 }

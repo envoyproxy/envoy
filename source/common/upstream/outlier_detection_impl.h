@@ -190,6 +190,7 @@ private:
   void onIntervalTimer();
   void runCallbacks(HostPtr host);
   bool enforceEjection(EjectionType type);
+  void successRateEjections();
 
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
