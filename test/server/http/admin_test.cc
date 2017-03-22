@@ -14,7 +14,7 @@ class AdminFilterTest : public testing::Test {
 public:
   // TODO(mattklein123): Switch to mocks and do not bind to a real port.
   AdminFilterTest()
-      : admin_("/dev/null", "/tmp/enovy.prof", Network::Utility::resolveUrl("tcp://127.0.0.1:9002"),
+      : admin_("/dev/null", "/tmp/envoy.prof", Network::Utility::resolveUrl("tcp://127.0.0.1:9002"),
                server_),
         admin_bad_profiler_path_("/dev/null", "/var/log/envoy/envoy.prof",
                                  Network::Utility::resolveUrl("tcp://127.0.0.1:9002"), server_),
@@ -28,6 +28,7 @@ public:
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestHeaderMapImpl request_headers_;
+  Http::TestHeaderMapImpl profiler_headers_;
 };
 
 TEST_F(AdminFilterTest, HeaderOnly) {
