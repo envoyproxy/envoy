@@ -57,13 +57,13 @@ public:
         .WillByDefault(Return(true));
   }
 
-  void loadRq(std::vector<HostPtr>& hosts, int num_rq, int http_code) {
+  void loadRq(std::vector<HostSharedPtr>& hosts, int num_rq, int http_code) {
     for (uint64_t i = 0; i < hosts.size(); i++) {
       loadRq(hosts[i], num_rq, http_code);
     }
   }
 
-  void loadRq(HostPtr host, int num_rq, int http_code) {
+  void loadRq(HostSharedPtr host, int num_rq, int http_code) {
     for (int i = 0; i < num_rq; i++) {
       host->outlierDetector().putHttpResponseCode(http_code);
     }
@@ -218,20 +218,20 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
 TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   cluster_.hosts_ = {
-      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+      HostSharedPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
                            false, 1, "")},
-      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:81"),
+      HostSharedPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:81"),
                            false, 1, "")},
-      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:82"),
+      HostSharedPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:82"),
                            false, 1, "")},
-      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:83"),
+      HostSharedPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:83"),
                            false, 1, "")},
-      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:84"),
+      HostSharedPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:84"),
                            false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off 5xx detection to test SR detection in isolation.
   ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
