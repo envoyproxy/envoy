@@ -27,7 +27,6 @@ namespace Server {
 
 class MockOptions : public Options {
 public:
-  // If it is not provided the configPath will be an empty string in the mock.
   MockOptions() : MockOptions(std::string()) {}
   MockOptions(const std::string& path);
   ~MockOptions();

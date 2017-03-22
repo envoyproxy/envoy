@@ -1,11 +1,10 @@
 #include "server/server.h"
 
+#include "test/integration/server.h"
 #include "test/mocks/common.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
-
-#include "test/integration/server.h" // for TestDrainManager, TestIsolatedStoreImpl
 
 using testing::_;
 using testing::InSequence;
@@ -67,8 +66,7 @@ protected:
 };
 
 TEST_F(ServerInstanceImplTest, NoListenSocketFds) {
-  std::string bad_tcp_url("tcp://255.255.255.255:80");
-  EXPECT_EQ(server_.getListenSocketFd(bad_tcp_url), -1);
+  EXPECT_EQ(server_.getListenSocketFd("tcp://255.255.255.255:80"), -1);
 }
 
 } // Server
