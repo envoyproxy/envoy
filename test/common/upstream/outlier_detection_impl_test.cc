@@ -218,16 +218,16 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
 TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   cluster_.hosts_ = {
-      HostSharedPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-                           false, 1, "")},
-      HostSharedPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:81"),
-                           false, 1, "")},
-      HostSharedPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:82"),
-                           false, 1, "")},
-      HostSharedPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:83"),
-                           false, 1, "")},
-      HostSharedPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:84"),
-                           false, 1, "")}};
+      HostSharedPtr{new HostImpl(cluster_.info_, "",
+                                 Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")},
+      HostSharedPtr{new HostImpl(cluster_.info_, "",
+                                 Network::Utility::resolveUrl("tcp://127.0.0.1:81"), false, 1, "")},
+      HostSharedPtr{new HostImpl(cluster_.info_, "",
+                                 Network::Utility::resolveUrl("tcp://127.0.0.1:82"), false, 1, "")},
+      HostSharedPtr{new HostImpl(cluster_.info_, "",
+                                 Network::Utility::resolveUrl("tcp://127.0.0.1:83"), false, 1, "")},
+      HostSharedPtr{new HostImpl(
+          cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:84"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
