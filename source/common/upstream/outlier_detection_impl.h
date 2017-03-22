@@ -83,7 +83,7 @@ class DetectorHostSinkImpl : public DetectorHostSink {
 public:
   DetectorHostSinkImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host)
       : detector_(detector), host_(host) {
-    // Point the sr_accumulator_bucket_ pointer to a bucket.
+    // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();
   }
 
