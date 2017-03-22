@@ -255,8 +255,11 @@ void DetectorImpl::onIntervalTimer() {
       "outlier_detection.rq_volume_threshold", config_.rqVolumeThreshold());
   std::vector<double> sr_data;
   double sr_sum = 0;
-  // reserve upper bound of vector size to avoid reallocation.
-  sr_data.reserve(host_sinks_.size());
+
+  if (host_sinks_.size() >= significant_host_threshold) {
+    // reserve upper bound of vector size to avoid reallocation.
+    sr_data.reserve(host_sinks_.size());
+  }
 
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
