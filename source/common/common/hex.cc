@@ -1,6 +1,7 @@
+#include "common/common/hex.h"
+
 #include "envoy/common/exception.h"
 
-#include "common/common/hex.h"
 #include "common/common/utility.h"
 
 std::string Hex::encode(const uint8_t* data, size_t length) {

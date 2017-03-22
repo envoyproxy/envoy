@@ -1,6 +1,7 @@
+#include "common/common/thread.h"
+
 #include "common/common/assert.h"
 #include "common/common/macros.h"
-#include "common/common/thread.h"
 
 #include <sys/syscall.h>
 

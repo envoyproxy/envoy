@@ -1,10 +1,11 @@
+#include "common/filesystem/watcher_impl.h"
+
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
-#include "common/filesystem/watcher_impl.h"
 
 #include <sys/inotify.h>
 

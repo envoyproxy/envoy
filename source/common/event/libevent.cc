@@ -1,5 +1,6 @@
-#include "common/common/assert.h"
 #include "common/event/libevent.h"
+
+#include "common/common/assert.h"
 
 #include "event2/thread.h"
 

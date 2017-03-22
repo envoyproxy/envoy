@@ -1,3 +1,5 @@
+#include "common/network/listener_impl.h"
+
 #include "envoy/common/exception.h"
 #include "envoy/network/connection_handler.h"
 
@@ -6,7 +8,6 @@
 #include "common/event/file_event_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/connection_impl.h"
-#include "common/network/listener_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
 

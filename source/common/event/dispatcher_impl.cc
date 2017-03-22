@@ -1,7 +1,8 @@
+#include "common/event/dispatcher_impl.h"
+
 #include "envoy/network/listener.h"
 #include "envoy/network/listen_socket.h"
 
-#include "common/event/dispatcher_impl.h"
 #include "common/event/file_event_impl.h"
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
