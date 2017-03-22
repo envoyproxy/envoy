@@ -1089,12 +1089,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "exclusiveMinimum" : true
           },
-          "significant_host_threshold" : {
+          "success_rate_minimum_hosts" : {
             "type" : "integer",
             "minimum" : 0,
             "exclusiveMinimum" : true
           },
-          "rq_volume_threshold" : {
+          "success_rate_request_volume" : {
             "type" : "integer",
             "minimum" : 0,
             "exclusiveMinimum" : true
@@ -1119,7 +1119,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "maximum" : 100
           },
-          "enforcing_sr" : {
+          "enforcing_success_rate" : {
             "type" : "integer",
             "minimum" : 0,
             "maximum" : 100
