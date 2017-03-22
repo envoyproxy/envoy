@@ -774,6 +774,10 @@ const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
         "type" : "integer",
         "minimum" : 0,
         "maximum" : 10
+      },
+      "request_type" : {
+        "type" : "string",
+        "enum" : ["internal", "external", "both"]
       }
     },
     "required" : ["domain"],

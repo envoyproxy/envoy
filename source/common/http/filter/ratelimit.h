@@ -15,6 +15,11 @@ namespace Http {
 namespace RateLimit {
 
 /**
+ * Type of requests the filter should apply to.
+ */
+enum class FilterRequestType { Internal, External, Both };
+
+/**
  * Global configuration for the HTTP rate limit filter.
  */
 class FilterConfig : Json::JsonValidator {
@@ -23,8 +28,9 @@ public:
                Stats::Store& global_store, Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : Json::JsonValidator(config, Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA),
         domain_(config.getString("domain")),
-        stage_(static_cast<uint64_t>(config.getInteger("stage", 0))), local_info_(local_info),
-        global_store_(global_store), runtime_(runtime), cm_(cm) {}
+        stage_(static_cast<uint64_t>(config.getInteger("stage", 0))),
+        request_type_(stringToType(config.getString("request_type", "both"))),
+        local_info_(local_info), global_store_(global_store), runtime_(runtime), cm_(cm) {}
 
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
@@ -32,10 +38,24 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Store& globalStore() { return global_store_; }
   Upstream::ClusterManager& cm() { return cm_; }
+  FilterRequestType requestType() const { return request_type_; }
 
 private:
+  static FilterRequestType stringToType(const std::string& request_type) {
+    if (request_type == "internal") {
+      return FilterRequestType::Internal;
+    } else if (request_type == "external") {
+      return FilterRequestType::External;
+    } else if (request_type == "both") {
+      return FilterRequestType::Both;
+    } else {
+      throw EnvoyException(fmt::format("invalid filter request type '{}'", request_type));
+    }
+  }
+
   const std::string domain_;
   uint64_t stage_;
+  FilterRequestType request_type_;
   const LocalInfo::LocalInfo& local_info_;
   Stats::Store& global_store_;
   Runtime::Loader& runtime_;
