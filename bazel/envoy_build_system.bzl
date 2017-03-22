@@ -1,5 +1,6 @@
 ENVOY_COPTS = [
     "-fno-omit-frame-pointer",
+    "-fmax-errors=3",
     "-Wall",
     "-Wextra",
     "-Werror",
