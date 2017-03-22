@@ -16,11 +16,11 @@ NetworkFilterFactoryCb TcpProxyConfigFactory::tryCreateFilterFactory(NetworkFilt
     return nullptr;
   }
 
-  Filter::TcpProxyConfigPtr filter_config(
+  Filter::TcpProxyConfigSharedPtr filter_config(
       new Filter::TcpProxyConfig(config, server.clusterManager(), server.stats()));
   return [filter_config, &server](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
-        Network::ReadFilterPtr{new Filter::TcpProxy(filter_config, server.clusterManager())});
+        Network::ReadFilterSharedPtr{new Filter::TcpProxy(filter_config, server.clusterManager())});
   };
 }
 

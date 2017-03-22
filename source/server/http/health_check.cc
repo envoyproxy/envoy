@@ -39,7 +39,7 @@ HttpFilterFactoryCb HealthCheckFilterConfig::tryCreateFilterFactory(HttpFilterTy
     throw EnvoyException("cache_time_ms must not be set when path_through_mode is disabled");
   }
 
-  HealthCheckCacheManagerPtr cache_manager;
+  HealthCheckCacheManagerSharedPtr cache_manager;
   if (cache_time_ms > 0) {
     cache_manager.reset(
         new HealthCheckCacheManager(server.dispatcher(), std::chrono::milliseconds(cache_time_ms)));
@@ -47,7 +47,7 @@ HttpFilterFactoryCb HealthCheckFilterConfig::tryCreateFilterFactory(HttpFilterTy
 
   return [&server, pass_through_mode, cache_manager, hc_endpoint](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(Http::StreamFilterPtr{
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
         new HealthCheckFilter(server, pass_through_mode, cache_manager, hc_endpoint)});
   };
 }

@@ -91,7 +91,8 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
   Network::MockFilterChainFactory factory;
   Network::MockConnectionHandler connection_handler;
   Network::MockListenSocket socket;
-  Network::Address::InstancePtr alt_address(new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  Network::Address::InstanceConstSharedPtr alt_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(socket, localAddress()).WillRepeatedly(Return(alt_address));
 
   Network::Listener* listener = new Network::MockListener();
@@ -110,8 +111,9 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
   EXPECT_EQ(listener, handler.findListenerByAddress(ByRef(*alt_address)));
 
   Network::MockListenSocket socket2;
-  Network::Address::InstancePtr alt_address2(new Network::Address::Ipv4Instance("0.0.0.0", 10001));
-  Network::Address::InstancePtr alt_address3(
+  Network::Address::InstanceConstSharedPtr alt_address2(
+      new Network::Address::Ipv4Instance("0.0.0.0", 10001));
+  Network::Address::InstanceConstSharedPtr alt_address3(
       new Network::Address::Ipv4Instance("127.0.0.2", 10001));
   EXPECT_CALL(socket2, localAddress()).WillRepeatedly(Return(alt_address2));
 

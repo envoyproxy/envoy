@@ -19,7 +19,7 @@ public:
   virtual void shutdown() PURE;
 };
 
-typedef std::shared_ptr<ThreadLocalObject> ThreadLocalObjectPtr;
+typedef std::shared_ptr<ThreadLocalObject> ThreadLocalObjectSharedPtr;
 
 /**
  * Interface for getting and setting thread local data as well as registering a thread
@@ -36,7 +36,7 @@ public:
   /**
    * Get a thread local index stored in the specified slot ID.
    */
-  virtual ThreadLocalObjectPtr get(uint32_t index) PURE;
+  virtual ThreadLocalObjectSharedPtr get(uint32_t index) PURE;
 
   /**
    * This is a helper on top of get() that casts the object stored in the slot to the specified
@@ -69,7 +69,7 @@ public:
    *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
    *                     the same data across all threads or to share different data on each thread.
    */
-  typedef std::function<ThreadLocalObjectPtr(Event::Dispatcher& dispatcher)> InitializeCb;
+  typedef std::function<ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher)> InitializeCb;
   virtual void set(uint32_t index, InitializeCb cb) PURE;
 
   /**

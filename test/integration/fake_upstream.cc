@@ -123,7 +123,7 @@ FakeHttpConnection::FakeHttpConnection(Network::Connection& connection, Stats::S
     ASSERT(type == Type::HTTP2);
   }
 
-  connection.addReadFilter(Network::ReadFilterPtr{new ReadFilter(*this)});
+  connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
 }
 
 void FakeConnectionBase::close() {

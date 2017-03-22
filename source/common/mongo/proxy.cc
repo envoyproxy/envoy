@@ -28,7 +28,7 @@ void AccessLog::logMessage(const Message& message, const std::string&, bool full
 }
 
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Store& store,
-                         Runtime::Loader& runtime, AccessLogPtr access_log)
+                         Runtime::Loader& runtime, AccessLogSharedPtr access_log)
     : stat_prefix_(stat_prefix), stat_store_(store), stats_(generateStats(stat_prefix, store)),
       runtime_(runtime), access_log_(access_log) {
 
@@ -166,7 +166,7 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
 void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string& prefix,
                                    const ReplyMessage& message) {
   uint64_t reply_documents_byte_size = 0;
-  for (const Bson::DocumentPtr& document : message.documents()) {
+  for (const Bson::DocumentSharedPtr& document : message.documents()) {
     reply_documents_byte_size += document->byteSize();
   }
 

@@ -106,7 +106,7 @@ protected:
    * @param host supplies the owning host.
    */
   CodecClient(Type type, Network::ClientConnectionPtr&& connection,
-              Upstream::HostDescriptionPtr host);
+              Upstream::HostDescriptionConstSharedPtr host);
 
   // Http::ConnectionCallbacks
   void onGoAway() override {
@@ -118,7 +118,7 @@ protected:
   const Type type_;
   ClientConnectionPtr codec_;
   Network::ClientConnectionPtr connection_;
-  Upstream::HostDescriptionPtr host_;
+  Upstream::HostDescriptionConstSharedPtr host_;
 
 private:
   /**
@@ -189,7 +189,7 @@ typedef std::unique_ptr<CodecClient> CodecClientPtr;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionPtr host);
+                  Upstream::HostDescriptionConstSharedPtr host);
 };
 
 } // Http

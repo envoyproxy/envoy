@@ -50,7 +50,7 @@ typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
 class IntegrationCodecClient : public Http::CodecClientProd {
 public:
   IntegrationCodecClient(Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
-                         Upstream::HostDescriptionPtr host_description,
+                         Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecClient::Type type);
 
   void makeHeaderOnlyRequest(const Http::HeaderMap& headers, IntegrationStreamDecoder& response);

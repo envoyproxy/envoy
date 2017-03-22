@@ -137,7 +137,7 @@ private:
   spdlog::logger& logger_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::list<std::pair<Network::Address::InstancePtr, ActiveListenerPtr>> listeners_;
+  std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
   std::list<ActiveConnectionPtr> connections_;
   std::atomic<uint64_t> num_connections_{};
   Stats::Counter& watchdog_miss_counter_;

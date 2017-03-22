@@ -47,7 +47,7 @@ public:
   virtual void reopen() PURE;
 };
 
-typedef std::shared_ptr<File> FilePtr;
+typedef std::shared_ptr<File> FileSharedPtr;
 
 /**
  * Abstraction for a file watcher.

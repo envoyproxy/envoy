@@ -18,10 +18,11 @@ public:
   virtual const HostSet& hostSet() PURE;
 
   /**
-   * @return ClusterInfoPtr the info for this cluster. The info is safe to store beyond the
+   * @return ClusterInfoConstSharedPtr the info for this cluster. The info is safe to store beyond
+   * the
    *         lifetime of the ThreadLocalCluster instance itself.
    */
-  virtual ClusterInfoPtr info() PURE;
+  virtual ClusterInfoConstSharedPtr info() PURE;
 
   /**
    * @return LoadBalancer& the backing load balancer.

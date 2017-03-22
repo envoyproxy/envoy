@@ -18,10 +18,11 @@ LoadBalancerBase::LoadBalancerBase(const HostSet& host_set, const HostSet* local
     : stats_(stats), runtime_(runtime), random_(random), host_set_(host_set),
       local_host_set_(local_host_set) {
   if (local_host_set_) {
-    host_set_.addMemberUpdateCb([this](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
-                                    -> void { regenerateZoneRoutingStructures(); });
+    host_set_.addMemberUpdateCb(
+        [this](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
+            -> void { regenerateZoneRoutingStructures(); });
     local_host_set_->addMemberUpdateCb(
-        [this](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
+        [this](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
             -> void { regenerateZoneRoutingStructures(); });
   }
 }
@@ -131,7 +132,7 @@ bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, ClusterStats& s
 }
 
 void LoadBalancerBase::calculateZonePercentage(
-    const std::vector<std::vector<HostPtr>>& hosts_per_zone, uint64_t* ret) {
+    const std::vector<std::vector<HostSharedPtr>>& hosts_per_zone, uint64_t* ret) {
   uint64_t total_hosts = 0;
   for (const auto& zone_hosts : hosts_per_zone) {
     total_hosts += zone_hosts.size();
@@ -145,7 +146,7 @@ void LoadBalancerBase::calculateZonePercentage(
   }
 }
 
-const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
+const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
   ASSERT(zone_routing_state_ != ZoneRoutingState::NoZoneRouting);
 
   // At this point it's guaranteed to be at least 2 zones.
@@ -193,7 +194,7 @@ const std::vector<HostPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
   return host_set_.healthyHostsPerZone()[i];
 }
 
-const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
+const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
   ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
 
   if (host_set_.hosts().empty() ||
@@ -218,8 +219,8 @@ const std::vector<HostPtr>& LoadBalancerBase::hostsToUse() {
   return tryChooseLocalZoneHosts();
 }
 
-ConstHostPtr RoundRobinLoadBalancer::chooseHost(const LoadBalancerContext*) {
-  const std::vector<HostPtr>& hosts_to_use = hostsToUse();
+HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(const LoadBalancerContext*) {
+  const std::vector<HostSharedPtr>& hosts_to_use = hostsToUse();
   if (hosts_to_use.empty()) {
     return nullptr;
   }
@@ -232,22 +233,22 @@ LeastRequestLoadBalancer::LeastRequestLoadBalancer(const HostSet& host_set,
                                                    ClusterStats& stats, Runtime::Loader& runtime,
                                                    Runtime::RandomGenerator& random)
     : LoadBalancerBase(host_set, local_host_set, stats, runtime, random) {
-  host_set.addMemberUpdateCb(
-      [this](const std::vector<HostPtr>&, const std::vector<HostPtr>& hosts_removed) -> void {
-        if (last_host_) {
-          for (const HostPtr& host : hosts_removed) {
-            if (host == last_host_) {
-              hits_left_ = 0;
-              last_host_.reset();
+  host_set.addMemberUpdateCb([this](const std::vector<HostSharedPtr>&,
+                                    const std::vector<HostSharedPtr>& hosts_removed) -> void {
+    if (last_host_) {
+      for (const HostSharedPtr& host : hosts_removed) {
+        if (host == last_host_) {
+          hits_left_ = 0;
+          last_host_.reset();
 
-              break;
-            }
-          }
+          break;
         }
-      });
+      }
+    }
+  });
 }
 
-ConstHostPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext*) {
+HostConstSharedPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext*) {
   bool is_weight_imbalanced = stats_.max_host_weight_.value() != 1;
   bool is_weight_enabled = runtime_.snapshot().getInteger("upstream.weight_enabled", 1UL) != 0;
 
@@ -261,7 +262,7 @@ ConstHostPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext*) {
     last_host_.reset();
   }
 
-  const std::vector<HostPtr>& hosts_to_use = hostsToUse();
+  const std::vector<HostSharedPtr>& hosts_to_use = hostsToUse();
   if (hosts_to_use.empty()) {
     return nullptr;
   }
@@ -273,8 +274,8 @@ ConstHostPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext*) {
 
     return last_host_;
   } else {
-    HostPtr host1 = hosts_to_use[random_.random() % hosts_to_use.size()];
-    HostPtr host2 = hosts_to_use[random_.random() % hosts_to_use.size()];
+    HostSharedPtr host1 = hosts_to_use[random_.random() % hosts_to_use.size()];
+    HostSharedPtr host2 = hosts_to_use[random_.random() % hosts_to_use.size()];
     if (host1->stats().rq_active_.value() < host2->stats().rq_active_.value()) {
       return host1;
     } else {
@@ -283,8 +284,8 @@ ConstHostPtr LeastRequestLoadBalancer::chooseHost(const LoadBalancerContext*) {
   }
 }
 
-ConstHostPtr RandomLoadBalancer::chooseHost(const LoadBalancerContext*) {
-  const std::vector<HostPtr>& hosts_to_use = hostsToUse();
+HostConstSharedPtr RandomLoadBalancer::chooseHost(const LoadBalancerContext*) {
+  const std::vector<HostSharedPtr>& hosts_to_use = hostsToUse();
   if (hosts_to_use.empty()) {
     return nullptr;
   }

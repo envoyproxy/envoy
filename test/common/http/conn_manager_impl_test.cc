@@ -38,14 +38,14 @@ class HttpConnectionManagerImplTest : public Test, public ConnectionManagerConfi
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
     // Router::RouteConfigProvider
-    Router::ConfigPtr config() override { return route_config_; }
+    Router::ConfigConstSharedPtr config() override { return route_config_; }
 
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };
 
   HttpConnectionManagerImplTest()
       : access_log_path_("dummy_path"),
-        access_logs_{Http::AccessLog::InstancePtr{new Http::AccessLog::InstanceImpl(
+        access_logs_{Http::AccessLog::InstanceSharedPtr{new Http::AccessLog::InstanceImpl(
             access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
             log_manager_)}},
         codec_(new NiceMock<Http::MockServerConnection>()),
@@ -75,7 +75,9 @@ public:
   }
 
   // Http::ConnectionManagerConfig
-  const std::list<Http::AccessLog::InstancePtr>& accessLogs() override { return access_logs_; }
+  const std::list<Http::AccessLog::InstanceSharedPtr>& accessLogs() override {
+    return access_logs_;
+  }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
                                   ServerConnectionCallbacks&) override {
     return ServerConnectionPtr{codec_};
@@ -101,7 +103,7 @@ public:
   Event::MockDispatcher dispatcher_;
   NiceMock<::AccessLog::MockAccessLogManager> log_manager_;
   std::string access_log_path_;
-  std::list<Http::AccessLog::InstancePtr> access_logs_;
+  std::list<Http::AccessLog::InstanceSharedPtr> access_logs_;
   Stats::IsolatedStoreImpl fake_stats_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Http::MockServerConnection* codec_;
@@ -422,7 +424,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   Http::MockStreamDecoderFilter* filter = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{filter});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{filter});
       }));
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
@@ -467,7 +469,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
   Http::MockStreamDecoderFilter* filter = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{filter});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{filter});
       }));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false))
@@ -505,7 +507,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
   Http::MockStreamDecoderFilter* filter = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{filter});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{filter});
       }));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false))
@@ -554,7 +556,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamDisconnect) {
   Http::MockStreamDecoderFilter* filter = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{filter});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{filter});
       }));
 
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -580,7 +582,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
   Http::MockStreamDecoderFilter* filter = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{filter});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{filter});
       }));
 
   // A protocol exception should result in reset of the streams followed by a local close.
@@ -626,7 +628,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   Http::MockStreamDecoderFilter* filter = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{filter});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{filter});
       }));
 
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -675,8 +677,8 @@ TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
   Http::MockStreamDecoderFilter* decoder_filter2 = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{decoder_filter1});
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{decoder_filter2});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{decoder_filter1});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{decoder_filter2});
       }));
 
   EXPECT_CALL(*decoder_filter1, decodeHeaders(_, false))
@@ -722,9 +724,9 @@ TEST_F(HttpConnectionManagerImplTest, DoubleBuffering) {
   Http::MockStreamDecoderFilter* decoder_filter3 = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{decoder_filter1});
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{decoder_filter2});
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{decoder_filter3});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{decoder_filter1});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{decoder_filter2});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{decoder_filter3});
       }));
 
   EXPECT_CALL(*decoder_filter1, decodeHeaders(_, false))
@@ -773,8 +775,8 @@ TEST_F(HttpConnectionManagerImplTest, ZeroByteDataFiltering) {
   Http::MockStreamDecoderFilter* decoder_filter2 = new NiceMock<Http::MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{decoder_filter1});
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{decoder_filter2});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{decoder_filter1});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{decoder_filter2});
       }));
 
   EXPECT_CALL(*decoder_filter1, decodeHeaders(_, false))
@@ -820,11 +822,11 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   Http::MockStreamEncoderFilter* encoder_filter2 = new NiceMock<Http::MockStreamEncoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{decoder_filter1});
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{decoder_filter2});
-        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{decoder_filter3});
-        callbacks.addStreamEncoderFilter(Http::StreamEncoderFilterPtr{encoder_filter1});
-        callbacks.addStreamEncoderFilter(Http::StreamEncoderFilterPtr{encoder_filter2});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{decoder_filter1});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{decoder_filter2});
+        callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{decoder_filter3});
+        callbacks.addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr{encoder_filter1});
+        callbacks.addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr{encoder_filter2});
       }));
 
   // Test route caching.

@@ -74,11 +74,11 @@ public:
   }
 
   // Stats::Store
-  std::list<CounterPtr> counters() const override {
+  std::list<CounterSharedPtr> counters() const override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.counters();
   }
-  std::list<GaugePtr> gauges() const override {
+  std::list<GaugeSharedPtr> gauges() const override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.gauges();
   }

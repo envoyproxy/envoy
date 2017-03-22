@@ -7,10 +7,10 @@
 namespace Upstream {
 
 class Host;
-typedef std::shared_ptr<Host> HostPtr;
+typedef std::shared_ptr<Host> HostSharedPtr;
 
 class HostDescription;
-typedef std::shared_ptr<const HostDescription> HostDescriptionPtr;
+typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
 
 namespace Outlier {
 
@@ -66,16 +66,16 @@ public:
    * @param host supplies the host that generated the event.
    * @param type supplies the type of the event.
    */
-  virtual void logEject(HostDescriptionPtr host, EjectionType type) PURE;
+  virtual void logEject(HostDescriptionConstSharedPtr host, EjectionType type) PURE;
 
   /**
    * Log an unejection event.
    * @param host supplies the host that generated the event.
    */
-  virtual void logUneject(HostDescriptionPtr host) PURE;
+  virtual void logUneject(HostDescriptionConstSharedPtr host) PURE;
 };
 
-typedef std::shared_ptr<EventLogger> EventLoggerPtr;
+typedef std::shared_ptr<EventLogger> EventLoggerSharedPtr;
 
 /**
  * Interface for an outlier detection engine. Uses per host data to determine which hosts in a
@@ -88,7 +88,7 @@ public:
   /**
    * Outlier detection change state callback.
    */
-  typedef std::function<void(HostPtr host)> ChangeStateCb;
+  typedef std::function<void(HostSharedPtr host)> ChangeStateCb;
 
   /**
    * Add a changed state callback to the detector. The callback will be called whenever any host
@@ -97,7 +97,7 @@ public:
   virtual void addChangedStateCb(ChangeStateCb cb) PURE;
 };
 
-typedef std::shared_ptr<Detector> DetectorPtr;
+typedef std::shared_ptr<Detector> DetectorSharedPtr;
 
 } // Outlier
 } // Upstream

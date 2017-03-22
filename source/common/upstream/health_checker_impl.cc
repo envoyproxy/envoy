@@ -32,9 +32,9 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster, const Json:
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
       interval_(config.getInteger("interval_ms")),
       interval_jitter_(config.getInteger("interval_jitter_ms", 0)) {
-  cluster_.addMemberUpdateCb(
-      [this](const std::vector<HostPtr>& hosts_added, const std::vector<HostPtr>& hosts_removed)
-          -> void { onClusterMemberUpdate(hosts_added, hosts_removed); });
+  cluster_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
+                                    const std::vector<HostSharedPtr>& hosts_removed)
+                                 -> void { onClusterMemberUpdate(hosts_added, hosts_removed); });
 }
 
 void HealthCheckerImplBase::decHealthy() {
@@ -85,7 +85,7 @@ void HealthCheckerImplBase::refreshHealthyStat() {
   stats_.healthy_.set(local_process_healthy_);
 }
 
-void HealthCheckerImplBase::runCallbacks(HostPtr host, bool changed_state) {
+void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, bool changed_state) {
   // When a parent process shuts down, it will kill all of the active health checking sessions,
   // which will decrement the healthy count and the healthy stat in the parent. If the child is
   // stable and does not update, the healthy stat will be wrong. This routine is called any time
@@ -98,7 +98,7 @@ void HealthCheckerImplBase::runCallbacks(HostPtr host, bool changed_state) {
 }
 
 HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
-    HealthCheckerImplBase& parent, HostPtr host)
+    HealthCheckerImplBase& parent, HostSharedPtr host)
     : parent_(parent), host_(host),
       interval_timer_(parent.dispatcher_.createTimer([this]() -> void { onInterval(); })),
       timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeout(); })) {
@@ -168,13 +168,13 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster, const Json:
   }
 }
 
-void HttpHealthCheckerImpl::onClusterMemberUpdate(const std::vector<HostPtr>& hosts_added,
-                                                  const std::vector<HostPtr>& hosts_removed) {
-  for (const HostPtr& host : hosts_added) {
+void HttpHealthCheckerImpl::onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
+                                                  const std::vector<HostSharedPtr>& hosts_removed) {
+  for (const HostSharedPtr& host : hosts_added) {
     active_sessions_[host].reset(new HttpActiveHealthCheckSession(*this, host));
   }
 
-  for (const HostPtr& host : hosts_removed) {
+  for (const HostSharedPtr& host : hosts_removed) {
     auto session_iter = active_sessions_.find(host);
     ASSERT(active_sessions_.end() != session_iter);
     active_sessions_.erase(session_iter);
@@ -182,13 +182,13 @@ void HttpHealthCheckerImpl::onClusterMemberUpdate(const std::vector<HostPtr>& ho
 }
 
 void HttpHealthCheckerImpl::start() {
-  for (const HostPtr& host : cluster_.hosts()) {
+  for (const HostSharedPtr& host : cluster_.hosts()) {
     active_sessions_[host].reset(new HttpActiveHealthCheckSession(*this, host));
   }
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
-    HttpHealthCheckerImpl& parent, HostPtr host)
+    HttpHealthCheckerImpl& parent, HostSharedPtr host)
     : ActiveHealthCheckSession(parent, host), parent_(parent) {
   onInterval();
 }
@@ -355,13 +355,13 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster, const Json::O
       send_bytes_(TcpHealthCheckMatcher::loadJsonBytes(config.getObjectArray("send"))),
       receive_bytes_(TcpHealthCheckMatcher::loadJsonBytes(config.getObjectArray("receive"))) {}
 
-void TcpHealthCheckerImpl::onClusterMemberUpdate(const std::vector<HostPtr>& hosts_added,
-                                                 const std::vector<HostPtr>& hosts_removed) {
-  for (const HostPtr& host : hosts_added) {
+void TcpHealthCheckerImpl::onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
+                                                 const std::vector<HostSharedPtr>& hosts_removed) {
+  for (const HostSharedPtr& host : hosts_added) {
     active_sessions_[host].reset(new TcpActiveHealthCheckSession(*this, host));
   }
 
-  for (const HostPtr& host : hosts_removed) {
+  for (const HostSharedPtr& host : hosts_removed) {
     auto session_iter = active_sessions_.find(host);
     ASSERT(active_sessions_.end() != session_iter);
     active_sessions_.erase(session_iter);
@@ -369,7 +369,7 @@ void TcpHealthCheckerImpl::onClusterMemberUpdate(const std::vector<HostPtr>& hos
 }
 
 void TcpHealthCheckerImpl::start() {
-  for (const HostPtr& host : cluster_.hosts()) {
+  for (const HostSharedPtr& host : cluster_.hosts()) {
     active_sessions_[host].reset(new TcpActiveHealthCheckSession(*this, host));
   }
 }

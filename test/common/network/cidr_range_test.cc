@@ -60,10 +60,10 @@ TEST(TruncateIpAddressAndLength, Various) {
   };
   test_cases.size();
   for (const auto& kv : test_cases) {
-    InstancePtr inPtr = parseInternetAddress(kv.first.first);
+    InstanceConstSharedPtr inPtr = parseInternetAddress(kv.first.first);
     EXPECT_TRUE(inPtr != nullptr) << kv.first.first;
     int length_io = kv.first.second;
-    InstancePtr outPtr = CidrRange::truncateIpAddressAndLength(inPtr, &length_io);
+    InstanceConstSharedPtr outPtr = CidrRange::truncateIpAddressAndLength(inPtr, &length_io);
     if (kv.second.second == -1) {
       EXPECT_EQ(outPtr, nullptr) << outPtr->asString() << "\n" << kv;
       EXPECT_EQ(length_io, -1) << kv;
@@ -75,8 +75,8 @@ TEST(TruncateIpAddressAndLength, Various) {
   }
 }
 
-TEST(Ipv4CidrRangeTest, InstancePtrAndLengthCtor) {
-  InstancePtr ptr = parseInternetAddress("1.2.3.5");
+TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
+  InstanceConstSharedPtr ptr = parseInternetAddress("1.2.3.5");
   CidrRange rng(CidrRange::create(ptr, 31)); // Copy ctor.
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.length(), 31);
@@ -155,8 +155,8 @@ TEST(Ipv4CidrRangeTest, BigRange) {
   EXPECT_FALSE(rng.isInRange(parseInternetAddress("11.0.0.0")));
 }
 
-TEST(Ipv6CidrRange, InstancePtrAndLengthCtor) {
-  InstancePtr ptr = parseInternetAddress("abcd::0345");
+TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
+  InstanceConstSharedPtr ptr = parseInternetAddress("abcd::0345");
   CidrRange rng(CidrRange::create(ptr, 127)); // Copy ctor.
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.length(), 127);

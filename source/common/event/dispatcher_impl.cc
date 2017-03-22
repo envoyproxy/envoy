@@ -56,13 +56,13 @@ void DispatcherImpl::clearDeferredDeleteList() {
 }
 
 Network::ClientConnectionPtr
-DispatcherImpl::createClientConnection(Network::Address::InstancePtr address) {
+DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address) {
   return Network::ClientConnectionPtr{new Network::ClientConnectionImpl(*this, address)};
 }
 
 Network::ClientConnectionPtr
 DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                          Network::Address::InstancePtr address) {
+                                          Network::Address::InstanceConstSharedPtr address) {
   return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, address)};
 }
 

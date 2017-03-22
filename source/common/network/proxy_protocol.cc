@@ -74,9 +74,10 @@ void ProxyProtocol::ActiveConnection::onReadWorker() {
 
   // TODO(mattklein123): Parse the remote port instead of passing zero.
   // TODO(mattklein123): IPv6 support.
-  listener.newConnection(
-      fd, Network::Address::InstancePtr{new Network::Address::Ipv4Instance(remote_address, 0)},
-      listener.socket().localAddress());
+  listener.newConnection(fd,
+                         Network::Address::InstanceConstSharedPtr{
+                             new Network::Address::Ipv4Instance(remote_address, 0)},
+                         listener.socket().localAddress());
 }
 
 void ProxyProtocol::ActiveConnection::close() {

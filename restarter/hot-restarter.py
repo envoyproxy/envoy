@@ -98,7 +98,7 @@ def sigchld_handler(signum, frame):
   # Our last child died, so we have no purpose. Exit.
   if not pid_list:
     print "exiting due to lack of child processes"
-    sys.exit(0)
+    sys.exit(1 if kill_all_and_exit else 0)
 
 
 def fork_and_exec():

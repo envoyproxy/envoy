@@ -48,8 +48,10 @@ public:
     return response_flags_ & response_flag;
   }
   void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
-  void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override { upstream_host_ = host; }
-  Upstream::HostDescriptionPtr upstreamHost() const override { return upstream_host_; }
+  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
+    upstream_host_ = host;
+  }
+  Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
   bool healthCheck() const override { return hc_request_; }
   void healthCheck(bool is_hc) { hc_request_ = is_hc; }
 
@@ -58,7 +60,7 @@ public:
   Optional<uint32_t> response_code_;
   uint64_t response_flags_{};
   uint64_t duration_{3};
-  Upstream::HostDescriptionPtr upstream_host_{};
+  Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
 };
 
@@ -86,7 +88,7 @@ TEST_F(AccessLogImplTest, LogMoreData) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   request_info_.response_flags_ = ResponseFlag::UpstreamConnectionFailure;
@@ -109,7 +111,7 @@ TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   response_headers_.addViaCopy(Http::Headers::get().EnvoyUpstreamServiceTime, "999");
@@ -128,7 +130,7 @@ TEST_F(AccessLogImplTest, NoFilter) {
     )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -149,7 +151,7 @@ TEST_F(AccessLogImplTest, UpstreamHost) {
       )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -171,7 +173,7 @@ TEST_F(AccessLogImplTest, WithFilterMiss) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -194,7 +196,7 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_)).Times(3);
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -216,7 +218,7 @@ TEST_F(AccessLogImplTest, RuntimeFilter) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   // Value is taken from random generator.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0)).WillOnce(Return(true));
@@ -248,7 +250,7 @@ TEST_F(AccessLogImplTest, PathRewrite) {
       )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
@@ -266,7 +268,7 @@ TEST_F(AccessLogImplTest, healthCheckTrue) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   TestHeaderMapImpl header_map{};
   request_info_.hc_request_ = true;
@@ -284,7 +286,7 @@ TEST_F(AccessLogImplTest, healthCheckFalse) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   TestHeaderMapImpl header_map{};
   EXPECT_CALL(*file_, write(_));
@@ -310,7 +312,7 @@ TEST_F(AccessLogImplTest, requestTracing) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
 
   {
     TestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
@@ -459,7 +461,7 @@ TEST_F(AccessLogImplTest, andFilter) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
   request_info_.response_code_.value(500);
 
   {
@@ -490,7 +492,7 @@ TEST_F(AccessLogImplTest, orFilter) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
   request_info_.response_code_.value(500);
 
   {
@@ -524,7 +526,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   )EOF";
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  InstancePtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
+  InstanceSharedPtr log = InstanceImpl::fromJson(*loader, runtime_, log_manager_);
   request_info_.response_code_.value(500);
 
   {

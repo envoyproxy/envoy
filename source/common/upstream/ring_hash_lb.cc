@@ -9,13 +9,13 @@ RingHashLoadBalancer::RingHashLoadBalancer(HostSet& host_set, ClusterStats& stat
                                            Runtime::Loader& runtime,
                                            Runtime::RandomGenerator& random)
     : host_set_(host_set), stats_(stats), runtime_(runtime), random_(random) {
-  host_set_.addMemberUpdateCb([this](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
-                                  -> void { refresh(); });
+  host_set_.addMemberUpdateCb([this](const std::vector<HostSharedPtr>&,
+                                     const std::vector<HostSharedPtr>&) -> void { refresh(); });
 
   refresh();
 }
 
-ConstHostPtr RingHashLoadBalancer::chooseHost(const LoadBalancerContext* context) {
+HostConstSharedPtr RingHashLoadBalancer::chooseHost(const LoadBalancerContext* context) {
   if (LoadBalancerUtility::isGlobalPanic(host_set_, stats_, runtime_)) {
     return all_hosts_ring_.chooseHost(context, random_);
   } else {
@@ -23,8 +23,8 @@ ConstHostPtr RingHashLoadBalancer::chooseHost(const LoadBalancerContext* context
   }
 }
 
-ConstHostPtr RingHashLoadBalancer::Ring::chooseHost(const LoadBalancerContext* context,
-                                                    Runtime::RandomGenerator& random) {
+HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(const LoadBalancerContext* context,
+                                                          Runtime::RandomGenerator& random) {
   if (ring_.empty()) {
     return nullptr;
   }
@@ -71,7 +71,7 @@ ConstHostPtr RingHashLoadBalancer::Ring::chooseHost(const LoadBalancerContext* c
 }
 
 void RingHashLoadBalancer::Ring::create(Runtime::Loader& runtime,
-                                        const std::vector<HostPtr>& hosts) {
+                                        const std::vector<HostSharedPtr>& hosts) {
   log_trace("ring hash: building ring");
   ring_.clear();
   if (hosts.empty()) {

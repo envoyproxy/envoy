@@ -10,11 +10,11 @@
 namespace Upstream {
 namespace Outlier {
 
-DetectorPtr DetectorImplFactory::createForCluster(Cluster& cluster,
-                                                  const Json::Object& cluster_config,
-                                                  Event::Dispatcher& dispatcher,
-                                                  Runtime::Loader& runtime,
-                                                  EventLoggerPtr event_logger) {
+DetectorSharedPtr DetectorImplFactory::createForCluster(Cluster& cluster,
+                                                        const Json::Object& cluster_config,
+                                                        Event::Dispatcher& dispatcher,
+                                                        Runtime::Loader& runtime,
+                                                        EventLoggerSharedPtr event_logger) {
   if (cluster_config.hasObject("outlier_detection")) {
     return DetectorImpl::create(cluster, *cluster_config.getObject("outlier_detection"), dispatcher,
                                 runtime, ProdSystemTimeSource::instance_, event_logger);
@@ -76,7 +76,7 @@ DetectorConfig::DetectorConfig(const Json::Object& json_config)
 
 DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                           SystemTimeSource& time_source, EventLoggerPtr event_logger)
+                           SystemTimeSource& time_source, EventLoggerSharedPtr event_logger)
     : config_(json_config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
@@ -94,7 +94,7 @@ DetectorImpl::~DetectorImpl() {
 std::shared_ptr<DetectorImpl>
 DetectorImpl::create(const Cluster& cluster, const Json::Object& json_config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                     SystemTimeSource& time_source, EventLoggerPtr event_logger) {
+                     SystemTimeSource& time_source, EventLoggerSharedPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
       new DetectorImpl(cluster, json_config, dispatcher, runtime, time_source, event_logger));
   detector->initialize(cluster);
@@ -102,17 +102,17 @@ DetectorImpl::create(const Cluster& cluster, const Json::Object& json_config,
 }
 
 void DetectorImpl::initialize(const Cluster& cluster) {
-  for (HostPtr host : cluster.hosts()) {
+  for (HostSharedPtr host : cluster.hosts()) {
     addHostSink(host);
   }
 
-  cluster.addMemberUpdateCb([this](const std::vector<HostPtr>& hosts_added,
-                                   const std::vector<HostPtr>& hosts_removed) -> void {
-    for (HostPtr host : hosts_added) {
+  cluster.addMemberUpdateCb([this](const std::vector<HostSharedPtr>& hosts_added,
+                                   const std::vector<HostSharedPtr>& hosts_removed) -> void {
+    for (HostSharedPtr host : hosts_added) {
       addHostSink(host);
     }
 
-    for (HostPtr host : hosts_removed) {
+    for (HostSharedPtr host : hosts_removed) {
       ASSERT(host_sinks_.count(host) == 1);
       if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
         ASSERT(stats_.ejections_active_.value() > 0);
@@ -126,7 +126,7 @@ void DetectorImpl::initialize(const Cluster& cluster) {
   armIntervalTimer();
 }
 
-void DetectorImpl::addHostSink(HostPtr host) {
+void DetectorImpl::addHostSink(HostSharedPtr host) {
   ASSERT(host_sinks_.count(host) == 0);
   DetectorHostSinkImpl* sink = new DetectorHostSinkImpl(shared_from_this(), host);
   host_sinks_[host] = sink;
@@ -138,7 +138,8 @@ void DetectorImpl::armIntervalTimer() {
       runtime_.snapshot().getInteger("outlier_detection.interval_ms", config_.intervalMs())));
 }
 
-void DetectorImpl::checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink, SystemTime now) {
+void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostSinkImpl* sink,
+                                       SystemTime now) {
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
     return;
   }
@@ -172,7 +173,7 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
   NOT_REACHED;
 }
 
-void DetectorImpl::ejectHost(HostPtr host, EjectionType type) {
+void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
                                           config_.maxEjectionPercent()));
@@ -199,7 +200,7 @@ DetectionStats DetectorImpl::generateStats(Stats::Scope& scope) {
                                       POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
-void DetectorImpl::onConsecutive5xx(HostPtr host) {
+void DetectorImpl::onConsecutive5xx(HostSharedPtr host) {
   // This event will come from all threads, so we synchronize with a post to the main thread.
   // NOTE: Unfortunately consecutive 5xx is complicated from a threading perspective because
   //       we catch consecutive 5xx on worker threads and then post back to the main thread.
@@ -219,7 +220,7 @@ void DetectorImpl::onConsecutive5xx(HostPtr host) {
   });
 }
 
-void DetectorImpl::onConsecutive5xxWorker(HostPtr host) {
+void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
   // This comes in cross thread. There is a chance that the host has already been removed from
   // the set. If so, just ignore it.
   if (host_sinks_.count(host) == 0) {
@@ -264,7 +265,7 @@ double Utility::successRateEjectionThreshold(double success_rate_sum,
 }
 
 void DetectorImpl::successRateEjections() {
-  std::unordered_map<HostPtr, double> valid_success_rate_hosts;
+  std::unordered_map<HostSharedPtr, double> valid_success_rate_hosts;
   uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
       "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
@@ -320,13 +321,13 @@ void DetectorImpl::onIntervalTimer() {
   armIntervalTimer();
 }
 
-void DetectorImpl::runCallbacks(HostPtr host) {
+void DetectorImpl::runCallbacks(HostSharedPtr host) {
   for (ChangeStateCb cb : callbacks_) {
     cb(host);
   }
 }
 
-void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
+void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, EjectionType type) {
   // TODO(mattklein123): Log friendly host name (e.g., instance ID or DNS name).
   // clang-format off
   static const std::string json =
@@ -347,7 +348,7 @@ void EventLoggerImpl::logEject(HostDescriptionPtr host, EjectionType type) {
                            host->outlierDetector().numEjections()));
 }
 
-void EventLoggerImpl::logUneject(HostDescriptionPtr host) {
+void EventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
   // TODO(mattklein123): Log friendly host name (e.g., instance ID or DNS name).
   // clang-format off
   static const std::string json =

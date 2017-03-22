@@ -84,7 +84,7 @@ ConnectionHandlerImpl::findListenerByAddress(const Network::Address::Instance& a
   // However, linear performance might be adequate since the number of listeners is small.
   auto listener = std::find_if(
       listeners_.begin(), listeners_.end(),
-      [&address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
+      [&address](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
         return p.first->type() == Network::Address::Type::Ip && *(p.first) == address;
       });
 
@@ -97,7 +97,7 @@ ConnectionHandlerImpl::findListenerByAddress(const Network::Address::Instance& a
   // TODO(wattli): consolidate with previous search for more efficiency.
   listener = std::find_if(
       listeners_.begin(), listeners_.end(),
-      [&address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
+      [&address](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
         return p.first->type() == Network::Address::Type::Ip &&
                p.first->ip()->port() == address.ip()->port() && p.first->ip()->isAnyAddress();
       });

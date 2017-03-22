@@ -31,7 +31,7 @@ class TestDnsServerQuery {
 public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts)
       : connection_(std::move(connection)), hosts_(hosts) {
-    connection_->addReadFilter(Network::ReadFilterPtr{new ReadFilter(*this)});
+    connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
   ~TestDnsServerQuery() { connection_->close(ConnectionCloseType::NoFlush); }
@@ -218,7 +218,8 @@ protected:
   DnsResolverPtr resolver_;
 };
 
-static bool hasAddress(const std::list<Address::InstancePtr>& results, const std::string& address) {
+static bool hasAddress(const std::list<Address::InstanceConstSharedPtr>& results,
+                       const std::string& address) {
   for (auto result : results) {
     if (result->ip()->addressAsString() == address) {
       return true;
@@ -232,10 +233,11 @@ static bool hasAddress(const std::list<Address::InstancePtr>& results, const std
 // development, where segfaults were encountered due to callback invocations on
 // destruction.
 TEST_F(DnsImplTest, DestructPending) {
-  EXPECT_NE(nullptr, resolver_->resolve("", [&](std::list<Address::InstancePtr>&& results) -> void {
-    FAIL();
-    UNREFERENCED_PARAMETER(results);
-  }));
+  EXPECT_NE(nullptr, resolver_->resolve(
+                         "", [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                           FAIL();
+                           UNREFERENCED_PARAMETER(results);
+                         }));
   // Also validate that pending events are around to exercise the resource
   // reclamation path.
   EXPECT_GT(peer_->events().size(), 0U);
@@ -245,17 +247,19 @@ TEST_F(DnsImplTest, DestructPending) {
 // to TestDnsServer, but localhost should resolve via the hosts file with no
 // asynchronous behavior or network events.
 TEST_F(DnsImplTest, LocalLookup) {
-  std::list<Address::InstancePtr> address_list;
-  EXPECT_NE(nullptr, resolver_->resolve("", [&](std::list<Address::InstancePtr>&& results) -> void {
-    address_list = results;
-    dispatcher_.exit();
-  }));
+  std::list<Address::InstanceConstSharedPtr> address_list;
+  EXPECT_NE(nullptr, resolver_->resolve(
+                         "", [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                           address_list = results;
+                           dispatcher_.exit();
+                         }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(address_list.empty());
 
-  EXPECT_EQ(nullptr, resolver_->resolve("localhost", [&](std::list<Address::InstancePtr>&& results)
-                                                         -> void { address_list = results; }));
+  EXPECT_EQ(nullptr, resolver_->resolve("localhost",
+                                        [&](std::list<Address::InstanceConstSharedPtr>&& results)
+                                            -> void { address_list = results; }));
   EXPECT_TRUE(hasAddress(address_list, "127.0.0.1"));
 }
 
@@ -263,21 +267,23 @@ TEST_F(DnsImplTest, LocalLookup) {
 // network event handling in DnsResolverImpl.
 TEST_F(DnsImplTest, RemoteAsyncLookup) {
   server_->addHosts("some.good.domain", {"201.134.56.7"});
-  std::list<Address::InstancePtr> address_list;
-  EXPECT_NE(nullptr, resolver_->resolve("some.bad.domain",
-                                        [&](std::list<Address::InstancePtr>&& results) -> void {
-                                          address_list = results;
-                                          dispatcher_.exit();
-                                        }));
+  std::list<Address::InstanceConstSharedPtr> address_list;
+  EXPECT_NE(nullptr,
+            resolver_->resolve("some.bad.domain",
+                               [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                                 address_list = results;
+                                 dispatcher_.exit();
+                               }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(address_list.empty());
 
-  EXPECT_NE(nullptr, resolver_->resolve("some.good.domain",
-                                        [&](std::list<Address::InstancePtr>&& results) -> void {
-                                          address_list = results;
-                                          dispatcher_.exit();
-                                        }));
+  EXPECT_NE(nullptr,
+            resolver_->resolve("some.good.domain",
+                               [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                                 address_list = results;
+                                 dispatcher_.exit();
+                               }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(hasAddress(address_list, "201.134.56.7"));
@@ -286,12 +292,13 @@ TEST_F(DnsImplTest, RemoteAsyncLookup) {
 // Validate that multiple A records are correctly passed to the callback.
 TEST_F(DnsImplTest, MultiARecordLookup) {
   server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"});
-  std::list<Address::InstancePtr> address_list;
-  EXPECT_NE(nullptr, resolver_->resolve("some.good.domain",
-                                        [&](std::list<Address::InstancePtr>&& results) -> void {
-                                          address_list = results;
-                                          dispatcher_.exit();
-                                        }));
+  std::list<Address::InstanceConstSharedPtr> address_list;
+  EXPECT_NE(nullptr,
+            resolver_->resolve("some.good.domain",
+                               [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                                 address_list = results;
+                                 dispatcher_.exit();
+                               }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(hasAddress(address_list, "201.134.56.7"));
@@ -303,15 +310,16 @@ TEST_F(DnsImplTest, MultiARecordLookup) {
 TEST_F(DnsImplTest, Cancel) {
   server_->addHosts("some.good.domain", {"201.134.56.7"});
 
-  ActiveDnsQuery* query = resolver_->resolve("some.domain", [](std::list<Address::InstancePtr> && )
-                                                                -> void { FAIL(); });
+  ActiveDnsQuery* query = resolver_->resolve(
+      "some.domain", [](std::list<Address::InstanceConstSharedPtr> && ) -> void { FAIL(); });
 
-  std::list<Address::InstancePtr> address_list;
-  EXPECT_NE(nullptr, resolver_->resolve("some.good.domain",
-                                        [&](std::list<Address::InstancePtr>&& results) -> void {
-                                          address_list = results;
-                                          dispatcher_.exit();
-                                        }));
+  std::list<Address::InstanceConstSharedPtr> address_list;
+  EXPECT_NE(nullptr,
+            resolver_->resolve("some.good.domain",
+                               [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                                 address_list = results;
+                                 dispatcher_.exit();
+                               }));
 
   ASSERT_NE(nullptr, query);
   query->cancel();
@@ -328,12 +336,13 @@ protected:
 // Validate that timeouts result in an empty callback.
 TEST_F(DnsImplZeroTimeoutTest, Timeout) {
   server_->addHosts("some.good.domain", {"201.134.56.7"});
-  std::list<Address::InstancePtr> address_list;
-  EXPECT_NE(nullptr, resolver_->resolve("some.good.domain",
-                                        [&](std::list<Address::InstancePtr>&& results) -> void {
-                                          address_list = results;
-                                          dispatcher_.exit();
-                                        }));
+  std::list<Address::InstanceConstSharedPtr> address_list;
+  EXPECT_NE(nullptr,
+            resolver_->resolve("some.good.domain",
+                               [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
+                                 address_list = results;
+                                 dispatcher_.exit();
+                               }));
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(address_list.empty());

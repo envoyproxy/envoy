@@ -77,7 +77,7 @@ public:
   /**
    * Create a client given an upstream host.
    */
-  virtual ClientPtr create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher) PURE;
+  virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher) PURE;
 };
 
 /**
