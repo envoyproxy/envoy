@@ -15,7 +15,7 @@ class Host : virtual public HostDescription {
 public:
   struct CreateConnectionData {
     Network::ClientConnectionPtr connection_;
-    HostDescriptionPtr host_description_;
+    HostDescriptionConstSharedPtr host_description_;
   };
 
   enum class HealthFlag {
@@ -28,7 +28,7 @@ public:
   /**
    * @return host specific counters.
    */
-  virtual std::list<Stats::CounterPtr> counters() const PURE;
+  virtual std::list<Stats::CounterSharedPtr> counters() const PURE;
 
   /**
    * Create a connection for this host.
@@ -44,7 +44,7 @@ public:
   /**
    * @return host specific gauges.
    */
-  virtual std::list<Stats::GaugePtr> gauges() const PURE;
+  virtual std::list<Stats::GaugeSharedPtr> gauges() const PURE;
 
   /**
    * Atomically clear a health flag for a host. Flags are specified in HealthFlags.
@@ -85,7 +85,7 @@ public:
   virtual void weight(uint32_t new_weight) PURE;
 };
 
-typedef std::shared_ptr<const Host> ConstHostPtr;
+typedef std::shared_ptr<const Host> HostConstSharedPtr;
 
 /**
  * Base host set interface. This is used both for clusters, as well as per thread/worker host sets
@@ -100,8 +100,8 @@ public:
    * @param hosts_added supplies the newly added hosts, if any.
    * @param hosts_removed supplies the removed hosts, if any.
    */
-  typedef std::function<void(const std::vector<HostPtr>& hosts_added,
-                             const std::vector<HostPtr>& hosts_removed)> MemberUpdateCb;
+  typedef std::function<void(const std::vector<HostSharedPtr>& hosts_added,
+                             const std::vector<HostSharedPtr>& hosts_removed)> MemberUpdateCb;
 
   /**
    * Install a callback that will be invoked when the cluster membership changes.
@@ -112,7 +112,7 @@ public:
   /**
    * @return all hosts that make up the set at the current time.
    */
-  virtual const std::vector<HostPtr>& hosts() const PURE;
+  virtual const std::vector<HostSharedPtr>& hosts() const PURE;
 
   /**
    * @return all healthy hosts contained in the set at the current time. NOTE: This set is
@@ -120,7 +120,7 @@ public:
    *         unhealthy and calling healthy() on it will return false. Code should be written to
    *         deal with this case if it matters.
    */
-  virtual const std::vector<HostPtr>& healthyHosts() const PURE;
+  virtual const std::vector<HostSharedPtr>& healthyHosts() const PURE;
 
   /**
    * @return hosts per zone, index 0 is dedicated to local zone hosts.
@@ -129,12 +129,12 @@ public:
    *
    * Note, that we sort zones in alphabetical order starting from index 1.
    */
-  virtual const std::vector<std::vector<HostPtr>>& hostsPerZone() const PURE;
+  virtual const std::vector<std::vector<HostSharedPtr>>& hostsPerZone() const PURE;
 
   /**
    * @return same as hostsPerZone but only contains healthy hosts.
    */
-  virtual const std::vector<std::vector<HostPtr>>& healthyHostsPerZone() const PURE;
+  virtual const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerZone() const PURE;
 };
 
 /**
@@ -285,7 +285,7 @@ public:
   virtual Stats::Scope& statsScope() const PURE;
 };
 
-typedef std::shared_ptr<const ClusterInfo> ClusterInfoPtr;
+typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
 
 /**
  * An upstream cluster (group of hosts). This class is the "primary" singleton cluster used amongst
@@ -298,7 +298,7 @@ public:
   /**
    * @return the information about this upstream cluster.
    */
-  virtual ClusterInfoPtr info() const PURE;
+  virtual ClusterInfoConstSharedPtr info() const PURE;
 
   /**
    * Initialize the cluster. This will be called either immediately at creation or after all primary

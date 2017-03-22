@@ -17,7 +17,7 @@ namespace Http2 {
  */
 class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::Instance {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host,
+  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority);
   ~ConnPoolImpl();
 
@@ -50,7 +50,7 @@ protected:
 
     ConnPoolImpl& parent_;
     CodecClientPtr client_;
-    Upstream::HostDescriptionPtr real_host_description_;
+    Upstream::HostDescriptionConstSharedPtr real_host_description_;
     uint64_t total_streams_{};
     Event::TimerPtr connect_timer_;
     Stats::TimespanPtr conn_length_;
@@ -72,7 +72,7 @@ protected:
 
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
-  Upstream::ConstHostPtr host_;
+  Upstream::HostConstSharedPtr host_;
   ActiveClientPtr primary_client_;
   ActiveClientPtr draining_client_;
   std::list<DrainedCb> drained_callbacks_;

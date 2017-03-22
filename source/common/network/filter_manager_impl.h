@@ -32,9 +32,9 @@ public:
   FilterManagerImpl(Connection& connection, BufferSource& buffer_source)
       : connection_(connection), buffer_source_(buffer_source) {}
 
-  void addWriteFilter(WriteFilterPtr filter);
-  void addFilter(FilterPtr filter);
-  void addReadFilter(ReadFilterPtr filter);
+  void addWriteFilter(WriteFilterSharedPtr filter);
+  void addFilter(FilterSharedPtr filter);
+  void addReadFilter(ReadFilterSharedPtr filter);
   void destroyFilters();
   bool initializeReadFilters();
   void onRead();
@@ -42,18 +42,20 @@ public:
 
 private:
   struct ActiveReadFilter : public ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
-    ActiveReadFilter(FilterManagerImpl& parent, ReadFilterPtr filter)
+    ActiveReadFilter(FilterManagerImpl& parent, ReadFilterSharedPtr filter)
         : parent_(parent), filter_(filter) {}
 
     Connection& connection() override { return parent_.connection_; }
     void continueReading() override { parent_.onContinueReading(this); }
-    Upstream::HostDescriptionPtr upstreamHost() override { return parent_.host_description_; }
-    void upstreamHost(Upstream::HostDescriptionPtr host) override {
+    Upstream::HostDescriptionConstSharedPtr upstreamHost() override {
+      return parent_.host_description_;
+    }
+    void upstreamHost(Upstream::HostDescriptionConstSharedPtr host) override {
       parent_.host_description_ = host;
     }
 
     FilterManagerImpl& parent_;
-    ReadFilterPtr filter_;
+    ReadFilterSharedPtr filter_;
     bool initialized_{};
   };
 
@@ -63,9 +65,9 @@ private:
 
   Connection& connection_;
   BufferSource& buffer_source_;
-  Upstream::HostDescriptionPtr host_description_;
+  Upstream::HostDescriptionConstSharedPtr host_description_;
   std::list<ActiveReadFilterPtr> upstream_filters_;
-  std::list<WriteFilterPtr> downstream_filters_;
+  std::list<WriteFilterSharedPtr> downstream_filters_;
 };
 
 } // Network

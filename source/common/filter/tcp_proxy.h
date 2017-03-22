@@ -70,7 +70,7 @@ private:
   const TcpProxyStats stats_;
 };
 
-typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigPtr;
+typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
 
 /**
  * An implementation of a TCP (L3/L4) proxy. This filter will instantiate a new outgoing TCP
@@ -79,7 +79,7 @@ typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigPtr;
  */
 class TcpProxy : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  TcpProxy(TcpProxyConfigPtr config, Upstream::ClusterManager& cluster_manager);
+  TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
   ~TcpProxy();
 
   // Network::ReadFilter
@@ -119,7 +119,7 @@ private:
   void onUpstreamData(Buffer::Instance& data);
   void onUpstreamEvent(uint32_t event);
 
-  TcpProxyConfigPtr config_;
+  TcpProxyConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::ClientConnectionPtr upstream_connection_;

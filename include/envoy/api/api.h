@@ -25,9 +25,10 @@ public:
    * @param dispatcher supplies the dispatcher uses for async flushing.
    * @param lock supplies the lock to use for cross thread appends.
    */
-  virtual Filesystem::FilePtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                                         Thread::BasicLockable& lock,
-                                         Stats::Store& stats_store) PURE;
+  virtual Filesystem::FileSharedPtr createFile(const std::string& path,
+                                               Event::Dispatcher& dispatcher,
+                                               Thread::BasicLockable& lock,
+                                               Stats::Store& stats_store) PURE;
 
   /**
    * @return bool whether a file exists and can be opened for read on disk.

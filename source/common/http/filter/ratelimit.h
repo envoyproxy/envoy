@@ -42,7 +42,7 @@ private:
   Upstream::ClusterManager& cm_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigPtr;
+typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
 
 /**
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
@@ -50,7 +50,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigPtr;
  */
 class Filter : public StreamDecoderFilter, public ::RateLimit::RequestCallbacks {
 public:
-  Filter(FilterConfigPtr config, ::RateLimit::ClientPtr&& client)
+  Filter(FilterConfigSharedPtr config, ::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamDecoderFilter
@@ -73,12 +73,12 @@ private:
 
   static const std::unique_ptr<const Http::HeaderMap> TOO_MANY_REQUESTS_HEADER;
 
-  FilterConfigPtr config_;
+  FilterConfigSharedPtr config_;
   ::RateLimit::ClientPtr client_;
   StreamDecoderFilterCallbacks* callbacks_{};
   bool initiating_call_{};
   State state_{State::NotStarted};
-  Upstream::ClusterInfoPtr cluster_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
 };
 
 } // RateLimit

@@ -14,10 +14,10 @@ HttpFilterFactoryCb RateLimitFilterConfig::tryCreateFilterFactory(HttpFilterType
     return nullptr;
   }
 
-  Http::RateLimit::FilterConfigPtr filter_config(new Http::RateLimit::FilterConfig(
+  Http::RateLimit::FilterConfigSharedPtr filter_config(new Http::RateLimit::FilterConfig(
       config, server.localInfo(), server.stats(), server.runtime(), server.clusterManager()));
   return [filter_config, &server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{new Http::RateLimit::Filter(
+    callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new Http::RateLimit::Filter(
         filter_config, server.rateLimitClient(std::chrono::milliseconds(20)))});
   };
 }

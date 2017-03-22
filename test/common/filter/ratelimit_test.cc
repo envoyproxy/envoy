@@ -44,14 +44,14 @@ public:
   }
 
   ~RateLimitFilterTest() {
-    for (Stats::GaugePtr gauge : stats_store_.gauges()) {
+    for (Stats::GaugeSharedPtr gauge : stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
   }
 
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
-  ConfigPtr config_;
+  ConfigSharedPtr config_;
   MockClient* client_;
   std::unique_ptr<Instance> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;

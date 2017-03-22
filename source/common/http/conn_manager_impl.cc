@@ -304,7 +304,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
-  for (AccessLog::InstancePtr access_log : connection_manager_.config_.accessLogs()) {
+  for (AccessLog::InstanceSharedPtr access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
   for (const auto& log_handler : access_log_handlers_) {
@@ -320,25 +320,27 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilter(StreamDecoderFilterPtr filter) {
+void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilter(
+    StreamDecoderFilterSharedPtr filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter));
   filter->setDecoderFilterCallbacks(*wrapper);
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
-void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilter(StreamEncoderFilterPtr filter) {
+void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilter(
+    StreamEncoderFilterSharedPtr filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter));
   filter->setEncoderFilterCallbacks(*wrapper);
   wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
 }
 
-void ConnectionManagerImpl::ActiveStream::addStreamFilter(StreamFilterPtr filter) {
+void ConnectionManagerImpl::ActiveStream::addStreamFilter(StreamFilterSharedPtr filter) {
   addStreamDecoderFilter(filter);
   addStreamEncoderFilter(filter);
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
-    Http::AccessLog::InstancePtr handler) {
+    Http::AccessLog::InstanceSharedPtr handler) {
   access_log_handlers_.push_back(handler);
 }
 
@@ -826,7 +828,7 @@ AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestIn
   return parent_.request_info_;
 }
 
-Router::RoutePtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
+Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
   if (!parent_.cached_route_.valid()) {
     parent_.cached_route_.value(
         parent_.snapped_route_config_->route(*parent_.request_headers_, parent_.stream_id_));

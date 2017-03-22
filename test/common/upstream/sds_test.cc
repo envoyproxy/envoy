@@ -42,8 +42,8 @@ protected:
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
-  HostPtr findHost(const std::string& address) {
-    for (HostPtr host : cluster_->hosts()) {
+  HostSharedPtr findHost(const std::string& address) {
+    for (HostSharedPtr host : cluster_->hosts()) {
       if (host->address()->ip()->addressAsString() == address) {
         return host;
       }
@@ -54,7 +54,7 @@ protected:
 
   uint64_t numHealthy() {
     uint64_t healthy = 0;
-    for (HostPtr host : cluster_->hosts()) {
+    for (HostSharedPtr host : cluster_->hosts()) {
       if (host->healthy()) {
         healthy++;
       }
@@ -115,8 +115,9 @@ TEST_F(SdsTest, NoHealthChecker) {
   cluster_->initialize();
 
   EXPECT_CALL(membership_updated_, ready()).Times(3);
-  cluster_->addMemberUpdateCb([&](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
-                                  -> void { membership_updated_.ready(); });
+  cluster_->addMemberUpdateCb(
+      [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
+          -> void { membership_updated_.ready(); });
   cluster_->setInitializedCb([&]() -> void { membership_updated_.ready(); });
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
@@ -137,7 +138,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   // Hosts in SDS and static clusters should have empty hostname
   EXPECT_EQ("", cluster_->hosts()[0]->hostname());
 
-  HostPtr canary_host = findHost("10.0.16.43");
+  HostSharedPtr canary_host = findHost("10.0.16.43");
   EXPECT_TRUE(canary_host->canary());
   EXPECT_EQ("us-east-1d", canary_host->zone());
   EXPECT_EQ(40U, canary_host->weight());

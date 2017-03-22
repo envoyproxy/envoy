@@ -19,7 +19,7 @@ public:
     }
 
     return [](Network::FilterManager& filter_manager)
-        -> void { filter_manager.addReadFilter(Network::ReadFilterPtr{new Filter::Echo()}); };
+        -> void { filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Filter::Echo()}); };
   }
 };
 

@@ -20,7 +20,7 @@ NetworkFilterFactoryCb RedisProxyFilterConfigFactory::tryCreateFilterFactory(
       Redis::ConnPool::ClientFactoryImpl::instance_, server.threadLocal()));
   return [conn_pool](Network::FilterManager& filter_manager) -> void {
     Redis::DecoderFactoryImpl factory;
-    filter_manager.addReadFilter(Network::ReadFilterPtr{
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         new Redis::ProxyFilter(factory, Redis::EncoderPtr{new Redis::EncoderImpl()}, *conn_pool)});
   };
 }

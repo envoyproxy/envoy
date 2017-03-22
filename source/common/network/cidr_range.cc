@@ -12,7 +12,7 @@ namespace Address {
 
 CidrRange::CidrRange() : length_(-1) {}
 
-CidrRange::CidrRange(InstancePtr address, int length)
+CidrRange::CidrRange(InstanceConstSharedPtr address, int length)
     : address_(std::move(address)), length_(length) {
   // This is a private ctor, so only checking these asserts in debug builds.
   if (address_ == nullptr) {
@@ -66,7 +66,7 @@ IpVersion CidrRange::version() const {
   return IpVersion::v4;
 }
 
-bool CidrRange::isInRange(InstancePtr address) const {
+bool CidrRange::isInRange(InstanceConstSharedPtr address) const {
   if (address == nullptr || length_ < 0 || address->type() != Type::Ip ||
       address->ip()->version() != version()) {
     return false;
@@ -88,8 +88,8 @@ std::string CidrRange::asString() const {
 }
 
 // static
-CidrRange CidrRange::create(InstancePtr address, int length) {
-  InstancePtr ptr = truncateIpAddressAndLength(std::move(address), &length);
+CidrRange CidrRange::create(InstanceConstSharedPtr address, int length) {
+  InstanceConstSharedPtr ptr = truncateIpAddressAndLength(std::move(address), &length);
   return CidrRange(std::move(ptr), length);
 }
 
@@ -102,7 +102,7 @@ CidrRange CidrRange::create(const std::string& address, int length) {
 CidrRange CidrRange::create(const std::string& range) {
   std::vector<std::string> parts = StringUtil::split(range, '/');
   if (parts.size() == 2) {
-    InstancePtr ptr = parseInternetAddress(parts[0]);
+    InstanceConstSharedPtr ptr = parseInternetAddress(parts[0]);
     if (ptr != nullptr && ptr->type() == Type::Ip) {
       uint64_t length64;
       if (StringUtil::atoul(parts[1].c_str(), length64, 10)) {
@@ -117,7 +117,8 @@ CidrRange CidrRange::create(const std::string& range) {
 }
 
 // static
-InstancePtr CidrRange::truncateIpAddressAndLength(InstancePtr address, int* length_io) {
+InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstSharedPtr address,
+                                                             int* length_io) {
   int length = *length_io;
   if (address == nullptr || length < 0 || address->type() != Type::Ip) {
     *length_io = -1;
@@ -131,7 +132,7 @@ InstancePtr CidrRange::truncateIpAddressAndLength(InstancePtr address, int* leng
       return address;
     } else if (length == 0) {
       // Create an Ipv4Instance with only a port, which will thus have the any address.
-      return InstancePtr(new Ipv4Instance(uint32_t(0)));
+      return InstanceConstSharedPtr(new Ipv4Instance(uint32_t(0)));
     }
     // Need to mask out the unused bits, and create an Ipv4Instance with this address.
     uint32_t ip4 = ntohl(address->ip()->ipv4()->address());
@@ -140,7 +141,7 @@ InstancePtr CidrRange::truncateIpAddressAndLength(InstancePtr address, int* leng
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(0);
     sa4.sin_addr.s_addr = htonl(ip4);
-    return InstancePtr(new Ipv4Instance(&sa4));
+    return InstanceConstSharedPtr(new Ipv4Instance(&sa4));
   }
 
   case IpVersion::v6: {
@@ -150,7 +151,7 @@ InstancePtr CidrRange::truncateIpAddressAndLength(InstancePtr address, int* leng
       return address;
     } else if (length == 0) {
       // Create an Ipv6Instance with only a port, which will thus have the any address.
-      return InstancePtr(new Ipv6Instance(uint32_t(0)));
+      return InstanceConstSharedPtr(new Ipv6Instance(uint32_t(0)));
     }
     // We need to mask out the unused bits, but we don't have a uint128_t available.
     // However, we know that the array returned by Ipv6::address() represents the address
@@ -174,7 +175,7 @@ InstancePtr CidrRange::truncateIpAddressAndLength(InstancePtr address, int* leng
         length -= 8;
       }
     }
-    return InstancePtr(new Ipv6Instance(sa6));
+    return InstanceConstSharedPtr(new Ipv6Instance(sa6));
   }
   }
   NOT_REACHED

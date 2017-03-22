@@ -115,7 +115,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  for (Stats::CounterPtr counter : stats_store_.counters()) {
+  for (Stats::CounterSharedPtr counter : stats_store_.counters()) {
     uint64_t delta = counter->latch();
     if (counter->used()) {
       for (const auto& sink : stat_sinks_) {
@@ -124,7 +124,7 @@ void InstanceImpl::flushStats() {
     }
   }
 
-  for (Stats::GaugePtr gauge : stats_store_.gauges()) {
+  for (Stats::GaugeSharedPtr gauge : stats_store_.gauges()) {
     if (gauge->used()) {
       for (const auto& sink : stat_sinks_) {
         sink->flushGauge(gauge->name(), gauge->value());
@@ -136,7 +136,7 @@ void InstanceImpl::flushStats() {
 }
 
 int InstanceImpl::getListenSocketFd(const std::string& address) {
-  Network::Address::InstancePtr addr = Network::Utility::resolveUrl(address);
+  Network::Address::InstanceConstSharedPtr addr = Network::Utility::resolveUrl(address);
   for (const auto& entry : socket_map_) {
     if (entry.second->localAddress()->asString() == addr->asString()) {
       return entry.second->fd();

@@ -15,7 +15,7 @@ public:
   typedef std::function<void(CodecClient*)> DestroyCb;
 
   CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
-                     DestroyCb destroy_cb, Upstream::HostDescriptionPtr host)
+                     DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host)
       : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host),
         destroy_cb_(destroy_cb) {
     codec_.reset(codec);
@@ -36,14 +36,15 @@ public:
  * Mock callbacks used for conn pool testing.
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
-  void onPoolReady(Http::StreamEncoder& encoder, Upstream::HostDescriptionPtr host) override {
+  void onPoolReady(Http::StreamEncoder& encoder,
+                   Upstream::HostDescriptionConstSharedPtr host) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();
   }
 
   void onPoolFailure(Http::ConnectionPool::PoolFailureReason,
-                     Upstream::HostDescriptionPtr host) override {
+                     Upstream::HostDescriptionConstSharedPtr host) override {
     host_ = host;
     pool_failure_.ready();
   }
@@ -51,7 +52,7 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   ReadyWatcher pool_failure_;
   ReadyWatcher pool_ready_;
   Http::StreamEncoder* outer_encoder_{};
-  Upstream::HostDescriptionPtr host_;
+  Upstream::HostDescriptionConstSharedPtr host_;
 };
 
 /**

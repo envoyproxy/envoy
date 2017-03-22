@@ -29,6 +29,14 @@ We welcome contributions from the community. Here are some guidelines.
 * Global static non-pod variables are allowed because Envoy correctly joins all threads on exit.
   However, care is needed during init and static accessor functions may be required.
 * OOM events (both memory and FDs) are considered fatal crashing errors.
+* Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
+* Smart pointers are type aliased:
+  * `typedef std::unique_ptr<Foo> FooPtr;`
+  * `typedef std::shared_ptr<Bar> BarSharedPtr;`
+  * `typedef std::shareD_ptr<const Blah> BlahConstSharedPtr;`
+  * Regular pointers (e.g. `int* foo`) should not be type aliased.
+* API-level comments should follow normal Doxygen conventions. Use `@param` to describe
+  parameters, `@return <return-type>` for return values.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
 

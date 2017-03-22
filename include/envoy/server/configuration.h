@@ -23,9 +23,9 @@ public:
   virtual Network::FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * @return Network::Address::InstancePtr the address.
+   * @return Network::Address::InstanceConstSharedPtr the address.
    */
-  virtual Network::Address::InstancePtr address() PURE;
+  virtual Network::Address::InstanceConstSharedPtr address() PURE;
 
   /**
    * @return Ssl::ServerContext* the SSL context
@@ -147,9 +147,9 @@ public:
   virtual const std::string& accessLogPath() PURE;
 
   /**
-   * @return Network::Address::InstancePtr the server address.
+   * @return Network::Address::InstanceConstSharedPtr the server address.
    */
-  virtual Network::Address::InstancePtr address() PURE;
+  virtual Network::Address::InstanceConstSharedPtr address() PURE;
 };
 
 /**

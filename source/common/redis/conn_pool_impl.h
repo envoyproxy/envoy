@@ -18,7 +18,7 @@ namespace ConnPool {
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
 public:
-  static ClientPtr create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher,
+  static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory);
 
   ~ClientImpl();
@@ -74,7 +74,7 @@ private:
 class ClientFactoryImpl : public ClientFactory {
 public:
   // Redis::ConnPool::ClientFactoryImpl
-  ClientPtr create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher) override;
+  ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher) override;
 
   static ClientFactoryImpl instance_;
 
@@ -102,7 +102,7 @@ private:
     void onEvent(uint32_t events) override;
 
     ThreadLocalPool& parent_;
-    Upstream::ConstHostPtr host_;
+    Upstream::HostConstSharedPtr host_;
     ClientPtr redis_client_;
   };
 
@@ -114,7 +114,7 @@ private:
 
     ActiveRequest* makeRequest(const std::string& hash_key, const RespValue& request,
                                ActiveRequestCallbacks& callbacks);
-    void onHostsRemoved(const std::vector<Upstream::HostPtr>& hosts_removed);
+    void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
 
     // ThreadLocal::ThreadLocalObject
     void shutdown() override;
@@ -122,7 +122,7 @@ private:
     InstanceImpl& parent_;
     Event::Dispatcher& dispatcher_;
     Upstream::ThreadLocalCluster* cluster_;
-    std::unordered_map<Upstream::ConstHostPtr, ThreadLocalActiveClientPtr> client_map_;
+    std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContext {

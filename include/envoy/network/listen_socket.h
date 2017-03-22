@@ -15,7 +15,7 @@ public:
   /**
    * @return the address that the socket is listening on.
    */
-  virtual Address::InstancePtr localAddress() PURE;
+  virtual Address::InstanceConstSharedPtr localAddress() PURE;
 
   /**
    * @return fd the listen socket's file descriptor.

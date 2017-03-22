@@ -26,8 +26,8 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
 
   // This must come before startResolve(), since the resolve callback relies on
   // tls_slot_ being initialized.
-  tls.set(tls_slot_, [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr {
-    return ThreadLocal::ThreadLocalObjectPtr{new PerThreadCurrentHostData()};
+  tls.set(tls_slot_, [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return ThreadLocal::ThreadLocalObjectSharedPtr{new PerThreadCurrentHostData()};
   });
 
   startResolve();
@@ -45,8 +45,8 @@ void LogicalDnsCluster::startResolve() {
   info_->stats().update_attempt_.inc();
 
   active_dns_query_ = dns_resolver_.resolve(
-      dns_address,
-      [this, dns_address](std::list<Network::Address::InstancePtr>&& address_list) -> void {
+      dns_address, [this, dns_address](
+                       std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_dns_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
@@ -54,7 +54,7 @@ void LogicalDnsCluster::startResolve() {
         if (!address_list.empty()) {
           // TODO(mattklein123): IPv6 support as well as moving port handling into the DNS
           // interface.
-          Network::Address::InstancePtr new_address(
+          Network::Address::InstanceConstSharedPtr new_address(
               new Network::Address::Ipv4Instance(address_list.front()->ip()->addressAsString(),
                                                  Network::Utility::portFromTcpUrl(dns_url_)));
           if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
@@ -73,7 +73,7 @@ void LogicalDnsCluster::startResolve() {
             // want to do better again later.
             logical_host_.reset(new LogicalHost(
                 info_, hostname_, Network::Utility::resolveUrl("tcp://0.0.0.0:0"), *this));
-            HostVectorPtr new_hosts(new std::vector<HostPtr>());
+            HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
             new_hosts->emplace_back(logical_host_);
             updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,
                         empty_host_lists_, *new_hosts, {});
@@ -96,7 +96,7 @@ LogicalDnsCluster::LogicalHost::createConnection(Event::Dispatcher& dispatcher) 
       parent_.tls_.getTyped<PerThreadCurrentHostData>(parent_.tls_slot_);
   ASSERT(data.current_resolved_address_);
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_),
-          HostDescriptionPtr{
+          HostDescriptionConstSharedPtr{
               new RealHostDescription(data.current_resolved_address_, shared_from_this())}};
 }
 

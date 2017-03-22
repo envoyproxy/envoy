@@ -31,7 +31,8 @@ public:
     EXPECT_CALL(*connection_, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, addReadFilter(_))
-        .WillOnce(Invoke([this](Network::ReadFilterPtr filter) -> void { filter_ = filter; }));
+        .WillOnce(
+            Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
 
     codec_ = new Http::MockClientConnection();
 
@@ -46,9 +47,9 @@ public:
   Http::MockClientConnection* codec_;
   std::unique_ptr<CodecClientForTest> client_;
   Network::ConnectionCallbacks* connection_cb_;
-  Network::ReadFilterPtr filter_;
+  Network::ReadFilterSharedPtr filter_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionPtr host_{new Upstream::HostDescriptionImpl(
+  Upstream::HostDescriptionConstSharedPtr host_{new Upstream::HostDescriptionImpl(
       cluster_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
 };
 

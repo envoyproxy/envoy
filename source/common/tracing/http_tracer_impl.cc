@@ -236,13 +236,15 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
         fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_->name()));
   }
 
-  tls_.set(tls_slot_, [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
-    lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
-        *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::ref(dispatcher),
-                             std::placeholders::_1)));
+  tls_.set(tls_slot_,
+           [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+             lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
+                 *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this),
+                                      std::ref(dispatcher), std::placeholders::_1)));
 
-    return ThreadLocal::ThreadLocalObjectPtr{new TlsLightStepTracer(std::move(tracer), *this)};
-  });
+             return ThreadLocal::ThreadLocalObjectSharedPtr{
+                 new TlsLightStepTracer(std::move(tracer), *this)};
+           });
 }
 
 SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,

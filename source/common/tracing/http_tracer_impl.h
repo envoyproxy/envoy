@@ -113,7 +113,7 @@ public:
                     SystemTime start_time) override;
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
-  Upstream::ClusterInfoPtr cluster() { return cluster_; }
+  Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
@@ -128,7 +128,7 @@ private:
   };
 
   Upstream::ClusterManager& cm_;
-  Upstream::ClusterInfoPtr cluster_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
   LightstepTracerStats tracer_stats_;
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;

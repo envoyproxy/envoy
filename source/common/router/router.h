@@ -93,7 +93,7 @@ private:
   ShadowWriterPtr shadow_writer_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigPtr;
+typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
 
 /**
  * Service routing filter.
@@ -132,7 +132,7 @@ private:
     void setupPerTryTimeout();
     void onPerTryTimeout();
 
-    void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) {
+    void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
       upstream_host_ = host;
       parent_.callbacks_->requestInfo().onUpstreamHostSelected(host);
     }
@@ -147,9 +147,9 @@ private:
 
     // Http::ConnectionPool::Callbacks
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
-                       Upstream::HostDescriptionPtr host) override;
+                       Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Http::StreamEncoder& request_encoder,
-                     Upstream::HostDescriptionPtr host) override;
+                     Upstream::HostDescriptionConstSharedPtr host) override;
 
     Filter& parent_;
     Http::ConnectionPool::Instance& conn_pool_;
@@ -158,7 +158,7 @@ private:
     Http::StreamEncoder* request_encoder_{};
     Optional<Http::StreamResetReason> deferred_reset_reason_;
     Buffer::InstancePtr buffered_request_body_;
-    Upstream::HostDescriptionPtr upstream_host_;
+    Upstream::HostDescriptionConstSharedPtr upstream_host_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
@@ -182,10 +182,10 @@ private:
   Http::AccessLog::ResponseFlag
   streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
-  static const std::string& upstreamZone(Upstream::HostDescriptionPtr upstream_host);
+  static const std::string& upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(const Http::HeaderMap& response_headers,
-                          Upstream::HostDescriptionPtr upstream_host);
-  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionPtr upstream_host);
+                          Upstream::HostDescriptionConstSharedPtr upstream_host);
+  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::HeaderMap& request_headers,
@@ -211,9 +211,9 @@ private:
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  RoutePtr route_;
+  RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
-  Upstream::ClusterInfoPtr cluster_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
   std::string alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;

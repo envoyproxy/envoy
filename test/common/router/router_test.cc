@@ -75,7 +75,8 @@ public:
   TestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
-  Network::Address::InstancePtr host_address_{Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
+  Network::Address::InstanceConstSharedPtr host_address_{
+      Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
 };
 
 TEST_F(RouterTest, RouteNotFound) {
@@ -122,7 +123,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_CALL(callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   Http::TestHeaderMapImpl headers;
@@ -248,7 +249,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
                              return nullptr;
                            }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   expectResponseTimerCreate();
@@ -287,7 +288,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
                              return nullptr;
                            }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   expectResponseTimerCreate();
@@ -325,7 +326,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
                              return nullptr;
                            }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   expectResponseTimerCreate();
@@ -368,7 +369,7 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
   EXPECT_CALL(callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRemoteReset));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
@@ -393,7 +394,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
 
   expectResponseTimerCreate();
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
@@ -1002,7 +1003,7 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
       }));
 
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
   router_.decodeHeaders(incoming_headers, true);
@@ -1036,7 +1037,7 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
       }));
 
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(false));
   router_.decodeHeaders(incoming_headers, true);

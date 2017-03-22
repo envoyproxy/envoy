@@ -54,16 +54,17 @@ public:
                    const Network::ListenerOptions& listener_options)
       : ListenerImpl(conn_handler, dispatcher, socket, cb, stats_store, listener_options) {
     ON_CALL(*this, newConnection(_, _, _))
-        .WillByDefault(Invoke(
-            [this](int fd, Address::InstancePtr remote_address, Address::InstancePtr local_address)
-                -> void { ListenerImpl::newConnection(fd, remote_address, local_address); }
+        .WillByDefault(Invoke([this](int fd, Address::InstanceConstSharedPtr remote_address,
+                                     Address::InstanceConstSharedPtr local_address) -> void {
+          ListenerImpl::newConnection(fd, remote_address, local_address);
+        }
 
-            ));
+                              ));
   }
 
-  MOCK_METHOD1(getOriginalDst, Address::InstancePtr(int fd));
-  MOCK_METHOD3(newConnection, void(int fd, Address::InstancePtr remote_address,
-                                   Address::InstancePtr local_address));
+  MOCK_METHOD1(getOriginalDst, Address::InstanceConstSharedPtr(int fd));
+  MOCK_METHOD3(newConnection, void(int fd, Address::InstanceConstSharedPtr remote_address,
+                                   Address::InstanceConstSharedPtr local_address));
 };
 
 TEST(ListenerImplTest, NormalRedirect) {
@@ -88,7 +89,7 @@ TEST(ListenerImplTest, NormalRedirect) {
       dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
   client_connection->connect();
 
-  Address::InstancePtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
+  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
       .WillRepeatedly(Return(&listenerDst));
@@ -128,7 +129,7 @@ TEST(ListenerImplTest, FallbackToWildcardListener) {
       dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
   client_connection->connect();
 
-  Address::InstancePtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
+  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
       .WillRepeatedly(Return(&listenerDst));
@@ -167,7 +168,7 @@ TEST(ListenerImplTest, UseActualDst) {
       dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
   client_connection->connect();
 
-  Address::InstancePtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
+  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
       .WillRepeatedly(Return(&listener));

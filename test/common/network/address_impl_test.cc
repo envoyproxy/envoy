@@ -11,7 +11,7 @@
 namespace Network {
 namespace Address {
 namespace {
-bool addressesEqual(const InstancePtr& a, const Instance& b) {
+bool addressesEqual(const InstanceConstSharedPtr& a, const Instance& b) {
   if (a == nullptr || a->type() != Type::Ip || b.type() != Type::Ip) {
     return false;
   } else {
