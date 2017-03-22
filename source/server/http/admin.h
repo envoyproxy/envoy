@@ -113,9 +113,7 @@ private:
 
   Server::Instance& server_;
   std::list<Http::AccessLog::InstanceSharedPtr> access_logs_;
-  // TODO(hennna): Remove default value after making profile_path a configurable
-  // parameter via the Envoy config JSON
-  std::string profile_path_ = "/var/log/envoy/envoy.prof";
+  std::string profile_path_;
   Network::ListenSocketPtr socket_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;

@@ -105,18 +105,6 @@ TEST_F(IntegrationTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("400", response->headers().Status()->value().c_str());
 
-  // TODO(hennna): Change to expect 200 when profile path is a configurable parameter
-  // via the Envoy config JSON. Currently call returns 400 due to inaccessable profiler path
-  response = IntegrationUtil::makeSingleRequest(ADMIN_PORT, "GET", "/cpuprofiler?enable=y", "",
-                                                Http::CodecClient::Type::HTTP1);
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("500", response->headers().Status()->value().c_str());
-
-  response = IntegrationUtil::makeSingleRequest(ADMIN_PORT, "GET", "/cpuprofiler?enable=n", "",
-                                                Http::CodecClient::Type::HTTP1);
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-
   response = IntegrationUtil::makeSingleRequest(ADMIN_PORT, "GET", "/hot_restart_version", "",
                                                 Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
@@ -132,3 +120,24 @@ TEST_F(IntegrationTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
+
+// Successful call to startProfiler requires tcmalloc.
+#ifdef TCMALLOC
+
+TEST_F(IntegrationTest, AdminCpuProfilerStart) {
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      ADMIN_PORT, "GET", "/", "", Http::CodecClient::Type::HTTP1);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+
+  response = IntegrationUtil::makeSingleRequest(ADMIN_PORT, "GET", "/cpuprofiler?enable=y", "",
+                                                Http::CodecClient::Type::HTTP1);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+
+  response = IntegrationUtil::makeSingleRequest(ADMIN_PORT, "GET", "/cpuprofiler?enable=n", "",
+                                                Http::CodecClient::Type::HTTP1);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+#endif
