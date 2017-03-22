@@ -344,7 +344,7 @@ TEST_F(HttpRateLimitFilterTest, IncorrectRequestType) {
   }
   )EOF";
   SetUpTest(external_filter_config);
-  Http::TestHeaderMapImpl request_headers{{"x-forwarded-for", "10.0.0.0"}};
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _)).Times(0);
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _)).Times(0);
@@ -362,7 +362,7 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
   }
   )EOF";
   SetUpTest(internal_filter_config);
-  Http::TestHeaderMapImpl request_headers{{"x-forwarded-for", "10.0.0.0"}};
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0))
@@ -399,6 +399,7 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
   }
   )EOF";
   SetUpTest(external_filter_config);
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-internal", "false"}};
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0))
@@ -418,9 +419,9 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
       })));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers));
 
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());

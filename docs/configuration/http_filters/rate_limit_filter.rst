@@ -36,8 +36,11 @@ stage
 
 request_type
   *(optional, string)* The type of requests the filter should apply to. The supported
-  types are *internal*, *external* or *both*. The filter defaults to *both*, and it
-  will apply to all requests.
+  types are *internal*, *external* or *both*. A request is considered internal, if
+  :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is set to true. If
+  :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is not set or false, a
+  request is considered external. The filter defaults to *both*, and it will apply to all request
+  types.
 
 Statistics
 ----------

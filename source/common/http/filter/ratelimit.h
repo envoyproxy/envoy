@@ -46,16 +46,14 @@ private:
       return FilterRequestType::Internal;
     } else if (request_type == "external") {
       return FilterRequestType::External;
-    } else if (request_type == "both") {
-      return FilterRequestType::Both;
     } else {
-      throw EnvoyException(fmt::format("invalid filter request type '{}'", request_type));
+      return FilterRequestType::Both;
     }
   }
 
   const std::string domain_;
-  uint64_t stage_;
-  FilterRequestType request_type_;
+  const uint64_t stage_;
+  const FilterRequestType request_type_;
   const LocalInfo::LocalInfo& local_info_;
   Stats::Store& global_store_;
   Runtime::Loader& runtime_;
