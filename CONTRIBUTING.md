@@ -33,7 +33,7 @@ We welcome contributions from the community. Here are some guidelines.
 * Smart pointers are type aliased:
   * `typedef std::unique_ptr<Foo> FooPtr;`
   * `typedef std::shared_ptr<Bar> BarSharedPtr;`
-  * `typedef std::shareD_ptr<const Blah> BlahConstSharedPtr;`
+  * `typedef std::shared_ptr<const Blah> BlahConstSharedPtr;`
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
 * API-level comments should follow normal Doxygen conventions. Use `@param` to describe
   parameters, `@return <return-type>` for return values.
