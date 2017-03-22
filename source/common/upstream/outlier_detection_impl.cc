@@ -1,4 +1,3 @@
-#include <algorithm>
 #include "outlier_detection_impl.h"
 
 #include "envoy/event/dispatcher.h"
