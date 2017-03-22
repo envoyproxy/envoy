@@ -14,7 +14,7 @@ public:
 
   /**
    * Start the profiler and write to the specified path.
-   * @return bool whether the call to start profiler succeeded.
+   * @return bool whether the call to start the profiler succeeded.
    */
   static bool startProfiler(const std::string& output_path);
 

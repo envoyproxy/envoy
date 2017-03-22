@@ -113,7 +113,7 @@ private:
 
   Server::Instance& server_;
   std::list<Http::AccessLog::InstanceSharedPtr> access_logs_;
-  std::string profile_path_;
+  const std::string profile_path_;
   Network::ListenSocketPtr socket_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;

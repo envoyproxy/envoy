@@ -65,7 +65,7 @@ TEST_F(AdminFilterTest, AdminProfiler) {
 
 TEST_F(AdminFilterTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
-  AdminImpl admin_bad_profile_path("/dev/null", "/var/log/envoy/envoy.prof",
+  AdminImpl admin_bad_profile_path("/dev/null", "/some/unlikely/bad/path.prof",
                                    Network::Utility::resolveUrl("tcp://127.0.0.1:9002"), server_);
   admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", data);
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());

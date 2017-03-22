@@ -126,12 +126,7 @@ TEST_F(IntegrationTest, Admin) {
 
 TEST_F(IntegrationTest, AdminCpuProfilerStart) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      ADMIN_PORT, "GET", "/", "", Http::CodecClient::Type::HTTP1);
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
-
-  response = IntegrationUtil::makeSingleRequest(ADMIN_PORT, "GET", "/cpuprofiler?enable=y", "",
-                                                Http::CodecClient::Type::HTTP1);
+      ADMIN_PORT, "GET", "/cpuprofiler?enable=y", "", Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 

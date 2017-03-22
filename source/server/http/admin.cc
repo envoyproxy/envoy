@@ -322,6 +322,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/server_info", "print server version/status information",
            MAKE_HANDLER(handlerServerInfo)},
           {"/stats", "print server stats", MAKE_HANDLER(handlerStats)}} {
+
   access_logs_.emplace_back(new Http::AccessLog::InstanceImpl(
       access_log_path, {}, Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
       server.accessLogManager()));
