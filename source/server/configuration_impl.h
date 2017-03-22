@@ -91,7 +91,7 @@ private:
 
     // Server::Configuration::Listener
     Network::FilterChainFactory& filterChainFactory() override { return *this; }
-    Network::Address::InstancePtr address() override { return address_; }
+    Network::Address::InstanceConstSharedPtr address() override { return address_; }
     bool bindToPort() override { return bind_to_port_; }
     Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
     bool useProxyProto() override { return use_proxy_proto_; }
@@ -104,7 +104,7 @@ private:
 
   private:
     MainImpl& parent_;
-    Network::Address::InstancePtr address_;
+    Network::Address::InstanceConstSharedPtr address_;
     bool bind_to_port_{};
     Stats::ScopePtr scope_;
     Ssl::ServerContextPtr ssl_context_;
@@ -157,10 +157,10 @@ private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
     const std::string& accessLogPath() override { return access_log_path_; }
-    Network::Address::InstancePtr address() override { return address_; }
+    Network::Address::InstanceConstSharedPtr address() override { return address_; }
 
     std::string access_log_path_;
-    Network::Address::InstancePtr address_;
+    Network::Address::InstanceConstSharedPtr address_;
   };
 
   struct RuntimeImpl : public Runtime {

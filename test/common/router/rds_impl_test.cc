@@ -163,7 +163,7 @@ TEST_F(RdsImplTest, Basic) {
   interval_timer_->callback_();
 
   // Load the config and verified shared count.
-  ConfigPtr config = rds_->config();
+  ConfigConstSharedPtr config = rds_->config();
   EXPECT_EQ(2, config.use_count());
 
   // Third request.

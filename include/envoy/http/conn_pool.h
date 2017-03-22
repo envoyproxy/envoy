@@ -45,7 +45,8 @@ public:
    * @param host supplies the description of the host that caused the failure. This may be nullptr
    *             if no host was involved in the failure (for example overflow).
    */
-  virtual void onPoolFailure(PoolFailureReason reason, Upstream::HostDescriptionPtr host) PURE;
+  virtual void onPoolFailure(PoolFailureReason reason,
+                             Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**
    * Called when a connection is available to process a request/response.
@@ -53,7 +54,8 @@ public:
    * @param host supplies the description of the host that will carry the request. For logical
    *             connection pools the description may be different each time this is called.
    */
-  virtual void onPoolReady(Http::StreamEncoder& encoder, Upstream::HostDescriptionPtr host) PURE;
+  virtual void onPoolReady(Http::StreamEncoder& encoder,
+                           Upstream::HostDescriptionConstSharedPtr host) PURE;
 };
 
 /**

@@ -11,8 +11,9 @@ using testing::Return;
 
 namespace Upstream {
 
-static HostPtr newTestHost(Upstream::ClusterInfoPtr cluster, const std::string& url) {
-  return HostPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, 1, "")};
+static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
+                                 const std::string& url) {
+  return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url), false, 1, "")};
 }
 
 class TestLoadBalancerContext : public LoadBalancerContext {

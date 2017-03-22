@@ -56,14 +56,14 @@ private:
   FaultFilterStats stats_;
 };
 
-typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigPtr;
+typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigSharedPtr;
 
 /**
  * A filter that is capable of faulting an entire request before dispatching it upstream.
  */
 class FaultFilter : public StreamDecoderFilter {
 public:
-  FaultFilter(FaultFilterConfigPtr config);
+  FaultFilter(FaultFilterConfigSharedPtr config);
   ~FaultFilter();
 
   FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
@@ -78,7 +78,7 @@ private:
   void abortWithHTTPStatus();
   bool matchesTargetCluster();
 
-  FaultFilterConfigPtr config_;
+  FaultFilterConfigSharedPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr delay_timer_;
 };

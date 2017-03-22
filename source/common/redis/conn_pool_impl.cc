@@ -5,13 +5,13 @@
 namespace Redis {
 namespace ConnPool {
 
-ClientPtr ClientImpl::create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher,
+ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory) {
 
   std::unique_ptr<ClientImpl> client(new ClientImpl(std::move(encoder), decoder_factory));
   client->connection_ = host->createConnection(dispatcher).connection_;
   client->connection_->addConnectionCallbacks(*client);
-  client->connection_->addReadFilter(Network::ReadFilterPtr{new UpstreamReadFilter(*client)});
+  client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
   client->connection_->noDelay(true);
   return std::move(client);
@@ -72,17 +72,18 @@ void ClientImpl::PendingRequest::cancel() {
 
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
-ClientPtr ClientFactoryImpl::create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher) {
+ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
+                                    Event::Dispatcher& dispatcher) {
   return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_);
 }
 
 InstanceImpl::InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
                            ClientFactory& client_factory, ThreadLocal::Instance& tls)
     : cm_(cm), client_factory_(client_factory), tls_(tls), tls_slot_(tls.allocateSlot()) {
-  tls.set(tls_slot_,
-          [this, cluster_name](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
-            return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
-          });
+  tls.set(tls_slot_, [this, cluster_name](
+                         Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
+  });
 }
 
 ActiveRequest* InstanceImpl::makeRequest(const std::string& hash_key, const RespValue& value,
@@ -94,13 +95,14 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
                                                const std::string& cluster_name)
     : parent_(parent), dispatcher_(dispatcher), cluster_(parent_.cm_.get(cluster_name)) {
 
-  cluster_->hostSet().addMemberUpdateCb([this](const std::vector<Upstream::HostPtr>&,
-                                               const std::vector<Upstream::HostPtr>& hosts_removed)
-                                            -> void { onHostsRemoved(hosts_removed); });
+  cluster_->hostSet().addMemberUpdateCb(
+      [this](const std::vector<Upstream::HostSharedPtr>&,
+             const std::vector<Upstream::HostSharedPtr>& hosts_removed)
+          -> void { onHostsRemoved(hosts_removed); });
 }
 
 void InstanceImpl::ThreadLocalPool::onHostsRemoved(
-    const std::vector<Upstream::HostPtr>& hosts_removed) {
+    const std::vector<Upstream::HostSharedPtr>& hosts_removed) {
   for (auto host : hosts_removed) {
     auto it = client_map_.find(host);
     if (it != client_map_.end()) {
@@ -115,7 +117,7 @@ ActiveRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& has
                                                           const RespValue& request,
                                                           ActiveRequestCallbacks& callbacks) {
   LbContextImpl lb_context(hash_key);
-  Upstream::ConstHostPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
+  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
   }

@@ -35,7 +35,7 @@ public:
 
   // Http::AccessLog::RequestInfo
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
-  MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionPtr host));
+  MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionConstSharedPtr host));
   MOCK_CONST_METHOD0(startTime, SystemTime());
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
   MOCK_CONST_METHOD0(protocol, Protocol());
@@ -44,7 +44,7 @@ public:
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
   MOCK_CONST_METHOD0(duration, std::chrono::milliseconds());
   MOCK_CONST_METHOD1(getResponseFlag, bool(Http::AccessLog::ResponseFlag));
-  MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionPtr());
+  MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheck, bool());
   MOCK_METHOD1(healthCheck, void(bool is_hc));
 
@@ -65,7 +65,7 @@ public:
     return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
   }
 
-  MOCK_METHOD0(accessLogs, const std::list<AccessLog::InstancePtr>&());
+  MOCK_METHOD0(accessLogs, const std::list<AccessLog::InstanceSharedPtr>&());
   MOCK_METHOD3(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
                                                ServerConnectionCallbacks&));
   MOCK_METHOD0(dateProvider, DateProvider&());
@@ -215,7 +215,7 @@ public:
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
-  MOCK_METHOD0(route, Router::RoutePtr());
+  MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
@@ -245,7 +245,7 @@ public:
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
-  MOCK_METHOD0(route, Router::RoutePtr());
+  MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
@@ -347,10 +347,10 @@ public:
   MockFilterChainFactoryCallbacks();
   ~MockFilterChainFactoryCallbacks();
 
-  MOCK_METHOD1(addStreamDecoderFilter, void(Http::StreamDecoderFilterPtr filter));
-  MOCK_METHOD1(addStreamEncoderFilter, void(Http::StreamEncoderFilterPtr filter));
-  MOCK_METHOD1(addStreamFilter, void(Http::StreamFilterPtr filter));
-  MOCK_METHOD1(addAccessLogHandler, void(Http::AccessLog::InstancePtr handler));
+  MOCK_METHOD1(addStreamDecoderFilter, void(Http::StreamDecoderFilterSharedPtr filter));
+  MOCK_METHOD1(addStreamEncoderFilter, void(Http::StreamEncoderFilterSharedPtr filter));
+  MOCK_METHOD1(addStreamFilter, void(Http::StreamFilterSharedPtr filter));
+  MOCK_METHOD1(addAccessLogHandler, void(Http::AccessLog::InstanceSharedPtr handler));
 };
 } // Http
 

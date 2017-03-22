@@ -26,8 +26,8 @@ public:
   MockEventLogger();
   ~MockEventLogger();
 
-  MOCK_METHOD2(logEject, void(HostDescriptionPtr host, EjectionType type));
-  MOCK_METHOD1(logUneject, void(HostDescriptionPtr host));
+  MOCK_METHOD2(logEject, void(HostDescriptionConstSharedPtr host, EjectionType type));
+  MOCK_METHOD1(logUneject, void(HostDescriptionConstSharedPtr host));
 };
 
 class MockDetector : public Detector {
@@ -35,7 +35,7 @@ public:
   MockDetector();
   ~MockDetector();
 
-  void runCallbacks(HostPtr host) {
+  void runCallbacks(HostSharedPtr host) {
     for (ChangeStateCb cb : callbacks_) {
       cb(host);
     }
@@ -53,7 +53,7 @@ public:
   MockHostDescription();
   ~MockHostDescription();
 
-  MOCK_CONST_METHOD0(address, Network::Address::InstancePtr());
+  MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostSink&());
@@ -62,7 +62,7 @@ public:
   MOCK_CONST_METHOD0(zone, const std::string&());
 
   std::string hostname_;
-  Network::Address::InstancePtr address_;
+  Network::Address::InstanceConstSharedPtr address_;
   testing::NiceMock<Outlier::MockDetectorHostSink> outlier_detector_;
   testing::NiceMock<MockClusterInfo> cluster_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -73,7 +73,7 @@ class MockHost : public Host {
 public:
   struct MockCreateConnectionData {
     Network::ClientConnection* connection_{};
-    ConstHostPtr host_;
+    HostConstSharedPtr host_;
   };
 
   MockHost();
@@ -88,12 +88,12 @@ public:
     setOutlierDetector_(outlier_detector);
   }
 
-  MOCK_CONST_METHOD0(address, Network::Address::InstancePtr());
+  MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
-  MOCK_CONST_METHOD0(counters, std::list<Stats::CounterPtr>());
+  MOCK_CONST_METHOD0(counters, std::list<Stats::CounterSharedPtr>());
   MOCK_CONST_METHOD1(createConnection_, MockCreateConnectionData(Event::Dispatcher& dispatcher));
-  MOCK_CONST_METHOD0(gauges, std::list<Stats::GaugePtr>());
+  MOCK_CONST_METHOD0(gauges, std::list<Stats::GaugeSharedPtr>());
   MOCK_METHOD1(healthFlagClear, void(HealthFlag flag));
   MOCK_CONST_METHOD1(healthFlagGet, bool(HealthFlag flag));
   MOCK_METHOD1(healthFlagSet, void(HealthFlag flag));

@@ -9,11 +9,11 @@
 namespace Http {
 
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
-                         Upstream::HostDescriptionPtr host)
+                         Upstream::HostDescriptionConstSharedPtr host)
     : type_(type), connection_(std::move(connection)), host_(host) {
 
   connection_->addConnectionCallbacks(*this);
-  connection_->addReadFilter(Network::ReadFilterPtr{new CodecReadFilter(*this)});
+  connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
   conn_log_info("connecting", *connection_);
   connection_->connect();
@@ -112,7 +112,7 @@ void CodecClient::onData(Buffer::Instance& data) {
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                                 Upstream::HostDescriptionPtr host)
+                                 Upstream::HostDescriptionConstSharedPtr host)
     : CodecClient(type, std::move(connection), host) {
   switch (type) {
   case Type::HTTP1: {

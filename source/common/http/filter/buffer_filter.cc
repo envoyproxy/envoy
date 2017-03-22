@@ -12,7 +12,7 @@
 
 namespace Http {
 
-BufferFilter::BufferFilter(BufferFilterConfigPtr config) : config_(config) {}
+BufferFilter::BufferFilter(BufferFilterConfigConstSharedPtr config) : config_(config) {}
 
 BufferFilter::~BufferFilter() { ASSERT(!request_timeout_); }
 

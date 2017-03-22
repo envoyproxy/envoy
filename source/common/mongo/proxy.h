@@ -60,10 +60,10 @@ public:
                   const Upstream::HostDescription* upstream_host);
 
 private:
-  Filesystem::FilePtr file_;
+  Filesystem::FileSharedPtr file_;
 };
 
-typedef std::shared_ptr<AccessLog> AccessLogPtr;
+typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
 
 /**
  * A sniffing filter for mongo traffic. The current implementation makes a copy of read/written
@@ -75,7 +75,7 @@ class ProxyFilter : public Network::Filter,
                     Logger::Loggable<Logger::Id::mongo> {
 public:
   ProxyFilter(const std::string& stat_prefix, Stats::Store& store, Runtime::Loader& runtime,
-              AccessLogPtr access_log);
+              AccessLogSharedPtr access_log);
   ~ProxyFilter();
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -139,7 +139,7 @@ private:
   Buffer::OwnedImpl write_buffer_;
   bool sniffing_{true};
   std::list<ActiveQueryPtr> active_query_list_;
-  AccessLogPtr access_log_;
+  AccessLogSharedPtr access_log_;
   std::string last_base64_op_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };

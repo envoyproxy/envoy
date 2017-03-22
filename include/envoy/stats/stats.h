@@ -29,7 +29,7 @@ public:
   virtual uint64_t value() PURE;
 };
 
-typedef std::shared_ptr<Counter> CounterPtr;
+typedef std::shared_ptr<Counter> CounterSharedPtr;
 
 /**
  * A gauge that can both increment and decrement.
@@ -48,7 +48,7 @@ public:
   virtual uint64_t value() PURE;
 };
 
-typedef std::shared_ptr<Gauge> GaugePtr;
+typedef std::shared_ptr<Gauge> GaugeSharedPtr;
 
 /**
  * An individual timespan that is owned by a timer. The initial time is captured on construction.
@@ -84,7 +84,7 @@ public:
   virtual std::string name() PURE;
 };
 
-typedef std::shared_ptr<Timer> TimerPtr;
+typedef std::shared_ptr<Timer> TimerSharedPtr;
 
 /**
  * A sink for stats. Each sink is responsible for writing stats to a backing store.
@@ -168,12 +168,12 @@ public:
   /**
    * @return a list of all known counters.
    */
-  virtual std::list<CounterPtr> counters() const PURE;
+  virtual std::list<CounterSharedPtr> counters() const PURE;
 
   /**
    * @return a list of all known gauges.
    */
-  virtual std::list<GaugePtr> gauges() const PURE;
+  virtual std::list<GaugeSharedPtr> gauges() const PURE;
 };
 
 /**

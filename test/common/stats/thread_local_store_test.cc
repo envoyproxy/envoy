@@ -67,7 +67,7 @@ public:
     store_->addSink(sink_);
   }
 
-  CounterPtr findCounter(const std::string& name) {
+  CounterSharedPtr findCounter(const std::string& name) {
     for (auto counter : store_->counters()) {
       if (counter->name() == name) {
         return counter;
@@ -76,7 +76,7 @@ public:
     return nullptr;
   }
 
-  GaugePtr findGauge(const std::string& name) {
+  GaugeSharedPtr findGauge(const std::string& name) {
     for (auto gauge : store_->gauges()) {
       if (gauge->name() == name) {
         return gauge;
@@ -205,7 +205,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_CALL(*this, alloc(_));
   scope1->counter("c1");
   EXPECT_EQ(2UL, store_->counters().size());
-  CounterPtr c1 = store_->counters().front();
+  CounterSharedPtr c1 = store_->counters().front();
   EXPECT_EQ("scope1.c1", c1->name());
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));

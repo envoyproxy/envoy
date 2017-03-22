@@ -45,7 +45,7 @@ private:
   std::atomic<Http::Code> last_response_code_{};
 };
 
-typedef std::shared_ptr<HealthCheckCacheManager> HealthCheckCacheManagerPtr;
+typedef std::shared_ptr<HealthCheckCacheManager> HealthCheckCacheManagerSharedPtr;
 
 /**
  * Health check responder filter.
@@ -53,7 +53,7 @@ typedef std::shared_ptr<HealthCheckCacheManager> HealthCheckCacheManagerPtr;
 class HealthCheckFilter : public Http::StreamFilter {
 public:
   HealthCheckFilter(Server::Instance& server, bool pass_through_mode,
-                    HealthCheckCacheManagerPtr cache_manager, const std::string& endpoint)
+                    HealthCheckCacheManagerSharedPtr cache_manager, const std::string& endpoint)
       : server_(server), pass_through_mode_(pass_through_mode), cache_manager_(cache_manager),
         endpoint_(endpoint) {}
 
@@ -83,6 +83,6 @@ private:
   bool handling_{};
   bool health_check_request_{};
   bool pass_through_mode_{};
-  HealthCheckCacheManagerPtr cache_manager_{};
+  HealthCheckCacheManagerSharedPtr cache_manager_{};
   const std::string endpoint_;
 };

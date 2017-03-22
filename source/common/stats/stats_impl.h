@@ -211,8 +211,8 @@ public:
   Timer& timer(const std::string& name) override { return timers_.get(name); }
 
   // Stats::Store
-  std::list<CounterPtr> counters() const override { return counters_.toList(); }
-  std::list<GaugePtr> gauges() const override { return gauges_.toList(); }
+  std::list<CounterSharedPtr> counters() const override { return counters_.toList(); }
+  std::list<GaugeSharedPtr> gauges() const override { return gauges_.toList(); }
   ScopePtr createScope(const std::string& name) override {
     return ScopePtr{new ScopeImpl(*this, name)};
   }

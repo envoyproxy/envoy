@@ -22,7 +22,8 @@ public:
   MockCluster();
   ~MockCluster();
 
-  void runCallbacks(const std::vector<HostPtr> added, const std::vector<HostPtr> removed) {
+  void runCallbacks(const std::vector<HostSharedPtr> added,
+                    const std::vector<HostSharedPtr> removed) {
     for (MemberUpdateCb cb : callbacks_) {
       cb(added, removed);
     }
@@ -30,21 +31,21 @@ public:
 
   // Upstream::HostSet
   MOCK_CONST_METHOD1(addMemberUpdateCb, void(MemberUpdateCb callback));
-  MOCK_CONST_METHOD0(hosts, const std::vector<HostPtr>&());
-  MOCK_CONST_METHOD0(healthyHosts, const std::vector<HostPtr>&());
-  MOCK_CONST_METHOD0(hostsPerZone, const std::vector<std::vector<HostPtr>>&());
-  MOCK_CONST_METHOD0(healthyHostsPerZone, const std::vector<std::vector<HostPtr>>&());
+  MOCK_CONST_METHOD0(hosts, const std::vector<HostSharedPtr>&());
+  MOCK_CONST_METHOD0(healthyHosts, const std::vector<HostSharedPtr>&());
+  MOCK_CONST_METHOD0(hostsPerZone, const std::vector<std::vector<HostSharedPtr>>&());
+  MOCK_CONST_METHOD0(healthyHostsPerZone, const std::vector<std::vector<HostSharedPtr>>&());
 
   // Upstream::Cluster
-  MOCK_CONST_METHOD0(info, ClusterInfoPtr());
+  MOCK_CONST_METHOD0(info, ClusterInfoConstSharedPtr());
   MOCK_METHOD0(initialize, void());
   MOCK_CONST_METHOD0(initializePhase, InitializePhase());
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
 
-  std::vector<HostPtr> hosts_;
-  std::vector<HostPtr> healthy_hosts_;
-  std::vector<std::vector<HostPtr>> hosts_per_zone_;
-  std::vector<std::vector<HostPtr>> healthy_hosts_per_zone_;
+  std::vector<HostSharedPtr> hosts_;
+  std::vector<HostSharedPtr> healthy_hosts_;
+  std::vector<std::vector<HostSharedPtr>> hosts_per_zone_;
+  std::vector<std::vector<HostSharedPtr>> healthy_hosts_per_zone_;
   std::list<MemberUpdateCb> callbacks_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;
@@ -56,7 +57,7 @@ public:
   ~MockLoadBalancer();
 
   // Upstream::LoadBalancer
-  MOCK_METHOD1(chooseHost, ConstHostPtr(const LoadBalancerContext* context));
+  MOCK_METHOD1(chooseHost, HostConstSharedPtr(const LoadBalancerContext* context));
 
   std::shared_ptr<MockHost> host_{new MockHost()};
 };
@@ -68,7 +69,7 @@ public:
 
   // Upstream::ThreadLocalCluster
   MOCK_METHOD0(hostSet, const HostSet&());
-  MOCK_METHOD0(info, ClusterInfoPtr());
+  MOCK_METHOD0(info, ClusterInfoConstSharedPtr());
   MOCK_METHOD0(loadBalancer, LoadBalancer&());
 
   NiceMock<MockCluster> cluster_;
@@ -112,7 +113,7 @@ public:
   MOCK_METHOD1(addHostCheckCompleteCb, void(HostStatusCb callback));
   MOCK_METHOD0(start, void());
 
-  void runCallbacks(Upstream::HostPtr host, bool changed_state) {
+  void runCallbacks(Upstream::HostSharedPtr host, bool changed_state) {
     for (auto callback : callbacks_) {
       callback(host, changed_state);
     }

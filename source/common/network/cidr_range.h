@@ -60,7 +60,7 @@ public:
    * @return true if the address argument is in the range of this object, false if not, including
              if the range is uninitialized or if the argument is not of the same IpVersion.
    */
-  bool isInRange(InstancePtr address) const;
+  bool isInRange(InstanceConstSharedPtr address) const;
 
   /**
    * @return a human readable string for the range. This string will be in the following format:
@@ -82,7 +82,7 @@ public:
    *         in the appropriate range (0 to 32 for IPv4, 0 to 128 for IPv6). If the the address or
    *         length is invalid, then the range will be invalid (i.e. length == -1).
    */
-  static CidrRange create(InstancePtr address, int length);
+  static CidrRange create(InstanceConstSharedPtr address, int length);
   static CidrRange create(const std::string& address, int length);
 
   /**
@@ -104,12 +104,13 @@ public:
    *         from address, and *length_io is in the range 0 to N, where N is the number of bits
    *         in an address of the IP version (i.e. address->ip()->version()).
    */
-  static InstancePtr truncateIpAddressAndLength(InstancePtr address, int* length_io);
+  static InstanceConstSharedPtr truncateIpAddressAndLength(InstanceConstSharedPtr address,
+                                                           int* length_io);
 
 private:
-  CidrRange(InstancePtr address, int length);
+  CidrRange(InstanceConstSharedPtr address, int length);
 
-  InstancePtr address_;
+  InstanceConstSharedPtr address_;
   int length_;
 };
 

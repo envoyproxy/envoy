@@ -32,9 +32,9 @@ private:
  */
 class DetectorImplFactory {
 public:
-  static DetectorPtr createForCluster(Cluster& cluster, const Json::Object& cluster_config,
-                                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                                      EventLoggerPtr event_logger);
+  static DetectorSharedPtr createForCluster(Cluster& cluster, const Json::Object& cluster_config,
+                                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                                            EventLoggerSharedPtr event_logger);
 };
 
 class DetectorImpl;
@@ -44,7 +44,7 @@ class DetectorImpl;
  */
 class DetectorHostSinkImpl : public DetectorHostSink {
 public:
-  DetectorHostSinkImpl(std::shared_ptr<DetectorImpl> detector, HostPtr host)
+  DetectorHostSinkImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host)
       : detector_(detector), host_(host) {}
 
   void eject(SystemTime ejection_time);
@@ -114,10 +114,11 @@ class DetectorImpl : public Detector, public std::enable_shared_from_this<Detect
 public:
   static std::shared_ptr<DetectorImpl>
   create(const Cluster& cluster, const Json::Object& json_config, Event::Dispatcher& dispatcher,
-         Runtime::Loader& runtime, SystemTimeSource& time_source, EventLoggerPtr event_logger);
+         Runtime::Loader& runtime, SystemTimeSource& time_source,
+         EventLoggerSharedPtr event_logger);
   ~DetectorImpl();
 
-  void onConsecutive5xx(HostPtr host);
+  void onConsecutive5xx(HostSharedPtr host);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
 
@@ -127,17 +128,17 @@ public:
 private:
   DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-               SystemTimeSource& time_source, EventLoggerPtr event_logger);
+               SystemTimeSource& time_source, EventLoggerSharedPtr event_logger);
 
-  void addHostSink(HostPtr host);
+  void addHostSink(HostSharedPtr host);
   void armIntervalTimer();
-  void checkHostForUneject(HostPtr host, DetectorHostSinkImpl* sink, SystemTime now);
-  void ejectHost(HostPtr host, EjectionType type);
+  void checkHostForUneject(HostSharedPtr host, DetectorHostSinkImpl* sink, SystemTime now);
+  void ejectHost(HostSharedPtr host, EjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(const Cluster& cluster);
-  void onConsecutive5xxWorker(HostPtr host);
+  void onConsecutive5xxWorker(HostSharedPtr host);
   void onIntervalTimer();
-  void runCallbacks(HostPtr host);
+  void runCallbacks(HostSharedPtr host);
 
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
@@ -146,8 +147,8 @@ private:
   DetectionStats stats_;
   Event::TimerPtr interval_timer_;
   std::list<ChangeStateCb> callbacks_;
-  std::unordered_map<HostPtr, DetectorHostSinkImpl*> host_sinks_;
-  EventLoggerPtr event_logger_;
+  std::unordered_map<HostSharedPtr, DetectorHostSinkImpl*> host_sinks_;
+  EventLoggerSharedPtr event_logger_;
 };
 
 class EventLoggerImpl : public EventLogger {
@@ -157,14 +158,14 @@ public:
       : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
 
   // Upstream::Outlier::EventLogger
-  void logEject(HostDescriptionPtr host, EjectionType type) override;
-  void logUneject(HostDescriptionPtr host) override;
+  void logEject(HostDescriptionConstSharedPtr host, EjectionType type) override;
+  void logUneject(HostDescriptionConstSharedPtr host) override;
 
 private:
   std::string typeToString(EjectionType type);
   int secsSinceLastAction(const Optional<SystemTime>& lastActionTime, SystemTime now);
 
-  Filesystem::FilePtr file_;
+  Filesystem::FileSharedPtr file_;
   SystemTimeSource& time_source_;
 };
 

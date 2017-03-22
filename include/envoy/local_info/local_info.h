@@ -15,7 +15,7 @@ public:
   /**
    * @return the local (non-loopback) address of the server.
    */
-  virtual Network::Address::InstancePtr address() const PURE;
+  virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
    * Human readable zone name. E.g., "us-east-1a".

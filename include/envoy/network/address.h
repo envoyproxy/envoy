@@ -128,7 +128,7 @@ public:
   virtual Type type() const PURE;
 };
 
-typedef std::shared_ptr<const Instance> InstancePtr;
+typedef std::shared_ptr<const Instance> InstanceConstSharedPtr;
 
 } // Address
 } // Network

@@ -21,8 +21,9 @@ public:
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     cluster_.reset(new LogicalDnsCluster(*config, runtime_, stats_store_, ssl_context_manager_,
                                          dns_resolver_, tls_, dispatcher_));
-    cluster_->addMemberUpdateCb([&](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
-                                    -> void { membership_updated_.ready(); });
+    cluster_->addMemberUpdateCb(
+        [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
+            -> void { membership_updated_.ready(); });
     cluster_->setInitializedCb([&]() -> void { initialized_.ready(); });
   }
 
@@ -117,7 +118,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   EXPECT_EQ(0UL, cluster_->hostsPerZone().size());
   EXPECT_EQ(0UL, cluster_->healthyHostsPerZone().size());
   EXPECT_EQ(cluster_->hosts()[0], cluster_->healthyHosts()[0]);
-  HostPtr logical_host = cluster_->hosts()[0];
+  HostSharedPtr logical_host = cluster_->hosts()[0];
 
   EXPECT_CALL(dispatcher_, createClientConnection_(
                                PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443"))))

@@ -251,7 +251,7 @@ public:
   virtual const RouteEntry* routeEntry() const PURE;
 };
 
-typedef std::shared_ptr<const Route> RoutePtr;
+typedef std::shared_ptr<const Route> RouteConstSharedPtr;
 
 /**
  * The router configuration.
@@ -268,7 +268,8 @@ public:
    *        allows stable choices between calls if desired.
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual RoutePtr route(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
+  virtual RouteConstSharedPtr route(const Http::HeaderMap& headers,
+                                    uint64_t random_value) const PURE;
 
   /**
    * Return a list of headers that will be cleaned from any requests that are not from an internal
@@ -297,6 +298,6 @@ public:
   virtual bool usesRuntime() const PURE;
 };
 
-typedef std::shared_ptr<const Config> ConfigPtr;
+typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
 
 } // Router
