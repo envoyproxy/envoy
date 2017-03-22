@@ -6,6 +6,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
@@ -47,6 +48,7 @@ private:
     } else if (request_type == "external") {
       return FilterRequestType::External;
     } else {
+      ASSERT(request_type == "both");
       return FilterRequestType::Both;
     }
   }

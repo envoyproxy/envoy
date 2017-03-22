@@ -6,7 +6,6 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
-#include "common/http/utility.h"
 #include "common/router/config_impl.h"
 
 namespace Http {
