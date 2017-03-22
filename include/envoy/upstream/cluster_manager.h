@@ -41,7 +41,8 @@ public:
   virtual ClusterInfoMap clusters() PURE;
 
   /**
-   * @return ClusterInfoPtr the thread local cluster with the given name or nullptr if it does not
+   * @return ClusterInfoConstSharedPtr the thread local cluster with the given name or nullptr if it
+   *does not
    * exist. This is thread safe.
    *
    * NOTE: The pointer returned by this function is ONLY safe to use in the context of the owning
@@ -136,7 +137,7 @@ public:
    * Allocate an HTTP connection pool.
    */
   virtual Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
-                                                             ConstHostPtr host,
+                                                             HostConstSharedPtr host,
                                                              ResourcePriority priority) PURE;
 
   /**
@@ -144,7 +145,7 @@ public:
    */
   virtual ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
                                      const Optional<SdsConfig>& sds_config,
-                                     Outlier::EventLoggerPtr outlier_event_logger) PURE;
+                                     Outlier::EventLoggerSharedPtr outlier_event_logger) PURE;
 
   /**
    * Create a CDS API provider from configuration JSON.

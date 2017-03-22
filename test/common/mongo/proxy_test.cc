@@ -64,7 +64,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockDispatcher dispatcher_;
   std::shared_ptr<Filesystem::MockFile> file_{new NiceMock<Filesystem::MockFile>()};
-  AccessLogPtr access_log_;
+  AccessLogSharedPtr access_log_;
   std::unique_ptr<TestProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   ::AccessLog::MockAccessLogManager log_manager_;

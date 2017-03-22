@@ -42,8 +42,8 @@ public:
 
 private:
   struct LogicalHost : public HostImpl {
-    LogicalHost(ClusterInfoPtr cluster, const std::string& hostname,
-                Network::Address::InstancePtr address, LogicalDnsCluster& parent)
+    LogicalHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+                Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent)
         : HostImpl(cluster, hostname, address, false, 1, ""), parent_(parent) {}
 
     // Upstream::Host
@@ -53,7 +53,8 @@ private:
   };
 
   struct RealHostDescription : public HostDescription {
-    RealHostDescription(Network::Address::InstancePtr address, ConstHostPtr logical_host)
+    RealHostDescription(Network::Address::InstanceConstSharedPtr address,
+                        HostConstSharedPtr logical_host)
         : address_(address), logical_host_(logical_host) {}
 
     // Upstream:HostDescription
@@ -64,18 +65,18 @@ private:
     }
     const HostStats& stats() const override { return logical_host_->stats(); }
     const std::string& hostname() const override { return logical_host_->hostname(); }
-    Network::Address::InstancePtr address() const override { return address_; }
+    Network::Address::InstanceConstSharedPtr address() const override { return address_; }
     const std::string& zone() const override { return EMPTY_STRING; }
 
-    Network::Address::InstancePtr address_;
-    ConstHostPtr logical_host_;
+    Network::Address::InstanceConstSharedPtr address_;
+    HostConstSharedPtr logical_host_;
   };
 
   struct PerThreadCurrentHostData : public ThreadLocal::ThreadLocalObject {
     // ThreadLocal::ThreadLocalObject
     void shutdown() override {}
 
-    Network::Address::InstancePtr current_resolved_address_;
+    Network::Address::InstanceConstSharedPtr current_resolved_address_;
   };
 
   void startResolve();
@@ -90,8 +91,8 @@ private:
   Event::TimerPtr resolve_timer_;
   std::string dns_url_;
   std::string hostname_;
-  Network::Address::InstancePtr current_resolved_address_;
-  HostPtr logical_host_;
+  Network::Address::InstanceConstSharedPtr current_resolved_address_;
+  HostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
 };
 

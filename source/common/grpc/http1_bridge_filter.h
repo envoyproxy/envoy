@@ -42,7 +42,7 @@ private:
   Http::HeaderMap* response_headers_{};
   bool do_bridging_{};
   bool do_stat_tracking_{};
-  Upstream::ClusterInfoPtr cluster_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
   std::string grpc_service_;
   std::string grpc_method_;
 };

@@ -50,7 +50,7 @@ private:
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
   Upstream::ClusterManager& cm_;
-  Upstream::ClusterInfoPtr cluster_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
   Http::AsyncClient::Request* http_request_{};
   const proto::MethodDescriptor* grpc_method_{};
   proto::Message* grpc_response_{};

@@ -51,7 +51,7 @@ private:
   Runtime::Loader& runtime_;
 };
 
-typedef std::shared_ptr<Config> ConfigPtr;
+typedef std::shared_ptr<Config> ConfigSharedPtr;
 
 /**
  * TCP rate limit filter instance. This filter will call the rate limit service with the given
@@ -63,7 +63,8 @@ class Instance : public Network::ReadFilter,
                  public Network::ConnectionCallbacks,
                  public RequestCallbacks {
 public:
-  Instance(ConfigPtr config, ClientPtr&& client) : config_(config), client_(std::move(client)) {}
+  Instance(ConfigSharedPtr config, ClientPtr&& client)
+      : config_(config), client_(std::move(client)) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -82,7 +83,7 @@ public:
 private:
   enum class Status { NotStarted, Calling, Complete };
 
-  ConfigPtr config_;
+  ConfigSharedPtr config_;
   ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};

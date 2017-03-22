@@ -41,7 +41,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent*
     delete this;
     return;
   }
-  std::list<Address::InstancePtr> address_list;
+  std::list<Address::InstanceConstSharedPtr> address_list;
   completed_ = true;
   if (status == ARES_SUCCESS) {
     ASSERT(hostent->h_addrtype == AF_INET);

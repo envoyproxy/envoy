@@ -332,11 +332,11 @@ public:
               filter_->onNewConnection());
   }
 
-  TcpProxyConfigPtr config_;
+  TcpProxyConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Network::MockClientConnection>* upstream_connection_{};
-  Network::ReadFilterPtr upstream_read_filter_;
+  Network::ReadFilterSharedPtr upstream_read_filter_;
   NiceMock<Event::MockTimer>* connect_timer_{};
   std::unique_ptr<TcpProxy> filter_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -484,7 +484,7 @@ public:
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
-  TcpProxyConfigPtr config_;
+  TcpProxyConfigSharedPtr config_;
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;

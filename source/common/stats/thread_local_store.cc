@@ -12,9 +12,9 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(scopes_.empty());
 }
 
-std::list<CounterPtr> ThreadLocalStoreImpl::counters() const {
+std::list<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
-  std::list<CounterPtr> ret;
+  std::list<CounterSharedPtr> ret;
   std::unordered_set<std::string> names;
   std::unique_lock<std::mutex> lock(lock_);
   for (ScopeImpl* scope : scopes_) {
@@ -35,9 +35,9 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   return std::move(new_scope);
 }
 
-std::list<GaugePtr> ThreadLocalStoreImpl::gauges() const {
+std::list<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
-  std::list<GaugePtr> ret;
+  std::list<GaugeSharedPtr> ret;
   std::unordered_set<std::string> names;
   std::unique_lock<std::mutex> lock(lock_);
   for (ScopeImpl* scope : scopes_) {
@@ -56,8 +56,8 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
   main_thread_dispatcher_ = &main_thread_dispatcher;
   tls_ = &tls;
   tls_slot_ = tls_->allocateSlot();
-  tls_->set(tls_slot_, [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr {
-    return ThreadLocal::ThreadLocalObjectPtr{new TlsCache()};
+  tls_->set(tls_slot_, [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsCache()};
   });
 }
 
@@ -110,7 +110,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // We now try to acquire a *reference* to the TLS cache shared pointer. This might remain null
   // if we don't have TLS initialized currently. The de-referenced pointer might be null if there
   // is no cache entry.
-  CounterPtr* tls_ref = nullptr;
+  CounterSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>(parent_.tls_slot_)
                    .scope_cache_[this]
@@ -125,7 +125,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // We must now look in the central store so we must be locked. We grab a reference to the
   // central store location. It might contain nothing. In this case, we allocate a new stat.
   std::unique_lock<std::mutex> lock(parent_.lock_);
-  CounterPtr& central_ref = central_cache_.counters_[final_name];
+  CounterSharedPtr& central_ref = central_cache_.counters_[final_name];
   if (!central_ref) {
     SafeAllocData alloc = parent_.safeAlloc(final_name);
     central_ref.reset(new CounterImpl(alloc.data_, alloc.free_));
@@ -160,7 +160,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
-  GaugePtr* tls_ref = nullptr;
+  GaugeSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref =
         &parent_.tls_->getTyped<TlsCache>(parent_.tls_slot_).scope_cache_[this].gauges_[final_name];
@@ -171,7 +171,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   }
 
   std::unique_lock<std::mutex> lock(parent_.lock_);
-  GaugePtr& central_ref = central_cache_.gauges_[final_name];
+  GaugeSharedPtr& central_ref = central_cache_.gauges_[final_name];
   if (!central_ref) {
     SafeAllocData alloc = parent_.safeAlloc(final_name);
     central_ref.reset(new GaugeImpl(alloc.data_, alloc.free_));
@@ -188,7 +188,7 @@ Timer& ThreadLocalStoreImpl::ScopeImpl::timer(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
-  TimerPtr* tls_ref = nullptr;
+  TimerSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref =
         &parent_.tls_->getTyped<TlsCache>(parent_.tls_slot_).scope_cache_[this].timers_[final_name];
@@ -199,7 +199,7 @@ Timer& ThreadLocalStoreImpl::ScopeImpl::timer(const std::string& name) {
   }
 
   std::unique_lock<std::mutex> lock(parent_.lock_);
-  TimerPtr& central_ref = central_cache_.timers_[final_name];
+  TimerSharedPtr& central_ref = central_cache_.timers_[final_name];
   if (!central_ref) {
     central_ref.reset(new TimerImpl(final_name, parent_));
   }

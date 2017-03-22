@@ -56,7 +56,7 @@ public:
   }
   )EOF";
 
-  FilterConfigPtr config_;
+  FilterConfigSharedPtr config_;
   ::RateLimit::MockClient* client_;
   std::unique_ptr<Filter> filter_;
   NiceMock<MockStreamDecoderFilterCallbacks> filter_callbacks_;

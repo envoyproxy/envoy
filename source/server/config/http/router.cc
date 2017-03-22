@@ -18,7 +18,7 @@ HttpFilterFactoryCb RouterFilterConfig::tryCreateFilterFactory(HttpFilterType ty
 
   json_config.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
 
-  Router::FilterConfigPtr config(new Router::FilterConfig(
+  Router::FilterConfigSharedPtr config(new Router::FilterConfig(
       stat_prefix, server.localInfo(), server.stats(), server.clusterManager(), server.runtime(),
       server.random(),
       Router::ShadowWriterPtr{new Router::ShadowWriterImpl(server.clusterManager())},

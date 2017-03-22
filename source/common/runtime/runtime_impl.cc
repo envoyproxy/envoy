@@ -140,9 +140,9 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
 
 void LoaderImpl::onSymlinkSwap() {
   current_snapshot_.reset(new SnapshotImpl(root_path_, override_path_, stats_, generator_));
-  ThreadLocal::ThreadLocalObjectPtr ptr_copy = current_snapshot_;
+  ThreadLocal::ThreadLocalObjectSharedPtr ptr_copy = current_snapshot_;
   tls_.set(tls_slot_, [ptr_copy](Event::Dispatcher&)
-                          -> ThreadLocal::ThreadLocalObjectPtr { return ptr_copy; });
+                          -> ThreadLocal::ThreadLocalObjectSharedPtr { return ptr_copy; });
 }
 
 Snapshot& LoaderImpl::snapshot() { return tls_.getTyped<Snapshot>(tls_slot_); }

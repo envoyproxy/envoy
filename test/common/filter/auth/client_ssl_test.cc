@@ -72,7 +72,7 @@ public:
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
   Http::MockAsyncClientRequest request_;
-  ConfigPtr config_;
+  ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Instance> instance_;
   Event::MockTimer* interval_timer_;

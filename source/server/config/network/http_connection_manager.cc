@@ -28,7 +28,7 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::tryCreateFilter
   std::shared_ptr<HttpConnectionManagerConfig> http_config(
       new HttpConnectionManagerConfig(config, server));
   return [http_config, &server](Network::FilterManager& filter_manager) mutable -> void {
-    filter_manager.addReadFilter(Network::ReadFilterPtr{
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         new Http::ConnectionManagerImpl(*http_config, server.drainManager(), server.random(),
                                         server.httpTracer(), server.runtime())});
   };
@@ -96,8 +96,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
 
   if (config.hasObject("access_log")) {
     for (Json::ObjectPtr& access_log : config.getObjectArray("access_log")) {
-      Http::AccessLog::InstancePtr current_access_log = Http::AccessLog::InstanceImpl::fromJson(
-          *access_log, server.runtime(), server.accessLogManager());
+      Http::AccessLog::InstanceSharedPtr current_access_log =
+          Http::AccessLog::InstanceImpl::fromJson(*access_log, server.runtime(),
+                                                  server.accessLogManager());
       access_logs_.push_back(current_access_log);
     }
   }

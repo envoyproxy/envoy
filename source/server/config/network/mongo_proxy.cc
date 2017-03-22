@@ -19,14 +19,14 @@ NetworkFilterFactoryCb MongoProxyFilterConfigFactory::tryCreateFilterFactory(
   config.validateSchema(Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA);
 
   std::string stat_prefix = "mongo." + config.getString("stat_prefix") + ".";
-  Mongo::AccessLogPtr access_log;
+  Mongo::AccessLogSharedPtr access_log;
   if (config.hasObject("access_log")) {
     access_log.reset(
         new Mongo::AccessLog(config.getString("access_log"), server.accessLogManager()));
   }
 
   return [stat_prefix, &server, access_log](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(Network::FilterPtr{
+    filter_manager.addFilter(Network::FilterSharedPtr{
         new Mongo::ProdProxyFilter(stat_prefix, server.stats(), server.runtime(), access_log)});
   };
 }

@@ -19,7 +19,7 @@ public:
    * @param file_name specifies the file to create/open.
    * @return the opened file.
    */
-  virtual Filesystem::FilePtr createAccessLog(const std::string& file_name) PURE;
+  virtual Filesystem::FileSharedPtr createAccessLog(const std::string& file_name) PURE;
 };
 
 typedef std::unique_ptr<AccessLogManager> AccessLogManagerPtr;

@@ -581,18 +581,18 @@ TEST(RouterMatcherTest, HashPolicy) {
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    Router::RoutePtr route = config.route(headers, 0);
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
     EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash(headers).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addViaCopy("foo_header", "bar");
-    Router::RoutePtr route = config.route(headers, 0);
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
     EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(headers).valid());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
-    Router::RoutePtr route = config.route(headers, 0);
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
     EXPECT_EQ(nullptr, route->routeEntry()->hashPolicy());
   }
 }
@@ -637,7 +637,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
     headers.addViaCopy("some_header", "some_cluster");
-    Router::RoutePtr route = config.route(headers, 0);
+    Router::RouteConstSharedPtr route = config.route(headers, 0);
     EXPECT_EQ("some_cluster", route->routeEntry()->clusterName());
 
     // Make sure things forward and don't crash.

@@ -19,13 +19,13 @@ public:
   ~MockDispatcher();
 
   Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstancePtr address) override {
+  createClientConnection(Network::Address::InstanceConstSharedPtr address) override {
     return Network::ClientConnectionPtr{createClientConnection_(address)};
   }
 
   Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                            Network::Address::InstancePtr address) override {
+                            Network::Address::InstanceConstSharedPtr address) override {
     return Network::ClientConnectionPtr{createSslClientConnection_(ssl_ctx, address)};
   }
 
@@ -74,10 +74,10 @@ public:
   // Event::Dispatcher
   MOCK_METHOD0(clearDeferredDeleteList, void());
   MOCK_METHOD1(createClientConnection_,
-               Network::ClientConnection*(Network::Address::InstancePtr address));
+               Network::ClientConnection*(Network::Address::InstanceConstSharedPtr address));
   MOCK_METHOD2(createSslClientConnection_,
                Network::ClientConnection*(Ssl::ClientContext& ssl_ctx,
-                                          Network::Address::InstancePtr address));
+                                          Network::Address::InstanceConstSharedPtr address));
   MOCK_METHOD0(createDnsResolver_, Network::DnsResolver*());
   MOCK_METHOD4(createFileEvent_,
                FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));

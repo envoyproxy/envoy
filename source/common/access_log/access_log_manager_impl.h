@@ -13,14 +13,14 @@ public:
 
   // AccessLog::AccessLogManager
   void reopen() override;
-  Filesystem::FilePtr createAccessLog(const std::string& file_name) override;
+  Filesystem::FileSharedPtr createAccessLog(const std::string& file_name) override;
 
 private:
   Api::Api& api_;
   Event::Dispatcher& dispatcher_;
   Thread::BasicLockable& lock_;
   Stats::Store& stats_store_;
-  std::unordered_map<std::string, Filesystem::FilePtr> access_logs_;
+  std::unordered_map<std::string, Filesystem::FileSharedPtr> access_logs_;
 };
 
 } // AccessLog

@@ -11,7 +11,7 @@ public:
   ~ListenSocketImpl() { close(); }
 
   // Network::ListenSocket
-  Address::InstancePtr localAddress() override { return local_address_; }
+  Address::InstanceConstSharedPtr localAddress() override { return local_address_; }
   int fd() override { return fd_; }
 
   void close() override {
@@ -25,7 +25,7 @@ protected:
   void doBind();
 
   int fd_;
-  Address::InstancePtr local_address_;
+  Address::InstanceConstSharedPtr local_address_;
 };
 
 /**
@@ -33,10 +33,10 @@ protected:
  */
 class TcpListenSocket : public ListenSocketImpl {
 public:
-  TcpListenSocket(Address::InstancePtr address, bool bind_to_port);
+  TcpListenSocket(Address::InstanceConstSharedPtr address, bool bind_to_port);
   TcpListenSocket(uint32_t port, bool bind_to_port);
   TcpListenSocket(int fd, uint32_t port);
-  TcpListenSocket(int fd, Address::InstancePtr address);
+  TcpListenSocket(int fd, Address::InstanceConstSharedPtr address);
 };
 
 typedef std::unique_ptr<TcpListenSocket> TcpListenSocketPtr;

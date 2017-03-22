@@ -146,7 +146,7 @@ private:
  * @param ip_addr string to be parsed as an internet address.
  * @return pointer to the Instance, or nullptr if unable to parse the address.
  */
-InstancePtr parseInternetAddress(const std::string& ip_addr);
+InstanceConstSharedPtr parseInternetAddress(const std::string& ip_addr);
 
 /**
  * Implementation of a pipe address (unix domain socket on unix).

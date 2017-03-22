@@ -52,9 +52,9 @@ public:
   Timer& timer(const std::string& name) override { return default_scope_->timer(name); }
 
   // Stats::Store
-  std::list<CounterPtr> counters() const override;
+  std::list<CounterSharedPtr> counters() const override;
   ScopePtr createScope(const std::string& name) override;
-  std::list<GaugePtr> gauges() const override;
+  std::list<GaugeSharedPtr> gauges() const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -64,9 +64,9 @@ public:
 
 private:
   struct TlsCacheEntry {
-    std::unordered_map<std::string, CounterPtr> counters_;
-    std::unordered_map<std::string, GaugePtr> gauges_;
-    std::unordered_map<std::string, TimerPtr> timers_;
+    std::unordered_map<std::string, CounterSharedPtr> counters_;
+    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
+    std::unordered_map<std::string, TimerSharedPtr> timers_;
   };
 
   struct ScopeImpl : public Scope {

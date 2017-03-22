@@ -37,7 +37,7 @@ public:
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
   virtual Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstancePtr address) PURE;
+  createClientConnection(Network::Address::InstanceConstSharedPtr address) PURE;
 
   /**
    * Create an SSL client connection.
@@ -47,7 +47,7 @@ public:
    */
   virtual Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                            Network::Address::InstancePtr address) PURE;
+                            Network::Address::InstanceConstSharedPtr address) PURE;
 
   /**
    * Create an async DNS resolver. Only a single resolver can exist in the process at a time and it

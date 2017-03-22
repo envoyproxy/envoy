@@ -81,10 +81,9 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason) {
   }
 }
 
-IntegrationCodecClient::IntegrationCodecClient(Event::Dispatcher& dispatcher,
-                                               Network::ClientConnectionPtr&& conn,
-                                               Upstream::HostDescriptionPtr host_description,
-                                               CodecClient::Type type)
+IntegrationCodecClient::IntegrationCodecClient(
+    Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
+    Upstream::HostDescriptionConstSharedPtr host_description, CodecClient::Type type)
     : CodecClientProd(type, std::move(conn), host_description), callbacks_(*this),
       codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
@@ -237,7 +236,7 @@ IntegrationCodecClientPtr
 BaseIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn,
                                         Http::CodecClient::Type type) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionPtr host_description{new Upstream::HostDescriptionImpl(
+  Upstream::HostDescriptionConstSharedPtr host_description{new Upstream::HostDescriptionImpl(
       cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
   return IntegrationCodecClientPtr{
       new IntegrationCodecClient(*dispatcher_, std::move(conn), host_description, type)};

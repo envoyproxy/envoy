@@ -54,7 +54,7 @@ public:
 
   ~Http2ConnPoolImplTest() {
     // Make sure all gauges are 0.
-    for (Stats::GaugePtr gauge : cluster_->stats_store_.gauges()) {
+    for (Stats::GaugeSharedPtr gauge : cluster_->stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
   }
@@ -87,7 +87,7 @@ public:
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostPtr host_{new Upstream::HostImpl(
+  Upstream::HostSharedPtr host_{new Upstream::HostImpl(
       cluster_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")};
   TestConnPoolImpl pool_;
   std::vector<TestCodecClient> test_clients_;

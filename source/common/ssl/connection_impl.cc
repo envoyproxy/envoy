@@ -11,8 +11,8 @@
 namespace Ssl {
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                               Network::Address::InstancePtr remote_address,
-                               Network::Address::InstancePtr local_address, Context& ctx,
+                               Network::Address::InstanceConstSharedPtr remote_address,
+                               Network::Address::InstanceConstSharedPtr local_address, Context& ctx,
                                InitialState state)
     : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
@@ -236,7 +236,7 @@ std::string ConnectionImpl::uriSanPeerCertificate() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
-                                           Network::Address::InstancePtr address)
+                                           Network::Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
                      null_local_address_, ctx, InitialState::Client) {}
 

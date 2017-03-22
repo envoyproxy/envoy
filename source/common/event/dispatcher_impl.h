@@ -26,10 +26,10 @@ public:
   // Event::Dispatcher
   void clearDeferredDeleteList() override;
   Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstancePtr address) override;
+  createClientConnection(Network::Address::InstanceConstSharedPtr address) override;
   Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                            Network::Address::InstancePtr address) override;
+                            Network::Address::InstanceConstSharedPtr address) override;
   Network::DnsResolverPtr createDnsResolver() override;
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;

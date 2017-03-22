@@ -37,10 +37,10 @@ public:
                                 Upstream::ClusterManager& cm);
 
   // Router::RouteConfigProvider
-  Router::ConfigPtr config() override { return config_; }
+  Router::ConfigConstSharedPtr config() override { return config_; }
 
 private:
-  ConfigPtr config_;
+  ConfigConstSharedPtr config_;
 };
 
 /**
@@ -77,7 +77,7 @@ public:
   }
 
   // Router::RouteConfigProvider
-  Router::ConfigPtr config() override;
+  Router::ConfigConstSharedPtr config() override;
 
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override;
@@ -87,12 +87,12 @@ public:
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig(ConfigPtr initial_config) : config_(initial_config) {}
+    ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(initial_config) {}
 
     // ThreadLocal::ThreadLocalObject
     void shutdown() override {}
 
-    ConfigPtr config_;
+    ConfigConstSharedPtr config_;
   };
 
   RdsRouteConfigProviderImpl(const Json::Object& config, Runtime::Loader& runtime,

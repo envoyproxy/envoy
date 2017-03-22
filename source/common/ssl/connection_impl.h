@@ -11,8 +11,9 @@ public:
   enum class InitialState { Client, Server };
 
   ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                 Network::Address::InstancePtr remote_address,
-                 Network::Address::InstancePtr local_address, Context& ctx, InitialState state);
+                 Network::Address::InstanceConstSharedPtr remote_address,
+                 Network::Address::InstanceConstSharedPtr local_address, Context& ctx,
+                 InitialState state);
   ~ConnectionImpl();
 
   // Network::Connection
@@ -41,7 +42,7 @@ private:
 class ClientConnectionImpl final : public ConnectionImpl, public Network::ClientConnection {
 public:
   ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
-                       Network::Address::InstancePtr address);
+                       Network::Address::InstanceConstSharedPtr address);
 
   // Network::ClientConnection
   void connect() override;
