@@ -33,7 +33,12 @@ void DetectorHostSinkImpl::uneject(SystemTime unejection_time) {
   last_unejection_time_.value(unejection_time);
 }
 
+void DetectorHostSinkImpl::updateCurrentSuccessRateBucket() {
+  success_rate_accumulator_bucket_.store(success_rate_accumulator_.updateCurrentWriter());
+}
+
 void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
+  success_rate_accumulator_bucket_.load()->total_request_counter_++;
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
@@ -47,6 +52,7 @@ void DetectorHostSinkImpl::putHttpResponseCode(uint64_t response_code) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
+    success_rate_accumulator_bucket_.load()->success_request_counter_++;
     consecutive_5xx_ = 0;
   }
 }
@@ -58,7 +64,14 @@ DetectorConfig::DetectorConfig(const Json::Object& json_config)
       consecutive_5xx_(static_cast<uint64_t>(json_config.getInteger("consecutive_5xx", 5))),
       max_ejection_percent_(
           static_cast<uint64_t>(json_config.getInteger("max_ejection_percent", 10))),
-      enforcing_(static_cast<uint64_t>(json_config.getInteger("enforcing", 100))) {}
+      success_rate_minimum_hosts_(
+          static_cast<uint64_t>(json_config.getInteger("success_rate_minimum_hosts", 5))),
+      success_rate_request_volume_(
+          static_cast<uint64_t>(json_config.getInteger("success_rate_request_volume", 100))),
+      enforcing_consecutive_5xx_(
+          static_cast<uint64_t>(json_config.getInteger("enforcing_consecutive_5xx", 100))),
+      enforcing_success_rate_(
+          static_cast<uint64_t>(json_config.getInteger("enforcing_success_rate", 100))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
@@ -146,6 +159,19 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostSinkImpl*
   }
 }
 
+bool DetectorImpl::enforceEjection(EjectionType type) {
+  switch (type) {
+  case EjectionType::Consecutive5xx:
+    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_consecutive_5xx",
+                                              config_.enforcingConsecutive5xx());
+  case EjectionType::SuccessRate:
+    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_success_rate",
+                                              config_.enforcingSuccessRate());
+  }
+
+  NOT_REACHED;
+}
+
 void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
@@ -153,7 +179,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
   double ejected_percent = 100.0 * stats_.ejections_active_.value() / host_sinks_.size();
   if (ejected_percent < max_ejection_percent) {
     stats_.ejections_total_.inc();
-    if (runtime_.snapshot().featureEnabled("outlier_detection.enforcing", config_.enforcing())) {
+    if (enforceEjection(type)) {
       stats_.ejections_active_.inc();
       host_sinks_[host]->eject(time_source_.currentSystemTime());
       runCallbacks(host);
@@ -208,11 +234,92 @@ void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
   ejectHost(host, EjectionType::Consecutive5xx);
 }
 
+// The canonical factor for outlier detection in normal distributions is 2. However, host
+// success rates are intuitively a distribution with negative skew, with most of the mass around
+// 100 and a left tail. Therefore, a more aggressive (lower) factor is needed to detect
+// outliers.
+const double Utility::SUCCESS_RATE_STDEV_FACTOR = 1.9;
+
+double Utility::successRateEjectionThreshold(
+    double success_rate_sum, const std::vector<HostSuccessRatePair>& valid_success_rate_hosts) {
+  // This function is using mean and standard deviation as statistical measures for outlier
+  // detection. First the mean is calculated by dividing the sum of success rate data over the
+  // number of data points. Then variance is calculated by taking the mean of the
+  // squared difference of data points to the mean of the data. Then standard deviation is
+  // calculated by taking the square root of the variance. Then the outlier threshold is
+  // calculated as the difference between the mean and the product of the standard
+  // deviation and a constant factor.
+  //
+  // For example with a data set that looks like success_rate_data = {50, 100, 100, 100, 100} the
+  // math would work as follows:
+  // success_rate_sum = 450
+  // mean = 90
+  // variance = 400
+  // stdev = 20
+  // threshold returned = 52
+  double mean = success_rate_sum / valid_success_rate_hosts.size();
+  double variance = 0;
+  std::for_each(valid_success_rate_hosts.begin(), valid_success_rate_hosts.end(),
+                [&variance, mean](HostSuccessRatePair v) {
+                  variance += std::pow(v.success_rate_ - mean, 2);
+                });
+  variance /= valid_success_rate_hosts.size();
+  double stdev = std::sqrt(variance);
+
+  return mean - (SUCCESS_RATE_STDEV_FACTOR * stdev);
+}
+
+void DetectorImpl::processSuccessRateEjections() {
+  uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
+      "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
+  uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
+      "outlier_detection.success_rate_request_volume", config_.successRateRequestVolume());
+  std::vector<HostSuccessRatePair> valid_success_rate_hosts;
+  double success_rate_sum = 0;
+
+  // Exit early if there are not enough hosts.
+  if (host_sinks_.size() < success_rate_minimum_hosts) {
+    return;
+  }
+
+  // reserve upper bound of vector size to avoid reallocation.
+  valid_success_rate_hosts.reserve(host_sinks_.size());
+
+  for (const auto& host : host_sinks_) {
+    host.second->updateCurrentSuccessRateBucket();
+    // Don't do work if the host is already ejected.
+    if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+      Optional<double> host_success_rate =
+          host.second->successRateAccumulator().getSuccessRate(success_rate_request_volume);
+
+      if (host_success_rate.valid()) {
+        valid_success_rate_hosts.emplace_back(
+            HostSuccessRatePair(host.first, host_success_rate.value()));
+        success_rate_sum += host_success_rate.value();
+      }
+    }
+  }
+
+  if (valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
+    double ejection_threshold =
+        Utility::successRateEjectionThreshold(success_rate_sum, valid_success_rate_hosts);
+    for (const auto& host_success_rate_pair : valid_success_rate_hosts) {
+      if (host_success_rate_pair.success_rate_ < ejection_threshold) {
+        stats_.ejections_success_rate_.inc();
+        ejectHost(host_success_rate_pair.host_, EjectionType::SuccessRate);
+      }
+    }
+  }
+}
+
 void DetectorImpl::onIntervalTimer() {
   SystemTime now = time_source_.currentSystemTime();
+
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
   }
+
+  processSuccessRateEjections();
 
   armIntervalTimer();
 }
@@ -268,9 +375,11 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
   switch (type) {
   case EjectionType::Consecutive5xx:
     return "5xx";
+  case EjectionType::SuccessRate:
+    return "SuccessRate";
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 int EventLoggerImpl::secsSinceLastAction(const Optional<SystemTime>& lastActionTime,
@@ -279,6 +388,25 @@ int EventLoggerImpl::secsSinceLastAction(const Optional<SystemTime>& lastActionT
     return std::chrono::duration_cast<std::chrono::seconds>(now - lastActionTime.value()).count();
   }
   return -1;
+}
+
+SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
+  // Right now current is being written to and backup is not. Flush the backup and swap.
+  backup_success_rate_bucket_->success_request_counter_ = 0;
+  backup_success_rate_bucket_->total_request_counter_ = 0;
+
+  current_success_rate_bucket_.swap(backup_success_rate_bucket_);
+
+  return current_success_rate_bucket_.get();
+}
+
+Optional<double> SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_request_volume) {
+  if (backup_success_rate_bucket_->total_request_counter_ < success_rate_request_volume) {
+    return Optional<double>();
+  }
+
+  return Optional<double>(backup_success_rate_bucket_->success_request_counter_ * 100.0 /
+                          backup_success_rate_bucket_->total_request_counter_);
 }
 
 } // Outlier

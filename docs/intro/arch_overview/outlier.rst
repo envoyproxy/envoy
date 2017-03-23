@@ -46,7 +46,19 @@ If an upstream host returns some number of consecutive 5xx, it will be ejected. 
 case a 5xx means an actual 5xx respond code, or an event that would cause the HTTP router to return
 one on the upstream's behalf (reset, connection failure, etc.). The number of consecutive 5xx
 required for ejection is controlled by the :ref:`outlier_detection.consecutive_5xx
-<config_cluster_manager_cluster_outlier_detection>` value.
+<config_cluster_manager_cluster_outlier_detection_consecutive_5xx>` value.
+
+Success Rate
+^^^^^^^^^^^^
+
+Success Rate based outlier ejection aggregates success rate data from every host in a cluster. Then at given
+intervals ejects hosts based on statistical outlier detection. Success Rate outlier ejection will not be
+calculated for a host if its request volume over the aggregation interval is less than the
+:ref:`outlier_detection.success_rate_request_volume<config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
+value. Moreover, detection will not be performed for a cluster if the number of hosts
+with the minimum required request volume in an interval is less than the
+:ref:`outlier_detection.success_rate_minimum_hosts<config_cluster_manager_cluster_outlier_detection_success_rate_minimum_hosts>`
+value.
 
 Ejection event logging
 ----------------------

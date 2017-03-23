@@ -1094,6 +1094,16 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "exclusiveMinimum" : true
           },
+          "success_rate_minimum_hosts" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "success_rate_request_volume" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
           "interval_ms" : {
             "type" : "integer",
             "minimum" : 0,
@@ -1109,7 +1119,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "maximum" : 100
           },
-          "enforcing" : {
+          "enforcing_consecutive_5xx" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          },
+          "enforcing_success_rate" : {
             "type" : "integer",
             "minimum" : 0,
             "maximum" : 100

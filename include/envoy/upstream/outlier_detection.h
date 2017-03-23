@@ -52,7 +52,7 @@ public:
 
 typedef std::unique_ptr<DetectorHostSink> DetectorHostSinkPtr;
 
-enum class EjectionType { Consecutive5xx };
+enum class EjectionType { Consecutive5xx, SuccessRate };
 
 /**
  * Sink for outlier detection event logs.
