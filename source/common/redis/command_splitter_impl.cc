@@ -22,7 +22,7 @@ SplitRequestPtr AllParamsToOneServerCommandHandler::startRequest(const RespValue
     return nullptr;
   }
 
-  return request_handle;
+  return std::move(request_handle);
 }
 
 AllParamsToOneServerCommandHandler::SplitRequestImpl::~SplitRequestImpl() { ASSERT(!handle_); }
