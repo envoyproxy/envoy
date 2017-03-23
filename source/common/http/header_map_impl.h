@@ -1,10 +1,9 @@
 #pragma once
 
-#include "headers.h"
-
 #include "envoy/http/header_map.h"
 
 #include "common/common/non_copyable.h"
+#include "common/http/headers.h"
 
 namespace Http {
 

@@ -1,4 +1,4 @@
-#include "dynamo_utility.h"
+#include "common/dynamo/dynamo_utility.h"
 
 #include "common/stats/stats_impl.h"
 

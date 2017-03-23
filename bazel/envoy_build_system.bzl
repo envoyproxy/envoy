@@ -29,6 +29,7 @@ def envoy_include_prefix(path):
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(name,
+                     testonly = 0,
                      srcs = [],
                      hdrs = [],
                      public_hdrs = [],
@@ -39,11 +40,13 @@ def envoy_cc_library(name,
                      deps = []):
     native.cc_library(
         name = name,
+        testonly = testonly,
         srcs = srcs,
         hdrs = hdrs + public_hdrs,
         copts = ENVOY_COPTS + copts,
         visibility = visibility,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
+            "//include/envoy/common:base_includes",
             "//source/precompiled:precompiled_includes",
         ],
         alwayslink = alwayslink,
@@ -65,3 +68,28 @@ def envoy_cc_test(name,
             "//test/precompiled:precompiled_includes",
         ],
     )
+
+# Envoy C++ test related libraries (that want gtest, gmock) should be specified with this function.
+def envoy_cc_test_library(name,
+                  srcs = [],
+                  hdrs = [],
+                  deps = []):
+    native.cc_library(
+        name = name,
+        srcs = srcs,
+        hdrs = hdrs,
+        copts = ENVOY_COPTS + ["-includetest/precompiled/precompiled_test.h"],
+        testonly = 1,
+        alwayslink = 1,
+        deps = deps + [
+            "//source/precompiled:precompiled_includes",
+            "//test/precompiled:precompiled_includes",
+        ],
+    )
+
+# Envoy C++ mock targets should be specified with this function.
+def envoy_cc_mock(name,
+                  srcs = [],
+                  hdrs = [],
+                  deps = []):
+    envoy_cc_test_library(name, srcs, hdrs, deps)

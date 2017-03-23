@@ -1,8 +1,8 @@
-#include "rest_api_fetcher.h"
-#include "utility.h"
+#include "common/http/rest_api_fetcher.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/http/message_impl.h"
+#include "common/http/utility.h"
 
 namespace Http {
 

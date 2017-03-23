@@ -160,6 +160,27 @@ cc_library(
         remote = "https://github.com/google/googletest.git",
     )
 
+def http_parser_repositories():
+    BUILD = """
+cc_library(
+    name = "http_parser",
+    srcs = [
+        "http_parser.c",
+    ],
+    hdrs = [
+        "http_parser.h",
+    ],
+    visibility = ["//visibility:public"],
+)
+"""
+
+    native.new_git_repository(
+        name = "http_parser_git",
+        remote = "https://github.com/nodejs/http-parser.git",
+        commit = "9b0d5b33ebdaacff1dadd06bad4e198b11ff880e",
+        build_file_content = BUILD,
+    )
+
 def libevent_repositories():
     BUILD = """
 genrule(
@@ -270,6 +291,153 @@ cc_library(
         build_file_content = BUILD,
     )
 
+def lightstep_repositories():
+    BUILD = """
+load("@protobuf_git//:protobuf.bzl", "cc_proto_library")
+
+cc_library(
+    name = "lightstep_core",
+    srcs = [
+        "src/c++11/impl.cc",
+        "src/c++11/span.cc",
+        "src/c++11/tracer.cc",
+        "src/c++11/util.cc",
+    ],
+    hdrs = [
+        "src/c++11/lightstep/impl.h",
+        "src/c++11/lightstep/options.h",
+        "src/c++11/lightstep/propagation.h",
+        "src/c++11/lightstep/carrier.h",
+        "src/c++11/lightstep/span.h",
+        "src/c++11/lightstep/tracer.h",
+        "src/c++11/lightstep/util.h",
+        "src/c++11/lightstep/value.h",
+        "src/c++11/mapbox_variant/recursive_wrapper.hpp",
+        "src/c++11/mapbox_variant/variant.hpp",
+    ],
+    copts = [
+        "-DPACKAGE_VERSION='\\"0.36\\"'",
+        "-Iexternal/lightstep_git/src/c++11/lightstep",
+        "-Iexternal/lightstep_git/src/c++11/mapbox_variant",
+    ],
+    includes = ["src/c++11"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@lightstep_common_git//:collector_proto",
+        "@lightstep_common_git//:lightstep_carrier_proto",
+        "//external:protobuf",
+    ],
+)"""
+
+    COMMON_BUILD = """
+load("@protobuf_git//:protobuf.bzl", "cc_proto_library")
+
+cc_proto_library(
+    name = "collector_proto",
+    srcs = ["collector.proto"],
+    include = ".",
+    deps = [
+        "//external:cc_wkt_protos",
+    ],
+    protoc = "//external:protoc",
+    default_runtime = "//external:protobuf",
+    visibility = ["//visibility:public"],
+)
+
+cc_proto_library(
+    name = "lightstep_carrier_proto",
+    srcs = ["lightstep_carrier.proto"],
+    include = ".",
+    deps = [
+        "//external:cc_wkt_protos",
+    ],
+    protoc = "//external:protoc",
+    default_runtime = "//external:protobuf",
+    visibility = ["//visibility:public"],
+)
+"""
+
+    native.new_git_repository(
+        name = "lightstep_common_git",
+        remote = "https://github.com/lightstep/lightstep-tracer-common.git",
+        commit = "cbbecd671c1ae1f20ae873c5da688c8c14d04ec3",
+        build_file_content = COMMON_BUILD,
+    )
+
+    native.new_git_repository(
+        name = "lightstep_git",
+        remote = "https://github.com/lightstep/lightstep-tracer-cpp.git",
+        commit = "f1dc8f3dfd529350e053fd21273e627f409ae428", # 0.36
+        build_file_content = BUILD,
+    )
+
+def nghttp2_repositories():
+    BUILD = """
+genrule(
+    name = "config",
+    srcs = glob(["**/*"]),
+    outs = ["config.h"],
+    cmd = "TMPDIR=$(@D) $(location configure) --enable-lib-only --enable-shared=no" +
+          " && cp config.h $@",
+    tools = ["configure"],
+)
+
+cc_library(
+    name = "nghttp2",
+    srcs = glob([
+        "lib/*.c",
+        "lib/*.h",
+    ]) + ["config.h"],
+    hdrs = glob(["lib/includes/nghttp2/*.h"]),
+    copts = [
+        "-DHAVE_CONFIG_H",
+        "-DBUILDING_NGHTTP2",
+    ],
+    includes = [
+        ".",
+        "lib/includes",
+    ],
+    visibility = ["//visibility:public"],
+)
+"""
+
+    native.new_http_archive(
+        name = "nghttp2_tar",
+        url = "https://github.com/nghttp2/nghttp2/releases/download/v1.20.0/nghttp2-1.20.0.tar.gz",
+        strip_prefix = "nghttp2-1.20.0",
+        build_file_content = BUILD,
+    )
+
+def protobuf_repositories():
+    native.git_repository(
+        name = "protobuf_git",
+        commit = "a428e42072765993ff674fda72863c9f1aa2d268",  # v3.1.0
+        remote = "https://github.com/google/protobuf.git",
+    )
+
+def rapidjson_repositories():
+    BUILD = """
+cc_library(
+    name = "rapidjson",
+    srcs = glob([
+        "include/rapidjson/internal/*.h",
+    ]),
+    hdrs = glob([
+        "include/rapidjson/*.h",
+        "include/rapidjson/error/*.h",
+    ]),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+"""
+
+    native.new_git_repository(
+        name = "rapidjson_git",
+        remote = "https://github.com/miloyip/rapidjson.git",
+        commit = "f54b0e47a08782a6131cc3d60f94d038fa6e0a51", # v1.1.0
+        build_file_content = BUILD,
+    )
+
 def spdlog_repositories():
     BUILD = """
 package(default_visibility = ["//visibility:public"])
@@ -330,7 +498,6 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 """
-
     native.new_http_archive(
         name = "tclap_archive",
         url = "https://storage.googleapis.com/istio-build-deps/tclap-1.2.1.tar.gz",
@@ -342,6 +509,11 @@ def envoy_dependencies():
     ares_repositories()
     boringssl_repositories()
     googletest_repositories()
+    http_parser_repositories()
     libevent_repositories()
+    lightstep_repositories()
+    nghttp2_repositories()
+    protobuf_repositories()
+    rapidjson_repositories()
     spdlog_repositories()
     tclap_repositories()

@@ -12,5 +12,6 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/ssl:openssl_lib",
         "//source/server:options_lib",
+        "//test/test_common:printers_lib",
     ],
 )

@@ -1,7 +1,7 @@
-#include "runtime_impl.h"
-#include "uuid_util.h"
+#include "common/runtime/uuid_util.h"
 
 #include "common/common/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 bool UuidUtils::uuidModBy(const std::string& uuid, uint16_t& out, uint16_t mod) {
   if (uuid.length() < 8) {

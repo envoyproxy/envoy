@@ -1,4 +1,4 @@
-#include "runtime_impl.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/stats.h"

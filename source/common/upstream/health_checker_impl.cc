@@ -1,4 +1,4 @@
-#include "health_checker_impl.h"
+#include "common/upstream/health_checker_impl.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
