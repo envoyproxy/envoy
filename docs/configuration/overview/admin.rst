@@ -10,7 +10,7 @@ Administration interface :ref:`operations documentation <operations_admin_interf
   {
     "access_log_path": "...",
     "profile_path": "...",
-    "port": "..."
+    "address": "..."
   }
 
 access_log_path
