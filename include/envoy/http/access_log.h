@@ -52,7 +52,7 @@ public:
   /**
    * Filter can trigger this callback when an upstream host has been selected.
    */
-  virtual void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) PURE;
+  virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**
    * @return the time that the first byte of the request was received.
@@ -97,7 +97,7 @@ public:
   /**
    * @return upstream host description.
    */
-  virtual Upstream::HostDescriptionPtr upstreamHost() const PURE;
+  virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
 
   /**
    * @return whether the request is a health check request or not.
@@ -144,7 +144,7 @@ public:
                    const RequestInfo& request_info) PURE;
 };
 
-typedef std::shared_ptr<Instance> InstancePtr;
+typedef std::shared_ptr<Instance> InstanceSharedPtr;
 
 /**
  * Interface for access log formatter.

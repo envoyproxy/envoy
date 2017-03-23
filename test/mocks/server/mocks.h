@@ -27,7 +27,8 @@ namespace Server {
 
 class MockOptions : public Options {
 public:
-  MockOptions();
+  MockOptions() : MockOptions(std::string()) {}
+  MockOptions(const std::string& path);
   ~MockOptions();
 
   MOCK_METHOD0(baseId, uint64_t());
@@ -38,6 +39,8 @@ public:
   MOCK_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_METHOD0(restartEpoch, uint64_t());
   MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
+
+  std::string path_;
 };
 
 class MockAdmin : public Admin {

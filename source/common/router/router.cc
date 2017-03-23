@@ -92,12 +92,12 @@ Filter::~Filter() {
   ASSERT(!retry_state_);
 }
 
-const std::string& Filter::upstreamZone(Upstream::HostDescriptionPtr upstream_host) {
+const std::string& Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
   return upstream_host ? upstream_host->zone() : EMPTY_STRING;
 }
 
 void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
-                                Upstream::HostDescriptionPtr upstream_host) {
+                                Upstream::HostDescriptionConstSharedPtr upstream_host) {
   if (config_.emit_dynamic_stats_ && !callbacks_->requestInfo().healthCheck()) {
     const Http::HeaderEntry* upstream_canary_header = response_headers.EnvoyUpstreamCanary();
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
@@ -125,7 +125,8 @@ void Filter::chargeUpstreamCode(const Http::HeaderMap& response_headers,
   }
 }
 
-void Filter::chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionPtr upstream_host) {
+void Filter::chargeUpstreamCode(Http::Code code,
+                                Upstream::HostDescriptionConstSharedPtr upstream_host) {
   Http::HeaderMapImpl fake_response_headers{
       {Http::Headers::get().Status, std::to_string(enumToInt(code))}};
   chargeUpstreamCode(fake_response_headers, upstream_host);
@@ -371,7 +372,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     stream_log_debug("upstream reset", *callbacks_);
   }
 
-  Upstream::HostDescriptionPtr upstream_host;
+  Upstream::HostDescriptionConstSharedPtr upstream_host;
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
     if (upstream_host) {
@@ -680,7 +681,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
 }
 
 void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
-                                            Upstream::HostDescriptionPtr host) {
+                                            Upstream::HostDescriptionConstSharedPtr host) {
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
   case Http::ConnectionPool::PoolFailureReason::Overflow:
@@ -697,7 +698,7 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 }
 
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
-                                          Upstream::HostDescriptionPtr host) {
+                                          Upstream::HostDescriptionConstSharedPtr host) {
   stream_log_debug("pool ready", *parent_.callbacks_);
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);

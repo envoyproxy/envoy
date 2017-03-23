@@ -29,10 +29,11 @@ namespace Http1 {
  */
 class ConnPoolImplForTest : public ConnPoolImpl {
 public:
-  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterInfoPtr cluster)
+  ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
+                      Upstream::ClusterInfoConstSharedPtr cluster)
       : ConnPoolImpl(
             dispatcher,
-            Upstream::HostPtr{new Upstream::HostImpl(
+            Upstream::HostSharedPtr{new Upstream::HostImpl(
                 cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:9000"), false, 1, "")},
             Upstream::ResourcePriority::Default),
         mock_dispatcher_(dispatcher) {}
@@ -98,7 +99,7 @@ public:
 
   ~Http1ConnPoolImplTest() {
     // Make sure all gauges are 0.
-    for (Stats::GaugePtr gauge : cluster_->stats_store_.gauges()) {
+    for (Stats::GaugeSharedPtr gauge : cluster_->stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
   }
@@ -201,6 +202,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyBufferLimits) {
   EXPECT_NE(nullptr, handle);
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
+  EXPECT_CALL(callbacks.pool_failure_, ready());
   conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }

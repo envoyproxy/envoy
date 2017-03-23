@@ -1,13 +1,12 @@
 #pragma once
 
-#include "filter_manager_impl.h"
-
 #include "envoy/network/connection.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
+#include "common/network/filter_manager_impl.h"
 
 namespace Network {
 
@@ -37,15 +36,16 @@ class ConnectionImpl : public virtual Connection,
                        public BufferSource,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
-  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd, Address::InstancePtr remote_address,
-                 Address::InstancePtr local_address);
+  ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
+                 Address::InstanceConstSharedPtr remote_address,
+                 Address::InstanceConstSharedPtr local_address);
 
   ~ConnectionImpl();
 
   // Network::FilterManager
-  void addWriteFilter(WriteFilterPtr filter) override;
-  void addFilter(FilterPtr filter) override;
-  void addReadFilter(ReadFilterPtr filter) override;
+  void addWriteFilter(WriteFilterSharedPtr filter) override;
+  void addFilter(FilterSharedPtr filter) override;
+  void addReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 
   // Network::Connection
@@ -92,11 +92,11 @@ protected:
   // Reconsider how to make fairness happen.
   void setReadBufferReady() { file_event_->activate(Event::FileReadyType::Read); }
 
-  static const Address::InstancePtr null_local_address_;
+  static const Address::InstanceConstSharedPtr null_local_address_;
 
   FilterManagerImpl filter_manager_;
-  Address::InstancePtr remote_address_;
-  Address::InstancePtr local_address_;
+  Address::InstanceConstSharedPtr remote_address_;
+  Address::InstanceConstSharedPtr local_address_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
   uint32_t read_buffer_limit_ = 0;
@@ -140,7 +140,7 @@ private:
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
 public:
-  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Address::InstancePtr address);
+  ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Address::InstanceConstSharedPtr address);
 
   // Network::ClientConnection
   void connect() override { doConnect(); }

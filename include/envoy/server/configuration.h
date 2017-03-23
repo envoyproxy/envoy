@@ -23,9 +23,9 @@ public:
   virtual Network::FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * @return std::string the address.
+   * @return Network::Address::InstanceConstSharedPtr the address.
    */
-  virtual Network::Address::InstancePtr address() PURE;
+  virtual Network::Address::InstanceConstSharedPtr address() PURE;
 
   /**
    * @return Ssl::ServerContext* the SSL context
@@ -56,6 +56,11 @@ public:
    *         buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope to use for all listener specific stats.
+   */
+  virtual Stats::Scope& scope() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;
@@ -142,9 +147,14 @@ public:
   virtual const std::string& accessLogPath() PURE;
 
   /**
-   * @return uint32_t the server admin HTTP port.
+   * @return const std::string& profiler output path.
    */
-  virtual uint32_t port() PURE;
+  virtual const std::string& profilePath() PURE;
+
+  /**
+   * @return Network::Address::InstanceConstSharedPtr the server address.
+   */
+  virtual Network::Address::InstanceConstSharedPtr address() PURE;
 };
 
 /**

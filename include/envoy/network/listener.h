@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/exception.h"
+#include "envoy/network/connection.h"
 
 namespace Network {
 

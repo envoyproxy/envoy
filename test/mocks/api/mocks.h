@@ -18,8 +18,8 @@ public:
 
   MOCK_METHOD0(allocateDispatcher_, Event::Dispatcher*());
   MOCK_METHOD4(createFile,
-               Filesystem::FilePtr(const std::string& path, Event::Dispatcher& dispatcher,
-                                   Thread::BasicLockable& lock, Stats::Store& stats_store));
+               Filesystem::FileSharedPtr(const std::string& path, Event::Dispatcher& dispatcher,
+                                         Thread::BasicLockable& lock, Stats::Store& stats_store));
   MOCK_METHOD1(fileExists, bool(const std::string& path));
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string& path));
 

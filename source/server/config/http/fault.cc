@@ -15,10 +15,11 @@ HttpFilterFactoryCb FaultFilterConfig::tryCreateFilterFactory(HttpFilterType typ
     return nullptr;
   }
 
-  Http::FaultFilterConfigPtr config(
+  Http::FaultFilterConfigSharedPtr config(
       new Http::FaultFilterConfig(json_config, server.runtime(), stats_prefix, server.stats()));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{new Http::FaultFilter(config)});
+    callbacks.addStreamDecoderFilter(
+        Http::StreamDecoderFilterSharedPtr{new Http::FaultFilter(config)});
   };
 }
 

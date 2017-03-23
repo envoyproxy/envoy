@@ -13,14 +13,14 @@ public:
 
   // Server::ThreadLocal
   MOCK_METHOD0(allocateSlot, uint32_t());
-  MOCK_METHOD1(get, ThreadLocalObjectPtr(uint32_t index));
+  MOCK_METHOD1(get, ThreadLocalObjectSharedPtr(uint32_t index));
   MOCK_METHOD2(registerThread, void(Event::Dispatcher& dispatcher, bool main_thread));
   MOCK_METHOD1(runOnAllThreads, void(Event::PostCb cb));
   MOCK_METHOD2(set, void(uint32_t index, InitializeCb cb));
   MOCK_METHOD0(shutdownThread, void());
 
   uint32_t allocateSlot_() { return current_slot_++; }
-  ThreadLocalObjectPtr get_(uint32_t index) { return data_[index]; }
+  ThreadLocalObjectSharedPtr get_(uint32_t index) { return data_[index]; }
   void runOnAllThreads_(Event::PostCb cb) { cb(); }
   void set_(uint32_t index, InitializeCb cb) { data_[index] = cb(dispatcher_); }
   void shutdownThread_() {
@@ -31,7 +31,7 @@ public:
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   uint32_t current_slot_{};
-  std::unordered_map<uint32_t, ThreadLocalObjectPtr> data_;
+  std::unordered_map<uint32_t, ThreadLocalObjectSharedPtr> data_;
 };
 
 } // ThreadLocal

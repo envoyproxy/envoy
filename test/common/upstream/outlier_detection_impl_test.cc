@@ -45,7 +45,7 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
 
 class CallbackChecker {
 public:
-  MOCK_METHOD1(check, void(HostPtr host));
+  MOCK_METHOD1(check, void(HostSharedPtr host));
 };
 
 class OutlierDetectorImplTest : public testing::Test {
@@ -90,12 +90,12 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
 
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(
+  cluster_.hosts_ = {HostSharedPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
@@ -120,12 +120,12 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
 
 TEST_F(OutlierDetectorImplTest, DestroyHostInUse) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(
+  cluster_.hosts_ = {HostSharedPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   detector.reset();
 
@@ -138,14 +138,14 @@ TEST_F(OutlierDetectorImplTest, DestroyHostInUse) {
 
 TEST_F(OutlierDetectorImplTest, BasicFlow) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(
+  cluster_.hosts_ = {HostSharedPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  cluster_.hosts_.push_back(HostPtr{new HostImpl(
+  cluster_.hosts_.push_back(HostSharedPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:81"), false, 1, "")});
   cluster_.runCallbacks({cluster_.hosts_[1]}, {});
 
@@ -195,12 +195,12 @@ TEST_F(OutlierDetectorImplTest, BasicFlow) {
 
 TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(
+  cluster_.hosts_ = {HostSharedPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
@@ -218,7 +218,7 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
 
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
-  std::vector<HostPtr> old_hosts = std::move(cluster_.hosts_);
+  std::vector<HostSharedPtr> old_hosts = std::move(cluster_.hosts_);
   cluster_.runCallbacks({}, old_hosts);
 
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
@@ -232,14 +232,14 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
 TEST_F(OutlierDetectorImplTest, Overflow) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
   cluster_.hosts_ = {
-      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-                           false, 1, "")},
-      HostPtr{new HostImpl(cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:81"),
-                           false, 1, "")}};
+      HostSharedPtr{new HostImpl(cluster_.info_, "",
+                                 Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")},
+      HostSharedPtr{new HostImpl(
+          cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:81"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.max_ejection_percent", _))
       .WillByDefault(Return(1));
@@ -272,12 +272,12 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
 
 TEST_F(OutlierDetectorImplTest, NotEnforcing) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(
+  cluster_.hosts_ = {HostSharedPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
@@ -297,12 +297,12 @@ TEST_F(OutlierDetectorImplTest, NotEnforcing) {
 
 TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(
+  cluster_.hosts_ = {HostSharedPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
@@ -314,7 +314,7 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
 
   // Remove before the cross thread event comes in.
-  std::vector<HostPtr> old_hosts = std::move(cluster_.hosts_);
+  std::vector<HostSharedPtr> old_hosts = std::move(cluster_.hosts_);
   cluster_.runCallbacks({}, old_hosts);
   post_cb();
 
@@ -323,12 +323,12 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
 
 TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(
+  cluster_.hosts_ = {HostSharedPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
@@ -350,12 +350,12 @@ TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
 
 TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(
+  cluster_.hosts_ = {HostSharedPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
@@ -383,12 +383,12 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
 
 TEST_F(OutlierDetectorImplTest, Consecutive5xxAlreadyEjected) {
   EXPECT_CALL(cluster_, addMemberUpdateCb(_));
-  cluster_.hosts_ = {HostPtr{new HostImpl(
+  cluster_.hosts_ = {HostSharedPtr{new HostImpl(
       cluster_.info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(
       DetectorImpl::create(cluster_, *loader_, dispatcher_, runtime_, time_source_, event_logger_));
-  detector->addChangedStateCb([&](HostPtr host) -> void { checker_.check(host); });
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Cause a consecutive 5xx error.
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);

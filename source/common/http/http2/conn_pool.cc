@@ -11,7 +11,7 @@
 namespace Http {
 namespace Http2 {
 
-ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host,
+ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority)
     : dispatcher_(dispatcher), host_(host), priority_(priority) {}
 

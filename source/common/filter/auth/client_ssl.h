@@ -57,10 +57,10 @@ private:
   std::unordered_set<std::string> allowed_sha256_digests_;
 };
 
-typedef std::shared_ptr<AllowedPrincipals> AllowedPrincipalsPtr;
+typedef std::shared_ptr<AllowedPrincipals> AllowedPrincipalsSharedPtr;
 
 class Config;
-typedef std::shared_ptr<Config> ConfigPtr;
+typedef std::shared_ptr<Config> ConfigSharedPtr;
 
 /**
  * Global configuration for client SSL authentication. The config contacts a JSON API to fetch the
@@ -69,9 +69,9 @@ typedef std::shared_ptr<Config> ConfigPtr;
  */
 class Config : public Http::RestApiFetcher {
 public:
-  static ConfigPtr create(const Json::Object& config, ThreadLocal::Instance& tls,
-                          Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                          Stats::Store& stats_store, Runtime::RandomGenerator& random);
+  static ConfigSharedPtr create(const Json::Object& config, ThreadLocal::Instance& tls,
+                                Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+                                Stats::Store& stats_store, Runtime::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
   const Network::IpList& ipWhiteList() { return ip_white_list_; }
@@ -101,7 +101,7 @@ private:
  */
 class Instance : public Network::ReadFilter, public Network::ConnectionCallbacks {
 public:
-  Instance(ConfigPtr config) : config_(config) {}
+  Instance(ConfigSharedPtr config) : config_(config) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -115,7 +115,7 @@ public:
   void onEvent(uint32_t events) override;
 
 private:
-  ConfigPtr config_;
+  ConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 

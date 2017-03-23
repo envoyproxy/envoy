@@ -16,7 +16,7 @@ const std::unique_ptr<const Http::HeaderMap> Filter::TOO_MANY_REQUESTS_HEADER{
         {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}}};
 
 void Filter::initiateCall(const HeaderMap& headers) {
-  Router::RoutePtr route = callbacks_->route();
+  Router::RouteConstSharedPtr route = callbacks_->route();
   if (!route || !route->routeEntry()) {
     return;
   }

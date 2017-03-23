@@ -57,10 +57,10 @@ public:
   uint64_t numConnections() override { return num_connections_; }
 
   void addListener(Network::FilterChainFactory& factory, Network::ListenSocket& socket,
-                   const Network::ListenerOptions& listener_options) override;
+                   Stats::Scope& scope, const Network::ListenerOptions& listener_options) override;
 
   void addSslListener(Network::FilterChainFactory& factory, Ssl::ServerContext& ssl_ctx,
-                      Network::ListenSocket& socket,
+                      Network::ListenSocket& socket, Stats::Scope& scope,
                       const Network::ListenerOptions& listener_options) override;
 
   Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
@@ -73,11 +73,11 @@ private:
    */
   struct ActiveListener : public Network::ListenerCallbacks {
     ActiveListener(ConnectionHandlerImpl& parent, Network::ListenSocket& socket,
-                   Network::FilterChainFactory& factory,
+                   Network::FilterChainFactory& factory, Stats::Scope& scope,
                    const Network::ListenerOptions& listener_options);
 
     ActiveListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
-                   Network::FilterChainFactory& factory, const std::string& stats_prefix);
+                   Network::FilterChainFactory& factory, Stats::Scope& scope);
 
     /**
      * Fires when a new connection is received from the listener.
@@ -94,7 +94,7 @@ private:
   struct SslActiveListener : public ActiveListener {
     SslActiveListener(ConnectionHandlerImpl& parent, Ssl::ServerContext& ssl_ctx,
                       Network::ListenSocket& socket, Network::FilterChainFactory& factory,
-                      const Network::ListenerOptions& listener_options);
+                      Stats::Scope& scope, const Network::ListenerOptions& listener_options);
   };
 
   typedef std::unique_ptr<ActiveListener> ActiveListenerPtr;
@@ -132,13 +132,12 @@ private:
    */
   void removeConnection(ActiveConnection& connection);
 
-  static ListenerStats generateStats(const std::string& prefix, Stats::Store& store);
+  static ListenerStats generateStats(Stats::Scope& scope);
 
-  Stats::Store& stats_store_;
   spdlog::logger& logger_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::list<std::pair<Network::Address::InstancePtr, ActiveListenerPtr>> listeners_;
+  std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
   std::list<ActiveConnectionPtr> connections_;
   std::atomic<uint64_t> num_connections_{};
   Stats::Counter& watchdog_miss_counter_;

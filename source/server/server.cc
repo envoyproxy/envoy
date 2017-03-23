@@ -115,7 +115,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  for (Stats::CounterPtr counter : stats_store_.counters()) {
+  for (Stats::CounterSharedPtr counter : stats_store_.counters()) {
     uint64_t delta = counter->latch();
     if (counter->used()) {
       for (const auto& sink : stat_sinks_) {
@@ -124,7 +124,7 @@ void InstanceImpl::flushStats() {
     }
   }
 
-  for (Stats::GaugePtr gauge : stats_store_.gauges()) {
+  for (Stats::GaugeSharedPtr gauge : stats_store_.gauges()) {
     if (gauge->used()) {
       for (const auto& sink : stat_sinks_) {
         sink->flushGauge(gauge->name(), gauge->value());
@@ -136,7 +136,7 @@ void InstanceImpl::flushStats() {
 }
 
 int InstanceImpl::getListenSocketFd(const std::string& address) {
-  Network::Address::InstancePtr addr = Network::Utility::resolveUrl(address);
+  Network::Address::InstanceConstSharedPtr addr = Network::Utility::resolveUrl(address);
   for (const auto& entry : socket_map_) {
     if (entry.second->localAddress()->asString() == addr->asString()) {
       return entry.second->fd();
@@ -162,16 +162,18 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   Json::ObjectPtr config_json = Json::Factory::LoadFromFile(options.configPath());
   config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
-  log().info("admin port: {}", initial_config.admin().port());
+  log().info("admin address: {}", initial_config.admin().address()->asString());
 
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   drain_manager_->startParentShutdownSequence();
   original_start_time_ = info.original_start_time_;
-  admin_.reset(
-      new AdminImpl(initial_config.admin().accessLogPath(), initial_config.admin().port(), *this));
-  handler_.addListener(*admin_, admin_->socket(),
+  admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
+                             initial_config.admin().profilePath(), initial_config.admin().address(),
+                             *this));
+  admin_scope_ = stats_store_.createScope("listener.admin.");
+  handler_.addListener(*admin_, admin_->socket(), *admin_scope_,
                        Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   loadServerFlags(initial_config.flagsPath());

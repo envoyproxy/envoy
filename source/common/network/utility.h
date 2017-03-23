@@ -55,9 +55,9 @@ public:
   /**
    * Resolve a URL.
    * @param url supplies the url to resolve.
-   * @return Address::InstancePtr the resolved address.
+   * @return Address::InstanceConstSharedPtr the resolved address.
    */
-  static Address::InstancePtr resolveUrl(const std::string& url);
+  static Address::InstanceConstSharedPtr resolveUrl(const std::string& url);
 
   /**
    * Parses the host from a TCP URL
@@ -76,7 +76,7 @@ public:
   /**
    * @return the local IP address of the server
    */
-  static Address::InstancePtr getLocalAddress();
+  static Address::InstanceConstSharedPtr getLocalAddress();
 
   /**
    * Determine whether this is an internal (RFC1918) address.
@@ -91,13 +91,28 @@ public:
   static bool isLoopbackAddress(const Address::Instance& address);
 
   /**
+   * @return Address::InstanceConstSharedPtr an address that represents the IPv4 wildcard address
+   *         (i.e. "0.0.0.0"). Used during binding to indicate that incoming connections to any
+   *         local IPv4 address are to be accepted.
+   */
+  static Address::InstanceConstSharedPtr getIpv4AnyAddress();
+
+  /**
+   * @return Address::InstanceConstSharedPtr an address that represents the IPv6 wildcard address
+   * (i.e. "::").
+   *         Used during binding to indicate that incoming connections to any local IPv6 address
+   *         are to be accepted.
+   */
+  static Address::InstanceConstSharedPtr getIpv6AnyAddress();
+
+  /**
    * Retrieve the original destination address from an accepted fd.
    * The address (IP and port) may be not local and the port may differ from
    * the listener port if the packets were redirected using iptables
    * @param fd is the descriptor returned by accept()
    * @return the original destination or nullptr if not available.
    */
-  static Address::InstancePtr getOriginalDst(int fd);
+  static Address::InstanceConstSharedPtr getOriginalDst(int fd);
 
   /**
    * Parses a string containing a comma-separated list of port numbers and/or

@@ -13,9 +13,10 @@ We welcome contributions from the community. Here are some guidelines.
   issues are taken care of automatically. The Travis tests will automatically check
   the code format and fail. There are make targets that can both check the format 
   (check_format) as well as fix the code format for you (fix_format).
-* Beyond code formatting, for the most part Envoy uses the [Google C++ style guidelines]
-  (https://google.github.io/styleguide/cppguide.html). The following section covers the 
-  major areas where we deviate from the Google guidelines.
+* Beyond code formatting, for the most part Envoy uses the 
+  [Google C++ style guidelines](https://google.github.io/styleguide/cppguide.html). 
+  The following section covers the major areas where we deviate from the Google 
+  guidelines.
 
 # Deviations from Google C++ Style guidelines
 
@@ -28,6 +29,14 @@ We welcome contributions from the community. Here are some guidelines.
 * Global static non-pod variables are allowed because Envoy correctly joins all threads on exit.
   However, care is needed during init and static accessor functions may be required.
 * OOM events (both memory and FDs) are considered fatal crashing errors.
+* Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
+* Smart pointers are type aliased:
+  * `typedef std::unique_ptr<Foo> FooPtr;`
+  * `typedef std::shared_ptr<Bar> BarSharedPtr;`
+  * `typedef std::shared_ptr<const Blah> BlahConstSharedPtr;`
+  * Regular pointers (e.g. `int* foo`) should not be type aliased.
+* API-level comments should follow normal Doxygen conventions. Use `@param` to describe
+  parameters, `@return <return-type>` for return values.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
 

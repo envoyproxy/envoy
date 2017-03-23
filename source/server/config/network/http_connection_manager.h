@@ -72,7 +72,9 @@ public:
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
-  const std::list<Http::AccessLog::InstancePtr>& accessLogs() override { return access_logs_; }
+  const std::list<Http::AccessLog::InstanceSharedPtr>& accessLogs() override {
+    return access_logs_;
+  }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks) override;
@@ -110,7 +112,7 @@ private:
 
   Server::Instance& server_;
   std::list<HttpFilterFactoryCb> filter_factories_;
-  std::list<Http::AccessLog::InstancePtr> access_logs_;
+  std::list<Http::AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;

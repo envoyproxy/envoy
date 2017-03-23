@@ -32,9 +32,11 @@ struct RequestInfoImpl : public RequestInfo {
 
   bool getResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
 
-  void onUpstreamHostSelected(Upstream::HostDescriptionPtr host) override { upstream_host_ = host; }
+  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
+    upstream_host_ = host;
+  }
 
-  Upstream::HostDescriptionPtr upstreamHost() const override { return upstream_host_; }
+  Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
 
   bool healthCheck() const override { return hc_request_; }
 
@@ -46,7 +48,7 @@ struct RequestInfoImpl : public RequestInfo {
   Optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};
   uint64_t response_flags_{};
-  Upstream::HostDescriptionPtr upstream_host_{};
+  Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
 };
 

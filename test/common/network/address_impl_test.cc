@@ -11,6 +11,14 @@
 namespace Network {
 namespace Address {
 namespace {
+bool addressesEqual(const InstanceConstSharedPtr& a, const Instance& b) {
+  if (a == nullptr || a->type() != Type::Ip || b.type() != Type::Ip) {
+    return false;
+  } else {
+    return a->ip()->addressAsString() == b.ip()->addressAsString();
+  }
+}
+
 void makeFdBlocking(int fd) {
   const int flags = ::fcntl(fd, F_GETFL, 0);
   ASSERT_GE(flags, 0);
@@ -48,7 +56,7 @@ void testSocketBindAndConnect(const Instance& loopbackPort) {
   err = errno;
   ASSERT_EQ(rc, 0) << loopbackPort.asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
 }
-}
+} // namespace
 
 TEST(Ipv4InstanceTest, SocketAddress) {
   sockaddr_in addr4;
@@ -62,6 +70,7 @@ TEST(Ipv4InstanceTest, SocketAddress) {
   EXPECT_EQ("1.2.3.4", address.ip()->addressAsString());
   EXPECT_EQ(6502U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(parseInternetAddress("1.2.3.4"), address));
 }
 
 TEST(Ipv4InstanceTest, AddressOnly) {
@@ -71,6 +80,7 @@ TEST(Ipv4InstanceTest, AddressOnly) {
   EXPECT_EQ("3.4.5.6", address.ip()->addressAsString());
   EXPECT_EQ(0U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(parseInternetAddress("3.4.5.6"), address));
 }
 
 TEST(Ipv4InstanceTest, AddressAndPort) {
@@ -81,6 +91,7 @@ TEST(Ipv4InstanceTest, AddressAndPort) {
   EXPECT_FALSE(address.ip()->isAnyAddress());
   EXPECT_EQ(80U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(parseInternetAddress("127.0.0.1"), address));
 }
 
 TEST(Ipv4InstanceTest, PortOnly) {
@@ -91,11 +102,17 @@ TEST(Ipv4InstanceTest, PortOnly) {
   EXPECT_TRUE(address.ip()->isAnyAddress());
   EXPECT_EQ(443U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(parseInternetAddress("0.0.0.0"), address));
 }
 
 TEST(Ipv4InstanceTest, BadAddress) {
   EXPECT_THROW(Ipv4Instance("foo"), EnvoyException);
   EXPECT_THROW(Ipv4Instance("bar", 1), EnvoyException);
+  EXPECT_EQ(parseInternetAddress(""), nullptr);
+  EXPECT_EQ(parseInternetAddress("1.2.3"), nullptr);
+  EXPECT_EQ(parseInternetAddress("1.2.3.4.5"), nullptr);
+  EXPECT_EQ(parseInternetAddress("1.2.3.256"), nullptr);
+  EXPECT_EQ(parseInternetAddress("foo"), nullptr);
 }
 
 TEST(Ipv4InstanceTest, SocketBindAndConnect) {
@@ -119,6 +136,7 @@ TEST(Ipv6InstanceTest, SocketAddress) {
   EXPECT_FALSE(address.ip()->isAnyAddress());
   EXPECT_EQ(32000U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(parseInternetAddress("1:0023::0Ef"), address));
 }
 
 TEST(Ipv6InstanceTest, AddressOnly) {
@@ -128,6 +146,7 @@ TEST(Ipv6InstanceTest, AddressOnly) {
   EXPECT_EQ("2001:db8:85a3::8a2e:370:7334", address.ip()->addressAsString());
   EXPECT_EQ(0U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(parseInternetAddress("2001:db8:85a3::8a2e:0370:7334"), address));
 }
 
 TEST(Ipv6InstanceTest, AddressAndPort) {
@@ -137,6 +156,7 @@ TEST(Ipv6InstanceTest, AddressAndPort) {
   EXPECT_EQ("::1", address.ip()->addressAsString());
   EXPECT_EQ(80U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(parseInternetAddress("0:0:0:0:0:0:0:1"), address));
 }
 
 TEST(Ipv6InstanceTest, PortOnly) {
@@ -147,11 +167,15 @@ TEST(Ipv6InstanceTest, PortOnly) {
   EXPECT_TRUE(address.ip()->isAnyAddress());
   EXPECT_EQ(443U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
+  EXPECT_TRUE(addressesEqual(parseInternetAddress("::0000"), address));
 }
 
 TEST(Ipv6InstanceTest, BadAddress) {
   EXPECT_THROW(Ipv6Instance("foo"), EnvoyException);
   EXPECT_THROW(Ipv6Instance("bar", 1), EnvoyException);
+  EXPECT_EQ(parseInternetAddress("0:0:0:0"), nullptr);
+  EXPECT_EQ(parseInternetAddress("fffff::"), nullptr);
+  EXPECT_EQ(parseInternetAddress("/foo"), nullptr);
 }
 
 TEST(Ipv6InstanceTest, SocketBindAndConnect) {

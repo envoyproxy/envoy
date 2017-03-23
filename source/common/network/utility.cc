@@ -1,4 +1,4 @@
-#include "utility.h"
+#include "common/network/utility.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
@@ -75,15 +75,16 @@ IpList::IpList(const Json::Object& config, const std::string& member_name)
 const std::string Utility::TCP_SCHEME = "tcp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 
-Address::InstancePtr Utility::resolveUrl(const std::string& url) {
+Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   // TODO(mattklein123): IPv6 support.
   // TODO(mattklein123): We still support the legacy tcp:// and unix:// names. We should
   // support/parse ip:// and pipe:// as better names.
   if (url.find(TCP_SCHEME) == 0) {
-    return Address::InstancePtr{
+    return Address::InstanceConstSharedPtr{
         new Address::Ipv4Instance(hostFromTcpUrl(url), portFromTcpUrl(url))};
   } else if (url.find(UNIX_SCHEME) == 0) {
-    return Address::InstancePtr{new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
+    return Address::InstanceConstSharedPtr{
+        new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
   } else {
     throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
   }
@@ -121,10 +122,10 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   }
 }
 
-Address::InstancePtr Utility::getLocalAddress() {
+Address::InstanceConstSharedPtr Utility::getLocalAddress() {
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;
-  Address::InstancePtr ret;
+  Address::InstanceConstSharedPtr ret;
 
   int rc = getifaddrs(&ifaddr);
   RELEASE_ASSERT(!rc);
@@ -178,7 +179,19 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
   return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
 }
 
-Address::InstancePtr Utility::getOriginalDst(int fd) {
+Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {
+  // Initialized on first call in a thread-safe manner.
+  static Address::InstanceConstSharedPtr any(new Address::Ipv4Instance(static_cast<uint32_t>(0)));
+  return any;
+}
+
+Address::InstanceConstSharedPtr Utility::getIpv6AnyAddress() {
+  // Initialized on first call in a thread-safe manner.
+  static Address::InstanceConstSharedPtr any(new Address::Ipv6Instance(static_cast<uint32_t>(0)));
+  return any;
+}
+
+Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
   int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
@@ -186,7 +199,7 @@ Address::InstancePtr Utility::getOriginalDst(int fd) {
   if (status == 0) {
     // TODO(mattklein123): IPv6 support
     ASSERT(orig_addr.ss_family == AF_INET);
-    return Address::InstancePtr{
+    return Address::InstanceConstSharedPtr{
         new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
   } else {
     return nullptr;

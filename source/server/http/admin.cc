@@ -125,11 +125,11 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
 
     for (auto& host : cluster.second.get().hosts()) {
       std::map<std::string, uint64_t> all_stats;
-      for (Stats::CounterPtr counter : host->counters()) {
+      for (Stats::CounterSharedPtr counter : host->counters()) {
         all_stats[counter->name()] = counter->value();
       }
 
-      for (Stats::GaugePtr gauge : host->gauges()) {
+      for (Stats::GaugeSharedPtr gauge : host->gauges()) {
         all_stats[gauge->name()] = gauge->value();
       }
 
@@ -163,7 +163,11 @@ Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Buffer::Instanc
 
   bool enable = query_params.begin()->second == "y";
   if (enable && !Profiler::Cpu::profilerEnabled()) {
-    Profiler::Cpu::startProfiler("/var/log/envoy/envoy.prof");
+    if (!Profiler::Cpu::startProfiler(profile_path_)) {
+      response.add("failure to start the profiler");
+      return Http::Code::InternalServerError;
+    }
+
   } else if (!enable && Profiler::Cpu::profilerEnabled()) {
     Profiler::Cpu::stopProfiler();
   }
@@ -215,7 +219,7 @@ Http::Code AdminImpl::handlerLogging(const std::string& url, Buffer::Instance& r
 }
 
 Http::Code AdminImpl::handlerResetCounters(const std::string&, Buffer::Instance& response) {
-  for (Stats::CounterPtr counter : server_.stats().counters()) {
+  for (Stats::CounterSharedPtr counter : server_.stats().counters()) {
     counter->reset();
   }
 
@@ -237,11 +241,11 @@ Http::Code AdminImpl::handlerStats(const std::string&, Buffer::Instance& respons
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   std::map<std::string, uint64_t> all_stats;
-  for (Stats::CounterPtr counter : server_.stats().counters()) {
+  for (Stats::CounterSharedPtr counter : server_.stats().counters()) {
     all_stats.emplace(counter->name(), counter->value());
   }
 
-  for (Stats::GaugePtr gauge : server_.stats().gauges()) {
+  for (Stats::GaugeSharedPtr gauge : server_.stats().gauges()) {
     all_stats.emplace(gauge->name(), gauge->value());
   }
 
@@ -295,8 +299,10 @@ void AdminFilter::onComplete() {
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
     : config_(new Router::NullConfigImpl()) {}
 
-AdminImpl::AdminImpl(const std::string& access_log_path, uint32_t port, Server::Instance& server)
-    : server_(server), socket_(new Network::TcpListenSocket(port, true)),
+AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
+                     Network::Address::InstanceConstSharedPtr address, Server::Instance& server)
+    : server_(server), profile_path_(profile_path),
+      socket_(new Network::TcpListenSocket(address, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),
@@ -329,13 +335,13 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
 }
 
 bool AdminImpl::createFilterChain(Network::Connection& connection) {
-  connection.addReadFilter(Network::ReadFilterPtr{new Http::ConnectionManagerImpl(
+  connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime())});
   return true;
 }
 
 void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterPtr{new AdminFilter(*this)});
+  callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new AdminFilter(*this)});
 }
 
 Http::Code AdminImpl::runCallback(const std::string& path, Buffer::Instance& response) {

@@ -32,7 +32,7 @@ public:
    *        context information. Load balancers should be written to assume that context information
    *        is missing and use sensible defaults.
    */
-  virtual ConstHostPtr chooseHost(const LoadBalancerContext* context) PURE;
+  virtual HostConstSharedPtr chooseHost(const LoadBalancerContext* context) PURE;
 };
 
 typedef std::unique_ptr<LoadBalancer> LoadBalancerPtr;

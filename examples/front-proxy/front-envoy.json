@@ -44,7 +44,7 @@
   ],
   "admin": {
     "access_log_path": "/dev/null",
-    "port": 8001
+    "address": "tcp://0.0.0.0:8001"
   },
   "cluster_manager": {
     "clusters": [

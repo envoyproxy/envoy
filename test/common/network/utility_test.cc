@@ -123,7 +123,7 @@ TEST(NetworkUtility, Url) {
 
 TEST(NetworkUtility, getLocalAddress) { EXPECT_NE(nullptr, Utility::getLocalAddress()); }
 
-TEST(NetworkUtlity, getOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
+TEST(NetworkUtility, getOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
 
 TEST(NetworkUtility, loopbackAddress) {
   {
@@ -137,6 +137,25 @@ TEST(NetworkUtility, loopbackAddress) {
   {
     Address::PipeInstance address("/foo");
     EXPECT_FALSE(Utility::isLoopbackAddress(address));
+  }
+}
+
+TEST(NetworkUtility, AnyAddress) {
+  {
+    Address::InstanceConstSharedPtr any = Utility::getIpv4AnyAddress();
+    ASSERT_TRUE(any != nullptr);
+    EXPECT_EQ(any->type(), Address::Type::Ip);
+    EXPECT_EQ(any->ip()->version(), Address::IpVersion::v4);
+    EXPECT_EQ(any->asString(), "0.0.0.0:0");
+    EXPECT_EQ(any, Utility::getIpv4AnyAddress());
+  }
+  {
+    Address::InstanceConstSharedPtr any = Utility::getIpv6AnyAddress();
+    ASSERT_TRUE(any != nullptr);
+    EXPECT_EQ(any->type(), Address::Type::Ip);
+    EXPECT_EQ(any->ip()->version(), Address::IpVersion::v6);
+    EXPECT_EQ(any->asString(), "[::]:0");
+    EXPECT_EQ(any, Utility::getIpv6AnyAddress());
   }
 }
 

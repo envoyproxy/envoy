@@ -247,9 +247,8 @@ TEST(SslConnectionImplTest, SslError) {
 
 class SslReadBufferLimitTest : public testing::Test {
 public:
-  void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
-    const uint32_t buffer_size = 256 * 1024;
-
+  void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
+                           uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
     Network::TcpListenSocket socket(uint32_t(10000), true);
@@ -306,10 +305,10 @@ public:
     EXPECT_CALL(*read_filter, onNewConnection());
     EXPECT_CALL(*read_filter, onData(_))
         .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Network::FilterStatus {
-          EXPECT_EQ(expected_chunk_size, data.length());
+          EXPECT_GE(expected_chunk_size, data.length());
           filter_seen += data.length();
           data.drain(data.length());
-          if (filter_seen == buffer_size) {
+          if (filter_seen == (write_size * num_writes)) {
             server_connection->close(Network::ConnectionCloseType::FlushWrite);
           }
           return Network::FilterStatus::StopIteration;
@@ -320,18 +319,41 @@ public:
     EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::Connected));
     EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](uint32_t) -> void {
-          EXPECT_EQ(buffer_size, filter_seen);
+          EXPECT_EQ((write_size * num_writes), filter_seen);
           dispatcher.exit();
         }));
 
-    Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
-    client_connection->write(data);
+    for (uint32_t i = 0; i < num_writes; i++) {
+      Buffer::OwnedImpl data(std::string(write_size, 'a'));
+
+      // Incredibly contrived way of making sure that the write buffer has an empty chain in it.
+      if (reserve_write_space) {
+        Buffer::RawSlice iovecs[2];
+        EXPECT_EQ(2UL, data.reserve(16384, iovecs, 2));
+        iovecs[0].len_ = 0;
+        iovecs[1].len_ = 0;
+        data.commit(iovecs, 2);
+      }
+
+      client_connection->write(data);
+    }
+
     dispatcher.run(Event::Dispatcher::RunType::Block);
   }
 };
 
-TEST_F(SslReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
+TEST_F(SslReadBufferLimitTest, NoLimit) {
+  readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1, false);
+}
 
-TEST_F(SslReadBufferLimitTest, SomeLimit) { readBufferLimitTest(32 * 1024, 32 * 1024); }
+TEST_F(SslReadBufferLimitTest, NoLimitReserveSpace) { readBufferLimitTest(0, 512, 512, 1, true); }
+
+TEST_F(SslReadBufferLimitTest, NoLimitSmallWrites) {
+  readBufferLimitTest(0, 256 * 1024, 1, 256 * 1024, false);
+}
+
+TEST_F(SslReadBufferLimitTest, SomeLimit) {
+  readBufferLimitTest(32 * 1024, 32 * 1024, 256 * 1024, 1, false);
+}
 
 } // Ssl

@@ -241,8 +241,8 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
-RoutePtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& headers,
-                                          uint64_t random_value) const {
+RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& headers,
+                                                     uint64_t random_value) const {
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
   if (weighted_clusters_.empty()) {
@@ -272,7 +272,7 @@ RoutePtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& headers,
   // Find the right cluster to route to based on the interval in which
   // the selected value falls.  The intervals are determined as
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
-  for (const WeightedClusterEntryPtr& cluster : weighted_clusters_) {
+  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
     end = begin + cluster->clusterWeight();
     if (((selected_value >= begin) && (selected_value < end)) ||
         (end >= WeightedClusterEntry::MAX_CLUSTER_WEIGHT)) {
@@ -304,7 +304,7 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
       throw EnvoyException(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
   } else if (!weighted_clusters_.empty()) {
-    for (const WeightedClusterEntryPtr& cluster : weighted_clusters_) {
+    for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
       if (!cm.get(cluster->clusterName())) {
         throw EnvoyException(
             fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
@@ -323,8 +323,8 @@ void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) cons
   finalizePathHeader(headers, prefix_);
 }
 
-RoutePtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
-                                       uint64_t random_value) const {
+RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value) &&
       StringUtil::startsWith(headers.Path()->value().c_str(), prefix_, case_sensitive_)) {
     return clusterEntry(headers, random_value);
@@ -342,7 +342,8 @@ void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers) const 
   finalizePathHeader(headers, path_);
 }
 
-RoutePtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers, uint64_t random_value) const {
+RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                                uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value)) {
     // TODO(mattklein123) PERF: Avoid copy.
     std::string path = headers.Path()->value().c_str();
@@ -414,7 +415,7 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Load
 
 bool VirtualHostImpl::usesRuntime() const {
   bool uses = false;
-  for (const RouteEntryImplBasePtr& route : routes_) {
+  for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
     // Currently a base runtime rule as well as a shadow rule can use runtime.
     uses |= (route->usesRuntime() || !route->shadowPolicy().runtimeKey().empty());
   }
@@ -438,7 +439,7 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
   config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
   for (const Json::ObjectPtr& virtual_host_config : config.getObjectArray("virtual_hosts")) {
-    VirtualHostPtr virtual_host(
+    VirtualHostSharedPtr virtual_host(
         new VirtualHostImpl(*virtual_host_config, runtime, cm, validate_clusters));
     uses_runtime_ |= virtual_host->usesRuntime();
 
@@ -460,8 +461,8 @@ RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
   }
 }
 
-RoutePtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
-                                              uint64_t random_value) const {
+RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
+                                                         uint64_t random_value) const {
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto()->value() != "https") {
     return SSL_REDIRECT_ROUTE;
@@ -471,8 +472,8 @@ RoutePtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
   }
 
   // Check for a route that matches the request.
-  for (const RouteEntryImplBasePtr& route : routes_) {
-    RoutePtr route_entry = route->matches(headers, random_value);
+  for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
+    RouteConstSharedPtr route_entry = route->matches(headers, random_value);
     if (nullptr != route_entry) {
       return route_entry;
     }
@@ -497,7 +498,8 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   return nullptr;
 }
 
-RoutePtr RouteMatcher::route(const Http::HeaderMap& headers, uint64_t random_value) const {
+RouteConstSharedPtr RouteMatcher::route(const Http::HeaderMap& headers,
+                                        uint64_t random_value) const {
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
     return virtual_host->getRouteFromEntries(headers, random_value);

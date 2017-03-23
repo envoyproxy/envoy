@@ -27,10 +27,10 @@ void Worker::initializeConfiguration(Server::Configuration::Main& config,
         .per_connection_buffer_limit_bytes_ = listener->perConnectionBufferLimitBytes()};
     if (listener->sslContext()) {
       handler_->addSslListener(listener->filterChainFactory(), *listener->sslContext(),
-                               *socket_map.at(listener.get()), listener_options);
+                               *socket_map.at(listener.get()), listener->scope(), listener_options);
     } else {
       handler_->addListener(listener->filterChainFactory(), *socket_map.at(listener.get()),
-                            listener_options);
+                            listener->scope(), listener_options);
     }
   }
 

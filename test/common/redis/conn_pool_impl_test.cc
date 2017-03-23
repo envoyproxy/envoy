@@ -45,7 +45,7 @@ public:
   MockDecoder* decoder_{new MockDecoder()};
   DecoderCallbacks* callbacks_{};
   NiceMock<Network::MockClientConnection>* upstream_connection_{};
-  Network::ReadFilterPtr upstream_read_filter_;
+  Network::ReadFilterSharedPtr upstream_read_filter_;
   ClientPtr client_;
 };
 
@@ -165,11 +165,11 @@ TEST(RedisClientFactoryImplTest, Basic) {
 class RedisConnPoolImplTest : public testing::Test, public ClientFactory {
 public:
   // Redis::ConnPool::ClientFactory
-  ClientPtr create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher) override {
+  ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher) override {
     return ClientPtr{create_(host, dispatcher)};
   }
 
-  MOCK_METHOD2(create_, Client*(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher));
+  MOCK_METHOD2(create_, Client*(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher));
 
   const std::string cluster_name_{"foo"};
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -186,10 +186,11 @@ TEST_F(RedisConnPoolImplTest, Basic) {
   MockClient* client = new NiceMock<MockClient>();
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
-      .WillOnce(Invoke([&](const Upstream::LoadBalancerContext* context) -> Upstream::ConstHostPtr {
-        EXPECT_EQ(context->hashKey().value(), std::hash<std::string>()("foo"));
-        return cm_.thread_local_cluster_.lb_.host_;
-      }));
+      .WillOnce(
+          Invoke([&](const Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+            EXPECT_EQ(context->hashKey().value(), std::hash<std::string>()("foo"));
+            return cm_.thread_local_cluster_.lb_.host_;
+          }));
   EXPECT_CALL(*this, create_(_, _)).WillOnce(Return(client));
   EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
   ActiveRequest* request = conn_pool_.makeRequest("foo", value, callbacks);

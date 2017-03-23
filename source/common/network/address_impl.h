@@ -35,12 +35,12 @@ public:
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
    */
-  Ipv4Instance(const sockaddr_in* address);
+  explicit Ipv4Instance(const sockaddr_in* address);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4". Port will be unset/0.
    */
-  Ipv4Instance(const std::string& address);
+  explicit Ipv4Instance(const std::string& address);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4" as well as a port.
@@ -51,7 +51,7 @@ public:
    * Construct from a port. The IPv4 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
-  Ipv4Instance(uint32_t port);
+  explicit Ipv4Instance(uint32_t port);
 
   // Network::Address::Instance
   int bind(int fd) const override;
@@ -89,12 +89,12 @@ public:
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
    */
-  Ipv6Instance(const sockaddr_in6& address);
+  explicit Ipv6Instance(const sockaddr_in6& address);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5". Port will be unset/0.
    */
-  Ipv6Instance(const std::string& address);
+  explicit Ipv6Instance(const std::string& address);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5" as well as a port.
@@ -105,7 +105,7 @@ public:
    * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
-  Ipv6Instance(uint32_t port);
+  explicit Ipv6Instance(uint32_t port);
 
   // Network::Address::Instance
   int bind(int fd) const override;
@@ -140,6 +140,14 @@ private:
   IpHelper ip_;
 };
 
+/*
+ * Parse an internet host address (IPv4 or IPv6) and create an Instance from it.
+ * The address must not include a port number.
+ * @param ip_addr string to be parsed as an internet address.
+ * @return pointer to the Instance, or nullptr if unable to parse the address.
+ */
+InstanceConstSharedPtr parseInternetAddress(const std::string& ip_addr);
+
 /**
  * Implementation of a pipe address (unix domain socket on unix).
  */
@@ -148,12 +156,12 @@ public:
   /**
    * Construct from an existing unix address.
    */
-  PipeInstance(const sockaddr_un* address);
+  explicit PipeInstance(const sockaddr_un* address);
 
   /**
    * Construct from a string pipe path.
    */
-  PipeInstance(const std::string& pipe_path);
+  explicit PipeInstance(const std::string& pipe_path);
 
   // Network::Address::Instance
   int bind(int fd) const override;

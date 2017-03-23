@@ -22,7 +22,8 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& access_log_path, uint32_t port, Server::Instance& server);
+  AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
+            Network::Address::InstanceConstSharedPtr address, Server::Instance& server);
 
   Http::Code runCallback(const std::string& path, Buffer::Instance& response);
   Network::ListenSocket& socket() { return *socket_; }
@@ -40,7 +41,9 @@ public:
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
-  const std::list<Http::AccessLog::InstancePtr>& accessLogs() override { return access_logs_; }
+  const std::list<Http::AccessLog::InstanceSharedPtr>& accessLogs() override {
+    return access_logs_;
+  }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks) override;
@@ -79,9 +82,9 @@ private:
     NullRouteConfigProvider();
 
     // Router::RouteConfigProvider
-    Router::ConfigPtr config() override { return config_; }
+    Router::ConfigConstSharedPtr config() override { return config_; }
 
-    Router::ConfigPtr config_;
+    Router::ConfigConstSharedPtr config_;
   };
 
   /**
@@ -109,7 +112,8 @@ private:
   Http::Code handlerQuitQuitQuit(const std::string& url, Buffer::Instance& response);
 
   Server::Instance& server_;
-  std::list<Http::AccessLog::InstancePtr> access_logs_;
+  std::list<Http::AccessLog::InstanceSharedPtr> access_logs_;
+  const std::string profile_path_;
   Network::ListenSocketPtr socket_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;

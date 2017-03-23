@@ -1,5 +1,6 @@
-#include "base64.h"
-#include "empty_string.h"
+#include "common/common/base64.h"
+
+#include "common/common/empty_string.h"
 
 static constexpr char CHAR_TABLE[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

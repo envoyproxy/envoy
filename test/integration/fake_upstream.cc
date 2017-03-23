@@ -123,7 +123,7 @@ FakeHttpConnection::FakeHttpConnection(Network::Connection& connection, Stats::S
     ASSERT(type == Type::HTTP2);
   }
 
-  connection.addReadFilter(Network::ReadFilterPtr{new ReadFilter(*this)});
+  connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
 }
 
 void FakeConnectionBase::close() {
@@ -222,10 +222,10 @@ bool FakeUpstream::createFilterChain(Network::Connection& connection) {
 
 void FakeUpstream::threadRoutine() {
   if (ssl_ctx_) {
-    handler_.addSslListener(*this, *ssl_ctx_, *socket_,
+    handler_.addSslListener(*this, *ssl_ctx_, *socket_, stats_store_,
                             Network::ListenerOptions::listenerOptionsWithBindToPort());
   } else {
-    handler_.addListener(*this, *socket_,
+    handler_.addListener(*this, *socket_, stats_store_,
                          Network::ListenerOptions::listenerOptionsWithBindToPort());
   }
 

@@ -1,5 +1,4 @@
-#include "connection_impl.h"
-#include "utility.h"
+#include "common/network/connection_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/event/timer.h"
@@ -36,12 +35,12 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 // TODO(mattklein123): Currently we don't populate local address for client connections. Nothing
 // looks at this currently, but we may want to populate this later for logging purposes.
-const Address::InstancePtr
+const Address::InstanceConstSharedPtr
     ConnectionImpl::null_local_address_(new Address::Ipv4Instance("0.0.0.0"));
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                               Address::InstancePtr remote_address,
-                               Address::InstancePtr local_address)
+                               Address::InstanceConstSharedPtr remote_address,
+                               Address::InstanceConstSharedPtr local_address)
     : filter_manager_(*this, *this), remote_address_(remote_address), local_address_(local_address),
       dispatcher_(dispatcher), fd_(fd), id_(++next_global_id_) {
 
@@ -66,13 +65,15 @@ ConnectionImpl::~ConnectionImpl() {
   close(ConnectionCloseType::NoFlush);
 }
 
-void ConnectionImpl::addWriteFilter(WriteFilterPtr filter) {
+void ConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
   filter_manager_.addWriteFilter(filter);
 }
 
-void ConnectionImpl::addFilter(FilterPtr filter) { filter_manager_.addFilter(filter); }
+void ConnectionImpl::addFilter(FilterSharedPtr filter) { filter_manager_.addFilter(filter); }
 
-void ConnectionImpl::addReadFilter(ReadFilterPtr filter) { filter_manager_.addReadFilter(filter); }
+void ConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
+  filter_manager_.addReadFilter(filter);
+}
 
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
@@ -231,6 +232,12 @@ void ConnectionImpl::write(Buffer::Instance& data) {
 
   if (data.length() > 0) {
     conn_log_trace("writing {} bytes", *this, data.length());
+    // TODO(mattklein123): All data currently gets moved from the source buffer to the write buffer.
+    // This can lead to inefficient behavior if writing a bunch of small chunks. In this case, it
+    // would likely be more efficient to copy data below a certain size. VERY IMPORTANT: If this is
+    // ever changed, read the comment in Ssl::ConnectionImpl::doWriteToSocket() VERY carefully.
+    // That code assumes that we never change existing write_buffer_ chain elements between calls
+    // to SSL_write(). That code will have to change if we ever copy here.
     write_buffer_.move(data);
     if (!(state_ & InternalState::Connecting)) {
       file_event_->activate(Event::FileReadyType::Write);
@@ -431,7 +438,7 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
-                                           Address::InstancePtr address)
+                                           Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Address::SocketType::Stream), address,
                      null_local_address_) {}
 

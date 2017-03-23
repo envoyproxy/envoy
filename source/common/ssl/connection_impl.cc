@@ -1,4 +1,4 @@
-#include "connection_impl.h"
+#include "common/ssl/connection_impl.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -11,8 +11,8 @@
 namespace Ssl {
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                               Network::Address::InstancePtr remote_address,
-                               Network::Address::InstancePtr local_address, Context& ctx,
+                               Network::Address::InstanceConstSharedPtr remote_address,
+                               Network::Address::InstanceConstSharedPtr local_address, Context& ctx,
                                InitialState state)
     : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
@@ -134,47 +134,57 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
     }
   }
 
-  if (write_buffer_.length() == 0) {
-    return {PostIoAction::KeepOpen, 0};
-  }
+  uint64_t original_buffer_length = write_buffer_.length();
+  uint64_t total_bytes_written = 0;
+  bool keep_writing = true;
+  while ((original_buffer_length != total_bytes_written) && keep_writing) {
+    // Protect against stack overflow if the buffer has a very large buffer chain.
+    // TODO(mattklein123): See the comment on getRawSlices() for why we have to also check
+    // original_buffer_length != total_bytes_written during loop iteration.
+    // TODO(mattklein123): As it relates to our fairness efforts, we might want to limit the number
+    // of iterations of this loop, either by pure iterations, bytes written, etc.
+    const uint64_t MAX_SLICES = 32;
+    Buffer::RawSlice slices[MAX_SLICES];
+    uint64_t num_slices = write_buffer_.getRawSlices(slices, MAX_SLICES);
 
-  uint64_t num_slices = write_buffer_.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  write_buffer_.getRawSlices(slices, num_slices);
+    uint64_t inner_bytes_written = 0;
+    for (uint64_t i = 0; (i < num_slices) && (original_buffer_length != total_bytes_written); i++) {
+      // SSL_write() requires that if a previous call returns SSL_ERROR_WANT_WRITE, we need to call
+      // it again with the same parameters. Most implementations keep track of the last write size.
+      // In our case we don't need to do that because: a) SSL_write() will not write partial
+      // buffers. b) We only move() into the write buffer, which means that it's impossible for a
+      // particular chain to increase in size. So as long as we start writing where we left off we
+      // are guaranteed to call SSL_write() with the same parameters.
+      int rc = SSL_write(ssl_.get(), slices[i].mem_, slices[i].len_);
+      conn_log_trace("ssl write returns: {}", *this, rc);
+      if (rc > 0) {
+        inner_bytes_written += rc;
+        total_bytes_written += rc;
+      } else {
+        int err = SSL_get_error(ssl_.get(), rc);
+        switch (err) {
+        case SSL_ERROR_WANT_WRITE:
+          keep_writing = false;
+          break;
+        case SSL_ERROR_WANT_READ:
+        // Renegotiation has started. We don't handle renegotiation so just fall through.
+        default:
+          drainErrorQueue();
+          return {PostIoAction::Close, total_bytes_written};
+        }
 
-  uint64_t bytes_written = 0;
-  for (uint64_t i = 0; i < num_slices; i++) {
-    // SSL_write() requires that if a previous call returns SSL_ERROR_WANT_WRITE, we need to call
-    // it again with the same parameters. Most implementations keep track of the last write size.
-    // In our case we don't need to do that because: a) SSL_write() will not write partial buffers.
-    // b) We only move() into the write buffer, which means that it's impossible for a particular
-    // chain to increase in size. So as long as we start writing where we left off we are guaranteed
-    // to call SSL_write() with the same parameters.
-    int rc = SSL_write(ssl_.get(), slices[i].mem_, slices[i].len_);
-    conn_log_trace("ssl write returns: {}", *this, rc);
-    if (rc > 0) {
-      bytes_written += rc;
-    } else {
-      int err = SSL_get_error(ssl_.get(), rc);
-      switch (err) {
-      case SSL_ERROR_WANT_WRITE:
         break;
-      case SSL_ERROR_WANT_READ:
-      // Renegotiation has started. We don't handle renegotiation so just fall through.
-      default:
-        drainErrorQueue();
-        return {PostIoAction::Close, bytes_written};
       }
+    }
 
-      break;
+    // Draining must be done within the inner loop, otherwise we will keep getting the same slices
+    // at the beginning of the buffer.
+    if (inner_bytes_written > 0) {
+      write_buffer_.drain(inner_bytes_written);
     }
   }
 
-  if (bytes_written > 0) {
-    write_buffer_.drain(bytes_written);
-  }
-
-  return {PostIoAction::KeepOpen, bytes_written};
+  return {PostIoAction::KeepOpen, total_bytes_written};
 }
 
 void ConnectionImpl::onConnected() { ASSERT(!handshake_complete_); }
@@ -226,7 +236,7 @@ std::string ConnectionImpl::uriSanPeerCertificate() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
-                                           Network::Address::InstancePtr address)
+                                           Network::Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
                      null_local_address_, ctx, InitialState::Client) {}
 

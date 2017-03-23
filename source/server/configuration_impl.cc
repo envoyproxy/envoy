@@ -114,10 +114,15 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { return listeners_; }
 
 MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json) : parent_(parent) {
-  std::string addr = json.getString("address");
-  address_ = Network::Utility::resolveUrl(addr);
-  scope_ = parent_.server_.stats().createScope(fmt::format("listener.{}.", addr));
-  log().info("  address={}", addr);
+  address_ = Network::Utility::resolveUrl(json.getString("address"));
+
+  // ':' is a reserved char in statsd. Do the translation here to avoid costly inline translations
+  // later.
+  std::string final_stat_name = fmt::format("listener.{}.", address_->asString());
+  std::replace(final_stat_name.begin(), final_stat_name.end(), ':', '_');
+
+  scope_ = parent_.server_.stats().createScope(final_stat_name);
+  log().info("  address={}", address_->asString());
 
   json.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
@@ -180,7 +185,8 @@ bool MainImpl::ListenerConfig::createFilterChain(Network::Connection& connection
 InitialImpl::InitialImpl(const Json::Object& json) {
   Json::ObjectPtr admin = json.getObject("admin");
   admin_.access_log_path_ = admin->getString("access_log_path");
-  admin_.port_ = admin->getInteger("port");
+  admin_.profile_path_ = admin->getString("profile_path", "/var/log/envoy/envoy.prof");
+  admin_.address_ = Network::Utility::resolveUrl(admin->getString("address"));
 
   if (json.hasObject("flags_path")) {
     flags_path_.value(json.getString("flags_path"));

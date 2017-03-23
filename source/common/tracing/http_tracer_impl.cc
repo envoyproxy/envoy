@@ -236,13 +236,15 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
         fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_->name()));
   }
 
-  tls_.set(tls_slot_, [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
-    lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
-        *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::ref(dispatcher),
-                             std::placeholders::_1)));
+  tls_.set(tls_slot_,
+           [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+             lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
+                 *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this),
+                                      std::ref(dispatcher), std::placeholders::_1)));
 
-    return ThreadLocal::ThreadLocalObjectPtr{new TlsLightStepTracer(std::move(tracer), *this)};
-  });
+             return ThreadLocal::ThreadLocalObjectSharedPtr{
+                 new TlsLightStepTracer(std::move(tracer), *this)};
+           });
 }
 
 SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
@@ -254,11 +256,11 @@ SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
     // Extract downstream context from HTTP carrier.
     // This code is safe even if decode returns empty string or data is malformed.
     std::string parent_context = Base64::decode(request_headers.OtSpanContext()->value().c_str());
-    lightstep::envoy::CarrierStruct ctx;
+    lightstep::BinaryCarrier ctx;
     ctx.ParseFromString(parent_context);
 
     lightstep::SpanContext parent_span_ctx = tracer.Extract(
-        lightstep::CarrierFormat::EnvoyProtoCarrier, lightstep::envoy::ProtoReader(ctx));
+        lightstep::CarrierFormat::LightStepBinaryCarrier, lightstep::ProtoReader(ctx));
     lightstep::Span ls_span =
         tracer.StartSpan(operation_name, {lightstep::ChildOf(parent_span_ctx),
                                           lightstep::StartTimestamp(start_time)});
@@ -270,9 +272,9 @@ SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
   }
 
   // Inject newly created span context into HTTP carrier.
-  lightstep::envoy::CarrierStruct ctx;
-  tracer.Inject(active_span->context(), lightstep::CarrierFormat::EnvoyProtoCarrier,
-                lightstep::envoy::ProtoWriter(&ctx));
+  lightstep::BinaryCarrier ctx;
+  tracer.Inject(active_span->context(), lightstep::CarrierFormat::LightStepBinaryCarrier,
+                lightstep::ProtoWriter(&ctx));
   const std::string current_span_context = ctx.SerializeAsString();
   request_headers.insertOtSpanContext().value(
       Base64::encode(current_span_context.c_str(), current_span_context.length()));

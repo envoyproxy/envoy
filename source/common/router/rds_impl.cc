@@ -56,13 +56,14 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     throw EnvoyException(fmt::format("rds: unknown remote cluster '{}'", remote_cluster_name_));
   }
 
-  ConfigPtr initial_config(new NullConfigImpl());
-  tls_.set(tls_slot_, [initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr {
-    return ThreadLocal::ThreadLocalObjectPtr{new ThreadLocalConfig(initial_config)};
-  });
+  ConfigConstSharedPtr initial_config(new NullConfigImpl());
+  tls_.set(tls_slot_,
+           [initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+             return ThreadLocal::ThreadLocalObjectSharedPtr{new ThreadLocalConfig(initial_config)};
+           });
 }
 
-Router::ConfigPtr RdsRouteConfigProviderImpl::config() {
+Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
   return tls_.getTyped<ThreadLocalConfig>(tls_slot_).config_;
 }
 
@@ -81,7 +82,7 @@ void RdsRouteConfigProviderImpl::parseResponse(const Http::Message& response) {
   uint64_t new_hash = response_json->hash();
   if (new_hash != last_config_hash_ || !initialized_) {
     response_json->validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
-    ConfigPtr new_config(new ConfigImpl(*response_json, runtime_, cm_, false));
+    ConfigConstSharedPtr new_config(new ConfigImpl(*response_json, runtime_, cm_, false));
     initialized_ = true;
     last_config_hash_ = new_hash;
     stats_.config_reload_.inc();

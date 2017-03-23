@@ -255,7 +255,7 @@
     }]
   }],
 
-  "admin": { "access_log_path": "/dev/null", "port": 10003 },
+  "admin": { "access_log_path": "/dev/null", "address": "tcp://127.0.0.1:10003" },
 
   "cluster_manager": {
     "clusters": [

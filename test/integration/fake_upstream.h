@@ -123,7 +123,7 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
 class FakeRawConnection : Logger::Loggable<Logger::Id::testing>, public FakeConnectionBase {
 public:
   FakeRawConnection(Network::Connection& connection) : FakeConnectionBase(connection) {
-    connection.addReadFilter(Network::ReadFilterPtr{new ReadFilter(*this)});
+    connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
   void waitForData(uint64_t num_bytes);

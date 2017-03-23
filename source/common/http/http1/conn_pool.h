@@ -22,7 +22,7 @@ namespace Http1 {
  */
 class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::Instance {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host,
+  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority)
       : dispatcher_(dispatcher), host_(host), priority_(priority) {}
 
@@ -74,7 +74,7 @@ protected:
 
     ConnPoolImpl& parent_;
     CodecClientPtr codec_client_;
-    Upstream::HostDescriptionPtr real_host_description_;
+    Upstream::HostDescriptionConstSharedPtr real_host_description_;
     StreamWrapperPtr stream_wrapper_;
     Event::TimerPtr connect_timer_;
     Stats::TimespanPtr conn_length_;
@@ -111,7 +111,7 @@ protected:
 
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
-  Upstream::ConstHostPtr host_;
+  Upstream::HostConstSharedPtr host_;
   std::list<ActiveClientPtr> ready_clients_;
   std::list<ActiveClientPtr> busy_clients_;
   std::list<PendingRequestPtr> pending_requests_;
@@ -124,7 +124,7 @@ protected:
  */
 class ConnPoolImplProd : public ConnPoolImpl {
 public:
-  ConnPoolImplProd(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host,
+  ConnPoolImplProd(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority)
       : ConnPoolImpl(dispatcher, host, priority) {}
 

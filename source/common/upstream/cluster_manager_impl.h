@@ -30,11 +30,11 @@ public:
 
   // Upstream::ClusterManagerFactory
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
-                                                     ConstHostPtr host,
+                                                     HostConstSharedPtr host,
                                                      ResourcePriority priority) override;
   ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
                              const Optional<SdsConfig>& sds_config,
-                             Outlier::EventLoggerPtr outlier_event_logger) override;
+                             Outlier::EventLoggerSharedPtr outlier_event_logger) override;
   CdsApiPtr createCds(const Json::Object& config, ClusterManager& cm) override;
 
 private:
@@ -148,7 +148,7 @@ private:
     };
 
     struct ClusterEntry : public ThreadLocalCluster {
-      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoPtr cluster);
+      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster);
       ~ClusterEntry();
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
@@ -156,13 +156,13 @@ private:
 
       // Upstream::ThreadLocalCluster
       const HostSet& hostSet() override { return host_set_; }
-      ClusterInfoPtr info() override { return cluster_info_; }
+      ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
 
       ThreadLocalClusterManagerImpl& parent_;
       HostSetImpl host_set_;
       LoadBalancerPtr lb_;
-      ClusterInfoPtr cluster_info_;
+      ClusterInfoConstSharedPtr cluster_info_;
       Http::AsyncClientImpl http_async_client_;
     };
 
@@ -171,14 +171,14 @@ private:
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const Optional<std::string>& local_cluster_name);
     ~ThreadLocalClusterManagerImpl();
-    void drainConnPools(const std::vector<HostPtr>& hosts);
-    void drainConnPools(HostPtr old_host, ConnPoolsContainer& container);
-    static void updateClusterMembership(const std::string& name, ConstHostVectorPtr hosts,
-                                        ConstHostVectorPtr healthy_hosts,
-                                        ConstHostListsPtr hosts_per_zone,
-                                        ConstHostListsPtr healthy_hosts_per_zone,
-                                        const std::vector<HostPtr>& hosts_added,
-                                        const std::vector<HostPtr>& hosts_removed,
+    void drainConnPools(const std::vector<HostSharedPtr>& hosts);
+    void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
+    static void updateClusterMembership(const std::string& name, HostVectorConstSharedPtr hosts,
+                                        HostVectorConstSharedPtr healthy_hosts,
+                                        HostListsConstSharedPtr hosts_per_zone,
+                                        HostListsConstSharedPtr healthy_hosts_per_zone,
+                                        const std::vector<HostSharedPtr>& hosts_added,
+                                        const std::vector<HostSharedPtr>& hosts_removed,
                                         ThreadLocal::Instance& tls, uint32_t thread_local_slot);
 
     // ThreadLocal::ThreadLocalObject
@@ -187,7 +187,7 @@ private:
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
-    std::unordered_map<ConstHostPtr, ConnPoolsContainer> host_http_conn_pool_map_;
+    std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
     const HostSet* local_host_set_{};
   };
 
@@ -204,8 +204,8 @@ private:
   void loadCluster(const Json::Object& cluster, bool added_via_api);
   void postInitializeCluster(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& primary_cluster,
-                                    const std::vector<HostPtr>& hosts_added,
-                                    const std::vector<HostPtr>& hosts_removed);
+                                    const std::vector<HostSharedPtr>& hosts_added,
+                                    const std::vector<HostSharedPtr>& hosts_removed);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
@@ -215,7 +215,7 @@ private:
   uint32_t thread_local_slot_;
   std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
   Optional<SdsConfig> sds_config_;
-  Outlier::EventLoggerPtr outlier_event_logger_;
+  Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;

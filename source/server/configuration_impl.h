@@ -91,19 +91,20 @@ private:
 
     // Server::Configuration::Listener
     Network::FilterChainFactory& filterChainFactory() override { return *this; }
-    Network::Address::InstancePtr address() override { return address_; }
+    Network::Address::InstanceConstSharedPtr address() override { return address_; }
     bool bindToPort() override { return bind_to_port_; }
     Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
     bool useProxyProto() override { return use_proxy_proto_; }
     bool useOriginalDst() override { return use_original_dst_; }
     uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
+    Stats::Scope& scope() override { return *scope_; }
 
     // Network::FilterChainFactory
     bool createFilterChain(Network::Connection& connection) override;
 
   private:
     MainImpl& parent_;
-    Network::Address::InstancePtr address_;
+    Network::Address::InstanceConstSharedPtr address_;
     bool bind_to_port_{};
     Stats::ScopePtr scope_;
     Ssl::ServerContextPtr ssl_context_;
@@ -156,10 +157,12 @@ private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
     const std::string& accessLogPath() override { return access_log_path_; }
-    uint32_t port() override { return port_; }
+    const std::string& profilePath() override { return profile_path_; }
+    Network::Address::InstanceConstSharedPtr address() override { return address_; }
 
     std::string access_log_path_;
-    uint32_t port_;
+    std::string profile_path_;
+    Network::Address::InstanceConstSharedPtr address_;
   };
 
   struct RuntimeImpl : public Runtime {

@@ -1,4 +1,4 @@
-#include "context_impl.h"
+#include "common/ssl/context_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"

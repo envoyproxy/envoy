@@ -16,7 +16,7 @@ HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::tryCreateFilterFactory(HttpFilt
 
   return [&server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
-        Http::StreamFilterPtr{new Grpc::Http1BridgeFilter(server.clusterManager())});
+        Http::StreamFilterSharedPtr{new Grpc::Http1BridgeFilter(server.clusterManager())});
   };
 }
 

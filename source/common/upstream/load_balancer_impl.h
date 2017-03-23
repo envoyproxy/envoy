@@ -30,7 +30,7 @@ protected:
   /**
    * Pick the host list to use (healthy or all depending on how many in the set are not healthy).
    */
-  const std::vector<HostPtr>& hostsToUse();
+  const std::vector<HostSharedPtr>& hostsToUse();
 
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
@@ -48,14 +48,14 @@ private:
   /**
    * Try to select upstream hosts from the same zone.
    */
-  const std::vector<HostPtr>& tryChooseLocalZoneHosts();
+  const std::vector<HostSharedPtr>& tryChooseLocalZoneHosts();
 
   /**
    * @return (number of hosts in a given zone)/(total number of hosts) in ret param.
    * The result is stored as integer number and scaled by 10000 multiplier for better precision.
    * Caller is responsible for allocation/de-allocation of ret.
    */
-  void calculateZonePercentage(const std::vector<std::vector<HostPtr>>& hosts_per_zone,
+  void calculateZonePercentage(const std::vector<std::vector<HostSharedPtr>>& hosts_per_zone,
                                uint64_t* ret);
 
   /**
@@ -82,7 +82,7 @@ public:
       : LoadBalancerBase(host_set, local_host_set_, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
-  ConstHostPtr chooseHost(const LoadBalancerContext* context) override;
+  HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
 
 private:
   size_t rr_index_{};
@@ -108,10 +108,10 @@ public:
                            Runtime::RandomGenerator& random);
 
   // Upstream::LoadBalancer
-  ConstHostPtr chooseHost(const LoadBalancerContext* context) override;
+  HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
 
 private:
-  HostPtr last_host_;
+  HostSharedPtr last_host_;
   uint32_t hits_left_{};
 };
 
@@ -125,7 +125,7 @@ public:
       : LoadBalancerBase(host_set, local_host_set, stats, runtime, random) {}
 
   // Upstream::LoadBalancer
-  ConstHostPtr chooseHost(const LoadBalancerContext* context) override;
+  HostConstSharedPtr chooseHost(const LoadBalancerContext* context) override;
 };
 
 } // Upstream

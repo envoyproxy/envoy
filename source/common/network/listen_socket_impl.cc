@@ -1,5 +1,4 @@
-#include "listen_socket_impl.h"
-#include "utility.h"
+#include "common/network/listen_socket_impl.h"
 
 #include "envoy/common/exception.h"
 
@@ -19,7 +18,7 @@ void ListenSocketImpl::doBind() {
 }
 
 // TODO(wattli): remove this once the admin port is updated with address.
-TcpListenSocket::TcpListenSocket(Address::InstancePtr address, bool bind_to_port) {
+TcpListenSocket::TcpListenSocket(Address::InstanceConstSharedPtr address, bool bind_to_port) {
   // TODO(mattklein123): IPv6 support.
   local_address_ = address;
   fd_ = local_address_->socket(Address::SocketType::Stream);
@@ -54,7 +53,7 @@ TcpListenSocket::TcpListenSocket(int fd, uint32_t port) {
   local_address_.reset(new Address::Ipv4Instance(port));
 }
 
-TcpListenSocket::TcpListenSocket(int fd, Address::InstancePtr address) {
+TcpListenSocket::TcpListenSocket(int fd, Address::InstanceConstSharedPtr address) {
   fd_ = fd;
   local_address_ = address;
 }

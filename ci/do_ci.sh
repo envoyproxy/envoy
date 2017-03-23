@@ -14,10 +14,11 @@ if [[ "$1" == "bazel.debug" ]]; then
   export CC=gcc-4.9
   export CXX=g++-4.9
   export USER=bazel
-  export TEST_TMPDIR=/source
+  export TEST_TMPDIR=/source/build
   BAZEL_OPTIONS="--strategy=CppCompile=standalone --strategy=CppLink=standalone \
     --strategy=TestRunner=standalone --verbose_failures --package_path %workspace%:.."
   [[ "$BAZEL_INTERACTIVE" == "1" ]] && BAZEL_BATCH="" || BAZEL_BATCH="--batch"
+  [[ "$BAZEL_EXPUNGE" == "1" ]] && bazel clean --expunge
   bazel $BAZEL_BATCH build $BAZEL_OPTIONS //source/...
   echo "Testing..."
   bazel $BAZEL_BATCH test $BAZEL_OPTIONS --test_output=all //test/...
