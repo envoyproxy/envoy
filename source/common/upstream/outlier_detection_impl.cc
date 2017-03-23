@@ -241,8 +241,7 @@ void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
 const double Utility::SUCCESS_RATE_STDEV_FACTOR = 1.9;
 
 double Utility::successRateEjectionThreshold(
-    double success_rate_sum,
-    const std::vector<std::tuple<HostSharedPtr, double>>& valid_success_rate_hosts) {
+    double success_rate_sum, const std::vector<HostSuccessRatePair>& valid_success_rate_hosts) {
   // This function is using mean and standard deviation as statistical measures for outlier
   // detection. First the mean is calculated by dividing the sum of success rate data over the
   // number of data points. Then variance is calculated by taking the mean of the
@@ -261,8 +260,8 @@ double Utility::successRateEjectionThreshold(
   double mean = success_rate_sum / valid_success_rate_hosts.size();
   double variance = 0;
   std::for_each(valid_success_rate_hosts.begin(), valid_success_rate_hosts.end(),
-                [&variance, mean](std::tuple<HostSharedPtr, double> v) {
-                  variance += std::pow(std::get<1>(v) - mean, 2);
+                [&variance, mean](HostSuccessRatePair v) {
+                  variance += std::pow(v.success_rate_ - mean, 2);
                 });
   variance /= valid_success_rate_hosts.size();
   double stdev = std::sqrt(variance);
@@ -275,7 +274,7 @@ void DetectorImpl::successRateEjections() {
       "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
       "outlier_detection.success_rate_request_volume", config_.successRateRequestVolume());
-  std::vector<std::tuple<HostSharedPtr, double>> valid_success_rate_hosts;
+  std::vector<HostSuccessRatePair> valid_success_rate_hosts;
   double success_rate_sum = 0;
 
   // Exit early if there are not enough hosts.
@@ -286,7 +285,7 @@ void DetectorImpl::successRateEjections() {
   // reserve upper bound of vector size to avoid reallocation.
   valid_success_rate_hosts.reserve(host_sinks_.size());
 
-  for (auto host : host_sinks_) {
+  for (const auto& host : host_sinks_) {
     host.second->updateCurrentSuccessRateBucket();
     // Don't do work if the host is already ejected.
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
@@ -295,7 +294,7 @@ void DetectorImpl::successRateEjections() {
 
       if (host_success_rate.valid()) {
         valid_success_rate_hosts.emplace_back(
-            std::make_tuple(host.first, host_success_rate.value()));
+            HostSuccessRatePair(host.first, host_success_rate.value()));
         success_rate_sum += host_success_rate.value();
       }
     }
@@ -304,10 +303,10 @@ void DetectorImpl::successRateEjections() {
   if (valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
     double ejection_threshold =
         Utility::successRateEjectionThreshold(success_rate_sum, valid_success_rate_hosts);
-    for (auto tuple : valid_success_rate_hosts) {
-      if (std::get<1>(tuple) < ejection_threshold) {
+    for (const auto& host_success_rate_pair : valid_success_rate_hosts) {
+      if (host_success_rate_pair.success_rate_ < ejection_threshold) {
         stats_.ejections_success_rate_.inc();
-        ejectHost(std::get<0>(tuple), EjectionType::SuccessRate);
+        ejectHost(host_success_rate_pair.host_, EjectionType::SuccessRate);
       }
     }
   }
@@ -406,7 +405,7 @@ Optional<double> SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_re
     return Optional<double>();
   }
 
-  return Optional<double>(backup_success_rate_bucket_->success_request_counter_ * 100 /
+  return Optional<double>(backup_success_rate_bucket_->success_request_counter_ * 100.0 /
                           backup_success_rate_bucket_->total_request_counter_);
 }
 

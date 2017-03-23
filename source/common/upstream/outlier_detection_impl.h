@@ -37,6 +37,16 @@ public:
                                             EventLoggerSharedPtr event_logger);
 };
 
+/**
+ * Thin struct to facilitate calculations for success rate outlier detection.
+ */
+struct HostSuccessRatePair {
+  HostSuccessRatePair(HostSharedPtr host, double success_rate)
+      : host_(host), success_rate_(success_rate) {}
+  HostSharedPtr host_;
+  double success_rate_;
+};
+
 struct SuccessRateAccumulatorBucket {
   std::atomic<uint64_t> success_request_counter_;
   std::atomic<uint64_t> total_request_counter_;
@@ -62,8 +72,8 @@ public:
    * This function returns the success rate of a host over a window of time if the request volume is
    * high enough. The underlying window of time could be dynamically adjusted. In the current
    * implementation it is a fixed time window.
-   * @param request_volume_threshold the threshold of requests an accumulator has to have in order
-   *                                 to be able to return a significant success rate value.
+   * @param success_rate_request_volume the threshold of requests an accumulator has to have in order
+   *                                    to be able to return a significant success rate value.
    * @return a valid Optional<double> with the success rate. If there were not enough requests, an
    *         invalid Optional<double> is returned.
    */
@@ -223,7 +233,7 @@ private:
 };
 
 /**
- * Utilities for Outlier Detection
+ * Utilities for Outlier Detection.
  */
 class Utility {
 public:
@@ -234,9 +244,9 @@ public:
    * @param success_rate_data is the vector containing the individual success rate data points.
    * @return the success rate threshold.
    */
-  static double successRateEjectionThreshold(
-      double success_rate_sum,
-      const std::vector<std::tuple<HostSharedPtr, double>>& valid_success_rate_hosts);
+  static double
+  successRateEjectionThreshold(double success_rate_sum,
+                               const std::vector<HostSuccessRatePair>& valid_success_rate_hosts);
 
 private:
   // Factor to multiply the stdev of a cluster's success rate for success rate outlier ejection.

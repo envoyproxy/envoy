@@ -538,9 +538,10 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
 }
 
 TEST(OutlierUtility, SRThreshold) {
-  std::vector<std::tuple<HostSharedPtr, double>> data = {
-      std::make_tuple(nullptr, 50),  std::make_tuple(nullptr, 100), std::make_tuple(nullptr, 100),
-      std::make_tuple(nullptr, 100), std::make_tuple(nullptr, 100),
+  std::vector<HostSuccessRatePair> data = {
+      HostSuccessRatePair(nullptr, 50),  HostSuccessRatePair(nullptr, 100),
+      HostSuccessRatePair(nullptr, 100), HostSuccessRatePair(nullptr, 100),
+      HostSuccessRatePair(nullptr, 100),
   };
   double sum = 450;
 
