@@ -1,6 +1,5 @@
 #include "network_utility.h"
 
-#include "envoy/common/exception.h"
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
 #include "utility.h"
@@ -10,25 +9,15 @@
 namespace Network {
 namespace Test {
 
-Address::InstancePtr checkPortAvailability(Address::InstancePtr addrPort,
-                                           Address::SocketType type) {
+Address::InstanceConstSharedPtr checkPortAvailability(Address::InstanceConstSharedPtr addrPort,
+                                                      Address::SocketType type) {
   // Note that there isn't any point in passing in a port of zero as we don't provide
   // a means of finding out what port the OS assigned in that case. That could be fixed
   // if desired.
-  if (addrPort == nullptr) {
-    // TODO(jamessynge) Add logging of err since it isn't expected, for now throwing.
-    throw EnvoyException("addrPort == nullptr");
-  }
-  if (addrPort->type() != Address::Type::Ip) {
-    // TODO(jamessynge) Add logging of err since it isn't expected, for now throwing.
-    throw EnvoyException(fmt::format("Wrong type of Address::Instance: {}", addrPort->asString()));
-  }
+  RELEASE_ASSERT(addrPort != nullptr);
+  RELEASE_ASSERT(addrPort->type() == Address::Type::Ip);
   const int fd = addrPort->socket(type);
-  if (fd < 0) {
-    // This occurs  if the family (e.g. IPv6) isn't supported.
-    // TODO(jamessynge) Add debug only logging?
-    return nullptr;
-  }
+  RELEASE_ASSERT(fd >= 0);
   ScopedFdCloser closer(fd);
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
@@ -47,20 +36,14 @@ Address::InstancePtr checkPortAvailability(Address::InstancePtr addrPort,
       // A privileged port, and we don't have privileges. Might want to log this.
       return nullptr;
     }
-    // TODO(jamessynge) Add logging of err since it isn't expected, for now throwing.
-    throw EnvoyException(fmt::format("Unable to bind to address '{}': {} ({})",
-                                     addrPort->asString(), strerror(err), err));
+    RELEASE_ASSERT(false);
   }
   if (addrPort->ip()->port() == 0) {
     // Need to find out the port number that the OS picked.
     sockaddr_storage ss;
     socklen_t ss_len = sizeof ss;
     rc = ::getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-    if (rc < 0) {
-      err = errno;
-      throw new EnvoyException(fmt::format("Unable to getsockname for address '{}': {} ({})",
-                                           addrPort->asString(), strerror(err), err));
-    }
+    RELEASE_ASSERT(rc >= 0);
     switch (ss.ss_family) {
     case AF_INET: {
       ASSERT(ss_len == sizeof(sockaddr_in));
@@ -77,11 +60,19 @@ Address::InstancePtr checkPortAvailability(Address::InstancePtr addrPort,
       break;
     }
     default:
-      throw new EnvoyException(fmt::format("Unexpected ss_family ({}) after binding to address {}",
-                                           static_cast<int>(ss.ss_family), addrPort->asString()));
+      RELEASE_ASSERT(false);
     }
   }
   return addrPort;
+}
+
+Address::InstanceConstSharedPtr checkPortAvailability(const std::string& addrPort,
+                                                      Address::SocketType type) {
+  auto instance = Address::parseInternetAddressAndPort(addrPort);
+  if (instance != nullptr) {
+    instance = checkPortAvailability(instance, type);
+  }
+  return instance;
 }
 
 } // Test
