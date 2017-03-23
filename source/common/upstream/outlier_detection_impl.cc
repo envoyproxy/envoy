@@ -269,7 +269,7 @@ double Utility::successRateEjectionThreshold(
   return mean - (SUCCESS_RATE_STDEV_FACTOR * stdev);
 }
 
-void DetectorImpl::successRateEjections() {
+void DetectorImpl::processSuccessRateEjections() {
   uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
       "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
@@ -319,7 +319,7 @@ void DetectorImpl::onIntervalTimer() {
     checkHostForUneject(host.first, host.second, now);
   }
 
-  successRateEjections();
+  processSuccessRateEjections();
 
   armIntervalTimer();
 }
