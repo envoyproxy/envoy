@@ -234,10 +234,15 @@ void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
   ejectHost(host, EjectionType::Consecutive5xx);
 }
 
+// The canonical factor for outlier detection in normal distributions is 2. However, host
+// success rates are intuitively a distribution with negative skew, with most of the mass around
+// 100 and a left tail. Therefore, a more aggressive (lower) factor is needed to detect
+// outliers.
 const double Utility::SUCCESS_RATE_STDEV_FACTOR = 1.9;
 
-double Utility::successRateEjectionThreshold(double success_rate_sum,
-                                             std::vector<double>& success_rate_data) {
+double Utility::successRateEjectionThreshold(
+    double success_rate_sum,
+    const std::vector<std::tuple<HostSharedPtr, double>>& valid_success_rate_hosts) {
   // This function is using mean and standard deviation as statistical measures for outlier
   // detection. First the mean is calculated by dividing the sum of success rate data over the
   // number of data points. Then variance is calculated by taking the mean of the
@@ -253,56 +258,56 @@ double Utility::successRateEjectionThreshold(double success_rate_sum,
   // variance = 400
   // stdev = 20
   // threshold returned = 52
-  double mean = success_rate_sum / success_rate_data.size();
+  double mean = success_rate_sum / valid_success_rate_hosts.size();
   double variance = 0;
-  std::for_each(success_rate_data.begin(), success_rate_data.end(),
-                [&variance, mean](double& v) { variance += std::pow(v - mean, 2); });
-  variance /= success_rate_data.size();
+  std::for_each(valid_success_rate_hosts.begin(), valid_success_rate_hosts.end(),
+                [&variance, mean](std::tuple<HostSharedPtr, double> v) {
+                  variance += std::pow(std::get<1>(v) - mean, 2);
+                });
+  variance /= valid_success_rate_hosts.size();
   double stdev = std::sqrt(variance);
 
   return mean - (SUCCESS_RATE_STDEV_FACTOR * stdev);
 }
 
 void DetectorImpl::successRateEjections() {
-  std::unordered_map<HostSharedPtr, double> valid_success_rate_hosts;
   uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
       "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
       "outlier_detection.success_rate_request_volume", config_.successRateRequestVolume());
-  std::vector<double> success_rate_data;
+  std::vector<std::tuple<HostSharedPtr, double>> valid_success_rate_hosts;
   double success_rate_sum = 0;
 
-  if (host_sinks_.size() >= success_rate_minimum_hosts) {
-    // reserve upper bound of vector size to avoid reallocation.
-    success_rate_data.reserve(host_sinks_.size());
+  // Exit early if there are not enough hosts.
+  if (host_sinks_.size() < success_rate_minimum_hosts) {
+    return;
   }
+
+  // reserve upper bound of vector size to avoid reallocation.
+  valid_success_rate_hosts.reserve(host_sinks_.size());
 
   for (auto host : host_sinks_) {
     host.second->updateCurrentSuccessRateBucket();
+    // Don't do work if the host is already ejected.
+    if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+      Optional<double> host_success_rate =
+          host.second->successRateAccumulator().getSuccessRate(success_rate_request_volume);
 
-    // If there are not enough hosts to begin with, don't do the work.
-    if (host_sinks_.size() >= success_rate_minimum_hosts) {
-      // Don't do work if the host is already ejected.
-      if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-        Optional<double> host_success_rate =
-            host.second->successRateAccumulator().getSuccessRate(success_rate_request_volume);
-
-        if (host_success_rate.valid()) {
-          valid_success_rate_hosts[host.first] = host_success_rate.value();
-          success_rate_data.emplace_back(host_success_rate.value());
-          success_rate_sum += host_success_rate.value();
-        }
+      if (host_success_rate.valid()) {
+        valid_success_rate_hosts.emplace_back(
+            std::make_tuple(host.first, host_success_rate.value()));
+        success_rate_sum += host_success_rate.value();
       }
     }
   }
 
   if (valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
     double ejection_threshold =
-        Utility::successRateEjectionThreshold(success_rate_sum, success_rate_data);
-    for (auto host : valid_success_rate_hosts) {
-      if (host.second < ejection_threshold) {
+        Utility::successRateEjectionThreshold(success_rate_sum, valid_success_rate_hosts);
+    for (auto tuple : valid_success_rate_hosts) {
+      if (std::get<1>(tuple) < ejection_threshold) {
         stats_.ejections_success_rate_.inc();
-        ejectHost(host.first, EjectionType::SuccessRate);
+        ejectHost(std::get<0>(tuple), EjectionType::SuccessRate);
       }
     }
   }

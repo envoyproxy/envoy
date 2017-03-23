@@ -234,8 +234,9 @@ public:
    * @param success_rate_data is the vector containing the individual success rate data points.
    * @return the success rate threshold.
    */
-  static double successRateEjectionThreshold(double success_rate_sum,
-                                             std::vector<double>& success_rate_data);
+  static double successRateEjectionThreshold(
+      double success_rate_sum,
+      const std::vector<std::tuple<HostSharedPtr, double>>& valid_success_rate_hosts);
 
 private:
   // Factor to multiply the stdev of a cluster's success rate for success rate outlier ejection.

@@ -538,8 +538,11 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
 }
 
 TEST(OutlierUtility, SRThreshold) {
-  std::vector<double> data = {50, 100, 100, 100, 100};
-  double sum = std::accumulate(data.begin(), data.end(), 0.0);
+  std::vector<std::tuple<HostSharedPtr, double>> data = {
+      std::make_tuple(nullptr, 50),  std::make_tuple(nullptr, 100), std::make_tuple(nullptr, 100),
+      std::make_tuple(nullptr, 100), std::make_tuple(nullptr, 100),
+  };
+  double sum = 450;
 
   EXPECT_EQ(Utility::successRateEjectionThreshold(sum, data), 52);
 }
