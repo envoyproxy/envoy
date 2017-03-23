@@ -72,8 +72,8 @@ public:
    * This function returns the success rate of a host over a window of time if the request volume is
    * high enough. The underlying window of time could be dynamically adjusted. In the current
    * implementation it is a fixed time window.
-   * @param success_rate_request_volume the threshold of requests an accumulator has to have in order
-   *                                    to be able to return a significant success rate value.
+   * @param success_rate_request_volume the threshold of requests an accumulator has to have in
+   *                                    order to be able to return a significant success rate value.
    * @return a valid Optional<double> with the success rate. If there were not enough requests, an
    *         invalid Optional<double> is returned.
    */
