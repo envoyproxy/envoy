@@ -1,12 +1,13 @@
 package(default_visibility = ["//visibility:public"])
 
-load("//bazel:envoy_build_system.bzl", "envoy_external_dep_path")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
 
-cc_library(
+envoy_cc_library(
     name = "precompiled_includes",
     hdrs = ["precompiled_test.h"],
+    external_deps = ["googletest"],
     deps = [
-        envoy_external_dep_path("googletest_main"),
+        "//test:main",
         "//test/test_common:printers_includes",
     ],
 )

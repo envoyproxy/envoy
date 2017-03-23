@@ -8,7 +8,9 @@ using testing::SaveArg;
 
 namespace Server {
 
-MockOptions::MockOptions() {}
+MockOptions::MockOptions(const std::string& path) : path_(path) {
+  ON_CALL(*this, configPath()).WillByDefault(ReturnRef(path_));
+}
 MockOptions::~MockOptions() {}
 
 MockAdmin::MockAdmin() {}

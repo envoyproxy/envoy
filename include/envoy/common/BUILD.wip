@@ -19,4 +19,5 @@ envoy_cc_library(
 envoy_cc_library(
     name = "optional_includes",
     hdrs = ["optional.h"],
+    deps = [":base_includes"],
 )

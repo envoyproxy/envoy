@@ -1,13 +1,12 @@
 #pragma once
 
-#include "listen_socket_impl.h"
-#include "proxy_protocol.h"
-
 #include "envoy/network/listener.h"
 #include "envoy/network/connection_handler.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
+#include "common/network/listen_socket_impl.h"
+#include "common/network/proxy_protocol.h"
 
 #include "event2/event.h"
 

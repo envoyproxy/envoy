@@ -1,5 +1,4 @@
-#include "connection_impl.h"
-#include "utility.h"
+#include "common/network/connection_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/event/timer.h"
