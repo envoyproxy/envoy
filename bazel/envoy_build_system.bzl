@@ -29,7 +29,6 @@ def envoy_include_prefix(path):
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(name,
-                     testonly = 0,
                      srcs = [],
                      hdrs = [],
                      public_hdrs = [],
@@ -40,7 +39,6 @@ def envoy_cc_library(name,
                      deps = []):
     native.cc_library(
         name = name,
-        testonly = testonly,
         srcs = srcs,
         hdrs = hdrs + public_hdrs,
         copts = ENVOY_COPTS + copts,
