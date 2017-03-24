@@ -61,14 +61,14 @@ TEST(TruncateIpAddressAndLength, Various) {
   test_cases.size();
   for (const auto& kv : test_cases) {
     InstanceConstSharedPtr inPtr = parseInternetAddress(kv.first.first);
-    EXPECT_TRUE(inPtr != nullptr) << kv.first.first;
+    EXPECT_NE(inPtr, nullptr) << kv.first.first;
     int length_io = kv.first.second;
     InstanceConstSharedPtr outPtr = CidrRange::truncateIpAddressAndLength(inPtr, &length_io);
     if (kv.second.second == -1) {
       EXPECT_EQ(outPtr, nullptr) << outPtr->asString() << "\n" << kv;
       EXPECT_EQ(length_io, -1) << kv;
     } else {
-      ASSERT_TRUE(outPtr != nullptr) << kv;
+      ASSERT_NE(outPtr, nullptr) << kv;
       EXPECT_EQ(outPtr->ip()->addressAsString(), kv.second.first) << kv;
       EXPECT_EQ(length_io, kv.second.second) << kv;
     }
