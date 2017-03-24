@@ -37,6 +37,7 @@ Buffer::InstancePtr Common::serializeBody(const google::protobuf::Message& messa
   iovec.len_ = alloc_size;
   uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
 
+  // TODO(fengli79): Make this less ugly.
   *current++ = 0; // flags
   *reinterpret_cast<uint32_t*>(current) = htonl(size);
   current += sizeof(uint32_t);
