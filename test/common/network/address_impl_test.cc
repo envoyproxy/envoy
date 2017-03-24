@@ -29,7 +29,7 @@ void testSocketBindAndConnect(const std::string& addr_port_str) {
   auto addr_port = parseInternetAddressAndPort(addr_port_str);
   ASSERT_FALSE(addr_port == nullptr);
   if (addr_port->ip()->port() == 0) {
-    addr_port = Network::Test::checkPortAvailability(addr_port, SocketType::Stream);
+    addr_port = Network::Test::findOrCheckFreePort(addr_port, SocketType::Stream);
   }
 
   // Create a socket on which we'll listen for connections from clients.
@@ -127,10 +127,6 @@ TEST(Ipv4InstanceTest, SocketBindAndConnect) {
 }
 
 TEST(Ipv4InstanceTest, ParseInternetAddressAndPort) {
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:"));
-  if (true) {
-    return;
-  }
   EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4"));
   EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:"));
   EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4::1"));

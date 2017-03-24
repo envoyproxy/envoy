@@ -7,8 +7,8 @@
 namespace Network {
 namespace Test {
 
-Address::InstanceConstSharedPtr checkPortAvailability(Address::InstanceConstSharedPtr addr_port,
-                                                      Address::SocketType type) {
+Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstSharedPtr addr_port,
+                                                    Address::SocketType type) {
   if (addr_port == nullptr || addr_port->type() != Address::Type::Ip) {
     ADD_FAILURE() << "Not an internet address: " << (addr_port == nullptr ? "nullptr"
                                                                           : addr_port->asString());
@@ -85,11 +85,11 @@ Address::InstanceConstSharedPtr checkPortAvailability(Address::InstanceConstShar
   return addr_port;
 }
 
-Address::InstanceConstSharedPtr checkPortAvailability(const std::string& addr_port,
-                                                      Address::SocketType type) {
+Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
+                                                    Address::SocketType type) {
   auto instance = Address::parseInternetAddressAndPort(addr_port);
   if (instance != nullptr) {
-    instance = checkPortAvailability(instance, type);
+    instance = findOrCheckFreePort(instance, type);
   } else {
     ADD_FAILURE() << "Unable to parse as an address and port: " << addr_port;
   }

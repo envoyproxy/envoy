@@ -17,8 +17,8 @@ namespace Test {
  * @returns the address and port (selected if zero was the passed in port) that can be used for
  *          listening, else nullptr if the address and port are not free.
  */
-Address::InstanceConstSharedPtr checkPortAvailability(Address::InstanceConstSharedPtr addr_port,
-                                                      Address::SocketType type);
+Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstSharedPtr addr_port,
+                                                    Address::SocketType type);
 
 /**
  * As above, but addr_port is specified as a string. For example:
@@ -27,8 +27,8 @@ Address::InstanceConstSharedPtr checkPortAvailability(Address::InstanceConstShar
  *    - 0.0.0.0:0        Pick a free port on all local addresses of all local interfaces.
  *    - [::]:45678       Check whether a specific port on all local IPv6 addresses is free.
  */
-Address::InstanceConstSharedPtr checkPortAvailability(const std::string& addr_port,
-                                                      Address::SocketType type);
+Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
+                                                    Address::SocketType type);
 
 } // Test
 } // Network
