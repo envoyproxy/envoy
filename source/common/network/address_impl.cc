@@ -160,5 +160,49 @@ InstanceConstSharedPtr parseInternetAddress(const std::string& ip_addr) {
   return nullptr;
 }
 
+InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& addr) {
+  if (addr.empty()) {
+    return nullptr;
+  }
+  if (addr[0] == '[') {
+    // Appears to be an IPv6 address. Find the "]:" that separates the address from the port.
+    auto pos = addr.rfind("]:");
+    if (pos == std::string::npos) {
+      return nullptr;
+    }
+    const auto ip_str = addr.substr(1, pos - 1);
+    const auto port_str = addr.substr(pos + 2);
+    uint64_t port64;
+    if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
+      return nullptr;
+    }
+    sockaddr_in6 sa6;
+    if (ip_str.empty() || inet_pton(AF_INET6, ip_str.c_str(), &sa6.sin6_addr) != 1) {
+      return nullptr;
+    }
+    sa6.sin6_family = AF_INET6;
+    sa6.sin6_port = htons(port64);
+    return InstanceConstSharedPtr(new Ipv6Instance(sa6));
+  }
+  // Treat it as an IPv4 address followed by a port.
+  auto pos = addr.rfind(":");
+  if (pos == std::string::npos) {
+    return nullptr;
+  }
+  const auto ip_str = addr.substr(0, pos);
+  const auto port_str = addr.substr(pos + 1);
+  uint64_t port64;
+  if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
+    return nullptr;
+  }
+  sockaddr_in sa4;
+  if (ip_str.empty() || inet_pton(AF_INET, ip_str.c_str(), &sa4.sin_addr) != 1) {
+    return nullptr;
+  }
+  sa4.sin_family = AF_INET;
+  sa4.sin_port = htons(port64);
+  return InstanceConstSharedPtr(new Ipv4Instance(&sa4));
+}
+
 } // Address
 } // Network

@@ -25,24 +25,30 @@ void makeFdBlocking(int fd) {
   ASSERT_EQ(::fcntl(fd, F_SETFL, flags & (~O_NONBLOCK)), 0);
 }
 
-void testSocketBindAndConnect(const Instance& loopbackPort) {
+void testSocketBindAndConnect(const std::string& addr_port_str) {
+  auto addr_port = parseInternetAddressAndPort(addr_port_str);
+  ASSERT_NE(addr_port, nullptr);
+  if (addr_port->ip()->port() == 0) {
+    addr_port = Network::Test::findOrCheckFreePort(addr_port, SocketType::Stream);
+  }
+
   // Create a socket on which we'll listen for connections from clients.
-  const int listen_fd = loopbackPort.socket(SocketType::Stream);
-  ASSERT_GE(listen_fd, 0) << loopbackPort.asString();
+  const int listen_fd = addr_port->socket(SocketType::Stream);
+  ASSERT_GE(listen_fd, 0) << addr_port->asString();
   ScopedFdCloser closer1(listen_fd);
 
   // Bind the socket to the desired address and port.
-  int rc = loopbackPort.bind(listen_fd);
+  int rc = addr_port->bind(listen_fd);
   int err = errno;
-  ASSERT_EQ(rc, 0) << loopbackPort.asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
+  ASSERT_EQ(rc, 0) << addr_port->asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
   // require another thread.
   ASSERT_EQ(::listen(listen_fd, 1), 0);
 
   // Create a client socket and connect to the server.
-  const int client_fd = loopbackPort.socket(SocketType::Stream);
-  ASSERT_GE(client_fd, 0) << loopbackPort.asString();
+  const int client_fd = addr_port->socket(SocketType::Stream);
+  ASSERT_GE(client_fd, 0) << addr_port->asString();
   ScopedFdCloser closer2(client_fd);
 
   // Instance::socket creates a non-blocking socket, which that extends all the way to the
@@ -52,9 +58,9 @@ void testSocketBindAndConnect(const Instance& loopbackPort) {
   makeFdBlocking(client_fd);
 
   // Connect to the server.
-  rc = loopbackPort.connect(client_fd);
+  rc = addr_port->connect(client_fd);
   err = errno;
-  ASSERT_EQ(rc, 0) << loopbackPort.asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
+  ASSERT_EQ(rc, 0) << addr_port->asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
 }
 } // namespace
 
@@ -117,8 +123,27 @@ TEST(Ipv4InstanceTest, BadAddress) {
 
 TEST(Ipv4InstanceTest, SocketBindAndConnect) {
   // Test listening on and connecting to an unused port on the IPv4 loopback address.
-  Ipv4Instance loopbackPort("127.0.0.1", ::Network::Test::getUnusedPort());
-  testSocketBindAndConnect(loopbackPort);
+  testSocketBindAndConnect("127.0.0.1:0");
+}
+
+TEST(Ipv4InstanceTest, ParseInternetAddressAndPort) {
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4::1"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:-1"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort(":1"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort(" :1"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3:1"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4]:2"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:65536"));
+
+  auto ptr = parseInternetAddressAndPort("0.0.0.0:0");
+  ASSERT_NE(ptr, nullptr);
+  EXPECT_EQ(ptr->asString(), "0.0.0.0:0");
+
+  ptr = parseInternetAddressAndPort("255.255.255.255:65535");
+  ASSERT_NE(ptr, nullptr);
+  EXPECT_EQ(ptr->asString(), "255.255.255.255:65535");
 }
 
 TEST(Ipv6InstanceTest, SocketAddress) {
@@ -177,9 +202,33 @@ TEST(Ipv6InstanceTest, BadAddress) {
 }
 
 TEST(Ipv6InstanceTest, SocketBindAndConnect) {
-  // Test listening on and connecting to an unused port on the IPv4 loopback address.
-  Ipv6Instance loopbackPort("::1", ::Network::Test::getUnusedPort());
-  testSocketBindAndConnect(loopbackPort);
+  // Test listening on and connecting to an unused port on the IPv6 loopback address.
+  testSocketBindAndConnect("[::1]:0");
+}
+
+TEST(Ipv6InstanceTest, ParseInternetAddressAndPort) {
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort(""));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("::1"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("::"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[[::]]:1"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:1]:2"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("]:[::1]:2"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[1.2.3.4:0"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[1.2.3.4]:0"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:-1"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:bogus"));
+
+  auto ptr = parseInternetAddressAndPort("[::]:0");
+  ASSERT_NE(ptr, nullptr);
+  EXPECT_EQ(ptr->asString(), "[::]:0");
+
+  ptr = parseInternetAddressAndPort("[1::1]:65535");
+  ASSERT_NE(ptr, nullptr);
+  EXPECT_EQ(ptr->asString(), "[1::1]:65535");
+
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:-1"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[1::1]:65536"));
 }
 
 TEST(PipeInstanceTest, Basic) {
