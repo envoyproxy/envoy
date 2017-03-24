@@ -1,4 +1,4 @@
-#include "logical_dns_cluster.h"
+#include "common/upstream/logical_dns_cluster.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"

@@ -1,4 +1,4 @@
-#include "dynamo_request_parser.h"
+#include "common/dynamo/dynamo_request_parser.h"
 
 #include "common/common/utility.h"
 

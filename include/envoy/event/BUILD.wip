@@ -27,7 +27,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "file_event_includes",
     hdrs = ["file_event.h"],
-    deps = ["//include/envoy/common:base_includes"],
 )
 
 envoy_cc_library(
@@ -38,5 +37,4 @@ envoy_cc_library(
 envoy_cc_library(
     name = "timer_includes",
     hdrs = ["timer.h"],
-    deps = ["//include/envoy/common:base_includes"],
 )

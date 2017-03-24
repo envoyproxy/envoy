@@ -1,4 +1,4 @@
-#include "outlier_detection_impl.h"
+#include "common/upstream/outlier_detection_impl.h"
 
 #include "envoy/event/dispatcher.h"
 

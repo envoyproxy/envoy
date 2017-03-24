@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
 
 #include "common/http/header_map_impl.h"

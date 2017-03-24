@@ -1,8 +1,5 @@
 #pragma once
 
-#include "outlier_detection_impl.h"
-#include "resource_manager_impl.h"
-
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -17,6 +14,8 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/stats/stats_impl.h"
+#include "common/upstream/outlier_detection_impl.h"
+#include "common/upstream/resource_manager_impl.h"
 
 namespace Upstream {
 

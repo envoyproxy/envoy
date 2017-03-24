@@ -2,21 +2,6 @@ package(default_visibility = ["//visibility:public"])
 
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
 
-# Needed to break circular dependency between DispatcherImpl/ConnectionImpl/ListenerImpl/
-# TODO(htuch): Can we reorganize packages and hierarchy to avoid the need for this hack?
-envoy_cc_library(
-    name = "dispatcher_lib_includes",
-    hdrs = [
-        "dispatcher_impl.h",
-        "event_impl_base.h",
-        "file_event_impl.h",
-    ],
-    deps = [
-        ":libevent_lib",
-        "//include/envoy/event:dispatcher_includes",
-    ],
-)
-
 envoy_cc_library(
     name = "dispatcher_lib",
     srcs = [
@@ -32,11 +17,33 @@ envoy_cc_library(
     ],
     deps = [
         ":dispatcher_lib_includes",
-        "//include/envoy/event:file_event_includes",
+        "//include/envoy/event:signal_includes",
+        "//include/envoy/event:timer_includes",
+        "//include/envoy/network:listen_socket_includes",
+        "//include/envoy/network:listener_includes",
+        "//source/common/common:assert_lib",
         "//source/common/filesystem:watcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:dns_lib",
         "//source/common/network:listener_lib",
+        "//source/common/ssl:connection_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "dispatcher_lib_includes",
+    hdrs = [
+        "dispatcher_impl.h",
+        "event_impl_base.h",
+        "file_event_impl.h",
+    ],
+    deps = [
+        ":libevent_lib",
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/event:dispatcher_includes",
+        "//include/envoy/event:file_event_includes",
+        "//include/envoy/network:connection_handler_includes",
+        "//source/common/common:logger_lib",
     ],
 )
 

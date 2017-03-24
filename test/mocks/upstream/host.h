@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cluster_info.h"
+#include "test/mocks/upstream/cluster_info.h"
 
 #include "envoy/upstream/upstream.h"
 
