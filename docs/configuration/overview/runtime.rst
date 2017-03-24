@@ -48,7 +48,7 @@ runtime:
 
 * *symlink_root*: ``/srv/runtime/current``
 * *subdirectory*: ``envoy``
-* *override_subdirectory*: ```envoy_override``
+* *override_subdirectory*: ``envoy_override``
 
 Where ``/srv/runtime/current`` is a symbolic link to ``/srv/runtime/v1``.
 
