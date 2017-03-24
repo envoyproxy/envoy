@@ -19,8 +19,12 @@ ProxyFilter::~ProxyFilter() { ASSERT(pending_requests_.empty()); }
 void ProxyFilter::onRespValue(RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
-  request.request_handle_ = splitter_.makeRequest(*value, request);
-  // The splitter can immediately respond.
+  CommandSplitter::SplitRequestPtr split = splitter_.makeRequest(*value, request);
+  if (split) {
+    // The splitter can immediately respond and destroy the pending request. Only store the handle
+    // if the request is still alive.
+    request.request_handle_ = std::move(split);
+  }
 }
 
 void ProxyFilter::onEvent(uint32_t events) {
