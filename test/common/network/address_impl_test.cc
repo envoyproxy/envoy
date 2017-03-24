@@ -27,7 +27,7 @@ void makeFdBlocking(int fd) {
 
 void testSocketBindAndConnect(const std::string& addr_port_str) {
   auto addr_port = parseInternetAddressAndPort(addr_port_str);
-  ASSERT_FALSE(addr_port == nullptr);
+  ASSERT_NE(addr_port, nullptr);
   if (addr_port->ip()->port() == 0) {
     addr_port = Network::Test::findOrCheckFreePort(addr_port, SocketType::Stream);
   }
@@ -138,11 +138,11 @@ TEST(Ipv4InstanceTest, ParseInternetAddressAndPort) {
   EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:65536"));
 
   auto ptr = parseInternetAddressAndPort("0.0.0.0:0");
-  ASSERT_FALSE(ptr == nullptr);
+  ASSERT_NE(ptr, nullptr);
   EXPECT_EQ(ptr->asString(), "0.0.0.0:0");
 
   ptr = parseInternetAddressAndPort("255.255.255.255:65535");
-  ASSERT_FALSE(ptr == nullptr);
+  ASSERT_NE(ptr, nullptr);
   EXPECT_EQ(ptr->asString(), "255.255.255.255:65535");
 }
 
@@ -224,7 +224,7 @@ TEST(Ipv6InstanceTest, ParseInternetAddressAndPort) {
   EXPECT_EQ(ptr->asString(), "[::]:0");
 
   ptr = parseInternetAddressAndPort("[1::1]:65535");
-  ASSERT_FALSE(ptr == nullptr);
+  ASSERT_NE(ptr, nullptr);
   EXPECT_EQ(ptr->asString(), "[1::1]:65535");
 
   EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:-1"));
