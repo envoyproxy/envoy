@@ -104,6 +104,8 @@ public:
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(weight, uint32_t());
   MOCK_METHOD1(weight, void(uint32_t new_weight));
+  MOCK_CONST_METHOD0(successRate, double());
+  MOCK_METHOD1(successRate, void(double new_success_rate));
   MOCK_CONST_METHOD0(zone, const std::string&());
 };
 

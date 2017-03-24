@@ -147,6 +147,8 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
                                host->address()->asString(), host->zone()));
       response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
                                host->address()->asString(), host->canary()));
+      response.add(fmt::format("{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
+                               host->address()->asString(), host->successRate()));
     }
   }
 

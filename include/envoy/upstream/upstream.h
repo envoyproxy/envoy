@@ -83,6 +83,19 @@ public:
    * Set the current load balancing weight of the host, in the range 1-100.
    */
   virtual void weight(uint32_t new_weight) PURE;
+
+  /**
+   * @return the success rate of the host in the last calculated interval, in the range -1-100.
+   *         -1 means that the host did not have enough request volume to calculate success rate
+   *         or the cluster did not have enough hosts to run through success rate outlier ejection.
+   */
+  virtual double successRate() const PURE;
+
+  /**
+   * Set the success rate of the host.
+   * @param new_success_rate the new success rate calculated for the host in the last interval.
+   */
+  virtual void successRate(double new_success_rate) PURE;
 };
 
 typedef std::shared_ptr<const Host> HostConstSharedPtr;

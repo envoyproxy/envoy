@@ -286,7 +286,6 @@ void DetectorImpl::processSuccessRateEjections() {
   valid_success_rate_hosts.reserve(host_sinks_.size());
 
   for (const auto& host : host_sinks_) {
-    host.second->updateCurrentSuccessRateBucket();
     // Don't do work if the host is already ejected.
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
       Optional<double> host_success_rate =
@@ -296,6 +295,7 @@ void DetectorImpl::processSuccessRateEjections() {
         valid_success_rate_hosts.emplace_back(
             HostSuccessRatePair(host.first, host_success_rate.value()));
         success_rate_sum += host_success_rate.value();
+        host.first->successRate(host_success_rate.value());
       }
     }
   }
@@ -317,6 +317,12 @@ void DetectorImpl::onIntervalTimer() {
 
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
+
+    // Need to update the writer bucket to keep the data valid.
+    host.second->updateCurrentSuccessRateBucket();
+    // Refresh host success rate stat for the /clusters endpoint. If there is a new valid value it
+    // will get updated in processSuccessRateEjections().
+    host.first->successRate(-1);
   }
 
   processSuccessRateEjections();

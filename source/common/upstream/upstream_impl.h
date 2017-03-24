@@ -87,6 +87,8 @@ public:
   bool healthy() const override { return !health_flags_; }
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
+  double successRate() const override { return success_rate_; }
+  void successRate(double new_success_rate) override { success_rate_.store(new_success_rate); }
 
 protected:
   static Network::ClientConnectionPtr
@@ -96,6 +98,7 @@ protected:
 private:
   std::atomic<uint64_t> health_flags_{};
   std::atomic<uint32_t> weight_;
+  std::atomic<double> success_rate_;
 };
 
 typedef std::shared_ptr<std::vector<HostSharedPtr>> HostVectorSharedPtr;
