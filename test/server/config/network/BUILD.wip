@@ -1,0 +1,28 @@
+package(default_visibility = ["//visibility:public"])
+
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
+
+envoy_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    deps = [
+        "//source/server/config/network:client_ssl_auth_lib",
+        "//source/server/config/network:http_connection_manager_lib",
+        "//source/server/config/network:mongo_proxy_lib",
+        "//source/server/config/network:ratelimit_lib",
+        "//source/server/config/network:redis_proxy_lib",
+        "//source/server/config/network:tcp_proxy_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "http_connection_manager_test",
+    srcs = ["http_connection_manager_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/server/config/network:http_connection_manager_lib",
+        "//test/mocks/network:network_mocks",
+    ],
+)

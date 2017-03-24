@@ -11,5 +11,6 @@ envoy_cc_test(
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
     ],
 )
