@@ -1,14 +1,10 @@
 package(default_visibility = ["//visibility:public"])
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test_library")
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "common_lib",
-    testonly = 1,
     srcs = ["common.cc"],
     hdrs = ["common.h"],
-    deps = [
-        "//include/envoy/common:time_includes",
-        "//test/precompiled:precompiled_includes",
-    ],
+    deps = ["//include/envoy/common:time_includes"],
 )
