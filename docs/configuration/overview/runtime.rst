@@ -62,7 +62,7 @@ The terminal portion of a path is the file. The contents of the file constitute 
 When reading numeric values from a file, spaces and new lines will be ignored.
 
 The *override_subdirectory* is used along with the :option:`--service-cluster` CLI option. Assume
-that :option:`--service-cluster` has been set to ``my-clustser``. Envoy will first look for the
+that :option:`--service-cluster` has been set to ``my-cluster``. Envoy will first look for the
 *health_check.min_interval* key in the following full file system path:
 
 ``/srv/runtime/current/envoy_override/my-cluster/health_check/min_interval``
