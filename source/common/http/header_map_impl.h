@@ -69,6 +69,7 @@ protected:
     void value(uint64_t value) override;
     void value(const HeaderEntry& header) override;
     const HeaderString& value() const override { return value_; }
+    HeaderString& value() override { return value_; }
 
     HeaderString key_;
     HeaderString value_;

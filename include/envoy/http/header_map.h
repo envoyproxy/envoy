@@ -167,6 +167,11 @@ public:
    */
   virtual const HeaderString& value() const PURE;
 
+  /**
+   * @return the header value.
+   */
+  virtual HeaderString& value() PURE;
+
 private:
   void value(const char*); // Do not allow auto conversion to std::string
 };
