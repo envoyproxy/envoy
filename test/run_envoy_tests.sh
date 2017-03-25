@@ -5,21 +5,10 @@ set -e
 SOURCE_DIR=$1
 BINARY_DIR=$2
 
-# These directories have the Bazel meaning described at
-# https://bazel.build/versions/master/docs/test-encyclopedia.html. In particular, TEST_SRCDIR is
-# where we expect to find the generated outputs of various scripts preparing input data (these are
-# not only the actual source files!).
-# It is a precondition that both $TEST_TMPDIR and $TEST_SRCDIR are empty.
-if [ -z "$TEST_TMPDIR" ] || [ -z "$TEST_SRCDIR" ]
-then
-  TEST_BASE=/tmp/envoy_test
-  rm -rf $TEST_BASE
-fi
-: ${TEST_TMPDIR:=$TEST_BASE/tmp}
-: ${TEST_SRCDIR:=$TEST_BASE/runfiles}
-export TEST_TMPDIR TEST_SRCDIR
+source $SOURCE_DIR/test/setup_test_env.sh
 echo "TEST_TMPDIR=$TEST_TMPDIR"
 echo "TEST_SRCDIR=$TEST_SRCDIR"
+
 mkdir -p $TEST_TMPDIR
 
 $SOURCE_DIR/test/certs/gen_test_certs.sh $TEST_SRCDIR/test/certs
