@@ -9,7 +9,7 @@ BINARY_DIR=$2
 # https://bazel.build/versions/master/docs/test-encyclopedia.html. In particular, TEST_SRCDIR is
 # where we expect to find the generated outputs of various scripts preparing input data (these are
 # not only the actual source files!).
-# It is a precondition that $TEST_TMPDIR is empty.
+# It is a precondition that both $TEST_TMPDIR and $TEST_SRCDIR are empty.
 if [ -z "$TEST_TMPDIR" ] || [ -z "$TEST_SRCDIR" ]
 then
   TEST_BASE=$(mktemp -d /tmp/envoy_test.XXXXXXXX)
