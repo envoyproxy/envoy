@@ -22,3 +22,13 @@ const std::string& TestEnvironment::runfilesDirectory() {
   static const std::string* runfiles_directory = getCheckedEnvVar("TEST_SRCDIR");
   return *runfiles_directory;
 }
+
+std::string TestEnvironment::substitute(const std::string str) {
+  // TODO(htuch): Add support for {{ test_tmpdir }} etc. as needed for tests.
+  const std::regex test_cert_regex("\\{\\{ test_certs \\}\\}");
+  return std::regex_replace(str, test_cert_regex, TestEnvironment::runfilesPath("test/certs"));
+}
+
+Json::ObjectPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
+  return Json::Factory::LoadFromString(substitute(json));
+}

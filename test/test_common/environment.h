@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/json/json_loader.h"
+
 class TestEnvironment {
 public:
   /**
@@ -31,4 +33,25 @@ public:
   static std::string runfilesPath(const std::string& path) {
     return runfilesDirectory() + "/" + path;
   }
+
+  /**
+   * Obtain pregenerated test ssl key/certificate directory.
+   * @return std::string& with the path to the pregenerated test ssl key/certificate
+   *         directory.
+   */
+  static std::string certsDirectory() { return runfilesPath("test/certs"); }
+
+  /**
+   * String environment path substitution.
+   * @param str string with template patterns including {{ test_certs }}.
+   * @return std::string with patterns replaced with environment values.
+   */
+  static std::string substitute(const std::string str);
+
+  /**
+   * Build JSON object from a string subject to environment path substitution.
+   * @param json JSON with template patterns including {{ test_certs }}.
+   * @return Json::ObjectPtr with built JSON object.
+   */
+  static Json::ObjectPtr jsonLoadFromString(const std::string& json);
 };

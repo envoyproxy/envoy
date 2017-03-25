@@ -52,4 +52,4 @@ TEST(WatcherImplTest, All) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-} // namespace Filesystem
+} // Filesystem
