@@ -9,10 +9,16 @@ BINARY_DIR=$2
 # https://bazel.build/versions/master/docs/test-encyclopedia.html. In particular, TEST_SRCDIR is
 # where we expect to find the generated outputs of various scripts preparing input data (these are
 # not only the actual source files!).
-: ${TEST_TMPDIR:=/tmp/envoy_test_tmp}
-: ${TEST_SRCDIR:=/tmp/envoy_test_runfiles}
+# It is a precondition that $TEST_TMPDIR is empty.
+if [ -z "$TEST_TMPDIR" ] || [ -z "$TEST_SRCDIR" ]
+then
+  TEST_BASE=$(mktemp -d /tmp/envoy_test.XXXXXXXX)
+fi
+: ${TEST_TMPDIR:=$TEST_BASE/tmp}
+: ${TEST_SRCDIR:=$TEST_BASE/runfiles}
 export TEST_TMPDIR TEST_SRCDIR
-
+echo "TEST_TMPDIR=$TEST_TMPDIR"
+echo "TEST_SRCDIR=$TEST_SRCDIR"
 mkdir -p $TEST_TMPDIR
 
 $SOURCE_DIR/test/certs/gen_test_certs.sh $TEST_SRCDIR/test/certs
