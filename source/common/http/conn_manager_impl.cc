@@ -465,6 +465,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
@@ -472,12 +473,27 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
-    FilterHeadersStatus status = (*entry)->handle_->decodeHeaders(headers, end_stream);
+    FilterHeadersStatus status = (*entry)->handle_->decodeHeaders(
+        headers, end_stream && continue_data_entry == decoder_filters_.end());
     stream_log_trace("decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterHeadersCallback(status)) {
       return;
     }
+
+    // Here we handle the case where we have a header only request, but a filter adds a body
+    // to it. We need to not raise end_stream = true to further filters during inline iteration.
+    if (end_stream && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
+      continue_data_entry = entry;
+    }
+  }
+
+  if (continue_data_entry != decoder_filters_.end()) {
+    // We use the continueDecoding() code since it will correctly handle not calling
+    // decodeHeaders() again. Fake setting stopped_ since the continueDecoding() code expects it.
+    ASSERT(buffered_request_data_);
+    (*continue_data_entry)->stopped_ = true;
+    (*continue_data_entry)->continueDecoding();
   }
 }
 
@@ -577,12 +593,21 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
+  std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
+
   for (; entry != encoder_filters_.end(); entry++) {
-    FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, end_stream);
+    FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(
+        headers, end_stream && continue_data_entry == encoder_filters_.end());
     stream_log_trace("encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterHeadersCallback(status)) {
       return;
+    }
+
+    // Here we handle the case where we have a header only response, but a filter adds a body
+    // to it. We need to not raise end_stream = true to further filters during inline iteration.
+    if (end_stream && buffered_response_data_ && continue_data_entry == encoder_filters_.end()) {
+      continue_data_entry = entry;
     }
   }
 
@@ -628,7 +653,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   chargeStats(headers);
 
-  stream_log_debug("encoding headers via codec (end_stream={}):", *this, end_stream);
+  stream_log_debug("encoding headers via codec (end_stream={}):", *this,
+                   end_stream && continue_data_entry == encoder_filters_.end());
 #ifndef NDEBUG
   headers.iterate([](const HeaderEntry& header, void* context) -> void {
     stream_log_debug("  '{}':'{}'", *static_cast<ActiveStream*>(context), header.key().c_str(),
@@ -637,8 +663,18 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 #endif
 
   // Now actually encode via the codec.
-  response_encoder_->encodeHeaders(headers, end_stream);
-  maybeEndEncode(end_stream);
+  response_encoder_->encodeHeaders(headers,
+                                   end_stream && continue_data_entry == encoder_filters_.end());
+
+  if (continue_data_entry != encoder_filters_.end()) {
+    // We use the continueEncoding() code since it will correctly handle not calling
+    // encodeHeaders() again. Fake setting stopped_ since the continueEncoding() code expects it.
+    ASSERT(buffered_response_data_);
+    (*continue_data_entry)->stopped_ = true;
+    (*continue_data_entry)->continueEncoding();
+  } else {
+    maybeEndEncode(end_stream);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* filter,
