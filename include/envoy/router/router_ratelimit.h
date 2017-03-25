@@ -19,8 +19,9 @@ public:
    * @param local_service_cluster supplies the name of the local service cluster.
    * @param headers supplies the header for the request.
    * @param remote_address supplies the trusted downstream address for the connection.
+   * @return true if the RateLimitAction populated the descriptor. Otherwise, false is returned.
    */
-  virtual void populateDescriptor(const RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+  virtual bool populateDescriptor(const RouteEntry& route, ::RateLimit::Descriptor& descriptor,
                                   const std::string& local_service_cluster,
                                   const Http::HeaderMap& headers,
                                   const std::string& remote_address) const PURE;
