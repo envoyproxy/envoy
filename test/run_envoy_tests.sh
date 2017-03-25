@@ -12,7 +12,8 @@ BINARY_DIR=$2
 # It is a precondition that both $TEST_TMPDIR and $TEST_SRCDIR are empty.
 if [ -z "$TEST_TMPDIR" ] || [ -z "$TEST_SRCDIR" ]
 then
-  TEST_BASE=$(mktemp -d /tmp/envoy_test.XXXXXXXX)
+  TEST_BASE=/tmp/envoy_test
+  rm -rf $TEST_BASE
 fi
 : ${TEST_TMPDIR:=$TEST_BASE/tmp}
 : ${TEST_SRCDIR:=$TEST_BASE/runfiles}
