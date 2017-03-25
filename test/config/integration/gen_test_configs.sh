@@ -8,8 +8,6 @@ set -e
 CONFIG_IN_DIR=$1
 CONFIG_OUT_DIR=$2
 
-mkdir -p "${CONFIG_OUT_DIR}"
-
 for f in $(find "${CONFIG_IN_DIR}" -name "*.json");
 do
   cat $f | sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#g" | \
