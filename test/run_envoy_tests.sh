@@ -5,39 +5,19 @@ set -e
 SOURCE_DIR=$1
 BINARY_DIR=$2
 
-# Create a test certificate with a 15-day expiration for SSL tests
-TEST_CERT_DIR=/tmp/envoy_test
-mkdir -p $TEST_CERT_DIR
-openssl genrsa -out $TEST_CERT_DIR/unittestkey.pem 1024
-openssl genrsa -out $TEST_CERT_DIR/unittestkey_expired.pem 1024
-openssl req -new -key $TEST_CERT_DIR/unittestkey.pem -out $TEST_CERT_DIR/unittestcert.csr \
-    -sha256 <<EOF
-US
-California
-San Francisco
-Lyft
-Test
-Unit Test CA
-unittest@lyft.com
+# These directories have the Bazel meaning described at
+# https://bazel.build/versions/master/docs/test-encyclopedia.html. In particular, TEST_SRCDIR is
+# where we expect to find the generated outputs of various scripts preparing input data (these are
+# not only the actual source files!).
+: ${TEST_TMPDIR:=/tmp/envoy_test_tmp}
+: ${TEST_SRCDIR:=/tmp/envoy_test_runfiles}
+export TEST_TMPDIR TEST_SRCDIR
 
+mkdir -p $TEST_TMPDIR
 
-EOF
-openssl req -new -key $TEST_CERT_DIR/unittestkey_expired.pem -out $TEST_CERT_DIR/unittestcert_expired.csr \
-    -sha256 <<EOF
-US
-California
-San Francisco
-Lyft
-Test
-Unit Test CA
-unittest@lyft.com
-
-
-EOF
-openssl x509 -req -days 15 -in $TEST_CERT_DIR/unittestcert.csr -sha256 -signkey \
-    $TEST_CERT_DIR/unittestkey.pem -out $TEST_CERT_DIR/unittestcert.pem
-openssl x509 -req -days -365 -in $TEST_CERT_DIR/unittestcert_expired.csr -sha256 -signkey \
-    $TEST_CERT_DIR/unittestkey_expired.pem -out $TEST_CERT_DIR/unittestcert_expired.pem
+$SOURCE_DIR/test/certs/gen_test_certs.sh $TEST_SRCDIR/test/certs
+$SOURCE_DIR/test/config/integration/gen_test_configs.sh $SOURCE_DIR/test/config/integration \
+  $TEST_SRCDIR/test/config/integration
 
 # First run the normal unit test suite
 cd $SOURCE_DIR
@@ -51,7 +31,7 @@ fi
 # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart
 # sanity test.
 echo "Starting epoch 0"
-$BINARY_DIR/source/exe/envoy -c test/config/integration/server.json \
+$BINARY_DIR/source/exe/envoy -c $TEST_SRCDIR/test/config/integration/server.json \
     --restart-epoch 0 --base-id 1 --service-cluster cluster --service-node node &
 
 FIRST_SERVER_PID=$!
@@ -64,7 +44,7 @@ kill -SIGHUP $FIRST_SERVER_PID
 sleep 3
 
 echo "Starting epoch 1"
-$BINARY_DIR/source/exe/envoy -c test/config/integration/server.json \
+$BINARY_DIR/source/exe/envoy -c $TEST_SRCDIR/test/config/integration/server.json \
     --restart-epoch 1 --base-id 1 --service-cluster cluster --service-node node &
 
 SECOND_SERVER_PID=$!
@@ -72,7 +52,7 @@ SECOND_SERVER_PID=$!
 sleep 7
 
 echo "Starting epoch 2"
-$BINARY_DIR/source/exe/envoy -c test/config/integration/server.json \
+$BINARY_DIR/source/exe/envoy -c $TEST_SRCDIR/test/config/integration/server.json \
     --restart-epoch 2 --base-id 1 --service-cluster cluster --service-node node &
 
 THIRD_SERVER_PID=$!

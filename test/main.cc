@@ -11,11 +11,19 @@
 #ifndef BAZEL_BRINGUP
 #include "test/integration/integration.h"
 #endif
+#include "test/test_common/environment.h"
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleMock(&argc, argv);
   Ssl::OpenSsl::initialize();
   Event::Libevent::Global::initialize();
+
+  // Set gtest properties
+  // (https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#logging-additional-information),
+  // they are available in the test XML.
+  // TODO(htuch): Log these as well?
+  ::testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
+  ::testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
 
   OptionsImpl options(argc, argv, "1", spdlog::level::err);
   Thread::MutexBasicLockable lock;

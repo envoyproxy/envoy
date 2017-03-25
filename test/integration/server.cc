@@ -8,6 +8,8 @@
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 
+#include "test/test_common/environment.h"
+
 namespace Server {
 
 class TestHotRestart : public HotRestart {
@@ -25,7 +27,8 @@ public:
 } // Server
 
 IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config_path) {
-  IntegrationTestServerPtr server{new IntegrationTestServer(config_path)};
+  IntegrationTestServerPtr server{
+      new IntegrationTestServer(TestEnvironment::runfilesPath(config_path))};
   server->start();
   return server;
 }
