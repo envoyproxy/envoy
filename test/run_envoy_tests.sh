@@ -7,6 +7,8 @@ BINARY_DIR=$2
 
 source $SOURCE_DIR/test/setup_test_env.sh
 
+mkdir -p $TEST_TMPDIR
+
 $SOURCE_DIR/test/certs/gen_test_certs.sh $TEST_SRCDIR/test/certs
 $SOURCE_DIR/test/config/integration/gen_test_configs.sh $SOURCE_DIR/test/config/integration \
   $TEST_SRCDIR/test/config/integration

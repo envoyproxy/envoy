@@ -7,6 +7,3 @@
 : ${TEST_TMPDIR:=/tmp/envoy_test_tmp}
 : ${TEST_SRCDIR:=/tmp/envoy_test_runfiles}
 export TEST_TMPDIR TEST_SRCDIR
-
-mkdir -p $TEST_TMPDIR
-mkdir -p $TEST_SRCDIR
