@@ -188,9 +188,12 @@ add_custom_target(
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
+set(ENVOY_TEST_EXTRA_SETUP_SCRIPT "" CACHE STRING
+    "extra setup script to call from run_envoy_tests.sh after basic setup")
+
 add_custom_target(
   ${PROJECT_NAME}.check ${PROJECT_SOURCE_DIR}/test/run_envoy_tests.sh ${PROJECT_SOURCE_DIR}
-                        ${PROJECT_BINARY_DIR}
+                        ${PROJECT_BINARY_DIR} ${ENVOY_TEST_EXTRA_SETUP_SCRIPT}
   DEPENDS envoy envoy-test envoy.generate_example_configs
 )
 
