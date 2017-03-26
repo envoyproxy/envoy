@@ -6,6 +6,8 @@ SOURCE_DIR=$1
 BINARY_DIR=$2
 
 source $SOURCE_DIR/test/setup_test_env.sh
+echo "TEST_TMPDIR=$TEST_TMPDIR"
+echo "TEST_SRCDIR=$TEST_SRCDIR"
 
 mkdir -p $TEST_TMPDIR
 
