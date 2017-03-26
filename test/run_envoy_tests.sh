@@ -4,8 +4,23 @@ set -e
 
 SOURCE_DIR=$1
 BINARY_DIR=$2
+EXTRA_SETUP_SCRIPT=$3
 
-source $SOURCE_DIR/test/setup_test_env.sh
+# These directories have the Bazel meaning described at
+# https://bazel.build/versions/master/docs/test-encyclopedia.html. In particular, TEST_SRCDIR is
+# where we expect to find the generated outputs of various scripts preparing input data (these are
+# not only the actual source files!).
+# It is a precondition that both $TEST_TMPDIR and $TEST_SRCDIR are empty.
+if [ -z "$TEST_TMPDIR" ] || [ -z "$TEST_SRCDIR" ]
+then
+  TEST_BASE=/tmp/envoy_test
+  echo "Cleaning $TEST_BASE"
+  rm -rf $TEST_BASE
+fi
+: ${TEST_TMPDIR:=$TEST_BASE/tmp}
+: ${TEST_SRCDIR:=$TEST_BASE/runfiles}
+export TEST_TMPDIR TEST_SRCDIR
+
 echo "TEST_TMPDIR=$TEST_TMPDIR"
 echo "TEST_SRCDIR=$TEST_SRCDIR"
 
@@ -14,6 +29,10 @@ mkdir -p $TEST_TMPDIR
 $SOURCE_DIR/test/certs/gen_test_certs.sh $TEST_SRCDIR/test/certs
 $SOURCE_DIR/test/config/integration/gen_test_configs.sh $SOURCE_DIR/test/config/integration \
   $TEST_SRCDIR/test/config/integration
+
+if [ -n "$EXTRA_SETUP_SCRIPT" ]; then
+  $EXTRA_SETUP_SCRIPT
+fi
 
 # First run the normal unit test suite
 cd $SOURCE_DIR
