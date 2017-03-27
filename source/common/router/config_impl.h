@@ -383,6 +383,11 @@ public:
     return response_headers_to_remove_;
   }
 
+  const std::list<std::pair<Http::LowerCaseString, std::string>>&
+  requestHeadersToAdd() const override {
+    return request_headers_to_add_;
+  }
+
   bool usesRuntime() const override { return route_matcher_->usesRuntime(); }
 
 private:
@@ -390,6 +395,7 @@ private:
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
+  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
 /**
@@ -413,12 +419,18 @@ public:
     return response_headers_to_remove_;
   }
 
+  const std::list<std::pair<Http::LowerCaseString, std::string>>&
+  requestHeadersToAdd() const override {
+    return request_headers_to_add_;
+  }
+
   bool usesRuntime() const override { return false; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
+  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
 } // Router

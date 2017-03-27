@@ -285,6 +285,13 @@ public:
   responseHeadersToAdd() const PURE;
 
   /**
+   * Return a list of header key/value pairs that will be added to every request
+   * proxied to an upstream cluster.
+   */
+  virtual const std::list<std::pair<Http::LowerCaseString, std::string>>&
+  requestHeadersToAdd() const PURE;
+
+  /**
    * Return a list of upstream headers that will be stripped from every response that transits the
    * router.
    */

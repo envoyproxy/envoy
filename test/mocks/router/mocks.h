@@ -181,12 +181,15 @@ public:
   MOCK_CONST_METHOD0(responseHeadersToAdd,
                      const std::list<std::pair<Http::LowerCaseString, std::string>>&());
   MOCK_CONST_METHOD0(responseHeadersToRemove, const std::list<Http::LowerCaseString>&());
+  MOCK_CONST_METHOD0(requestHeadersToAdd,
+                     const std::list<std::pair<Http::LowerCaseString, std::string>>&());
   MOCK_CONST_METHOD0(usesRuntime, bool());
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
+  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
 } // Router

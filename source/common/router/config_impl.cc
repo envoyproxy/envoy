@@ -553,6 +553,13 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
       response_headers_to_remove_.push_back(Http::LowerCaseString(header));
     }
   }
+
+  if (config.hasObject("request_headers_to_add")) {
+    for (const Json::ObjectPtr& header : config.getObjectArray("request_headers_to_add")) {
+      request_headers_to_add_.push_back(
+          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
+    }
+  }
 }
 
 } // Router

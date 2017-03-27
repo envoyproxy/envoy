@@ -28,6 +28,12 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
                                                     const Router::Config& route_config,
                                                     Runtime::RandomGenerator& random,
                                                     Runtime::Loader& runtime) {
+  // Add user-specified headers to the request before scrubbing the request headers.
+  for (const std::pair<Http::LowerCaseString, std::string>& to_add :
+       route_config.requestHeadersToAdd()) {
+    request_headers.addStatic(to_add.first, to_add.second);
+  }
+
   // Clean proxy headers.
   request_headers.removeConnection();
   request_headers.removeEnvoyInternalRequest();

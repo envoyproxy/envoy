@@ -12,7 +12,8 @@ Route configuration
     "virtual_hosts": [],
     "internal_only_headers": [],
     "response_headers_to_add": [],
-    "response_headers_to_remove": []
+    "response_headers_to_remove": [],
+    "request_headers_to_add": []
   }
 
 :ref:`virtual_hosts <config_http_conn_man_route_table_vhost>`
@@ -46,6 +47,17 @@ response_headers_to_remove
   .. code-block:: json
 
     ["header1", "header2"]
+
+request_headers_to_add
+  *(optional, array)* Optionally specifies a list of HTTP headers that should be added to each
+  request forwarded by the HTTP connection manager. Headers are specified in the following form:
+
+  .. code-block:: json
+
+    [
+      {"key": "header1", "value": "value1"},
+      {"key": "header2", "value": "value2"}
+    ]
 
 .. toctree::
   :hidden:

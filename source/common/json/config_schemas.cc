@@ -420,6 +420,20 @@ const std::string Json::Schema::ROUTE_CONFIGURATION_SCHEMA(R"EOF(
       "response_headers_to_remove" : {
         "type" : "array",
         "items" : {"type" : "string"}
+      },
+      "request_headers_to_add" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "object",
+          "properties": {
+            "key" : {"type" : "string"},
+            "value" : {"type" : "string"}
+          },
+          "required": ["key", "value"],
+          "additionalProperties": false
+        }
       }
     },
     "required": ["virtual_hosts"],

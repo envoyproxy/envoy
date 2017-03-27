@@ -140,6 +140,11 @@ TEST(RouteMatcherTest, TestRoutes) {
   "response_headers_to_remove": [
     "x-envoy-upstream-canary",
     "x-envoy-virtual-cluster"
+  ],
+
+  "request_headers_to_add": [
+    {"key": "x-backend-mystery-header", "value": "true"},
+    {"key" : "Connection", "value" : "Keep-Alive"}
   ]
 }
   )EOF";
@@ -269,7 +274,7 @@ TEST(RouteMatcherTest, TestRoutes) {
     EXPECT_EQ("new_host", headers.get_(Http::Headers::get().Host));
   }
 
-  // Header manipulaton testing.
+  // Response header manipulation testing.
   EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
               ContainerEq(config.internalOnlyHeaders()));
   EXPECT_THAT((std::list<std::pair<Http::LowerCaseString, std::string>>(
@@ -278,6 +283,23 @@ TEST(RouteMatcherTest, TestRoutes) {
   EXPECT_THAT(std::list<Http::LowerCaseString>({Http::LowerCaseString("x-envoy-upstream-canary"),
                                                 Http::LowerCaseString("x-envoy-virtual-cluster")}),
               ContainerEq(config.responseHeadersToRemove()));
+
+  // Request header manipulation testing
+  {
+    // At route_config level
+    // Check if user-specified request headers are added to config before scrubbing
+    EXPECT_THAT((std::list<std::pair<Http::LowerCaseString, std::string>>(
+                    {{Http::LowerCaseString("x-backend-mystery-header"), "true"},
+                     {Http::LowerCaseString("Connection"), "Keep-Alive"}})),
+                ContainerEq(config.requestHeadersToAdd()));
+
+    Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/host/rewrite/me", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers);
+
+    // check headers after scrubbing
+    EXPECT_EQ(nullptr, headers.get(Http::LowerCaseString("Connection")));
+  }
 
   // Virtual cluster testing.
   {
@@ -1520,6 +1542,7 @@ TEST(NullConfigImplTest, All) {
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
   EXPECT_EQ(0UL, config.responseHeadersToAdd().size());
   EXPECT_EQ(0UL, config.responseHeadersToRemove().size());
+  EXPECT_EQ(0UL, config.requestHeadersToAdd().size());
   EXPECT_FALSE(config.usesRuntime());
 }
 
