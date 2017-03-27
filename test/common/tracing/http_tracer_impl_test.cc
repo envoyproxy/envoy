@@ -467,6 +467,8 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
       .WillOnce(Return(span));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag("node_id", "node_name"));
+
   tracer_->startSpan(config_, request_headers_, request_info_);
 }
 
