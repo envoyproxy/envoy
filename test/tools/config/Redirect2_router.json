@@ -1,0 +1,24 @@
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2"
+        }
+      ]
+    },
+    {
+      "name": "redirect",
+      "domains": ["redirect.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "host_redirect": "new.lyft.com"
+        }
+      ]
+    }
+  ]
+}

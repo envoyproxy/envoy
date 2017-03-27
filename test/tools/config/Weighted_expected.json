@@ -1,0 +1,28 @@
+{ "input": [
+  {
+    "expected": "none",
+    "authority": "www1.lyft.com",
+    "path": "/foo",
+    "check": {"redirect": "path"},
+    "ssl": true,
+    "internal": true
+  },
+  {
+    "expected": "cluster1",
+    "authority": "www1.lyft.com",
+    "path": "/foo",
+    "random_lb_value": 115
+  },
+  {
+    "expected": "cluster2",
+    "authority": "www1.lyft.com",
+    "path": "/foo",
+    "random_lb_value": 445
+  },
+  {
+    "expected": "cluster3",
+    "authority": "www1.lyft.com",
+    "path": "/foo",
+    "random_lb_value": 560
+  }
+]}

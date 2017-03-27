@@ -60,10 +60,12 @@ def envoy_cc_binary(name,
                     srcs = [],
                     data = [],
                     linkstatic = 0,
+                    testonly = 0,
                     visibility = None,
                     deps = []):
     native.cc_binary(
         name = name,
+        testonly = testonly,
         srcs = srcs,
         data = data,
         copts = ENVOY_COPTS,

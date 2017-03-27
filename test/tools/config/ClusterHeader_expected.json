@@ -1,0 +1,25 @@
+{
+  "input": [
+    {
+      "expected": "some_cluster",
+      "authority": "some_cluster",
+      "path": "/foo"
+    },
+    {
+      "expected": "none",
+      "authority": "www.lyft.com",
+      "path": "/bar"
+    },
+    {
+      "expected": "some_cluster",
+      "authority": "www.lyft.com",
+      "path": "/bar",
+      "additional_headers": [
+        {
+          "name": "some_header",
+	  "value": "some_cluster"
+	}
+      ]
+    }
+  ]
+}
