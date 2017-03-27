@@ -475,6 +475,28 @@ TEST(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   tracer.startSpan(config, request_headers, request_info);
 }
 
+TEST(HttpTracerImplTest, TestOperationName) {
+  LocalInfo::MockLocalInfo local_info;
+  SystemTime time;
+  Http::AccessLog::MockRequestInfo request_info;
+  EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+
+  MockConfig config;
+  const std::string operation_name = "operation";
+  const std::string host = "api";
+  Http::TestHeaderMapImpl request_headers;
+  request_headers.insertHost().value(host);
+  const std::string expected_operation = "operation api";
+  EXPECT_CALL(config, operationName()).WillOnce(ReturnRef(operation_name));
+
+  MockDriver* driver = new MockDriver();
+  DriverPtr driver_ptr(driver);
+  HttpTracerImpl tracer(std::move(driver_ptr), local_info);
+
+  EXPECT_CALL(*driver, startSpan_(_, expected_operation, time)).WillOnce(Return(nullptr));
+  tracer.startSpan(config, request_headers, request_info);
+}
+
 TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   setupValidDriver();
 
