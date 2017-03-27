@@ -9,8 +9,8 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
-#include "test/mocks/upstream/mocks.h"
 #include "test/integration/utility.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 IntegrationTestServerPtr BaseIntegrationTest::test_server_;
