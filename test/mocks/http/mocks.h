@@ -50,6 +50,7 @@ public:
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
+  SystemTime start_time_;
 };
 
 } // AccessLog

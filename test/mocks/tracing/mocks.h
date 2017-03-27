@@ -15,6 +15,8 @@ public:
   ~MockConfig();
 
   MOCK_CONST_METHOD0(operationName, const std::string&());
+
+  const std::string operation_name_ = "operation";
 };
 
 class MockSpan : public Span {

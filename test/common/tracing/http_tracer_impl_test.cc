@@ -433,19 +433,14 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
 class HttpTracerImplTest : public Test {
 public:
   HttpTracerImplTest() {
-    ON_CALL(request_info_, startTime()).WillByDefault(Return(start_time_));
-    ON_CALL(config_, operationName()).WillByDefault(ReturnRef(operation_name_));
-
     driver_ = new MockDriver();
     DriverPtr driver_ptr(driver_);
     tracer_.reset(new HttpTracerImpl(std::move(driver_ptr), local_info_));
   }
 
-  const std::string operation_name_{"operation_name"};
   Http::TestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}, {":authority", "test"}};
-  const std::string full_span_name_{"operation_name test"};
-  SystemTime start_time_;
+  const std::string full_span_name_{"operation test"};
   Http::AccessLog::MockRequestInfo request_info_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   MockConfig config_;
@@ -456,7 +451,8 @@ public:
 TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
   EXPECT_CALL(config_, operationName());
   EXPECT_CALL(request_info_, startTime());
-  EXPECT_CALL(*driver_, startSpan_(_, full_span_name_, start_time_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*driver_, startSpan_(_, full_span_name_, request_info_.start_time_))
+      .WillOnce(Return(nullptr));
 
   tracer_->startSpan(config_, request_headers_, request_info_);
 }
@@ -467,7 +463,8 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   EXPECT_CALL(config_, operationName());
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
-  EXPECT_CALL(*driver_, startSpan_(_, full_span_name_, start_time_)).WillOnce(Return(span));
+  EXPECT_CALL(*driver_, startSpan_(_, full_span_name_, request_info_.start_time_))
+      .WillOnce(Return(span));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   tracer_->startSpan(config_, request_headers_, request_info_);
