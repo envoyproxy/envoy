@@ -1,4 +1,4 @@
-#include "proxy_proto_integration_test.h"
+#include "test/integration/proxy_proto_integration_test.h"
 
 #include "common/buffer/buffer_impl.h"
 

@@ -1,4 +1,4 @@
-#include "fault.h"
+#include "server/config/http/fault.h"
 
 #include "common/http/filter/fault_filter.h"
 #include "common/json/config_schemas.h"

@@ -1,4 +1,4 @@
-#include "load_balancer_impl.h"
+#include "common/upstream/load_balancer_impl.h"
 
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"

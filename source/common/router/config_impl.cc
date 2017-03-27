@@ -1,5 +1,4 @@
-#include "config_impl.h"
-#include "retry_state_impl.h"
+#include "common/router/config_impl.h"
 
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
@@ -13,6 +12,7 @@
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+#include "common/router/retry_state_impl.h"
 
 namespace Router {
 

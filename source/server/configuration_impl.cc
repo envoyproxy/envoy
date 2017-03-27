@@ -1,4 +1,4 @@
-#include "configuration_impl.h"
+#include "server/configuration_impl.h"
 
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"

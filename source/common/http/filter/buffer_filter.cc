@@ -1,4 +1,4 @@
-#include "buffer_filter.h"
+#include "common/http/filter/buffer_filter.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"

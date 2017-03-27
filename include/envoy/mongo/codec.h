@@ -1,6 +1,6 @@
 #pragma once
 
-#include "bson.h"
+#include "envoy/mongo/bson.h"
 
 /**
  * General implementation of https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/

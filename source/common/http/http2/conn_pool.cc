@@ -1,10 +1,10 @@
-#include "codec_impl.h"
-#include "conn_pool.h"
+#include "common/http/http2/conn_pool.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/http/http2/codec_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 

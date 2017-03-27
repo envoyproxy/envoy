@@ -1,7 +1,4 @@
-#include "cds_api_impl.h"
-#include "cluster_manager_impl.h"
-#include "load_balancer_impl.h"
-#include "ring_hash_lb.h"
+#include "common/upstream/cluster_manager_impl.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
@@ -14,6 +11,9 @@
 #include "common/http/async_client_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/router/shadow_writer_impl.h"
+#include "common/upstream/cds_api_impl.h"
+#include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/ring_hash_lb.h"
 
 namespace Upstream {
 

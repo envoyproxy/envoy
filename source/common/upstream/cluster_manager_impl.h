@@ -1,7 +1,5 @@
 #pragma once
 
-#include "sds.h"
-
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -10,6 +8,7 @@
 
 #include "common/http/async_client_impl.h"
 #include "common/json/json_loader.h"
+#include "common/upstream/sds.h"
 
 namespace Upstream {
 

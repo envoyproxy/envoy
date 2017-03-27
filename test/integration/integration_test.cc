@@ -1,9 +1,8 @@
-#include "integration.h"
-#include "utility.h"
+#include "test/integration/integration.h"
 
-#include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 
+#include "test/integration/utility.h"
 #include "test/test_common/utility.h"
 
 TEST_F(IntegrationTest, Echo) {

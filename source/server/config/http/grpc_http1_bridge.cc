@@ -1,4 +1,4 @@
-#include "grpc_http1_bridge.h"
+#include "server/config/http/grpc_http1_bridge.h"
 
 #include "common/grpc/http1_bridge_filter.h"
 

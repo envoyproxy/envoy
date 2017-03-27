@@ -1,12 +1,12 @@
 #pragma once
 
-#include "connection_handler_impl.h"
-
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/thread.h"
 #include "common/network/listen_socket_impl.h"
+
+#include "server/connection_handler_impl.h"
 
 typedef std::map<Server::Configuration::Listener*, Network::TcpListenSocketPtr> SocketMap;
 

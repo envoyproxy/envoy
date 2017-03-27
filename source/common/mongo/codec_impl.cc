@@ -1,11 +1,11 @@
-#include "bson_impl.h"
-#include "codec_impl.h"
+#include "common/mongo/codec_impl.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
+#include "common/mongo/bson_impl.h"
 
 namespace Mongo {
 

@@ -1,5 +1,4 @@
-#include "codec_impl.h"
-#include "proxy.h"
+#include "common/mongo/proxy.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/filesystem/filesystem.h"
@@ -7,6 +6,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/mongo/codec_impl.h"
 
 namespace Mongo {
 

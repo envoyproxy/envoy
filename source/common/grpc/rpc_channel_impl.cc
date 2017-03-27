@@ -1,8 +1,8 @@
-#include "common.h"
-#include "rpc_channel_impl.h"
+#include "common/grpc/rpc_channel_impl.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"

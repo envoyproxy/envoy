@@ -1,4 +1,4 @@
-#include "tcp_proxy.h"
+#include "common/filter/tcp_proxy.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"

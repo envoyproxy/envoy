@@ -1,7 +1,7 @@
-#include "load_balancer_impl.h"
-#include "ring_hash_lb.h"
+#include "common/upstream/ring_hash_lb.h"
 
 #include "common/common/assert.h"
+#include "common/upstream/load_balancer_impl.h"
 
 namespace Upstream {
 

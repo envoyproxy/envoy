@@ -1,4 +1,4 @@
-#include "conn_pool.h"
+#include "common/http/http1/conn_pool.h"
 
 #include "envoy/http/header_map.h"
 #include "envoy/event/dispatcher.h"
