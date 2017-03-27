@@ -24,8 +24,7 @@ ClientImpl::~ClientImpl() {
 
 void ClientImpl::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
-ActiveRequest* ClientImpl::makeRequest(const RespValue& request,
-                                       ActiveRequestCallbacks& callbacks) {
+PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
   pending_requests_.emplace_back(callbacks);
   encoder_->encode(request, encoder_buffer_);
@@ -86,8 +85,8 @@ InstanceImpl::InstanceImpl(const std::string& cluster_name, Upstream::ClusterMan
   });
 }
 
-ActiveRequest* InstanceImpl::makeRequest(const std::string& hash_key, const RespValue& value,
-                                         ActiveRequestCallbacks& callbacks) {
+PoolRequest* InstanceImpl::makeRequest(const std::string& hash_key, const RespValue& value,
+                                       PoolCallbacks& callbacks) {
   return tls_.getTyped<ThreadLocalPool>(tls_slot_).makeRequest(hash_key, value, callbacks);
 }
 
@@ -113,9 +112,9 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
   }
 }
 
-ActiveRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_key,
-                                                          const RespValue& request,
-                                                          ActiveRequestCallbacks& callbacks) {
+PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_key,
+                                                        const RespValue& request,
+                                                        PoolCallbacks& callbacks) {
   LbContextImpl lb_context(hash_key);
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {

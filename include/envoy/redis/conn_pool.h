@@ -9,9 +9,9 @@ namespace ConnPool {
 /**
  * A handle to an outbound request.
  */
-class ActiveRequest {
+class PoolRequest {
 public:
-  virtual ~ActiveRequest() {}
+  virtual ~PoolRequest() {}
 
   /**
    * Cancel the request. No further request callbacks will be called.
@@ -22,9 +22,9 @@ public:
 /**
  * Outbound request callbacks.
  */
-class ActiveRequestCallbacks {
+class PoolCallbacks {
 public:
-  virtual ~ActiveRequestCallbacks() {}
+  virtual ~PoolCallbacks() {}
 
   /**
    * Called when a pipelined response is received.
@@ -59,10 +59,10 @@ public:
    * Make a pipelined request to the remote redis server.
    * @param request supplies the RESP request to make.
    * @param callbacks supplies the request callbacks.
-   * @return ActiveRequest* a handle to the active request.
+   * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
+   *         for some reason.
    */
-  virtual ActiveRequest* makeRequest(const RespValue& request,
-                                     ActiveRequestCallbacks& callbacks) PURE;
+  virtual PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<Client> ClientPtr;
@@ -93,12 +93,14 @@ public:
    * @param hash_key supplies the key to use for consistent hashing.
    * @param request supplies the request to make.
    * @param callbacks supplies the request completion callbacks.
-   * @return ActiveRequest* a handle to the active request or nullptr if the request could not
-   *         be made for some reason.
+   * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
+   *         for some reason.
    */
-  virtual ActiveRequest* makeRequest(const std::string& hash_key, const RespValue& request,
-                                     ActiveRequestCallbacks& callbacks) PURE;
+  virtual PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
+                                   PoolCallbacks& callbacks) PURE;
 };
+
+typedef std::unique_ptr<Instance> InstancePtr;
 
 } // ConnPool
 } // Redis

@@ -1,5 +1,7 @@
 #include "printers.h"
 
+#include "envoy/redis/codec.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 
@@ -18,7 +20,7 @@ void PrintTo(const HeaderMapPtr& headers, std::ostream* os) {
 void PrintTo(const HeaderMap& headers, std::ostream* os) {
   PrintTo(*dynamic_cast<const HeaderMapImpl*>(&headers), os);
 }
-}
+} // Http
 
 namespace Buffer {
 void PrintTo(const Instance& buffer, std::ostream* os) {
@@ -28,4 +30,10 @@ void PrintTo(const Instance& buffer, std::ostream* os) {
 void PrintTo(const Buffer::OwnedImpl& buffer, std::ostream* os) {
   PrintTo(dynamic_cast<const Buffer::Instance&>(buffer), os);
 }
-}
+} // Buffer
+
+namespace Redis {
+void PrintTo(const RespValue& value, std::ostream* os) { *os << value.toString(); }
+
+void PrintTo(const RespValuePtr& value, std::ostream* os) { *os << value->toString(); }
+} // Redis

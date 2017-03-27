@@ -94,7 +94,6 @@ public:
   InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                const LocalInfo::LocalInfo& local_info);
-  ~InstanceImpl();
 
   void run();
 

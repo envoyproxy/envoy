@@ -361,8 +361,6 @@ void InstanceImpl::run() {
 
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
 
-InstanceImpl::~InstanceImpl() {}
-
 void InstanceImpl::shutdown() {
   log().warn("shutdown invoked. sending SIGTERM to self");
   kill(getpid(), SIGTERM);

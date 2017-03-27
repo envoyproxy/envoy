@@ -12,7 +12,10 @@ ACTION_P(SaveArgAddress, target) { *target = &arg0; }
 /**
  * Matcher that matches on whether the pointee of both lhs and rhs are equal.
  */
-MATCHER_P(PointeesEq, rhs, "") { return *arg == *rhs; }
+MATCHER_P(PointeesEq, rhs, "") {
+  *result_listener << testing::PrintToString(*arg) + " != " + testing::PrintToString(*rhs);
+  return *arg == *rhs;
+}
 
 /**
  * Simple mock that just lets us make sure a method gets called or not called form a lambda.

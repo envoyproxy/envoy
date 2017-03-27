@@ -69,7 +69,7 @@ void HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
-    : Json::JsonValidator(config, Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA),
+    : Json::Validator(config, Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA),
       disable_key_(config.getString("disable_key", "")),
       stage_(static_cast<uint64_t>(config.getInteger("stage", 0))) {
   for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
