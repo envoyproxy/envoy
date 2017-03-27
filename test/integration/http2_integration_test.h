@@ -1,6 +1,6 @@
 #pragma once
 
-#include "integration.h"
+#include "test/integration/integration.h"
 
 class Http2IntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:

@@ -1,4 +1,4 @@
-#include "codec_impl.h"
+#include "common/redis/codec_impl.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"

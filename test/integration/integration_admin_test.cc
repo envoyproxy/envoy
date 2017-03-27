@@ -1,7 +1,7 @@
-#include "integration.h"
-#include "utility.h"
-
 #include "envoy/http/header_map.h"
+
+#include "test/integration/integration.h"
+#include "test/integration/utility.h"
 
 TEST_F(IntegrationTest, HealthCheck) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(

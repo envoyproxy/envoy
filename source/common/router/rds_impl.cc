@@ -1,8 +1,8 @@
-#include "config_impl.h"
-#include "rds_impl.h"
+#include "common/router/rds_impl.h"
 
 #include "common/common/assert.h"
 #include "common/json/config_schemas.h"
+#include "common/router/config_impl.h"
 
 namespace Router {
 

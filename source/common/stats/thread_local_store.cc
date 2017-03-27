@@ -1,4 +1,4 @@
-#include "thread_local_store.h"
+#include "common/stats/thread_local_store.h"
 
 namespace Stats {
 

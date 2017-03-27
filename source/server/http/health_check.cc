@@ -1,4 +1,4 @@
-#include "health_check.h"
+#include "server/http/health_check.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"

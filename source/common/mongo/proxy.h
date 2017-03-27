@@ -1,7 +1,5 @@
 #pragma once
 
-#include "utility.h"
-
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/time.h"
 #include "envoy/mongo/codec.h"
@@ -13,6 +11,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+#include "common/mongo/utility.h"
 #include "common/network/filter_impl.h"
 
 namespace Mongo {

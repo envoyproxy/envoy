@@ -1,4 +1,4 @@
-#include "stats.h"
+#include "common/memory/stats.h"
 
 #ifdef TCMALLOC
 

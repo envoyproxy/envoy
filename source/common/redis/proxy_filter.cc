@@ -1,4 +1,4 @@
-#include "proxy_filter.h"
+#include "common/redis/proxy_filter.h"
 
 #include "common/common/assert.h"
 #include "common/json/config_schemas.h"

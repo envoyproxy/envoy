@@ -1,4 +1,4 @@
-#include "redis_proxy.h"
+#include "server/config/network/redis_proxy.h"
 
 #include "common/redis/codec_impl.h"
 #include "common/redis/command_splitter_impl.h"
