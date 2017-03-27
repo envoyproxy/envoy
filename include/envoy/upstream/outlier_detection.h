@@ -110,8 +110,20 @@ public:
    */
   virtual void addChangedStateCb(ChangeStateCb cb) PURE;
 
+  /**
+   * Returns the average success rate of the hosts in the Detector for the last aggregation
+   * interval.
+   * @return the average success rate, or -1 if there were not enough hosts with enough request
+   *         volume to proceed with success rate based outlier ejection.
+   */
   virtual double successRateAverage() PURE;
 
+  /**
+   * Returns the success rate threshold used in the last interval. The threshold is used to eject
+   * hosts based on their success rate.
+   * @return the threshold, or -1 if there were not enough hosts with enough request volume to
+   *         proceed with success rate based outlier ejection.
+   */
   virtual double successRateEjectionThreshold() PURE;
 };
 

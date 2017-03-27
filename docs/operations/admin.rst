@@ -35,7 +35,7 @@ modify different aspects of the server.
     weight, Integer, Load balancing weight (1-100)
     zone, String, Service zone
     canary, Boolean, Whether the host is a canary
-    success_rate, Double, Request success rate (0-100). -1 if there was not enough volume to calculate.
+    success_rate, Double, Request success rate (0-100). -1 if there was not enough request volume to calculate it
 
   Host health status
     A host is either healthy or unhealthy because of one or more different failing health states.
