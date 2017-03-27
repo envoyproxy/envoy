@@ -135,10 +135,8 @@ HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& l
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
                                   const Http::AccessLog::RequestInfo& request_info) {
-  std::string operation_name = config.operationName();
-  if (request_headers.Host()) {
-    operation_name += " " + std::string(request_headers.Host()->value().c_str());
-  }
+  std::string operation_name =
+      fmt::format("{} {}", config.operationName(), request_headers.Host()->value().c_str());
 
   SpanPtr active_span =
       driver_->startSpan(request_headers, operation_name, request_info.startTime());

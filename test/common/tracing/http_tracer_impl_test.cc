@@ -353,6 +353,7 @@ public:
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
   SystemTime start_time_;
+  Http::AccessLog::MockRequestInfo request_info_;
 
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
@@ -429,72 +430,47 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   EXPECT_EQ(nullptr, null_tracer.startSpan(config, request_headers, request_info));
 }
 
-TEST(HttpTracerImplTest, BasicFunctionalityNullSpan) {
-  LocalInfo::MockLocalInfo local_info;
-  SystemTime time;
-  Http::AccessLog::MockRequestInfo request_info;
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+class HttpTracerImplTest : public Test {
+public:
+  HttpTracerImplTest() {
+    ON_CALL(request_info_, startTime()).WillByDefault(Return(start_time_));
+    ON_CALL(config_, operationName()).WillByDefault(ReturnRef(operation_name_));
 
-  MockConfig config;
-  const std::string operation_name = "operation";
-  EXPECT_CALL(config, operationName()).WillOnce(ReturnRef(operation_name));
+    driver_ = new MockDriver();
+    DriverPtr driver_ptr(driver_);
+    tracer_.reset(new HttpTracerImpl(std::move(driver_ptr), local_info_));
+  }
 
-  Http::TestHeaderMapImpl request_headers;
-  MockDriver* driver = new MockDriver();
-  DriverPtr driver_ptr(driver);
+  const std::string operation_name_{"operation_name"};
+  Http::TestHeaderMapImpl request_headers_{
+      {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}, {":authority", "test"}};
+  const std::string full_span_name_{"operation_name test"};
+  SystemTime start_time_;
+  Http::AccessLog::MockRequestInfo request_info_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  MockConfig config_;
+  MockDriver* driver_;
+  HttpTracerPtr tracer_;
+};
 
-  HttpTracerImpl tracer(std::move(driver_ptr), local_info);
+TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
+  EXPECT_CALL(config_, operationName());
+  EXPECT_CALL(request_info_, startTime());
+  EXPECT_CALL(*driver_, startSpan_(_, full_span_name_, start_time_)).WillOnce(Return(nullptr));
 
-  EXPECT_CALL(*driver, startSpan_(_, operation_name, time)).WillOnce(Return(nullptr));
-
-  tracer.startSpan(config, request_headers, request_info);
+  tracer_->startSpan(config_, request_headers_, request_info_);
 }
 
-TEST(HttpTracerImplTest, BasicFunctionalityNodeSet) {
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  SystemTime time;
-  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
-  EXPECT_CALL(local_info, nodeName());
-
-  MockConfig config;
-  const std::string operation_name = "operation";
-  EXPECT_CALL(config, operationName()).WillOnce(ReturnRef(operation_name));
-
-  Http::TestHeaderMapImpl request_headers{
-      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
-  MockDriver* driver = new MockDriver();
-  DriverPtr driver_ptr(driver);
-
-  HttpTracerImpl tracer(std::move(driver_ptr), local_info);
+TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
+  EXPECT_CALL(request_info_, startTime());
+  EXPECT_CALL(local_info_, nodeName());
+  EXPECT_CALL(config_, operationName());
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
-  EXPECT_CALL(*driver, startSpan_(_, operation_name, time)).WillOnce(Return(span));
+  EXPECT_CALL(*driver_, startSpan_(_, full_span_name_, start_time_)).WillOnce(Return(span));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  tracer.startSpan(config, request_headers, request_info);
-}
-
-TEST(HttpTracerImplTest, TestOperationName) {
-  LocalInfo::MockLocalInfo local_info;
-  SystemTime time;
-  Http::AccessLog::MockRequestInfo request_info;
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
-
-  MockConfig config;
-  const std::string operation_name = "operation";
-  const std::string host = "api";
-  Http::TestHeaderMapImpl request_headers;
-  request_headers.insertHost().value(host);
-  const std::string expected_operation = "operation api";
-  EXPECT_CALL(config, operationName()).WillOnce(ReturnRef(operation_name));
-
-  MockDriver* driver = new MockDriver();
-  DriverPtr driver_ptr(driver);
-  HttpTracerImpl tracer(std::move(driver_ptr), local_info);
-
-  EXPECT_CALL(*driver, startSpan_(_, expected_operation, time)).WillOnce(Return(nullptr));
-  tracer.startSpan(config, request_headers, request_info);
+  tracer_->startSpan(config_, request_headers_, request_info_);
 }
 
 TEST_F(LightStepDriverTest, FlushSeveralSpans) {
