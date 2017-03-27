@@ -19,6 +19,8 @@ public:
   MOCK_METHOD1(putResponseTime, void(std::chrono::milliseconds time));
   MOCK_METHOD0(lastEjectionTime, const Optional<SystemTime>&());
   MOCK_METHOD0(lastUnejectionTime, const Optional<SystemTime>&());
+  MOCK_CONST_METHOD0(successRate, double());
+  MOCK_METHOD1(successRate, void(double new_success_rate));
 };
 
 class MockEventLogger : public EventLogger {
@@ -26,7 +28,8 @@ public:
   MockEventLogger();
   ~MockEventLogger();
 
-  MOCK_METHOD2(logEject, void(HostDescriptionConstSharedPtr host, EjectionType type));
+  MOCK_METHOD3(logEject,
+               void(HostDescriptionConstSharedPtr host, EjectionType type, bool enforced));
   MOCK_METHOD1(logUneject, void(HostDescriptionConstSharedPtr host));
 };
 
@@ -42,6 +45,8 @@ public:
   }
 
   MOCK_METHOD1(addChangedStateCb, void(ChangeStateCb cb));
+  MOCK_METHOD0(successRateAverage, double());
+  MOCK_METHOD0(successRateEjectionThreshold, double());
 
   std::list<ChangeStateCb> callbacks_;
 };
@@ -104,8 +109,6 @@ public:
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(weight, uint32_t());
   MOCK_METHOD1(weight, void(uint32_t new_weight));
-  MOCK_CONST_METHOD0(successRate, double());
-  MOCK_METHOD1(successRate, void(double new_success_rate));
   MOCK_CONST_METHOD0(zone, const std::string&());
 };
 

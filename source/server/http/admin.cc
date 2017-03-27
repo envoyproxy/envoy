@@ -100,6 +100,17 @@ bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
   return true;
 }
 
+void AdminImpl::addOutlierInfo(const std::string& cluster_name,
+                               Upstream::Outlier::DetectorSharedPtr outlier_detector,
+                               Buffer::Instance& response) {
+  if (outlier_detector) {
+    response.add(fmt::format("{}::outlier::success_rate_average::{}", cluster_name,
+                             outlier_detector->successRateAverage()));
+    response.add(fmt::format("{}::outlier::success_rate_average::{}", cluster_name,
+                             outlier_detector->successRateEjectionThreshold()));
+  }
+}
+
 void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
                                    Upstream::ResourceManager& resource_manager,
                                    Buffer::Instance& response) {
@@ -115,6 +126,9 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 
 Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& response) {
   for (auto& cluster : server_.clusterManager().clusters()) {
+    addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
+                   response);
+
     addCircuitSettings(
         cluster.second.get().info()->name(), "default",
         cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::Default),
@@ -148,7 +162,7 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Buffer::Instance& resp
       response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
                                host->address()->asString(), host->canary()));
       response.add(fmt::format("{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
-                               host->address()->asString(), host->successRate()));
+                               host->address()->asString(), host->outlierDetector().successRate()));
     }
   }
 

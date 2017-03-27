@@ -120,7 +120,7 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
-                       EjectionType::Consecutive5xx));
+                       EjectionType::Consecutive5xx, true));
   loadRq(cluster_.hosts_[0], 1, 503);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -169,7 +169,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
-                       EjectionType::Consecutive5xx));
+                       EjectionType::Consecutive5xx, true));
   loadRq(cluster_.hosts_[0], 1, 503);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -202,7 +202,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
-                       EjectionType::Consecutive5xx));
+                       EjectionType::Consecutive5xx, true));
   loadRq(cluster_.hosts_[0], 1, 503);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
@@ -236,6 +236,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   // Turn off 5xx detection to test SR detection in isolation.
   ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
       .WillByDefault(Return(false));
+  // Expect non-enforcing logging
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4]),
+                       EjectionType::Consecutive5xx, false)).Times(2);
 
   // Cause a consecutive SR error on one host. First have 4 of the hosts have perfect SR.
   loadRq(cluster_.hosts_, 200, 200);
@@ -247,7 +251,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_CALL(checker_, check(cluster_.hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4]),
-                       EjectionType::SuccessRate));
+                       EjectionType::SuccessRate, true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_TRUE(cluster_.hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -299,7 +303,7 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
-                       EjectionType::Consecutive5xx));
+                       EjectionType::Consecutive5xx, true));
   loadRq(cluster_.hosts_[0], 1, 503);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -338,7 +342,7 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
-                       EjectionType::Consecutive5xx));
+                       EjectionType::Consecutive5xx, true));
   cluster_.hosts_[0]->outlierDetector().putHttpResponseCode(503);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -439,7 +443,7 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
-                       EjectionType::Consecutive5xx));
+                       EjectionType::Consecutive5xx, true));
 
   // Fire the post callback twice. This should only result in a single ejection.
   post_cb();
@@ -466,7 +470,7 @@ TEST_F(OutlierDetectorImplTest, Consecutive5xxAlreadyEjected) {
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]),
-                       EjectionType::Consecutive5xx));
+                       EjectionType::Consecutive5xx, true));
   loadRq(cluster_.hosts_[0], 1, 503);
   EXPECT_TRUE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
@@ -497,12 +501,14 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
 
   std::string log1;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(time));
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                           "\"-1\", \"cluster\": "
-                           "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"5xx\", \"num_ejections\": 0}\n"))
+  EXPECT_CALL(
+      *file,
+      write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+            "\"-1\", \"cluster\": "
+            "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
+            "\"eject\", \"type\": \"5xx\", \"num_ejections\": \"0\", \"enforced\": \"true\"}\n"))
       .WillOnce(SaveArg<0>(&log1));
-  event_logger.logEject(host, EjectionType::Consecutive5xx);
+  event_logger.logEject(host, EjectionType::Consecutive5xx, true);
   Json::Factory::LoadFromString(log1);
 
   std::string log2;
@@ -522,9 +528,9 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"30\", \"cluster\": "
                            "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"SuccessRate\", \"num_ejections\": 0}\n"))
-      .WillOnce(SaveArg<0>(&log3));
-  event_logger.logEject(host, EjectionType::SuccessRate);
+                           "\"eject\", \"type\": \"SuccessRate\", \"num_ejections\": \"0\", "
+                           "\"enforced\": \"false\"}\n")).WillOnce(SaveArg<0>(&log3));
+  event_logger.logEject(host, EjectionType::SuccessRate, false);
   Json::Factory::LoadFromString(log3);
 
   std::string log4;
@@ -544,8 +550,10 @@ TEST(OutlierUtility, SRThreshold) {
       HostSuccessRatePair(nullptr, 100),
   };
   double sum = 450;
+  double average;
 
-  EXPECT_EQ(Utility::successRateEjectionThreshold(sum, data), 52);
+  EXPECT_EQ(Utility::successRateEjectionThreshold(sum, data, average), 52);
+  EXPECT_EQ(90.0, average);
 }
 
 } // Outlier

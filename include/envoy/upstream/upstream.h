@@ -4,6 +4,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/ssl/context.h"
 #include "envoy/upstream/load_balancer_type.h"
+#include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
 namespace Upstream {
@@ -83,19 +84,6 @@ public:
    * Set the current load balancing weight of the host, in the range 1-100.
    */
   virtual void weight(uint32_t new_weight) PURE;
-
-  /**
-   * @return the success rate of the host in the last calculated interval, in the range -1-100.
-   *         -1 means that the host did not have enough request volume to calculate success rate
-   *         or the cluster did not have enough hosts to run through success rate outlier ejection.
-   */
-  virtual double successRate() const PURE;
-
-  /**
-   * Set the success rate of the host.
-   * @param new_success_rate the new success rate calculated for the host in the last interval.
-   */
-  virtual void successRate(double new_success_rate) PURE;
 };
 
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
@@ -312,6 +300,8 @@ public:
    * @return the information about this upstream cluster.
    */
   virtual ClusterInfoConstSharedPtr info() const PURE;
+
+  virtual Outlier::DetectorSharedPtr outlierDetector() const PURE;
 
   /**
    * Initialize the cluster. This will be called either immediately at creation or after all primary

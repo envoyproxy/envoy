@@ -38,6 +38,7 @@ public:
 
   // Upstream::Cluster
   MOCK_CONST_METHOD0(info, ClusterInfoConstSharedPtr());
+  MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorSharedPtr());
   MOCK_METHOD0(initialize, void());
   MOCK_CONST_METHOD0(initializePhase, InitializePhase());
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));

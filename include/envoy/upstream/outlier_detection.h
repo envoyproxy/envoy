@@ -48,6 +48,19 @@ public:
    * @return the last time this host was unejected, if the host has been unejected previously.
    */
   virtual const Optional<SystemTime>& lastUnejectionTime() PURE;
+
+  /**
+   * @return the success rate of the host in the last calculated interval, in the range -1-100.
+   *         -1 means that the host did not have enough request volume to calculate success rate
+   *         or the cluster did not have enough hosts to run through success rate outlier ejection.
+   */
+  virtual double successRate() const PURE;
+
+  /**
+   * Set the success rate of the host.
+   * @param new_success_rate the new success rate calculated for the host in the last interval.
+   */
+  virtual void successRate(double new_success_rate) PURE;
 };
 
 typedef std::unique_ptr<DetectorHostSink> DetectorHostSinkPtr;
@@ -65,8 +78,9 @@ public:
    * Log an ejection event.
    * @param host supplies the host that generated the event.
    * @param type supplies the type of the event.
+   * @param enforced is true if the ejection took place, false if only logging took place.
    */
-  virtual void logEject(HostDescriptionConstSharedPtr host, EjectionType type) PURE;
+  virtual void logEject(HostDescriptionConstSharedPtr host, EjectionType type, bool enforced) PURE;
 
   /**
    * Log an unejection event.
@@ -95,6 +109,10 @@ public:
    * changes state (either ejected or brought back in) due to outlier status.
    */
   virtual void addChangedStateCb(ChangeStateCb cb) PURE;
+
+  virtual double successRateAverage() PURE;
+
+  virtual double successRateEjectionThreshold() PURE;
 };
 
 typedef std::shared_ptr<Detector> DetectorSharedPtr;

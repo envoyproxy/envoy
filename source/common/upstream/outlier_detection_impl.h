@@ -22,6 +22,8 @@ public:
   void putResponseTime(std::chrono::milliseconds) override {}
   const Optional<SystemTime>& lastEjectionTime() override { return time_; }
   const Optional<SystemTime>& lastUnejectionTime() override { return time_; }
+  double successRate() const override { return -1; }
+  void successRate(double) override {}
 
 private:
   const Optional<SystemTime> time_;
@@ -106,8 +108,10 @@ public:
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
   void putResponseTime(std::chrono::milliseconds) override {}
-  const Optional<SystemTime>& lastEjectionTime() { return last_ejection_time_; }
-  const Optional<SystemTime>& lastUnejectionTime() { return last_unejection_time_; }
+  const Optional<SystemTime>& lastEjectionTime() override { return last_ejection_time_; }
+  const Optional<SystemTime>& lastUnejectionTime() override { return last_unejection_time_; }
+  double successRate() const override { return success_rate_; }
+  void successRate(double new_success_rate) override { success_rate_ = new_success_rate; }
 
 private:
   std::weak_ptr<DetectorImpl> detector_;
@@ -118,6 +122,7 @@ private:
   uint32_t num_ejections_{};
   SuccessRateAccumulator success_rate_accumulator_;
   std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
+  double success_rate_;
 };
 
 /**
@@ -185,6 +190,8 @@ public:
 
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
+  double successRateAverage() override { return success_rate_average_; }
+  double successRateEjectionThreshold() override { return success_rate_ejection_threshold_; }
 
 private:
   DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
@@ -212,6 +219,8 @@ private:
   std::list<ChangeStateCb> callbacks_;
   std::unordered_map<HostSharedPtr, DetectorHostSinkImpl*> host_sinks_;
   EventLoggerSharedPtr event_logger_;
+  double success_rate_average_;
+  double success_rate_ejection_threshold_;
 };
 
 class EventLoggerImpl : public EventLogger {
@@ -221,7 +230,7 @@ public:
       : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
 
   // Upstream::Outlier::EventLogger
-  void logEject(HostDescriptionConstSharedPtr host, EjectionType type) override;
+  void logEject(HostDescriptionConstSharedPtr host, EjectionType type, bool enforced) override;
   void logUneject(HostDescriptionConstSharedPtr host) override;
 
 private:
@@ -246,7 +255,8 @@ public:
    */
   static double
   successRateEjectionThreshold(double success_rate_sum,
-                               const std::vector<HostSuccessRatePair>& valid_success_rate_hosts);
+                               const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
+                               double& success_rate_average);
 
 private:
   // Factor to multiply the stdev of a cluster's success rate for success rate outlier ejection.
