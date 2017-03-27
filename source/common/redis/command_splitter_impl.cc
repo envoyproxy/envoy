@@ -157,7 +157,8 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
 
   auto handler = command_map_.find(request.asArray()[0].asString());
   if (handler == command_map_.end()) {
-    callbacks.onResponse(Utility::makeError("unsupported command"));
+    callbacks.onResponse(Utility::makeError(
+        fmt::format("unsupported command '{}'", request.asArray()[0].asString())));
     return nullptr;
   }
 

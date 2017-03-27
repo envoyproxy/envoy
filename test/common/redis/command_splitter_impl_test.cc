@@ -67,7 +67,7 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayNotStrings) {
 TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
   RespValue response;
   response.type(RespType::Error);
-  response.asString() = "unsupported command";
+  response.asString() = "unsupported command 'newcommand'";
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   RespValue request;
   makeBulkStringArray(request, {"newcommand", "hello"});
