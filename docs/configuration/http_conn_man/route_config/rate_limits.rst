@@ -26,7 +26,7 @@ actions
   *(required, array)* A list of actions that are to be applied for this rate limit configuration.
   Order matters as the actions are processed sequentially and the descriptor is composed by
   appending descriptor entries in that sequence. If an action cannot append a descriptor entry,
-  no descriptor is generated. See :ref:`composing actions
+  no descriptor is generated for the configuration. See :ref:`composing actions
   <config_http_conn_man_route_table_rate_limit_composing_actions>` for additional documentation.
 
 .. _config_http_conn_man_route_table_rate_limit_actions:
@@ -208,7 +208,7 @@ The configuration would be:
     ]
   }
 
-If an action doesn't append a descriptor entry, no descriptor is sent for the configuration.
+If an action doesn't append a descriptor entry, no descriptor is generated for the configuration.
 For example given the following rate limit configuration, there are two possible outcomes:
 
 .. code-block:: json
