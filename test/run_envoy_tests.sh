@@ -20,6 +20,8 @@ fi
 : ${TEST_TMPDIR:=$TEST_BASE/tmp}
 : ${TEST_SRCDIR:=$TEST_BASE/runfiles}
 export TEST_TMPDIR TEST_SRCDIR
+export TEST_WORKSPACE=""
+export TEST_UDSDIR="$TEST_TMPDIR"
 
 echo "TEST_TMPDIR=$TEST_TMPDIR"
 echo "TEST_SRCDIR=$TEST_SRCDIR"
@@ -27,8 +29,24 @@ echo "TEST_SRCDIR=$TEST_SRCDIR"
 mkdir -p $TEST_TMPDIR
 
 $SOURCE_DIR/test/certs/gen_test_certs.sh $TEST_SRCDIR/test/certs
-$SOURCE_DIR/test/config/integration/gen_test_configs.sh $SOURCE_DIR/test/config/integration \
-  $TEST_SRCDIR/test/config/integration
+
+# Some hacks for the config file template substitution. These go away in the Bazel build.
+CONFIG_IN_DIR="$SOURCE_DIR"/test/config/integration
+CONFIG_RUNFILES_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/config/integration
+CONFIG_OUT_DIR="$TEST_TMPDIR"/test/config/integration
+mkdir -p "$CONFIG_RUNFILES_DIR"
+mkdir -p "$CONFIG_OUT_DIR"
+cp "$CONFIG_IN_DIR"/*.json "$CONFIG_RUNFILES_DIR"
+for f in $(cd "$SOURCE_DIR"; find test/config/integration -name "*.json")
+do
+  "$SOURCE_DIR"/test/test_common/environment_sub.sh "$f"
+done
+
+# Some hacks for the runtime test filesystem. These go away in the Bazel build.
+TEST_RUNTIME_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/common/runtime/test_data
+mkdir -p "$TEST_RUNTIME_DIR"
+cp -r "$SOURCE_DIR"/test/common/runtime/test_data/* "$TEST_RUNTIME_DIR"
+"$SOURCE_DIR"/test/common/runtime/filesystem_setup.sh
 
 if [ -n "$EXTRA_SETUP_SCRIPT" ]; then
   $EXTRA_SETUP_SCRIPT
@@ -59,7 +77,7 @@ kill -SIGHUP $FIRST_SERVER_PID
 sleep 3
 
 echo "Starting epoch 1"
-$BINARY_DIR/source/exe/envoy -c $TEST_SRCDIR/test/config/integration/server.json \
+$BINARY_DIR/source/exe/envoy -c $TEST_TMPDIR/test/config/integration/server.json \
     --restart-epoch 1 --base-id 1 --service-cluster cluster --service-node node &
 
 SECOND_SERVER_PID=$!
@@ -67,7 +85,7 @@ SECOND_SERVER_PID=$!
 sleep 7
 
 echo "Starting epoch 2"
-$BINARY_DIR/source/exe/envoy -c $TEST_SRCDIR/test/config/integration/server.json \
+$BINARY_DIR/source/exe/envoy -c $TEST_TMPDIR/test/config/integration/server.json \
     --restart-epoch 2 --base-id 1 --service-cluster cluster --service-node node &
 
 THIRD_SERVER_PID=$!

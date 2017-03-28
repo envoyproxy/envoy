@@ -42,6 +42,28 @@ public:
   static std::string certsDirectory() { return runfilesPath("test/certs"); }
 
   /**
+   * Prefix a given path with the pregenerated test ssl key/certificate directory.
+   * @param path path suffix.
+   * @return std::string path qualified with the pregenerated test ssl key/certificate directory.
+   */
+  static std::string certsPath(const std::string& path) { return certsDirectory() + "/" + path; }
+
+  /**
+   * Obtain Unix Domain Socket temporary directory.
+   * @return std::string& with the path to the Unix Domain Socket temporary directory.
+   */
+  static const std::string unixDomainSocketDirectory();
+
+  /**
+   * Prefix a given path with the Unix Domain Socket temporary directory.
+   * @param path path suffix.
+   * @return std::string path qualified with the Unix Domain Socket temporary directory.
+   */
+  static std::string unixDomainSocketPath(const std::string& path) {
+    return unixDomainSocketDirectory() + "/" + path;
+  }
+
+  /**
    * String environment path substitution.
    * @param str string with template patterns including {{ test_certs }}.
    * @return std::string with patterns replaced with environment values.

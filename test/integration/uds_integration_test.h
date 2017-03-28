@@ -15,10 +15,10 @@ public:
    */
   static void SetUpTestCase() {
     test_server_ = IntegrationTestServer::create("test/config/integration/server_uds.json");
-    fake_upstreams_.emplace_back(new FakeUpstream(TestEnvironment::temporaryPath("udstest.1.sock"),
-                                                  FakeHttpConnection::Type::HTTP1));
-    fake_upstreams_.emplace_back(new FakeUpstream(TestEnvironment::temporaryPath("udstest.2.sock"),
-                                                  FakeHttpConnection::Type::HTTP1));
+    fake_upstreams_.emplace_back(new FakeUpstream(
+        TestEnvironment::unixDomainSocketPath("udstest.1.sock"), FakeHttpConnection::Type::HTTP1));
+    fake_upstreams_.emplace_back(new FakeUpstream(
+        TestEnvironment::unixDomainSocketPath("udstest.2.sock"), FakeHttpConnection::Type::HTTP1));
   }
 
   /**

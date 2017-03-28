@@ -28,7 +28,7 @@ public:
 
 IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config_path) {
   IntegrationTestServerPtr server{
-      new IntegrationTestServer(TestEnvironment::runfilesPath(config_path))};
+      new IntegrationTestServer(TestEnvironment::temporaryPath(config_path))};
   server->start();
   return server;
 }
