@@ -13,9 +13,7 @@ InstanceConstSharedPtr addressFromFd(int fd) {
   socklen_t ss_len = sizeof ss;
   const int rc = ::getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (rc != 0) {
-    const int err = errno;
-    throw EnvoyException(fmt::format("getsockname failed for '{}': {}", fd, strerror(err)));
-    return nullptr;
+    throw EnvoyException(fmt::format("getsockname failed for '{}': {}", fd, strerror(errno)));
   }
   switch (ss.ss_family) {
   case AF_INET: {
@@ -23,20 +21,17 @@ InstanceConstSharedPtr addressFromFd(int fd) {
     const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&ss);
     ASSERT(AF_INET == sin->sin_family);
     return InstanceConstSharedPtr(new Address::Ipv4Instance(sin));
-    break;
   }
   case AF_INET6: {
     ASSERT(ss_len == sizeof(sockaddr_in6));
     const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&ss);
     ASSERT(AF_INET6 == sin6->sin6_family);
     return InstanceConstSharedPtr(new Address::Ipv6Instance(*sin6));
-    break;
   }
   default:
     throw EnvoyException(fmt::format("Unexpected family in getsockname result: {}", ss.ss_family));
-    return nullptr;
   }
-  return nullptr;
+  NOT_REACHED;
 }
 
 int InstanceBase::flagsFromSocketType(SocketType type) const {
