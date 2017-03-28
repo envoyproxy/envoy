@@ -325,7 +325,6 @@ TEST(RouteMatcherTest, TestRoutes) {
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      const VirtualHost& vhost = route->virtualHost();
       route->finalizeRequestHeaders(headers);
       EXPECT_EQ("route-override", headers.get_("x-global-header1"));
       EXPECT_EQ("global2", headers.get_("x-global-header2"));
@@ -338,7 +337,6 @@ TEST(RouteMatcherTest, TestRoutes) {
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      const VirtualHost& vhost = route->virtualHost();
       route->finalizeRequestHeaders(headers);
       EXPECT_EQ("vhost-www2-override", headers.get_("x-global-header1"));
       EXPECT_EQ("global2", headers.get_("x-global-header2"));
@@ -351,12 +349,11 @@ TEST(RouteMatcherTest, TestRoutes) {
     {
       Http::TestHeaderMapImpl headers = genHeaders("www2-staging.lyft.net", "/foo", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      const VirtualHost& vhost = route->virtualHost();
       route->finalizeRequestHeaders(headers);
       EXPECT_EQ("vhost-www2_staging-override", headers.get_("x-global-header1"));
       EXPECT_EQ("global2", headers.get_("x-global-header2"));
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
-      EXPECT_EQ(nullptr, headers.get_("x-vhost-header2"));
+      EXPECT_FALSE(headers.has("x-vhost-header2"));
       EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
     }
 
@@ -364,7 +361,6 @@ TEST(RouteMatcherTest, TestRoutes) {
     {
       Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      const VirtualHost& vhost = route->virtualHost();
       route->finalizeRequestHeaders(headers);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("global2", headers.get_("x-global-header2"));
