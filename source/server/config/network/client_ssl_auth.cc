@@ -1,4 +1,4 @@
-#include "client_ssl_auth.h"
+#include "server/config/network/client_ssl_auth.h"
 
 #include "envoy/network/connection.h"
 #include "envoy/server/instance.h"

@@ -1,10 +1,9 @@
-#include "hot_restart.h"
-
 #include "common/event/libevent.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/openssl.h"
 #include "common/stats/thread_local_store.h"
+#include "exe/hot_restart.h"
 #include "server/drain_manager_impl.h"
 #include "server/options_impl.h"
 #include "server/server.h"

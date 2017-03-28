@@ -28,7 +28,7 @@ public:
     connection_->addConnectionCallbacks(callbacks);
   }
   void close() override;
-  ActiveRequest* makeRequest(const RespValue& request, ActiveRequestCallbacks& callbacks) override;
+  PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
 
 private:
   struct UpstreamReadFilter : public Network::ReadFilterBaseImpl {
@@ -43,13 +43,13 @@ private:
     ClientImpl& parent_;
   };
 
-  struct PendingRequest : public ActiveRequest {
-    PendingRequest(ActiveRequestCallbacks& callbacks) : callbacks_(callbacks) {}
+  struct PendingRequest : public PoolRequest {
+    PendingRequest(PoolCallbacks& callbacks) : callbacks_(callbacks) {}
 
-    // Redis::ConnPool::ActiveRequest
+    // Redis::ConnPool::PoolRequest
     void cancel() override;
 
-    ActiveRequestCallbacks& callbacks_;
+    PoolCallbacks& callbacks_;
     bool canceled_{};
   };
 
@@ -88,8 +88,8 @@ public:
                ClientFactory& client_factory, ThreadLocal::Instance& tls);
 
   // Redis::ConnPool::Instance
-  ActiveRequest* makeRequest(const std::string& hash_key, const RespValue& request,
-                             ActiveRequestCallbacks& callbacks) override;
+  PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
+                           PoolCallbacks& callbacks) override;
 
 private:
   struct ThreadLocalPool;
@@ -112,8 +112,8 @@ private:
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
                     const std::string& cluster_name);
 
-    ActiveRequest* makeRequest(const std::string& hash_key, const RespValue& request,
-                               ActiveRequestCallbacks& callbacks);
+    PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
+                             PoolCallbacks& callbacks);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
 
     // ThreadLocal::ThreadLocalObject

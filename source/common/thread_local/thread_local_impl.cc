@@ -1,4 +1,4 @@
-#include "thread_local_impl.h"
+#include "common/thread_local/thread_local_impl.h"
 
 #include "envoy/event/dispatcher.h"
 

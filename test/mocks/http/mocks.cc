@@ -143,7 +143,10 @@ namespace AccessLog {
 MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
-MockRequestInfo::MockRequestInfo() { ON_CALL(*this, upstreamHost()).WillByDefault(Return(host_)); }
+MockRequestInfo::MockRequestInfo() {
+  ON_CALL(*this, upstreamHost()).WillByDefault(Return(host_));
+  ON_CALL(*this, startTime()).WillByDefault(Return(start_time_));
+}
 
 MockRequestInfo::~MockRequestInfo() {}
 

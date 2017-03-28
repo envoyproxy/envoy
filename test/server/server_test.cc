@@ -50,7 +50,7 @@ protected:
       : options_(std::string("test/config/integration/server.json")),
         server_(options_, hooks_, restart_, stats_store_, fakelock_, component_factory_,
                 local_info_) {}
-  void TearDown() {
+  void TearDown() override {
     server_.clusterManager().shutdown();
     server_.threadLocal().shutdownThread();
   }

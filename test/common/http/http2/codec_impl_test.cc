@@ -37,7 +37,8 @@ public:
 
   Http2CodecImplTest()
       : client_(client_connection_, client_callbacks_, stats_store_, GetParam()),
-        server_(server_connection_, server_callbacks_, stats_store_, GetParam()) {
+        server_(server_connection_, server_callbacks_, stats_store_, GetParam()),
+        request_encoder_(client_.newStream(response_decoder_)) {
     setupDefaultConnectionMocks();
 
     EXPECT_CALL(server_callbacks_, newStream(_))
@@ -67,7 +68,7 @@ public:
   ServerConnectionImpl server_;
   ConnectionWrapper server_wrapper_;
   MockStreamDecoder response_decoder_;
-  StreamEncoder& request_encoder_{client_.newStream(response_decoder_)};
+  StreamEncoder& request_encoder_;
   MockStreamDecoder request_decoder_;
   StreamEncoder* response_encoder_{};
   MockStreamCallbacks callbacks_;

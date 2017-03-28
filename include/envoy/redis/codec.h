@@ -20,6 +20,11 @@ public:
   ~RespValue() { cleanup(); }
 
   /**
+   * Convert a RESP value to a string for debugging purposes.
+   */
+  std::string toString() const;
+
+  /**
    * The following are getters and setters for the internal value. A RespValue start as null,
    * and much change type via type() before the following methods can be used.
    */

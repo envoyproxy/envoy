@@ -23,11 +23,11 @@ enum class FilterRequestType { Internal, External, Both };
 /**
  * Global configuration for the HTTP rate limit filter.
  */
-class FilterConfig : Json::JsonValidator {
+class FilterConfig : Json::Validator {
 public:
   FilterConfig(const Json::Object& config, const LocalInfo::LocalInfo& local_info,
                Stats::Store& global_store, Runtime::Loader& runtime, Upstream::ClusterManager& cm)
-      : Json::JsonValidator(config, Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA),
+      : Json::Validator(config, Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA),
         domain_(config.getString("domain")),
         stage_(static_cast<uint64_t>(config.getInteger("stage", 0))),
         request_type_(stringToType(config.getString("request_type", "both"))),
@@ -90,8 +90,6 @@ private:
                                     const HeaderMap& headers) const;
 
   enum class State { NotStarted, Calling, Complete, Responded };
-
-  static const std::unique_ptr<const Http::HeaderMap> TOO_MANY_REQUESTS_HEADER;
 
   FilterConfigSharedPtr config_;
   ::RateLimit::ClientPtr client_;

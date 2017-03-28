@@ -1,5 +1,4 @@
-#include "access_log_impl.h"
-#include "access_log_formatter.h"
+#include "common/http/access_log/access_log_impl.h"
 
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
@@ -8,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"

@@ -2,7 +2,11 @@
 #include "common/grpc/rpc_channel_impl.h"
 #include "common/http/message_impl.h"
 
+#ifdef BAZEL_BRINGUP
+#include "test/proto/helloworld.pb.h"
+#else
 #include "test/generated/helloworld.pb.h"
+#endif
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"

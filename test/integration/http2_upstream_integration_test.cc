@@ -1,4 +1,4 @@
-#include "http2_upstream_integration_test.h"
+#include "test/integration/http2_upstream_integration_test.h"
 
 #include "common/http/header_map_impl.h"
 

@@ -1,4 +1,4 @@
-#include "ratelimit.h"
+#include "common/http/filter/ratelimit.h"
 
 #include "envoy/http/codes.h"
 
@@ -11,9 +11,15 @@
 namespace Http {
 namespace RateLimit {
 
-const std::unique_ptr<const Http::HeaderMap> Filter::TOO_MANY_REQUESTS_HEADER{
-    new Http::HeaderMapImpl{
-        {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}}};
+namespace {
+
+static const Http::HeaderMap* getTooManyRequestsHeader() {
+  static const Http::HeaderMap* header_map = new Http::HeaderMapImpl{
+      {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}};
+  return header_map;
+}
+
+} // namespace;
 
 void Filter::initiateCall(const HeaderMap& headers) {
   bool is_internal_request =
@@ -101,7 +107,7 @@ void Filter::complete(::RateLimit::LimitStatus status) {
   case ::RateLimit::LimitStatus::OverLimit:
     cluster_->statsScope().counter("ratelimit.over_limit").inc();
     Http::CodeUtility::ResponseStatInfo info{
-        config_->globalStore(), cluster_->statsScope(), EMPTY_STRING, *TOO_MANY_REQUESTS_HEADER,
+        config_->globalStore(), cluster_->statsScope(), EMPTY_STRING, *getTooManyRequestsHeader(),
         true, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, false};
     Http::CodeUtility::chargeResponseStat(info);
     break;
@@ -110,7 +116,7 @@ void Filter::complete(::RateLimit::LimitStatus status) {
   if (status == ::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    Http::HeaderMapPtr response_headers{new HeaderMapImpl(*TOO_MANY_REQUESTS_HEADER)};
+    Http::HeaderMapPtr response_headers{new HeaderMapImpl(*getTooManyRequestsHeader())};
     callbacks_->encodeHeaders(std::move(response_headers), true);
     callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::RateLimited);
   } else if (!initiating_call_) {

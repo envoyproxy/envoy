@@ -1,9 +1,34 @@
-#include "codec_impl.h"
+#include "common/redis/codec_impl.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 
 namespace Redis {
+
+std::string RespValue::toString() const {
+  switch (type_) {
+  case RespType::Array: {
+    std::string ret = "[";
+    for (uint64_t i = 0; i < asArray().size(); i++) {
+      ret += asArray()[i].toString();
+      if (i != asArray().size() - 1) {
+        ret += ", ";
+      }
+    }
+    return ret + "]";
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error:
+    return fmt::format("\"{}\"", asString());
+  case RespType::Null:
+    return "null";
+  case RespType::Integer:
+    return std::to_string(asInteger());
+  }
+
+  NOT_REACHED;
+}
 
 std::vector<RespValue>& RespValue::asArray() {
   ASSERT(type_ == RespType::Array);

@@ -1,13 +1,12 @@
 #pragma once
 
-#include "router_ratelimit.h"
-
 #include "envoy/common/optional.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/router/config_utility.h"
+#include "common/router/router_ratelimit.h"
 
 namespace Router {
 

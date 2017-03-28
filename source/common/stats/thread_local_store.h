@@ -1,8 +1,8 @@
 #pragma once
 
-#include "stats_impl.h"
-
 #include "envoy/thread_local/thread_local.h"
+
+#include "common/stats/stats_impl.h"
 
 namespace Stats {
 

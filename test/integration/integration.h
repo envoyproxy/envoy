@@ -1,11 +1,11 @@
 #pragma once
 
-#include "fake_upstream.h"
-#include "server.h"
-
 #include "common/http/codec_client.h"
 #include "common/network/filter_impl.h"
 #include "common/stats/stats_impl.h"
+
+#include "test/integration/fake_upstream.h"
+#include "test/integration/server.h"
 
 /**
  * Stream decoder wrapper used during integration testing.

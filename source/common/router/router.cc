@@ -1,6 +1,4 @@
-#include "config_impl.h"
-#include "retry_state_impl.h"
-#include "router.h"
+#include "common/router/router.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -19,6 +17,8 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/router/config_impl.h"
+#include "common/router/retry_state_impl.h"
 
 namespace Router {
 

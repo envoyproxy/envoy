@@ -1,7 +1,5 @@
 #pragma once
 
-#include "message_impl.h"
-
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
@@ -15,6 +13,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
 #include "common/http/access_log/request_info_impl.h"
+#include "common/http/message_impl.h"
 #include "common/router/router.h"
 
 namespace Http {

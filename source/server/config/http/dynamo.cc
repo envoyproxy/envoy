@@ -1,4 +1,4 @@
-#include "dynamo.h"
+#include "server/config/http/dynamo.h"
 
 #include "common/dynamo/dynamo_filter.h"
 

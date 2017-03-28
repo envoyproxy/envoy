@@ -1,6 +1,4 @@
-#include "integration.h"
-#include "server.h"
-#include "utility.h"
+#include "test/integration/server.h"
 
 #include "envoy/http/header_map.h"
 #include "envoy/server/hot_restart.h"
@@ -8,6 +6,8 @@
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 
+#include "test/integration/integration.h"
+#include "test/integration/utility.h"
 #include "test/test_common/environment.h"
 
 namespace Server {
@@ -28,7 +28,7 @@ public:
 
 IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config_path) {
   IntegrationTestServerPtr server{
-      new IntegrationTestServer(TestEnvironment::runfilesPath(config_path))};
+      new IntegrationTestServer(TestEnvironment::temporaryPath(config_path))};
   server->start();
   return server;
 }
