@@ -17,7 +17,8 @@ upstream cluster to route to or whether to perform a redirect.
     "routes": [],
     "require_ssl": "...",
     "virtual_clusters": [],
-    "rate_limits": []
+    "rate_limits": [],
+    "request_headers_to_add": []
   }
 
 name
@@ -58,3 +59,21 @@ require_ssl
 :ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>`
   *(optional, array)* Specifies a set of rate limit configurations that will be applied to the
   virtual host.
+
+.. _config_http_conn_man_route_table_vhost_add_req_headers:
+
+request_headers_to_add
+  *(optional, array)* Specifies a list of HTTP headers that should be added to each
+  request handled by this virtual host. Headers are specified in the following form:
+
+  .. code-block:: json
+
+    [
+      {"key": "header1", "value": "value1"},
+      {"key": "header2", "value": "value2"}
+    ]
+
+  Virtual host level headers override global headers (with same key) specified at
+  :ref:`route_config <config_http_conn_man_route_table_add_req_headers>` level. The value of these
+  virtual host-specific headers can be overridden using the
+  :ref:`route-specific headers <config_http_conn_man_route_table_route_add_req_headers>`.

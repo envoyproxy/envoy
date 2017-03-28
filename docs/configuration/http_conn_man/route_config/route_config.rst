@@ -48,8 +48,10 @@ response_headers_to_remove
 
     ["header1", "header2"]
 
+.. _config_http_conn_man_route_table_add_req_headers:
+
 request_headers_to_add
-  *(optional, array)* Optionally specifies a list of HTTP headers that should be added to each
+  *(optional, array)* Specifies a list of HTTP headers that should be added to each
   request forwarded by the HTTP connection manager. Headers are specified in the following form:
 
   .. code-block:: json
@@ -58,6 +60,10 @@ request_headers_to_add
       {"key": "header1", "value": "value1"},
       {"key": "header2", "value": "value2"}
     ]
+
+  The value of these global request headers can be overridden using the
+  :ref:`virtual host specific headers <config_http_conn_man_route_table_vhost_add_req_headers>`
+  and :ref:`route-specific headers <config_http_conn_man_route_table_route_add_req_headers>`.
 
 .. toctree::
   :hidden:

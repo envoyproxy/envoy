@@ -28,6 +28,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "headers": [],
     "rate_limits": [],
     "hash_policy": "{...}",
+    "request_headers_to_add" : [],
     "opaque_config": []
   }
 
@@ -142,6 +143,9 @@ priority
   check the request's headers against all the specified headers in the route config. A match will
   happen if all the headers in the route are present in the request with the same values (or based
   on presence if the ``value`` field is not in the config).
+
+:ref:`request_headers_to_add <config_http_conn_man_route_table_route_add_req_headers>`
+  *(optional, array)* Specifies a set of headers that will be added to requests matching this route.
 
 :ref:`opaque_config <config_http_conn_man_route_table_opaque_config>`
   *(optional, array)* Specifies a set of optional route configuration values that can be accessed by filters.
@@ -337,6 +341,25 @@ header_name
   *(required, string)* The name of the request header that will be used to obtain the hash key. If
   the request header is not present, the load balancer will use a random number as the hash,
   effectively making the load balancing policy random.
+
+.. _config_http_conn_man_route_table_route_add_req_headers:
+
+Adding custom request headers
+-----------------------------
+
+Custom request headers can be added to a request that matches a specific route. The headers are
+specified in the following form:
+
+.. code-block:: json
+
+  [
+    {"key": "header1", "value": "value1"},
+    {"key": "header2", "value": "value2"}
+  ]
+
+Route-specific headers of same key override
+:ref:`virtual host level headers <config_http_conn_man_route_table_vhost_add_req_headers>`, that in turn
+override global headers specified at :ref:`route_config <config_http_conn_man_route_table_add_req_headers>` level.
 
 .. _config_http_conn_man_route_table_opaque_config:
 
