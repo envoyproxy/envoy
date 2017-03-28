@@ -15,8 +15,7 @@ void ListenSocketImpl::doBind() {
     throw EnvoyException(
         fmt::format("cannot bind '{}': {}", local_address_->asString(), strerror(errno)));
   }
-  if (local_address_->type() == Address::Type::Ip && local_address_->ip() != nullptr &&
-      local_address_->ip()->port() == 0) {
+  if (local_address_->type() == Address::Type::Ip && local_address_->ip()->port() == 0) {
     // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
     // any), and we need to find out the port number that the OS picked.
     local_address_ = Address::addressFromFd(fd_);
