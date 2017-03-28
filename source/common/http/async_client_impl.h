@@ -98,8 +98,13 @@ private:
     // Router::VirtualHost
     const std::string& name() const override { return EMPTY_STRING; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+    const std::list<std::pair<Http::LowerCaseString, std::string>>&
+    requestHeadersToAdd() const override {
+      return request_headers_to_add_;
+    }
 
     static const NullRateLimitPolicy rate_limit_policy_;
+    static const std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {
@@ -127,6 +132,10 @@ private:
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
       return nullptr;
     }
+    const std::list<std::pair<Http::LowerCaseString, std::string>>&
+    requestHeadersToAdd() const override {
+      return request_headers_to_add_;
+    }
     const std::multimap<std::string, std::string>& opaqueConfig() const override {
       return opaque_config_;
     }
@@ -137,6 +146,7 @@ private:
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
     static const NullVirtualHost virtual_host_;
+    static const std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
     static const std::multimap<std::string, std::string> opaque_config_;
 
     const std::string& cluster_name_;
