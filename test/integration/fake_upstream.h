@@ -161,6 +161,8 @@ public:
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;
 
+  uint32_t port() const { return socket_->localAddress()->ip()->port(); }
+
 private:
   FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,
                FakeHttpConnection::Type type);

@@ -10,11 +10,11 @@
 TEST_F(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP2); }
 
 TEST_F(Http2IntegrationTest, RouterNotFoundBodyNoBuffer) {
-  testRouterNotFoundWithBody(HTTP_PORT, Http::CodecClient::Type::HTTP2);
+  testRouterNotFoundWithBody(lookupPort("http"), Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2IntegrationTest, RouterNotFoundBodyBuffer) {
-  testRouterNotFoundWithBody(HTTP_BUFFER_PORT, Http::CodecClient::Type::HTTP2);
+  testRouterNotFoundWithBody(lookupPort("http_buffer"), Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecClient::Type::HTTP2); }
@@ -22,58 +22,58 @@ TEST_F(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(Http::CodecCli
 TEST_F(Http2IntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP2); }
 
 TEST_F(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(IntegrationTest::HTTP_PORT),
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, false);
 }
 
 TEST_F(Http2IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(IntegrationTest::HTTP_BUFFER_PORT),
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, false);
 }
 
 TEST_F(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(IntegrationTest::HTTP_BUFFER_PORT),
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
                                        Http::CodecClient::Type::HTTP2, 1024 * 1024, 1024 * 1024,
                                        false);
 }
 
 TEST_F(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(IntegrationTest::HTTP_PORT),
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
                                          Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(IntegrationTest::HTTP_BUFFER_PORT),
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")),
                                          Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(IntegrationTest::HTTP_PORT),
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, true);
 }
 
 TEST_F(Http2IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
-  testRouterUpstreamDisconnectBeforeRequestComplete(
-      makeClientConnection(IntegrationTest::HTTP_PORT), Http::CodecClient::Type::HTTP2);
+  testRouterUpstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
+                                                    Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
-  testRouterUpstreamDisconnectBeforeResponseComplete(
-      makeClientConnection(IntegrationTest::HTTP_PORT), Http::CodecClient::Type::HTTP2);
+  testRouterUpstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
+                                                     Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
-  testRouterDownstreamDisconnectBeforeRequestComplete(
-      makeClientConnection(IntegrationTest::HTTP_PORT), Http::CodecClient::Type::HTTP2);
+  testRouterDownstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
+                                                      Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2IntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
-  testRouterDownstreamDisconnectBeforeResponseComplete(
-      makeClientConnection(IntegrationTest::HTTP_PORT), Http::CodecClient::Type::HTTP2);
+  testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
+                                                       Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
-  testRouterUpstreamResponseBeforeRequestComplete(makeClientConnection(IntegrationTest::HTTP_PORT),
+  testRouterUpstreamResponseBeforeRequestComplete(makeClientConnection(lookupPort("http")),
                                                   Http::CodecClient::Type::HTTP2);
 }
 
@@ -92,7 +92,7 @@ TEST_F(Http2IntegrationTest, MaxHeadersInCodec) {
   Http::StreamEncoder* downstream_request{};
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(HTTP_PORT, Http::CodecClient::Type::HTTP2);
+        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
       },
        [&]() -> void { downstream_request = &codec_client->startRequest(big_headers, *response); },
        [&]() -> void { response->waitForReset(); }, [&]() -> void { codec_client->close(); }});
@@ -107,7 +107,7 @@ TEST_F(Http2IntegrationTest, MaxHeadersInConnectionManager) {
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   executeActions({[&]() -> void {
-    codec_client = makeHttpConnection(HTTP_PORT, Http::CodecClient::Type::HTTP2);
+    codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
   },
                   [&]() -> void { codec_client->makeHeaderOnlyRequest(big_headers, *response); },
                   [&]() -> void { response->waitForEndStream(); },
@@ -125,8 +125,9 @@ TEST_F(Http2IntegrationTest, BadMagic) {
   Buffer::OwnedImpl buffer("hello");
   std::string response;
   RawConnectionDriver connection(
-      HTTP_PORT, buffer, [&](Network::ClientConnection&, const Buffer::Instance& data)
-                             -> void { response.append(TestUtility::bufferToString(data)); });
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data)
+          -> void { response.append(TestUtility::bufferToString(data)); });
 
   connection.run();
   EXPECT_EQ("", response);
@@ -136,8 +137,9 @@ TEST_F(Http2IntegrationTest, BadFrame) {
   Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
   std::string response;
   RawConnectionDriver connection(
-      HTTP_PORT, buffer, [&](Network::ClientConnection&, const Buffer::Instance& data)
-                             -> void { response.append(TestUtility::bufferToString(data)); });
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data)
+          -> void { response.append(TestUtility::bufferToString(data)); });
 
   connection.run();
   EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);
@@ -149,7 +151,7 @@ TEST_F(Http2IntegrationTest, GoAway) {
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(HTTP_PORT, Http::CodecClient::Type::HTTP2);
+        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
       },
        [&]() -> void {
          encoder = &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -182,8 +184,7 @@ TEST_F(Http2IntegrationTest, SimultaneousRequest) {
   FakeStreamPtr upstream_request2;
   executeActions(
       {[&]() -> void {
-        codec_client =
-            makeHttpConnection(IntegrationTest::HTTP_PORT, Http::CodecClient::Type::HTTP2);
+        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
       },
        // Start request 1
        [&]() -> void {

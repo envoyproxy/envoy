@@ -4,6 +4,8 @@
 
 class TestEnvironment {
 public:
+  typedef std::unordered_map<std::string, uint32_t> PortMap;
+
   /**
    * Obtain a private writable temporary directory.
    * @return const std::string& with the path to the temporary directory.
@@ -69,6 +71,14 @@ public:
    * @return std::string with patterns replaced with environment values.
    */
   static std::string substitute(const std::string str);
+
+  /**
+   * Substitue ports in a JSON file in the private writable test temporary directory.
+   * @param path path prefix for the input file with port templates.
+   * @param port_map map from port name to port number.
+   * @return std::string path prefix for the generated file.
+   */
+  static std::string temporaryFileSubstitutePorts(const std::string& path, const PortMap& port_map);
 
   /**
    * Build JSON object from a string subject to environment path substitution.

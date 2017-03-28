@@ -8,9 +8,11 @@ public:
    * Global initializer for all integration tests.
    */
   static void SetUpTestCase() {
-    test_server_ = IntegrationTestServer::create("test/config/integration/server_http2.json");
-    fake_upstreams_.emplace_back(new FakeUpstream(11000, FakeHttpConnection::Type::HTTP1));
-    fake_upstreams_.emplace_back(new FakeUpstream(11001, FakeHttpConnection::Type::HTTP1));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
+    registerPort("upstream_0", fake_upstreams_.back()->port());
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
+    registerPort("upstream_1", fake_upstreams_.back()->port());
+    createTestServer("test/config/integration/server_http2.json", {"echo", "http", "http_buffer"});
   }
 
   /**

@@ -48,6 +48,30 @@ std::string TestEnvironment::substitute(const std::string str) {
   return std::regex_replace(str, test_cert_regex, TestEnvironment::runfilesPath("test/certs"));
 }
 
+std::string TestEnvironment::temporaryFileSubstitutePorts(const std::string& path,
+                                                          const PortMap& port_map) {
+  // Load the entire file as a string, regex replace one at a time and write it back out. Proper
+  // templating might be better one day, but this works for now.
+  const std::string tmp_json_path = TestEnvironment::temporaryPath(path);
+  std::string out_json_string;
+  {
+    std::ifstream file(tmp_json_path);
+    std::stringstream file_string_stream;
+    file_string_stream << file.rdbuf();
+    out_json_string = file_string_stream.str();
+  }
+  for (auto it : port_map) {
+    const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
+    out_json_string = std::regex_replace(out_json_string, port_regex, std::to_string(it.second));
+  }
+  const std::string out_json_path = tmp_json_path + ".with.ports.json";
+  {
+    std::ofstream out_json_file(out_json_path);
+    out_json_file << out_json_string;
+  }
+  return out_json_path;
+}
+
 Json::ObjectPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
   return Json::Factory::LoadFromString(substitute(json));
 }

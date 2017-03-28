@@ -18,16 +18,20 @@ ClientContextPtr SslIntegrationTest::client_ssl_ctx_alpn_;
 ClientContextPtr SslIntegrationTest::client_ssl_ctx_no_alpn_;
 
 void SslIntegrationTest::SetUpTestCase() {
-  test_server_ =
-      MockRuntimeIntegrationTestServer::create("test/config/integration/server_ssl.json");
   context_manager_.reset(new ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
+  fake_upstreams_.emplace_back(
+      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
+  registerPort("upstream_0", fake_upstreams_.back()->port());
+  fake_upstreams_.emplace_back(
+      new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
+  registerPort("upstream_1", fake_upstreams_.back()->port());
+  test_server_ =
+      MockRuntimeIntegrationTestServer::create(TestEnvironment::temporaryFileSubstitutePorts(
+          "test/config/integration/server_ssl.json", port_map()));
+  registerTestServerPorts({"http"});
   client_ssl_ctx_alpn_ = createClientSslContext(true);
   client_ssl_ctx_no_alpn_ = createClientSslContext(false);
-  fake_upstreams_.emplace_back(
-      new FakeUpstream(upstream_ssl_ctx_.get(), 11000, FakeHttpConnection::Type::HTTP1));
-  fake_upstreams_.emplace_back(
-      new FakeUpstream(upstream_ssl_ctx_.get(), 11001, FakeHttpConnection::Type::HTTP1));
 }
 
 void SslIntegrationTest::TearDownTestCase() {
@@ -40,6 +44,7 @@ void SslIntegrationTest::TearDownTestCase() {
 }
 
 ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
+  static Stats::TestIsolatedStoreImpl upstream_stats_store;
   std::string json = R"EOF(
 {
   "cert_chain_file": "test/config/integration/certs/upstreamcert.pem",
@@ -49,7 +54,7 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
-  return context_manager_->createSslServerContext(test_server_->store(), cfg);
+  return context_manager_->createSslServerContext(upstream_stats_store, cfg);
 }
 
 ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {
@@ -78,11 +83,11 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn) {
   return dispatcher_->createSslClientConnection(
       alpn ? *client_ssl_ctx_alpn_ : *client_ssl_ctx_no_alpn_,
-      Network::Utility::resolveUrl("tcp://127.0.0.1:10001"));
+      Network::Utility::resolveUrl("tcp://127.0.0.1:" + std::to_string(lookupPort("http"))));
 }
 
 void SslIntegrationTest::checkStats() {
-  Stats::Counter& counter = test_server_->store().counter("listener.127.0.0.1_10001.ssl.handshake");
+  Stats::Counter& counter = test_server_->store().counter("listener.127.0.0.1_0.ssl.handshake");
   EXPECT_EQ(1U, counter.value());
   counter.reset();
 }
@@ -133,7 +138,7 @@ TEST_F(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
 // This test must be here vs integration_admin_test so that it tests a server with loaded certs.
 TEST_F(SslIntegrationTest, AdminCertEndpoint) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      ADMIN_PORT, "GET", "/certs", "", Http::CodecClient::Type::HTTP1);
+      lookupPort("admin"), "GET", "/certs", "", Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }

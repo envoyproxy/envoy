@@ -147,6 +147,14 @@ int InstanceImpl::getListenSocketFd(const std::string& address) {
   return -1;
 }
 
+Network::ListenSocket* InstanceImpl::getListenSocketByIndex(uint32_t index) {
+  if (index < config_->listeners().size()) {
+    auto it = std::next(config_->listeners().begin(), index);
+    return socket_map_[it->get()].get();
+  }
+  return nullptr;
+}
+
 void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
   info.memory_allocated_ = Memory::Stats::totalCurrentlyAllocated();
   info.num_connections_ = numConnections();

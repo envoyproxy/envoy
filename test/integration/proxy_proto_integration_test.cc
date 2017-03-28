@@ -3,7 +3,7 @@
 #include "common/buffer/buffer_impl.h"
 
 TEST_F(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  Network::ClientConnectionPtr conn = makeClientConnection(IntegrationTest::HTTP_PORT);
+  Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
 
   Buffer::OwnedImpl buf("PROXY TCP4 1.2.3.4 255.255.255.255 66776 1234\r\n");
   conn->write(buf);
