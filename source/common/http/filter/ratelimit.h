@@ -91,8 +91,6 @@ private:
 
   enum class State { NotStarted, Calling, Complete, Responded };
 
-  static const std::unique_ptr<const Http::HeaderMap> TOO_MANY_REQUESTS_HEADER;
-
   FilterConfigSharedPtr config_;
   ::RateLimit::ClientPtr client_;
   StreamDecoderFilterCallbacks* callbacks_{};
