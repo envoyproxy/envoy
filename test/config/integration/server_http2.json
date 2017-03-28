@@ -200,9 +200,9 @@
     "http": {
       "driver": {
         "type": "lightstep",
-        "access_token_file": "test/config/integration/lightstep_access_token",
         "config": {
-          "collector_cluster": "lightstep_saas"
+          "collector_cluster": "lightstep_saas",
+          "access_token_file": "test/config/integration/lightstep_access_token"
         }
       }
     }

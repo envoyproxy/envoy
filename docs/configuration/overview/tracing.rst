@@ -31,8 +31,8 @@ LightStep driver
 
   {
     "type": "lightstep",
-    "access_token_file": "...",
     "config": {
+      "access_token_file": "...",
       "collector_cluster": "..."
     }
   }
