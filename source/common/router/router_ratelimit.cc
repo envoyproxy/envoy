@@ -92,7 +92,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
       actions_.emplace_back(new RemoteAddressAction());
     } else if (type == "generic_key") {
       actions_.emplace_back(new GenericKeyAction(*action));
-    } else if (type == "header_value_match") {
+    } else {
       ASSERT(type == "header_value_match");
       actions_.emplace_back(new HeaderValueMatchAction(*action));
     }
