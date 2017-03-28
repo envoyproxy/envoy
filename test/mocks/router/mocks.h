@@ -114,9 +114,12 @@ public:
   // Router::VirtualHost
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
+  MOCK_CONST_METHOD0(requestHeadersToAdd,
+                     const std::list<std::pair<Http::LowerCaseString, std::string>>&());
 
   std::string name_{"fake_vhost"};
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
+  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
 class MockHashPolicy : public HashPolicy {
@@ -146,9 +149,12 @@ public:
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
+  MOCK_CONST_METHOD0(requestHeadersToAdd,
+                     const std::list<std::pair<Http::LowerCaseString, std::string>>&());
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
 
   std::string cluster_name_{"fake_cluster"};
+  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
   std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;

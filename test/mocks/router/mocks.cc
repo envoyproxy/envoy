@@ -37,6 +37,7 @@ MockShadowWriter::~MockShadowWriter() {}
 MockVirtualHost::MockVirtualHost() {
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
+  ON_CALL(*this, requestHeadersToAdd()).WillByDefault(ReturnRef(request_headers_to_add_));
 }
 
 MockVirtualHost::~MockVirtualHost() {}
@@ -53,6 +54,7 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
   ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
   ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
+  ON_CALL(*this, requestHeadersToAdd()).WillByDefault(ReturnRef(request_headers_to_add_));
 }
 
 MockRouteEntry::~MockRouteEntry() {}

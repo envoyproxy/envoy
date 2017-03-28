@@ -136,6 +136,13 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   if (route.hasObject("hash_policy")) {
     hash_policy_.reset(new HashPolicyImpl(*route.getObject("hash_policy")));
   }
+
+  if (route.hasObject("request_headers_to_add")) {
+    for (const Json::ObjectPtr& header : route.getObjectArray("request_headers_to_add")) {
+      request_headers_to_add_.push_back(
+          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
+    }
+  }
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -154,6 +161,17 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const {
+  // Add user-specified request headers from the vhost and then from the route.
+  // User-specified headers that are applicable across virtual hosts are already
+  // added by the connection manager.
+  for (const std::pair<Http::LowerCaseString, std::string>& to_add : vhost_.requestHeadersToAdd()) {
+    headers.addStatic(to_add.first, to_add.second);
+  }
+
+  for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
+    headers.addStatic(to_add.first, to_add.second);
+  }
+
   if (host_rewrite_.empty()) {
     return;
   }
@@ -379,6 +397,13 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Load
     ssl_requirements_ = SslRequirements::EXTERNAL_ONLY;
   } else {
     throw EnvoyException(fmt::format("unknown 'require_ssl' type '{}'", require_ssl));
+  }
+
+  if (virtual_host.hasObject("request_headers_to_add")) {
+    for (const Json::ObjectPtr& header : virtual_host.getObjectArray("request_headers_to_add")) {
+      request_headers_to_add_.push_back(
+          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
+    }
   }
 
   for (const Json::ObjectPtr& route : virtual_host.getObjectArray("routes")) {

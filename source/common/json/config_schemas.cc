@@ -474,7 +474,21 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
         "minItems" : 1,
         "properties" : {"$ref" : "#/definitions/virtual_clusters"}
       },
-      "rate_limits" : {"type" : "array"}
+      "rate_limits" : {"type" : "array"},
+      "request_headers_to_add" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "object",
+          "properties": {
+            "key" : {"type" : "string"},
+            "value" : {"type" : "string"}
+          },
+          "required": ["key", "value"],
+          "additionalProperties": false
+        }
+      }
     },
     "required" : ["name", "domains", "routes"],
     "additionalProperties" : false
@@ -565,6 +579,20 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : ["header_name"],
         "additionalProperties" : false
+      },
+      "request_headers_to_add" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "object",
+          "properties": {
+            "key" : {"type" : "string"},
+            "value" : {"type" : "string"}
+          },
+          "required": ["key", "value"],
+          "additionalProperties": false
+        }
       },
       "opaque_config" : {
         "type" : "object",

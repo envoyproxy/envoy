@@ -66,6 +66,10 @@ public:
   // Router::VirtualHost
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+  const std::list<std::pair<Http::LowerCaseString, std::string>>&
+  requestHeadersToAdd() const override {
+    return request_headers_to_add_;
+  }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -101,6 +105,7 @@ private:
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
   const RateLimitPolicyImpl rate_limit_policy_;
+  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
@@ -184,6 +189,12 @@ public:
   std::chrono::milliseconds timeout() const override { return timeout_; }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
+
+  const std::list<std::pair<Http::LowerCaseString, std::string>>&
+  requestHeadersToAdd() const override {
+    return request_headers_to_add_;
+  }
+
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -230,6 +241,11 @@ private:
 
     const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
       return parent_->virtualCluster(headers);
+    }
+
+    const std::list<std::pair<Http::LowerCaseString, std::string>>&
+    requestHeadersToAdd() const override {
+      return parent_->requestHeadersToAdd();
     }
 
     const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -298,6 +314,7 @@ private:
   std::vector<ConfigUtility::HeaderData> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
+  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
   const std::multimap<std::string, std::string> opaque_config_;
 };
 
