@@ -1,6 +1,4 @@
-#include "conn_manager_impl.h"
-#include "conn_manager_utility.h"
-#include "headers.h"
+#include "common/http/conn_manager_impl.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
@@ -15,8 +13,10 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
+#include "common/http/conn_manager_utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"

@@ -24,8 +24,9 @@ disable_key
 
 actions
   *(required, array)* A list of actions that are to be applied for this rate limit configuration.
-  Order matters as the actions are processed sequentially and the descriptor will be composed by
-  appending decriptor entries in that sequence. See :ref:`composing actions
+  Order matters as the actions are processed sequentially and the descriptor is composed by
+  appending descriptor entries in that sequence. If an action cannot append a descriptor entry,
+  no descriptor is generated for the configuration. See :ref:`composing actions
   <config_http_conn_man_route_table_rate_limit_composing_actions>` for additional documentation.
 
 .. _config_http_conn_man_route_table_rate_limit_actions:
@@ -185,11 +186,15 @@ Each action populates a descriptor entry. A vector of descriptor entries compose
 create more complex rate limit descriptors, actions can be composed in any order. The descriptor
 will be populated in the order the actions are specified in the configuration.
 
+Example 1
+^^^^^^^^^
+
 For example, to generate the following descriptor:
 
 .. code-block:: cpp
 
-  ("generic_key", "some_value"), ("source_cluster", "from_cluster")
+  ("generic_key", "some_value")
+  ("source_cluster", "from_cluster")
 
 The configuration would be:
 
@@ -207,9 +212,13 @@ The configuration would be:
     ]
   }
 
-If an action doesn't append a descriptor entry, the next item in the action list will
-be processed. For example given the following rate limit configuration, a request can
-generate a few possible descriptors depending on what is present in the request.
+Example 2
+^^^^^^^^^
+
+If an action doesn't append a descriptor entry, no descriptor is generated for
+the configuration.
+
+For the following configuration:
 
 .. code-block:: json
 
@@ -228,17 +237,14 @@ generate a few possible descriptors depending on what is present in the request.
     ]
   }
 
-For a request with :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>` set and the
-trusted address is for example *127.0.0.1*, the following descriptor would be generated:
+If a request did not set :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`,
+no descriptor is generated.
+
+If a request sets :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`, the
+the following descriptor is generated:
 
 .. code-block:: cpp
 
-  ("generic_key", "some_value"), ("remote_address", "127.0.0.1"), ("source_cluster",
-    "from_cluster")
-
-If a request did not set :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`, the
-following descriptor would be generated:
-
-.. code-block:: cpp
-
-  ("generic_key", "some_value"), ("source_cluster", "from_cluster")
+  ("generic_key", "some_value")
+  ("remote_address", "<trusted address from x-forwarded-for>")
+  ("source_cluster", "from_cluster")

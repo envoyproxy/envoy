@@ -1,7 +1,4 @@
-#include "configuration_impl.h"
-#include "server.h"
-#include "test_hooks.h"
-#include "worker.h"
+#include "server/server.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
@@ -19,6 +16,10 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/statsd.h"
+
+#include "server/configuration_impl.h"
+#include "server/test_hooks.h"
+#include "server/worker.h"
 
 namespace Server {
 
@@ -360,8 +361,6 @@ void InstanceImpl::run() {
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
-
-InstanceImpl::~InstanceImpl() {}
 
 void InstanceImpl::shutdown() {
   log().warn("shutdown invoked. sending SIGTERM to self");

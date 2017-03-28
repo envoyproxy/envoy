@@ -143,7 +143,7 @@ TEST(NetworkUtility, loopbackAddress) {
 TEST(NetworkUtility, AnyAddress) {
   {
     Address::InstanceConstSharedPtr any = Utility::getIpv4AnyAddress();
-    ASSERT_TRUE(any != nullptr);
+    ASSERT_NE(any, nullptr);
     EXPECT_EQ(any->type(), Address::Type::Ip);
     EXPECT_EQ(any->ip()->version(), Address::IpVersion::v4);
     EXPECT_EQ(any->asString(), "0.0.0.0:0");
@@ -151,7 +151,7 @@ TEST(NetworkUtility, AnyAddress) {
   }
   {
     Address::InstanceConstSharedPtr any = Utility::getIpv6AnyAddress();
-    ASSERT_TRUE(any != nullptr);
+    ASSERT_NE(any, nullptr);
     EXPECT_EQ(any->type(), Address::Type::Ip);
     EXPECT_EQ(any->ip()->version(), Address::IpVersion::v6);
     EXPECT_EQ(any->asString(), "[::]:0");

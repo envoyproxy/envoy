@@ -1,10 +1,9 @@
 #pragma once
 
-#include "upstream_impl.h"
-
 #include "envoy/local_info/local_info.h"
 
 #include "common/http/rest_api_fetcher.h"
+#include "common/upstream/upstream_impl.h"
 
 namespace Upstream {
 

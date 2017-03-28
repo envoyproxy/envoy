@@ -5,5 +5,4 @@ load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
 envoy_cc_library(
     name = "options_includes",
     hdrs = ["options.h"],
-    deps = ["//include/envoy/common:base_includes"],
 )

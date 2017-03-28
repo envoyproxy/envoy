@@ -1,8 +1,8 @@
-#include "dynamo_filter.h"
-#include "dynamo_utility.h"
+#include "common/dynamo/dynamo_filter.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/dynamo/dynamo_request_parser.h"
+#include "common/dynamo/dynamo_utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/utility.h"

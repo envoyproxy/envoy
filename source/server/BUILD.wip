@@ -9,7 +9,7 @@ envoy_cc_library(
     external_deps = ["tclap"],
     deps = [
         "//include/envoy/server:options_includes",
-        "//source/common/common:macros_lib",
+        "//source/common/common:macros",
         "//source/common/common:version_lib",
     ],
 )

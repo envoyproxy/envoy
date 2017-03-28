@@ -1,4 +1,4 @@
-#include "json_loader.h"
+#include "common/json/json_loader.h"
 
 // Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"

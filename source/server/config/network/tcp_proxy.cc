@@ -1,4 +1,4 @@
-#include "tcp_proxy.h"
+#include "server/config/network/tcp_proxy.h"
 
 #include "envoy/network/connection.h"
 #include "envoy/server/instance.h"

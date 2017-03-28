@@ -1,4 +1,4 @@
-#include "admin.h"
+#include "server/http/admin.h"
 
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/hot_restart.h"

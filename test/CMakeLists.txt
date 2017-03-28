@@ -82,6 +82,7 @@ add_executable(envoy-test
   common/network/utility_test.cc
   common/ratelimit/ratelimit_impl_test.cc
   common/redis/codec_impl_test.cc
+  common/redis/command_splitter_impl_test.cc
   common/redis/conn_pool_impl_test.cc
   common/redis/proxy_filter_test.cc
   common/router/config_impl_test.cc
@@ -154,6 +155,7 @@ add_executable(envoy-test
   server/http/health_check_test.cc
   server/options_impl_test.cc
   server/server_test.cc
+  test_common/environment.cc
   test_common/network_utility.cc
   test_common/printers.cc
   test_common/utility.cc)
@@ -187,9 +189,12 @@ add_custom_target(
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
+set(ENVOY_TEST_EXTRA_SETUP_SCRIPT "" CACHE STRING
+    "extra setup script to call from run_envoy_tests.sh after basic setup")
+
 add_custom_target(
   ${PROJECT_NAME}.check ${PROJECT_SOURCE_DIR}/test/run_envoy_tests.sh ${PROJECT_SOURCE_DIR}
-                        ${PROJECT_BINARY_DIR}
+                        ${PROJECT_BINARY_DIR} ${ENVOY_TEST_EXTRA_SETUP_SCRIPT}
   DEPENDS envoy envoy-test envoy.generate_example_configs
 )
 

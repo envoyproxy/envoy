@@ -1,4 +1,5 @@
 #include "envoy/api/api.h"
+#include "envoy/http/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/json/config_schemas.h"
@@ -135,7 +136,8 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(Http::CodecOptions::NoCompression, cluster.info()->httpCodecOptions());
+  EXPECT_EQ(static_cast<uint64_t>(Http::CodecOptions::NoCompression),
+            cluster.info()->httpCodecOptions());
 
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats.counter("cluster.name.upstream_rq_total").value());

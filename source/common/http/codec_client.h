@@ -1,7 +1,5 @@
 #pragma once
 
-#include "codec_wrappers.h"
-
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -10,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/http/codec_wrappers.h"
 #include "common/network/filter_impl.h"
 
 namespace Http {

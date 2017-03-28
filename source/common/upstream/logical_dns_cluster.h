@@ -1,10 +1,9 @@
 #pragma once
 
-#include "upstream_impl.h"
-
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"
+#include "common/upstream/upstream_impl.h"
 
 namespace Upstream {
 

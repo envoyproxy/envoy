@@ -13,7 +13,7 @@ envoy_cc_library(
     srcs = ["base64.cc"],
     hdrs = ["base64.h"],
     deps = [
-        ":empty_string_lib",
+        ":empty_string",
         "//include/envoy/buffer:buffer_includes",
     ],
 )
@@ -24,12 +24,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "empty_string_lib",
+    name = "empty_string",
     hdrs = ["empty_string.h"],
 )
 
 envoy_cc_library(
-    name = "enum_to_int_lib",
+    name = "enum_to_int",
     hdrs = ["enum_to_int.h"],
 )
 
@@ -37,14 +37,11 @@ envoy_cc_library(
     name = "hex_lib",
     srcs = ["hex.cc"],
     hdrs = ["hex.h"],
-    deps = [
-        ":utility_lib",
-        "//include/envoy/common:base_includes",
-    ],
+    deps = [":utility_lib"],
 )
 
 envoy_cc_library(
-    name = "linked_object_lib",
+    name = "linked_object",
     hdrs = ["linked_object.h"],
     deps = [":assert_lib"],
 )
@@ -54,9 +51,14 @@ envoy_cc_library(
     srcs = ["logger.cc"],
     hdrs = ["logger.h"],
     deps = [
-        ":macros_lib",
+        ":macros",
         "//include/envoy/thread:thread_includes",
     ],
+)
+
+envoy_cc_library(
+    name = "non_copyable",
+    hdrs = ["non_copyable.h"],
 )
 
 envoy_cc_library(
@@ -65,13 +67,13 @@ envoy_cc_library(
     hdrs = ["thread.h"],
     deps = [
         ":assert_lib",
-        ":macros_lib",
+        ":macros",
         "//include/envoy/thread:thread_includes",
     ],
 )
 
 envoy_cc_library(
-    name = "macros_lib",
+    name = "macros",
     hdrs = ["macros.h"],
 )
 

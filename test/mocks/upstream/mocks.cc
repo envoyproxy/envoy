@@ -1,4 +1,4 @@
-#include "mocks.h"
+#include "test/mocks/upstream/mocks.h"
 
 #include "envoy/upstream/load_balancer.h"
 

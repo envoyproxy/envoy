@@ -5,6 +5,7 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/environment.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -39,8 +40,8 @@ public:
     EXPECT_CALL(dispatcher, createFilesystemWatcher_())
         .WillOnce(ReturnNew<NiceMock<Filesystem::MockWatcher>>());
 
-    loader.reset(
-        new LoaderImpl(dispatcher, tls, primary_dir, "envoy", override_dir, store, generator));
+    loader.reset(new LoaderImpl(dispatcher, tls, TestEnvironment::temporaryPath(primary_dir),
+                                "envoy", override_dir, store, generator));
   }
 
   Event::MockDispatcher dispatcher;

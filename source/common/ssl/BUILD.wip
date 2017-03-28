@@ -8,10 +8,21 @@ envoy_cc_library(
     hdrs = ["connection_impl.h"],
     deps = [
         ":context_lib",
-        "//source/common/common:empty_string_lib",
-        "//source/common/event:dispatcher_lib_includes",
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:hex_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "context_config_lib",
+    srcs = ["context_config_impl.cc"],
+    hdrs = ["context_config_impl.h"],
+    deps = [
+        "//include/envoy/ssl:context_config_includes",
+        "//source/common/json:json_loader_lib",
     ],
 )
 
@@ -28,9 +39,12 @@ envoy_cc_library(
     deps = [
         ":openssl_lib",
         "//include/envoy/runtime:runtime_includes",
+        "//include/envoy/ssl:context_config_includes",
         "//include/envoy/ssl:context_includes",
         "//include/envoy/ssl:context_manager_includes",
+        "//include/envoy/stats:stats_includes",
         "//include/envoy/stats:stats_macros",
+        "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
     ],
 )

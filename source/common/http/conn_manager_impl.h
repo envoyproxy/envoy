@@ -1,8 +1,5 @@
 #pragma once
 
-#include "date_provider.h"
-#include "user_agent.h"
-
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
@@ -19,6 +16,8 @@
 
 #include "common/common/linked_object.h"
 #include "common/http/access_log/request_info_impl.h"
+#include "common/http/date_provider.h"
+#include "common/http/user_agent.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Http {

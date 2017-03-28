@@ -1,4 +1,4 @@
-#include "statsd.h"
+#include "common/stats/statsd.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"

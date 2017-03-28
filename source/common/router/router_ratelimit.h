@@ -15,7 +15,7 @@ namespace Router {
 class SourceClusterAction : public RateLimitAction {
 public:
   // Router::RateLimitAction
-  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
                           const std::string& remote_address) const override;
 };
@@ -26,7 +26,7 @@ public:
 class DestinationClusterAction : public RateLimitAction {
 public:
   // Router::RateLimitAction
-  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
                           const std::string& remote_address) const override;
 };
@@ -41,7 +41,7 @@ public:
         descriptor_key_(action.getString("descriptor_key")) {}
 
   // Router::RateLimitAction
-  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
                           const std::string& remote_address) const override;
 
@@ -56,7 +56,7 @@ private:
 class RemoteAddressAction : public RateLimitAction {
 public:
   // Router::RateLimitAction
-  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
                           const std::string& remote_address) const override;
 };
@@ -70,7 +70,7 @@ public:
       : descriptor_value_(action.getString("descriptor_value")) {}
 
   // Router::RateLimitAction
-  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
                           const std::string& remote_address) const override;
 
@@ -86,7 +86,7 @@ public:
   HeaderValueMatchAction(const Json::Object& action);
 
   // Router::RateLimitAction
-  void populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(const Router::RouteEntry& route, ::RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
                           const std::string& remote_address) const override;
 
@@ -98,7 +98,7 @@ private:
 /*
  * Implementation of RateLimitPolicyEntry that holds the action for the configuration.
  */
-class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry, Json::JsonValidator {
+class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry, Json::Validator {
 public:
   RateLimitPolicyEntryImpl(const Json::Object& config);
 

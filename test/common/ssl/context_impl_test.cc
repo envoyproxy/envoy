@@ -4,6 +4,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/environment.h"
 
 namespace Ssl {
 
@@ -22,9 +23,9 @@ TEST(SslContextImplTest, TestdNSNameMatching) {
 
 TEST(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
   FILE* fp = fopen("test/common/ssl/test_data/san_dns.crt", "r");
-  EXPECT_TRUE(fp != nullptr);
+  EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-  EXPECT_TRUE(cert != nullptr);
+  EXPECT_NE(cert, nullptr);
   std::vector<std::string> verify_subject_alt_name_list = {"foo.com", "test.com"};
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
   X509_free(cert);
@@ -33,9 +34,9 @@ TEST(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
 
 TEST(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
   FILE* fp = fopen("test/common/ssl/test_data/san_uri.crt", "r");
-  EXPECT_TRUE(fp != nullptr);
+  EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-  EXPECT_TRUE(cert != nullptr);
+  EXPECT_NE(cert, nullptr);
   std::vector<std::string> verify_subject_alt_name_list = {"istio:account.test.com",
                                                            "istio:account2.test.com"};
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
@@ -45,9 +46,9 @@ TEST(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
 
 TEST(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
   FILE* fp = fopen("test/common/ssl/test_data/san_dns.crt", "r");
-  EXPECT_TRUE(fp != nullptr);
+  EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-  EXPECT_TRUE(cert != nullptr);
+  EXPECT_NE(cert, nullptr);
   std::vector<std::string> verify_subject_alt_name_list = {"foo", "bar"};
   EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
   X509_free(cert);
@@ -61,7 +62,7 @@ TEST(SslContextImplTest, TestCipherSuites) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
@@ -72,12 +73,12 @@ TEST(SslContextImplTest, TestCipherSuites) {
 TEST(SslContextImplTest, TestExpiringCert) {
   std::string json = R"EOF(
   {
-      "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
-      "private_key_file": "/tmp/envoy_test/unittestkey.pem"
+      "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
+      "private_key_file": "{{ test_certs }}/unittestkey.pem"
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
@@ -95,12 +96,12 @@ TEST(SslContextImplTest, TestExpiringCert) {
 TEST(SslContextImplTest, TestExpiredCert) {
   std::string json = R"EOF(
   {
-      "cert_chain_file": "/tmp/envoy_test/unittestcert_expired.pem",
-      "private_key_file": "/tmp/envoy_test/unittestkey_expired.pem"
+      "cert_chain_file": "{{ test_certs }}/unittestcert_expired.pem",
+      "private_key_file": "{{ test_certs }}/unittestkey_expired.pem"
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
@@ -112,13 +113,13 @@ TEST(SslContextImplTest, TestExpiredCert) {
 TEST(SslContextImplTest, TestGetCertInformation) {
   std::string json = R"EOF(
   {
-    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
-    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
+    "private_key_file": "{{ test_certs }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt"
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
@@ -134,7 +135,8 @@ TEST(SslContextImplTest, TestGetCertInformation) {
   std::string ca_cert_partial_output(
       "Certificate Path: test/common/ssl/test_data/ca.crt, Serial Number: F0DE921A0515EB45, "
       "Days until Expiration: ");
-  std::string cert_chain_partial_output("Certificate Path: /tmp/envoy_test/unittestcert.pem");
+  std::string cert_chain_partial_output(
+      TestEnvironment::substitute("Certificate Path: {{ test_certs }}/unittestcert.pem"));
 
   EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
   EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
@@ -142,7 +144,7 @@ TEST(SslContextImplTest, TestGetCertInformation) {
 }
 
 TEST(SslContextImplTest, TestNoCert) {
-  Json::ObjectPtr loader = Json::Factory::LoadFromString("{}");
+  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString("{}");
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
