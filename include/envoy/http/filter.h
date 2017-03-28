@@ -243,7 +243,7 @@ public:
    *         buffer the data passed to the callback on behalf of the filter.
    *
    *         NOTE: In complex cases, the filter may wish to manually modify the buffer. One example
-   *         of this is switching a  header only request to a request with body data. If a filter
+   *         of this is switching a header only request to a request with body data. If a filter
    *         receives encodeHeaders(..., true), it has the option of filling encodingBuffer() with
    *         body data. Subsequent filters will receive encodeHeaders(..., false) followed by
    *         encodeData(..., true). This works both in the direct iteration as well as the
