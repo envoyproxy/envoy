@@ -26,14 +26,15 @@ int main(int argc, char** argv) {
   ::testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
 
   if (::setenv("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory().c_str(), 1) != 0) {
-    ::perror("Failed to temporary UDS directory.");
+    ::perror("Failed to set temporary UDS directory.");
     ::exit(1);
   }
 
-  // Quick and dirty filtering and execution of --envoy_test_setup. Scripts run
-  // in this environment have access to env vars such as TEST_TMPDIR. This
-  // script can be used for situations where genrules are unsuitable for unit
-  // tests, since genrules don't have access to TEST_TMPDIR.
+  // Quick and dirty filtering and execution of --envoy_test_setup. Scripts run in this environment
+  // have access to env vars such as TEST_TMPDIR. This script can be used for situations where
+  // genrules are unsuitable for unit tests, since genrules don't have access to TEST_TMPDIR.
+  // TODO(rlazarus): Consider adding a TestOptionsImpl subclass of OptionsImpl during the #613 work,
+  // where we will be doing some additional command-line parsing in OptionsImpl anyway.
   const std::string envoy_test_setup_flag = "--envoy_test_setup";
   int i;
   for (i = 0; i < argc; ++i) {
