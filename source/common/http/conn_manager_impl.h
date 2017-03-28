@@ -301,9 +301,7 @@ private:
 
     // Http::StreamDecoderFilterCallbacks
     void continueDecoding() override;
-    const Buffer::Instance* decodingBuffer() override {
-      return parent_.buffered_request_data_.get();
-    }
+    Buffer::InstancePtr& decodingBuffer() override { return parent_.buffered_request_data_; }
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
@@ -336,9 +334,7 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void continueEncoding() override;
-    const Buffer::Instance* encodingBuffer() override {
-      return parent_.buffered_response_data_.get();
-    }
+    Buffer::InstancePtr& encodingBuffer() override { return parent_.buffered_response_data_; }
 
     StreamEncoderFilterSharedPtr handle_;
   };
