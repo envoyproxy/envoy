@@ -84,7 +84,7 @@ public:
    * @return the average success rate, or -1 if there were not enough hosts with enough request
    *         volume to proceed with success rate based outlier ejection.
    */
-  virtual double successRateAverage() PURE;
+  virtual double successRateAverage() const PURE;
 
   /**
    * Returns the success rate threshold used in the last interval. The threshold is used to eject
@@ -92,7 +92,7 @@ public:
    * @return the threshold, or -1 if there were not enough hosts with enough request volume to
    *         proceed with success rate based outlier ejection.
    */
-  virtual double successRateEjectionThreshold() PURE;
+  virtual double successRateEjectionThreshold() const PURE;
 };
 
 typedef std::shared_ptr<Detector> DetectorSharedPtr;

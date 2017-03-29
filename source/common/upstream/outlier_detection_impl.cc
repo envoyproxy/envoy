@@ -270,7 +270,7 @@ Utility::EjectionPair Utility::successRateEjectionThreshold(
   variance /= valid_success_rate_hosts.size();
   double stdev = std::sqrt(variance);
 
-  return EjectionPair(mean, (mean - (SUCCESS_RATE_STDEV_FACTOR * stdev)));
+  return {mean, (mean - (SUCCESS_RATE_STDEV_FACTOR * stdev))};
 }
 
 void DetectorImpl::processSuccessRateEjections() {
@@ -393,6 +393,7 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
                              typeToString(type), host->outlierDetector().numEjections(), enforced,
                              host->outlierDetector().successRate(), detector.successRateAverage(),
                              detector.successRateEjectionThreshold()));
+    break;
   }
 }
 

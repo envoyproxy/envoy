@@ -97,7 +97,7 @@ private:
   void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
                           Upstream::ResourceManager& resource_manager, Buffer::Instance& response);
   void addOutlierInfo(const std::string& cluster_name,
-                      Upstream::Outlier::DetectorSharedPtr outlier_detector,
+                      const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
 
   /**

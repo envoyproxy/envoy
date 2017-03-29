@@ -117,25 +117,19 @@ enforced
 
 host_success_rate
   If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies the host's success rate
-  at the time of the ejection event on a ``0-100`` range. A ``-1`` value means that a success
-  rate was not calculated for the host in the last
-  :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`.
+  at the time of the ejection event on a ``0-100`` range.
 
 .. _arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average:
 
 cluster_success_rate_average
   If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies the average success
   rate of the hosts in the cluster at the time of the ejection event on a ``0-100`` range.
-  A ``-1`` value means that an average success rate was not calculated in the last
-  :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`.
 
 .. _arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_ejection_threshold:
 
 cluster_success_rate_ejection_threshold
   If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies success rate ejection
-  threshold at the time of the ejection event. A ``-1`` value means that an ejection threshold
-  was not calculated in the last
-  :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`.
+  threshold at the time of the ejection event.
 
 Configuration reference
 -----------------------

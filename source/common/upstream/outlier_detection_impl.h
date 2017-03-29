@@ -190,8 +190,8 @@ public:
 
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
-  double successRateAverage() override { return success_rate_average_; }
-  double successRateEjectionThreshold() override { return success_rate_ejection_threshold_; }
+  double successRateAverage() const override { return success_rate_average_; }
+  double successRateEjectionThreshold() const override { return success_rate_ejection_threshold_; }
 
 private:
   DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
@@ -248,14 +248,13 @@ private:
 class Utility {
 public:
   struct EjectionPair {
-    EjectionPair(double success_rate_average, double ejection_threshold)
-        : success_rate_average_(success_rate_average), ejection_threshold_(ejection_threshold) {}
     double success_rate_average_;
     double ejection_threshold_;
   };
   /**
-   * This function returns the success rate threshold for success rate outlier detection. If a
-   * host's success rate is under this threshold the host is an outlier.
+   * This function returns the an EjectionPair for success rate outlier detection. The pair contains
+   * the average success rate of all valid hosts in the cluster, and the ejection threshold.
+   * If a host's success rate is under this threshold the host is an outlier
    * @param success_rate_sum is the sum of the data in the success_rate_data vector.
    * @param valid_success_rate_hosts is the vector containing the individual success rate data
    * points.

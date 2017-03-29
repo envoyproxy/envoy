@@ -101,7 +101,7 @@ bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
 }
 
 void AdminImpl::addOutlierInfo(const std::string& cluster_name,
-                               Upstream::Outlier::DetectorSharedPtr outlier_detector,
+                               const Upstream::Outlier::Detector* outlier_detector,
                                Buffer::Instance& response) {
   if (outlier_detector) {
     response.add(fmt::format("{}::outlier::success_rate_average::{}", cluster_name,
