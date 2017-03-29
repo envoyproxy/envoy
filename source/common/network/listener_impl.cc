@@ -50,16 +50,8 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   if (listener->options_.use_proxy_proto_) {
     listener->proxy_protocol_.newConnection(listener->dispatcher_, fd, *listener);
   } else {
-    Address::InstanceConstSharedPtr final_remote_address;
-    if (remote_addr->sa_family == AF_INET) {
-      final_remote_address.reset(
-          new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(remote_addr)));
-    } else {
-      // TODO(mattklein123): IPv6 support.
-      ASSERT(remote_addr->sa_family == AF_UNIX);
-      final_remote_address.reset(
-          new Address::PipeInstance(reinterpret_cast<sockaddr_un*>(remote_addr)));
-    }
+    Address::InstanceConstSharedPtr final_remote_address =
+        Address::addressFromSockAddr(*remote_addr);
     listener->newConnection(fd, final_remote_address, final_local_address);
   }
 }

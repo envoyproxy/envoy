@@ -8,6 +8,68 @@
 namespace Network {
 namespace Address {
 
+Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len) {
+  if (ss_len != 0 && ss_len <= sizeof(sa_family_t)) {
+    throw EnvoyException(fmt::format("sockaddr_storage is too short: {}", ss_len));
+  }
+  switch (ss.ss_family) {
+  case AF_INET:
+    if (ss_len == 0 || ss_len == sizeof(sockaddr_in)) {
+      const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&ss);
+      // Only ASSERT-ing in debug builds because definition of sockaddr_storage and sockaddr_in
+      // requires them to share the same storage for the ss_family and sin_family fields.
+      ASSERT(AF_INET == sin->sin_family);
+      return InstanceConstSharedPtr(new Address::Ipv4Instance(sin));
+    } else {
+      throw EnvoyException(
+          fmt::format("sockaddr_in is wrong length: {} != {}", ss_len, sizeof(sockaddr_in)));
+    }
+  case AF_INET6:
+    if (ss_len == 0 || ss_len == sizeof(sockaddr_in6)) {
+      const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&ss);
+      // Only ASSERT-ing in debug builds because definition of sockaddr_storage and sockaddr_in6
+      // requires them to share the same storage for the ss_family and sin6_family fields.
+      ASSERT(AF_INET6 == sin6->sin6_family);
+      return InstanceConstSharedPtr(new Address::Ipv6Instance(*sin6));
+    } else {
+      throw EnvoyException(
+          fmt::format("sockaddr_in6 is wrong length: {} != {}", ss_len, sizeof(sockaddr_in6)));
+    }
+  case AF_UNIX: {
+    const struct sockaddr_un* sun = reinterpret_cast<const struct sockaddr_un*>(&ss);
+    // Only ASSERT-ing in debug builds because definition of sockaddr_storage and sockaddr_un
+    // requires them to share the same storage for the ss_family and sun_family fields.
+    ASSERT(AF_UNIX == sun->sun_family);
+    if (ss_len != 0) {
+      // Note that we're not supporting unnamed or abstract AF_UNIX sockets, only those with a
+      // pathname.
+      if (ss_len <= offsetof(struct sockaddr_un, sun_path)) {
+        throw EnvoyException(fmt::format("sockaddr_un not long enough for path: {}", ss_len));
+      }
+      size_t path_len = strlen(sun->sun_path);
+      if (ss_len != offsetof(struct sockaddr_un, sun_path) + path_len + 1) {
+        throw EnvoyException(
+            fmt::format("sockaddr_un has wrong length not long enough for path: {}", ss_len));
+      }
+    }
+    return InstanceConstSharedPtr(new Address::PipeInstance(sun));
+  }
+  default:
+    throw EnvoyException(fmt::format("Unexpected sockaddr family: {}", ss.ss_family));
+  }
+  NOT_REACHED;
+}
+
+/**
+ * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
+ * a Network::Address::Instance and return a pointer to it.  Raises an EnvoyException on failure.
+ * @param addr a valid address with family AF_INET, AF_INET6 or AF_UNIX.
+ * @return InstanceConstSharedPtr the address.
+ */
+Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr& addr) {
+  return addressFromSockAddr(*reinterpret_cast<const struct sockaddr_storage*>(&addr), 0);
+}
+
 InstanceConstSharedPtr addressFromFd(int fd) {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof ss;
@@ -15,23 +77,7 @@ InstanceConstSharedPtr addressFromFd(int fd) {
   if (rc != 0) {
     throw EnvoyException(fmt::format("getsockname failed for '{}': {}", fd, strerror(errno)));
   }
-  switch (ss.ss_family) {
-  case AF_INET: {
-    ASSERT(ss_len == sizeof(sockaddr_in));
-    const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&ss);
-    ASSERT(AF_INET == sin->sin_family);
-    return InstanceConstSharedPtr(new Address::Ipv4Instance(sin));
-  }
-  case AF_INET6: {
-    ASSERT(ss_len == sizeof(sockaddr_in6));
-    const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&ss);
-    ASSERT(AF_INET6 == sin6->sin6_family);
-    return InstanceConstSharedPtr(new Address::Ipv6Instance(*sin6));
-  }
-  default:
-    throw EnvoyException(fmt::format("Unexpected family in getsockname result: {}", ss.ss_family));
-  }
-  NOT_REACHED;
+  return addressFromSockAddr(ss, ss_len);
 }
 
 int InstanceBase::flagsFromSocketType(SocketType type) const {
@@ -147,6 +193,9 @@ int Ipv6Instance::socket(SocketType type) const {
 }
 
 PipeInstance::PipeInstance(const sockaddr_un* address) : InstanceBase(Type::Pipe) {
+  if (address->sun_path[0] == '\0') {
+    throw EnvoyException("Abstract AF_UNIX sockets not supported.");
+  }
   address_ = *address;
   friendly_name_ = address_.sun_path;
 }
