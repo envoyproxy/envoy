@@ -8,6 +8,13 @@ namespace Network {
 namespace Address {
 
 /**
+ * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
+ * @param fd file descriptor.
+ * @return InstanceConstSharedPtr for bound address.
+ */
+InstanceConstSharedPtr addressFromFd(int fd);
+
+/**
  * Base class for all address types.
  */
 class InstanceBase : public Instance {

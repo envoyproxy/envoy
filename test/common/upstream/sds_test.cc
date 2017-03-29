@@ -122,8 +122,8 @@ TEST_F(SdsTest, NoHealthChecker) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json")));
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -150,8 +150,8 @@ TEST_F(SdsTest, NoHealthChecker) {
 
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
-      "test/common/upstream/test_data/sds_response_weight_change.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_weight_change.json")));
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
@@ -210,8 +210,8 @@ TEST_F(SdsTest, HealthChecker) {
   // all the hosts to load in unhealthy.
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json")));
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -256,8 +256,8 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json")));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(14UL, cluster_->hosts().size());
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
@@ -276,8 +276,8 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json")));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
@@ -295,8 +295,8 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_3.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_3.json")));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
@@ -320,7 +320,7 @@ TEST_F(SdsTest, Failure) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(bad_response_json)});
+  message->body().reset(new Buffer::OwnedImpl(bad_response_json));
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -338,7 +338,7 @@ TEST_F(SdsTest, FailureArray) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(bad_response_json)});
+  message->body().reset(new Buffer::OwnedImpl(bad_response_json));
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));

@@ -21,4 +21,13 @@ TEST(ListenSocket, All) {
   EXPECT_EQ(addr1->asString(), socket5.localAddress()->asString());
 }
 
+// Validate we get port allocation when binding to port zero.
+TEST(ListenSocket, BindPortZero) {
+  TcpListenSocket socket(Utility::resolveUrl("tcp://127.0.0.1:0"), true);
+  EXPECT_EQ(Address::Type::Ip, socket.localAddress()->type());
+  EXPECT_EQ("127.0.0.1", socket.localAddress()->ip()->addressAsString());
+  EXPECT_GT(socket.localAddress()->ip()->port(), 0U);
+  EXPECT_EQ(Address::IpVersion::v4, socket.localAddress()->ip()->version());
+}
+
 } // Network

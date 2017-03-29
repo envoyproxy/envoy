@@ -136,10 +136,22 @@ public:
   virtual void continueDecoding() PURE;
 
   /**
-   * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
-   *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
+   * @return Buffer::InstancePtr& the currently buffered data as buffered by this filter or previous
+   *         ones in the filter chain. May be nullptr if nothing has been buffered yet. Callers
+   *         are free to remove, reallocate, and generally modify the buffered data.
+   *
+   *         NOTE: For common buffering cases, there is no need for each filter to manually handle
+   *         buffering. If decodeData() returns StopIterationAndBuffer, the filter manager will
+   *         buffer the data passed to the callback on behalf of the filter.
+   *
+   *         NOTE: In complex cases, the filter may wish to manually modify the buffer. One example
+   *         of this is switching a header only request to a request with body data. If a filter
+   *         receives decodeHeaders(..., true), it has the option of filling decodingBuffer() with
+   *         body data. Subsequent filters will receive decodeHeaders(..., false) followed by
+   *         decodeData(..., true). This works both in the direct iteration as well as the
+   *         continuation case.
    */
-  virtual const Buffer::Instance* decodingBuffer() PURE;
+  virtual Buffer::InstancePtr& decodingBuffer() PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -222,10 +234,22 @@ public:
   virtual void continueEncoding() PURE;
 
   /**
-   * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
-   *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
+   * @return Buffer::InstancePtr& the currently buffered data as buffered by this filter or previous
+   *         ones in the filter chain. May be nullptr if nothing has been buffered yet. Callers
+   *         are free to remove, reallocate, and generally modify the buffered data.
+   *
+   *         NOTE: For common buffering cases, there is no need for each filter to manually handle
+   *         buffering. If encodeData() returns StopIterationAndBuffer, the filter manager will
+   *         buffer the data passed to the callback on behalf of the filter.
+   *
+   *         NOTE: In complex cases, the filter may wish to manually modify the buffer. One example
+   *         of this is switching a header only request to a request with body data. If a filter
+   *         receives encodeHeaders(..., true), it has the option of filling encodingBuffer() with
+   *         body data. Subsequent filters will receive encodeHeaders(..., false) followed by
+   *         encodeData(..., true). This works both in the direct iteration as well as the
+   *         continuation case.
    */
-  virtual const Buffer::Instance* encodingBuffer() PURE;
+  virtual Buffer::InstancePtr& encodingBuffer() PURE;
 };
 
 /**
