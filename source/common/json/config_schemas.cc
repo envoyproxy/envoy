@@ -860,17 +860,17 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
             "type" : "string",
             "enum" : ["lightstep"]
           },
-          "access_token_file" : {"type" : "string"},
           "config" : {
             "type" : "object",
             "properties" : {
-              "collector_cluster" : {"type" : "string"}
+              "collector_cluster" : {"type" : "string"},
+              "access_token_file" : {"type" : "string"}
             },
-            "required": ["collector_cluster"],
+            "required": ["collector_cluster", "access_token_file"],
             "additionalProperties" : false
           }
         },
-        "required" : ["type", "access_token_file", "config"],
+        "required" : ["type", "config"],
         "additionalProperties" : false
       },
       "rate_limit_service" : {

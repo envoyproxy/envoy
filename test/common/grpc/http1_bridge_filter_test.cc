@@ -10,6 +10,7 @@ using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
+using testing::ReturnRef;
 
 namespace Grpc {
 
@@ -135,8 +136,8 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingNormalResponse) {
   Http::TestHeaderMapImpl request_trailers{{"hello", "world"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 
-  Buffer::OwnedImpl buffer("hello");
-  ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer));
+  Buffer::InstancePtr buffer(new Buffer::OwnedImpl("hello"));
+  ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(ReturnRef(buffer));
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,

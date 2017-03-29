@@ -8,47 +8,52 @@ namespace Router {
 
 const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
 
-void SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
+bool SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
                                              ::RateLimit::Descriptor& descriptor,
                                              const std::string& local_service_cluster,
                                              const Http::HeaderMap&, const std::string&) const {
   descriptor.entries_.push_back({"source_cluster", local_service_cluster});
+  return true;
 }
 
-void DestinationClusterAction::populateDescriptor(const Router::RouteEntry& route,
+bool DestinationClusterAction::populateDescriptor(const Router::RouteEntry& route,
                                                   ::RateLimit::Descriptor& descriptor,
                                                   const std::string&, const Http::HeaderMap&,
                                                   const std::string&) const {
   descriptor.entries_.push_back({"destination_cluster", route.clusterName()});
+  return true;
 }
 
-void RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
+bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
                                               ::RateLimit::Descriptor& descriptor,
                                               const std::string&, const Http::HeaderMap& headers,
                                               const std::string&) const {
   const Http::HeaderEntry* header_value = headers.get(header_name_);
   if (!header_value) {
-    return;
+    return false;
   }
 
   descriptor.entries_.push_back({descriptor_key_, header_value->value().c_str()});
+  return true;
 }
 
-void RemoteAddressAction::populateDescriptor(const Router::RouteEntry&,
+bool RemoteAddressAction::populateDescriptor(const Router::RouteEntry&,
                                              ::RateLimit::Descriptor& descriptor,
                                              const std::string&, const Http::HeaderMap&,
                                              const std::string& remote_address) const {
   if (remote_address.empty()) {
-    return;
+    return false;
   }
 
   descriptor.entries_.push_back({"remote_address", remote_address});
+  return true;
 }
 
-void GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
+bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
                                           ::RateLimit::Descriptor& descriptor, const std::string&,
                                           const Http::HeaderMap&, const std::string&) const {
   descriptor.entries_.push_back({"generic_key", descriptor_value_});
+  return true;
 }
 
 HeaderValueMatchAction::HeaderValueMatchAction(const Json::Object& action)
@@ -59,12 +64,15 @@ HeaderValueMatchAction::HeaderValueMatchAction(const Json::Object& action)
   }
 }
 
-void HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
+bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
                                                 ::RateLimit::Descriptor& descriptor,
                                                 const std::string&, const Http::HeaderMap& headers,
                                                 const std::string&) const {
   if (ConfigUtility::matchHeaders(headers, action_headers_)) {
     descriptor.entries_.push_back({"header_match", descriptor_value_});
+    return true;
+  } else {
+    return false;
   }
 }
 
@@ -84,10 +92,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
       actions_.emplace_back(new RemoteAddressAction());
     } else if (type == "generic_key") {
       actions_.emplace_back(new GenericKeyAction(*action));
-    } else if (type == "header_value_match") {
-      actions_.emplace_back(new HeaderValueMatchAction(*action));
     } else {
-      throw EnvoyException(fmt::format("unknown http rate limit filter action '{}'", type));
+      ASSERT(type == "header_value_match");
+      actions_.emplace_back(new HeaderValueMatchAction(*action));
     }
   }
 }
@@ -97,11 +104,17 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
     const std::string& local_service_cluster, const Http::HeaderMap& headers,
     const std::string& remote_address) const {
   ::RateLimit::Descriptor descriptor;
+  bool result = true;
   for (const RateLimitActionPtr& action : actions_) {
-    action->populateDescriptor(route, descriptor, local_service_cluster, headers, remote_address);
+    result = result &&
+             action->populateDescriptor(route, descriptor, local_service_cluster, headers,
+                                        remote_address);
+    if (!result) {
+      break;
+    }
   }
 
-  if (!descriptor.entries_.empty()) {
+  if (result) {
     descriptors.emplace_back(descriptor);
   }
 }

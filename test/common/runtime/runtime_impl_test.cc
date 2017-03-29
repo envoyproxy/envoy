@@ -36,24 +36,6 @@ TEST(UUID, sanityCheckOfUniqueness) {
 
 class RuntimeImplTest : public testing::Test {
 public:
-  void SetUp() override {
-    // Some ugly ::system escaping. This is needed as this test relies on
-    // symlinks which can only exist in the test temporary directory to play
-    // nice with Bazel, so we create them on-the-fly. Could do this cleanly with
-    // std::filesystem if/when we have C++17.
-    ASSERT_EQ(0, ::system(("cp -rf --parents test/common/runtime/test_data " +
-                           TestEnvironment::temporaryDirectory()).c_str()));
-    ASSERT_EQ(
-        0,
-        ::system(("ln -sf " + TestEnvironment::temporaryPath("test/common/runtime/test_data/root") +
-                  " " + TestEnvironment::temporaryPath("test/common/runtime/test_data/current"))
-                     .c_str()));
-    ASSERT_EQ(0, ::system(("ln -sf " + TestEnvironment::temporaryPath(
-                                           "test/common/runtime/test_data/root/envoy/subdir") +
-                           " " + TestEnvironment::temporaryPath(
-                                     "test/common/runtime/test_data/root/envoy/badlink")).c_str()));
-  }
-
   void setup(const std::string& primary_dir, const std::string& override_dir) {
     EXPECT_CALL(dispatcher, createFilesystemWatcher_())
         .WillOnce(ReturnNew<NiceMock<Filesystem::MockWatcher>>());
