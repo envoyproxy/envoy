@@ -22,10 +22,10 @@ void SslIntegrationTest::SetUpTestCase() {
   upstream_ssl_ctx_ = createUpstreamSslContext();
   fake_upstreams_.emplace_back(
       new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
-  registerPort("upstream_0", fake_upstreams_.back()->port());
+  registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
   fake_upstreams_.emplace_back(
       new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
-  registerPort("upstream_1", fake_upstreams_.back()->port());
+  registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
   test_server_ =
       MockRuntimeIntegrationTestServer::create(TestEnvironment::temporaryFileSubstitutePorts(
           "test/config/integration/server_ssl.json", port_map()));
@@ -44,7 +44,7 @@ void SslIntegrationTest::TearDownTestCase() {
 }
 
 ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
-  static Stats::TestIsolatedStoreImpl upstream_stats_store;
+  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   std::string json = R"EOF(
 {
   "cert_chain_file": "test/config/integration/certs/upstreamcert.pem",
@@ -54,7 +54,7 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   ContextConfigImpl cfg(*loader);
-  return context_manager_->createSslServerContext(upstream_stats_store, cfg);
+  return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
 }
 
 ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {

@@ -157,11 +157,10 @@ public:
   FakeHttpConnection::Type httpType() { return http_type_; }
   FakeHttpConnectionPtr waitForHttpConnection(Event::Dispatcher& client_dispatcher);
   FakeRawConnectionPtr waitForRawConnection();
+  Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
 
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;
-
-  uint32_t port() const { return socket_->localAddress()->ip()->port(); }
 
 private:
   FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& connection,

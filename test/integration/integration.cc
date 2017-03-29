@@ -258,7 +258,7 @@ uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
   if (it != port_map().end()) {
     return it->second;
   }
-  return 0;
+  RELEASE_ASSERT(false);
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
