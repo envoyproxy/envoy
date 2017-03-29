@@ -204,6 +204,7 @@ add_custom_target(
   DEPENDS envoy envoy-test envoy.generate_example_configs
   COMMAND ${PROJECT_SOURCE_DIR}/test/run_envoy_coverage.sh ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}
           ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR} ${ENVOY_GCOVR} ${ENVOY_GCOVR_EXTRA_ARGS}
+          ${ENVOY_TEST_EXTRA_SETUP_SCRIPT}
 )
 endif()
 
