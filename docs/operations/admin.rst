@@ -19,26 +19,34 @@ modify different aspects of the server.
 
   List out all configured :ref:`cluster manager <arch_overview_cluster_manager>` clusters. This
   information includes all discovered upstream hosts in each cluster along with per host statistics.
-  This is useful for debugging service discovery issues. The per host statistics include:
+  This is useful for debugging service discovery issues.
 
-  .. csv-table::
-    :header: Name, Type, Description
-    :widths: 1, 1, 2
+  Cluster wide information
+    - :ref:`circuit breakers<config_cluster_manager_cluster_circuit_breakers>` settings for all priority settings.
 
-    cx_total, Counter, Total connections
-    cx_active, Gauge, Total active connections
-    cx_connect_fail, Counter, Total connection failures
-    rq_total, Counter, Total requests
-    rq_timeout, Counter, Total timed out requests
-    rq_active, Gauge, Total active requests
-    healthy, String, The health status of the host. See below
-    weight, Integer, Load balancing weight (1-100)
-    zone, String, Service zone
-    canary, Boolean, Whether the host is a canary
-    success_rate, Double, "Request success rate (0-100). -1 if there was not enough
-    :ref:`request volume<config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
-    in the :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`
-    to calculate it"
+    - Information about :ref:`outlier detection<arch_overview_outlier_detection>` if a detector is installed. Currently
+      :ref:`success rate average<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average>`,
+      and :ref:`ejection threshold<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_ejection_threshold>` are presented.
+
+  Per host statistics
+    .. csv-table::
+      :header: Name, Type, Description
+      :widths: 1, 1, 2
+
+      cx_total, Counter, Total connections
+      cx_active, Gauge, Total active connections
+      cx_connect_fail, Counter, Total connection failures
+      rq_total, Counter, Total requests
+      rq_timeout, Counter, Total timed out requests
+      rq_active, Gauge, Total active requests
+      healthy, String, The health status of the host. See below
+      weight, Integer, Load balancing weight (1-100)
+      zone, String, Service zone
+      canary, Boolean, Whether the host is a canary
+      success_rate, Double, "Request success rate (0-100). -1 if there was not enough
+      :ref:`request volume<config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
+      in the :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`
+      to calculate it"
 
   Host health status
     A host is either healthy or unhealthy because of one or more different failing health states.
