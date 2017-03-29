@@ -939,7 +939,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "properties" : {
           "type" : {
             "type" : "string",
-            "enum" : ["lightstep"]
+            "enum" : ["lightstep", "zipkin"]
           },
           "config" : {
             "type" : "object",

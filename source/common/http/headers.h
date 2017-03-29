@@ -56,6 +56,11 @@ public:
   const LowerCaseString TransferEncoding{"transfer-encoding"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
+  const LowerCaseString XB3TraceId{"x-b3-traceid"};
+  const LowerCaseString XB3SpanId{"x-b3-spanid"};
+  const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
+  const LowerCaseString XB3Sampled{"x-b3-sampled"};
+  const LowerCaseString XB3Flags{"x-b3-flags"};
 
   struct {
     const std::string Close{"close"};
