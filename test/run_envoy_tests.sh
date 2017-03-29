@@ -61,10 +61,16 @@ then
   exit 0
 fi
 
+# TODO(htuch): Clean this up when Bazelifying the hot restart test below.
+HOT_RESTART_JSON="$TEST_SRCDIR"/test/config/integration/hot_restart.json
+cat "$TEST_TMPDIR"/test/config/integration/server.json |
+  sed -e "s#{{ upstream_. }}#0#g" | \
+  cat > "$HOT_RESTART_JSON"
+
 # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart
 # sanity test.
 echo "Starting epoch 0"
-$BINARY_DIR/source/exe/envoy -c $TEST_SRCDIR/test/config/integration/server.json \
+$BINARY_DIR/source/exe/envoy -c "$HOT_RESTART_JSON" \
     --restart-epoch 0 --base-id 1 --service-cluster cluster --service-node node &
 
 FIRST_SERVER_PID=$!
@@ -77,7 +83,7 @@ kill -SIGHUP $FIRST_SERVER_PID
 sleep 3
 
 echo "Starting epoch 1"
-$BINARY_DIR/source/exe/envoy -c $TEST_TMPDIR/test/config/integration/server.json \
+$BINARY_DIR/source/exe/envoy -c "$HOT_RESTART_JSON" \
     --restart-epoch 1 --base-id 1 --service-cluster cluster --service-node node &
 
 SECOND_SERVER_PID=$!
@@ -85,7 +91,7 @@ SECOND_SERVER_PID=$!
 sleep 7
 
 echo "Starting epoch 2"
-$BINARY_DIR/source/exe/envoy -c $TEST_TMPDIR/test/config/integration/server.json \
+$BINARY_DIR/source/exe/envoy -c "$HOT_RESTART_JSON" \
     --restart-epoch 2 --base-id 1 --service-cluster cluster --service-node node &
 
 THIRD_SERVER_PID=$!
