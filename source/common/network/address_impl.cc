@@ -42,8 +42,8 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
     ASSERT(AF_UNIX == sun->sun_family);
     if (ss_len != 0) {
       // Note that we're not supporting unnamed or abstract AF_UNIX sockets, only those with a
-      // pathname.
-      if (ss_len <= offsetof(struct sockaddr_un, sun_path)) {
+      // pathname, which means a path of at least 1 char plus a terminating \0.
+      if (ss_len < offsetof(struct sockaddr_un, sun_path) + 2) {
         throw EnvoyException(fmt::format("sockaddr_un not long enough for path: {}", ss_len));
       }
       size_t path_len = strlen(sun->sun_path);
