@@ -23,7 +23,6 @@ public:
   const Optional<SystemTime>& lastEjectionTime() override { return time_; }
   const Optional<SystemTime>& lastUnejectionTime() override { return time_; }
   double successRate() const override { return -1; }
-  void successRate(double) override {}
 
 private:
   const Optional<SystemTime> time_;
@@ -97,12 +96,14 @@ public:
       : detector_(detector), host_(host) {
     // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();
+    success_rate_ = -1;
   }
 
   void eject(SystemTime ejection_time);
   void uneject(SystemTime ejection_time);
   void updateCurrentSuccessRateBucket();
-  SuccessRateAccumulator& successRateAccumulator() { return success_rate_accumulator_; };
+  SuccessRateAccumulator& successRateAccumulator() { return success_rate_accumulator_; }
+  void successRate(double new_success_rate) { success_rate_ = new_success_rate; }
 
   // Upstream::Outlier::DetectorHostSink
   uint32_t numEjections() override { return num_ejections_; }
@@ -111,7 +112,6 @@ public:
   const Optional<SystemTime>& lastEjectionTime() override { return last_ejection_time_; }
   const Optional<SystemTime>& lastUnejectionTime() override { return last_unejection_time_; }
   double successRate() const override { return success_rate_; }
-  void successRate(double new_success_rate) override { success_rate_ = new_success_rate; }
 
 private:
   std::weak_ptr<DetectorImpl> detector_;
@@ -230,7 +230,8 @@ public:
       : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
 
   // Upstream::Outlier::EventLogger
-  void logEject(HostDescriptionConstSharedPtr host, EjectionType type, bool enforced) override;
+  void logEject(HostDescriptionConstSharedPtr host, Detector& detector, EjectionType type,
+                bool enforced) override;
   void logUneject(HostDescriptionConstSharedPtr host) override;
 
 private:
@@ -246,17 +247,23 @@ private:
  */
 class Utility {
 public:
+  struct EjectionPair {
+    EjectionPair(double success_rate_average, double ejection_threshold)
+        : success_rate_average_(success_rate_average), ejection_threshold_(ejection_threshold) {}
+    double success_rate_average_;
+    double ejection_threshold_;
+  };
   /**
    * This function returns the success rate threshold for success rate outlier detection. If a
    * host's success rate is under this threshold the host is an outlier.
    * @param success_rate_sum is the sum of the data in the success_rate_data vector.
-   * @param success_rate_data is the vector containing the individual success rate data points.
+   * @param valid_success_rate_hosts is the vector containing the individual success rate data
+   * points.
    * @return the success rate threshold.
    */
-  static double
+  static EjectionPair
   successRateEjectionThreshold(double success_rate_sum,
-                               const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
-                               double& success_rate_average);
+                               const std::vector<HostSuccessRatePair>& valid_success_rate_hosts);
 
 private:
   // Factor to multiply the stdev of a cluster's success rate for success rate outlier ejection.

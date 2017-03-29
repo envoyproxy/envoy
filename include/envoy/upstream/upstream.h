@@ -301,7 +301,11 @@ public:
    */
   virtual ClusterInfoConstSharedPtr info() const PURE;
 
-  virtual Outlier::DetectorSharedPtr outlierDetector() const PURE;
+  /**
+   * @return a shared pointer to the cluster's outlier detector. If an outlier detector has not been
+   *         installed, returns a nullptr.
+   */
+  virtual const Outlier::DetectorSharedPtr outlierDetector() const PURE;
 
   /**
    * Initialize the cluster. This will be called either immediately at creation or after all primary

@@ -37,6 +37,7 @@ modify different aspects of the server.
     canary, Boolean, Whether the host is a canary
     success_rate, Double, "Request success rate (0-100). -1 if there was not enough
     :ref:`request volume<config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
+    in the :ref:`interval<config_cluster_manager_cluster_outlier_detection_interval_ms>`
     to calculate it"
 
   Host health status

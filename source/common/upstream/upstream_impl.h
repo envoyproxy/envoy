@@ -235,7 +235,7 @@ public:
 
   // Upstream::Cluster
   ClusterInfoConstSharedPtr info() const override { return info_; }
-  Outlier::DetectorSharedPtr outlierDetector() const override { return outlier_detector_; }
+  const Outlier::DetectorSharedPtr outlierDetector() const override { return outlier_detector_; }
 
 protected:
   ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,

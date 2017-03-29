@@ -28,8 +28,8 @@ public:
   MockEventLogger();
   ~MockEventLogger();
 
-  MOCK_METHOD3(logEject,
-               void(HostDescriptionConstSharedPtr host, EjectionType type, bool enforced));
+  MOCK_METHOD4(logEject, void(HostDescriptionConstSharedPtr host, Detector& detector,
+                              EjectionType type, bool enforced));
   MOCK_METHOD1(logUneject, void(HostDescriptionConstSharedPtr host));
 };
 

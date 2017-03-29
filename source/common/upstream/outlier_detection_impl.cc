@@ -185,11 +185,11 @@ void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
       runCallbacks(host);
 
       if (event_logger_) {
-        event_logger_->logEject(host, type, true);
+        event_logger_->logEject(host, *this, type, true);
       }
     } else {
       if (event_logger_) {
-        event_logger_->logEject(host, type, false);
+        event_logger_->logEject(host, *this, type, false);
       }
     }
   } else {
@@ -244,9 +244,8 @@ void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
 // outliers.
 const double Utility::SUCCESS_RATE_STDEV_FACTOR = 1.9;
 
-double Utility::successRateEjectionThreshold(
-    double success_rate_sum, const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
-    double& success_rate_average) {
+Utility::EjectionPair Utility::successRateEjectionThreshold(
+    double success_rate_sum, const std::vector<HostSuccessRatePair>& valid_success_rate_hosts) {
   // This function is using mean and standard deviation as statistical measures for outlier
   // detection. First the mean is calculated by dividing the sum of success rate data over the
   // number of data points. Then variance is calculated by taking the mean of the
@@ -271,10 +270,7 @@ double Utility::successRateEjectionThreshold(
   variance /= valid_success_rate_hosts.size();
   double stdev = std::sqrt(variance);
 
-  // Set the Detector's member variable
-  success_rate_average = mean;
-
-  return mean - (SUCCESS_RATE_STDEV_FACTOR * stdev);
+  return EjectionPair(mean, (mean - (SUCCESS_RATE_STDEV_FACTOR * stdev)));
 }
 
 void DetectorImpl::processSuccessRateEjections() {
@@ -313,8 +309,10 @@ void DetectorImpl::processSuccessRateEjections() {
   }
 
   if (valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
-    success_rate_ejection_threshold_ = Utility::successRateEjectionThreshold(
-        success_rate_sum, valid_success_rate_hosts, success_rate_average_);
+    Utility::EjectionPair ejection_pair =
+        Utility::successRateEjectionThreshold(success_rate_sum, valid_success_rate_hosts);
+    success_rate_average_ = ejection_pair.success_rate_average_;
+    success_rate_ejection_threshold_ = ejection_pair.ejection_threshold_;
     for (const auto& host_success_rate_pair : valid_success_rate_hosts) {
       if (host_success_rate_pair.success_rate_ < success_rate_ejection_threshold_) {
         stats_.ejections_success_rate_.inc();
@@ -348,11 +346,11 @@ void DetectorImpl::runCallbacks(HostSharedPtr host) {
   }
 }
 
-void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, EjectionType type,
-                               bool enforced) {
+void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& detector,
+                               EjectionType type, bool enforced) {
   // TODO(mattklein123): Log friendly host name (e.g., instance ID or DNS name).
   // clang-format off
-  static const std::string json =
+  static const std::string json_5xx =
     std::string("{{") +
     "\"time\": \"{}\", " +
     "\"secs_since_last_action\": \"{}\", " +
@@ -363,12 +361,39 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, EjectionType 
     "\"num_ejections\": \"{}\", " +
     "\"enforced\": \"{}\"" +
     "}}\n";
+
+  static const std::string json_success_rate =
+    std::string("{{") +
+    "\"time\": \"{}\", " +
+    "\"secs_since_last_action\": \"{}\", " +
+    "\"cluster\": \"{}\", " +
+    "\"upstream_url\": \"{}\", " +
+    "\"action\": \"eject\", " +
+    "\"type\": \"{}\", " +
+    "\"num_ejections\": \"{}\", " +
+    "\"enforced\": \"{}\", " +
+    "\"host_success_rate\": \"{}\", " +
+    "\"cluster_average_success_rate\": \"{}\", " +
+    "\"cluster_success_rate_ejection_threshold\": \"{}\"" +
+    "}}\n";
   // clang-format on
   SystemTime now = time_source_.currentSystemTime();
-  file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
-                           secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), now),
-                           host->cluster().name(), host->address()->asString(), typeToString(type),
-                           host->outlierDetector().numEjections(), enforced));
+
+  switch (type) {
+  case EjectionType::Consecutive5xx:
+    file_->write(fmt::format(json_5xx, AccessLogDateTimeFormatter::fromTime(now),
+                             secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), now),
+                             host->cluster().name(), host->address()->asString(),
+                             typeToString(type), host->outlierDetector().numEjections(), enforced));
+    break;
+  case EjectionType::SuccessRate:
+    file_->write(fmt::format(json_success_rate, AccessLogDateTimeFormatter::fromTime(now),
+                             secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), now),
+                             host->cluster().name(), host->address()->asString(),
+                             typeToString(type), host->outlierDetector().numEjections(), enforced,
+                             host->outlierDetector().successRate(), detector.successRateAverage(),
+                             detector.successRateEjectionThreshold()));
+  }
 }
 
 void EventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
