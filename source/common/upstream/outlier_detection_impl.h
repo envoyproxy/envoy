@@ -258,7 +258,7 @@ public:
    * @param success_rate_sum is the sum of the data in the success_rate_data vector.
    * @param valid_success_rate_hosts is the vector containing the individual success rate data
    * points.
-   * @return the success rate threshold.
+   * @return EjectionPair.
    */
   static EjectionPair
   successRateEjectionThreshold(double success_rate_sum,
