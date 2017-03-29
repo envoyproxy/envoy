@@ -35,9 +35,11 @@ add_library(
   event/dispatcher_impl.cc
   event/event_impl_base.cc
   event/file_event_impl.cc
+  event/guarddog_impl.cc
   event/libevent.cc
   event/signal_impl.cc
   event/timer_impl.cc
+  event/watchdog_impl.cc
   filesystem/filesystem_impl.cc
   filesystem/watcher_impl.cc
   filter/auth/client_ssl.cc

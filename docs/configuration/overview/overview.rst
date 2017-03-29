@@ -18,6 +18,10 @@ specify miscellaneous configuration.
     "statsd_local_udp_port": "...",
     "statsd_tcp_cluster_name": "...",
     "stats_flush_interval_ms": "...",
+    "watchdog_miss_timeout_ms": "...",
+    "watchdog_megamiss_timeout_ms": "...",
+    "watchdog_kill_timeout_ms": "...",
+    "watchdog_multikill_timeout_ms": "...",
     "tracing": "{...}",
     "rate_limit_service": "{...}",
     "runtime": "{...}",
@@ -56,6 +60,24 @@ stats_flush_interval_ms
   *(optional, integer)* The time in milliseconds between flushes to configured stats sinks. For
   performance reasons Envoy latches counters and only flushes counters and gauges at a periodic
   interval. If not specified the default is 5000ms (5 seconds).
+
+watchdog_miss_timeout_ms
+  *(optional, integer)* The time in milliseconds after which we count a nonresponsive thread in the
+  "server.watchdog_miss" statistic. If not specified the default is 200ms.
+
+watchdog_megamiss_timeout_ms
+  *(optional, integer)* The time in milliseconds after which we count a nonresponsive thread in the
+  "server.watchdog_mega_miss" statistic. If not specified the default is 1000ms.
+
+watchdog_kill_timeout_ms
+  *(optional, integer)* If a watched thread has been nonresponsive for this many milliseconds assume
+  a programming error and kill the entire Envoy process. Set to 0 to disable kill behavior. If not
+  specified the default is 2000ms (2 seconds).
+
+watchdog_multikill_timeout_ms
+  *(optional, integer)* If at least two watched threads have been nonresponsive for at least this many
+  milliseconds assume a true deadlock and kill the entire Envoy process. Set to 0 to disable this
+  behavior. If not specified the default is 1000ms (1 second).
 
 :ref:`tracing <config_tracing>`
   *(optional, object)* Configuration for an external :ref:`tracing <arch_overview_tracing>`

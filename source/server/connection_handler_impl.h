@@ -36,7 +36,7 @@ struct ListenerStats {
  */
 class ConnectionHandlerImpl : public Network::ConnectionHandler, NonCopyable {
 public:
-  ConnectionHandlerImpl(Stats::Store& stats_store, spdlog::logger& logger, Api::ApiPtr&& api);
+  ConnectionHandlerImpl(spdlog::logger& logger, Api::ApiPtr&& api);
   ~ConnectionHandlerImpl();
 
   Api::Api& api() { return *api_; }
@@ -46,12 +46,6 @@ public:
    * Close and destroy all connections.
    */
   void closeConnections();
-
-  /**
-   * Start a watchdog that attempts to tick every 100ms and will increment a stat if a tick takes
-   * more than 200ms in real time.
-   */
-  void startWatchdog();
 
   // Network::ConnectionHandler
   uint64_t numConnections() override { return num_connections_; }
@@ -140,10 +134,6 @@ private:
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
   std::list<ActiveConnectionPtr> connections_;
   std::atomic<uint64_t> num_connections_{};
-  Stats::Counter& watchdog_miss_counter_;
-  Stats::Counter& watchdog_mega_miss_counter_;
-  Event::TimerPtr watchdog_timer_;
-  SystemTime last_watchdog_time_;
 };
 
 typedef std::unique_ptr<ConnectionHandlerImpl> ConnectionHandlerImplPtr;
