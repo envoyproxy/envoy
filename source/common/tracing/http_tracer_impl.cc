@@ -1,5 +1,6 @@
 #include "common/tracing/http_tracer_impl.h"
 
+#include "common/common/assert.h"
 #include "common/common/base64.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
@@ -70,6 +71,20 @@ void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime:
   request_headers.RequestId()->value(x_request_id);
 }
 
+const std::string HttpTracerUtility::INGRESS_OPERATION = "ingress";
+const std::string HttpTracerUtility::EGRESS_OPERATION = "egress";
+
+std::string HttpTracerUtility::toString(OperationName operation_name) {
+  switch (operation_name) {
+  case OperationName::Ingress:
+    return INGRESS_OPERATION;
+  case OperationName::Egress:
+    return EGRESS_OPERATION;
+  }
+
+  NOT_REACHED
+}
+
 Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& request_info,
                                       const Http::HeaderMap& request_headers) {
   // Exclude HC requests immediately.
@@ -135,11 +150,13 @@ HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& l
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
                                   const Http::AccessLog::RequestInfo& request_info) {
-  std::string operation_name =
-      config.operationName() + " " + request_headers.Host()->value().c_str();
+  std::string span_name = HttpTracerUtility::toString(config.operationName());
 
-  SpanPtr active_span =
-      driver_->startSpan(request_headers, operation_name, request_info.startTime());
+  if (config.operationName() == OperationName::Egress) {
+    span_name += " " + std::string(request_headers.Host()->value().c_str());
+  }
+
+  SpanPtr active_span = driver_->startSpan(request_headers, span_name, request_info.startTime());
   if (active_span) {
     active_span->setTag("node_id", local_info_.nodeName());
     active_span->setTag("zone", local_info_.zoneName());
