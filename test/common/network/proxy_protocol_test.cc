@@ -18,15 +18,13 @@ namespace Network {
 class ProxyProtocolTest : public testing::Test {
 public:
   ProxyProtocolTest()
-      : listener_addr_(Network::Test::findOrCheckFreePort("127.0.0.99:0",
-                                                          Network::Address::SocketType::Stream)),
-        socket_(listener_addr_, true),
+      : socket_(Network::Utility::getCanonicalIpv4LoopbackAddress(), true),
         listener_(connection_handler_, dispatcher_, socket_, callbacks_, stats_store_,
                   {.bind_to_port_ = true,
                    .use_proxy_proto_ = true,
                    .use_original_dst_ = false,
                    .per_connection_buffer_limit_bytes_ = 0}) {
-    conn_ = dispatcher_.createClientConnection(listener_addr_);
+    conn_ = dispatcher_.createClientConnection(socket_.localAddress());
     conn_->addConnectionCallbacks(connection_callbacks_);
     conn_->connect();
   }
@@ -37,7 +35,6 @@ public:
   }
 
   Event::DispatcherImpl dispatcher_;
-  Network::Address::InstanceConstSharedPtr listener_addr_;
   TcpListenSocket socket_;
   Stats::IsolatedStoreImpl stats_store_;
   MockListenerCallbacks callbacks_;

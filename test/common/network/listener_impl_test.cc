@@ -20,9 +20,7 @@ static void errorCallbackTest() {
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  auto addr =
-      Network::Test::findOrCheckFreePort("127.0.0.28:0", Network::Address::SocketType::Stream);
-  Network::TcpListenSocket socket(addr, true);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -32,7 +30,8 @@ static void errorCallbackTest() {
                                  .use_original_dst_ = false,
                                  .per_connection_buffer_limit_bytes_ = 0});
 
-  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(addr);
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))
@@ -72,8 +71,8 @@ public:
 TEST(ListenerImplTest, NormalRedirect) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Utility::resolveUrl("tcp://127.0.0.1:10000"), true);
-  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://127.0.0.1:10001"), false);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
+  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://127.1.2.3:10001"), false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // The traffic should redirect from binding listener to the virtual listener.
@@ -88,10 +87,10 @@ TEST(ListenerImplTest, NormalRedirect) {
                                         Network::ListenerOptions());
 
   Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
+      dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
+  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.1.2.3", 10001));
   EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
       .WillRepeatedly(Return(&listenerDst));
@@ -100,7 +99,7 @@ TEST(ListenerImplTest, NormalRedirect) {
   EXPECT_CALL(listenerDst, newConnection(_, _, _));
   EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        EXPECT_EQ("127.0.0.1:10001", conn->localAddress().asString());
+        EXPECT_EQ("127.1.2.3:10001", conn->localAddress().asString());
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -112,8 +111,8 @@ TEST(ListenerImplTest, NormalRedirect) {
 TEST(ListenerImplTest, FallbackToWildcardListener) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Utility::resolveUrl("tcp://127.0.0.1:10000"), true);
-  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://0.0.0.0:10001"), false);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
+  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://127.1.2.3:10001"), false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // The virtual listener of exact address does not exist, fall back to wild card virtual listener.
@@ -128,10 +127,10 @@ TEST(ListenerImplTest, FallbackToWildcardListener) {
                                         Network::ListenerOptions());
 
   Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
+      dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
+  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.1.2.3", 10001));
   EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
       .WillRepeatedly(Return(&listenerDst));
@@ -151,8 +150,8 @@ TEST(ListenerImplTest, FallbackToWildcardListener) {
 TEST(ListenerImplTest, UseActualDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Utility::resolveUrl("tcp://127.0.0.1:10000"), true);
-  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://127.0.0.1:10001"), false);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
+  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://127.1.2.3:10001"), false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
@@ -167,10 +166,10 @@ TEST(ListenerImplTest, UseActualDst) {
                                         Network::ListenerOptions());
 
   Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
+      dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.0.0.1", 10001));
+  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.1.2.3", 10001));
   EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
   EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
       .WillRepeatedly(Return(&listener));

@@ -65,8 +65,7 @@ struct MockBufferStats {
 TEST(ConnectionImplTest, BufferStats) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  auto addr = Network::Address::parseInternetAddressAndPort("0.0.0.0:10000");
-  Network::TcpListenSocket socket(addr, true);
+  Network::TcpListenSocket socket(Network::Utility::getIpv4AnyAddress(), true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -74,7 +73,7 @@ TEST(ConnectionImplTest, BufferStats) {
                                 Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
+      dispatcher.createClientConnection(socket.localAddress());
   MockConnectionCallbacks client_callbacks;
   client_connection->addConnectionCallbacks(client_callbacks);
   MockBufferStats client_buffer_stats;
@@ -138,8 +137,7 @@ public:
 
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
-    auto addr = Network::Address::parseInternetAddressAndPort("0.0.0.0:10000");
-    Network::TcpListenSocket socket(addr, true);
+    Network::TcpListenSocket socket(Network::Utility::getIpv6AnyAddress(), true);
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
     Network::ListenerPtr listener =
@@ -150,7 +148,7 @@ public:
                                    .per_connection_buffer_limit_bytes_ = read_buffer_limit});
 
     Network::ClientConnectionPtr client_connection =
-        dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
+        dispatcher.createClientConnection(socket.localAddress());
     client_connection->connect();
 
     Network::ConnectionPtr server_connection;
