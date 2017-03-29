@@ -34,7 +34,8 @@ private_key_file
 
 ca_cert_file
   *(optional, string)* A file containing certificate authority certificates to use in verifying
-  a presented server certificate.
+  a presented server certificate. If specified, a server must present a valid certificate or the
+  connection will be rejected.
 
 verify_certificate_hash
   *(optional, string)* If specified, Envoy will verify (pin) the hash of the presented server
