@@ -227,7 +227,8 @@ TEST(SslConnectionImplTest, SslError) {
       dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(socket.localAddress());
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
   client_connection->write(bad_data);
