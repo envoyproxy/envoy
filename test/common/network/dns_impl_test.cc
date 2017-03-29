@@ -9,6 +9,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/network_utility.h"
 
 #include <arpa/nameser.h>
 #include <arpa/nameser_compat.h>
@@ -190,14 +191,17 @@ public:
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver();
 
+    auto addr =
+        Network::Test::findOrCheckFreePort("127.0.0.17:0", Network::Address::SocketType::Stream);
+
     // Point c-ares at 127.0.0.1:10000 with no search domains and TCP-only.
     peer_.reset(new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver_.get())));
     peer_->resetChannelTcpOnly(zero_timeout());
-    ares_set_servers_ports_csv(peer_->channel(), "127.0.0.1:10000");
+    ares_set_servers_ports_csv(peer_->channel(), addr->asString().c_str());
 
     // Instantiate TestDnsServer and listen on 127.0.0.1:10000.
     server_.reset(new TestDnsServer());
-    socket_.reset(new Network::TcpListenSocket(uint32_t(10000), true));
+    socket_.reset(new Network::TcpListenSocket(addr, true));
     listener_ = dispatcher_.createListener(connection_handler_, *socket_, *server_, stats_store_,
                                            {.bind_to_port_ = true,
                                             .use_proxy_proto_ = false,

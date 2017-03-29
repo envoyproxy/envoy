@@ -13,6 +13,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 
 using testing::_;
 using testing::Invoke;
@@ -32,7 +33,9 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  auto addr =
+      Network::Test::findOrCheckFreePort("127.7.88.2:0", Network::Address::SocketType::Stream);
+  Network::TcpListenSocket socket(addr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -42,8 +45,8 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-      *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createSslClientConnection(*client_ctx, addr);
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -163,7 +166,9 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  auto addr =
+      Network::Test::findOrCheckFreePort("127.7.88.2:0", Network::Address::SocketType::Stream);
+  Network::TcpListenSocket socket(addr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -180,8 +185,8 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-      *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createSslClientConnection(*client_ctx, addr);
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -220,15 +225,16 @@ TEST(SslConnectionImplTest, SslError) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  auto addr =
+      Network::Test::findOrCheckFreePort("127.7.88.2:0", Network::Address::SocketType::Stream);
+  Network::TcpListenSocket socket(addr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(addr);
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
   client_connection->write(bad_data);
@@ -256,7 +262,9 @@ public:
                            uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
-    Network::TcpListenSocket socket(uint32_t(10000), true);
+    auto addr =
+        Network::Test::findOrCheckFreePort("127.7.88.2:0", Network::Address::SocketType::Stream);
+    Network::TcpListenSocket socket(addr, true);
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
 
@@ -291,8 +299,8 @@ public:
     ContextConfigImpl client_ctx_config(*client_ctx_loader);
     ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
 
-    Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-        *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+    Network::ClientConnectionPtr client_connection =
+        dispatcher.createSslClientConnection(*client_ctx, addr);
     client_connection->connect();
 
     Network::ConnectionPtr server_connection;

@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/network/address_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
@@ -64,7 +65,8 @@ struct MockBufferStats {
 TEST(ConnectionImplTest, BufferStats) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  auto addr = Network::Address::parseInternetAddressAndPort("0.0.0.0:10000");
+  Network::TcpListenSocket socket(addr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -136,7 +138,8 @@ public:
 
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
-    Network::TcpListenSocket socket(uint32_t(10000), true);
+    auto addr = Network::Address::parseInternetAddressAndPort("0.0.0.0:10000");
+    Network::TcpListenSocket socket(addr, true);
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
     Network::ListenerPtr listener =

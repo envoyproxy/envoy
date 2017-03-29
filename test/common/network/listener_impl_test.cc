@@ -5,6 +5,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/network_utility.h"
 
 using testing::_;
 using testing::ByRef;
@@ -19,7 +20,9 @@ static void errorCallbackTest() {
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  auto addr =
+      Network::Test::findOrCheckFreePort("127.0.0.28:0", Network::Address::SocketType::Stream);
+  Network::TcpListenSocket socket(addr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -29,8 +32,7 @@ static void errorCallbackTest() {
                                  .use_original_dst_ = false,
                                  .per_connection_buffer_limit_bytes_ = 0});
 
-  Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(addr);
   client_connection->connect();
 
   EXPECT_CALL(listener_callbacks, onNewConnection_(_))

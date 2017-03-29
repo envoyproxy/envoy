@@ -2,34 +2,23 @@
 
 #include "common/network/utility.h"
 #include "common/network/listen_socket_impl.h"
+#include "test/test_common/network_utility.h"
 
 namespace Network {
 
 TEST(ListenSocket, All) {
-  // Test the case of a socket with given port and bind_to_port set to true.
-  TcpListenSocket socket1(uint32_t(15000), true);
+  // Test the case of a socket with given address and port, and with bind_to_port set to true.
+  auto addr1 = Network::Test::findOrCheckFreePort("127.0.0.2:0", Address::SocketType::Stream);
+  TcpListenSocket socket1(addr1, true);
   EXPECT_EQ(0, listen(socket1.fd(), 0));
-  EXPECT_EQ(15000U, socket1.localAddress()->ip()->port());
+  EXPECT_EQ(addr1->ip()->port(), socket1.localAddress()->ip()->port());
 
-  // Test the case of a socket with given tcp address and bind_to_port set to true.
-  TcpListenSocket socket2(Utility::resolveUrl("tcp://127.0.0.1:15002"), true);
-  EXPECT_EQ(0, listen(socket2.fd(), 0));
-  EXPECT_EQ("127.0.0.1:15002", socket2.localAddress()->asString());
+  // The address and port are bound already, should throw exception.
+  EXPECT_THROW(Network::TcpListenSocket socket3(addr1, true), EnvoyException);
 
-  // The port is bound already, should throw exception.
-  EXPECT_THROW(Network::TcpListenSocket socket3(uint32_t(15000), true), EnvoyException);
-
-  // The address is bound already, should throw exception.
-  EXPECT_THROW(Network::TcpListenSocket socket4(Utility::resolveUrl("tcp://127.0.0.1:15002"), true),
-               EnvoyException);
-
-  // Test the case of a socket with fd and given port.
-  TcpListenSocket socket5(dup(socket1.fd()), 15000);
-  EXPECT_EQ(15000U, socket5.localAddress()->ip()->port());
-
-  // Test the case of a socket with fd and given tcp address.
-  TcpListenSocket socket6(dup(socket1.fd()), Utility::resolveUrl("tcp://127.0.0.1:15004"));
-  EXPECT_EQ("127.0.0.1:15004", socket6.localAddress()->asString());
+  // Test the case of a socket with fd and given address and port.
+  TcpListenSocket socket5(dup(socket1.fd()), addr1);
+  EXPECT_EQ(addr1->asString(), socket5.localAddress()->asString());
 }
 
 } // Network
