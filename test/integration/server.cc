@@ -37,7 +37,13 @@ void IntegrationTestServer::start() {
   log().info("starting integration test server");
   ASSERT(!thread_);
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
+  // First, we want to wait until we know the server's worker threads are all
+  // started.
   server_initialized_.waitReady();
+  // Then we need to make sure the thread with
+  // IntegrationTestServer::threadRoutine has set server_, since integration
+  // tests might rely on the value of server().
+  server_set_.waitReady();
 }
 
 IntegrationTestServer::~IntegrationTestServer() {
@@ -59,6 +65,7 @@ void IntegrationTestServer::threadRoutine() {
                                       "cluster_name", "node_name");
   server_.reset(
       new Server::InstanceImpl(options, *this, restarter, stats_store_, lock, *this, local_info));
+  server_set_.setReady();
   server_->run();
   server_.reset();
 }
