@@ -414,8 +414,9 @@ def protobuf_repositories():
         # Using a non-canonical repository/branch here. This is a workaround to the lack of
         # merge on https://github.com/google/protobuf/pull/2508, which is needed for supporting
         # arbitrary CC compiler locations from the environment. The branch is
-        # https://github.com/htuch/protobuf/tree/default-shell-env,
-        commit = "48fa0fde075ec8f7975b54575b40d81a4a582e0d",
+        # https://github.com/htuch/protobuf/tree/v3.2.0-default-shell-env, which is the 3.2.0
+        # release with the above mentioned PR cherry picked.
+        commit = "d490587268931da78c942a6372ef57bb53db80da",
         remote = "https://github.com/htuch/protobuf.git",
     )
 
