@@ -35,7 +35,7 @@ public:
    * Obtain socket the admin endpoint is bound to.
    * @return Network::ListenSocket& socket reference.
    */
-  virtual Network::ListenSocket& socket() PURE;
+  virtual const Network::ListenSocket& socket() PURE;
 };
 
 } // Server

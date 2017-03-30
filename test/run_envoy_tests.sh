@@ -61,7 +61,10 @@ then
   exit 0
 fi
 
-# TODO(htuch): Clean this up when Bazelifying the hot restart test below.
+# TODO(htuch): Clean this up when Bazelifying the hot restart test below. At the same time, restore
+# some test behavior lost in #650, when we switched to 0 port binding - the hot restart tests no
+# longer check socket passing. Will need to generate the second server's JSON based on the actual
+# bound ports in the first server.
 HOT_RESTART_JSON="$TEST_SRCDIR"/test/config/integration/hot_restart.json
 cat "$TEST_TMPDIR"/test/config/integration/server.json |
   sed -e "s#{{ upstream_. }}#0#g" | \

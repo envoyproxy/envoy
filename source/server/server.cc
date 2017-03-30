@@ -182,7 +182,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
                              initial_config.admin().profilePath(), initial_config.admin().address(),
                              *this));
   admin_scope_ = stats_store_.createScope("listener.admin.");
-  handler_.addListener(*admin_, admin_->socket(), *admin_scope_,
+  handler_.addListener(*admin_, admin_->mutable_socket(), *admin_scope_,
                        Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   loadServerFlags(initial_config.flagsPath());
@@ -379,7 +379,7 @@ void InstanceImpl::shutdownAdmin() {
   log().warn("shutting down admin due to child startup");
   stat_flush_timer_.reset();
   handler_.closeListeners();
-  admin_->socket().close();
+  admin_->mutable_socket().close();
 
   log().warn("terminating parent process");
   restarter_.terminateParent();
