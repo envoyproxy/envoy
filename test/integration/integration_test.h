@@ -2,18 +2,18 @@
 
 #include "test/integration/integration.h"
 
-class Http2UpstreamIntegrationTest : public BaseIntegrationTest, public testing::Test {
+class IntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:
   /**
    * Global initializer for all integration tests.
    */
   static void SetUpTestCase() {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2));
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/server_http2_upstream.json",
-                     {"http", "http_buffer", "http1_buffer"});
+    createTestServer("test/config/integration/server.json",
+                     {"echo", "http", "http_buffer", "tcp_proxy", "rds"});
   }
 
   /**

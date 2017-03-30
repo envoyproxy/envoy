@@ -188,14 +188,14 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type)
     : FakeUpstream(nullptr, Network::ListenSocketPtr{new Network::TcpListenSocket(port, true)},
                    type) {
-  log().info("starting fake server on port {}", port);
+  log().info("starting fake server on port {}", this->localAddress()->ip()->port());
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
                            FakeHttpConnection::Type type)
     : FakeUpstream(ssl_ctx, Network::ListenSocketPtr{new Network::TcpListenSocket(port, true)},
                    type) {
-  log().info("starting fake SSL server on port {}", port);
+  log().info("starting fake SSL server on port {}", this->localAddress()->ip()->port());
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& listen_socket,

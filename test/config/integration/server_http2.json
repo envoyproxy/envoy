@@ -1,13 +1,13 @@
 {
   "listeners": [
   {
-    "address": "tcp://127.0.0.1:10000",
+    "address": "tcp://127.0.0.1:0",
     "filters": [
       { "type": "read", "name": "echo", "config": {} }
     ]
   },
   {
-    "address": "tcp://127.0.0.1:10001",
+    "address": "tcp://127.0.0.1:0",
     "filters": [
     {
       "type": "read",
@@ -88,7 +88,7 @@
     }]
   },
   {
-    "address": "tcp://127.0.0.1:10002",
+    "address": "tcp://127.0.0.1:0",
     "filters": [
     {
       "type": "read",
@@ -175,7 +175,7 @@
     }]
   },
   {
-    "address": "tcp://127.0.0.1:10004",
+    "address": "tcp://127.0.0.1:0",
     "filters": [
       { "type": "read", "name":
         "tcp_proxy",
@@ -193,7 +193,7 @@
     ]
   }],
 
-  "admin": { "access_log_path": "/dev/null", "address": "tcp://127.0.0.1:10003" },
+  "admin": { "access_log_path": "/dev/null", "address": "tcp://127.0.0.1:0" },
   "statsd_local_udp_port": 8125,
   "statsd_tcp_cluster_name": "statsd",
   "tracing": {
@@ -221,14 +221,14 @@
       "connect_timeout_ms": 250,
       "type": "static",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11000"}]
+      "hosts": [{"url": "tcp://127.0.0.1:{{ upstream_0 }}"}]
     },
     {
       "name": "cluster_2",
       "connect_timeout_ms": 250,
       "type": "logical_dns",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://localhost:11001"}]
+      "hosts": [{"url": "tcp://localhost:{{ upstream_1 }}"}]
     },
     {
       "name": "statsd",
