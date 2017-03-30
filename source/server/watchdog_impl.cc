@@ -1,10 +1,8 @@
-
 #include "common/common/assert.h"
-#include "common/event/watchdog_impl.h"
-
 #include "envoy/event/dispatcher.h"
+#include "server/watchdog_impl.h"
 
-namespace Event {
+namespace Server {
 
 void WatchDogImpl::startWatchdog(Event::Dispatcher& dispatcher) {
   timer_ = dispatcher.createTimer([this]() -> void {
@@ -14,4 +12,4 @@ void WatchDogImpl::startWatchdog(Event::Dispatcher& dispatcher) {
   timer_->enableTimer(timer_interval_);
 }
 
-} // Event
+} // Server

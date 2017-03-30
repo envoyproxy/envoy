@@ -1,5 +1,6 @@
 #include "common/common/utility.h"
-#include "common/event/guarddog_impl.h"
+
+#include "server/guarddog_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/server/mocks.h"
@@ -7,7 +8,7 @@
 
 using testing::InSequence;
 
-namespace Event {
+namespace Server {
 
 /**
  * Death test caveat: Because of the way we die gcov doesn't receive coverage
@@ -22,44 +23,6 @@ protected:
       : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500),
         time_point_(std::chrono::system_clock::now()) {}
 
-  void startNeglectedDogAndWait() {
-    InSequence s;
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
-    GuardDogImpl gd(fakestats_, config_kill_, time_source_);
-    auto unpet_dog = gd.getWatchDog(0);
-    gd.force_check();
-    time_point_ += std::chrono::milliseconds(500);
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
-    gd.force_check();
-  }
-
-  void startNeglectedDogsAndWait() {
-    InSequence s;
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
-    GuardDogImpl gd(fakestats_, config_multikill_, time_source_);
-    auto unpet_dog1 = gd.getWatchDog(0);
-    gd.force_check();
-    auto unpet_dog2 = gd.getWatchDog(1);
-    gd.force_check();
-    time_point_ += std::chrono::milliseconds(501);
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
-    gd.force_check();
-  }
-
-  void startNeglectedDogAndTouchedDog() {
-    InSequence s;
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
-    GuardDogImpl gd(fakestats_, config_multikill_, time_source_);
-    auto unpet_dog = gd.getWatchDog(0);
-    auto pet_dog = gd.getWatchDog(1);
-    for (int i = 0; i < 6; i++) {
-      time_point_ += std::chrono::milliseconds(100);
-      EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
-      pet_dog->touch();
-      gd.force_check();
-    }
-  }
-
   testing::NiceMock<Server::Configuration::MockMain> config_kill_;
   testing::NiceMock<Server::Configuration::MockMain> config_multikill_;
   testing::NiceMock<Stats::MockStore> fakestats_;
@@ -71,17 +34,6 @@ class GuardDogMissTest : public testing::Test {
 protected:
   GuardDogMissTest() : config_miss(1, 1000, 0, 0), config_mega(1000, 1, 0, 0) {}
 
-  void startNeglectedDogAndWait(bool mega) {
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
-    GuardDogImpl gd(stats_store, mega ? config_mega : config_miss, time_source_);
-    auto unpet_dog = gd.getWatchDog(0);
-    time_point_ += std::chrono::milliseconds(501);
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
-    gd.force_check();
-    gd.stopWatching(unpet_dog);
-    unpet_dog = nullptr;
-  }
-
   testing::NiceMock<Server::Configuration::MockMain> config_miss;
   testing::NiceMock<Server::Configuration::MockMain> config_mega;
   testing::NiceMock<Stats::MockStore> stats_store;
@@ -89,22 +41,73 @@ protected:
   std::chrono::system_clock::time_point time_point_;
 };
 
-TEST_F(GuardDogDeathTest, KillDeathTest) { EXPECT_DEATH(startNeglectedDogAndWait(), ""); }
-TEST_F(GuardDogDeathTest, MultiKillDeathTest) { EXPECT_DEATH(startNeglectedDogsAndWait(), ""); }
+TEST_F(GuardDogDeathTest, KillDeathTest) {
+  // Is it German for "The Function"? Almost...
+  auto die_function = [&]() -> void {
+    InSequence s;
+    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+    GuardDogImpl gd(fakestats_, config_kill_, time_source_);
+    auto unpet_dog = gd.createWatchDog(0);
+    gd.forceCheckForTest();
+    time_point_ += std::chrono::milliseconds(500);
+    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+    gd.forceCheckForTest();
+  };
+  // Why do it this way? Any threads must be started inside the death test
+  // statement and this is the easiest way to accomplish that.
+  EXPECT_DEATH(die_function(), "");
+}
+
+TEST_F(GuardDogDeathTest, MultiKillDeathTest) {
+  auto die_function = [&]() -> void {
+    InSequence s;
+    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+    GuardDogImpl gd(fakestats_, config_multikill_, time_source_);
+    auto unpet_dog1 = gd.createWatchDog(0);
+    gd.forceCheckForTest();
+    auto unpet_dog2 = gd.createWatchDog(1);
+    gd.forceCheckForTest();
+    time_point_ += std::chrono::milliseconds(501);
+    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+    gd.forceCheckForTest();
+  };
+  EXPECT_DEATH(die_function(), "");
+}
 
 TEST_F(GuardDogDeathTest, NearDeathTest) {
-  startNeglectedDogAndTouchedDog();
-  SUCCEED(); // if we haven't crashed by now
+  InSequence s;
+  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  GuardDogImpl gd(fakestats_, config_multikill_, time_source_);
+  auto unpet_dog = gd.createWatchDog(0);
+  auto pet_dog = gd.createWatchDog(1);
+  for (int i = 0; i < 6; i++) {
+    time_point_ += std::chrono::milliseconds(100);
+    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+    pet_dog->touch();
+    gd.forceCheckForTest();
+  }
 }
 
 TEST_F(GuardDogMissTest, MissTest) {
-  startNeglectedDogAndWait(false);
-  SUCCEED(); // if we haven't crashed by now
+  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  GuardDogImpl gd(stats_store, config_miss, time_source_);
+  auto unpet_dog = gd.createWatchDog(0);
+  time_point_ += std::chrono::milliseconds(501);
+  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  gd.forceCheckForTest();
+  gd.stopWatching(unpet_dog);
+  unpet_dog = nullptr;
 }
 
 TEST_F(GuardDogMissTest, MegaMissTest) {
-  startNeglectedDogAndWait(true);
-  SUCCEED(); // if we haven't crashed by now
+  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  GuardDogImpl gd(stats_store, config_mega, time_source_);
+  auto unpet_dog = gd.createWatchDog(0);
+  time_point_ += std::chrono::milliseconds(501);
+  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  gd.forceCheckForTest();
+  gd.stopWatching(unpet_dog);
+  unpet_dog = nullptr;
 }
 
 TEST(GuardDogBasicTest, StartStopTest) {
@@ -119,7 +122,7 @@ TEST(GuardDogBasicTest, LoopIntervalNoKillTest) {
   testing::NiceMock<Server::Configuration::MockMain> config(40, 50, 0, 0);
   testing::NiceMock<MockSystemTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
-  ASSERT_EQ(gd.loopInterval(), 40);
+  EXPECT_EQ(gd.loopIntervalForTest(), 40);
 }
 
 TEST(GuardDogBasicTest, LoopIntervalTest) {
@@ -127,7 +130,7 @@ TEST(GuardDogBasicTest, LoopIntervalTest) {
   testing::NiceMock<Server::Configuration::MockMain> config(100, 90, 1000, 500);
   testing::NiceMock<MockSystemTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
-  ASSERT_EQ(gd.loopInterval(), 90);
+  EXPECT_EQ(gd.loopIntervalForTest(), 90);
 }
 
 TEST(WatchDogBasicTest, ThreadIdTest) {
@@ -135,8 +138,8 @@ TEST(WatchDogBasicTest, ThreadIdTest) {
   testing::NiceMock<Server::Configuration::MockMain> config(100, 90, 1000, 500);
   testing::NiceMock<MockSystemTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
-  auto watched_dog = gd.getWatchDog(123);
-  ASSERT_EQ(watched_dog->threadId(), 123);
+  auto watched_dog = gd.createWatchDog(123);
+  EXPECT_EQ(watched_dog->threadId(), 123);
   gd.stopWatching(watched_dog);
 }
 // If this test fails it is because the SystemTime object has become nontrivial
@@ -149,4 +152,4 @@ TEST(WatchDogTimeTest, AtomicIsAtomicTest) {
   ASSERT(std::atomic<ProdSystemTimeSource>{}.is_lock_free());
 }
 
-} // Event
+} // Server

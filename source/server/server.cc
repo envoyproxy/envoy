@@ -11,7 +11,6 @@
 #include "common/api/api_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
-#include "common/event/guarddog_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
@@ -19,6 +18,7 @@
 #include "common/stats/statsd.h"
 
 #include "server/configuration_impl.h"
+#include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker.h"
 
@@ -258,7 +258,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_.reset(
-      new Event::GuardDogImpl(stats_store_, *config_, ProdSystemTimeSource::instance_));
+      new Server::GuardDogImpl(stats_store_, *config_, ProdSystemTimeSource::instance_));
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
@@ -350,7 +350,7 @@ uint64_t InstanceImpl::numConnections() {
 void InstanceImpl::run() {
   // Run the main dispatch loop waiting to exit.
   log().warn("starting main dispatch loop");
-  auto watchdog = guard_dog_->getWatchDog(Thread::Thread::currentThreadId());
+  auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
   watchdog->startWatchdog(handler_.dispatcher());
   handler_.dispatcher().run(Event::Dispatcher::RunType::Block);
   log().warn("main dispatch loop exited");

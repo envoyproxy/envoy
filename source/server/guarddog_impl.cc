@@ -1,19 +1,20 @@
 #include "common/common/assert.h"
-#include "common/event/guarddog_impl.h"
-#include "common/event/watchdog_impl.h"
+#include "server/guarddog_impl.h"
+#include "server/watchdog_impl.h"
 
-namespace Event {
+namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Store& stats_store, const Server::Configuration::Main& config,
                            SystemTimeSource& tsource)
     : time_source_(tsource), miss_timeout_(config.wdMissTimeout()),
       megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
       multi_kill_timeout_(config.wdMultiKillTimeout()),
-      loop_interval_(
-          std::min({miss_timeout_, megamiss_timeout_,
-                    kill_enabled() ? kill_timeout_ : std::min(miss_timeout_, megamiss_timeout_),
-                    multikill_enabled() ? multi_kill_timeout_
-                                        : std::min(miss_timeout_, megamiss_timeout_)})),
+      loop_interval_([&]() -> std::chrono::milliseconds {
+        const auto min_of_nonfatal = std::min(miss_timeout_, megamiss_timeout_);
+        return std::min({killEnabled() ? kill_timeout_ : min_of_nonfatal,
+                         multikillEnabled() ? multi_kill_timeout_ : min_of_nonfatal,
+                         min_of_nonfatal});
+      }()),
       watchdog_miss_counter_(stats_store.counter("server.watchdog_miss")),
       watchdog_megamiss_counter_(stats_store.counter("server.watchdog_mega_miss")),
       run_thread_(true) {
@@ -24,21 +25,21 @@ GuardDogImpl::~GuardDogImpl() { exit(); }
 
 void GuardDogImpl::threadRoutine() {
   do {
-    auto now = time_source_.currentSystemTime();
+    const auto now = time_source_.currentSystemTime();
     bool seen_one_multi_timeout(false);
     std::lock_guard<std::mutex> guard(wd_lock_);
     for (auto watched_dog : watched_dogs_) {
-      auto delta = now - watched_dog->lastTouchTime();
+      const auto delta = now - watched_dog->lastTouchTime();
       if (delta > miss_timeout_) {
         watchdog_miss_counter_.inc();
       }
       if (delta > megamiss_timeout_) {
         watchdog_megamiss_counter_.inc();
       }
-      if (kill_enabled() && delta > kill_timeout_) {
+      if (killEnabled() && delta > kill_timeout_) {
         PANIC("GuardDog: one thread stuck for more than watchdog_kill_timeout");
       }
-      if (multikill_enabled() && delta > multi_kill_timeout_) {
+      if (multikillEnabled() && delta > multi_kill_timeout_) {
         if (seen_one_multi_timeout) {
           PANIC("GuardDog: multiple threads stuck for more than watchdog_multikill_timeout");
         } else {
@@ -49,10 +50,12 @@ void GuardDogImpl::threadRoutine() {
   } while (waitOrDetectStop());
 }
 
-WatchDogSharedPtr GuardDogImpl::getWatchDog(int32_t thread_id) {
-  // Timer started by WatchDog will try to fire at 3/4 of the interval of the
-  // minimum timeout specified.
-  auto wd_interval = loop_interval_ * 3 / 4;
+WatchDogSharedPtr GuardDogImpl::createWatchDog(int32_t thread_id) {
+  // Timer started by WatchDog will try to fire at 1/2 of the interval of the
+  // minimum timeout specified. loop_interval_ is const so all shared state
+  // accessed out of the locked section below is const (time_source_ has no
+  // state).
+  auto wd_interval = loop_interval_ / 2;
   WatchDogSharedPtr new_watchdog =
       std::make_shared<WatchDogImpl>(thread_id, time_source_, wd_interval);
   {
@@ -97,4 +100,4 @@ void GuardDogImpl::exit() {
   }
 }
 
-} // Event
+} // Server

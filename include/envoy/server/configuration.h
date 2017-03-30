@@ -128,29 +128,29 @@ public:
   virtual Optional<uint32_t> statsdUdpPort() PURE;
 
   /**
-   * @return the time interval between flushing to configured stat sinks. The server latches
-   *         counters.
+   * @return std::chrono::milliseconds the time interval between flushing to configured stat sinks.
+   *         The server latches counters.
    */
   virtual std::chrono::milliseconds statsFlushInterval() PURE;
 
   /**
-   * @return the time interval after which we count a nonresponsive thread event
-   * as a "miss" statistic.
+   * @return std::chrono::milliseconds the time interval after which we count a nonresponsive thread
+   *         event as a "miss" statistic.
    */
   virtual std::chrono::milliseconds wdMissTimeout() const PURE;
   /**
-   * @return the time interval after which we count a nonresponsive thread event
-   * as a "mega miss" statistic.
+   * @return std::chrono::milliseconds the time interval after which we count a nonresponsive thread
+   *         event as a "mega miss" statistic.
    */
   virtual std::chrono::milliseconds wdMegaMissTimeout() const PURE;
   /**
-   * @return the time interval after which we kill the process due to a single
-   * nonresponsive thread.
+   * @return std::chrono::milliseconds the time interval after which we kill the process due to a
+   *         single nonresponsive thread.
    */
   virtual std::chrono::milliseconds wdKillTimeout() const PURE;
   /**
-   * @return the time interval after which we kill the process due to multiple
-   * nonresponsive threads.
+   * @return std::chrono::milliseconds the time interval after which we kill the process due to
+   *         multiple nonresponsive threads.
    */
   virtual std::chrono::milliseconds wdMultiKillTimeout() const PURE;
 };

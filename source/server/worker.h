@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/event/guarddog.h"
 #include "envoy/server/configuration.h"
+#include "envoy/server/guarddog.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/thread.h"
@@ -22,7 +22,7 @@ public:
   Event::Dispatcher& dispatcher() { return handler_->dispatcher(); }
   Network::ConnectionHandler* handler() { return handler_.get(); }
   void initializeConfiguration(Server::Configuration::Main& config, const SocketMap& socket_map,
-                               Event::GuardDog& guard_dog);
+                               Server::GuardDog& guard_dog);
 
   /**
    * Exit the worker. Will block until the worker thread joins. Called from the main thread.
@@ -31,7 +31,7 @@ public:
 
 private:
   void onNoExitTimer();
-  void threadRoutine(Event::GuardDog& guard_dog);
+  void threadRoutine(Server::GuardDog& guard_dog);
 
   ThreadLocal::Instance& tls_;
   Server::ConnectionHandlerImplPtr handler_;

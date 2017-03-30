@@ -2,9 +2,9 @@
 
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/watchdog.h"
+#include "envoy/server/watchdog.h"
 
-namespace Event {
+namespace Server {
 
 /**
  * This class stores the actual data about when the WatchDog was last touched
@@ -41,4 +41,4 @@ private:
   std::chrono::milliseconds timer_interval_;
 };
 
-} // Event
+} // Server

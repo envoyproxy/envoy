@@ -17,7 +17,7 @@ Worker::Worker(ThreadLocal::Instance& tls, std::chrono::milliseconds file_flush_
 Worker::~Worker() {}
 
 void Worker::initializeConfiguration(Server::Configuration::Main& config,
-                                     const SocketMap& socket_map, Event::GuardDog& guard_dog) {
+                                     const SocketMap& socket_map, Server::GuardDog& guard_dog) {
   for (const Server::Configuration::ListenerPtr& listener : config.listeners()) {
     const Network::ListenerOptions listener_options = {
         .bind_to_port_ = listener->bindToPort(),
@@ -55,9 +55,9 @@ void Worker::onNoExitTimer() {
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::hours(1)));
 }
 
-void Worker::threadRoutine(Event::GuardDog& guard_dog) {
+void Worker::threadRoutine(Server::GuardDog& guard_dog) {
   log().info("worker entering dispatch loop");
-  auto watchdog = guard_dog.getWatchDog(Thread::Thread::currentThreadId());
+  auto watchdog = guard_dog.createWatchDog(Thread::Thread::currentThreadId());
   watchdog->startWatchdog(handler_->dispatcher());
   handler_->dispatcher().run(Event::Dispatcher::RunType::Block);
   log().info("worker exited dispatch loop");

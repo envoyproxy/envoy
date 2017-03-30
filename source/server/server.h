@@ -164,7 +164,7 @@ private:
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   InitManagerImpl init_manager_;
-  std::unique_ptr<Event::GuardDog> guard_dog_;
+  std::unique_ptr<Server::GuardDog> guard_dog_;
 };
 
 } // Server

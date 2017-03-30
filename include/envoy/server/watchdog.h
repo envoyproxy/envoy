@@ -3,7 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
-namespace Event {
+namespace Server {
 
 /**
  * WatchDog objects are an individual thread's interface with the deadlock
@@ -38,4 +38,4 @@ public:
 
 typedef std::shared_ptr<WatchDog> WatchDogSharedPtr;
 
-} // Event
+} // Server
