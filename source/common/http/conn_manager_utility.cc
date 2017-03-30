@@ -120,12 +120,6 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
   if (config.tracingConfig().valid()) {
     Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
   }
-
-  // Add user-specified headers to the request
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add :
-       route_config.requestHeadersToAdd()) {
-    request_headers.addStatic(to_add.first, to_add.second);
-  }
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,

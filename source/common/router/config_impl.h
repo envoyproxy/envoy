@@ -50,26 +50,26 @@ private:
   static const SslRedirector SSL_REDIRECTOR;
 };
 
+class ConfigImpl;
 /**
  * Holds all routing configuration for an entire virtual host.
  */
 class VirtualHostImpl : public VirtualHost {
 public:
-  VirtualHostImpl(const Json::Object& virtual_host, Runtime::Loader& runtime,
-                  Upstream::ClusterManager& cm, bool validate_clusters);
+  VirtualHostImpl(const Json::Object& virtual_host, const ConfigImpl& httpConfig,
+                  Runtime::Loader& runtime, Upstream::ClusterManager& cm, bool validate_clusters);
 
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;
   bool usesRuntime() const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
+  const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
+    return request_headers_to_add_;
+  }
 
   // Router::VirtualHost
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
-  const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  requestHeadersToAdd() const override {
-    return request_headers_to_add_;
-  }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -174,6 +174,9 @@ public:
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
+  const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
+    return request_headers_to_add_;
+  }
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -189,12 +192,6 @@ public:
   std::chrono::milliseconds timeout() const override { return timeout_; }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
-
-  const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  requestHeadersToAdd() const override {
-    return request_headers_to_add_;
-  }
-
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -241,11 +238,6 @@ private:
 
     const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
       return parent_->virtualCluster(headers);
-    }
-
-    const std::list<std::pair<Http::LowerCaseString, std::string>>&
-    requestHeadersToAdd() const override {
-      return parent_->requestHeadersToAdd();
     }
 
     const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -360,8 +352,8 @@ private:
  */
 class RouteMatcher {
 public:
-  RouteMatcher(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-               bool validate_clusters);
+  RouteMatcher(const Json::Object& config, const ConfigImpl& httpConfig, Runtime::Loader& runtime,
+               Upstream::ClusterManager& cm, bool validate_clusters);
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const { return uses_runtime_; }
@@ -382,6 +374,10 @@ public:
   ConfigImpl(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
              bool validate_clusters);
 
+  const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
+    return request_headers_to_add_;
+  }
+
   // Router::Config
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
     return route_matcher_->route(headers, random_value);
@@ -398,11 +394,6 @@ public:
 
   const std::list<Http::LowerCaseString>& responseHeadersToRemove() const override {
     return response_headers_to_remove_;
-  }
-
-  const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  requestHeadersToAdd() const override {
-    return request_headers_to_add_;
   }
 
   bool usesRuntime() const override { return route_matcher_->usesRuntime(); }
@@ -436,18 +427,12 @@ public:
     return response_headers_to_remove_;
   }
 
-  const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  requestHeadersToAdd() const override {
-    return request_headers_to_add_;
-  }
-
   bool usesRuntime() const override { return false; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
-  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
 } // Router

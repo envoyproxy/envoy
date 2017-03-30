@@ -94,14 +94,6 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
   EXPECT_EQ("true", headers.get_(Headers::get().EnvoyInternalRequest));
 }
 
-TEST_F(ConnectionManagerUtilityTest, AllowAddingCustomRequestHeaders) {
-  route_config_.request_headers_to_add_.push_back({LowerCaseString("to_add"), "foo"});
-  TestHeaderMapImpl headers;
-  ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                 random_, runtime_);
-  EXPECT_EQ("foo", headers.get_("to_add"));
-}
-
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   Network::Address::Ipv4Instance internal_remote_address("10.0.0.1");
 
