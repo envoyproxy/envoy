@@ -29,6 +29,8 @@ name
   *(required, string)* Supplies the name of the cluster which must be unique across all clusters.
   The cluster name is used when emitting :ref:`statistics <config_cluster_manager_cluster_stats>`.
 
+.. _config_cluster_manager_type:
+
 type
   *(required, string)* The :ref:`service discovery type <arch_overview_service_discovery_types>` to
   use for resolving the cluster. Possible options are *static*, *strict_dns*, *logical_dns*, and
@@ -196,7 +198,7 @@ outlier_detection
     to include this host in success rate based outlier detection. If the volume is lower than this setting,
     outlier detection via success rate statistics is not performed for that host. Defaults to 100.
 
-  Each of the above configuration values can be overridden via 
+  Each of the above configuration values can be overridden via
   :ref:`runtime values <config_cluster_manager_cluster_runtime_outlier_detection>`.
 
 .. toctree::

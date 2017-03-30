@@ -12,4 +12,4 @@ Operations and administration
   stats_overview
   runtime
   fs_flags
-  common_configuration/overview
+  faq/overview
