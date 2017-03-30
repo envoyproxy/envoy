@@ -103,6 +103,13 @@ public:
   static std::vector<std::string> split(const std::string& source, char split);
 
   /**
+   * Split a string.
+   * @param source supplies the string to split.
+   * @param split supplies the string to split on.
+   */
+  static std::vector<std::string> split(const std::string& source, const std::string& split);
+
+  /**
    * Version of substr() that operates on a start and end index instead of a start index and a
    * length.
    */
