@@ -105,6 +105,10 @@ public:
   MOCK_CONST_METHOD0(weight, uint32_t());
   MOCK_METHOD1(weight, void(uint32_t new_weight));
   MOCK_CONST_METHOD0(zone, const std::string&());
+
+  testing::NiceMock<MockClusterInfo> cluster_;
+  Stats::IsolatedStoreImpl stats_store_;
+  HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
 };
 
 } // Upstream
