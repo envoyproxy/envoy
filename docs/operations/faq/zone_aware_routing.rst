@@ -8,11 +8,13 @@ between source service A and destination service B.
 
 Envoy configuration on source service
 -------------------------------------
-* :ref:`sds <config_cluster_manager_type>` type must be used for cluster B definition.
+This section describes specific configuration for Envoy running side by side with the service A.
+These are the requirements:
+* Envoy must be launched with :option:`--service-zone` option which defines availability zone for the current host.
+* Both cluster A and cluster B must have :ref:`sds <config_cluster_manager_type>` type.
   See more on service discovery :ref:`here <arch_overview_service_discovery_sds>`.
-* sds type must be used for cluster A definition.
 * :ref:`local_cluster_name <config_cluster_manager_local_cluster_name>` must be set to cluster A.
-  Only essential part is listed in the configuration below.
+  Only essential parts are listed in the configuration below.
 
 .. code-block:: json
 
@@ -31,12 +33,14 @@ Envoy configuration on source service
     "local_cluster_name": "cluster_a"
   }
 
-* Envoy must be launched with :option:`--service-zone` option which defines availability zone for current host.
-
 Envoy configuration on destination service
 ------------------------------------------
-* All hosts from cluster B should report `zone data <https://github.com/lyft/discovery#tags-json>`_
-  to `discovery service <https://github.com/lyft/discovery#post-v1registrationservice>`_ as part of the registry process.
+It's not necessary to run Envoy side by side with the service B, but it's important that each host in cluster B registers
+with the discovery service which is queried by Envoy on service A cluster.
+Specifically you need to setup a periodic process to register hosts from service B with the
+`discovery service <https://github.com/lyft/discovery#post-v1registrationservice>`_.
+And each registration call must have `zone data <https://github.com/lyft/discovery#tags-json>`_
+provided.
 
 Verify it works
 ---------------
