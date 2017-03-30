@@ -104,7 +104,7 @@ action
 
 type
   If ``action`` is ``eject``, specifies the type of ejection that took place. Currently this can be:
-  ``5xx``, and ``SuccessRate``.
+  ``5xx`` and ``SuccessRate``.
 
 num_ejections
   If ``action`` is ``eject``, specifies the number of times the host has been ejected

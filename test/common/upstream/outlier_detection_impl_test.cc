@@ -180,6 +180,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
       .WillOnce(Return(SystemTime(std::chrono::milliseconds(9999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
+  EXPECT_FALSE(cluster_.hosts_[0]->outlierDetector().lastUnejectionTime().valid());
 
   // Interval that does bring the host back in.
   EXPECT_CALL(time_source_, currentSystemTime())
@@ -190,6 +191,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_FALSE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_TRUE(cluster_.hosts_[0]->outlierDetector().lastUnejectionTime().valid());
 
   // Eject host again to cause an ejection after an unejection has taken place
   loadRq(cluster_.hosts_[0], 1, 503);
@@ -254,6 +256,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
                        EjectionType::SuccessRate, true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
+  EXPECT_EQ(50, cluster_.hosts_[4]->outlierDetector().successRate());
+  EXPECT_EQ(90, detector->successRateAverage());
+  EXPECT_EQ(52, detector->successRateEjectionThreshold());
   EXPECT_TRUE(cluster_.hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
@@ -285,6 +290,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(-1, cluster_.hosts_[4]->outlierDetector().successRate());
+  EXPECT_EQ(-1, detector->successRateAverage());
+  EXPECT_EQ(-1, detector->successRateEjectionThreshold());
 }
 
 TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
