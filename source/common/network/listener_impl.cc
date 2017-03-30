@@ -19,8 +19,8 @@ Address::InstanceConstSharedPtr ListenerImpl::getOriginalDst(int fd) {
   return Utility::getOriginalDst(fd);
 }
 
-void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr, int,
-                                  void* arg) {
+void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
+                                  int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
   Address::InstanceConstSharedPtr final_local_address = listener->socket_.localAddress();
@@ -50,8 +50,17 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   if (listener->options_.use_proxy_proto_) {
     listener->proxy_protocol_.newConnection(listener->dispatcher_, fd, *listener);
   } else {
-    Address::InstanceConstSharedPtr final_remote_address =
-        Address::addressFromSockAddr(*remote_addr);
+    Address::InstanceConstSharedPtr final_remote_address;
+    if (remote_addr->sa_family == AF_UNIX) {
+      // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
+      // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
+      // sockaddr_un associated with the client socket when starting from the server socket.
+      // We work around this by using our own name for the socket in this case.
+      final_remote_address = Address::peerAddressFromFd(fd);
+    } else {
+      final_remote_address = Address::addressFromSockAddr(
+          *reinterpret_cast<const sockaddr_storage*>(remote_addr), remote_addr_len);
+    }
     listener->newConnection(fd, final_remote_address, final_local_address);
   }
 }

@@ -60,22 +60,32 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
   NOT_REACHED;
 }
 
-/**
- * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
- * a Network::Address::Instance and return a pointer to it.  Raises an EnvoyException on failure.
- * @param addr a valid address with family AF_INET, AF_INET6 or AF_UNIX.
- * @return InstanceConstSharedPtr the address.
- */
-Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr& addr) {
-  return addressFromSockAddr(*reinterpret_cast<const struct sockaddr_storage*>(&addr), 0);
-}
-
 InstanceConstSharedPtr addressFromFd(int fd) {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof ss;
   const int rc = ::getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (rc != 0) {
     throw EnvoyException(fmt::format("getsockname failed for '{}': {}", fd, strerror(errno)));
+  }
+  return addressFromSockAddr(ss, ss_len);
+}
+
+InstanceConstSharedPtr peerAddressFromFd(int fd) {
+  sockaddr_storage ss;
+  socklen_t ss_len = sizeof ss;
+  const int rc = ::getpeername(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+  if (rc != 0) {
+    throw EnvoyException(fmt::format("getpeername failed for '{}': {}", fd, strerror(errno)));
+  }
+  if (ss_len == sizeof(sa_family_t) && ss.ss_family == AF_UNIX) {
+    // For Unix domain sockets, can't find out the peer name, but it should match our own
+    // name for the socket (i.e. the path should match, barring any namespace or other
+    // mechanisms to hide things, of which there are many).
+    ss_len = sizeof ss;
+    const int rc = ::getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+    if (rc != 0) {
+      throw EnvoyException(fmt::format("getsockname failed for '{}': {}", fd, strerror(errno)));
+    }
   }
   return addressFromSockAddr(ss, ss_len);
 }
