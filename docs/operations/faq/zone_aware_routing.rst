@@ -40,7 +40,7 @@ Envoy configuration on destination service
 
 Verify it works
 ---------------
-* You can use :ref:`per zone <config_cluster_manager_cluster_per_az_stats>` Envoy stats.
+* Use :ref:`per zone <config_cluster_manager_cluster_per_az_stats>` Envoy stats to monitor cross zone traffic.
 
 The above configuration is necessary for zone aware routing, but there are certain conditions
 when zone aware routing is not performed, see details
