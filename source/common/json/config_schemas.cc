@@ -332,9 +332,10 @@ const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
     "properties":{
-      "cluster_name" : {"type" : "string"}
+      "cluster_name" : {"type" : "string"},
+      "stat_prefix" : {"type" : "string"}
     },
-    "required": ["cluster_name"],
+    "required": ["cluster_name", "stat_prefix"],
     "additionalProperties": false
   }
   )EOF");

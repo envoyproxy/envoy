@@ -95,18 +95,45 @@ private:
   };
 };
 
+/**
+ * All splitter stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_COMMAND_SPLITTER_STATS(COUNTER)                                                        \
+  COUNTER(invalid_request)                                                                         \
+  COUNTER(unsupported_command)
+// clang-format on
+
+/**
+ * Struct definition for all splitter stats. @see stats_macros.h
+ */
+struct InstanceStats {
+  ALL_COMMAND_SPLITTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
-  InstanceImpl(ConnPool::InstancePtr&& conn_pool);
+  InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
+               const std::string& stat_prefix);
 
   // Redis::CommandSplitter::Instance
   SplitRequestPtr makeRequest(const RespValue& request, SplitCallbacks& callbacks) override;
 
 private:
+  struct HandlerData {
+    Stats::Counter& total_;
+    std::reference_wrapper<CommandHandler> handler_;
+  };
+
+  void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
+                  CommandHandler& handler);
+  void onInvalidRequest(SplitCallbacks& callbacks);
+
   ConnPool::InstancePtr conn_pool_;
   AllParamsToOneServerCommandHandler all_to_one_handler_;
   MGETCommandHandler mget_handler_;
-  std::unordered_map<std::string, std::reference_wrapper<CommandHandler>> command_map_;
+  std::unordered_map<std::string, HandlerData> command_map_;
+  InstanceStats stats_;
 };
 
 } // CommandSplitter
