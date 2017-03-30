@@ -411,8 +411,13 @@ cc_library(
 def protobuf_repositories():
     native.git_repository(
         name = "protobuf_git",
-        commit = "a428e42072765993ff674fda72863c9f1aa2d268",  # v3.1.0
-        remote = "https://github.com/google/protobuf.git",
+        # Using a non-canonical repository/branch here. This is a workaround to the lack of
+        # merge on https://github.com/google/protobuf/pull/2508, which is needed for supporting
+        # arbitrary CC compiler locations from the environment. The branch is
+        # https://github.com/htuch/protobuf/tree/v3.2.0-default-shell-env, which is the 3.2.0
+        # release with the above mentioned PR cherry picked.
+        commit = "d490587268931da78c942a6372ef57bb53db80da",
+        remote = "https://github.com/htuch/protobuf.git",
     )
 
 def rapidjson_repositories():

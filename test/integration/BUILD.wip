@@ -1,0 +1,187 @@
+package(default_visibility = ["//visibility:public"])
+
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_library", "envoy_cc_test_with_json")
+
+envoy_cc_test_with_json(
+    name = "http2_integration_test",
+    srcs = [
+        "http2_integration_test.cc",
+        "http2_integration_test.h",
+    ],
+    data = ["//test/config/integration:server_config_files"],
+    jsons = ["//test/config/integration:server_http2.json"],
+    setup_cmds = [(
+        "//test/common/runtime:filesystem_setup.sh",
+        [],
+    )],
+    deps = [
+        ":integration_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_with_json(
+    name = "http2_upstream_integration_test",
+    srcs = [
+        "http2_upstream_integration_test.cc",
+        "http2_upstream_integration_test.h",
+    ],
+    jsons = ["//test/config/integration:server_http2_upstream.json"],
+    setup_cmds = [(
+        "//test/common/runtime:filesystem_setup.sh",
+        [],
+    )],
+    deps = [
+        ":integration_lib",
+        "//source/common/http:header_map_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_with_json(
+    name = "integration_admin_test",
+    srcs = ["integration_admin_test.cc"],
+    data = ["//test/config/integration:server_config_files"],
+    jsons = ["//test/config/integration:server.json"],
+    setup_cmds = [(
+        "//test/common/runtime:filesystem_setup.sh",
+        [],
+    )],
+    deps = [
+        ":integration_lib",
+        "//include/envoy/http:header_map_includes",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "integration_lib",
+    srcs = [
+        "fake_upstream.cc",
+        "integration.cc",
+        "server.cc",
+        "utility.cc",
+    ],
+    hdrs = [
+        "fake_upstream.h",
+        "integration.h",
+        "server.h",
+        "utility.h",
+    ],
+    data = ["//test/common/runtime:filesystem_test_data"],
+    deps = [
+        "//include/envoy/api:api_includes",
+        "//include/envoy/buffer:buffer_includes",
+        "//include/envoy/event:dispatcher_includes",
+        "//include/envoy/http:codec_includes",
+        "//include/envoy/http:header_map_includes",
+        "//include/envoy/network:connection_includes",
+        "//include/envoy/network:filter_includes",
+        "//include/envoy/server:configuration_includes",
+        "//include/envoy/server:hot_restart_includes",
+        "//include/envoy/server:options_includes",
+        "//source/common/api:api_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http/http1:codec_lib",
+        "//source/common/http/http2:codec_lib",
+        "//source/common/local_info:local_info_lib",
+        "//source/common/network:filter_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//source/common/upstream:upstream_lib",
+        "//source/common/upstream:upstream_lib_includes",
+        "//source/server:connection_handler_lib",
+        "//source/server:server_lib",
+        "//source/server:test_hooks_lib",
+        "//source/server/config/http:buffer_lib",
+        "//source/server/config/http:dynamo_lib",
+        "//source/server/config/http:fault_lib",
+        "//source/server/config/http:grpc_http1_bridge_lib",
+        "//source/server/config/http:ratelimit_lib",
+        "//source/server/config/http:router_lib",
+        "//source/server/config/network:client_ssl_auth_lib",
+        "//source/server/config/network:echo_lib",
+        "//source/server/config/network:http_connection_manager_lib",
+        "//source/server/config/network:mongo_proxy_lib",
+        "//source/server/config/network:ratelimit_lib",
+        "//source/server/config/network:redis_proxy_lib",
+        "//source/server/config/network:tcp_proxy_lib",
+        "//source/server/http:health_check_lib",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_with_json(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    data = ["//test/config/integration:server_config_files"],
+    jsons = ["//test/config/integration:server.json"],
+    deps = [
+        ":integration_lib",
+        "//source/common/http:header_map_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_with_json(
+    name = "proxy_proto_integration_test",
+    srcs = [
+        "proxy_proto_integration_test.cc",
+        "proxy_proto_integration_test.h",
+    ],
+    jsons = ["//test/config/integration:server_proxy_proto.json"],
+    deps = [
+        ":integration_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_test_with_json(
+    name = "ssl_integration_test",
+    srcs = [
+        "ssl_integration_test.cc",
+        "ssl_integration_test.h",
+    ],
+    data = ["//test/config/integration/certs"],
+    jsons = ["//test/config/integration:server_ssl.json"],
+    deps = [
+        ":integration_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/event:dispatcher_lib_includes",
+        "//source/common/network:utility_lib",
+        "//source/common/ssl:context_config_lib",
+        "//source/common/ssl:context_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test_with_json(
+    name = "uds_integration_test",
+    srcs = [
+        "uds_integration_test.cc",
+        "uds_integration_test.h",
+    ],
+    jsons = ["//test/config/integration:server_uds.json"],
+    deps = [
+        ":integration_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/event:dispatcher_lib_includes",
+        "//source/common/http:codec_client_lib",
+        "//source/common/stats:stats_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
