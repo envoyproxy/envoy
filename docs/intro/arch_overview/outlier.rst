@@ -81,7 +81,6 @@ being ejected and for what reasons. The log uses a JSON format with one object p
     "host_success_rate": "...",
     "cluster_success_rate_average": "...",
     "cluster_success_rate_ejection_threshold": "..."
-
   }
 
 time
