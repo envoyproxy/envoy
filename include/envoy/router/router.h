@@ -138,13 +138,6 @@ public:
    * @return const RateLimitPolicy& the rate limit policy for the virtual host.
    */
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
-
-  /**
-   * @return const std::list<std::pair<Http::LowerCaseString, std::string>>&
-   * list of HTTP headers that will be added to every request handled by the virtual host.
-   */
-  virtual const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  requestHeadersToAdd() const PURE;
 };
 
 /**
@@ -234,13 +227,6 @@ public:
   virtual bool autoHostRewrite() const PURE;
 
   /**
-   * @return const std::list<std::pair<Http::LowerCaseString, std::string>>&
-   * list of HTTP headers that will be added to every request associated with the route.
-   */
-  virtual const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  requestHeadersToAdd() const PURE;
-
-  /**
    * @return const std::multimap<std::string, std::string> the opaque configuration associated
    *         with the route
    */
@@ -297,12 +283,6 @@ public:
    */
   virtual const std::list<std::pair<Http::LowerCaseString, std::string>>&
   responseHeadersToAdd() const PURE;
-
-  /**
-   * Return a list of HTTP headers that will be added to every request that transits the router.
-   */
-  virtual const std::list<std::pair<Http::LowerCaseString, std::string>>&
-  requestHeadersToAdd() const PURE;
 
   /**
    * Return a list of upstream headers that will be stripped from every response that transits the

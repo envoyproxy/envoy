@@ -11,10 +11,6 @@ const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_po
 const AsyncStreamImpl::NullShadowPolicy AsyncStreamImpl::RouteEntryImpl::shadow_policy_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
-const std::list<std::pair<Http::LowerCaseString, std::string>>
-    AsyncStreamImpl::NullVirtualHost::request_headers_to_add_;
-const std::list<std::pair<Http::LowerCaseString, std::string>>
-    AsyncStreamImpl::RouteEntryImpl::request_headers_to_add_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 
 AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
