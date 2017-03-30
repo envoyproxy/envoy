@@ -10,6 +10,7 @@ Envoy configuration on source service
 -------------------------------------
 This section describes specific configuration for Envoy running side by side with the service A.
 These are the requirements:
+
 * Envoy must be launched with :option:`--service-zone` option which defines availability zone for the current host.
 * Both cluster A and cluster B must have :ref:`sds <config_cluster_manager_type>` type.
   See more on service discovery :ref:`here <arch_overview_service_discovery_sds>`.
