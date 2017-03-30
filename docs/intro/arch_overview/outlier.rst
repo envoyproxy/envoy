@@ -102,8 +102,8 @@ action
   brought back into service.
 
 type
-  If ``action`` is ``eject``, specifies the type of ejection that took place. Currently this can be:
-  ``5xx`` and ``SuccessRate``.
+  If ``action`` is ``eject``, specifies the type of ejection that took place. Currently type can
+  be either ``5xx`` or ``SuccessRate``.
 
 num_ejections
   If ``action`` is ``eject``, specifies the number of times the host has been ejected
