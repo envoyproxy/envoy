@@ -4,6 +4,8 @@
 #include "tracer.h"
 #include "zipkin_core_constants.h"
 
+#include <iostream>
+
 namespace Zipkin {
 
 Span Tracer::startSpan(const std::string& operation_name, uint64_t start_time) {

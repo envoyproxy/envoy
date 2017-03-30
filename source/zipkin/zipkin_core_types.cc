@@ -197,6 +197,8 @@ const std::string& Span::toJson() {
 
   json_string_ = s.GetString();
 
+  std::cerr << "Will convert annotations to JSON" << std::endl;
+
   std::vector<const std::string*> annotation_json_vector;
 
   for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
