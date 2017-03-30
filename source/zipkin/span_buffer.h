@@ -7,7 +7,7 @@
 
 namespace Zipkin {
 
-typedef Span* SpanPtr;
+typedef std::shared_ptr<Span> SpanPtr;
 
 class SpanBuffer {
 public:
@@ -17,13 +17,15 @@ public:
 
   virtual ~SpanBuffer() {}
 
-  void allocateBuffer(uint64_t size) { span_buffer_.resize(size); }
+  void allocateBuffer(uint64_t size);
 
   bool addSpan(Span&& span);
 
   void flush();
 
   uint64_t pendingSpans() { return next_position_; }
+
+  std::string toStringifiedJsonArray();
 
 private:
   // We use a pre-allocated vector to improve performance
