@@ -68,11 +68,24 @@ public:
                                    Address::InstanceConstSharedPtr local_address));
 };
 
-TEST(ListenerImplTest, NormalRedirect) {
+class ListenerImplTest : public testing::TestWithParam<Address::IpVersion> {
+protected:
+  ListenerImplTest()
+      : version_(GetParam()),
+        alt_address_(Network::Test::findOrCheckFreePort(
+            Network::Test::getSomeLoopbackAddress(version_), Address::SocketType::Stream)) {}
+
+  const Address::IpVersion version_;
+  const Address::InstanceConstSharedPtr alt_address_;
+};
+INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
+                        testing::Values(Address::IpVersion::v4, Address::IpVersion::v6));
+
+TEST_P(ListenerImplTest, NormalRedirect) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
-  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://127.1.2.3:10001"), false);
+  Network::TcpListenSocket socket(Network::Test::getSomeLoopbackAddress(version_), true);
+  Network::TcpListenSocket socketDst(alt_address_, false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // The traffic should redirect from binding listener to the virtual listener.
@@ -90,16 +103,15 @@ TEST(ListenerImplTest, NormalRedirect) {
       dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.1.2.3", 10001));
-  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
-  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
+  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address_));
+  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
       .WillRepeatedly(Return(&listenerDst));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
   EXPECT_CALL(listenerDst, newConnection(_, _, _));
   EXPECT_CALL(listener_callbacks2, onNewConnection_(_))
       .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        EXPECT_EQ("127.1.2.3:10001", conn->localAddress().asString());
+        EXPECT_EQ(*alt_address_, conn->localAddress());
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -108,11 +120,11 @@ TEST(ListenerImplTest, NormalRedirect) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-TEST(ListenerImplTest, FallbackToWildcardListener) {
+TEST_P(ListenerImplTest, FallbackToWildcardListener) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
-  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://127.1.2.3:10001"), false);
+  Network::TcpListenSocket socket(Network::Test::getSomeLoopbackAddress(version_), true);
+  Network::TcpListenSocket socketDst(alt_address_, false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // The virtual listener of exact address does not exist, fall back to wild card virtual listener.
@@ -130,9 +142,8 @@ TEST(ListenerImplTest, FallbackToWildcardListener) {
       dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.1.2.3", 10001));
-  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
-  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
+  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address_));
+  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
       .WillRepeatedly(Return(&listenerDst));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(0);
@@ -147,11 +158,11 @@ TEST(ListenerImplTest, FallbackToWildcardListener) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-TEST(ListenerImplTest, UseActualDst) {
+TEST_P(ListenerImplTest, UseActualDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
-  Network::TcpListenSocket socketDst(Utility::resolveUrl("tcp://127.1.2.3:10001"), false);
+  Network::TcpListenSocket socket(Network::Test::getSomeLoopbackAddress(version_), true);
+  Network::TcpListenSocket socketDst(alt_address_, false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
@@ -169,9 +180,8 @@ TEST(ListenerImplTest, UseActualDst) {
       dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
 
-  Address::InstanceConstSharedPtr alt_address(new Address::Ipv4Instance("127.1.2.3", 10001));
-  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address));
-  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address))))
+  EXPECT_CALL(listener, getOriginalDst(_)).WillRepeatedly(Return(alt_address_));
+  EXPECT_CALL(connection_handler, findListenerByAddress(Eq(ByRef(*alt_address_))))
       .WillRepeatedly(Return(&listener));
 
   EXPECT_CALL(listener, newConnection(_, _, _)).Times(1);

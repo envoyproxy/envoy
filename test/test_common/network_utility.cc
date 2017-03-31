@@ -2,6 +2,8 @@
 
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
+#include "common/network/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "test/test_common/utility.h"
 
 namespace Network {
@@ -67,6 +69,45 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
     ADD_FAILURE() << "Unable to parse as an address and port: " << addr_port;
   }
   return instance;
+}
+
+Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion version) {
+  if (version == Address::IpVersion::v4) {
+    // Pick a random address in 127.0.0.0/8.
+    Runtime::RandomGeneratorImpl rng;
+    sockaddr_in sin;
+    sin.sin_family = AF_INET;
+    sin.sin_port = 0;
+    sin.sin_addr.s_addr = static_cast<uint32_t>(rng.random() % 0xffffffff);
+    uint8_t* address_bytes = reinterpret_cast<uint8_t*>(&sin.sin_addr.s_addr);
+    address_bytes[0] = 127;
+    return Address::InstanceConstSharedPtr(new Address::Ipv4Instance(&sin));
+  } else {
+    // There is only one IPv6 loopback address.
+    return Network::Utility::getIpv6LoopbackAddress();
+  }
+}
+
+std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
+                                                                     Address::SocketType type) {
+  Address::InstanceConstSharedPtr addr = getSomeLoopbackAddress(version);
+  const char* failing_fn = nullptr;
+  const int fd = addr->socket(type);
+  if (fd < 0) {
+    failing_fn = "socket";
+  } else if (0 != addr->bind(fd)) {
+    failing_fn = "bind";
+  } else {
+    return std::make_pair(Address::addressFromFd(fd), fd);
+  }
+  const int err = errno;
+  if (fd >= 0) {
+    close(fd);
+  }
+  std::string msg = fmt::format("{} failed for address {} with error: {} ({})", failing_fn,
+                                addr->asString(), strerror(err), err);
+  ADD_FAILURE() << msg;
+  throw EnvoyException(msg);
 }
 
 } // Test

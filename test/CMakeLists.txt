@@ -157,6 +157,7 @@ add_executable(envoy-test
   server/server_test.cc
   test_common/environment.cc
   test_common/network_utility.cc
+  test_common/network_utility_test.cc
   test_common/printers.cc
   test_common/utility.cc)
 
