@@ -4,24 +4,27 @@
 
 namespace Server {
 
-GuardDogImpl::GuardDogImpl(Stats::Store& stats_store, const Server::Configuration::Main& config,
+GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
                            SystemTimeSource& tsource)
     : time_source_(tsource), miss_timeout_(config.wdMissTimeout()),
       megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
       multi_kill_timeout_(config.wdMultiKillTimeout()),
       loop_interval_([&]() -> std::chrono::milliseconds {
+        // The loop interval is simply the minimum of all specified intervals,
+        // but we must account for the 0=disabled case. This lambda takes care
+        // of that and returns a value that initializes the const loop interval.
         const auto min_of_nonfatal = std::min(miss_timeout_, megamiss_timeout_);
         return std::min({killEnabled() ? kill_timeout_ : min_of_nonfatal,
                          multikillEnabled() ? multi_kill_timeout_ : min_of_nonfatal,
                          min_of_nonfatal});
       }()),
-      watchdog_miss_counter_(stats_store.counter("server.watchdog_miss")),
-      watchdog_megamiss_counter_(stats_store.counter("server.watchdog_mega_miss")),
+      watchdog_miss_counter_(stats_scope.counter("server.watchdog_miss")),
+      watchdog_megamiss_counter_(stats_scope.counter("server.watchdog_mega_miss")),
       run_thread_(true) {
   start();
 }
 
-GuardDogImpl::~GuardDogImpl() { exit(); }
+GuardDogImpl::~GuardDogImpl() { stop(); }
 
 void GuardDogImpl::threadRoutine() {
   do {
@@ -37,11 +40,15 @@ void GuardDogImpl::threadRoutine() {
         watchdog_megamiss_counter_.inc();
       }
       if (killEnabled() && delta > kill_timeout_) {
-        PANIC("GuardDog: one thread stuck for more than watchdog_kill_timeout");
+        PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
+                          watched_dog->threadId()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
         if (seen_one_multi_timeout) {
-          PANIC("GuardDog: multiple threads stuck for more than watchdog_multikill_timeout");
+
+          PANIC(fmt::format(
+              "GuardDog: multiple threads ({},...) stuck for more than watchdog_multikill_timeout",
+              watched_dog->threadId()));
         } else {
           seen_one_multi_timeout = true;
         }
@@ -71,6 +78,8 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
   auto found_wd = std::find(watched_dogs_.begin(), watched_dogs_.end(), wd);
   if (found_wd != watched_dogs_.end()) {
     watched_dogs_.erase(found_wd);
+  } else {
+    ASSERT(false);
   }
 }
 
@@ -88,7 +97,7 @@ void GuardDogImpl::start() {
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
 }
 
-void GuardDogImpl::exit() {
+void GuardDogImpl::stop() {
   {
     std::lock_guard<std::mutex> guard(exit_lock_);
     run_thread_ = false;

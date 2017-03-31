@@ -62,22 +62,22 @@ stats_flush_interval_ms
   interval. If not specified the default is 5000ms (5 seconds).
 
 watchdog_miss_timeout_ms
-  *(optional, integer)* The time in milliseconds after which we count a nonresponsive thread in the
+  *(optional, integer)* The time in milliseconds after which Envoy counts a nonresponsive thread in the
   "server.watchdog_miss" statistic. If not specified the default is 200ms.
 
 watchdog_megamiss_timeout_ms
-  *(optional, integer)* The time in milliseconds after which we count a nonresponsive thread in the
+  *(optional, integer)* The time in milliseconds after which Envoy counts a nonresponsive thread in the
   "server.watchdog_mega_miss" statistic. If not specified the default is 1000ms.
 
 watchdog_kill_timeout_ms
   *(optional, integer)* If a watched thread has been nonresponsive for this many milliseconds assume
   a programming error and kill the entire Envoy process. Set to 0 to disable kill behavior. If not
-  specified the default is 2000ms (2 seconds).
+  specified the default is 0 (disabled).
 
 watchdog_multikill_timeout_ms
   *(optional, integer)* If at least two watched threads have been nonresponsive for at least this many
   milliseconds assume a true deadlock and kill the entire Envoy process. Set to 0 to disable this
-  behavior. If not specified the default is 1000ms (1 second).
+  behavior. If not specified the default is 0 (disabled).
 
 :ref:`tracing <config_tracing>`
   *(optional, object)* Configuration for an external :ref:`tracing <arch_overview_tracing>`

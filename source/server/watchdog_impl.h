@@ -26,19 +26,19 @@ public:
       : thread_id_(thread_id), time_source_(tsource),
         latest_touch_time_(tsource.currentSystemTime()), timer_interval_(interval) {}
 
-  void startWatchdog(Event::Dispatcher& dispatcher);
-
-  void touch() { latest_touch_time_.store(time_source_.currentSystemTime()); }
-
   int32_t threadId() const { return thread_id_; }
   SystemTime lastTouchTime() const { return latest_touch_time_.load(); }
 
+  // Server::WatchDog
+  void startWatchdog(Event::Dispatcher& dispatcher) override;
+  void touch() override { latest_touch_time_.store(time_source_.currentSystemTime()); }
+
 private:
-  int32_t thread_id_;
+  const int32_t thread_id_;
   SystemTimeSource& time_source_;
   std::atomic<SystemTime> latest_touch_time_;
   Event::TimerPtr timer_;
-  std::chrono::milliseconds timer_interval_;
+  const std::chrono::milliseconds timer_interval_;
 };
 
 } // Server

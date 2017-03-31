@@ -35,7 +35,6 @@ add_executable(envoy-test
   common/common/utility_test.cc
   common/event/dispatcher_impl_test.cc
   common/event/file_event_impl_test.cc
-  common/event/guarddog_impl_test.cc
   common/filesystem/filesystem_impl_test.cc
   common/filesystem/watcher_impl_test.cc
   common/grpc/codec_test.cc
@@ -152,6 +151,7 @@ add_executable(envoy-test
   server/configuration_impl_test.cc
   server/connection_handler_test.cc
   server/drain_manager_impl_test.cc
+  server/guarddog_impl_test.cc
   server/http/admin_test.cc
   server/http/health_check_test.cc
   server/options_impl_test.cc

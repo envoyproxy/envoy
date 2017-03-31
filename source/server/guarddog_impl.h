@@ -28,12 +28,9 @@ public:
    *
    * See the configuration documentation for details on the timeout settings.
    */
-  GuardDogImpl(Stats::Store& stats_store, const Server::Configuration::Main& config,
+  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
                SystemTimeSource& tsource);
   ~GuardDogImpl();
-
-  WatchDogSharedPtr createWatchDog(int32_t thread_id) override;
-  void stopWatching(WatchDogSharedPtr wd) override;
 
   /**
    * Exposed for testing purposes only (but harmless to call):
@@ -45,6 +42,10 @@ public:
     force_checked_event_.wait(exit_lock_);
   }
 
+  // Server::GuardDog
+  WatchDogSharedPtr createWatchDog(int32_t thread_id) override;
+  void stopWatching(WatchDogSharedPtr wd) override;
+
 private:
   void threadRoutine();
   /**
@@ -52,7 +53,7 @@ private:
    */
   bool waitOrDetectStop();
   void start();
-  void exit();
+  void stop();
   // Per the C++ standard it is OK to use these in ctor initializer as long as
   // it is after kill and multikill timeout values are initialized.
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }

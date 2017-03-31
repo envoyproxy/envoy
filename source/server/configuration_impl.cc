@@ -60,9 +60,9 @@ void MainImpl::initialize(const Json::Object& json) {
   watchdog_megamiss_timeout_ =
       std::chrono::milliseconds(json.getInteger("watchdog_megamiss_timeout_ms", 1000));
   watchdog_kill_timeout_ =
-      std::chrono::milliseconds(json.getInteger("watchdog_kill_timeout_ms", 2000));
+      std::chrono::milliseconds(json.getInteger("watchdog_kill_timeout_ms", 0));
   watchdog_multikill_timeout_ =
-      std::chrono::milliseconds(json.getInteger("watchdog_multikill_timeout_ms", 1000));
+      std::chrono::milliseconds(json.getInteger("watchdog_multikill_timeout_ms", 0));
 
   if (json.hasObject("tracing")) {
     initializeTracers(*json.getObject("tracing"));

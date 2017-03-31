@@ -7,6 +7,7 @@
 #include "test/mocks/stats/mocks.h"
 
 using testing::InSequence;
+using testing::NiceMock;
 
 namespace Server {
 
@@ -23,9 +24,9 @@ protected:
       : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500),
         time_point_(std::chrono::system_clock::now()) {}
 
-  testing::NiceMock<Server::Configuration::MockMain> config_kill_;
-  testing::NiceMock<Server::Configuration::MockMain> config_multikill_;
-  testing::NiceMock<Stats::MockStore> fakestats_;
+  NiceMock<Configuration::MockMain> config_kill_;
+  NiceMock<Configuration::MockMain> config_multikill_;
+  NiceMock<Stats::MockStore> fakestats_;
   MockSystemTimeSource time_source_;
   std::chrono::system_clock::time_point time_point_;
 };
@@ -34,9 +35,9 @@ class GuardDogMissTest : public testing::Test {
 protected:
   GuardDogMissTest() : config_miss(1, 1000, 0, 0), config_mega(1000, 1, 0, 0) {}
 
-  testing::NiceMock<Server::Configuration::MockMain> config_miss;
-  testing::NiceMock<Server::Configuration::MockMain> config_mega;
-  testing::NiceMock<Stats::MockStore> stats_store;
+  NiceMock<Configuration::MockMain> config_miss;
+  NiceMock<Configuration::MockMain> config_mega;
+  NiceMock<Stats::MockStore> stats_store;
   MockSystemTimeSource time_source_;
   std::chrono::system_clock::time_point time_point_;
 };
@@ -111,32 +112,32 @@ TEST_F(GuardDogMissTest, MegaMissTest) {
 }
 
 TEST(GuardDogBasicTest, StartStopTest) {
-  testing::NiceMock<Stats::MockStore> stats;
-  testing::NiceMock<Server::Configuration::MockMain> config(0, 0, 0, 0);
-  testing::NiceMock<MockSystemTimeSource> time_source;
+  NiceMock<Stats::MockStore> stats;
+  NiceMock<Configuration::MockMain> config(0, 0, 0, 0);
+  NiceMock<MockSystemTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
 }
 
 TEST(GuardDogBasicTest, LoopIntervalNoKillTest) {
-  testing::NiceMock<Stats::MockStore> stats;
-  testing::NiceMock<Server::Configuration::MockMain> config(40, 50, 0, 0);
-  testing::NiceMock<MockSystemTimeSource> time_source;
+  NiceMock<Stats::MockStore> stats;
+  NiceMock<Configuration::MockMain> config(40, 50, 0, 0);
+  NiceMock<MockSystemTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
   EXPECT_EQ(gd.loopIntervalForTest(), 40);
 }
 
 TEST(GuardDogBasicTest, LoopIntervalTest) {
-  testing::NiceMock<Stats::MockStore> stats;
-  testing::NiceMock<Server::Configuration::MockMain> config(100, 90, 1000, 500);
-  testing::NiceMock<MockSystemTimeSource> time_source;
+  NiceMock<Stats::MockStore> stats;
+  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
+  NiceMock<MockSystemTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
   EXPECT_EQ(gd.loopIntervalForTest(), 90);
 }
 
 TEST(WatchDogBasicTest, ThreadIdTest) {
-  testing::NiceMock<Stats::MockStore> stats;
-  testing::NiceMock<Server::Configuration::MockMain> config(100, 90, 1000, 500);
-  testing::NiceMock<MockSystemTimeSource> time_source;
+  NiceMock<Stats::MockStore> stats;
+  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
+  NiceMock<MockSystemTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
   auto watched_dog = gd.createWatchDog(123);
   EXPECT_EQ(watched_dog->threadId(), 123);
