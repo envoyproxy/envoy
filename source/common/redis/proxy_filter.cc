@@ -10,7 +10,7 @@ namespace Redis {
 ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm,
                                      Stats::Scope& scope)
     : Json::Validator(config, Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA),
-      cluster_name_{config.getString("cluster_name")},
+      cluster_name_(config.getString("cluster_name")),
       stat_prefix_(fmt::format("redis.{}.", config.getString("stat_prefix"))),
       stats_(generateStats(stat_prefix_, scope)) {
   if (!cm.get(cluster_name_)) {
