@@ -99,6 +99,7 @@ public:
    * Split a string.
    * @param source supplies the string to split.
    * @param split supplies the char to split on.
+   * @return vector of strings after splitting `source` around `split`.
    */
   static std::vector<std::string> split(const std::string& source, char split);
 
@@ -106,6 +107,7 @@ public:
    * Split a string.
    * @param source supplies the string to split.
    * @param split supplies the string to split on.
+   * @return vector of strings after splitting `source` around `split`.
    */
   static std::vector<std::string> split(const std::string& source, const std::string& split);
 
