@@ -3,18 +3,48 @@
 #include "common/common/assert.h"
 #include "common/json/config_schemas.h"
 
+// TODO(mattklein123): Graceful drain support.
+
 namespace Redis {
 
-ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm)
+ProxyFilterConfig::ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm,
+                                     Stats::Scope& scope)
     : Json::Validator(config, Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA),
-      cluster_name_{config.getString("cluster_name")} {
+      cluster_name_(config.getString("cluster_name")),
+      stat_prefix_(fmt::format("redis.{}.", config.getString("stat_prefix"))),
+      stats_(generateStats(stat_prefix_, scope)) {
   if (!cm.get(cluster_name_)) {
     throw EnvoyException(
         fmt::format("redis filter config: unknown cluster name '{}'", cluster_name_));
   }
 }
 
-ProxyFilter::~ProxyFilter() { ASSERT(pending_requests_.empty()); }
+ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
+  return {
+      ALL_REDIS_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix))};
+}
+
+ProxyFilter::ProxyFilter(DecoderFactory& factory, EncoderPtr&& encoder,
+                         CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config)
+    : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
+      config_(config) {
+  config_->stats().downstream_cx_total_.inc();
+  config_->stats().downstream_cx_active_.inc();
+}
+
+ProxyFilter::~ProxyFilter() {
+  ASSERT(pending_requests_.empty());
+  config_->stats().downstream_cx_active_.dec();
+}
+
+void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+  callbacks_ = &callbacks;
+  callbacks_->connection().addConnectionCallbacks(*this);
+  callbacks_->connection().setBufferStats({config_->stats().downstream_cx_rx_bytes_total_,
+                                           config_->stats().downstream_cx_rx_bytes_buffered_,
+                                           config_->stats().downstream_cx_tx_bytes_total_,
+                                           config_->stats().downstream_cx_tx_bytes_buffered_});
+}
 
 void ProxyFilter::onRespValue(RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
@@ -59,6 +89,7 @@ Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data) {
     decoder_->decode(data);
     return Network::FilterStatus::Continue;
   } catch (ProtocolError&) {
+    config_->stats().downstream_cx_protocol_error_.inc();
     RespValue error;
     error.type(RespType::Error);
     error.asString() = "downstream protocol error";
@@ -67,6 +98,15 @@ Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data) {
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
+}
+
+ProxyFilter::PendingRequest::PendingRequest(ProxyFilter& parent) : parent_(parent) {
+  parent.config_->stats().downstream_rq_total_.inc();
+  parent.config_->stats().downstream_rq_active_.inc();
+}
+
+ProxyFilter::PendingRequest::~PendingRequest() {
+  parent_.config_->stats().downstream_rq_active_.dec();
 }
 
 } // Redis

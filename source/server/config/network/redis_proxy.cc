@@ -15,16 +15,18 @@ NetworkFilterFactoryCb RedisProxyFilterConfigFactory::tryCreateFilterFactory(
     return nullptr;
   }
 
-  Redis::ProxyFilterConfig filter_config(config, server.clusterManager());
+  Redis::ProxyFilterConfigSharedPtr filter_config(
+      std::make_shared<Redis::ProxyFilterConfig>(config, server.clusterManager(), server.stats()));
   Redis::ConnPool::InstancePtr conn_pool(new Redis::ConnPool::InstanceImpl(
-      filter_config.clusterName(), server.clusterManager(),
+      filter_config->clusterName(), server.clusterManager(),
       Redis::ConnPool::ClientFactoryImpl::instance_, server.threadLocal()));
   std::shared_ptr<Redis::CommandSplitter::Instance> splitter(
-      new Redis::CommandSplitter::InstanceImpl(std::move(conn_pool)));
-  return [splitter](Network::FilterManager& filter_manager) -> void {
+      new Redis::CommandSplitter::InstanceImpl(std::move(conn_pool), server.stats(),
+                                               filter_config->statPrefix()));
+  return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
     Redis::DecoderFactoryImpl factory;
-    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
-        new Redis::ProxyFilter(factory, Redis::EncoderPtr{new Redis::EncoderImpl()}, *splitter)});
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Redis::ProxyFilter(
+        factory, Redis::EncoderPtr{new Redis::EncoderImpl()}, *splitter, filter_config)});
   };
 }
 

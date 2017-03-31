@@ -1,4 +1,5 @@
 #include "common/redis/command_splitter_impl.h"
+#include "common/stats/stats_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/redis/mocks.h"
@@ -29,7 +30,8 @@ public:
   }
 
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
-  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}};
+  Stats::IsolatedStoreImpl store_;
+  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo."};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -41,6 +43,8 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestNotArray) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   RespValue request;
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
 
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayTooSmall) {
@@ -51,6 +55,8 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayTooSmall) {
   RespValue request;
   makeBulkStringArray(request, {"incr"});
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
 
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayNotStrings) {
@@ -62,6 +68,8 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayNotStrings) {
   makeBulkStringArray(request, {"incr", ""});
   request.asArray()[1].type(RespType::Null);
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
 
 TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
@@ -72,6 +80,8 @@ TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
   RespValue request;
   makeBulkStringArray(request, {"newcommand", "hello"});
   EXPECT_EQ(nullptr, splitter_.makeRequest(request, callbacks_));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.unsupported_command").value());
 }
 
 class RedisAllParamsToOneServerCommandHandlerTest : public RedisCommandSplitterImplTest {
@@ -110,6 +120,8 @@ TEST_F(RedisAllParamsToOneServerCommandHandlerTest, IncrSuccess) {
   EXPECT_NE(nullptr, handle_);
 
   respond();
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.incr.total").value());
 };
 
 TEST_F(RedisAllParamsToOneServerCommandHandlerTest, IncrFail) {
@@ -209,6 +221,8 @@ TEST_F(RedisMGETCommandHandlerTest, Normal) {
   response1->asString() = "response";
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[0]->onResponse(std::move(response1));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.mget.total").value());
 };
 
 TEST_F(RedisMGETCommandHandlerTest, NormalWithNull) {
