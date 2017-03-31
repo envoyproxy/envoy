@@ -153,7 +153,8 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
   std::string span_name = HttpTracerUtility::toString(config.operationName());
 
   if (config.operationName() == OperationName::Egress) {
-    span_name += " " + std::string(request_headers.Host()->value().c_str());
+    span_name.append(" ");
+    span_name.append(request_headers.Host()->value().c_str());
   }
 
   SpanPtr active_span = driver_->startSpan(request_headers, span_name, request_info.startTime());

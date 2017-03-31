@@ -38,9 +38,9 @@ struct Decision {
 class HttpTracerUtility {
 public:
   /**
-   * Get string representation of operation name.
+   * Get string representation of the operation.
    * @param operation name to convert.
-   * @return string representation of operation.
+   * @return string representation of the operation.
    */
   static const std::string& toString(OperationName operation_name);
 
