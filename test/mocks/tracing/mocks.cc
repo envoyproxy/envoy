@@ -1,15 +1,13 @@
 #include "mocks.h"
 
-using testing::ReturnRef;
+using testing::Return;
 
 namespace Tracing {
 
 MockSpan::MockSpan() {}
 MockSpan::~MockSpan() {}
 
-MockConfig::MockConfig() {
-  ON_CALL(*this, operationName()).WillByDefault(ReturnRef(operation_name_));
-}
+MockConfig::MockConfig() { ON_CALL(*this, operationName()).WillByDefault(Return(operation_name_)); }
 MockConfig::~MockConfig() {}
 
 MockHttpTracer::MockHttpTracer() {}

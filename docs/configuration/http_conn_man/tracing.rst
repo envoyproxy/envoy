@@ -12,5 +12,7 @@ Tracing
   }
  
 operation_name
-  *(required, string)* Span name that will be emitted on completed request.
+  *(required, string)* Span name will be derived from operation_name. "ingress" and "egress"
+  are the only supported values.
+
 

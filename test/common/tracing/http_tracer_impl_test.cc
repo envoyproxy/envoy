@@ -317,6 +317,11 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
 }
 
+TEST(HttpTracerUtilityTest, operationTypeToString) {
+  EXPECT_EQ("ingress", HttpTracerUtility::toString(OperationName::Ingress));
+  EXPECT_EQ("egress", HttpTracerUtility::toString(OperationName::Egress));
+}
+
 class LightStepDriverTest : public Test {
 public:
   void setup(Json::Object& config, bool init_timer) {
@@ -440,7 +445,6 @@ public:
 
   Http::TestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}, {":authority", "test"}};
-  const std::string full_span_name_{"operation test"};
   Http::AccessLog::MockRequestInfo request_info_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   MockConfig config_;
@@ -449,9 +453,10 @@ public:
 };
 
 TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
-  EXPECT_CALL(config_, operationName());
+  EXPECT_CALL(config_, operationName()).Times(2);
   EXPECT_CALL(request_info_, startTime());
-  EXPECT_CALL(*driver_, startSpan_(_, full_span_name_, request_info_.start_time_))
+  const std::string operation_name = "ingress";
+  EXPECT_CALL(*driver_, startSpan_(_, operation_name, request_info_.start_time_))
       .WillOnce(Return(nullptr));
 
   tracer_->startSpan(config_, request_headers_, request_info_);
@@ -460,10 +465,11 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
 TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   EXPECT_CALL(request_info_, startTime());
   EXPECT_CALL(local_info_, nodeName());
-  EXPECT_CALL(config_, operationName());
+  EXPECT_CALL(config_, operationName()).Times(2).WillRepeatedly(Return(OperationName::Egress));
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
-  EXPECT_CALL(*driver_, startSpan_(_, full_span_name_, request_info_.start_time_))
+  const std::string operation_name = "egress test";
+  EXPECT_CALL(*driver_, startSpan_(_, operation_name, request_info_.start_time_))
       .WillOnce(Return(span));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());

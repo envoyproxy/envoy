@@ -54,7 +54,7 @@ public:
                "",
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))} {
-    tracing_config_.value({"operation"});
+    tracing_config_.value({Tracing::OperationName::Ingress});
   }
 
   ~HttpConnectionManagerImplTest() {
@@ -216,7 +216,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(tracer_, startSpan_(_, _, _))
       .WillOnce(Invoke([&](const Tracing::Config& config, const Http::HeaderMap&,
                            const Http::AccessLog::RequestInfo&) -> Tracing::Span* {
-        EXPECT_EQ("operation", config.operationName());
+        EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
         return span;
       }));
