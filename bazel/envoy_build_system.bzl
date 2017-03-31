@@ -116,6 +116,7 @@ def envoy_cc_test_with_json(name,
             "//test/test_common:environment_sub.sh",
             ["$(location " + f + ")" for f in jsons],
         )],
+        deps = deps,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified

@@ -44,7 +44,10 @@ envoy_cc_test_with_json(
 
 envoy_cc_test_with_json(
     name = "integration_admin_test",
-    srcs = ["integration_admin_test.cc"],
+    srcs = [
+        "integration_admin_test.cc",
+        "integration_test.h",
+    ],
     data = ["//test/config/integration:server_config_files"],
     jsons = ["//test/config/integration:server.json"],
     setup_cmds = [(
@@ -125,7 +128,10 @@ envoy_cc_test_library(
 
 envoy_cc_test_with_json(
     name = "integration_test",
-    srcs = ["integration_test.cc"],
+    srcs = [
+        "integration_test.cc",
+        "integration_test.h",
+    ],
     data = ["//test/config/integration:server_config_files"],
     jsons = ["//test/config/integration:server.json"],
     deps = [

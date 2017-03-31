@@ -74,7 +74,7 @@ public:
 
 protected:
   FakeConnectionBase(Network::Connection& connection) : connection_(connection) {
-    connection.addConnectionCallbacks(*this);
+    connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
   }
 
   Network::Connection& connection_;

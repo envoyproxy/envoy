@@ -164,7 +164,7 @@ std::string Utility::getLastAddressFromXFF(const Http::HeaderMap& request_header
   }
 
   std::vector<std::string> xff_address_list =
-      StringUtil::split(request_headers.ForwardedFor()->value().c_str(), ',');
+      StringUtil::split(request_headers.ForwardedFor()->value().c_str(), ", ");
 
   if (xff_address_list.empty()) {
     return EMPTY_STRING;

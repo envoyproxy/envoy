@@ -104,7 +104,7 @@ TEST(HttpUtility, TwoAddressesInXFF) {
   const std::string first_address = "34.0.0.1";
   const std::string second_address = "10.0.0.1";
   TestHeaderMapImpl request_headers{
-      {"x-forwarded-for", fmt::format("{0},{1}", first_address, second_address)}};
+      {"x-forwarded-for", fmt::format("{0}, {0}, {1}", first_address, second_address)}};
   EXPECT_EQ(second_address, Utility::getLastAddressFromXFF(request_headers));
 }
 
