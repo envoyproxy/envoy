@@ -74,7 +74,7 @@ void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime:
 const std::string HttpTracerUtility::INGRESS_OPERATION = "ingress";
 const std::string HttpTracerUtility::EGRESS_OPERATION = "egress";
 
-std::string HttpTracerUtility::toString(OperationName operation_name) {
+const std::string& HttpTracerUtility::toString(OperationName operation_name) {
   switch (operation_name) {
   case OperationName::Ingress:
     return INGRESS_OPERATION;

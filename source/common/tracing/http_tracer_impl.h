@@ -39,8 +39,10 @@ class HttpTracerUtility {
 public:
   /**
    * Get string representation of operation name.
+   * @param operation name to convert.
+   * @return string representation of operation.
    */
-  static std::string toString(OperationName operation_name);
+  static const std::string& toString(OperationName operation_name);
 
   /**
    * Request might be traceable if x-request-id is traceable uuid or we do sampling tracing.

@@ -90,6 +90,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     if (operation_name == "ingress") {
       tracing_config_.value({Tracing::OperationName::Ingress});
     } else {
+      ASSERT(operation_name == "egress");
       tracing_config_.value({Tracing::OperationName::Egress});
     }
   }
