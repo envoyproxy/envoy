@@ -56,6 +56,8 @@ def envoy_cc_library(name,
 def envoy_cc_binary(name,
                     srcs = [],
                     data = [],
+                    linkstatic = 0,
+                    visibility = None,
                     deps = []):
     native.cc_binary(
         name = name,
@@ -66,7 +68,8 @@ def envoy_cc_binary(name,
             "-pthread",
             "-lrt",
         ],
-        linkstatic = 1,
+        linkstatic = linkstatic,
+        visibility = visibility,
         deps = deps + [
             "//source/precompiled:precompiled_includes",
         ],
