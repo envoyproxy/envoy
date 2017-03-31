@@ -93,10 +93,9 @@ class DetectorImpl;
 class DetectorHostSinkImpl : public DetectorHostSink {
 public:
   DetectorHostSinkImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host)
-      : detector_(detector), host_(host) {
+      : detector_(detector), host_(host), success_rate_(-1) {
     // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();
-    success_rate_ = -1;
   }
 
   void eject(SystemTime ejection_time);
@@ -252,12 +251,12 @@ public:
     double ejection_threshold_;
   };
   /**
-   * This function returns the an EjectionPair for success rate outlier detection. The pair contains
-   * the average success rate of all valid hosts in the cluster, and the ejection threshold.
-   * If a host's success rate is under this threshold the host is an outlier
+   * This function returns an EjectionPair for success rate outlier detection. The pair contains
+   * the average success rate of all valid hosts in the cluster and the ejection threshold.
+   * If a host's success rate is under this threshold, the host is an outlier.
    * @param success_rate_sum is the sum of the data in the success_rate_data vector.
    * @param valid_success_rate_hosts is the vector containing the individual success rate data
-   * points.
+   *        points.
    * @return EjectionPair.
    */
   static EjectionPair

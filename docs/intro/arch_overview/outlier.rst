@@ -88,7 +88,7 @@ time
 
 secs_since_last_action
   The time in seconds since the last action (either an ejection or unejection)
-  took place. This time will be ``-1`` for the first ejection given there is no
+  took place. This value will be ``-1`` for the first ejection given there is no
   action before the first ejection.
 
 cluster
@@ -111,8 +111,8 @@ num_ejections
   reason and then re-added).
 
 enforced
-  If ``action`` is ``eject``, specifies if the ejection was actually performed (``true``), or
-  if the action was only logged but the host was not ejected (``false``).
+  If ``action`` is ``eject``, specifies if the ejection was enforced. ``true`` means the host was ejected.
+  ``false`` means the event was logged but the host was not actually ejected.
 
 host_success_rate
   If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies the host's success rate
