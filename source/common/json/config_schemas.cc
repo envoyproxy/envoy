@@ -1032,7 +1032,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
     },
     "type" : "object",
     "properties" : {
-      "name" : {"type" : "string"},
+      "name" : {
+        "type" : "string",
+        "pattern" : "^[^:]+$",
+        "minLength" : 1,
+        "maxLength" : 60
+      },
       "type" : {
         "type" : "string",
         "enum" : ["static", "strict_dns", "logical_dns", "sds"]
