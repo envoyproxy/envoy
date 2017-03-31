@@ -322,9 +322,7 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
       "name": "www2",
       "domains": ["lyft.com", "www.lyft.com", "w.lyft.com", "ww.lyft.com", "wwww.lyft.com"],
       "request_headers_to_add": [
-          {"key": "x-global-header1", "value": "vhost-www2-override"},
-          {"key": "x-vhost-header1", "value": "vhost1-www2"},
-          {"key": "x-vhost-header2", "value": "vhost2-www2"}
+          {"key": "x-vhost-header1", "value": "vhost1-www2"}
       ],
       "routes": [
         {
@@ -332,8 +330,6 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
           "prefix_rewrite": "/api/new_endpoint",
           "cluster": "www2",
           "request_headers_to_add": [
-             {"key": "x-global-header1", "value": "route-override"},
-             {"key": "x-vhost-header1", "value": "route-override"},
              {"key": "x-route-header", "value": "route-new_endpoint"}
           ]
         },
@@ -354,7 +350,6 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
       "name": "www2_staging",
       "domains": ["www-staging.lyft.net", "www-staging-orca.lyft.com"],
       "request_headers_to_add": [
-          {"key": "x-global-header1", "value": "vhost-www2_staging-override"},
           {"key": "x-vhost-header1", "value": "vhost1-www2_staging"}
       ],
       "routes": [
@@ -393,8 +388,7 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
   ],
 
   "request_headers_to_add": [
-    {"key": "x-global-header1", "value": "global1"},
-    {"key": "x-global-header2", "value": "global2"}
+    {"key": "x-global-header1", "value": "global1"}
   ]
 }
   )EOF";
@@ -406,16 +400,12 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
 
   // Request header manipulation testing.
   {
-    // Route-level headers with same name overrides virtual host level headers.
-    // Virtual host level headers with same name overrides global headers.
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
       route->finalizeRequestHeaders(headers);
-      EXPECT_EQ("route-override", headers.get_("x-global-header1"));
-      EXPECT_EQ("global2", headers.get_("x-global-header2"));
-      EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("vhost2-www2", headers.get_("x-vhost-header2"));
+      EXPECT_EQ("global1", headers.get_("x-global-header1"));
+      EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-new_endpoint", headers.get_("x-route-header"));
     }
 
@@ -424,32 +414,27 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
       route->finalizeRequestHeaders(headers);
-      EXPECT_EQ("vhost-www2-override", headers.get_("x-global-header1"));
-      EXPECT_EQ("global2", headers.get_("x-global-header2"));
+      EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("vhost2-www2", headers.get_("x-vhost-header2"));
       EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
     }
 
     // Multiple virtual hosts can have same virtual host level headers with different values.
     {
-      Http::TestHeaderMapImpl headers = genHeaders("www2-staging.lyft.net", "/foo", "GET");
+      Http::TestHeaderMapImpl headers = genHeaders("www-staging.lyft.net", "/foo", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
       route->finalizeRequestHeaders(headers);
-      EXPECT_EQ("vhost-www2_staging-override", headers.get_("x-global-header1"));
-      EXPECT_EQ("global2", headers.get_("x-global-header2"));
+      EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
-      EXPECT_FALSE(headers.has("x-vhost-header2"));
       EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
     }
 
-    // Global headers without overrides.
+    // Global headers.
     {
       Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
       route->finalizeRequestHeaders(headers);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
-      EXPECT_EQ("global2", headers.get_("x-global-header2"));
     }
   }
 

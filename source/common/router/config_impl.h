@@ -56,7 +56,7 @@ class ConfigImpl;
  */
 class VirtualHostImpl : public VirtualHost {
 public:
-  VirtualHostImpl(const Json::Object& virtual_host, const ConfigImpl& httpConfig,
+  VirtualHostImpl(const Json::Object& virtual_host, const ConfigImpl& global_http_config,
                   Runtime::Loader& runtime, Upstream::ClusterManager& cm, bool validate_clusters);
 
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
@@ -66,6 +66,7 @@ public:
   const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
     return request_headers_to_add_;
   }
+  const ConfigImpl& globalHttpConfig() const { return global_http_config_; }
 
   // Router::VirtualHost
   const std::string& name() const override { return name_; }
@@ -105,6 +106,7 @@ private:
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
   const RateLimitPolicyImpl rate_limit_policy_;
+  const ConfigImpl& global_http_config_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
@@ -352,8 +354,8 @@ private:
  */
 class RouteMatcher {
 public:
-  RouteMatcher(const Json::Object& config, const ConfigImpl& httpConfig, Runtime::Loader& runtime,
-               Upstream::ClusterManager& cm, bool validate_clusters);
+  RouteMatcher(const Json::Object& config, const ConfigImpl& global_http_config,
+               Runtime::Loader& runtime, Upstream::ClusterManager& cm, bool validate_clusters);
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const { return uses_runtime_; }

@@ -73,7 +73,8 @@ request_headers_to_add
       {"key": "header2", "value": "value2"}
     ]
 
-  Virtual host level headers override global headers (with same key) specified at
-  :ref:`route_config <config_http_conn_man_route_table_add_req_headers>` level. The value of these
-  virtual host-specific headers can be overridden using the
-  :ref:`route-specific headers <config_http_conn_man_route_table_route_add_req_headers>`.
+  *Note:* In the presence of duplicate header keys, headers specified at the global
+  :ref:`route_config <config_http_conn_man_route_table_add_req_headers>` level take
+  precedence over those specified at the virtual host level. Within a virtual host,
+  when there are multiple headers with same keys, only the first header is taken into
+  consideration.

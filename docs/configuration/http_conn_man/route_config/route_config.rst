@@ -61,9 +61,8 @@ request_headers_to_add
       {"key": "header2", "value": "value2"}
     ]
 
-  The value of these global request headers can be overridden using the
-  :ref:`virtual host specific headers <config_http_conn_man_route_table_vhost_add_req_headers>`
-  and :ref:`route-specific headers <config_http_conn_man_route_table_route_add_req_headers>`.
+  *Note:* In the presence of duplicate header keys, only the first header is taken into
+  consideration.
 
 .. toctree::
   :hidden:
