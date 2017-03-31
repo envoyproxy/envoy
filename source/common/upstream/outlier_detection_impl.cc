@@ -79,7 +79,8 @@ DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::Object& json_conf
     : config_(json_config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
-      event_logger_(event_logger), success_rate_average_(-1), success_rate_ejection_threshold_(-1) {}
+      event_logger_(event_logger), success_rate_average_(-1), success_rate_ejection_threshold_(-1) {
+}
 
 DetectorImpl::~DetectorImpl() {
   for (auto host : host_sinks_) {
