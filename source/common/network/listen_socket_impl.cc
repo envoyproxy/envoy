@@ -23,7 +23,6 @@ void ListenSocketImpl::doBind() {
 }
 
 TcpListenSocket::TcpListenSocket(Address::InstanceConstSharedPtr address, bool bind_to_port) {
-  // TODO(mattklein123): IPv6 support.
   local_address_ = address;
   fd_ = local_address_->socket(Address::SocketType::Stream);
   RELEASE_ASSERT(fd_ != -1);
