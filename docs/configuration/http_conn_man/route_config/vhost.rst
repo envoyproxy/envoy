@@ -73,8 +73,5 @@ request_headers_to_add
       {"key": "header2", "value": "value2"}
     ]
 
-  *Note:* In the presence of duplicate header keys, headers specified at the global
-  :ref:`route_config <config_http_conn_man_route_table_add_req_headers>` level take
-  precedence over those specified at the virtual host level. Within a virtual host,
-  when there are multiple headers with same keys, only the first header is taken into
-  consideration.
+  *Note:* In the presence of duplicate header keys,
+  :ref:`precendence rules <config_http_conn_man_route_table_route_add_req_headers>` apply.

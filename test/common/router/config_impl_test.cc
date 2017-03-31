@@ -322,6 +322,7 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
       "name": "www2",
       "domains": ["lyft.com", "www.lyft.com", "w.lyft.com", "ww.lyft.com", "wwww.lyft.com"],
       "request_headers_to_add": [
+          {"key": "x-global-header1", "value": "vhost-override"},
           {"key": "x-vhost-header1", "value": "vhost1-www2"}
       ],
       "routes": [
@@ -330,6 +331,8 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
           "prefix_rewrite": "/api/new_endpoint",
           "cluster": "www2",
           "request_headers_to_add": [
+             {"key": "x-global-header1", "value": "route-override"},
+             {"key": "x-vhost-header1", "value": "route-override"},
              {"key": "x-route-header", "value": "route-new_endpoint"}
           ]
         },
@@ -404,8 +407,8 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
       route->finalizeRequestHeaders(headers);
-      EXPECT_EQ("global1", headers.get_("x-global-header1"));
-      EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("route-override", headers.get_("x-global-header1"));
+      EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-new_endpoint", headers.get_("x-route-header"));
     }
 
@@ -414,7 +417,7 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
       route->finalizeRequestHeaders(headers);
-      EXPECT_EQ("global1", headers.get_("x-global-header1"));
+      EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
     }

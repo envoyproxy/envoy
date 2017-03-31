@@ -161,17 +161,17 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const {
-  // Add global headers first, followed by virtual host level headers
-  // and finally route-level headers If there are two headers with same
+  // Add route-level headers first, followed by virtual host level headers
+  // and finally connection manager level headers If there are two headers with same
   // name, we consider only the first one, and ignore the rest.
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add :
-       vhost_.globalHttpConfig().requestHeadersToAdd()) {
+  for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
     headers.addStatic(to_add.first, to_add.second);
   }
   for (const std::pair<Http::LowerCaseString, std::string>& to_add : vhost_.requestHeadersToAdd()) {
     headers.addStatic(to_add.first, to_add.second);
   }
-  for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
+  for (const std::pair<Http::LowerCaseString, std::string>& to_add :
+       vhost_.globalHttpConfig().requestHeadersToAdd()) {
     headers.addStatic(to_add.first, to_add.second);
   }
 
@@ -564,6 +564,8 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 
 ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
                        Upstream::ClusterManager& cm, bool validate_clusters) {
+  route_matcher_.reset(new RouteMatcher(config, *this, runtime, cm, validate_clusters));
+
   if (config.hasObject("internal_only_headers")) {
     for (std::string header : config.getStringArray("internal_only_headers")) {
       internal_only_headers_.push_back(Http::LowerCaseString(header));
@@ -589,8 +591,6 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
           {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
   }
-
-  route_matcher_.reset(new RouteMatcher(config, *this, runtime, cm, validate_clusters));
 }
 
 } // Router

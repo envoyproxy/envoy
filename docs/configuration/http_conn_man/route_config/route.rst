@@ -357,12 +357,11 @@ specified in the following form:
     {"key": "header2", "value": "value2"}
   ]
 
-*Note:* In the presence of duplicate header keys, headers specified at the global
-:ref:`route_config <config_http_conn_man_route_table_add_req_headers>` level take
-precedence over those specified at the virtual host level. Headers specified at the
-:ref:`virtual host level <config_http_conn_man_route_table_vhost_add_req_headers>`
-take precedence over those specified at the individual routes. Within a route, when there are
-multiple headers with same keys, only the first header is taken into consideration.
+*Note:* In the presence of duplicate header keys, headers specified at the
+individual route-level take precedence over those specified at 
+:ref:`virtual host level <config_http_conn_man_route_table_vhost_add_req_headers>`.
+Similarly, headers specified at virtual host level take precedence over
+those specified at the global :ref:`route_config <config_http_conn_man_route_table_add_req_headers>` level.
 
 .. _config_http_conn_man_route_table_opaque_config:
 
