@@ -10,18 +10,19 @@ if [[ "$1" == "bazel.debug" ]]; then
   ln -sf /thirdparty prebuilt
   ln -sf /thirdparty_build prebuilt
   # Not sandboxing, since non-privileged Docker can't do nested namespaces.
-  echo "Building..."
   export CC=gcc-4.9
-  export CXX=g++-4.9
   export USER=bazel
   export TEST_TMPDIR=/source/build
   BAZEL_OPTIONS="--strategy=CppCompile=standalone --strategy=CppLink=standalone \
-    --strategy=TestRunner=standalone --verbose_failures --package_path %workspace%:.."
+    --strategy=TestRunner=standalone --strategy=ProtoCompile=standalone \
+    --strategy=Genrule=standalone --verbose_failures --package_path %workspace%:.."
   [[ "$BAZEL_INTERACTIVE" == "1" ]] && BAZEL_BATCH="" || BAZEL_BATCH="--batch"
   [[ "$BAZEL_EXPUNGE" == "1" ]] && bazel clean --expunge
-  bazel $BAZEL_BATCH build $BAZEL_OPTIONS //source/...
+  echo "Building..."
+  bazel $BAZEL_BATCH build $BAZEL_OPTIONS //source/exe:envoy-static
   echo "Testing..."
-  bazel $BAZEL_BATCH test $BAZEL_OPTIONS --test_output=all //test/...
+  bazel $BAZEL_BATCH test $BAZEL_OPTIONS --define FORCE_TEST_LINK_STATIC=yes --test_output=all \
+    //test/...
   exit 0
 fi
 
