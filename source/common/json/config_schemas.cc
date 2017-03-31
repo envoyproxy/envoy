@@ -336,9 +336,26 @@ const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
     "type" : "object",
     "properties":{
       "cluster_name" : {"type" : "string"},
-      "stat_prefix" : {"type" : "string"}
+      "stat_prefix" : {"type" : "string"},
+      "conn_pool" : {"type" : "object"}
     },
-    "required": ["cluster_name", "stat_prefix"],
+    "required": ["cluster_name", "stat_prefix", "conn_pool"],
+    "additionalProperties": false
+  }
+  )EOF");
+
+const std::string Json::Schema::REDIS_CONN_POOL_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties":{
+      "op_timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      }
+    },
+    "required": ["op_timeout_ms"],
     "additionalProperties": false
   }
   )EOF");
