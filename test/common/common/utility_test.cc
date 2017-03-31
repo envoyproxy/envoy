@@ -100,12 +100,14 @@ TEST(StringUtil, strlcpy) {
 }
 
 TEST(StringUtil, split) {
-  EXPECT_EQ(std::vector<std::string>{}, StringUtil::split("", ','));
-  EXPECT_EQ(std::vector<std::string>{"a"}, StringUtil::split("a", ','));
   EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split(",hello", ','));
-  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello,", ','));
-  EXPECT_EQ(std::vector<std::string>{}, StringUtil::split(",,", ','));
-  EXPECT_EQ((std::vector<std::string>{"hello", "world"}), StringUtil::split("hello,world", ','));
+  EXPECT_EQ(std::vector<std::string>{}, StringUtil::split("", ","));
+  EXPECT_EQ(std::vector<std::string>{"a"}, StringUtil::split("a", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello,", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split(",hello", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello, ", ", "));
+  EXPECT_EQ(std::vector<std::string>{}, StringUtil::split(",,", ","));
+  EXPECT_EQ(std::vector<std::string>{"hello"}, StringUtil::split("hello", ""));
 }
 
 TEST(StringUtil, endsWith) {
