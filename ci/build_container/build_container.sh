@@ -84,13 +84,12 @@ cd ..
 rm -fr cares* c-ares*
 
 # protobuf
-wget https://github.com/google/protobuf/releases/download/v3.0.0/protobuf-cpp-3.0.0.tar.gz
-tar xf protobuf-cpp-3.0.0.tar.gz
-cd protobuf-3.0.0
+wget https://github.com/google/protobuf/releases/download/v3.2.0/protobuf-cpp-3.2.0.tar.gz
+tar xf protobuf-cpp-3.2.0.tar.gz
+cd protobuf-3.2.0
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no
 make install
 cd ..
-rm -fr protobuf*
 
 # cotire
 wget https://github.com/sakra/cotire/archive/cotire-1.7.8.tar.gz
