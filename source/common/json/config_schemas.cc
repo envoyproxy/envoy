@@ -211,7 +211,10 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       "tracing" : {
         "type" : "object",
         "properties" : {
-          "operation_name" : {"type" : "string"}
+          "operation_name" : {
+            "type" : "string",
+            "enum": ["ingress", "egress"]
+          }
         },
         "required" : ["operation_name"],
         "additionalProperties" : false
@@ -332,9 +335,10 @@ const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
     "properties":{
-      "cluster_name" : {"type" : "string"}
+      "cluster_name" : {"type" : "string"},
+      "stat_prefix" : {"type" : "string"}
     },
-    "required": ["cluster_name"],
+    "required": ["cluster_name", "stat_prefix"],
     "additionalProperties": false
   }
   )EOF");

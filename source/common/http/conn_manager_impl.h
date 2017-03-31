@@ -103,7 +103,7 @@ struct ConnectionManagerTracingStats {
  * Here we specify some specific for connection manager settings.
  */
 struct TracingConnectionManagerConfig {
-  std::string operation_name_;
+  Tracing::OperationName operation_name_;
 };
 
 /**
@@ -383,7 +383,7 @@ private:
     void addAccessLogHandler(Http::AccessLog::InstanceSharedPtr handler) override;
 
     // Tracing::TracingConfig
-    virtual const std::string& operationName() const override;
+    virtual Tracing::OperationName operationName() const override;
 
     // All state for the stream. Put here for readability. We could move this to a bit field
     // eventually if we want.

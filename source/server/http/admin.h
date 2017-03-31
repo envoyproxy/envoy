@@ -3,6 +3,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/admin.h"
+#include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
 #include "common/common/logger.h"
@@ -96,6 +97,9 @@ private:
   bool changeLogLevel(const Http::Utility::QueryParams& params);
   void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
                           Upstream::ResourceManager& resource_manager, Buffer::Instance& response);
+  void addOutlierInfo(const std::string& cluster_name,
+                      const Upstream::Outlier::Detector* outlier_detector,
+                      Buffer::Instance& response);
 
   /**
    * URL handlers.
