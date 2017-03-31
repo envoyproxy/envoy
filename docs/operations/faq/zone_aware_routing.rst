@@ -37,8 +37,8 @@ These are the requirements:
 
 Envoy configuration on destination service
 ------------------------------------------
-It's not necessary to run Envoy side by side with the service B, but it's important that each host in cluster B registers
-with the discovery service which is queried by Envoy on service A cluster.
+It's not necessary to run Envoy side by side with service B, but it's important that each host
+in cluster B registers with the discovery service queried by Envoy routing from service A.
 Specifically you need to setup a periodic process to register hosts from service B with the
 `discovery service <https://github.com/lyft/discovery#post-v1registrationservice>`_.
 And each registration call must have `zone data <https://github.com/lyft/discovery#tags-json>`_
