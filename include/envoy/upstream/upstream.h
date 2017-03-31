@@ -4,6 +4,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/ssl/context.h"
 #include "envoy/upstream/load_balancer_type.h"
+#include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
 namespace Upstream {
@@ -299,6 +300,12 @@ public:
    * @return the information about this upstream cluster.
    */
   virtual ClusterInfoConstSharedPtr info() const PURE;
+
+  /**
+   * @return a pointer to the cluster's outlier detector. If an outlier detector has not been
+   *         installed, returns a nullptr.
+   */
+  virtual const Outlier::Detector* outlierDetector() const PURE;
 
   /**
    * Initialize the cluster. This will be called either immediately at creation or after all primary
