@@ -3,7 +3,7 @@
 Envoy FAQ
 ==========
 
-The purpose of this document is to cover commonly used scenarios in typical
+The purpose of this document is to link examples of commonly used scenarios in typical
 Envoy deployment, e.g., setting up zone aware routing.
 
 .. toctree::
