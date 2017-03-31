@@ -132,38 +132,54 @@ void MGETCommandHandler::SplitRequestImpl::onFailure(uint32_t index) {
   onResponse(Utility::makeError("upstream failure"), index);
 }
 
-InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool)
+InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
+                           const std::string& stat_prefix)
     : conn_pool_(std::move(conn_pool)), all_to_one_handler_(*conn_pool_),
-      mget_handler_(*conn_pool_) {
+      mget_handler_(*conn_pool_),
+      stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
   // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
   // TODO(mattklein123): Make not case sensitive (like in header_map_impl).
-  command_map_.emplace("incr", all_to_one_handler_);
-  command_map_.emplace("incrby", all_to_one_handler_);
-  command_map_.emplace("mget", mget_handler_);
+  addHandler(scope, stat_prefix, "incr", all_to_one_handler_);
+  addHandler(scope, stat_prefix, "incrby", all_to_one_handler_);
+  addHandler(scope, stat_prefix, "mget", mget_handler_);
 }
 
 SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbacks& callbacks) {
   if (request.type() != RespType::Array || request.asArray().size() < 2) {
-    callbacks.onResponse(Utility::makeError("invalid request"));
+    onInvalidRequest(callbacks);
     return nullptr;
   }
 
   for (const RespValue& value : request.asArray()) {
     if (value.type() != RespType::BulkString) {
-      callbacks.onResponse(Utility::makeError("invalid request"));
+      onInvalidRequest(callbacks);
       return nullptr;
     }
   }
 
   auto handler = command_map_.find(request.asArray()[0].asString());
   if (handler == command_map_.end()) {
+    stats_.unsupported_command_.inc();
     callbacks.onResponse(Utility::makeError(
         fmt::format("unsupported command '{}'", request.asArray()[0].asString())));
     return nullptr;
   }
 
   log_debug("redis: splitting '{}'", request.toString());
-  return handler->second.get().startRequest(request, callbacks);
+  handler->second.total_.inc();
+  return handler->second.handler_.get().startRequest(request, callbacks);
+}
+
+void InstanceImpl::onInvalidRequest(SplitCallbacks& callbacks) {
+  stats_.invalid_request_.inc();
+  callbacks.onResponse(Utility::makeError("invalid request"));
+}
+
+void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefix,
+                              const std::string& name, CommandHandler& handler) {
+  command_map_.emplace(
+      name,
+      HandlerData{scope.counter(fmt::format("{}command.{}.total", stat_prefix, name)), handler});
 }
 
 } // CommandSplitter

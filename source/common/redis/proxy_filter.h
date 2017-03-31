@@ -11,20 +11,49 @@
 
 namespace Redis {
 
-// TODO(mattklein123): Stats
+/**
+ * All redis proxy stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_REDIS_PROXY_STATS(COUNTER, GAUGE)                                                      \
+  COUNTER(downstream_cx_rx_bytes_total)                                                            \
+  GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
+  COUNTER(downstream_cx_tx_bytes_total)                                                            \
+  GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
+  COUNTER(downstream_cx_protocol_error)                                                            \
+  COUNTER(downstream_cx_total)                                                                     \
+  GAUGE  (downstream_cx_active)                                                                    \
+  COUNTER(downstream_rq_total)                                                                     \
+  GAUGE  (downstream_rq_active)
+// clang-format on
+
+/**
+ * Struct definition for all redis proxy stats. @see stats_macros.h
+ */
+struct ProxyStats {
+  ALL_REDIS_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
 
 /**
  * Configuration for the redis proxy filter.
  */
 class ProxyFilterConfig : Json::Validator {
 public:
-  ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm);
+  ProxyFilterConfig(const Json::Object& config, Upstream::ClusterManager& cm, Stats::Scope& scope);
 
   const std::string& clusterName() { return cluster_name_; }
+  const std::string& statPrefix() { return stat_prefix_; }
+  ProxyStats& stats() { return stats_; }
 
 private:
+  static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
+
   const std::string cluster_name_;
+  const std::string stat_prefix_;
+  ProxyStats stats_;
 };
+
+typedef std::shared_ptr<ProxyFilterConfig> ProxyFilterConfigSharedPtr;
 
 /**
  * A redis multiplexing proxy filter. This filter will take incoming redis pipelined commands, and
@@ -34,16 +63,12 @@ class ProxyFilter : public Network::ReadFilter,
                     public DecoderCallbacks,
                     public Network::ConnectionCallbacks {
 public:
-  ProxyFilter(DecoderFactory& factory, EncoderPtr&& encoder, CommandSplitter::Instance& splitter)
-      : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter) {}
-
+  ProxyFilter(DecoderFactory& factory, EncoderPtr&& encoder, CommandSplitter::Instance& splitter,
+              ProxyFilterConfigSharedPtr config);
   ~ProxyFilter();
 
   // Network::ReadFilter
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
-    callbacks_ = &callbacks;
-    callbacks_->connection().addConnectionCallbacks(*this);
-  }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
   Network::FilterStatus onData(Buffer::Instance& data) override;
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
 
@@ -55,7 +80,8 @@ public:
 
 private:
   struct PendingRequest : public CommandSplitter::SplitCallbacks {
-    PendingRequest(ProxyFilter& parent) : parent_(parent) {}
+    PendingRequest(ProxyFilter& parent);
+    ~PendingRequest();
 
     // Redis::CommandSplitter::SplitCallbacks
     void onResponse(RespValuePtr&& value) override { parent_.onResponse(*this, std::move(value)); }
@@ -70,6 +96,7 @@ private:
   DecoderPtr decoder_;
   EncoderPtr encoder_;
   CommandSplitter::Instance& splitter_;
+  ProxyFilterConfigSharedPtr config_;
   Buffer::OwnedImpl encoder_buffer_;
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
