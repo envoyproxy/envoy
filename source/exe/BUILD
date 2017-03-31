@@ -4,9 +4,18 @@ load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cc_binary")
 
 envoy_cc_binary(
     name = "envoy",
-    srcs = ["main.cc"],
+    deps = ["envoy_main_lib"],
+)
+
+envoy_cc_binary(
+    name = "envoy-static",
+    linkstatic = 1,
+    deps = ["envoy_main_lib"],
+)
+
+envoy_cc_library(
+    name = "envoy_common_lib",
     deps = [
-        ":hot_restart_lib",
         "//source/common/event:libevent_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:utility_lib",
@@ -30,6 +39,15 @@ envoy_cc_binary(
         "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:tcp_proxy_lib",
         "//source/server/http:health_check_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_main_lib",
+    srcs = ["main.cc"],
+    deps = [
+        ":envoy_common_lib",
+        ":hot_restart_lib",
     ],
 )
 
