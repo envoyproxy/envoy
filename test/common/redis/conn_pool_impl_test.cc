@@ -26,21 +26,42 @@ public:
     return DecoderPtr{decoder_};
   }
 
+  ~RedisClientImplTest() {
+    client_.reset();
+
+    // Make sure all gauges are 0.
+    for (Stats::GaugeSharedPtr gauge : host_->cluster_.stats_store_.gauges()) {
+      EXPECT_EQ(0U, gauge->value());
+    }
+    for (Stats::GaugeSharedPtr gauge : host_->stats_store_.gauges()) {
+      EXPECT_EQ(0U, gauge->value());
+    }
+  }
+
   void setup() {
     upstream_connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
-    std::shared_ptr<Upstream::MockHost> host(new Upstream::MockHost());
     conn_info.connection_ = upstream_connection_;
-    EXPECT_CALL(*host, createConnection_(_)).WillOnce(Return(conn_info));
+    EXPECT_CALL(*connect_timer_, enableTimer(_));
+    EXPECT_CALL(*host_, createConnection_(_)).WillOnce(Return(conn_info));
     EXPECT_CALL(*upstream_connection_, addReadFilter(_))
         .WillOnce(SaveArg<0>(&upstream_read_filter_));
     EXPECT_CALL(*upstream_connection_, connect());
     EXPECT_CALL(*upstream_connection_, noDelay(true));
-    client_ = ClientImpl::create(host, dispatcher_, EncoderPtr{encoder_}, *this);
+    client_ = ClientImpl::create(host_, dispatcher_, EncoderPtr{encoder_}, *this);
+    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
+    EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
+  }
+
+  void onConnected() {
+    EXPECT_CALL(*connect_timer_, disableTimer());
+    upstream_connection_->raiseEvents(Network::ConnectionEvent::Connected);
   }
 
   const std::string cluster_name_{"foo"};
+  std::shared_ptr<Upstream::MockHost> host_{new NiceMock<Upstream::MockHost>()};
   Event::MockDispatcher dispatcher_;
+  Event::MockTimer* connect_timer_{new Event::MockTimer(&dispatcher_)};
   MockEncoder* encoder_{new MockEncoder()};
   MockDecoder* decoder_{new MockDecoder()};
   DecoderCallbacks* callbacks_{};
@@ -50,7 +71,10 @@ public:
 };
 
 TEST_F(RedisClientImplTest, Basic) {
+  InSequence s;
+
   setup();
+  onConnected();
 
   RespValue request1;
   MockPoolCallbacks callbacks1;
@@ -63,6 +87,11 @@ TEST_F(RedisClientImplTest, Basic) {
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
+
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
   Buffer::OwnedImpl fake_data;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
@@ -83,6 +112,8 @@ TEST_F(RedisClientImplTest, Basic) {
 }
 
 TEST_F(RedisClientImplTest, Cancel) {
+  InSequence s;
+
   setup();
 
   RespValue request1;
@@ -90,6 +121,8 @@ TEST_F(RedisClientImplTest, Cancel) {
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
+
+  onConnected();
 
   RespValue request2;
   MockPoolCallbacks callbacks2;
@@ -115,10 +148,15 @@ TEST_F(RedisClientImplTest, Cancel) {
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   client_->close();
+
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_cancelled_.value());
 }
 
 TEST_F(RedisClientImplTest, FailAll) {
+  InSequence s;
+
   setup();
+  onConnected();
 
   Network::MockConnectionCallbacks connection_callbacks;
   client_->addConnectionCallbacks(connection_callbacks);
@@ -129,13 +167,44 @@ TEST_F(RedisClientImplTest, FailAll) {
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
-  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   EXPECT_CALL(callbacks1, onFailure());
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_remote_with_active_rq_.value());
+}
+
+TEST_F(RedisClientImplTest, FailAllWithCancel) {
+  InSequence s;
+
+  setup();
+  onConnected();
+
+  Network::MockConnectionCallbacks connection_callbacks;
+  client_->addConnectionCallbacks(connection_callbacks);
+
+  RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+  handle1->cancel();
+
+  EXPECT_CALL(callbacks1, onFailure()).Times(0);
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  upstream_connection_->raiseEvents(Network::ConnectionEvent::LocalClose);
+
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_local_with_active_rq_.value());
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_cancelled_.value());
 }
 
 TEST_F(RedisClientImplTest, ProtocolError) {
+  InSequence s;
+
   setup();
+  onConnected();
 
   RespValue request1;
   MockPoolCallbacks callbacks1;
@@ -144,20 +213,60 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   EXPECT_NE(nullptr, handle1);
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
       .WillOnce(Invoke([&](Buffer::Instance&) -> void { throw ProtocolError("error"); }));
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(callbacks1, onFailure());
   upstream_read_filter_->onData(fake_data);
+
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_protocol_error_.value());
+}
+
+TEST_F(RedisClientImplTest, ConnectFail) {
+  InSequence s;
+
+  setup();
+
+  RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  EXPECT_CALL(callbacks1, onFailure());
+  EXPECT_CALL(*connect_timer_, disableTimer());
+  upstream_connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
+}
+
+TEST_F(RedisClientImplTest, ConnectTimeout) {
+  InSequence s;
+
+  setup();
+
+  RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(callbacks1, onFailure());
+  EXPECT_CALL(*connect_timer_, disableTimer());
+  connect_timer_->callback_();
+
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_connect_timeout_.value());
 }
 
 TEST(RedisClientFactoryImplTest, Basic) {
   ClientFactoryImpl factory;
   Upstream::MockHost::MockCreateConnectionData conn_info;
   conn_info.connection_ = new NiceMock<Network::MockClientConnection>();
-  std::shared_ptr<Upstream::MockHost> host(new Upstream::MockHost());
+  std::shared_ptr<Upstream::MockHost> host(new NiceMock<Upstream::MockHost>());
   EXPECT_CALL(*host, createConnection_(_)).WillOnce(Return(conn_info));
-  Event::MockDispatcher dispatcher;
+  NiceMock<Event::MockDispatcher> dispatcher;
   ClientPtr client = factory.create(host, dispatcher);
   client->close();
 }

@@ -154,4 +154,40 @@ TEST(SslContextImplTest, TestNoCert) {
   EXPECT_EQ("", context->getCertChainInformation());
 }
 
+TEST(SslContextImplTest, TestVerifyPeer) {
+  std::string json = R"EOF(
+  {
+    "ca_cert_file": "test/common/ssl/test_data/ca.crt"
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
+  ContextConfigImpl cfg(*loader);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
+  Stats::IsolatedStoreImpl store;
+  ClientContextPtr context(manager.createSslClientContext(store, cfg));
+  ClientContextImpl* contextImpl = dynamic_cast<ClientContextImpl*>(context.get());
+
+  SSL_CTX* ctx = SSL_CTX_new(SSLv23_server_method());
+  SSL* ssl = SSL_new(ctx);
+  SSL_SESSION* session = SSL_SESSION_new();
+  SSL_set_session(ssl, session);
+
+  // Test that verifyPeer returns false when peer certificate is not set.
+  EXPECT_FALSE(contextImpl->verifyPeer(ssl));
+
+  // Set peer certificate and make sure verifyPeer returns true.
+  FILE* fp = fopen("test/common/ssl/test_data/san_dns.crt", "r");
+  EXPECT_NE(fp, nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  session->x509_peer = cert;
+  EXPECT_TRUE(contextImpl->verifyPeer(ssl));
+
+  fclose(fp);
+  SSL_SESSION_free(session);
+  SSL_free(ssl);
+  SSL_CTX_free(ctx);
+}
+
 } // Ssl

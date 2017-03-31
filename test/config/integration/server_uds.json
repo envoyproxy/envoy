@@ -1,7 +1,7 @@
 {
   "listeners": [
   {
-    "address": "tcp://127.0.0.1:10001",
+    "address": "tcp://127.0.0.1:0",
     "filters": [
     {
       "type": "read",
@@ -81,7 +81,7 @@
     }]
   }],
 
-  "admin": { "access_log_path": "/dev/null", "address": "tcp://127.0.0.1:10003" },
+  "admin": { "access_log_path": "/dev/null", "address": "tcp://127.0.0.1:0" },
   "statsd_local_udp_port": 8125,
 
   "cluster_manager": {

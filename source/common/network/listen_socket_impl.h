@@ -11,7 +11,7 @@ public:
   ~ListenSocketImpl() { close(); }
 
   // Network::ListenSocket
-  Address::InstanceConstSharedPtr localAddress() override { return local_address_; }
+  Address::InstanceConstSharedPtr localAddress() const override { return local_address_; }
   int fd() override { return fd_; }
 
   void close() override {

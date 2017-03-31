@@ -8,7 +8,8 @@ namespace ConnPool {
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory) {
 
-  std::unique_ptr<ClientImpl> client(new ClientImpl(std::move(encoder), decoder_factory));
+  std::unique_ptr<ClientImpl> client(
+      new ClientImpl(host, dispatcher, std::move(encoder), decoder_factory));
   client->connection_ = host->createConnection(dispatcher).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -17,25 +18,44 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
   return std::move(client);
 }
 
+ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                       EncoderPtr&& encoder, DecoderFactory& decoder_factory)
+    : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
+      connect_timer_(dispatcher.createTimer([this]() -> void { onConnectTimeout(); })) {
+  host->cluster().stats().upstream_cx_total_.inc();
+  host->cluster().stats().upstream_cx_active_.inc();
+  host->stats().cx_total_.inc();
+  host->stats().cx_active_.inc();
+  connect_timer_->enableTimer(host->cluster().connectTimeout());
+}
+
 ClientImpl::~ClientImpl() {
   ASSERT(pending_requests_.empty());
   ASSERT(connection_->state() == Network::Connection::State::Closed);
+  host_->cluster().stats().upstream_cx_active_.dec();
+  host_->stats().cx_active_.dec();
 }
 
 void ClientImpl::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
 PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
-  pending_requests_.emplace_back(callbacks);
+  pending_requests_.emplace_back(*this, callbacks);
   encoder_->encode(request, encoder_buffer_);
   connection_->write(encoder_buffer_);
   return &pending_requests_.back();
+}
+
+void ClientImpl::onConnectTimeout() {
+  host_->cluster().stats().upstream_cx_connect_timeout_.inc();
+  connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
 void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
   } catch (ProtocolError&) {
+    host_->cluster().stats().upstream_cx_protocol_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
   }
 }
@@ -43,13 +63,35 @@ void ClientImpl::onData(Buffer::Instance& data) {
 void ClientImpl::onEvent(uint32_t events) {
   if ((events & Network::ConnectionEvent::RemoteClose) ||
       (events & Network::ConnectionEvent::LocalClose)) {
+    if (!pending_requests_.empty()) {
+      host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
+      if (events & Network::ConnectionEvent::RemoteClose) {
+        host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
+      }
+      if (events & Network::ConnectionEvent::LocalClose) {
+        host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
+      }
+    }
+
     while (!pending_requests_.empty()) {
       PendingRequest& request = pending_requests_.front();
       if (!request.canceled_) {
         request.callbacks_.onFailure();
+      } else {
+        host_->cluster().stats().upstream_rq_cancelled_.inc();
       }
       pending_requests_.pop_front();
     }
+  }
+
+  if ((events & Network::ConnectionEvent::RemoteClose) && connect_timer_) {
+    host_->cluster().stats().upstream_cx_connect_fail_.inc();
+    host_->stats().cx_connect_fail_.inc();
+  }
+
+  if (connect_timer_) {
+    connect_timer_->disableTimer();
+    connect_timer_.reset();
   }
 }
 
@@ -58,8 +100,23 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   PendingRequest& request = pending_requests_.front();
   if (!request.canceled_) {
     request.callbacks_.onResponse(std::move(value));
+  } else {
+    host_->cluster().stats().upstream_rq_cancelled_.inc();
   }
   pending_requests_.pop_front();
+}
+
+ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
+    : parent_(parent), callbacks_(callbacks) {
+  parent.host_->cluster().stats().upstream_rq_total_.inc();
+  parent.host_->cluster().stats().upstream_rq_active_.inc();
+  parent.host_->stats().rq_total_.inc();
+  parent.host_->stats().rq_active_.inc();
+}
+
+ClientImpl::PendingRequest::~PendingRequest() {
+  parent_.host_->cluster().stats().upstream_rq_active_.dec();
+  parent_.host_->stats().rq_active_.dec();
 }
 
 void ClientImpl::PendingRequest::cancel() {

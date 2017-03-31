@@ -6,11 +6,13 @@
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/common/assert.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 IntegrationTestServerPtr BaseIntegrationTest::test_server_;
@@ -247,6 +249,35 @@ IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
   return IntegrationTcpClientPtr{new IntegrationTcpClient(*dispatcher_, port)};
 }
 
+void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
+  port_map()[key] = port;
+}
+
+uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
+  auto it = port_map().find(key);
+  if (it != port_map().end()) {
+    return it->second;
+  }
+  RELEASE_ASSERT(false);
+}
+
+void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
+  int index = 0;
+  for (auto it : port_names) {
+    Network::ListenSocket* listen_socket = test_server_->server().getListenSocketByIndex(index++);
+    RELEASE_ASSERT(listen_socket != nullptr);
+    registerPort(it, listen_socket->localAddress()->ip()->port());
+  }
+  registerPort("admin", test_server_->server().admin().socket().localAddress()->ip()->port());
+}
+
+void BaseIntegrationTest::createTestServer(const std::string& json_path,
+                                           const std::vector<std::string>& port_names) {
+  test_server_ = IntegrationTestServer::create(
+      TestEnvironment::temporaryFileSubstitutePorts(json_path, port_map()));
+  registerTestServerPorts(port_names);
+}
+
 void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
                                                                Http::CodecClient::Type type,
                                                                uint64_t request_size,
@@ -335,7 +366,7 @@ void BaseIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
 
 void BaseIntegrationTest::testRouterNotFound(Http::CodecClient::Type type) {
   BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(HTTP_PORT, "GET", "/notfound", "", type);
+      IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "", type);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 }
@@ -348,8 +379,8 @@ void BaseIntegrationTest::testRouterNotFoundWithBody(uint32_t port, Http::CodecC
 }
 
 void BaseIntegrationTest::testRouterRedirect(Http::CodecClient::Type type) {
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(HTTP_PORT, "GET", "/foo", "", type, "www.redirect.com");
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/foo", "", type, "www.redirect.com");
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("301", response->headers().Status()->value().c_str());
   EXPECT_STREQ("https://www.redirect.com/foo",
@@ -361,7 +392,7 @@ void BaseIntegrationTest::testDrainClose(Http::CodecClient::Type type) {
 
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
-  executeActions({[&]() -> void { codec_client = makeHttpConnection(HTTP_PORT, type); },
+  executeActions({[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
                   [&]() -> void {
                     codec_client->makeHeaderOnlyRequest(
                         Http::TestHeaderMapImpl{{":method", "GET"},
@@ -603,7 +634,7 @@ void BaseIntegrationTest::testRetry(Http::CodecClient::Type type) {
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   executeActions(
-      {[&]() -> void { codec_client = makeHttpConnection(IntegrationTest::HTTP_PORT, type); },
+      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
        [&]() -> void {
          codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
                                                                    {":path", "/test/long/url"},
@@ -656,7 +687,7 @@ void BaseIntegrationTest::testTwoRequests(Http::CodecClient::Type type) {
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr request;
   executeActions(
-      {[&]() -> void { codec_client = makeHttpConnection(IntegrationTest::HTTP_PORT, type); },
+      {[&]() -> void { codec_client = makeHttpConnection(lookupPort("http"), type); },
        // Request 1.
        [&]() -> void {
          codec_client->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -717,8 +748,9 @@ void BaseIntegrationTest::testBadHttpRequest() {
   Buffer::OwnedImpl buffer("hello");
   std::string response;
   RawConnectionDriver connection(
-      HTTP_PORT, buffer, [&](Network::ClientConnection&, const Buffer::Instance& data)
-                             -> void { response.append(TestUtility::bufferToString(data)); });
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data)
+          -> void { response.append(TestUtility::bufferToString(data)); });
 
   connection.run();
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
@@ -727,11 +759,12 @@ void BaseIntegrationTest::testBadHttpRequest() {
 void BaseIntegrationTest::testHttp10Request() {
   Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
   std::string response;
-  RawConnectionDriver connection(HTTP_PORT, buffer, [&](Network::ClientConnection& client,
-                                                        const Buffer::Instance& data) -> void {
-    response.append(TestUtility::bufferToString(data));
-    client.close(Network::ConnectionCloseType::NoFlush);
-  });
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      });
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
@@ -740,11 +773,12 @@ void BaseIntegrationTest::testHttp10Request() {
 void BaseIntegrationTest::testNoHost() {
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   std::string response;
-  RawConnectionDriver connection(HTTP_PORT, buffer, [&](Network::ClientConnection& client,
-                                                        const Buffer::Instance& data) -> void {
-    response.append(TestUtility::bufferToString(data));
-    client.close(Network::ConnectionCloseType::NoFlush);
-  });
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      });
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
@@ -753,11 +787,12 @@ void BaseIntegrationTest::testNoHost() {
 void BaseIntegrationTest::testBadPath() {
   Buffer::OwnedImpl buffer("GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n");
   std::string response;
-  RawConnectionDriver connection(HTTP_PORT, buffer, [&](Network::ClientConnection& client,
-                                                        const Buffer::Instance& data) -> void {
-    response.append(TestUtility::bufferToString(data));
-    client.close(Network::ConnectionCloseType::NoFlush);
-  });
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+        response.append(TestUtility::bufferToString(data));
+        client.close(Network::ConnectionCloseType::NoFlush);
+      });
 
   connection.run();
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
@@ -767,24 +802,23 @@ void BaseIntegrationTest::testUpstreamProtocolError() {
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeRawConnectionPtr fake_upstream_connection;
-  executeActions({[&]() -> void {
-    codec_client = makeHttpConnection(IntegrationTest::HTTP_PORT, Http::CodecClient::Type::HTTP1);
-  },
-                  [&]() -> void {
-                    codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                       {":path", "/test/long/url"},
-                                                                       {":authority", "host"}},
-                                               *response);
-                  },
-                  [&]() -> void {
-                    fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-                  },
-                  // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
-                  // be fixed.
-                  [&]() -> void { fake_upstream_connection->waitForData(187); },
-                  [&]() -> void { fake_upstream_connection->write("bad protocol data!"); },
-                  [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
-                  [&]() -> void { codec_client->waitForDisconnect(); }});
+  executeActions(
+      {[&]() -> void {
+        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
+      },
+       [&]() -> void {
+         codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                            {":path", "/test/long/url"},
+                                                            {":authority", "host"}},
+                                    *response);
+       },
+       [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
+       // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
+       // be fixed.
+       [&]() -> void { fake_upstream_connection->waitForData(187); },
+       [&]() -> void { fake_upstream_connection->write("bad protocol data!"); },
+       [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
+       [&]() -> void { codec_client->waitForDisconnect(); }});
 
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
@@ -797,8 +831,9 @@ void BaseIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   Http::StreamEncoder* downstream_request{};
   FakeStreamPtr upstream_request;
   std::list<std::function<void()>> actions = {
-      [&]()
-          -> void { codec_client = makeHttpConnection(HTTP_PORT, Http::CodecClient::Type::HTTP2); },
+      [&]() -> void {
+        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
+      },
       [&]() -> void {
         downstream_request =
             &codec_client->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -855,7 +890,8 @@ void BaseIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
   executeActions(
       {[&]() -> void {
-        codec_client = makeHttpConnection(HTTP_BUFFER_PORT, Http::CodecClient::Type::HTTP2);
+        codec_client =
+            makeHttpConnection(lookupPort("http_buffer"), Http::CodecClient::Type::HTTP2);
       },
        [&]() -> void {
          request_encoder =

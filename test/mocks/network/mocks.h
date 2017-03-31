@@ -194,7 +194,7 @@ public:
   MockListenSocket();
   ~MockListenSocket();
 
-  MOCK_METHOD0(localAddress, Address::InstanceConstSharedPtr());
+  MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr());
   MOCK_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
 

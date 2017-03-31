@@ -1,7 +1,7 @@
 {
   "listeners": [
   {
-    "address": "tcp://127.0.0.1:10001",
+    "address": "tcp://127.0.0.1:0",
     "ssl_context": {
       "ca_cert_file": "./test/config/integration/certs/cacert.pem",
       "cert_chain_file": "./test/config/integration/certs/servercert.pem",
@@ -89,7 +89,7 @@
     }]
   }],
 
-  "admin": { "access_log_path": "/dev/null", "address": "tcp://127.0.0.1:10003" },
+  "admin": { "access_log_path": "/dev/null", "address": "tcp://127.0.0.1:0" },
   "statsd_local_udp_port": 8125,
 
   "cluster_manager": {
@@ -103,7 +103,7 @@
       },
       "type": "static",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://127.0.0.1:11000"}]
+      "hosts": [{"url": "tcp://127.0.0.1:{{ upstream_0 }}"}]
     },
     {
       "name": "cluster_2",
@@ -114,7 +114,7 @@
       },
       "type": "strict_dns",
       "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://localhost:11001"}]
+      "hosts": [{"url": "tcp://localhost:{{ upstream_1 }}"}]
     }]
   }
 }
