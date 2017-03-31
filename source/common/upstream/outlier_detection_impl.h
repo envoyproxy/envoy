@@ -250,6 +250,7 @@ public:
     double success_rate_average_;
     double ejection_threshold_;
   };
+
   /**
    * This function returns an EjectionPair for success rate outlier detection. The pair contains
    * the average success rate of all valid hosts in the cluster and the ejection threshold.
