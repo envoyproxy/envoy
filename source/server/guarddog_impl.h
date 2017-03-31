@@ -22,7 +22,7 @@ namespace Server {
 class GuardDogImpl : public GuardDog {
 public:
   /**
-   * @param stats_store Statistics store to write watchdog_miss and
+   * @param stats_scope Statistics scope to write watchdog_miss and
    * watchdog_mega_miss events into.
    * @param config Configuration object.
    *
