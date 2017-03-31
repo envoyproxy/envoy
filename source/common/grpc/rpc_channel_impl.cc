@@ -32,7 +32,7 @@ void RpcChannelImpl::CallMethod(const proto::MethodDescriptor* method, proto::Rp
 
   Http::MessagePtr message =
       Common::prepareHeaders(cluster_->name(), method->service()->full_name(), method->name());
-  message->body(Common::serializeBody(*grpc_request));
+  message->body() = Common::serializeBody(*grpc_request);
 
   callbacks_.onPreRequestCustomizeHeaders(message->headers());
   http_request_ =

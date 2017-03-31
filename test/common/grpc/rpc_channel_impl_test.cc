@@ -72,7 +72,7 @@ TEST_F(GrpcRequestImplTest, NoError) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   helloworld::HelloReply inner_response;
   inner_response.set_message("hello a name");
-  response_http_message->body(Common::serializeBody(inner_response));
+  response_http_message->body() = Common::serializeBody(inner_response);
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
@@ -199,7 +199,7 @@ TEST_F(GrpcRequestImplTest, ShortBodyInResponse) {
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  response_http_message->body(Buffer::InstancePtr{new Buffer::OwnedImpl("aaa")});
+  response_http_message->body().reset(new Buffer::OwnedImpl("aaa"));
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
@@ -218,7 +218,7 @@ TEST_F(GrpcRequestImplTest, BadMessageInResponse) {
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  response_http_message->body(Buffer::InstancePtr{new Buffer::OwnedImpl("aaaaaaaa")});
+  response_http_message->body().reset(new Buffer::OwnedImpl("aaaaaaaa"));
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
@@ -288,7 +288,7 @@ TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
   helloworld::HelloReply inner_response;
   inner_response.set_message("hello a name");
 
-  response_http_message->body(Common::serializeBody(inner_response));
+  response_http_message->body() = Common::serializeBody(inner_response);
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 

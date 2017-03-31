@@ -206,7 +206,7 @@ void LightStepRecorder::flushSpans() {
                                                             lightstep::CollectorServiceFullName(),
                                                             lightstep::CollectorMethodName());
 
-    message->body(Grpc::Common::serializeBody(std::move(request)));
+    message->body() = Grpc::Common::serializeBody(std::move(request));
 
     uint64_t timeout =
         driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);

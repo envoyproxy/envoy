@@ -27,7 +27,8 @@ public:
             Network::Address::InstanceConstSharedPtr address, Server::Instance& server);
 
   Http::Code runCallback(const std::string& path, Buffer::Instance& response);
-  Network::ListenSocket& socket() { return *socket_; }
+  const Network::ListenSocket& socket() override { return *socket_; }
+  Network::ListenSocket& mutable_socket() { return *socket_; }
 
   // Server::Admin
   void addHandler(const std::string& prefix, const std::string& help_text,

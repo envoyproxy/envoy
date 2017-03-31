@@ -172,7 +172,7 @@ void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
 
 void AsyncRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
   if (!response_->body()) {
-    response_->body(Buffer::InstancePtr{new Buffer::OwnedImpl()});
+    response_->body().reset(new Buffer::OwnedImpl());
   }
   response_->body()->move(data);
 

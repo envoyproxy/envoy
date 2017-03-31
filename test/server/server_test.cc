@@ -5,6 +5,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/environment.h"
 
 using testing::_;
 using testing::InSequence;
@@ -47,7 +48,8 @@ public:
 class ServerInstanceImplTest : public testing::Test {
 protected:
   ServerInstanceImplTest()
-      : options_(std::string("test/config/integration/server.json")),
+      : options_(TestEnvironment::temporaryFileSubstitutePorts(
+            "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}})),
         server_(options_, hooks_, restart_, stats_store_, fakelock_, component_factory_,
                 local_info_) {}
   void TearDown() override {

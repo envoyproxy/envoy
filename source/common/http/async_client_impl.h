@@ -172,7 +172,7 @@ private:
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
-  const Buffer::Instance* decodingBuffer() override {
+  Buffer::InstancePtr& decodingBuffer() override {
     throw EnvoyException("buffering is not supported in streaming");
   }
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -211,7 +211,7 @@ private:
   void onReset() override;
 
   // Http::StreamDecoderFilterCallbacks
-  const Buffer::Instance* decodingBuffer() override { return request_->body(); }
+  Buffer::InstancePtr& decodingBuffer() override { return request_->body(); }
 
   MessagePtr request_;
   AsyncClient::Callbacks& callbacks_;

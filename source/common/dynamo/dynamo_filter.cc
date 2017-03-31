@@ -41,7 +41,7 @@ Http::FilterTrailersStatus DynamoFilter::decodeTrailers(Http::HeaderMap&) {
 }
 
 void DynamoFilter::onDecodeComplete(const Buffer::Instance& data) {
-  std::string body = buildBody(decoder_callbacks_->decodingBuffer(), data);
+  std::string body = buildBody(decoder_callbacks_->decodingBuffer().get(), data);
   if (!body.empty()) {
     try {
       Json::ObjectPtr json_body = Json::Factory::LoadFromString(body);
@@ -61,7 +61,7 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
   uint64_t status = Http::Utility::getResponseStatus(*response_headers_);
   chargeBasicStats(status);
 
-  std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
+  std::string body = buildBody(encoder_callbacks_->encodingBuffer().get(), data);
   if (!body.empty()) {
     try {
       Json::ObjectPtr json_body = Json::Factory::LoadFromString(body);

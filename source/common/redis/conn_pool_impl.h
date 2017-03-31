@@ -11,8 +11,6 @@
 namespace Redis {
 namespace ConnPool {
 
-// TODO(mattklein123): Stats
-// TODO(mattklein123): Connect timeout
 // TODO(mattklein123): Op timeout
 // TODO(mattklein123): Circuit breaking
 
@@ -44,18 +42,20 @@ private:
   };
 
   struct PendingRequest : public PoolRequest {
-    PendingRequest(PoolCallbacks& callbacks) : callbacks_(callbacks) {}
+    PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks);
+    ~PendingRequest();
 
     // Redis::ConnPool::PoolRequest
     void cancel() override;
 
+    ClientImpl& parent_;
     PoolCallbacks& callbacks_;
     bool canceled_{};
   };
 
-  ClientImpl(EncoderPtr&& encoder, DecoderFactory& decoder_factory)
-      : encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)) {}
-
+  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+             DecoderFactory& decoder_factory);
+  void onConnectTimeout();
   void onData(Buffer::Instance& data);
 
   // Redis::DecoderCallbacks
@@ -64,11 +64,13 @@ private:
   // Network::ConnectionCallbacks
   void onEvent(uint32_t events) override;
 
+  Upstream::HostConstSharedPtr host_;
   Network::ClientConnectionPtr connection_;
   EncoderPtr encoder_;
   Buffer::OwnedImpl encoder_buffer_;
   DecoderPtr decoder_;
   std::list<PendingRequest> pending_requests_;
+  Event::TimerPtr connect_timer_;
 };
 
 class ClientFactoryImpl : public ClientFactory {

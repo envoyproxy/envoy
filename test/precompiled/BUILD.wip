@@ -7,7 +7,6 @@ envoy_cc_library(
     hdrs = ["precompiled_test.h"],
     external_deps = ["googletest"],
     deps = [
-        "//test:main",
         "//test/test_common:printers_includes",
     ],
 )

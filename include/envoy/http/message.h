@@ -18,15 +18,10 @@ public:
   virtual HeaderMap& headers() PURE;
 
   /**
-   * @return Buffer::Instance* the message body, if any.
+   * @return Buffer::InstancePtr& the message body, if any. Callers are free to reallocate, remove,
+   *         etc. the body.
    */
-  virtual Buffer::Instance* body() PURE;
-
-  /**
-   * Set the body.
-   * @param body supplies the new body.
-   */
-  virtual void body(Buffer::InstancePtr&& body) PURE;
+  virtual Buffer::InstancePtr& body() PURE;
 
   /**
    * @return HeaderMap* the message trailers, if any.

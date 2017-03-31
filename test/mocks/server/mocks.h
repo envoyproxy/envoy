@@ -51,6 +51,7 @@ public:
   // Server::Admin
   MOCK_METHOD3(addHandler,
                void(const std::string& prefix, const std::string& help_text, HandlerCb callback));
+  MOCK_METHOD0(socket, Network::ListenSocket&());
 };
 
 class MockDrainManager : public DrainManager {
@@ -102,6 +103,7 @@ public:
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD1(failHealthcheck, void(bool fail));
   MOCK_METHOD1(getListenSocketFd, int(const std::string& address));
+  MOCK_METHOD1(getListenSocketByIndex, Network::ListenSocket*(uint32_t index));
   MOCK_METHOD1(getParentStats, void(HotRestart::GetParentStatsInfo&));
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());
