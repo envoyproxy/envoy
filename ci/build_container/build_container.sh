@@ -89,6 +89,7 @@ tar xf protobuf-cpp-3.2.0.tar.gz
 cd protobuf-3.2.0
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no
 make install
+make distclean
 cd ..
 
 # cotire
