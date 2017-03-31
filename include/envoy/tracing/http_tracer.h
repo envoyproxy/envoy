@@ -6,6 +6,8 @@
 
 namespace Tracing {
 
+enum class OperationName { Ingress, Egress };
+
 /*
  * Tracing configuration, it carries additional data needed to populate the span.
  */
@@ -13,7 +15,7 @@ class Config {
 public:
   virtual ~Config() {}
 
-  virtual const std::string& operationName() const PURE;
+  virtual OperationName operationName() const PURE;
 };
 
 /*

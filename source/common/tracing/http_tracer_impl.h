@@ -38,6 +38,13 @@ struct Decision {
 class HttpTracerUtility {
 public:
   /**
+   * Get string representation of the operation.
+   * @param operation name to convert.
+   * @return string representation of the operation.
+   */
+  static const std::string& toString(OperationName operation_name);
+
+  /**
    * Request might be traceable if x-request-id is traceable uuid or we do sampling tracing.
    * Note: there is a global switch which turns off tracing completely on server side.
    *
@@ -57,6 +64,9 @@ public:
    */
   static void finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
                            const Http::AccessLog::RequestInfo& request_info);
+
+  static const std::string INGRESS_OPERATION;
+  static const std::string EGRESS_OPERATION;
 };
 
 class HttpNullTracer : public HttpTracer {

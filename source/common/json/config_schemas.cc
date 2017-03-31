@@ -211,7 +211,10 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       "tracing" : {
         "type" : "object",
         "properties" : {
-          "operation_name" : {"type" : "string"}
+          "operation_name" : {
+            "type" : "string",
+            "enum": ["ingress", "egress"]
+          }
         },
         "required" : ["operation_name"],
         "additionalProperties" : false

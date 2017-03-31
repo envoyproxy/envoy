@@ -744,7 +744,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
       removeFromList(connection_manager_.streams_));
 }
 
-const std::string& ConnectionManagerImpl::ActiveStream::operationName() const {
+Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
   return connection_manager_.config_.tracingConfig().value().operation_name_;
 }
 
