@@ -208,9 +208,9 @@ TEST(WatchDogBasicTest, ThreadIdTest) {
   gd.stopWatching(watched_dog);
 }
 
-// If this test fails it is because the std::time_t type has become nontrivial or we are compiling
-// under a compiler and library combo that makes std::chrono::system_clock::duration require a lock
-// to be atomicly modified.
+// If this test fails it is because the std::chrono::system_clock::duration type has become
+// nontrivial or we are compiling under a compiler and library combo that makes
+// std::chrono::system_clock::duration require a lock to be atomicly modified.
 //
 // The WatchDog/GuardDog relies on this being a lock free atomic for perf reasons so some workaround
 // will be required if this test starts failing.

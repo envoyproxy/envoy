@@ -18,22 +18,24 @@ public:
    */
   WatchDogImpl(int32_t thread_id, SystemTimeSource& tsource, std::chrono::milliseconds interval)
       : thread_id_(thread_id), time_source_(tsource),
-        latest_touch_time_(tsource.currentSystemTime().time_since_epoch()),
+        latest_touch_time_since_epoch_(tsource.currentSystemTime().time_since_epoch()),
         timer_interval_(interval) {}
 
   int32_t threadId() const override { return thread_id_; }
-  SystemTime lastTouchTime() const override { return SystemTime(latest_touch_time_.load()); }
+  SystemTime lastTouchTime() const override {
+    return SystemTime(latest_touch_time_since_epoch_.load());
+  }
 
   // Server::WatchDog
   void startWatchdog(Event::Dispatcher& dispatcher) override;
   void touch() override {
-    latest_touch_time_.store(time_source_.currentSystemTime().time_since_epoch());
+    latest_touch_time_since_epoch_.store(time_source_.currentSystemTime().time_since_epoch());
   }
 
 private:
   const int32_t thread_id_;
   SystemTimeSource& time_source_;
-  std::atomic<std::chrono::system_clock::duration> latest_touch_time_;
+  std::atomic<std::chrono::system_clock::duration> latest_touch_time_since_epoch_;
   Event::TimerPtr timer_;
   const std::chrono::milliseconds timer_interval_;
 };
