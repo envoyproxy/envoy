@@ -119,8 +119,13 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
 }
 
 void ConnectionImpl::drainErrorQueue() {
-  ctx_.stats().connection_error_.inc();
+  bool saw_error = false;
   while (uint64_t err = ERR_get_error()) {
+    if (!saw_error) {
+      ctx_.stats().connection_error_.inc();
+      saw_error = true;
+    }
+
     conn_log_debug("SSL error: {}:{}:{}:{}", *this, err, ERR_lib_error_string(err),
                    ERR_func_error_string(err), ERR_reason_error_string(err));
     UNREFERENCED_PARAMETER(err);
