@@ -182,7 +182,7 @@ public:
     }
   }
 
-  std::string asString() const {
+  std::string asString() const override {
     if (!value_.IsString()) {
       throw Exception(fmt::format("'{}' is not a string", name_));
     }
