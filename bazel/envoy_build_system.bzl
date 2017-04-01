@@ -7,7 +7,9 @@ ENVOY_COPTS = [
     # TODO(htuch): Clang wants -ferror-limit, should support both. Commented out for now.
     # "-fmax-errors=3",
     "-Wall",
-    "-Wextra",
+    # TODO(htuch): Figure out why protobuf-3.2.0 causes the CI build to fail
+    # with this but not the developer-local build.
+    #"-Wextra",
     "-Werror",
     "-Wnon-virtual-dtor",
     "-Woverloaded-virtual",
@@ -96,6 +98,10 @@ def envoy_cc_test(name,
         data = data,
         copts = ENVOY_COPTS + ["-includetest/precompiled/precompiled_test.h"],
         linkopts = ["-pthread"],
+        linkstatic = select({
+            "//:force_test_link_static": 1,
+            "//conditions:default": 0,
+        }),
         args = args,
         deps = deps + [
             "//source/precompiled:precompiled_includes",

@@ -19,6 +19,41 @@ bind(
 )
 
 bind(
+    name = "http_parser",
+    actual = "//ci/prebuilt:http_parser",
+)
+
+bind(
+    name = "lightstep",
+    actual = "//ci/prebuilt:lightstep",
+)
+
+bind(
+    name = "nghttp2",
+    actual = "//ci/prebuilt:nghttp2",
+)
+
+bind(
+    name = "protobuf",
+    actual = "//ci/prebuilt:protobuf",
+)
+
+local_repository(
+    name = "protobuf_git",
+    path = "/thirdparty/protobuf-3.2.0",
+)
+
+bind(
+    name = "protoc",
+    actual = "//ci/prebuilt:protoc",
+)
+
+bind(
+    name = "rapidjson",
+    actual = "//ci/prebuilt:rapidjson",
+)
+
+bind(
     name = "spdlog",
     actual = "//ci/prebuilt:spdlog",
 )
