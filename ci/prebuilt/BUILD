@@ -41,6 +41,52 @@ cc_library(
 )
 
 cc_library(
+    name = "http_parser",
+    srcs = ["thirdparty_build/lib/libhttp_parser.a"],
+    hdrs = glob(["thirdparty_build/include/http_parser.h"]),
+    strip_include_prefix = "thirdparty_build/include",
+)
+
+cc_library(
+    name = "lightstep",
+    srcs = ["thirdparty_build/lib/liblightstep_core_cxx11.a"],
+    hdrs = glob([
+        "thirdparty_build/include/lightstep/**/*.h",
+        "thirdparty_build/include/mapbox_variant/**/*.hpp",
+    ]) + [
+        "thirdparty_build/include/collector.pb.h",
+        "thirdparty_build/include/lightstep_carrier.pb.h",
+    ],
+    strip_include_prefix = "thirdparty_build/include",
+    deps = [":protobuf"],
+)
+
+cc_library(
+    name = "nghttp2",
+    srcs = ["thirdparty_build/lib/libnghttp2.a"],
+    hdrs = glob(["thirdparty_build/include/nghttp2/**/*.h"]),
+    strip_include_prefix = "thirdparty_build/include",
+)
+
+cc_library(
+    name = "protobuf",
+    srcs = glob(["thirdparty_build/lib/libproto*.a"]),
+    hdrs = glob(["thirdparty_build/include/google/protobuf/**/*.h"]),
+    strip_include_prefix = "thirdparty_build/include",
+)
+
+filegroup(
+    name = "protoc",
+    srcs = ["thirdparty_build/bin/protoc"],
+)
+
+cc_library(
+    name = "rapidjson",
+    hdrs = glob(["thirdparty/rapidjson-1.1.0/include/**/*.h"]),
+    strip_include_prefix = "thirdparty/rapidjson-1.1.0/include",
+)
+
+cc_library(
     name = "spdlog",
     hdrs = glob([
         "thirdparty/spdlog-0.11.0/include/**/*.cc",

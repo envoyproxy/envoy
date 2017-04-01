@@ -12,6 +12,7 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
