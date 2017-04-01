@@ -4,7 +4,8 @@ ENVOY_COPTS = [
     # TODO(htuch): Remove this when Bazel bringup is done.
     "-DBAZEL_BRINGUP",
     "-fno-omit-frame-pointer",
-    "-fmax-errors=3",
+    # TODO(htuch): Clang wants -ferror-limit, should support both. Commented out for now.
+    # "-fmax-errors=3",
     "-Wall",
     "-Wextra",
     "-Werror",

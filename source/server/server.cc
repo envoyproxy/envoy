@@ -244,7 +244,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
     access_log_manager_.reopen();
   });
 
-  sig_hup_ = handler_.dispatcher().listenForSignal(SIGHUP, [this]() -> void {
+  sig_hup_ = handler_.dispatcher().listenForSignal(SIGHUP, []() -> void {
     log().warn("caught and eating SIGHUP. See documentation for how to hot restart.");
   });
 
