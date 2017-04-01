@@ -19,5 +19,5 @@ envoy_cc_library(
 
 config_setting(
     name = "force_test_link_static",
-    values = {"define": "FORCE_TEST_LINK_STATIC=yes"},
+    values = {"define": "force_test_link_static=yes"},
 )
