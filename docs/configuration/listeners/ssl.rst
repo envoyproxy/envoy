@@ -42,8 +42,7 @@ alt_alpn_protocols
 ca_cert_file
   *(optional, string)* A file containing certificate authority certificates to use in verifying
   a presented client side certificate. If not specified and a client certificate is presented it
-  will not be verified. If specified, a client must present a valid certificate or the
-  connection will be rejected.
+  will not be verified.
 
 verify_certificate_hash
   *(optional, string)* If specified, Envoy will verify (pin) the hash of the presented client
