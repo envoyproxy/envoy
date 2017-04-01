@@ -9,10 +9,12 @@ if [[ "$1" == "bazel.debug" ]]; then
   cd ci
   ln -sf /thirdparty prebuilt
   ln -sf /thirdparty_build prebuilt
-  # Not sandboxing, since non-privileged Docker can't do nested namespaces.
+  # Only CC is required to find g++, see
+  # https://www.bazel.build/blog/2016/03/31/autoconfiguration.html#implementation
   export CC=gcc-4.9
   export USER=bazel
   export TEST_TMPDIR=/source/build
+  # Not sandboxing, since non-privileged Docker can't do nested namespaces.
   BAZEL_OPTIONS="--strategy=CppCompile=standalone --strategy=CppLink=standalone \
     --strategy=TestRunner=standalone --strategy=ProtoCompile=standalone \
     --strategy=Genrule=standalone --verbose_failures --package_path %workspace%:.."
