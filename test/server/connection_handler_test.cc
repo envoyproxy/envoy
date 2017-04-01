@@ -24,7 +24,7 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
   Api::MockApi* api = new Api::MockApi();
   Event::MockDispatcher* dispatcher = new NiceMock<Event::MockDispatcher>();
   EXPECT_CALL(*api, allocateDispatcher_()).WillOnce(Return(dispatcher));
-  Server::ConnectionHandlerImpl handler(stats_store, log(), Api::ApiPtr{api});
+  Server::ConnectionHandlerImpl handler(log(), Api::ApiPtr{api});
   Network::MockFilterChainFactory factory;
   Network::MockConnectionHandler connection_handler;
   NiceMock<Network::MockListenSocket> socket;
@@ -57,7 +57,7 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
   Api::MockApi* api = new Api::MockApi();
   Event::MockDispatcher* dispatcher = new NiceMock<Event::MockDispatcher>();
   EXPECT_CALL(*api, allocateDispatcher_()).WillOnce(Return(dispatcher));
-  Server::ConnectionHandlerImpl handler(stats_store, log(), Api::ApiPtr{api});
+  Server::ConnectionHandlerImpl handler(log(), Api::ApiPtr{api});
   Network::MockFilterChainFactory factory;
   Network::MockConnectionHandler connection_handler;
   NiceMock<Network::MockListenSocket> socket;
@@ -87,7 +87,7 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
   Api::MockApi* api = new Api::MockApi();
   Event::MockDispatcher* dispatcher = new NiceMock<Event::MockDispatcher>();
   EXPECT_CALL(*api, allocateDispatcher_()).WillOnce(Return(dispatcher));
-  Server::ConnectionHandlerImpl handler(stats_store, log(), Api::ApiPtr{api});
+  Server::ConnectionHandlerImpl handler(log(), Api::ApiPtr{api});
   Network::MockFilterChainFactory factory;
   Network::MockConnectionHandler connection_handler;
   Network::MockListenSocket socket;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/server/admin.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -12,6 +13,7 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -141,4 +143,29 @@ public:
   testing::NiceMock<Init::MockManager> init_manager_;
 };
 
+namespace Configuration {
+
+class MockMain : public Main {
+public:
+  MockMain() : MockMain(0, 0, 0, 0) {}
+  MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill);
+  MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
+  MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
+  MOCK_METHOD0(listeners, std::list<ListenerPtr>&());
+  MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
+  MOCK_METHOD0(statsdTcpClusterName, Optional<std::string>());
+  MOCK_METHOD0(statsdUdpPort, Optional<uint32_t>());
+  MOCK_METHOD0(statsFlushInterval, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(wdMegaMissTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(wdKillTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(wdMultiKillTimeout, std::chrono::milliseconds());
+
+  std::chrono::milliseconds wd_miss_;
+  std::chrono::milliseconds wd_megamiss_;
+  std::chrono::milliseconds wd_kill_;
+  std::chrono::milliseconds wd_multikill_;
+};
+
+} // Configuration
 } // Server

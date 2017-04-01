@@ -151,6 +151,7 @@ add_executable(envoy-test
   server/configuration_impl_test.cc
   server/connection_handler_test.cc
   server/drain_manager_impl_test.cc
+  server/guarddog_impl_test.cc
   server/http/admin_test.cc
   server/http/health_check_test.cc
   server/options_impl_test.cc
