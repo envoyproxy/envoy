@@ -65,6 +65,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "guarddog_lib",
+    srcs = ["guarddog_impl.cc"],
+    hdrs = ["guarddog_impl.h"],
+    deps = [
+        ":watchdog_lib",
+        "//include/envoy/event:dispatcher_includes",
+        "//include/envoy/server:configuration_includes",
+        "//include/envoy/server:guarddog_includes",
+        "//include/envoy/server:watchdog_includes",
+        "//include/envoy/stats:stats_includes",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/event:libevent_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "options_lib",
     srcs = ["options_impl.cc"],
     hdrs = ["options_impl.h"],
@@ -121,11 +139,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "watchdog_lib",
+    srcs = ["watchdog_impl.cc"],
+    hdrs = ["watchdog_impl.h"],
+    deps = [
+        "//include/envoy/common:time_includes",
+        "//include/envoy/event:dispatcher_includes",
+        "//include/envoy/server:watchdog_includes",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "worker_lib",
     srcs = ["worker.cc"],
     hdrs = ["worker.h"],
     deps = [
         ":connection_handler_lib",
+        ":guarddog_lib",
         "//include/envoy/event:dispatcher_includes",
         "//include/envoy/event:timer_includes",
         "//include/envoy/server:configuration_includes",
