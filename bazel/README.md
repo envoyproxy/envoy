@@ -20,10 +20,10 @@ independently sourced, the following steps should be followed:
 As a developer convenience, a [WORKSPACE](https://github.com/lyft/envoy/blob/master/WORKSPACE) and
 [rules for building a recent
 version](https://github.com/lyft/envoy/blob/master/bazel/repositories.bzl) of the various Envoy
-dependencies are provided. These are provided as-is and are only suitable for development and
+dependencies are provided. These are provided as is, they are only suitable for development and
 testing purposes. The specific versions of the Envoy dependencies used in this build may not be
-up-to-date with the latest security patches, Bazel build rules for deps have been improvised in some
-cases and this build is not checked by CI.
+up-to-date with the latest security patches. In addition, Bazel build rules for deps have been
+improvised in some cases and this build is not checked by CI.
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
 2. `bazel build //source/exe:envoy-static` from the Envoy source directory.
