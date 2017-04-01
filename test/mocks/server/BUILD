@@ -8,6 +8,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//include/envoy/server:admin_includes",
+        "//include/envoy/server:configuration_includes",
         "//include/envoy/server:drain_manager_includes",
         "//include/envoy/server:instance_includes",
         "//include/envoy/server:options_includes",
