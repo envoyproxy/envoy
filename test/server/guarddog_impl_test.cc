@@ -208,17 +208,15 @@ TEST(WatchDogBasicTest, ThreadIdTest) {
   gd.stopWatching(watched_dog);
 }
 
-// If this test fails it is because the SystemTime object has become nontrivial
-// or we are compiling under a compiler and library combo that makes the
-// SystemTime object require a lock to be atomicly modified.
+// If this test fails it is because the std::chrono::system_clock::duration type has become
+// nontrivial or we are compiling under a compiler and library combo that makes
+// std::chrono::system_clock::duration require a lock to be atomicly modified.
 //
-// The WatchDog/GuardDog relies on this being a lock free atomic for perf
-// reasons so some workaround will be required if this test starts failing.
+// The WatchDog/GuardDog relies on this being a lock free atomic for perf reasons so some workaround
+// will be required if this test starts failing.
 TEST(WatchDogTimeTest, AtomicIsAtomicTest) {
-  // To compile this test the atomic SystemTime must be non-default initialized,
-  // even though we only call the is_lock_free() method.
   ProdSystemTimeSource time_source;
-  std::atomic<SystemTime> atomic_time(time_source.currentSystemTime());
+  std::atomic<std::chrono::system_clock::duration> atomic_time;
   ASSERT_EQ(atomic_time.is_lock_free(), true);
 }
 

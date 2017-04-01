@@ -30,6 +30,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "guarddog_includes",
+    hdrs = ["guarddog.h"],
+    deps = [
+        "//include/envoy/server:watchdog_includes",
+        "//include/envoy/stats:stats_includes",
+    ],
+)
+
+envoy_cc_library(
     name = "hot_restart_includes",
     hdrs = ["hot_restart.h"],
     deps = ["//include/envoy/event:dispatcher_includes"],
@@ -59,4 +68,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "options_includes",
     hdrs = ["options.h"],
+)
+
+envoy_cc_library(
+    name = "watchdog_includes",
+    hdrs = ["watchdog.h"],
+    deps = ["//include/envoy/event:dispatcher_includes"],
 )
