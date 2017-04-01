@@ -62,3 +62,7 @@ the units tests in
 ```
 bazel test //test/commont/http:async_client_impl_test
 ```
+
+# Adding or maintaining Envoy build rules
+
+See the [developer guide for writing Envoy Bazel rules](DEVELOPER.md).
