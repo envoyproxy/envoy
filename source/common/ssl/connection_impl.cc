@@ -119,6 +119,7 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
 }
 
 void ConnectionImpl::drainErrorQueue() {
+  ctx_.stats().connection_error_.inc();
   while (uint64_t err = ERR_get_error()) {
     conn_log_debug("SSL error: {}:{}:{}:{}", *this, err, ERR_lib_error_string(err),
                    ERR_func_error_string(err), ERR_reason_error_string(err));
