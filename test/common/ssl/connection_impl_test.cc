@@ -248,6 +248,8 @@ TEST(SslConnectionImplTest, SslError) {
       }));
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(1UL, stats_store.counter("ssl.connection_error").value());
 }
 
 class SslReadBufferLimitTest : public testing::Test {
@@ -344,6 +346,8 @@ public:
     }
 
     dispatcher.run(Event::Dispatcher::RunType::Block);
+
+    EXPECT_EQ(0UL, stats_store.counter("ssl.connection_error").value());
   }
 };
 
