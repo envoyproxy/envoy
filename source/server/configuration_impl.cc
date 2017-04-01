@@ -55,6 +55,15 @@ void MainImpl::initialize(const Json::Object& json) {
   stats_flush_interval_ =
       std::chrono::milliseconds(json.getInteger("stats_flush_interval_ms", 5000));
 
+  watchdog_miss_timeout_ =
+      std::chrono::milliseconds(json.getInteger("watchdog_miss_timeout_ms", 200));
+  watchdog_megamiss_timeout_ =
+      std::chrono::milliseconds(json.getInteger("watchdog_megamiss_timeout_ms", 1000));
+  watchdog_kill_timeout_ =
+      std::chrono::milliseconds(json.getInteger("watchdog_kill_timeout_ms", 0));
+  watchdog_multikill_timeout_ =
+      std::chrono::milliseconds(json.getInteger("watchdog_multikill_timeout_ms", 0));
+
   if (json.hasObject("tracing")) {
     initializeTracers(*json.getObject("tracing"));
   } else {

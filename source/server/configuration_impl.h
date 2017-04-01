@@ -74,6 +74,14 @@ public:
   Optional<std::string> statsdTcpClusterName() override { return statsd_tcp_cluster_name_; }
   Optional<uint32_t> statsdUdpPort() override { return statsd_udp_port_; }
   std::chrono::milliseconds statsFlushInterval() override { return stats_flush_interval_; }
+  std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
+  std::chrono::milliseconds wdMegaMissTimeout() const override {
+    return watchdog_megamiss_timeout_;
+  }
+  std::chrono::milliseconds wdKillTimeout() const override { return watchdog_kill_timeout_; }
+  std::chrono::milliseconds wdMultiKillTimeout() const override {
+    return watchdog_multikill_timeout_;
+  }
 
 private:
   /**
@@ -128,6 +136,10 @@ private:
   Optional<uint32_t> statsd_udp_port_;
   RateLimit::ClientFactoryPtr ratelimit_client_factory_;
   std::chrono::milliseconds stats_flush_interval_;
+  std::chrono::milliseconds watchdog_miss_timeout_;
+  std::chrono::milliseconds watchdog_megamiss_timeout_;
+  std::chrono::milliseconds watchdog_kill_timeout_;
+  std::chrono::milliseconds watchdog_multikill_timeout_;
 };
 
 /**

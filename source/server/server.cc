@@ -18,6 +18,7 @@
 #include "common/stats/statsd.h"
 
 #include "server/configuration_impl.h"
+#include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker.h"
 
@@ -56,7 +57,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
-      handler_(stats_store_, log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
+      handler_(log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
       dns_resolver_(handler_.dispatcher().createDnsResolver()), local_info_(local_info),
       access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {
 
@@ -189,7 +190,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
 
   // Workers get created first so they register for thread local updates.
   for (uint32_t i = 0; i < std::max(1U, options.concurrency()); i++) {
-    workers_.emplace_back(new Worker(stats_store_, thread_local_, options.fileFlushIntervalMsec()));
+    workers_.emplace_back(new Worker(thread_local_, options.fileFlushIntervalMsec()));
   }
 
   // The main thread is also registered for thread local updates so that code that does not care
@@ -254,6 +255,11 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   stat_flush_timer_ = handler_.dispatcher().createTimer([this]() -> void { flushStats(); });
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 
+  // GuardDog (deadlock detection) object and thread setup before workers are
+  // started and before our own run() loop runs.
+  guard_dog_.reset(
+      new Server::GuardDogImpl(*admin_scope_, *config_, ProdSystemTimeSource::instance_));
+
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
   // this can fire immediately if all clusters have already initialized.
@@ -267,7 +273,7 @@ void InstanceImpl::startWorkers(TestHooks& hooks) {
   log().warn("all dependencies initialized. starting workers");
   for (const WorkerPtr& worker : workers_) {
     try {
-      worker->initializeConfiguration(*config_, socket_map_);
+      worker->initializeConfiguration(*config_, socket_map_, *guard_dog_);
     } catch (const Network::CreateListenerException& e) {
       // It is possible that we fail to start listening on a port, even though we were able to
       // bind to it above. This happens when there is a race between two applications to listen
@@ -344,9 +350,12 @@ uint64_t InstanceImpl::numConnections() {
 void InstanceImpl::run() {
   // Run the main dispatch loop waiting to exit.
   log().warn("starting main dispatch loop");
-  handler_.startWatchdog();
+  auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
+  watchdog->startWatchdog(handler_.dispatcher());
   handler_.dispatcher().run(Event::Dispatcher::RunType::Block);
   log().warn("main dispatch loop exited");
+  guard_dog_->stopWatching(watchdog);
+  watchdog.reset();
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
