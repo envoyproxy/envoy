@@ -7,8 +7,8 @@ envoy_cc_test(
     srcs = ["filesystem_impl_test.cc"],
     deps = [
         "//source/common/common:thread_lib",
+        "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
-        "//source/common/event:dispatcher_lib_includes",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/event:event_mocks",
@@ -22,8 +22,8 @@ envoy_cc_test(
     srcs = ["watcher_impl_test.cc"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
-        "//source/common/event:dispatcher_lib_includes",
         "//source/common/filesystem:watcher_lib",
         "//test/test_common:environment_lib",
     ],

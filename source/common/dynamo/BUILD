@@ -9,8 +9,8 @@ envoy_cc_library(
     deps = [
         ":dynamo_request_parser_lib",
         ":dynamo_utility_lib",
-        "//include/envoy/http:filter_includes",
-        "//include/envoy/runtime:runtime_includes",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:exception_lib",
@@ -22,7 +22,7 @@ envoy_cc_library(
     srcs = ["dynamo_request_parser.cc"],
     hdrs = ["dynamo_request_parser.h"],
     deps = [
-        "//include/envoy/http:header_map_includes",
+        "//include/envoy/http:header_map_interface",
         "//source/common/common:utility_lib",
         "//source/common/json:json_loader_lib",
     ],

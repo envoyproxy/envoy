@@ -7,7 +7,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/api:api_includes",
+        "//include/envoy/api:api_interface",
         "//test/mocks/filesystem:filesystem_mocks",
     ],
 )

@@ -46,8 +46,8 @@ envoy_cc_test_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
-        "//include/envoy/buffer:buffer_includes",
-        "//include/envoy/network:address_includes",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/network:address_interface",
         "//source/common/common:empty_string",
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",

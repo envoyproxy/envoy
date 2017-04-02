@@ -7,8 +7,8 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/stats:stats_includes",
-        "//include/envoy/thread_local:thread_local_includes",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/thread_local:thread_local_interface",
         "//source/common/stats:stats_lib",
         "//test/mocks:common_lib",
     ],

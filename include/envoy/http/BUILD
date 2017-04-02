@@ -3,79 +3,79 @@ package(default_visibility = ["//visibility:public"])
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
 
 envoy_cc_library(
-    name = "access_log_includes",
+    name = "access_log_interface",
     hdrs = ["access_log.h"],
     deps = [
-        ":header_map_includes",
-        ":protocol_includes",
-        "//include/envoy/common:optional_includes",
-        "//include/envoy/common:time_includes",
-        "//include/envoy/upstream:upstream_includes",
+        ":header_map_interface",
+        ":protocol_interface",
+        "//include/envoy/common:optional",
+        "//include/envoy/common:time_interface",
+        "//include/envoy/upstream:upstream_interface",
     ],
 )
 
 envoy_cc_library(
-    name = "async_client_includes",
+    name = "async_client_interface",
     hdrs = ["async_client.h"],
     deps = [
-        ":message_includes",
-        "//include/envoy/common:optional_includes",
+        ":message_interface",
+        "//include/envoy/common:optional",
     ],
 )
 
 envoy_cc_library(
-    name = "codec_includes",
+    name = "codec_interface",
     hdrs = ["codec.h"],
     deps = [
-        ":header_map_includes",
-        ":protocol_includes",
-        "//include/envoy/buffer:buffer_includes",
+        ":header_map_interface",
+        ":protocol_interface",
+        "//include/envoy/buffer:buffer_interface",
     ],
 )
 
 envoy_cc_library(
-    name = "codes_includes",
+    name = "codes_interface",
     hdrs = ["codes.h"],
 )
 
 envoy_cc_library(
-    name = "conn_pool_includes",
+    name = "conn_pool_interface",
     hdrs = ["conn_pool.h"],
     deps = [
-        ":codec_includes",
+        ":codec_interface",
         "//include/envoy/event:deferred_deletable",
-        "//include/envoy/upstream:upstream_includes",
+        "//include/envoy/upstream:upstream_interface",
     ],
 )
 
 envoy_cc_library(
-    name = "filter_includes",
+    name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [
-        ":access_log_includes",
-        ":codec_includes",
-        ":header_map_includes",
-        "//include/envoy/event:dispatcher_includes",
-        "//include/envoy/router:router_includes",
-        "//include/envoy/ssl:connection_includes",
+        ":access_log_interface",
+        ":codec_interface",
+        ":header_map_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/router:router_interface",
+        "//include/envoy/ssl:connection_interface",
     ],
 )
 
 envoy_cc_library(
-    name = "header_map_includes",
+    name = "header_map_interface",
     hdrs = ["header_map.h"],
 )
 
 envoy_cc_library(
-    name = "message_includes",
+    name = "message_interface",
     hdrs = ["message.h"],
     deps = [
-        ":header_map_includes",
-        "//include/envoy/buffer:buffer_includes",
+        ":header_map_interface",
+        "//include/envoy/buffer:buffer_interface",
     ],
 )
 
 envoy_cc_library(
-    name = "protocol_includes",
+    name = "protocol_interface",
     hdrs = ["protocol.h"],
 )

@@ -7,9 +7,9 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/router:router_includes",
-        "//include/envoy/router:router_ratelimit_includes",
-        "//include/envoy/router:shadow_writer_includes",
+        "//include/envoy/router:router_interface",
+        "//include/envoy/router:router_ratelimit_interface",
+        "//include/envoy/router:shadow_writer_interface",
         "//test/mocks:common_lib",
     ],
 )

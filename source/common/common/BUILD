@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["base64.h"],
     deps = [
         ":empty_string",
-        "//include/envoy/buffer:buffer_includes",
+        "//include/envoy/buffer:buffer_interface",
     ],
 )
 
@@ -52,7 +52,7 @@ envoy_cc_library(
     hdrs = ["logger.h"],
     deps = [
         ":macros",
-        "//include/envoy/thread:thread_includes",
+        "//include/envoy/thread:thread_interface",
     ],
 )
 
@@ -78,7 +78,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":macros",
-        "//include/envoy/thread:thread_includes",
+        "//include/envoy/thread:thread_interface",
     ],
 )
 
@@ -86,7 +86,7 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    deps = ["//include/envoy/common:time_includes"],
+    deps = ["//include/envoy/common:time_interface"],
 )
 
 envoy_cc_library(

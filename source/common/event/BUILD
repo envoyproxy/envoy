@@ -16,11 +16,11 @@ envoy_cc_library(
         "timer_impl.h",
     ],
     deps = [
-        ":dispatcher_lib_includes",
-        "//include/envoy/event:signal_includes",
-        "//include/envoy/event:timer_includes",
-        "//include/envoy/network:listen_socket_includes",
-        "//include/envoy/network:listener_includes",
+        ":dispatcher_includes",
+        "//include/envoy/event:signal_interface",
+        "//include/envoy/event:timer_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/network:listener_interface",
         "//source/common/common:assert_lib",
         "//source/common/filesystem:watcher_lib",
         "//source/common/network:connection_lib",
@@ -31,7 +31,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "dispatcher_lib_includes",
+    name = "dispatcher_includes",
     hdrs = [
         "dispatcher_impl.h",
         "event_impl_base.h",
@@ -40,9 +40,9 @@ envoy_cc_library(
     deps = [
         ":libevent_lib",
         "//include/envoy/event:deferred_deletable",
-        "//include/envoy/event:dispatcher_includes",
-        "//include/envoy/event:file_event_includes",
-        "//include/envoy/network:connection_handler_includes",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:file_event_interface",
+        "//include/envoy/network:connection_handler_interface",
         "//source/common/common:logger_lib",
     ],
 )

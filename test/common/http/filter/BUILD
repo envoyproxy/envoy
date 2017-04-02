@@ -6,7 +6,7 @@ envoy_cc_test(
     name = "buffer_filter_test",
     srcs = ["buffer_filter_test.cc"],
     deps = [
-        "//include/envoy/event:dispatcher_includes",
+        "//include/envoy/event:dispatcher_interface",
         "//source/common/http:header_map_lib",
         "//source/common/http/filter:buffer_filter_lib",
         "//source/common/stats:stats_lib",
@@ -20,7 +20,7 @@ envoy_cc_test(
     name = "fault_filter_test",
     srcs = ["fault_filter_test.cc"],
     deps = [
-        "//include/envoy/event:dispatcher_includes",
+        "//include/envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:header_map_lib",
@@ -42,8 +42,8 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:headers_lib",
+        "//source/common/http/filter:ratelimit_includes",
         "//source/common/http/filter:ratelimit_lib",
-        "//source/common/http/filter:ratelimit_lib_includes",
         "//source/common/ratelimit:ratelimit_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",

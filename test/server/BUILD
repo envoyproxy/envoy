@@ -43,13 +43,13 @@ envoy_cc_test(
     name = "guarddog_impl_test",
     srcs = ["guarddog_impl_test.cc"],
     deps = [
-        "//include/envoy/common:time_includes",
+        "//include/envoy/common:time_interface",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/server:guarddog_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
-        "//test/mocks:common_lib",
     ],
 )
 

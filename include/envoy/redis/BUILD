@@ -3,22 +3,22 @@ package(default_visibility = ["//visibility:public"])
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
 
 envoy_cc_library(
-    name = "codec_includes",
+    name = "codec_interface",
     hdrs = ["codec.h"],
-    deps = ["//include/envoy/buffer:buffer_includes"],
+    deps = ["//include/envoy/buffer:buffer_interface"],
 )
 
 envoy_cc_library(
-    name = "command_splitter_includes",
+    name = "command_splitter_interface",
     hdrs = ["command_splitter.h"],
-    deps = [":codec_includes"],
+    deps = [":codec_interface"],
 )
 
 envoy_cc_library(
-    name = "conn_pool_includes",
+    name = "conn_pool_interface",
     hdrs = ["conn_pool.h"],
     deps = [
-        ":codec_includes",
-        "//include/envoy/upstream:cluster_manager_includes",
+        ":codec_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
     ],
 )

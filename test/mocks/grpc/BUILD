@@ -6,5 +6,5 @@ envoy_cc_mock(
     name = "grpc_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    deps = ["//include/envoy/grpc:rpc_channel_includes"],
+    deps = ["//include/envoy/grpc:rpc_channel_interface"],
 )

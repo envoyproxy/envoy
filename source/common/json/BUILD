@@ -13,11 +13,11 @@ envoy_cc_library(
     srcs = ["json_loader.cc"],
     hdrs = ["json_loader.h"],
     external_deps = ["rapidjson"],
-    deps = ["//include/envoy/json:json_object_includes"],
+    deps = ["//include/envoy/json:json_object_interface"],
 )
 
 envoy_cc_library(
     name = "json_validator_lib",
     hdrs = ["json_validator.h"],
-    deps = ["//include/envoy/json:json_object_includes"],
+    deps = ["//include/envoy/json:json_object_interface"],
 )
