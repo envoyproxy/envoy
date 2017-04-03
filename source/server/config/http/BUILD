@@ -7,7 +7,7 @@ envoy_cc_library(
     srcs = ["buffer.cc"],
     hdrs = ["buffer.h"],
     deps = [
-        "//include/envoy/server:instance_includes",
+        "//include/envoy/server:instance_interface",
         "//source/common/http/filter:buffer_filter_lib",
         "//source/common/json:config_schemas_lib",
         "//source/server/config/network:http_connection_manager_lib",
@@ -31,7 +31,7 @@ envoy_cc_library(
     srcs = ["fault.cc"],
     hdrs = ["fault.h"],
     deps = [
-        "//include/envoy/server:instance_includes",
+        "//include/envoy/server:instance_interface",
         "//source/common/http/filter:fault_filter_lib",
         "//source/common/json:config_schemas_lib",
         "//source/server/config/network:http_connection_manager_lib",
@@ -44,7 +44,7 @@ envoy_cc_library(
     srcs = ["grpc_http1_bridge.cc"],
     hdrs = ["grpc_http1_bridge.h"],
     deps = [
-        "//include/envoy/server:instance_includes",
+        "//include/envoy/server:instance_interface",
         "//source/common/grpc:http1_bridge_filter_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
@@ -56,9 +56,9 @@ envoy_cc_library(
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
     deps = [
-        "//include/envoy/server:instance_includes",
+        "//include/envoy/server:instance_interface",
+        "//source/common/http/filter:ratelimit_includes",
         "//source/common/http/filter:ratelimit_lib",
-        "//source/common/http/filter:ratelimit_lib_includes",
         "//source/server/config/network:http_connection_manager_lib",
     ],
     alwayslink = 1,
@@ -69,7 +69,7 @@ envoy_cc_library(
     srcs = ["router.cc"],
     hdrs = ["router.h"],
     deps = [
-        "//include/envoy/server:instance_includes",
+        "//include/envoy/server:instance_interface",
         "//source/common/json:config_schemas_lib",
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",

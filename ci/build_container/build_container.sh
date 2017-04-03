@@ -22,6 +22,10 @@ rm -rf /var/lib/apt/lists/*
 # virtualenv
 pip install virtualenv
 
+# buildifier
+export GOPATH=/usr/lib/go
+go get github.com/bazelbuild/buildifier/buildifier
+
 # Build artifacts
 THIRDPARTY_BUILD=/thirdparty_build
 mkdir $THIRDPARTY_BUILD

@@ -7,8 +7,8 @@ envoy_cc_library(
     srcs = ["stats_impl.cc"],
     hdrs = ["stats_impl.h"],
     deps = [
-        "//include/envoy/common:time_includes",
-        "//include/envoy/stats:stats_includes",
+        "//include/envoy/common:time_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
     ],
@@ -19,12 +19,12 @@ envoy_cc_library(
     srcs = ["statsd.cc"],
     hdrs = ["statsd.h"],
     deps = [
-        "//include/envoy/event:dispatcher_includes",
-        "//include/envoy/local_info:local_info_includes",
-        "//include/envoy/network:connection_includes",
-        "//include/envoy/stats:stats_includes",
-        "//include/envoy/thread_local:thread_local_includes",
-        "//include/envoy/upstream:cluster_manager_includes",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/network:address_lib",
@@ -38,6 +38,6 @@ envoy_cc_library(
     hdrs = ["thread_local_store.h"],
     deps = [
         ":stats_lib",
-        "//include/envoy/thread_local:thread_local_includes",
+        "//include/envoy/thread_local:thread_local_interface",
     ],
 )

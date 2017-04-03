@@ -12,11 +12,11 @@ cc_library(
 )
 
 envoy_cc_library(
-    name = "time_includes",
+    name = "time_interface",
     hdrs = ["time.h"],
 )
 
 envoy_cc_library(
-    name = "optional_includes",
+    name = "optional",
     hdrs = ["optional.h"],
 )

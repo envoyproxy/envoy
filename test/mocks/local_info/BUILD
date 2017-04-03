@@ -7,7 +7,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/local_info:local_info_includes",
+        "//include/envoy/local_info:local_info_interface",
         "//source/common/network:address_lib",
     ],
 )

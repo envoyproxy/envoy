@@ -7,7 +7,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/ratelimit:ratelimit_includes",
-        "//include/envoy/tracing:context_includes",
+        "//include/envoy/ratelimit:ratelimit_interface",
+        "//include/envoy/tracing:context_interface",
     ],
 )

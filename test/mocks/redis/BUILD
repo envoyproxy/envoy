@@ -7,8 +7,8 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/redis:command_splitter_includes",
-        "//include/envoy/redis:conn_pool_includes",
+        "//include/envoy/redis:command_splitter_interface",
+        "//include/envoy/redis:conn_pool_interface",
         "//source/common/common:assert_lib",
         "//source/common/redis:codec_lib",
     ],

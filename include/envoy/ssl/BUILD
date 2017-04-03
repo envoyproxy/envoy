@@ -3,26 +3,26 @@ package(default_visibility = ["//visibility:public"])
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
 
 envoy_cc_library(
-    name = "connection_includes",
+    name = "connection_interface",
     hdrs = ["connection.h"],
 )
 
 envoy_cc_library(
-    name = "context_includes",
+    name = "context_interface",
     hdrs = ["context.h"],
 )
 
 envoy_cc_library(
-    name = "context_config_includes",
+    name = "context_config_interface",
     hdrs = ["context_config.h"],
 )
 
 envoy_cc_library(
-    name = "context_manager_includes",
+    name = "context_manager_interface",
     hdrs = ["context_manager.h"],
     deps = [
-        ":context_config_includes",
-        ":context_includes",
-        "//include/envoy/stats:stats_includes",
+        ":context_config_interface",
+        ":context_interface",
+        "//include/envoy/stats:stats_interface",
     ],
 )

@@ -6,8 +6,8 @@ envoy_cc_test(
     name = "dispatcher_impl_test",
     srcs = ["dispatcher_impl_test.cc"],
     deps = [
+        "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
-        "//source/common/event:dispatcher_lib_includes",
         "//test/mocks:common_lib",
     ],
 )
@@ -16,9 +16,9 @@ envoy_cc_test(
     name = "file_event_impl_test",
     srcs = ["file_event_impl_test.cc"],
     deps = [
-        "//include/envoy/event:file_event_includes",
+        "//include/envoy/event:file_event_interface",
+        "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
-        "//source/common/event:dispatcher_lib_includes",
         "//test/mocks:common_lib",
     ],
 )
