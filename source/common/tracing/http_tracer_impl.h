@@ -65,6 +65,15 @@ public:
   static void finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
                            const Http::AccessLog::RequestInfo& request_info);
 
+  /**
+   * Populate the active span's tags from request headers based on the list of headers to use.
+   * @param active_span span to populate.
+   * @param request_headers request headers.
+   * @param headers list of headers to be used as tags.
+   */
+  static void populateTagsBasedOnHeaders(Span& active_span, const Http::HeaderMap& request_headers,
+                                         const Config& tracing_config);
+
   static const std::string INGRESS_OPERATION;
   static const std::string EGRESS_OPERATION;
 };

@@ -315,6 +315,8 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     if (request_info_.healthCheck()) {
       connection_manager_.config_.tracingStats().health_check_.inc();
     } else {
+      Tracing::HttpTracerUtility::populateTagsBasedOnHeaders(*active_span_, *request_headers_,
+                                                             *this);
       Tracing::HttpTracerUtility::finalizeSpan(*active_span_, *request_headers_, request_info_);
     }
   }
@@ -746,6 +748,11 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
 
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
   return connection_manager_.config_.tracingConfig().value().operation_name_;
+}
+
+const std::list<Http::LowerCaseString>&
+ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
+  return connection_manager_.config_.tracingConfig().value().request_headers_for_tags_;
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::addResetStreamCallback(

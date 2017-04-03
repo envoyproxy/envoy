@@ -214,6 +214,11 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           "operation_name" : {
             "type" : "string",
             "enum": ["ingress", "egress"]
+          },
+          "request_headers_for_tags": {
+            "type" : "array",
+            "uniqueItems": "true",
+            "items" : {"type" : "string"}
           }
         },
         "required" : ["operation_name"],

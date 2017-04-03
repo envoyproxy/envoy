@@ -111,7 +111,7 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
     return {Reason::NotTraceableRequestId, false};
   }
 
-  throw std::invalid_argument("Unknown trace_status");
+  NOT_REACHED;
 }
 
 void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
@@ -143,6 +143,17 @@ void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& r
   }
 
   active_span.finishSpan();
+}
+
+void HttpTracerUtility::populateTagsBasedOnHeaders(Span& active_span,
+                                                   const Http::HeaderMap& request_headers,
+                                                   const Config& tracing_config) {
+  for (const Http::LowerCaseString& header : tracing_config.requestHeadersForTags()) {
+    const Http::HeaderEntry* entry = request_headers.get(header);
+    if (entry) {
+      active_span.setTag(header.get(), entry->value().c_str());
+    }
+  }
 }
 
 HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)

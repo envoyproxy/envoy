@@ -15,7 +15,15 @@ class Config {
 public:
   virtual ~Config() {}
 
+  /**
+   * Operation name for tracing, e.g., ingress.
+   */
   virtual OperationName operationName() const PURE;
+
+  /**
+   * List of headers to populate tags on the active span.
+   */
+  virtual const std::list<Http::LowerCaseString>& requestHeadersForTags() const PURE;
 };
 
 /*

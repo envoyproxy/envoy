@@ -54,7 +54,7 @@ public:
                "",
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))} {
-    tracing_config_.value({Tracing::OperationName::Ingress});
+    tracing_config_.value({Tracing::OperationName::Ingress, {Http::LowerCaseString(":method")}});
   }
 
   ~HttpConnectionManagerImplTest() {
@@ -221,6 +221,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
         return span;
       }));
   EXPECT_CALL(*span, finishSpan());
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  // Verify tag is set based on the request headers.
+  EXPECT_CALL(*span, setTag(":method", "GET"));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
 

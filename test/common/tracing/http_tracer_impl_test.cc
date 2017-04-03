@@ -317,6 +317,22 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
 }
 
+TEST(HttpTracerUtilityTest, SpanPopulatedFromRequestHeaders) {
+  std::unique_ptr<NiceMock<MockSpan>> span(new NiceMock<MockSpan>());
+  Http::TestHeaderMapImpl request_headers{{"aa", "a"}, {"bb", "b"}, {"cc", "c"}, {"dd", "d"}};
+
+  MockConfig config;
+  config.headers_.push_back(Http::LowerCaseString("aa"));
+  config.headers_.push_back(Http::LowerCaseString("cc"));
+  config.headers_.push_back(Http::LowerCaseString("ee"));
+
+  EXPECT_CALL(*span, setTag("aa", "a"));
+  EXPECT_CALL(*span, setTag("cc", "c"));
+  EXPECT_CALL(config, requestHeadersForTags());
+
+  HttpTracerUtility::populateTagsBasedOnHeaders(*span, request_headers, config);
+}
+
 TEST(HttpTracerUtilityTest, operationTypeToString) {
   EXPECT_EQ("ingress", HttpTracerUtility::toString(OperationName::Ingress));
   EXPECT_EQ("egress", HttpTracerUtility::toString(OperationName::Egress));
