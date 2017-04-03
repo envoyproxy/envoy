@@ -39,6 +39,9 @@ Bazel can also be built with the Docker image used for CI, by installing Docker 
 See also the [documentation](https://github.com/lyft/envoy/tree/master/ci) for developer use of the
 CI Docker image.
 
+The same caveats apply to using this build for production vs. development and testing as to the
+above Bazel quick start developer flow.
+
 ## Using a compiler toolchain in a non-standard location
 
 By setting the `CC` and `LD_LIBRARY_PATH` in the environment that Bazel executes from as

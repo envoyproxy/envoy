@@ -41,7 +41,7 @@ bind(
 
 bind(
     name = "lightstep",
-    actual = "@lightstep_git//:lightstep_core",
+    actual = "@lightstep_tar//:lightstep_core",
 )
 
 bind(
