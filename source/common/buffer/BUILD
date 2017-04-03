@@ -7,7 +7,7 @@ envoy_cc_library(
     srcs = ["buffer_impl.cc"],
     hdrs = ["buffer_impl.h"],
     deps = [
-        "//include/envoy/buffer:buffer_includes",
+        "//include/envoy/buffer:buffer_interface",
         "//source/common/event:libevent_lib",
     ],
 )

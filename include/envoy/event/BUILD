@@ -8,33 +8,33 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "dispatcher_includes",
+    name = "dispatcher_interface",
     hdrs = ["dispatcher.h"],
     deps = [
         ":deferred_deletable",
-        ":file_event_includes",
-        ":signal_includes",
-        ":timer_includes",
-        "//include/envoy/filesystem:filesystem_includes",
-        "//include/envoy/network:connection_handler_includes",
-        "//include/envoy/network:connection_includes",
-        "//include/envoy/network:dns_includes",
-        "//include/envoy/network:listen_socket_includes",
-        "//include/envoy/network:listener_includes",
+        ":file_event_interface",
+        ":signal_interface",
+        ":timer_interface",
+        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/network:connection_handler_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:dns_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/network:listener_interface",
     ],
 )
 
 envoy_cc_library(
-    name = "file_event_includes",
+    name = "file_event_interface",
     hdrs = ["file_event.h"],
 )
 
 envoy_cc_library(
-    name = "signal_includes",
+    name = "signal_interface",
     hdrs = ["signal.h"],
 )
 
 envoy_cc_library(
-    name = "timer_includes",
+    name = "timer_interface",
     hdrs = ["timer.h"],
 )

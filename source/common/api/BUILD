@@ -7,7 +7,7 @@ envoy_cc_library(
     srcs = ["api_impl.cc"],
     hdrs = ["api_impl.h"],
     deps = [
-        "//include/envoy/api:api_includes",
+        "//include/envoy/api:api_interface",
         "//source/common/event:dispatcher_lib",
         "//source/common/filesystem:filesystem_lib",
     ],

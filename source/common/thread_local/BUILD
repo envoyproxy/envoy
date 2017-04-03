@@ -7,8 +7,8 @@ envoy_cc_library(
     srcs = ["thread_local_impl.cc"],
     hdrs = ["thread_local_impl.h"],
     deps = [
-        "//include/envoy/event:dispatcher_includes",
-        "//include/envoy/thread_local:thread_local_includes",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:stl_helpers",

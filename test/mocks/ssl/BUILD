@@ -7,10 +7,10 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/ssl:connection_includes",
-        "//include/envoy/ssl:context_config_includes",
-        "//include/envoy/ssl:context_includes",
-        "//include/envoy/ssl:context_manager_includes",
-        "//include/envoy/stats:stats_includes",
+        "//include/envoy/ssl:connection_interface",
+        "//include/envoy/ssl:context_config_interface",
+        "//include/envoy/ssl:context_interface",
+        "//include/envoy/ssl:context_manager_interface",
+        "//include/envoy/stats:stats_interface",
     ],
 )
