@@ -2,6 +2,7 @@
 
 #include "common/network/utility.h"
 #include "common/network/listen_socket_impl.h"
+
 #include "test/test_common/network_utility.h"
 
 namespace Network {
@@ -26,6 +27,10 @@ TEST_P(ListenSocketImplTest, BindSpecificPort) {
   ASSERT_LT(0U, addr->ip()->port());
 
   // Release the socket and re-bind it.
+  // WARNING: This test has a small but real risk of flaky behavior if another thread or process
+  // should bind to our assigned port during the interval between closing the fd and re-binding.
+  // TODO(jamessynge): Consider adding a loop or other such approach to this test so that a
+  // bind failure (in the TcpListenSocket ctor) once isn't considered an error.
   EXPECT_EQ(0, close(addr_fd.second));
   TcpListenSocket socket1(addr, true);
   EXPECT_EQ(0, listen(socket1.fd(), 0));

@@ -1,5 +1,6 @@
 #include "envoy/common/exception.h"
 
+#include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -246,11 +247,11 @@ TEST(AddressFromSockAddr, IPv4) {
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &sin.sin_addr));
   sin.sin_port = htons(6502);
 
-  EXPECT_THROW(addressFromSockAddr(ss, 1), EnvoyException);
-  EXPECT_THROW(addressFromSockAddr(ss, sizeof(sockaddr_in) - 1), EnvoyException);
-  EXPECT_THROW(addressFromSockAddr(ss, sizeof(sockaddr_in) + 1), EnvoyException);
-  auto addr1 = addressFromSockAddr(ss, sizeof(sockaddr_in));
-  EXPECT_EQ("1.2.3.4:6502", addr1->asString());
+  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in) - 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in) + 1), "ss_len");
+
+  EXPECT_EQ("1.2.3.4:6502", addressFromSockAddr(ss, sizeof(sockaddr_in))->asString());
 
   // Invalid family.
   sin.sin_family = AF_UNSPEC;
@@ -265,28 +266,30 @@ TEST(AddressFromSockAddr, IPv6) {
   EXPECT_EQ(1, inet_pton(AF_INET6, "01:023::00Ef", &sin6.sin6_addr));
   sin6.sin6_port = htons(32000);
 
-  EXPECT_THROW(addressFromSockAddr(ss, 1), EnvoyException);
-  EXPECT_THROW(addressFromSockAddr(ss, sizeof(sockaddr_in6) - 1), EnvoyException);
-  EXPECT_THROW(addressFromSockAddr(ss, sizeof(sockaddr_in6) + 1), EnvoyException);
+  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in6) - 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in6) + 1), "ss_len");
 
-  auto addr1 = addressFromSockAddr(ss, sizeof(sockaddr_in6));
-  EXPECT_EQ("[1:23::ef]:32000", addr1->asString());
+  EXPECT_EQ("[1:23::ef]:32000", addressFromSockAddr(ss, sizeof(sockaddr_in6))->asString());
 }
 
 TEST(AddressFromSockAddr, Pipe) {
   sockaddr_storage ss;
   auto& sun = reinterpret_cast<sockaddr_un&>(ss);
   sun.sun_family = AF_UNIX;
-  strcpy(sun.sun_path, "/some/path");
 
-  EXPECT_THROW(addressFromSockAddr(ss, 1), EnvoyException);
-  EXPECT_THROW(addressFromSockAddr(ss, sizeof(sa_family_t) + 1), EnvoyException);
-  EXPECT_THROW(addressFromSockAddr(ss, sizeof(sa_family_t) + 3), EnvoyException);
-  auto addr1 = addressFromSockAddr(ss, sizeof(sa_family_t) + 1 + strlen(sun.sun_path));
-  EXPECT_EQ("/some/path", addr1->asString());
+  std::cout << "sizeof sun.sun_path=" << sizeof sun.sun_path << std::endl;
+
+  StringUtil::strlcpy(sun.sun_path, "/some/path", sizeof sun.sun_path);
+
+  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path)), "ss_len");
+
+  socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
+  EXPECT_EQ("/some/path", addressFromSockAddr(ss, ss_len)->asString());
 
   // Empty path (== start of Abstract socket name) is invalid.
-  strcpy(sun.sun_path, "");
+  StringUtil::strlcpy(sun.sun_path, "", sizeof sun.sun_path);
   EXPECT_THROW(addressFromSockAddr(ss, sizeof(sa_family_t) + 1 + strlen(sun.sun_path)),
                EnvoyException);
 }

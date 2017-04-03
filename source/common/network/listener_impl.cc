@@ -61,6 +61,9 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
       final_remote_address = Address::addressFromSockAddr(
           *reinterpret_cast<const sockaddr_storage*>(remote_addr), remote_addr_len);
     }
+    // TODO(jamessynge): We need to keep per-family stats. BUT, should it be based on the original
+    // family or the local family? Probably local family, as the original proxy can take care of
+    // stats for the original family.
     listener->newConnection(fd, final_remote_address, final_local_address);
   }
 }
