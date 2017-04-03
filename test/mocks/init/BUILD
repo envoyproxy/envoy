@@ -7,7 +7,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/init:init_includes",
+        "//include/envoy/init:init_interface",
         "//test/mocks:common_lib",
     ],
 )

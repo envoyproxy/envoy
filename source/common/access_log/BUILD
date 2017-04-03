@@ -7,7 +7,7 @@ envoy_cc_library(
     srcs = ["access_log_manager_impl.cc"],
     hdrs = ["access_log_manager_impl.h"],
     deps = [
-        "//include/envoy/access_log:access_log_includes",
-        "//include/envoy/api:api_includes",
+        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/api:api_interface",
     ],
 )

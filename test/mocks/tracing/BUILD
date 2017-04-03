@@ -7,7 +7,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/tracing:context_includes",
-        "//include/envoy/tracing:http_tracer_includes",
+        "//include/envoy/tracing:context_interface",
+        "//include/envoy/tracing:http_tracer_interface",
     ],
 )

@@ -7,8 +7,8 @@ envoy_cc_library(
     srcs = ["filesystem_impl.cc"],
     hdrs = ["filesystem_impl.h"],
     deps = [
-        "//include/envoy/event:dispatcher_includes",
-        "//include/envoy/filesystem:filesystem_includes",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/filesystem:filesystem_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:thread_lib",
     ],
@@ -19,7 +19,7 @@ envoy_cc_library(
     srcs = ["watcher_impl.cc"],
     hdrs = ["watcher_impl.h"],
     deps = [
-        "//include/envoy/event:dispatcher_includes",
+        "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",

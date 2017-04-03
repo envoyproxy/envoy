@@ -20,7 +20,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "optional_test",
     srcs = ["optional_test.cc"],
-    deps = ["//include/envoy/common:optional_includes"],
+    deps = ["//include/envoy/common:optional"],
 )
 
 envoy_cc_test(
