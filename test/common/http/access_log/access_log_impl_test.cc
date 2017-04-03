@@ -53,7 +53,7 @@ public:
   }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
   bool healthCheck() const override { return hc_request_; }
-  void healthCheck(bool is_hc) { hc_request_ = is_hc; }
+  void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
   SystemTime start_time_;
   Protocol protocol_{Protocol::Http11};

@@ -229,11 +229,6 @@ bool ContextImpl::verifyPeer(SSL* ssl) const {
 
   if (!cert.get()) {
     stats_.no_certificate_.inc();
-
-    if (ca_cert_) {
-      // In case that ca_cert_ exists, reject the connection when peer certificate is not present.
-      verified = false;
-    }
   }
 
   if (!verify_subject_alt_name_list_.empty()) {

@@ -15,10 +15,12 @@ add_library(envoy-server OBJECT
   configuration_impl.cc
   connection_handler_impl.cc
   drain_manager_impl.cc
+  guarddog_impl.cc
   http/admin.cc
   http/health_check.cc
   options_impl.cc
   server.cc
+  watchdog_impl.cc
   worker.cc)
 
 include_directories(SYSTEM ${ENVOY_TCLAP_INCLUDE_DIR})
