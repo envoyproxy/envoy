@@ -1,4 +1,4 @@
-load("@protobuf_git//:protobuf.bzl", "cc_proto_library")
+load("@protobuf_bzl//:protobuf.bzl", "cc_proto_library")
 
 ENVOY_COPTS = [
     # TODO(htuch): Remove this when Bazel bringup is done.

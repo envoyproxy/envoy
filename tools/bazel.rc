@@ -3,3 +3,8 @@
 build:asan --copt -fsanitize=address
 build:asan --linkopt -fsanitize=address
 build:asan --linkopt -ldl
+
+build --distinct_host_configuration=false
+build --action_env=CC
+build --action_env=CXX
+build --action_env=LD_LIBRARY_PATH
