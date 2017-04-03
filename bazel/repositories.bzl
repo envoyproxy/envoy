@@ -109,7 +109,6 @@ ARES_CONFIG_SH_CMDS = [
 
 genrule(
     name = "config",
-    # This list must not contain ares_config.h.
     srcs = glob(["**/*"]),
     outs = ["ares_config.h"],
     cmd = "; ".join(ARES_CONFIG_SH_CMDS),
