@@ -127,7 +127,9 @@ envoy_cc_mock(
 ```
 
 Typically, mocks are provided for all interfaces in a directory in a single
-`mocks.{cc,h}` and corresponding `_mocks` Bazel target.
+`mocks.{cc,h}` and corresponding `_mocks` Bazel target. There are some
+exceptions, such as [test/mocks/upstream/BUILD](../test/mocks/upstream/BUILD),
+where more granular mock targets are defined.
 
 Unit tests for `BarImpl` would be written in `test/common/foo/bar_impl_test.cc`
 and a target added to `test/common/foo/BUILD`:
