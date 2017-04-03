@@ -4,7 +4,7 @@ Zone aware routing
 ==================
 
 There are several steps required for enabling :ref:`zone aware routing <arch_overview_load_balancing_zone_aware_routing>`
-between a source service A and a destination service B. See below for the specific configuration/setup on the source
+between the source service A and the destination service B. See below for the specific configuration/setup on the source
 and the destination service/cluster.
 
 Envoy configuration on the source service
@@ -15,7 +15,7 @@ These are the requirements:
 * Envoy must be launched with the :option:`--service-zone` option which defines availability zone for the current host.
 * Both cluster A and cluster B must have :ref:`sds <config_cluster_manager_type>` type.
   See more on service discovery :ref:`here <arch_overview_service_discovery_sds>`.
-* :ref:`local_cluster_name <config_cluster_manager_local_cluster_name>` must be set to cluster A.
+* :ref:`local_cluster_name <config_cluster_manager_local_cluster_name>` must be set to the cluster A.
   Only essential parts are listed in the configuration below.
 
 .. code-block:: json
@@ -46,6 +46,6 @@ Verify it works
 ---------------
 * Use :ref:`per zone <config_cluster_manager_cluster_per_az_stats>` Envoy stats to monitor cross zone traffic.
 
-The above configuration is necessary for zone aware routing, but there are certain conditions
+The above configuration is necessary for the zone aware routing, but there are certain conditions
 when zone aware routing is not performed, see details
 :ref:`here <arch_overview_load_balancing_zone_aware_routing_preconditions>`.
