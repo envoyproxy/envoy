@@ -161,9 +161,8 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const {
-  // For user-specified request headers, route-level headers of take precedence over
-  // virtual host level headers of same name. Similarly, virtual host level headers
-  // take precendence over connection manager level headers of same name.
+  // Append user-specified request headers in the following order: route-level headers,
+  // virtual host level headers and finally global connection manager level headers.
   for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
     headers.addStatic(to_add.first, to_add.second);
   }
@@ -171,7 +170,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const 
     headers.addStatic(to_add.first, to_add.second);
   }
   for (const std::pair<Http::LowerCaseString, std::string>& to_add :
-       vhost_.globalHttpConfig().requestHeadersToAdd()) {
+       vhost_.globalRouteConfig().requestHeadersToAdd()) {
     headers.addStatic(to_add.first, to_add.second);
   }
 
@@ -386,10 +385,10 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
 }
 
 VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
-                                 const ConfigImpl& global_http_config, Runtime::Loader& runtime,
+                                 const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                                  Upstream::ClusterManager& cm, bool validate_clusters)
     : name_(virtual_host.getString("name")), rate_limit_policy_(virtual_host),
-      global_http_config_(global_http_config) {
+      global_route_config_(global_route_config) {
 
   virtual_host.validateSchema(Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA);
 
@@ -463,14 +462,14 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
   priority_ = ConfigUtility::parsePriority(virtual_cluster);
 }
 
-RouteMatcher::RouteMatcher(const Json::Object& json_config, const ConfigImpl& global_http_config,
+RouteMatcher::RouteMatcher(const Json::Object& json_config, const ConfigImpl& global_route_config,
                            Runtime::Loader& runtime, Upstream::ClusterManager& cm,
                            bool validate_clusters) {
 
   json_config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
   for (const Json::ObjectPtr& virtual_host_config : json_config.getObjectArray("virtual_hosts")) {
-    VirtualHostSharedPtr virtual_host(new VirtualHostImpl(*virtual_host_config, global_http_config,
+    VirtualHostSharedPtr virtual_host(new VirtualHostImpl(*virtual_host_config, global_route_config,
                                                           runtime, cm, validate_clusters));
     uses_runtime_ |= virtual_host->usesRuntime();
 
