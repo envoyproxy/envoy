@@ -99,7 +99,7 @@ ARES_CONFIG_SH_CMDS = [
     "export TMPDIR=$$(realpath $(@D))",
     "rm -rf $(@D)/cares_build",
     "mkdir -p $(@D)/cares_build",
-    "rsync -aRLv $(SRCS) $(@D)/cares_build",
+    "cp --parents -L $(SRCS) $(@D)/cares_build",
     "pushd $(@D)/cares_build/external/cares_git",
     "./buildconf",
     "./configure",
@@ -111,7 +111,7 @@ genrule(
     name = "config",
     srcs = glob(["**/*"]),
     outs = ["ares_config.h"],
-    cmd = "; ".join(ARES_CONFIG_SH_CMDS),
+    cmd = "&& ".join(ARES_CONFIG_SH_CMDS),
 )
 
 genrule(
