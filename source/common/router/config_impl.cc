@@ -161,9 +161,9 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const {
-  // Add route-level headers first, followed by virtual host level headers
-  // and finally connection manager level headers If there are two headers with same
-  // name, we consider only the first one, and ignore the rest.
+  // For user-specified request headers, route-level headers of take precedence over
+  // virtual host level headers of same name. Similarly, virtual host level headers
+  // take precendence over connection manager level headers of same name.
   for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
     headers.addStatic(to_add.first, to_add.second);
   }

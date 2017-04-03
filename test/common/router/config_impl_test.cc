@@ -373,7 +373,8 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
           "prefix": "/",
           "cluster": "instant-server",
           "timeout_ms": 30000
-        }]
+        }
+      ]
     }
   ],
 
