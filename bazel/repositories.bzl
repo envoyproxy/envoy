@@ -91,19 +91,27 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+# There is some moderate evil here. buildconf needs to be invoked in its source
+# location, where it also generates temp files (no option to place in TMPDIR).
+# Also, configure does a cd relative dance that doesn't play nice with the
+# symlink execroot in the Bazel build. So, copy everything prior to building.
+ARES_CONFIG_SH_CMDS = [
+    "export TMPDIR=$$(realpath $(@D))",
+    "rm -rf $(@D)/cares_build",
+    "mkdir -p $(@D)/cares_build",
+    "cp --parents -L $(SRCS) $(@D)/cares_build",
+    "pushd $(@D)/cares_build/external/cares_git",
+    "./buildconf",
+    "./configure",
+    "popd",
+    "cp $(@D)/cares_build/external/cares_git/ares_config.h $@",
+]
+
 genrule(
     name = "config",
-    # This list must not contain ares_config.h.
-    srcs = glob(["**/*.m4"]),
+    srcs = glob(["**/*"]),
     outs = ["ares_config.h"],
-    # There is some serious evil here. buildconf needs to be invoked in its source location, where
-    # it also generates temp files (no option to place in TMPDIR). Also, configure does a cd
-    # relative dance that doesn't play nice with the symlink execroot in the Bazel build. So,
-    # disable sandboxing and do some fragile stuff with the build dirs.
-    # TODO(htuch): Figure out a cleaner way to handle this.
-    cmd = "pushd ../../external/cares_git; ./buildconf; ./configure; " +
-          "cp -f ares_config.h ../../execroot/envoy/$@",
-    local = 1,
+    cmd = "&& ".join(ARES_CONFIG_SH_CMDS),
 )
 
 genrule(
