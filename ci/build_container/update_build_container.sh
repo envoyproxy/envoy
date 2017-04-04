@@ -5,7 +5,7 @@ then
   TAG="$(git rev-parse master)"
   docker-machine start default
   eval $(docker-machine env default)
-  docker build --rm -t lyft/envoy-build:$TAG .
+  ./gen_build_container.sh
   docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
   docker push lyft/envoy-build:$TAG
   echo Pushed lyft/envoy-build:$TAG

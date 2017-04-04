@@ -37,14 +37,14 @@ $EXTRA_CMAKE_FLAGS \
 -DENVOY_LIBEVENT_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_CARES_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_NGHTTP2_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
--DENVOY_SPDLOG_INCLUDE_DIR:FILEPATH=/thirdparty/spdlog-0.11.0/include \
+-DENVOY_SPDLOG_INCLUDE_DIR:FILEPATH=/thirdparty/spdlog/include \
 -DENVOY_TCLAP_INCLUDE_DIR:FILEPATH=/thirdparty/tclap-1.2.1/include \
 -DENVOY_OPENSSL_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_PROTOBUF_INCLUDE_DIR:FILEPATH=/thirdparty_build/include \
 -DENVOY_PROTOBUF_PROTOC:FILEPATH=/thirdparty_build/bin/protoc \
 -DENVOY_GCOVR:FILEPATH=/thirdparty/gcovr-3.3/scripts/gcovr \
--DENVOY_RAPIDJSON_INCLUDE_DIR:FILEPATH=/thirdparty/rapidjson-1.1.0/include \
+-DENVOY_RAPIDJSON_INCLUDE_DIR:FILEPATH=/thirdparty/rapidjson/include \
 -DENVOY_GCOVR_EXTRA_ARGS:STRING="-e test/* -e build/*" \
 -DENVOY_EXE_EXTRA_LINKER_FLAGS:STRING=-L/thirdparty_build/lib \
 -DENVOY_TEST_EXTRA_LINKER_FLAGS:STRING=-L/thirdparty_build/lib \

@@ -1,10 +1,12 @@
 #!/bin/bash
 
+. ./versions.bzl
+
 set -e
 
 # Setup basic requirements and install them.
 apt-get update
-apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc libtool automake
+apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc libtool automake unzip
 apt-get install -y golang
 # For debugging.
 apt-get install -y gdb strace
@@ -28,7 +30,7 @@ go get github.com/bazelbuild/buildifier/buildifier
 
 # Build artifacts
 THIRDPARTY_BUILD=/thirdparty_build
-mkdir $THIRDPARTY_BUILD
+mkdir ${THIRDPARTY_BUILD}
 
 # Source artifacts
 mkdir thirdparty
@@ -39,59 +41,59 @@ export CC=gcc-4.9
 export CXX=g++-4.9
 
 # libevent
-wget https://github.com/libevent/libevent/releases/download/release-2.1.8-stable/libevent-2.1.8-stable.tar.gz
+wget ${LIBEVENT_HTTP_ARCHIVE}
 tar xf libevent-2.1.8-stable.tar.gz
-cd libevent-2.1.8-stable
-./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --disable-libevent-regress --disable-openssl
+cd ${LIBEVENT_PREFIX}
+./configure --prefix=${THIRDPARTY_BUILD} --enable-shared=no --disable-libevent-regress --disable-openssl
 make install
 cd ..
 rm -fr libevent*
 
 # BoringSSL
-git clone https://boringssl.googlesource.com/boringssl
+git clone ${BORINGSSL_REMOTE}
 cd boringssl
-git reset --hard b87c80300647c2c0311c1489a104470e099f1531
-cmake .
-make
-cp -r include/* $THIRDPARTY_BUILD/include
-cp ssl/libssl.a $THIRDPARTY_BUILD/lib
-cp crypto/libcrypto.a $THIRDPARTY_BUILD/lib
+git reset --hard ${BORINGSSL_COMMIT}
+bazel build -c opt --strategy=CppCompile=standalone --strategy=CppLink=standalone //...
+cp -r src/include/* ${THIRDPARTY_BUILD}/include
+cp bazel-bin/libssl.a ${THIRDPARTY_BUILD}/lib
+cp bazel-bin/libcrypto.a ${THIRDPARTY_BUILD}/lib
 cd ..
 rm -rf boringssl
 
 # gperftools
-wget https://github.com/gperftools/gperftools/releases/download/gperftools-2.5/gperftools-2.5.tar.gz
+wget ${GPERFTOOLS_HTTP_ARCHIVE}
 tar xf gperftools-2.5.tar.gz
-cd gperftools-2.5
-./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-frame-pointers
+cd ${GPERFTOOLS_PREFIX}
+./configure --prefix=${THIRDPARTY_BUILD} --enable-shared=no --enable-frame-pointers
 make install
 cd ..
 rm -fr gperftools*
 
 # nghttp2
-wget https://github.com/nghttp2/nghttp2/releases/download/v1.20.0/nghttp2-1.20.0.tar.gz
+wget ${NGHTTP2_HTTP_ARCHIVE}
 tar xf nghttp2-1.20.0.tar.gz
-cd nghttp2-1.20.0
-./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-lib-only
+cd ${NGHTTP2_PREFIX}
+./configure --prefix=${THIRDPARTY_BUILD} --enable-shared=no --enable-lib-only
 make install
 cd ..
 rm -fr nghttp2*
 
 # c-ares
-wget https://github.com/c-ares/c-ares/archive/cares-1_12_0.tar.gz
-tar xf cares-1_12_0.tar.gz
-cd c-ares-cares-1_12_0
+git clone ${CARES_REMOTE}
+cd c-ares
+git reset --hard ${CARES_COMMIT}
 ./buildconf
-./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-lib-only
+./configure --prefix=${THIRDPARTY_BUILD} --enable-shared=no --enable-lib-only
 make install
 cd ..
-rm -fr cares* c-ares*
+rm -fr c-ares*
 
 # protobuf
-wget https://github.com/google/protobuf/releases/download/v3.2.0/protobuf-cpp-3.2.0.tar.gz
-tar xf protobuf-cpp-3.2.0.tar.gz
-cd protobuf-3.2.0
-./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no
+git clone ${PROTOBUF_REMOTE}
+cd protobuf
+git reset --hard ${PROTOBUF_COMMIT}
+./autogen.sh
+./configure --prefix=${THIRDPARTY_BUILD} --enable-shared=no
 make install
 make distclean
 cd ..
@@ -102,51 +104,53 @@ tar xf cotire-1.7.8.tar.gz
 rm cotire-1.7.8.tar.gz
 
 # spdlog
-wget https://github.com/gabime/spdlog/archive/v0.11.0.tar.gz
-tar xf v0.11.0.tar.gz
-rm v0.11.0.tar.gz
+git clone ${SPDLOG_REMOTE}
+cd spdlog
+git reset --hard ${SPDLOG_COMMIT}
+cd ..
 
 # http-parser
-wget -O http-parser-v2.7.0.tar.gz https://github.com/nodejs/http-parser/archive/v2.7.0.tar.gz
-tar xf http-parser-v2.7.0.tar.gz
-cd http-parser-2.7.0
+git clone ${HTTP_PARSER_REMOTE}
+cd http-parser
+git reset --hard ${HTTP_PARSER_COMMIT}
 $CC -O2 -c http_parser.c -o http_parser.o
 ar rcs libhttp_parser.a http_parser.o
-cp libhttp_parser.a $THIRDPARTY_BUILD/lib
-cp http_parser.h $THIRDPARTY_BUILD/include
+cp libhttp_parser.a ${THIRDPARTY_BUILD}/lib
+cp http_parser.h ${THIRDPARTY_BUILD}/include
 cd ..
 rm -fr http-parser*
 
 # tclap
-wget -O tclap-1.2.1.tar.gz https://sourceforge.net/projects/tclap/files/tclap-1.2.1.tar.gz/download
+wget ${TCLAP_HTTP_ARCHIVE}
 tar xf tclap-1.2.1.tar.gz
 rm tclap-1.2.1.tar.gz
 
 # lightstep
-wget https://github.com/lightstep/lightstep-tracer-cpp/releases/download/v0_36/lightstep-tracer-cpp-0.36.tar.gz
+wget ${LIGHTSTEP_HTTP_ARCHIVE}
 tar xf lightstep-tracer-cpp-0.36.tar.gz
-cd lightstep-tracer-cpp-0.36
-./configure --disable-grpc --prefix=$THIRDPARTY_BUILD --enable-shared=no \
-	    protobuf_CFLAGS="-I$THIRDPARTY_BUILD/include" protobuf_LIBS="-L$THIRDPARTY_BUILD/lib -lprotobuf" PROTOC=$THIRDPARTY_BUILD/bin/protoc
+cd ${LIGHTSTEP_PREFIX}
+./configure --disable-grpc --prefix=${THIRDPARTY_BUILD} --enable-shared=no \
+	    protobuf_CFLAGS="-I${THIRDPARTY_BUILD}/include" protobuf_LIBS="-L${THIRDPARTY_BUILD}/lib -lprotobuf" PROTOC=${THIRDPARTY_BUILD}/bin/protoc
 make install
 cd ..
 rm -rf lightstep-tracer*
 
 # rapidjson
-wget -O rapidjson-1.1.0.tar.gz https://github.com/miloyip/rapidjson/archive/v1.1.0.tar.gz
-tar xf rapidjson-1.1.0.tar.gz
-rm rapidjson-1.1.0.tar.gz
+git clone ${RAPIDJSON_REMOTE}
+cd rapidjson
+git reset --hard ${RAPIDJSON_COMMIT}
+cd ..
 
 # googletest
-wget -O googletest-1.8.0.tar.gz https://github.com/google/googletest/archive/release-1.8.0.tar.gz
-tar xf googletest-1.8.0.tar.gz
-cd googletest-release-1.8.0
-cmake -DCMAKE_INSTALL_PREFIX:PATH=$THIRDPARTY_BUILD .
+git clone ${GOOGLETEST_REMOTE}
+cd googletest
+git reset --hard ${GOOGLETEST_COMMIT}
+cmake -DCMAKE_INSTALL_PREFIX:PATH=${THIRDPARTY_BUILD} .
 make install
 cd ..
 rm -fr googletest*
 
 # gcovr
-wget -O gcovr-3.3.tar.gz https://github.com/gcovr/gcovr/archive/3.3.tar.gz
+wget -O gcovr-3.3.tar.gz ${GCOVR_HTTP_ARCHIVE}
 tar xf gcovr-3.3.tar.gz
 rm gcovr-3.3.tar.gz

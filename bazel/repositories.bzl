@@ -3,6 +3,32 @@
 # libraries according to their canonical build systems and expressing the dependencies in a manner
 # similar to ci/WORKSPACE.
 
+load(
+    ":versions.bzl",
+    "BORINGSSL_COMMIT",
+    "BORINGSSL_REMOTE",
+    "CARES_COMMIT",
+    "CARES_REMOTE",
+    "GOOGLETEST_COMMIT",
+    "GOOGLETEST_REMOTE",
+    "HTTP_PARSER_COMMIT",
+    "HTTP_PARSER_REMOTE",
+    "LIBEVENT_HTTP_ARCHIVE",
+    "LIBEVENT_PREFIX",
+    "LIGHTSTEP_HTTP_ARCHIVE",
+    "LIGHTSTEP_PREFIX",
+    "NGHTTP2_HTTP_ARCHIVE",
+    "NGHTTP2_PREFIX",
+    "PROTOBUF_COMMIT",
+    "PROTOBUF_REMOTE",
+    "RAPIDJSON_COMMIT",
+    "RAPIDJSON_REMOTE",
+    "SPDLOG_COMMIT",
+    "SPDLOG_REMOTE",
+    "TCLAP_HTTP_ARCHIVE",
+    "TCLAP_PREFIX",
+)
+
 def ares_repositories():
     BUILD = """
 cc_library(
@@ -124,16 +150,16 @@ genrule(
 
     native.new_git_repository(
         name = "cares_git",
-        remote = "https://github.com/c-ares/c-ares.git",
-        commit = "7691f773af79bf75a62d1863fd0f13ebf9dc51b1", # v1.12.0
+        remote = CARES_REMOTE,
+        commit = CARES_COMMIT,
         build_file_content = BUILD,
     )
 
 def boringssl_repositories():
     native.git_repository(
         name = "boringssl",
-        commit = "bfd36df3da38dbf8828e712f42fbab2a0034bc40",  # 2017-02-02
-        remote = "https://boringssl.googlesource.com/boringssl",
+        remote = BORINGSSL_REMOTE,
+        commit = BORINGSSL_COMMIT,
     )
 
 def googletest_repositories():
@@ -163,9 +189,8 @@ cc_library(
     native.new_git_repository(
         name = "googletest_git",
         build_file_content = BUILD,
-        # v1.8.0 release
-        commit = "ec44c6c1675c25b9827aacd08c02433cccde7780",
-        remote = "https://github.com/google/googletest.git",
+        remote = GOOGLETEST_REMOTE,
+        commit = GOOGLETEST_COMMIT,
     )
 
 def http_parser_repositories():
@@ -184,8 +209,8 @@ cc_library(
 
     native.new_git_repository(
         name = "http_parser_git",
-        remote = "https://github.com/nodejs/http-parser.git",
-        commit = "9b0d5b33ebdaacff1dadd06bad4e198b11ff880e",
+        remote = HTTP_PARSER_REMOTE,
+        commit = HTTP_PARSER_COMMIT,
         build_file_content = BUILD,
     )
 
@@ -294,8 +319,8 @@ cc_library(
 
     native.new_http_archive(
         name = "libevent_git",
-        url = "https://github.com/libevent/libevent/releases/download/release-2.1.8-stable/libevent-2.1.8-stable.tar.gz",
-        strip_prefix = "libevent-2.1.8-stable",
+        url = LIBEVENT_HTTP_ARCHIVE,
+        strip_prefix = LIBEVENT_PREFIX,
         build_file_content = BUILD,
     )
 
@@ -325,57 +350,45 @@ cc_library(
     ],
     copts = [
         "-DPACKAGE_VERSION='\\"0.36\\"'",
-        "-Iexternal/lightstep_git/src/c++11/lightstep",
-        "-Iexternal/lightstep_git/src/c++11/mapbox_variant",
+        "-Iexternal/lightstep_tar/src/c++11/lightstep",
+        "-Iexternal/lightstep_tar/src/c++11/mapbox_variant",
     ],
     includes = ["src/c++11"],
     visibility = ["//visibility:public"],
     deps = [
-        "@lightstep_common_git//:collector_proto",
-        "@lightstep_common_git//:lightstep_carrier_proto",
+        ":collector_proto",
+        ":lightstep_carrier_proto",
         "//external:protobuf",
     ],
-)"""
-
-    COMMON_BUILD = """
-load("@protobuf_git//:protobuf.bzl", "cc_proto_library")
+)
 
 cc_proto_library(
     name = "collector_proto",
-    srcs = ["collector.proto"],
-    include = ".",
+    srcs = ["lightstep-tracer-common/collector.proto"],
+    include = "lightstep-tracer-common",
     deps = [
         "//external:cc_wkt_protos",
     ],
     protoc = "//external:protoc",
     default_runtime = "//external:protobuf",
-    visibility = ["//visibility:public"],
 )
 
 cc_proto_library(
     name = "lightstep_carrier_proto",
-    srcs = ["lightstep_carrier.proto"],
-    include = ".",
+    srcs = ["lightstep-tracer-common/lightstep_carrier.proto"],
+    include = "lightstep-tracer-common",
     deps = [
         "//external:cc_wkt_protos",
     ],
     protoc = "//external:protoc",
     default_runtime = "//external:protobuf",
-    visibility = ["//visibility:public"],
 )
 """
 
-    native.new_git_repository(
-        name = "lightstep_common_git",
-        remote = "https://github.com/lightstep/lightstep-tracer-common.git",
-        commit = "cbbecd671c1ae1f20ae873c5da688c8c14d04ec3",
-        build_file_content = COMMON_BUILD,
-    )
-
-    native.new_git_repository(
-        name = "lightstep_git",
-        remote = "https://github.com/lightstep/lightstep-tracer-cpp.git",
-        commit = "f1dc8f3dfd529350e053fd21273e627f409ae428", # 0.36
+    native.new_http_archive(
+        name = "lightstep_tar",
+        url = LIGHTSTEP_HTTP_ARCHIVE,
+        strip_prefix = LIGHTSTEP_PREFIX,
         build_file_content = BUILD,
     )
 
@@ -411,21 +424,16 @@ cc_library(
 
     native.new_http_archive(
         name = "nghttp2_tar",
-        url = "https://github.com/nghttp2/nghttp2/releases/download/v1.20.0/nghttp2-1.20.0.tar.gz",
-        strip_prefix = "nghttp2-1.20.0",
+        url = NGHTTP2_HTTP_ARCHIVE,
+        strip_prefix = NGHTTP2_PREFIX,
         build_file_content = BUILD,
     )
 
 def protobuf_repositories():
     native.git_repository(
         name = "protobuf_git",
-        # Using a non-canonical repository/branch here. This is a workaround to the lack of
-        # merge on https://github.com/google/protobuf/pull/2508, which is needed for supporting
-        # arbitrary CC compiler locations from the environment. The branch is
-        # https://github.com/htuch/protobuf/tree/v3.2.0-default-shell-env, which is the 3.2.0
-        # release with the above mentioned PR cherry picked.
-        commit = "d490587268931da78c942a6372ef57bb53db80da",
-        remote = "https://github.com/htuch/protobuf.git",
+        remote = PROTOBUF_REMOTE,
+        commit = PROTOBUF_COMMIT,
     )
 
 def rapidjson_repositories():
@@ -446,8 +454,8 @@ cc_library(
 
     native.new_git_repository(
         name = "rapidjson_git",
-        remote = "https://github.com/miloyip/rapidjson.git",
-        commit = "f54b0e47a08782a6131cc3d60f94d038fa6e0a51", # v1.1.0
+        remote = RAPIDJSON_REMOTE,
+        commit = RAPIDJSON_COMMIT,
         build_file_content = BUILD,
     )
 
@@ -468,9 +476,8 @@ cc_library(
     native.new_git_repository(
         name = "spdlog_git",
         build_file_content = BUILD,
-        # v0.11.0 release
-        commit = "1f1f6a5f3b424203a429e9cb78e6548037adefa8",
-        remote = "https://github.com/gabime/spdlog.git",
+        remote = SPDLOG_REMOTE,
+        commit = SPDLOG_COMMIT,
     )
 
 def tclap_repositories():
@@ -513,8 +520,8 @@ cc_library(
 """
     native.new_http_archive(
         name = "tclap_archive",
-        url = "https://storage.googleapis.com/istio-build-deps/tclap-1.2.1.tar.gz",
-        strip_prefix = "tclap-1.2.1",
+        url = TCLAP_HTTP_ARCHIVE,
+        strip_prefix = TCLAP_PREFIX,
         build_file_content = BUILD,
     )
 
