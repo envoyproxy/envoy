@@ -83,7 +83,7 @@ Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion versio
     sin.sin_addr.s_addr = static_cast<uint32_t>(rng.random() % 0xffffffff);
     uint8_t* address_bytes = reinterpret_cast<uint8_t*>(&sin.sin_addr.s_addr);
     address_bytes[0] = 127;
-    return Address::InstanceConstSharedPtr(new Address::Ipv4Instance(&sin));
+    return std::make_shared<Address::Ipv4Instance>(&sin);
   } else {
     // There is only one IPv6 loopback address.
     return Network::Utility::getIpv6LoopbackAddress();
