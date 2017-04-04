@@ -12,15 +12,19 @@ binary:
 	mkdir -p ./bin/debug
 	mkdir -p ./bin/configs
 	docker run -t -i --name build-envoy-alpine-ct -v ${ROOT_DIR}/../../:/source lyft/envoy-build:latest /bin/bash -c \
-		"set -x && cd /source && /source/ci/do_ci.sh normal && \
+		"set -x && cd /source && /source/ci/do_ci.sh server_only && \
 		cp /source/build_normal/source/exe/envoy /tmp/ && \
 		cd /tmp/ && strip envoy && \
 		mv /tmp/envoy /source/ci/build_alpine_container/bin/stripped/ && \
 		cp /source/build_normal/source/exe/envoy /source/ci/build_alpine_container/bin/debug/ && \
 		cp /source/configs/google_com_proxy.json /source/ci/build_alpine_container/bin/configs/"
 	docker rm -f build-envoy-alpine-ct
-	# Remove any core file if it gets generated during the build, for now.
-	rm -f ../../core
+	# Fail build if a core file gets generated during the build.
+	if [ -f "../../core" ]; \
+	then \
+		echo "Core dumped, failing build"; \
+		exit 1; \
+	fi
 
 container:
 	docker build -f ./Dockerfile-envoy-alpine -t envoy-alpine:${ENVOY_TAG} .
