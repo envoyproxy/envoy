@@ -16,7 +16,7 @@ void TlsCachingDateProviderImpl::onRefreshDate() {
   std::string new_date_string = date_formatter_.now();
   tls_.set(
       tls_slot_, [new_date_string](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        return ThreadLocal::ThreadLocalObjectSharedPtr{new ThreadLocalCachedDate(new_date_string)};
+        return std::make_shared<ThreadLocalCachedDate>(new_date_string);
       });
 
   refresh_timer_->enableTimer(std::chrono::milliseconds(500));
