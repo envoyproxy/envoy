@@ -104,7 +104,7 @@ struct ConnectionManagerTracingStats {
  */
 struct TracingConnectionManagerConfig {
   Tracing::OperationName operation_name_;
-  std::list<Http::LowerCaseString> request_headers_for_tags_;
+  std::vector<Http::LowerCaseString> request_headers_for_tags_;
 };
 
 /**
@@ -385,7 +385,7 @@ private:
 
     // Tracing::TracingConfig
     virtual Tracing::OperationName operationName() const override;
-    virtual const std::list<Http::LowerCaseString>& requestHeadersForTags() const override;
+    virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
 
     // All state for the stream. Put here for readability. We could move this to a bit field
     // eventually if we want.

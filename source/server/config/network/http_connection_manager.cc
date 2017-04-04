@@ -90,7 +90,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
 
     const std::string operation_name = tracing_config->getString("operation_name");
     Tracing::OperationName tracing_operation_name;
-    std::list<Http::LowerCaseString> request_headers_for_tags;
+    std::vector<Http::LowerCaseString> request_headers_for_tags;
 
     if (operation_name == "ingress") {
       tracing_operation_name = Tracing::OperationName::Ingress;

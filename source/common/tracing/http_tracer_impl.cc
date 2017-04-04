@@ -115,7 +115,8 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
 }
 
 void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
-                                     const Http::AccessLog::RequestInfo& request_info) {
+                                     const Http::AccessLog::RequestInfo& request_info,
+                                     const Config& config) {
   // Pre response data.
   active_span.setTag("guid:x-request-id",
                      std::string(request_headers.RequestId()->value().c_str()));
@@ -131,6 +132,14 @@ void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& r
                        std::string(request_headers.ClientTraceId()->value().c_str()));
   }
 
+  // Build tags based on the custom headers.
+  for (const Http::LowerCaseString& header : config.requestHeadersForTags()) {
+    const Http::HeaderEntry* entry = request_headers.get(header);
+    if (entry) {
+      active_span.setTag(header.get(), entry->value().c_str());
+    }
+  }
+
   // Post response data.
   active_span.setTag("response_code", buildResponseCode(request_info));
   active_span.setTag("response_size", std::to_string(request_info.bytesSent()));
@@ -143,17 +152,6 @@ void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& r
   }
 
   active_span.finishSpan();
-}
-
-void HttpTracerUtility::populateTagsBasedOnHeaders(Span& active_span,
-                                                   const Http::HeaderMap& request_headers,
-                                                   const Config& tracing_config) {
-  for (const Http::LowerCaseString& header : tracing_config.requestHeadersForTags()) {
-    const Http::HeaderEntry* entry = request_headers.get(header);
-    if (entry) {
-      active_span.setTag(header.get(), entry->value().c_str());
-    }
-  }
 }
 
 HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)

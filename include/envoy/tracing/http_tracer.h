@@ -16,14 +16,14 @@ public:
   virtual ~Config() {}
 
   /**
-   * Operation name for tracing, e.g., ingress.
+   * @return operation name for tracing, e.g., ingress.
    */
   virtual OperationName operationName() const PURE;
 
   /**
-   * List of headers to populate tags on the active span.
+   * @return list of headers to populate tags on the active span.
    */
-  virtual const std::list<Http::LowerCaseString>& requestHeadersForTags() const PURE;
+  virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const PURE;
 };
 
 /*
