@@ -12,7 +12,7 @@ This section describes the specific configuration for the Envoy running side by 
 These are the requirements:
 
 * Envoy must be launched with :option:`--service-zone` option which defines the zone for the current host.
-* Both definitions of source and destination clusters must have :ref:`sds <config_cluster_manager_type>` type.
+* Both definitions of the source and the destination clusters must have :ref:`sds <config_cluster_manager_type>` type.
 * :ref:`local_cluster_name <config_cluster_manager_local_cluster_name>` must be set to the source cluster.
 
   Only essential parts are listed in the configuration below for the cluster manager.
