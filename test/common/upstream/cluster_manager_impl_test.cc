@@ -275,7 +275,6 @@ TEST_F(ClusterManagerImplTest, MaxClusterName) {
                             "JSON object doesn't conform to schema.\n Invalid schema: "
                             "#/properties/name.\n Invalid keyword: maxLength.\n Invalid document "
                             "key: #/name");
-  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
@@ -293,7 +292,6 @@ TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
                             "JSON object doesn't conform to schema.\n Invalid schema: "
                             "#/properties/name.\n Invalid keyword: pattern.\n Invalid document "
                             "key: #/name");
-  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
