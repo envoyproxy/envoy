@@ -25,9 +25,9 @@ main() {
     fi
 
     if [ "${type}" == "debug" ]; then
-        ENVOY_IMAGE=envoy-alpine-debug:${ENVOY_TAG}
+        ENVOY_IMAGE=lyft/envoy-alpine-debug:${ENVOY_TAG}
     else
-        ENVOY_IMAGE=envoy-alpine:${ENVOY_TAG}
+        ENVOY_IMAGE=lyft/envoy-alpine:${ENVOY_TAG}
     fi
     TEST_CONTAINER=alpine_envoy_test_ct
 
