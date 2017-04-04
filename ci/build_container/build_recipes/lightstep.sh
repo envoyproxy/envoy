@@ -1,3 +1,5 @@
+set -e
+
 wget https://github.com/lightstep/lightstep-tracer-cpp/releases/download/v0_36/lightstep-tracer-cpp-0.36.tar.gz
 tar xf lightstep-tracer-cpp-0.36.tar.gz
 cd lightstep-tracer-cpp-0.36
