@@ -1,3 +1,5 @@
+set -e
+
 git clone https://boringssl.googlesource.com/boringssl
 cd boringssl
 git reset --hard b87c80300647c2c0311c1489a104470e099f1531
