@@ -41,6 +41,16 @@ in the destination cluster registers with the discovery service
 :ref:`queried by the source service Envoy <config_cluster_manager_sds_api>`.
 :ref:`Zone <config_cluster_manager_sds_api_host>` information must be available as part of that response.
 
+Only zone related data is listed in the response below.
+
+.. code-block:: json
+
+   {
+      "tags": {
+          "az": "us-east-1d"
+      }
+   }
+
 Infrastructure setup
 --------------------
 The above configuration is necessary for zone aware routing, but there are certain conditions
