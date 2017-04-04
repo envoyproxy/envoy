@@ -14,10 +14,10 @@ TlsCachingDateProviderImpl::TlsCachingDateProviderImpl(Event::Dispatcher& dispat
 
 void TlsCachingDateProviderImpl::onRefreshDate() {
   std::string new_date_string = date_formatter_.now();
-  tls_.set(
-      tls_slot_, [new_date_string](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        return std::make_shared<ThreadLocalCachedDate>(new_date_string);
-      });
+  tls_.set(tls_slot_,
+           [new_date_string](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+             return std::make_shared<ThreadLocalCachedDate>(new_date_string);
+           });
 
   refresh_timer_->enableTimer(std::chrono::milliseconds(500));
 }
