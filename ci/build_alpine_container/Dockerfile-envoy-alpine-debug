@@ -1,0 +1,5 @@
+FROM frolvlad/alpine-glibc
+
+RUN mkdir -p /usr/local/conf/envoy
+COPY ./bin/debug/envoy /usr/local/bin/envoy
+COPY ./bin/configs/google_com_proxy.json /usr/local/conf/envoy/
