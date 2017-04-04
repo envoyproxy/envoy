@@ -9,6 +9,16 @@ envoy_package()
 envoy_cc_library(
     name = "assert_lib",
     hdrs = ["assert.h"],
+    deps = [
+        ":backward_lib",
+        ":logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "backward_lib",
+    hdrs = ["backward.h"],
+    external_deps = ["backward"],
     deps = [":logger_lib"],
 )
 

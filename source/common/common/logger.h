@@ -17,6 +17,7 @@ namespace Logger {
 #define ALL_LOGGER_IDS(FUNCTION) \
   FUNCTION(admin)                \
   FUNCTION(assert)               \
+  FUNCTION(backtrace)            \
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \

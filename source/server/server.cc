@@ -15,6 +15,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/api/api_impl.h"
+#include "common/common/backward.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/json/config_schemas.h"

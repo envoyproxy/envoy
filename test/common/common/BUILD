@@ -7,6 +7,12 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "backwards_test",
+    srcs = ["backwards_test.cc"],
+    deps = ["//source/common/common:backward_lib"],
+)
+
+envoy_cc_test(
     name = "base64_test",
     srcs = ["base64_test.cc"],
     deps = [
