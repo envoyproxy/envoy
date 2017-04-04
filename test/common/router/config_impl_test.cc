@@ -127,19 +127,6 @@ TEST(RouteMatcherTest, TestRoutes) {
         {"pattern": "^/users/\\d+$", "method": "PUT", "name": "update_user"},
         {"pattern": "^/users/\\d+/location$", "method": "POST", "name": "ulu"}]
     }
-  ],
-
-  "internal_only_headers": [
-    "x-lyft-user-id"
-  ],
-
-  "response_headers_to_add": [
-    {"key": "x-envoy-upstream-canary", "value": "true"}
-  ],
-
-  "response_headers_to_remove": [
-    "x-envoy-upstream-canary",
-    "x-envoy-virtual-cluster"
   ]
 }
   )EOF";
@@ -269,16 +256,6 @@ TEST(RouteMatcherTest, TestRoutes) {
     EXPECT_EQ("new_host", headers.get_(Http::Headers::get().Host));
   }
 
-  // Header manipulaton testing.
-  EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
-              ContainerEq(config.internalOnlyHeaders()));
-  EXPECT_THAT((std::list<std::pair<Http::LowerCaseString, std::string>>(
-                  {{Http::LowerCaseString("x-envoy-upstream-canary"), "true"}})),
-              ContainerEq(config.responseHeadersToAdd()));
-  EXPECT_THAT(std::list<Http::LowerCaseString>({Http::LowerCaseString("x-envoy-upstream-canary"),
-                                                Http::LowerCaseString("x-envoy-virtual-cluster")}),
-              ContainerEq(config.responseHeadersToRemove()));
-
   // Virtual cluster testing.
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/rides", "GET");
@@ -335,6 +312,145 @@ TEST(RouteMatcherTest, TestRoutes) {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/something/else", "GET");
     EXPECT_EQ("other", config.route(headers, 0)->routeEntry()->virtualCluster(headers)->name());
   }
+}
+
+TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
+  std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["lyft.com", "www.lyft.com", "w.lyft.com", "ww.lyft.com", "wwww.lyft.com"],
+      "request_headers_to_add": [
+          {"key": "x-global-header1", "value": "vhost-override"},
+          {"key": "x-vhost-header1", "value": "vhost1-www2"}
+      ],
+      "routes": [
+        {
+          "prefix": "/new_endpoint",
+          "prefix_rewrite": "/api/new_endpoint",
+          "cluster": "www2",
+          "request_headers_to_add": [
+             {"key": "x-global-header1", "value": "route-override"},
+             {"key": "x-vhost-header1", "value": "route-override"},
+             {"key": "x-route-header", "value": "route-new_endpoint"}
+          ]
+        },
+        {
+          "path": "/",
+          "cluster": "root_www2",
+          "request_headers_to_add": [
+             {"key": "x-route-header", "value": "route-allpath"}
+          ]
+        },
+        {
+          "prefix": "/",
+          "cluster": "www2"
+        }
+      ]
+    },
+    {
+      "name": "www2_staging",
+      "domains": ["www-staging.lyft.net", "www-staging-orca.lyft.com"],
+      "request_headers_to_add": [
+          {"key": "x-vhost-header1", "value": "vhost1-www2_staging"}
+      ],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2_staging",
+          "request_headers_to_add": [
+             {"key": "x-route-header", "value": "route-allprefix"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "default",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "instant-server",
+          "timeout_ms": 30000
+        }
+      ]
+    }
+  ],
+
+  "internal_only_headers": [
+    "x-lyft-user-id"
+  ],
+
+  "response_headers_to_add": [
+    {"key": "x-envoy-upstream-canary", "value": "true"}
+  ],
+
+  "response_headers_to_remove": [
+    "x-envoy-upstream-canary",
+    "x-envoy-virtual-cluster"
+  ],
+
+  "request_headers_to_add": [
+    {"key": "x-global-header1", "value": "global1"}
+  ]
+}
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(*loader, runtime, cm, true);
+
+  // Request header manipulation testing.
+  {
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+      const RouteEntry* route = config.route(headers, 0)->routeEntry();
+      route->finalizeRequestHeaders(headers);
+      EXPECT_EQ("route-override", headers.get_("x-global-header1"));
+      EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("route-new_endpoint", headers.get_("x-route-header"));
+    }
+
+    // Multiple routes can have same route-level headers with different values.
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+      const RouteEntry* route = config.route(headers, 0)->routeEntry();
+      route->finalizeRequestHeaders(headers);
+      EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
+      EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
+    }
+
+    // Multiple virtual hosts can have same virtual host level headers with different values.
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("www-staging.lyft.net", "/foo", "GET");
+      const RouteEntry* route = config.route(headers, 0)->routeEntry();
+      route->finalizeRequestHeaders(headers);
+      EXPECT_EQ("global1", headers.get_("x-global-header1"));
+      EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
+      EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
+    }
+
+    // Global headers.
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/", "GET");
+      const RouteEntry* route = config.route(headers, 0)->routeEntry();
+      route->finalizeRequestHeaders(headers);
+      EXPECT_EQ("global1", headers.get_("x-global-header1"));
+    }
+  }
+
+  // Response header manipulation testing.
+  EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
+              ContainerEq(config.internalOnlyHeaders()));
+  EXPECT_THAT((std::list<std::pair<Http::LowerCaseString, std::string>>(
+                  {{Http::LowerCaseString("x-envoy-upstream-canary"), "true"}})),
+              ContainerEq(config.responseHeadersToAdd()));
+  EXPECT_THAT(std::list<Http::LowerCaseString>({Http::LowerCaseString("x-envoy-upstream-canary"),
+                                                Http::LowerCaseString("x-envoy-virtual-cluster")}),
+              ContainerEq(config.responseHeadersToRemove()));
 }
 
 TEST(RouteMatcherTest, InvalidPriority) {
