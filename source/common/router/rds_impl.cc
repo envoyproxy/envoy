@@ -59,7 +59,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
   tls_.set(tls_slot_,
            [initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-             return ThreadLocal::ThreadLocalObjectSharedPtr{new ThreadLocalConfig(initial_config)};
+             return std::make_shared<ThreadLocalConfig>(initial_config);
            });
 }
 
