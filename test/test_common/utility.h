@@ -5,6 +5,16 @@
 
 #include "common/http/header_map_impl.h"
 
+using testing::_;
+
+#define EXPECT_THROW_WITH_MESSAGE(statement, expected_exception, message)                          \
+  try {                                                                                            \
+    statement;                                                                                     \
+    ADD_FAILURE() << "Exception should take place. It did not.";                                   \
+  } catch (expected_exception & e) {                                                               \
+    EXPECT_EQ(message, std::string(e.what()));                                                     \
+  }
+
 class TestUtility {
 public:
   /**
