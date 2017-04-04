@@ -273,11 +273,13 @@ TEST_F(ClusterManagerImplTest, MaxClusterName) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   try {
     create(*loader);
+    ADD_FAILURE() << "Json::Exception should take place. It did not.";
   } catch (Json::Exception& e) {
     EXPECT_EQ("JSON object doesn't conform to schema.\n Invalid schema: #/properties/name.\n "
               "Invalid keyword: maxLength.\n Invalid document key: #/name",
               std::string(e.what()));
   }
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
@@ -293,11 +295,13 @@ TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   try {
     create(*loader);
+    ADD_FAILURE() << "Json::Exception should take place. It did not.";
   } catch (Json::Exception& e) {
     EXPECT_EQ("JSON object doesn't conform to schema.\n Invalid schema: #/properties/name.\n "
               "Invalid keyword: pattern.\n Invalid document key: #/name",
               std::string(e.what()));
   }
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
