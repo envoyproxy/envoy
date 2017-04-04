@@ -5,14 +5,14 @@
 # easily blow away the lib/ and include/ install directories when we upgrade version.
 
 all: $(THIRDPARTY_DEPS)/libevent.dep \
-    $(THIRDPARTY_DEPS)/boringssl.dep \
-    $(THIRDPARTY_DEPS)/gperftools.dep \
+	$(THIRDPARTY_DEPS)/boringssl.dep \
+	$(THIRDPARTY_DEPS)/gperftools.dep \
 	$(THIRDPARTY_DEPS)/nghttp2.dep \
 	$(THIRDPARTY_DEPS)/cares.dep \
 	$(THIRDPARTY_DEPS)/protobuf.dep \
-    $(THIRDPARTY_DEPS)/cotire.dep \
-    $(THIRDPARTY_DEPS)/spdlog.dep \
-    $(THIRDPARTY_DEPS)/http-parser.dep \
+	$(THIRDPARTY_DEPS)/cotire.dep \
+	$(THIRDPARTY_DEPS)/spdlog.dep \
+	$(THIRDPARTY_DEPS)/http-parser.dep \
 	$(THIRDPARTY_DEPS)/tclap.dep \
 	$(THIRDPARTY_DEPS)/lightstep.dep \
 	$(THIRDPARTY_DEPS)/rapidjson.dep \
@@ -22,18 +22,18 @@ all: $(THIRDPARTY_DEPS)/libevent.dep \
 RECIPES := build_recipes
 
 build-setup = rm -rf $@.build && \
-    mkdir -p $@.build && \
+	mkdir -p $@.build && \
 	mkdir -p $(THIRDPARTY_BUILD)/lib && \
 	mkdir -p $(THIRDPARTY_BUILD)/include && \
-    cd $@.build && \
+	cd $@.build && \
 	echo "Building in $@.build, logs at $@.log"
 
 build-complete = rm -rf $@.build && \
-    echo "Successful build of $@" && \
-    touch $@
+	echo "Successful build of $@" && \
+	touch $@
 
 build-recipe = cd $(THIRDPARTY_SRC) && \
-    $(build-setup) && \
+	$(build-setup) && \
 	(((bash $(realpath $<) 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
 	$(build-complete)
 
