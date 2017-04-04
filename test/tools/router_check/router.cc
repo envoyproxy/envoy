@@ -26,7 +26,11 @@ void RouterCheckTool::compareEntriesInJson(const std::string& filename_json) {
 
   // Throws expection if json file not correctly written
   loader->validateSchema(Json::ToolSchema::ROUTER_CHECK_SCHEMA);
-
+  if (details_) {
+    // Print header for detailed match information
+    std::cout << "  Expected  Actual" << std::endl;
+    std::cout << "  ========  ======" << std::endl;
+  }
   // Iterate through each expected and acutal route match
   for (const Json::ObjectPtr& check_config : loader->getObjectArray("input")) {
     // Load parameters from JSON

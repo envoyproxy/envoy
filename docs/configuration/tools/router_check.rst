@@ -1,7 +1,7 @@
 .. _config_tools_router_check_tool:
 
-Router check tool input interface
-=================================
+Router check tool
+=================
 
 Input for the router check tool. The router check tool checks if the route returned
 by a router matches what is expected. The expected field specifies the expected value
