@@ -1,27 +1,27 @@
 .. _common_configuration_zone_aware_routing:
 
-Zone aware routing
-==================
+Zone aware routing setup
+========================
 
 There are several steps required for enabling :ref:`zone aware routing <arch_overview_load_balancing_zone_aware_routing>`
-between source service A and destination service B. See below for specific configuration/setup on source
-and destination service/cluster.
+between source service ("cluster_a") and destination service ("cluster_b").
 
-Envoy configuration on source service
--------------------------------------
-This section describes the specific configuration for the Envoy running side by side with service A.
+Envoy configuration on the source service
+-----------------------------------------
+This section describes the specific configuration for the Envoy running side by side with the source service.
 These are the requirements:
 
-* Envoy must be launched with :option:`--service-zone` option which defines the availability zone for the current host.
-* Both cluster A and cluster B must have :ref:`sds <config_cluster_manager_type>` type.
-  See more on service discovery :ref:`here <arch_overview_service_discovery_sds>`.
-* :ref:`local_cluster_name <config_cluster_manager_local_cluster_name>` must be set to cluster A.
-  Only essential parts are listed in the configuration below.
+* Envoy must be launched with :option:`--service-zone` option which defines the zone for the current host.
+* Both definitions of source and destination clusters must have :ref:`sds <config_cluster_manager_type>` type.
+* :ref:`local_cluster_name <config_cluster_manager_local_cluster_name>` must be set to the source cluster.
+
+  Only essential parts are listed in the configuration below for the cluster manager.
 
 .. code-block:: json
 
   {
     "sds": "{...}",
+    "local_cluster_name": "cluster_a",
     "clusters": [
       {
         "name": "cluster_a",
@@ -31,23 +31,21 @@ These are the requirements:
         "name": "cluster_b",
         "type": "sds"
       }
-    ],
-    "local_cluster_name": "cluster_a"
+    ]
   }
 
-Envoy configuration on destination service
-------------------------------------------
-It's not necessary to run Envoy side by side with service B, but it's important that each host
-in cluster B registers with the discovery service queried by Envoy routing from service A.
-Specifically you need to setup a periodic process to register hosts from service B with the
-`discovery service <https://github.com/lyft/discovery#post-v1registrationservice>`_.
-And each registration call must have `zone data <https://github.com/lyft/discovery#tags-json>`_
-provided.
+Envoy configuration on the destination service
+----------------------------------------------
+It's not necessary to run Envoy side by side with the destination service, but it's important that each host
+in the destination cluster registers with the discovery service
+:ref:`queried by the source service Envoy <config_cluster_manager_sds_api>`.
+:ref:`Zone <config_cluster_manager_sds_api_host>` information must be available as part of that response.
 
-Verify it works
----------------
-* Use :ref:`per zone <config_cluster_manager_cluster_per_az_stats>` Envoy stats to monitor cross zone traffic.
-
+Infrastructure setup
+--------------------
 The above configuration is necessary for zone aware routing, but there are certain conditions
-when zone aware routing is not performed. See details
-:ref:`here <arch_overview_load_balancing_zone_aware_routing_preconditions>`.
+when zone aware routing is :ref:`not performed <arch_overview_load_balancing_zone_aware_routing_preconditions>`.
+
+Verification steps
+------------------
+* Use :ref:`per zone <config_cluster_manager_cluster_per_az_stats>` Envoy stats to monitor cross zone traffic.
