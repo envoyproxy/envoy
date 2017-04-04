@@ -27,8 +27,8 @@ binary:
 	fi
 
 container:
-	docker build -f ./Dockerfile-envoy-alpine -t envoy-alpine:${ENVOY_TAG} .
-	docker build -f ./Dockerfile-envoy-alpine-debug -t envoy-alpine-debug:${ENVOY_TAG} .
+	docker build -f ./Dockerfile-envoy-alpine -t lyft/envoy-alpine:${ENVOY_TAG} .
+	docker build -f ./Dockerfile-envoy-alpine-debug -t lyft/envoy-alpine-debug:${ENVOY_TAG} .
 
 test:
 	./run_alpine_binary_verification.sh debug
