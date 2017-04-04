@@ -19,8 +19,8 @@ Address::InstanceConstSharedPtr ListenerImpl::getOriginalDst(int fd) {
   return Utility::getOriginalDst(fd);
 }
 
-void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr, int,
-                                  void* arg) {
+void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
+                                  int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
   Address::InstanceConstSharedPtr final_local_address = listener->socket_.localAddress();
@@ -51,15 +51,19 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
     listener->proxy_protocol_.newConnection(listener->dispatcher_, fd, *listener);
   } else {
     Address::InstanceConstSharedPtr final_remote_address;
-    if (remote_addr->sa_family == AF_INET) {
-      final_remote_address.reset(
-          new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(remote_addr)));
+    if (remote_addr->sa_family == AF_UNIX) {
+      // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
+      // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
+      // sockaddr_un associated with the client socket when starting from the server socket.
+      // We work around this by using our own name for the socket in this case.
+      final_remote_address = Address::peerAddressFromFd(fd);
     } else {
-      // TODO(mattklein123): IPv6 support.
-      ASSERT(remote_addr->sa_family == AF_UNIX);
-      final_remote_address.reset(
-          new Address::PipeInstance(reinterpret_cast<sockaddr_un*>(remote_addr)));
+      final_remote_address = Address::addressFromSockAddr(
+          *reinterpret_cast<const sockaddr_storage*>(remote_addr), remote_addr_len);
     }
+    // TODO(jamessynge): We need to keep per-family stats. BUT, should it be based on the original
+    // family or the local family? Probably local family, as the original proxy can take care of
+    // stats for the original family.
     listener->newConnection(fd, final_remote_address, final_local_address);
   }
 }

@@ -8,11 +8,29 @@ namespace Network {
 namespace Address {
 
 /**
+ * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
+ * a Network::Address::Instance and return a pointer to it.  Raises an EnvoyException on failure.
+ * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.
+ * @param len length of the address (e.g. from accept, getsockname or getpeername). If len > 0,
+ *        it is used to validate the structure contents; else if len == 0, it is ignored.
+ * @return InstanceConstSharedPtr the address.
+ */
+Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len);
+
+/**
  * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
  * @param fd file descriptor.
  * @return InstanceConstSharedPtr for bound address.
  */
 InstanceConstSharedPtr addressFromFd(int fd);
+
+/**
+ * Obtain the address of the peer of the socket with the specified file descriptor.
+ * Raises an EnvoyException on failure.
+ * @param fd file descriptor.
+ * @return InstanceConstSharedPtr for peer address.
+ */
+InstanceConstSharedPtr peerAddressFromFd(int fd);
 
 /**
  * Base class for all address types.

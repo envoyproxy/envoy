@@ -32,7 +32,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -42,8 +42,8 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-      *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -163,7 +163,7 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -180,8 +180,8 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-      *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -220,7 +220,7 @@ TEST(SslConnectionImplTest, SslError) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -228,7 +228,7 @@ TEST(SslConnectionImplTest, SslError) {
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+      dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
   client_connection->write(bad_data);
@@ -258,7 +258,7 @@ public:
                            uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
-    Network::TcpListenSocket socket(uint32_t(10000), true);
+    Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
 
@@ -293,8 +293,8 @@ public:
     ContextConfigImpl client_ctx_config(*client_ctx_loader);
     ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
 
-    Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-        *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+    Network::ClientConnectionPtr client_connection =
+        dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
     client_connection->connect();
 
     Network::ConnectionPtr server_connection;
