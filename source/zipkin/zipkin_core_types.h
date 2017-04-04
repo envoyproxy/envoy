@@ -80,6 +80,11 @@ public:
     isset_host_ = true;
   }
 
+  void setHost(const Endpoint&& host) {
+    host_ = host;
+    isset_host_ = true;
+  }
+
   uint64_t timestamp() const { return timestamp_; }
 
   void setTimestamp(uint64_t timestamp) { timestamp_ = timestamp; }
@@ -100,15 +105,7 @@ private:
   bool isset_host_;
 };
 
-enum class AnnotationType {
-  BOOL = 0,
-  BYTES = 1,
-  I16 = 2,
-  I32 = 3,
-  I64 = 4,
-  DOUBLE = 5,
-  STRING = 6
-};
+enum AnnotationType { BOOL = 0, BYTES = 1, I16 = 2, I32 = 3, I64 = 4, DOUBLE = 5, STRING = 6 };
 
 class BinaryAnnotation : public ZipkinBase {
 public:
@@ -116,7 +113,10 @@ public:
 
   BinaryAnnotation& operator=(const BinaryAnnotation&);
 
-  BinaryAnnotation() : key_(), value_(), annotation_type_(), isset_host_(false) {}
+  BinaryAnnotation() : key_(), value_(), annotation_type_(STRING), isset_host_(false) {}
+
+  BinaryAnnotation(const std::string& key, const std::string& value)
+      : key_(key), value_(value), annotation_type_(STRING), isset_host_(false) {}
 
   AnnotationType annotationType() const { return annotation_type_; }
 
@@ -125,6 +125,11 @@ public:
   const Endpoint& host() const { return host_; }
 
   void setHost(const Endpoint& host) {
+    host_ = host;
+    isset_host_ = true;
+  }
+
+  void setHost(const Endpoint&& host) {
     host_ = host;
     isset_host_ = true;
   }
@@ -182,13 +187,19 @@ public:
     isset_.parent_id = true;
   }
 
+  const std::vector<Annotation>& annotations() { return annotations_; }
+
   void setAannotations(const std::vector<Annotation>& val) { annotations_ = val; }
 
   void addAnnotation(const Annotation& ann) { annotations_.push_back(ann); }
 
+  void addAnnotation(const Annotation&& ann) { annotations_.push_back(ann); }
+
   void setBinaryAnnotations(const std::vector<BinaryAnnotation>& val) { binary_annotations_ = val; }
 
   void addBinaryAnnotation(const BinaryAnnotation& bann) { binary_annotations_.push_back(bann); }
+
+  void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
 
   void setDebug(const bool val) {
     debug_ = val;

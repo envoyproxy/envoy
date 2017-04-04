@@ -226,7 +226,7 @@ void Span::finish() {
     ss.setHost(annotations_[0].host());
     ss.setTimestamp(Util::timeSinceEpochMicro());
     ss.setValue(ZipkinCoreConstants::SERVER_SEND);
-    annotations_.push_back(ss);
+    annotations_.push_back(std::move(ss));
   } else if ((context.isSetAnnotation().cs) && (!context.isSetAnnotation().cr)) {
     // Need to set the CR annotation
     Annotation cr;
@@ -234,7 +234,7 @@ void Span::finish() {
     cr.setHost(annotations_[0].host());
     cr.setTimestamp(stop_time);
     cr.setValue(ZipkinCoreConstants::CLIENT_RECV);
-    annotations_.push_back(cr);
+    annotations_.push_back(std::move(cr));
     setDuration(stop_time - timestamp_);
   }
 
@@ -247,6 +247,9 @@ void Span::finish() {
 }
 
 void Span::setTag(const std::string& name, const std::string& value) {
-  std::cerr << "NO-OP setTag called --> Name: " << name << "; Value: " << value << std::endl;
+  std::cerr << "setTag called --> Name: " << name << "; Value: " << value << std::endl;
+  if ((name.size() > 0) && (value.size() > 0)) {
+    addBinaryAnnotation(BinaryAnnotation(name, value));
+  }
 }
 } // Zipkin

@@ -29,13 +29,12 @@ public:
   /**
    * Creates a "root" span
    */
-  Span startSpan(const std::string& operation_name, uint64_t start_time);
+  Span startSpan(const std::string& span_name, uint64_t start_time);
 
   /**
    * Based on the given context, creates either a "child" or a "shared-context" span
    */
-  Span startSpan(const std::string& operation_name, uint64_t start_time,
-                 SpanContext& previous_context);
+  Span startSpan(const std::string& span_name, uint64_t start_time, SpanContext& previous_context);
 
   /**
    * Called when the Span is finished

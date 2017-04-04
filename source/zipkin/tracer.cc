@@ -8,7 +8,7 @@
 
 namespace Zipkin {
 
-Span Tracer::startSpan(const std::string& operation_name, uint64_t start_time) {
+Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   Span span;
   Annotation cs;
   std::string ip;
@@ -23,11 +23,11 @@ Span Tracer::startSpan(const std::string& operation_name, uint64_t start_time) {
   ep.setServiceName(service_name_);
 
   // Build the CS annotation
-  cs.setHost(ep);
+  cs.setHost(std::move(ep));
   cs.setValue(ZipkinCoreConstants::CLIENT_SEND);
 
   // Create an all-new span, with no parent id
-  span.setName(operation_name);
+  span.setName(span_name);
   uint64_t randonNumber = Util::generateRandom64();
   span.setId(randonNumber);
   span.setTraceId(randonNumber);
@@ -39,7 +39,7 @@ Span Tracer::startSpan(const std::string& operation_name, uint64_t start_time) {
   span.setTimestamp(timestampMicro);
 
   // Add CS annotation to the span
-  span.addAnnotation(cs);
+  span.addAnnotation(std::move(cs));
 
   std::cerr << "Span's tracer pointer before: " << span.tracer() << std::endl;
   span.setTracer(this);
@@ -48,7 +48,7 @@ Span Tracer::startSpan(const std::string& operation_name, uint64_t start_time) {
   return span;
 }
 
-Span Tracer::startSpan(const std::string& operation_name, uint64_t start_time,
+Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
                        SpanContext& previous_context) {
   Span span;
   Annotation annotation;
@@ -67,6 +67,8 @@ Span Tracer::startSpan(const std::string& operation_name, uint64_t start_time,
     // Create a new span id
     uint64_t randonNumber = Util::generateRandom64();
     span.setId(randonNumber);
+
+    span.setName(span_name);
 
     // Set the parent id to the id of the previous span
     span.setParentId(previous_context.id());
@@ -101,14 +103,13 @@ Span Tracer::startSpan(const std::string& operation_name, uint64_t start_time,
   ep.setServiceName(service_name_);
 
   // Add the newly-created annotation to the span
-  annotation.setHost(ep);
+  annotation.setHost(std::move(ep));
   annotation.setTimestamp(timestampMicro);
-  span.addAnnotation(annotation);
+  span.addAnnotation(std::move(annotation));
 
   // Keep the same trace id
   span.setTraceId(previous_context.trace_id());
 
-  span.setName(operation_name);
   span.setStartTime(start_time);
 
   std::cerr << "Span's tracer pointer before: " << span.tracer() << std::endl;
