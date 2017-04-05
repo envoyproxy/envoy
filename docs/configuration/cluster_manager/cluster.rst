@@ -28,6 +28,7 @@ Cluster
 name
   *(required, string)* Supplies the name of the cluster which must be unique across all clusters.
   The cluster name is used when emitting :ref:`statistics <config_cluster_manager_cluster_stats>`.
+  The cluster name can be at most 60 characters long, and must **not** contain ``:``.
 
 .. _config_cluster_manager_type:
 

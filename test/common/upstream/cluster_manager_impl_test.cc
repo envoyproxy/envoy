@@ -260,6 +260,40 @@ TEST_F(ClusterManagerImplTest, UnknownHcType) {
   EXPECT_THROW(create(*loader), EnvoyException);
 }
 
+TEST_F(ClusterManagerImplTest, MaxClusterName) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "clusterwithareallyreallylongnamemorethanmaxcharsallowedbyschema"
+    }]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
+                            "JSON object doesn't conform to schema.\n Invalid schema: "
+                            "#/properties/name.\n Invalid keyword: maxLength.\n Invalid document "
+                            "key: #/name");
+}
+
+TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster:"
+    }]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
+                            "JSON object doesn't conform to schema.\n Invalid schema: "
+                            "#/properties/name.\n Invalid keyword: pattern.\n Invalid document "
+                            "key: #/name");
+}
+
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   std::string json = R"EOF(
   {
