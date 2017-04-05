@@ -5,8 +5,6 @@
 
 #include "common/http/header_map_impl.h"
 
-using testing::_;
-
 #define EXPECT_THROW_WITH_MESSAGE(statement, expected_exception, message)                          \
   try {                                                                                            \
     statement;                                                                                     \
