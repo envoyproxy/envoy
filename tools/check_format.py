@@ -4,7 +4,7 @@ import os
 import os.path
 import sys
 
-EXCLUDED_PREFIXES = ("./generated/thirdparty/", "./thirdparty/", "./build", "./.git/")
+EXCLUDED_PREFIXES = ("./generated/thirdparty", "./thirdparty/", "./build", "./.git/")
 SUFFIXES = (".cc", ".h", "BUILD")
 
 if len(sys.argv) != 5:
