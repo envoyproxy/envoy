@@ -217,7 +217,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           },
           "request_headers_for_tags": {
             "type" : "array",
-            "uniqueItems": "true",
+            "uniqueItems": true,
             "items" : {"type" : "string"}
           }
         },
