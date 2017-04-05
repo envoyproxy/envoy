@@ -105,7 +105,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       }
     }
 
-    tracing_config_.value({tracing_operation_name, request_headers_for_tags});
+    tracing_config_.reset(new Http::TracingConnectionManagerConfig(
+        {tracing_operation_name, request_headers_for_tags}));
   }
 
   if (config.hasObject("idle_timeout_s")) {

@@ -22,10 +22,6 @@ public:
 
   const std::string& get() const { return string_; }
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
-  LowerCaseString& operator=(const LowerCaseString& rhs) {
-    string_ = rhs.string_;
-    return *this;
-  }
 
 private:
   void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }

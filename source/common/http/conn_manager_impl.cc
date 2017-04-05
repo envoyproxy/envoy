@@ -447,7 +447,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.runtime_);
 
   // Check if tracing is enabled at all.
-  if (connection_manager_.config_.tracingConfig().valid()) {
+  if (connection_manager_.config_.tracingConfig()) {
     Tracing::Decision tracing_decision =
         Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
     ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
@@ -746,12 +746,12 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
 }
 
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
-  return connection_manager_.config_.tracingConfig().value().operation_name_;
+  return connection_manager_.config_.tracingConfig()->operation_name_;
 }
 
 const std::vector<Http::LowerCaseString>&
 ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
-  return connection_manager_.config_.tracingConfig().value().request_headers_for_tags_;
+  return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::addResetStreamCallback(

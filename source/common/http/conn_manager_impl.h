@@ -107,6 +107,8 @@ struct TracingConnectionManagerConfig {
   std::vector<Http::LowerCaseString> request_headers_for_tags_;
 };
 
+typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;
+
 /**
  * Abstract configuration for the connection manager.
  */
@@ -203,7 +205,7 @@ public:
   /**
    * @return tracing config.
    */
-  virtual const Optional<TracingConnectionManagerConfig>& tracingConfig() PURE;
+  virtual const TracingConnectionManagerConfig* tracingConfig() PURE;
 };
 
 /**
