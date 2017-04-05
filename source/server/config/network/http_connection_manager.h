@@ -88,8 +88,8 @@ public:
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
-  const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
-    return tracing_config_;
+  const Http::TracingConnectionManagerConfig* tracingConfig() override {
+    return tracing_config_.get();
   }
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
@@ -120,7 +120,7 @@ private:
   CodecType codec_type_;
   const uint64_t codec_options_;
   std::string server_name_;
-  Optional<Http::TracingConnectionManagerConfig> tracing_config_;
+  Http::TracingConnectionManagerConfigPtr tracing_config_;
   Optional<std::string> user_agent_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   Router::RouteConfigProviderPtr route_config_provider_;

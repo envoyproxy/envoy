@@ -63,9 +63,7 @@ public:
   bool useRemoteAddress() override { return true; }
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
-  const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
-    return tracing_config_;
-  }
+  const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
 
 private:
   /**
@@ -126,7 +124,6 @@ private:
   std::list<UrlHandler> handlers_;
   Optional<std::chrono::milliseconds> idle_timeout_;
   Optional<std::string> user_agent_;
-  Optional<Http::TracingConnectionManagerConfig> tracing_config_;
   Http::SlowDateProviderImpl date_provider_;
 };
 
