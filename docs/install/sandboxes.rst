@@ -317,10 +317,10 @@ This will be particularly useful if you are interested in modifying envoy, and t
 your changes.
 
 
-Using alpine envay image 
+Using alpine envoy image
 ------------------------
 
-A minimal image based on alpine is available as lyft/envoy-alpine. 
+A minimal image based on alpine is available as lyft/envoy-alpine.
 
 Another image lyft/envoy-alpine-debug has a debug build of envoy built into it and
 can be deployed when a requirement to debug envoy issues may arise.
