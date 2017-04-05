@@ -4,8 +4,8 @@
 #include <vector>
 #include <memory>
 
-#include "util.h"
-#include "tracer_interface.h"
+#include "zipkin/util.h"
+#include "zipkin/tracer_interface.h"
 
 namespace Zipkin {
 

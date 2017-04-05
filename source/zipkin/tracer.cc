@@ -1,8 +1,8 @@
 #include <regex>
 
-#include "util.h"
-#include "tracer.h"
-#include "zipkin_core_constants.h"
+#include "zipkin/util.h"
+#include "zipkin/tracer.h"
+#include "zipkin/zipkin_core_constants.h"
 
 #include <iostream>
 

@@ -2,8 +2,8 @@
 #include <string>
 #include <cstring>
 
-#include "zipkin_core_constants.h"
-#include "span_context.h"
+#include "zipkin/zipkin_core_constants.h"
+#include "zipkin/span_context.h"
 
 namespace Zipkin {
 

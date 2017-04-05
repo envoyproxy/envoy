@@ -3,8 +3,8 @@
 #include <vector>
 #include <string>
 
-#include "zipkin_core_types.h"
-#include "util.h"
+#include "zipkin/zipkin_core_types.h"
+#include "zipkin/util.h"
 
 namespace Zipkin {
 

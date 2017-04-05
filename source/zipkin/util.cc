@@ -7,7 +7,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/document.h"
 
-#include "util.h"
+#include "zipkin/util.h"
 
 namespace Zipkin {
 

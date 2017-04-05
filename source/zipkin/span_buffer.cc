@@ -1,4 +1,4 @@
-#include "span_buffer.h"
+#include "zipkin/span_buffer.h"
 
 #include <iostream>
 
