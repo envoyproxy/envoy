@@ -454,6 +454,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
                                               connection_manager_.config_.tracingStats());
 
     if (tracing_decision.is_tracing) {
+      stream_log_debug("XXX Fabio: About to call startSpan", *this);
       active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
     }
   }

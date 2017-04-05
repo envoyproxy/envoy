@@ -118,6 +118,18 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 
       http_tracer_.reset(
           new Tracing::HttpTracerImpl(std::move(lightstep_driver), server_.localInfo()));
+    } else if (type == "zipkin") {
+      if (server_.localInfo().clusterName().empty()) {
+        throw EnvoyException("cluster name must be defined if Zipkin tracing is enabled. See "
+                             "--service-cluster option.");
+      }
+
+      Tracing::DriverPtr zipkin_driver(
+          new Tracing::ZipkinDriver(*driver->getObject("config"), *cluster_manager_,
+                                    server_.threadLocal(), server_.runtime(), server_.localInfo()));
+
+      http_tracer_.reset(
+          new Tracing::HttpTracerImpl(std::move(zipkin_driver), server_.localInfo()));
     } else {
       throw EnvoyException(fmt::format("unsupported driver type: '{}'", type));
     }
