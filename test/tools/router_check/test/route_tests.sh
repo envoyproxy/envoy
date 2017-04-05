@@ -13,7 +13,6 @@ else
   PATH_CONFIG=$2
 fi
 
-
 TESTS=("ContentType" "ClusterHeader" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "TestRoutes" "Weighted")
 APPEND=("_router" "_expected")
 
