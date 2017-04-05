@@ -8,6 +8,13 @@ image at [`lyft/envoy:<hash>`](https://hub.docker.com/r/lyft/envoy/) is an image
 corresponds to the master commit at which the binary was compiled. Lastly, `lyft/envoy:latest` contains
 an Envoy binary built from the latest tip of master that passed tests.
 
+# Using alpine envoy image
+
+A minimal image based on alpine is available as lyft/envoy-alpine.
+
+Another image lyft/envoy-alpine-debug has a debug binary of envoy built into it and can be deployed when a requirement to debug envoy issues may arise.
+
+# Building a debug image
 An example basic invocation to build a debug image and run all tests is:
 
 ```bash

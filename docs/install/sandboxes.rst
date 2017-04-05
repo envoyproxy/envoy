@@ -316,11 +316,3 @@ the ``FROM`` line in any dockerfile.
 This will be particularly useful if you are interested in modifying envoy, and testing
 your changes.
 
-
-Using alpine envoy image
-------------------------
-
-A minimal image based on alpine is available as lyft/envoy-alpine.
-
-Another image lyft/envoy-alpine-debug has a debug build of envoy built into it and
-can be deployed when a requirement to debug envoy issues may arise.
