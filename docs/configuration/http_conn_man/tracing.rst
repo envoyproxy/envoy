@@ -17,8 +17,7 @@ operation_name
   are the only supported values.
 
 request_headers_for_tags
-  *(optional, array)* An optional list of header names which is used for populating tags on the active span.
-  Each tag name is the header name, and tag value is the header value from the request headers.
-  The tag is created if the specified header is present in the request headers. Otherwise, it's skipped.  
-
+  *(optional, array)* A list of header names used to create tags for the active span.
+   The header name is used to populate the tag name, and the header value is used to populate the tag value.
+   The tag is created if the specified header name is present in the request's headers. 
 
