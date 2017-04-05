@@ -939,16 +939,15 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "properties" : {
           "type" : {
             "type" : "string",
-            "enum" : ["lightstep", "zipkin"]
+            "enum" : ["lightstep"]
           },
           "config" : {
             "type" : "object",
             "properties" : {
               "collector_cluster" : {"type" : "string"},
-              "access_token_file" : {"type" : "string"},
-              "endpoint": {"type": "string"}
+              "access_token_file" : {"type" : "string"}
             },
-            "required": ["collector_cluster"],
+            "required": ["collector_cluster", "access_token_file"],
             "additionalProperties" : false
           }
         },

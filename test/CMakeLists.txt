@@ -26,7 +26,6 @@ include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 add_executable(envoy-test
   $<TARGET_OBJECTS:envoy-server>
   $<TARGET_OBJECTS:envoy-common>
-  $<TARGET_OBJECTS:zipkin>
   ${ENVOY_TEST_EXTRA_OBJECTS}
   common/access_log/access_log_manager_impl_test.cc
   common/api/api_impl_test.cc

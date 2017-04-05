@@ -1,4 +1,4 @@
-add_executable(envoy hot_restart.cc main.cc $<TARGET_OBJECTS:envoy-server> $<TARGET_OBJECTS:envoy-common> $<TARGET_OBJECTS:zipkin> ${ENVOY_EXE_EXTRA_OBJECTS})
+add_executable(envoy hot_restart.cc main.cc $<TARGET_OBJECTS:envoy-server> $<TARGET_OBJECTS:envoy-common> ${ENVOY_EXE_EXTRA_OBJECTS})
 
 if (ENVOY_TCMALLOC)
   target_link_libraries(envoy tcmalloc_and_profiler)
