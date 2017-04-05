@@ -65,7 +65,6 @@ def envoy_cc_binary(name,
                     deps = []):
     native.cc_binary(
         name = name,
-        testonly = testonly,
         srcs = srcs,
         data = data,
         copts = ENVOY_COPTS,
@@ -74,6 +73,7 @@ def envoy_cc_binary(name,
             "-lrt",
         ],
         linkstatic = linkstatic,
+        testonly = testonly,
         visibility = visibility,
         deps = deps + [
             "//source/precompiled:precompiled_includes",
@@ -187,4 +187,18 @@ def envoy_proto_library(name, srcs = [], deps = []):
         hdrs = [_proto_header(s) for s in srcs if _proto_header(s)],
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         deps = [internal_name],
+    )
+
+# Envoy shell script tests
+def envoy_sh_test(name,
+                  srcs = [],
+                  data = [],
+                  args = [],
+                  deps = []):
+    native.sh_test(
+        name = name,
+        srcs = srcs,
+        data = data,
+        args = args,
+        deps = deps,
     )

@@ -1,0 +1,20 @@
+[
+  {
+    "authority": "www.lyft.com",
+    "path": "/foo",
+    "check": {
+      "path_redirect": "none",
+      "cluster_name":"www2"
+    },
+    "ssl": true,
+    "internal": true
+  },
+  {
+    "authority": "redirect.lyft.com",
+    "path": "/foo",
+    "check": {
+      "cluster_name": "none",
+      "path_redirect": "http://new.lyft.com/foo"
+    }
+  }
+]

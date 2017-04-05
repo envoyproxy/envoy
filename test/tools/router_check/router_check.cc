@@ -1,27 +1,29 @@
-#include "router.h"
+#include "test/tools/router_check/source/router.h"
 #include "test/precompiled/precompiled_test.h"
 
 int main(int argc, char* argv[]) {
 
   if (argc < 3 || argc > 4) {
-    return -1;
+    return EXIT_FAILURE;
   }
 
   RouterCheckTool checktool;
 
+  // Load router config json
   if (!checktool.create(argv[1])) {
-    return -1;
+    return EXIT_FAILURE;
   }
 
   // TODO(hennna): Switch to gflags
   if (argc == 4 && std::string(argv[3]) == "--details") {
-    checktool.showDetails();
+    checktool.setShowDetails();
   }
 
-  checktool.compareEntriesInJson(argv[2]);
+  // Load tool config json
+  // Test fails if routes do not match what is expected
+  if (!checktool.compareEntriesInJson(argv[2])) {
+    return EXIT_FAILURE;
+  }
 
-  // Print out total matches and conflicts
-  std::cout << "Total Y:" << checktool.getYes() << " N:" << checktool.getNo() << std::endl;
-
-  return 0;
+  return EXIT_SUCCESS;
 }

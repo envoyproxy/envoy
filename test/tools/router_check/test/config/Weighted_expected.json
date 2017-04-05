@@ -1,28 +1,27 @@
-{ "input": [
+[
   {
-    "expected": "none",
     "authority": "www1.lyft.com",
     "path": "/foo",
-    "check": {"redirect": "path"},
+    "check": {"path_redirect": "none"},
     "ssl": true,
     "internal": true
   },
   {
-    "expected": "cluster1",
     "authority": "www1.lyft.com",
     "path": "/foo",
-    "random_lb_value": 115
+    "random_lb_value": 115,
+    "check": {"cluster_name": "cluster1"}
   },
   {
-    "expected": "cluster2",
     "authority": "www1.lyft.com",
     "path": "/foo",
-    "random_lb_value": 445
+    "random_lb_value": 445,
+    "check": {"cluster_name": "cluster2"}
   },
   {
-    "expected": "cluster3",
     "authority": "www1.lyft.com",
     "path": "/foo",
-    "random_lb_value": 560
+    "random_lb_value": 560,
+    "check": {"cluster_name": "cluster3"}
   }
-]}
+]

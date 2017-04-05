@@ -1,17 +1,15 @@
-{
-  "input": [
+[
     {
-      "expected": "some_cluster",
       "authority": "some_cluster",
-      "path": "/foo"
+      "path": "/foo",
+      "check": {"cluster_name": "some_cluster"}
     },
     {
-      "expected": "none",
       "authority": "www.lyft.com",
-      "path": "/bar"
+      "path": "/bar",
+      "check": {"cluster_name": "none"}
     },
     {
-      "expected": "some_cluster",
       "authority": "www.lyft.com",
       "path": "/bar",
       "additional_headers": [
@@ -19,7 +17,8 @@
           "name": "some_header",
 	  "value": "some_cluster"
 	}
-      ]
+      ],
+      "check": {"cluster_name": "some_cluster"}
     }
-  ]
-}
+]
+

@@ -1,98 +1,105 @@
 .. _config_tools_router_check_tool:
 
-Router check tool
-=================
+Route table check tool
+======================
 
-Input for the router check tool. The router check tool checks if the route returned
-by a router matches what is expected. The expected field specifies the expected value
-and is required. The authority and path fields specifies the url sent to the router
-and are also required. The simplest configuration has one test case and takes the following form: ::
+**NOTE: The following configuration is for the router table check tool only and is not part of the envoy binary.
+The route table check tool is used for testing purposes only.**
 
-   {
-     "input": [
-       { "expected":"locations",
-         "authority":"api.lyft.com",
-         "path": "/api/locations"
-       }
-     ]
-   }
+Input for the route table check tool. The route table check tool checks if the route returned
+by a router matches what is expected. The tool can be used to check cluster name, virtual cluster name,
+virtual host name, path rewrite, host rewrite, and path redirect matches. Extensions for other
+test cases can be added. The "check" field specifies the expected values in each test case. At least one test
+case is required. In addition, the authority and path fields specify the url sent to the router
+and are also required. A simple configuration has one test case and is writen as follows. The test
+expects a cluster name match of "instant-server".::
+
+   [
+     {
+       "authority":"api.lyft.com",
+       "path": "/api/locations",
+       "check": {"cluster_name": "instant-server"}
+     }
+   ]
 
 .. code-block:: json
 
-  {
-    "input": {
-      "type" : "array",
-      "items" : {
-        "type": "object",
-        "properties": {
-          "expected": { "type": "string" },
-          "authority": { "type": "string" },
-          "path": { "type": "string" },
-          "additional_headers": {
-            "type": "array",
-            "items" : {
-              "type": "object",
-             "properties": {
-                "name": { "type": "string" },
-                "value": { "type": "string" }
-               }
-            }
-          },
-          "check": {
-            "type": "object",
-            "properties" : {
-              "name": {"type" : "string", "enum" : ["cluster", "virtual_cluster", "virtual_host"] },
-              "rewrite" : {"type" : "string", "enum" : ["host", "path"] },
-              "redirect" : {"type" : "string", "enum" : ["path"] },
-              "maxItems" : 1
-            }
-          },
-          "method": { "type" : "string", "enum": ["GET", "PUT", "POST"] },
-          "random_lb_value" : { "type" : "integer" },
-          "ssl" : { "type" : "boolean" },
-          "internal" : { "type" : "boolean" }
+  [
+    {
+      "authority": "...",
+      "path": "...",
+      "additional_headers": [
+        {
+          "name": "...",
+          "value": "..."
         },
-        "additionalProperties": false,
-        "required": ["expected", "authority", "path"]
+        {
+          "..."
+        }
+      ],
+      "method": "...",
+      "random_lb_value" : "...",
+      "ssl" : "...",
+      "internal" : "...",
+      "check": {
+        "cluster_name": "...",
+        "virtual_cluster_name": "...",
+        "virtual_host_name": "...",
+        "path_rewrite": "...",
+        "host_rewrite": "...",
+        "path_redirect": "..."
       }
+    },
+    {
+      "..."
     }
-  }
-
-input
-  *(required, array)* An array of expected and actual routes to match. For each element in the input array, the expected route and actual returned route are compared. The total number of matches and conflicts are output by the router check tool.
-
-expected
-  *(required, string)* A string containing the expected name or host or path of the route to be compared. Use the string "none" to specify no route is expected.
+  ]
 
 authority
-  *(required, string)* The route authority. This value along with the path parameter define the url of the route to be matched. An example authority value is "api.lyft.com".
+  *(required, string)* The url authority. This value along with the path parameter define
+  the url to be matched. An example authority value is "api.lyft.com".
 
 path
-  *(required, string)* The route path. An example path value is "/foo".
+  *(required, string)* The url path. An example path value is "/foo".
 
 additional_headers
-  *(optional, array)*  Addtional headers to be added before a route is returned.
-
-check
-  *(optional, object)* The parameter to be matched. The default is to match the expected value with the returned cluster name. Only one of the following options can be chosen.
-
-  name
-    *(optional, string)* Choose from cluster, virtual_cluster and virtual_host. If cluster is selected, the returned anme of the clustr is matched with the string value of expected. If virtual_cluster is selected, the vitual cluster name is matched. If virtual_host is selected, the virtual host name is matched.
-
-  rewrite
-    *(optional, string)* Choose from host or path. If host is selected, the rewritten host is compared. If path is selected, the rewritten path is compared.
-
-  redirect
-    *(optional, string)* Compare the string value of expected to the returned redirect path.
+  *(optional, array)*  Additional headers to be added before a route is returned.
 
 method
-  *(optional, string)* The request method. The default is GET in all cases but comparing redirect paths. In the redirect case, this parameter is not set in the request header.
+  *(optional, string)* The request method. If not specified, the default method is GET in all test cases
+  except for the redirect path test case. In the redirect path case, this parameter is not set by default.
 
 random_lb_value
-  *(optional, integer)* A random integer used when choosing between weighted load balanced clusters. The default value is 0.
+  *(optional, integer)* A random integer used when choosing between weighted load balanced clusters.
+  The default value is 0.
 
 ssl
-  *(optional, boolean)* A flag that determines whether to set x-forwarded-proto to https or http. If not specified, this value is not set. In the redirect case, this value is default to false.
+  *(optional, boolean)* A flag that determines whether to set x-forwarded-proto to https or http.
+  In the redirect path test case, this value is set to false by default. In all other test cases,
+  this value is not set by default.
 
 internal
-  *(optional, boolean)* A flag that determines whether to set x-envoy-internal to true or false. If not specified, this value is not set. In the redirect case, this value is default to false.
+  *(optional, boolean)* A flag that determines whether to set x-envoy-internal to "true".
+  If not specified, or if internal is equal to false, x-envoy-internal is not set.
+
+check
+  *(required, object)* The check object specifies the returned router parameters to match. At least one
+  test parameter must be specificed.
+
+  cluster_name
+    *(optional, string)* Match the cluster name.
+
+  virutal_cluster_name
+    *(optional, string)* Match the virtual cluster name.
+
+  virtual_host_name
+    *(optional, string)* Match the virtual host name.
+
+  path_rewrite
+    *(optional, string)* Match the path header field after rewrite.
+
+  host_rewrite
+    *(optional, string)* Match the host header field after rewrite.
+
+  path_redirect
+    *(optional, string)* Match the returned redirect path.

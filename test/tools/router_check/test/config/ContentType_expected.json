@@ -1,25 +1,24 @@
-{
-  "input": [
+[
     {
-      "expected": "local_service",
       "authority": "www.lyft.com",
-      "path": "/"
+      "path": "/",
+      "check": {"cluster_name":"local_service"}
     },
     {
-      "expected": "local_service_grpc",
       "authority": "www.lyft.com",
       "path": "/",
       "additional_headers":[
 	      { "name":"content-type", "value":"application/grpc"}
-      ]
+      ],
+      "check": {"cluster_name":"local_service_grpc"}
     },
     {
-      "expected": "local_service",
       "authority": "www.lyft.com",
       "path": "/",
       "additional_headers":[
         { "name":"content-type", "value":"foo"}
-      ]
+      ],
+      "check": {"cluster_name":"local_service"}
     }
-  ]
-}
+]
+

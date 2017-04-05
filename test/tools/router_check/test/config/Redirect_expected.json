@@ -1,63 +1,54 @@
-{ "input": [
+[
   {
-    "expected": "none",
     "authority": "www.foo.com",
     "path": "/foo",
-    "check": {"redirect": "path"},
+    "check": {"path_redirect": "none"},
     "ssl": true,
     "internal": true
   },
   {
-    "expected": "none",
     "authority": "www.lyft.com",
     "path": "/foo",
-    "check": {"redirect": "path"},
+    "check": {"path_redirect": "none"},
     "ssl": true,
     "internal": true
   },
   {
-    "expected": "https://www.lyft.com/foo",
     "authority": "www.lyft.com",
     "path": "/foo",
-    "check": {"redirect": "path"},
+    "check": {"path_redirect": "https://www.lyft.com/foo"},
     "ssl" : false,
     "internal": false
   },
   {
-    "expected": "none",
     "authority": "api.lyft.com",
     "path": "/foo",
-    "check": {"redirect": "path"},
+    "check": {"path_redirect": "none"},
     "internal": true
   },
   {
-    "expected": "https://api.lyft.com/foo",
     "authority": "api.lyft.com",
     "path": "/foo",
-    "check": {"redirect": "path"}
+    "check": {"path_redirect": "https://api.lyft.com/foo"}
   },
   {
-    "expected": "http://new.lyft.com/foo",
     "authority": "redirect.lyft.com",
     "path": "/foo",
-    "check": {"redirect": "path"},
+    "check": {"path_redirect": "http://new.lyft.com/foo"},
     "ssl" : false,
     "internal": false
   },
   {
-    "expected": "https://redirect.lyft.com/new_bar",
     "authority": "redirect.lyft.com",
     "path": "/bar",
-    "check": {"redirect": "path"},
+    "check": {"path_redirect": "https://redirect.lyft.com/new_bar"},
     "ssl" : true
   },
   {
-    "expected": "https://new.lyft.com/new_baz",
     "authority": "redirect.lyft.com",
     "path": "/baz",
-    "check": {"redirect": "path"},
+    "check": {"path_redirect": "https://new.lyft.com/new_baz"},
     "ssl" : true,
     "internal": false
   }
-
-]}
+]
