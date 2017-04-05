@@ -12,6 +12,9 @@
 #include "lightstep/carrier.h"
 #include "lightstep/tracer.h"
 
+#include "zipkin/tracer.h"
+#include "zipkin/span_buffer.h"
+
 namespace Tracing {
 
 #define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
@@ -172,4 +175,71 @@ private:
   Event::TimerPtr flush_timer_;
 };
 
+class ZipkinSpan : public Span {
+public:
+  ZipkinSpan(Zipkin::Span& span);
+
+  void finishSpan() override;
+  void setTag(const std::string& name, const std::string& value) override;
+
+  bool hasCSAnnotation();
+
+private:
+  Zipkin::Span span_;
+};
+
+typedef std::unique_ptr<ZipkinSpan> ZipkinSpanPtr;
+
+class ZipkinDriver : public Driver {
+public:
+  ZipkinDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
+               ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+               const LocalInfo::LocalInfo& localinfo);
+
+  SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string&,
+                    SystemTime start_time) override;
+
+  Upstream::ClusterManager& clusterManager() { return cm_; }
+  Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
+  Runtime::Loader& runtime() { return runtime_; }
+
+private:
+  struct TlsZipkinTracer : ThreadLocal::ThreadLocalObject {
+    TlsZipkinTracer(Zipkin::Tracer tracer, ZipkinDriver& driver);
+
+    void shutdown() override {}
+
+    Zipkin::Tracer tracer_;
+    ZipkinDriver& driver_;
+  };
+
+  Upstream::ClusterManager& cm_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
+  ThreadLocal::Instance& tls_;
+  Runtime::Loader& runtime_;
+  const LocalInfo::LocalInfo& local_info_;
+  uint32_t tls_slot_;
+};
+
+class ZipkinReporter : public Zipkin::Reporter, Http::AsyncClient::Callbacks {
+public:
+  ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatcher, const std::string& endpoint);
+
+  void reportSpan(Zipkin::Span&& span) override;
+
+  void onSuccess(Http::MessagePtr&&) override;
+  void onFailure(Http::AsyncClient::FailureReason) override;
+
+  static std::unique_ptr<Zipkin::Reporter>
+  NewInstance(ZipkinDriver& driver, Event::Dispatcher& dispatcher, const std::string& endpoint);
+
+private:
+  void enableTimer();
+  void flushSpans();
+
+  ZipkinDriver& driver_;
+  Event::TimerPtr flush_timer_;
+  Zipkin::SpanBuffer span_buffer_;
+  std::string endpoint_;
+};
 } // Tracing
