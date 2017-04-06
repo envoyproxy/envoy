@@ -23,7 +23,7 @@ if [[ "$1" == "bazel.debug" ]]; then
   echo "Building..."
   bazel $BAZEL_BATCH build $BAZEL_OPTIONS //source/exe:envoy-static
   echo "Testing..."
-  bazel $BAZEL_BATCH test $BAZEL_OPTIONS --define force_test_link_static=yes --test_output=all \
+  bazel $BAZEL_BATCH test $BAZEL_OPTIONS --test_output=all \
     --cache_test_results=no //test/...
   exit 0
 fi
