@@ -1,18 +1,31 @@
-# Developer use of CI Docker image
+# Developer use of CI Docker images
 
-The Docker image at [`lyft/envoy-build:<hash>`](https://hub.docker.com/r/lyft/envoy-build/) is used for Travis CI checks, where `<hash>` is specified in
-[ci_steps.sh](https://github.com/lyft/envoy/blob/master/ci/ci_steps.sh). Developers
-may work with `lyft/envoy-build:latest` to provide a self-contained environment for
-building Envoy binaries and running tests that reflects the latest built image. Moreover, the Docker
-image at [`lyft/envoy:<hash>`](https://hub.docker.com/r/lyft/envoy/) is an image that has an Envoy binary at `usr/local/bin/envoy`. The `<hash>`
-corresponds to the master commit at which the binary was compiled. Lastly, `lyft/envoy:latest` contains
-an Envoy binary built from the latest tip of master that passed tests.
+Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
 
-# Using alpine envoy image
+## Ubuntu envoy image
+The Ubuntu based Envoy Docker image at [`lyft/envoy-build:<hash>`](https://hub.docker.com/r/lyft/envoy-build/) is used for Travis CI checks,
+where `<hash>` is specified in [ci_steps.sh](https://github.com/lyft/envoy/blob/master/ci/ci_steps.sh). Developers
+may work with `lyft/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
+running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
+at [`lyft/envoy:<hash>`](https://hub.docker.com/r/lyft/envoy/) is an image that has an Envoy binary at `/usr/local/bin/envoy`. The `<hash>`
+corresponds to the master commit at which the binary was compiled. Lastly, `lyft/envoy:latest` contains an Envoy
+binary built from the latest tip of master that passed tests.
 
-A minimal image based on alpine is available as lyft/envoy-alpine.
+## Alpine envoy image
 
-Another image lyft/envoy-alpine-debug has a debug binary of envoy built into it and can be deployed when a requirement to debug envoy issues may arise.
+Minimal images based on alpine Linux allow for quicker deployment of Envoy. Two alpine based images are built,
+one with an Envoy binary with debug symbols and one stripped of them (and consequently the smallest of the built images).
+
+The Alpine based Envoy Docker image at [`lyft/envoy-alpine:<hash>`](https://hub.docker.com/r/lyft/envoy-alpine/), and the
+Alpine based debug Envoy Docker image at [`lyft/envoy-alpine-debug:<hash>`](https://hub.docker.com/r/lyft/envoy-alpine-debug/) are
+both used for Travis CI checks, where `<hash>` is specified in [ci_steps.sh](https://github.com/lyft/envoy/blob/master/ci/ci_steps.sh).
+
+As with the Ubuntu based images, for the Alpine based images, developers
+may work with `lyft/envoy-alpine:latest` and `lyft/envoy-alpine-debug:latest` to provide a self-contained environment for
+building Envoy binaries and running tests that reflects the latest built Alpine Envoy image.
+Like the Ubuntu based images, the Alpine based images have an Envoy binary at `/usr/local/bin/envoy`, the `<hash>`
+corresponds to the master commit at which the binary was compiled, and `lyft/envoy-alpine:latest` and `lyft/envoy-alpine-debug:latest`
+contain an Envoy binary built from the latest tip of master that passed tests.
 
 # Building a debug image
 An example basic invocation to build a debug image and run all tests is:
