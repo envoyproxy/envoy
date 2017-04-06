@@ -126,6 +126,7 @@ public:
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
   getApplicableRateLimit(uint64_t stage = 0) const override;
+  bool empty() const override { return rate_limit_entries_.empty(); }
 
 private:
   std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;

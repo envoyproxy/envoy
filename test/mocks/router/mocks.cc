@@ -27,6 +27,7 @@ MockRateLimitPolicyEntry::~MockRateLimitPolicyEntry() {}
 
 MockRateLimitPolicy::MockRateLimitPolicy() {
   ON_CALL(*this, getApplicableRateLimit(_)).WillByDefault(ReturnRef(rate_limit_policy_entry_));
+  ON_CALL(*this, empty()).WillByDefault(Return(true));
 }
 
 MockRateLimitPolicy::~MockRateLimitPolicy() {}

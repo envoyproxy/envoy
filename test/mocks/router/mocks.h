@@ -67,6 +67,7 @@ public:
   MOCK_CONST_METHOD1(
       getApplicableRateLimit,
       std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(uint64_t stage));
+  MOCK_CONST_METHOD0(empty, bool());
 
   std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };
@@ -147,6 +148,7 @@ public:
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
+  MOCK_CONST_METHOD0(excludeVirtualHostRateLimits, bool());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;

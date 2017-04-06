@@ -231,6 +231,11 @@ public:
    *         with the route
    */
   virtual const std::multimap<std::string, std::string>& opaqueConfig() const PURE;
+
+  /**
+   * @return bool true if the virtual host rate limits should be excluded.
+   */
+  virtual bool excludeVirtualHostRateLimits() const PURE;
 };
 
 /**

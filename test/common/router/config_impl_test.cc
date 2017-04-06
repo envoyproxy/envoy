@@ -1786,4 +1786,97 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
   EXPECT_EQ("value2", opaque_config.find("name2")->second);
 }
 
+TEST(RoutePropertyTest, excludeVHRateLimits) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "cluster": "www2"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+
+  ConfigImpl config(*loader, runtime, cm, true);
+  EXPECT_FALSE(config.route(genHeaders("lyft.com", "/foo", "GET"), 0)
+                   ->routeEntry()
+                   ->excludeVirtualHostRateLimits());
+
+  json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "cluster": "www2",
+            "rate_limits": [
+              {
+                "actions": [
+                  {
+                    "type": "remote_address"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  loader = Json::Factory::LoadFromString(json);
+  ConfigImpl config1(*loader, runtime, cm, true);
+  EXPECT_TRUE(config1.route(genHeaders("lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->excludeVirtualHostRateLimits());
+
+  json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "cluster": "www2",
+            "exclude_vh_rate_limits": false,
+            "rate_limits": [
+              {
+                "actions": [
+                  {
+                    "type": "remote_address"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  loader = Json::Factory::LoadFromString(json);
+  ConfigImpl config2(*loader, runtime, cm, true);
+  EXPECT_FALSE(config2.route(genHeaders("lyft.com", "/foo", "GET"), 0)
+                   ->routeEntry()
+                   ->excludeVirtualHostRateLimits());
+}
+
 } // Router

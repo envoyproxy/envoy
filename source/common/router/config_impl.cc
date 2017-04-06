@@ -143,6 +143,15 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
           {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
   }
+
+  // Only set exclude_vh_rate_limits_ to true if there is a rate limit policy for the route
+  // and the route opted into excluding the virtual host.
+  if (!rate_limit_policy_.getApplicableRateLimit().empty() &&
+      route.getBoolean("exclude_vh_rate_limits", true)) {
+    exclude_vh_rate_limits_ = true;
+  } else {
+    exclude_vh_rate_limits_ = false;
+  }
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
