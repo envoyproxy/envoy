@@ -16,8 +16,3 @@ envoy_cc_library(
     srcs = ["version_generated.cc"],
     deps = ["//source/common/common:version_includes"],
 )
-
-config_setting(
-    name = "force_test_link_static",
-    values = {"define": "force_test_link_static=yes"},
-)

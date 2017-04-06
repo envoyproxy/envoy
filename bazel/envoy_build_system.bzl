@@ -59,8 +59,11 @@ def envoy_cc_library(name,
 def envoy_cc_binary(name,
                     srcs = [],
                     data = [],
+<<<<<<< HEAD
                     linkstatic = 0,
                     testonly = 0,
+=======
+>>>>>>> upstream/master
                     visibility = None,
                     deps = []):
     native.cc_binary(
@@ -72,8 +75,12 @@ def envoy_cc_binary(name,
             "-pthread",
             "-lrt",
         ],
+<<<<<<< HEAD
         linkstatic = linkstatic,
         testonly = testonly,
+=======
+        linkstatic = 1,
+>>>>>>> upstream/master
         visibility = visibility,
         deps = deps + [
             "//source/precompiled:precompiled_includes",
@@ -100,10 +107,7 @@ def envoy_cc_test(name,
         data = data,
         copts = ENVOY_COPTS + ["-includetest/precompiled/precompiled_test.h"],
         linkopts = ["-pthread"],
-        linkstatic = select({
-            "//:force_test_link_static": 1,
-            "//conditions:default": 0,
-        }),
+        linkstatic = 1,
         args = args,
         deps = deps + [
             "//source/precompiled:precompiled_includes",
