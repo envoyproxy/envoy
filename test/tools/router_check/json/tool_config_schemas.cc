@@ -3,39 +3,39 @@
 const std::string Json::ToolSchema::ROUTER_CHECK_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
-      "type" : "array",
-      "minItems" : 1,
-      "items" : {
+      "type": "array",
+      "minItems": 1,
+      "items": {
         "type": "object",
         "properties": {
-          "authority": { "type": "string" },
-          "path": { "type": "string" },
+          "authority": {"type": "string"},
+          "path": {"type": "string"},
           "additional_headers": {
             "type": "array",
-            "items" : {
+            "items": {
               "type": "object",
               "properties": {
-                "name": { "type": "string" },
-                "value": { "type": "string" }
+                "name": {"type": "string"},
+                "value": {"type": "string"}
               },
               "additionalProperties": false,
               "required": ["name", "value"],
               "maxProperties": 2
             }
           },
-          "method": { "type" : "string", "enum": ["GET", "PUT", "POST"] },
-          "random_lb_value" : { "type" : "integer" },
-          "ssl" : { "type" : "boolean" },
-          "internal" : { "type" : "boolean" },
+          "method": {"type": "string", "enum": ["GET", "PUT", "POST"]},
+          "random_lb_value": {"type": "integer"},
+          "ssl": {"type": "boolean"},
+          "internal": {"type": "boolean"},
           "check": {
             "type": "object",
-            "properties" : {
-              "cluster_name": {"type" : "string"},
-              "virtual_cluster_name": {"type" : "string"},
-              "virtual_host_name": {"type" : "string"},
-              "path_rewrite": {"type" : "string"},
-              "host_rewrite": {"type" : "string"},
-              "path_redirect": {"type" : "string"}
+            "properties": {
+              "cluster_name": {"type": "string"},
+              "virtual_cluster_name": {"type": "string"},
+              "virtual_host_name": {"type": "string"},
+              "path_rewrite": {"type": "string"},
+              "host_rewrite": {"type": "string"},
+              "path_redirect": {"type": "string"}
             },
             "minProperties": 1,
             "additionalProperties": false
@@ -44,5 +44,5 @@ const std::string Json::ToolSchema::ROUTER_CHECK_SCHEMA(R"EOF(
         "additionalProperties": false,
         "required": ["authority", "path", "check"]
       }
-  }
+    }
   )EOF");

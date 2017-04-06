@@ -14,9 +14,9 @@
     "path": "/foo",
     "check": {
       "path_redirect": "http://new.lyft.com/foo",
-      "cluster_name":"none"
+      "cluster_name": "none"
     },
-    "ssl" : false,
+    "ssl": false,
     "internal": false
   },
   {
@@ -24,7 +24,7 @@
     "path": "/foo",
     "check": {
       "path_redirect": "http://new.lyft.com/foo",
-      "cluster_name":"none"
+      "cluster_name": "none"
     }
   },
   {
@@ -32,17 +32,17 @@
     "path": "/foo",
     "check": {
       "path_redirect": "http://new.lyft.com/foo",
-      "cluster_name":"none"
+      "cluster_name": "none"
     },
-    "ssl" : false
+    "ssl": false
   },
   {
     "authority": "redirect.lyft.com",
     "path": "/foo",
     "check": {
       "path_redirect": "http://new.lyft.com/foo",
-      "cluster_name":"none"
+      "cluster_name": "none"
     },
-    "ssl" : false
+    "ssl": false
   }
 ]

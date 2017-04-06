@@ -39,133 +39,135 @@
     "authority": "www.lyft.com",
     "path": "/new_endpoint/foo",
     "check":
-      {"cluster_name": "www2",
-      "virtual_host_name": "www2"}
+      {
+	"cluster_name": "www2",
+        "virtual_host_name": "www2"
+      }
   },
   {
     "authority": "www.lyft.com",
     "path": "/new_endpoint/foo",
-    "check": { "path_rewrite": "/api/new_endpoint/foo" }
+    "check": {"path_rewrite": "/api/new_endpoint/foo"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/api/locations?works=true",
-    "check": { "path_rewrite":"/rewrote?works=true" }
+    "check": {"path_rewrite": "/rewrote?works=true"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/foo",
-    "check": { "path_rewrite":"/bar" }
+    "check": {"path_rewrite": "/bar"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/host/rewrite/me",
-    "check": { "host_rewrite":"new_host" }
+    "check": {"host_rewrite":"new_host"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/API/locations?works=true",
-    "check": { "path_rewrite":"/rewrote?works=true" }
+    "check": {"path_rewrite": "/rewrote?works=true"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/fooD",
-    "check": { "path_rewrite":"/cAndy" }
+    "check": {"path_rewrite": "/cAndy"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/FOO",
-    "check": { "path_rewrite":"/FOO" }
+    "check": {"path_rewrite": "/FOO"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/ApPles",
-    "check": { "path_rewrite":"/ApPles" }
+    "check": {"path_rewrite": "/ApPles"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/oLDhost/rewrite/me",
-    "check": { "host_rewrite":"api.lyft.com" }
+    "check": {"host_rewrite": "api.lyft.com"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/Tart",
-    "check": { "path_rewrite":"/Tart" }
+    "check": {"path_rewrite": "/Tart"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/newhost/rewrite/me",
-    "check": { "host_rewrite":"new_host" }
+    "check": {"host_rewrite": "new_host"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/rides",
-    "check": { "virtual_cluster_name":"other" }
+    "check": {"virtual_cluster_name": "other"}
   },
   {
     "authority": "api.lyft.com",
     "path": "/rides/blah",
-    "check": { "virtual_cluster_name":"other" },
+    "check": {"virtual_cluster_name": "other"},
     "method": "POST"
   },
   {
     "authority": "api.lyft.com",
     "path": "/rides",
-    "check": { "virtual_cluster_name":"ride_request"},
+    "check": {"virtual_cluster_name": "ride_request"},
     "method": "POST"
   },
   {
     "authority": "api.lyft.com",
     "path": "/rides/123",
-    "check": { "virtual_cluster_name":"update_ride" },
+    "check": {"virtual_cluster_name": "update_ride"},
     "method": "PUT"
   },
   {
     "authority": "api.lyft.com",
     "path": "/users/123/chargeaccounts",
-    "check": { "virtual_cluster_name":"cc_add" },
+    "check": {"virtual_cluster_name": "cc_add"},
     "method": "POST"
   },
   {
     "authority": "api.lyft.com",
     "path": "/users/123/chargeaccounts/hello123",
-    "check": { "virtual_cluster_name":"cc_add" },
+    "check": {"virtual_cluster_name": "cc_add"},
     "method": "PUT"
   },
   {
     "authority": "api.lyft.com",
     "path": "/users/123/chargeaccounts/validate",
-    "check": { "virtual_cluster_name":"other" },
+    "check": {"virtual_cluster_name": "other"},
     "method": "PUT"
   },
   {
     "authority": "api.lyft.com",
     "path": "/foo/bar",
-    "check": { "virtual_cluster_name":"other" },
+    "check": {"virtual_cluster_name": "other"},
     "method": "PUT"
   },
   {
     "authority": "api.lyft.com",
     "path": "/users",
-    "check": { "virtual_cluster_name":"create_user_login" },
+    "check": {"virtual_cluster_name": "create_user_login"},
     "method": "POST"
   },
   {
     "authority": "api.lyft.com",
     "path": "/users/123",
-    "check": { "virtual_cluster_name":"update_user" },
+    "check": {"virtual_cluster_name": "update_user"},
     "method": "PUT"
   },
   {
     "authority": "api.lyft.com",
     "path": "/users/123/location",
-    "check": { "virtual_cluster_name":"ulu" },
+    "check": {"virtual_cluster_name": "ulu"},
     "method": "POST"
   },
   {
     "authority": "api.lyft.com",
     "path": "/something/else",
-    "check": { "virtual_cluster_name":"other" },
+    "check": {"virtual_cluster_name": "other"},
     "method": "GET"
   }
 ]

@@ -1,77 +1,77 @@
 [
-    {
-      "authority": "www.lyft.com",
-      "path": "/",
-      "check": {"cluster_name":"local_service_without_headers"}
-    },
-    {
-      "authority": "www.lyft.com",
-      "path": "/",
-      "additional_headers" : [
-        {
-	  "name": "test_header",
-	  "value": "test"
-	}
-      ],
-      "check": {"cluster_name":"local_service_with_headers"}
-    },
-    {
-      "authority": "www.lyft.com",
-      "path": "/",
-      "additional_headers" : [
-        {
-	  "name": "test_header_multiple1",
-	  "value": "test1"
-	},
-	{
-	  "name": "test_header_multiple2",
-	  "value": "test2"
-	}
-      ],
-      "check": {"cluster_name":"local_service_with_multiple_headers"}
-    },
-    {
-      "authority": "www.lyft.com",
-      "path": "/",
-      "additional_headers" : [
-        {
-	  "name": "non_existent_header",
-	  "value": "foo"
-	}
-      ],
-      "check": {"cluster_name":"local_service_without_headers"}
-    },
-    {
-      "authority": "www.lyft.com",
-      "path": "/",
-      "additional_headers" : [
-        {
-	  "name": "test_header_presence",
-	  "value": "test"
-	}
-      ],
-      "check": {"cluster_name":"local_service_with_empty_headers"}
-    },
-    {
-      "authority": "www.lyft.com",
-      "path": "/",
-      "additional_headers" : [
-        {
-	  "name": "test_header_pattern",
-	  "value": "user=test-1223"
-	}
-      ],
-      "check": {"cluster_name":"local_service_with_header_pattern_set_regex"}
-    },
-    {
-      "authority": "www.lyft.com",
-      "path": "/",
-      "additional_headers" : [
-        {
-	  "name": "test_header_pattern",
-	  "value": "customer=test-1223"
-	}
-      ],
-      "check": {"cluster_name":"local_service_without_headers"}
-    }
+  {
+    "authority": "www.lyft.com",
+    "path": "/",
+    "check": {"cluster_name": "local_service_without_headers"}
+  },
+  {
+    "authority": "www.lyft.com",
+    "path": "/",
+    "additional_headers": [
+      {
+        "name": "test_header",
+	"value": "test"
+      }
+    ],
+    "check": {"cluster_name": "local_service_with_headers"}
+  },
+  {
+    "authority": "www.lyft.com",
+    "path": "/",
+    "additional_headers": [
+      {
+        "name": "test_header_multiple1",
+	"value": "test1"
+      },
+      {
+	"name": "test_header_multiple2",
+	"value": "test2"
+      }
+    ],
+    "check": {"cluster_name": "local_service_with_multiple_headers"}
+  },
+  {
+    "authority": "www.lyft.com",
+    "path": "/",
+    "additional_headers": [
+      {
+	"name": "non_existent_header",
+	"value": "foo"
+      }
+    ],
+    "check": {"cluster_name": "local_service_without_headers"}
+  },
+  {
+    "authority": "www.lyft.com",
+    "path": "/",
+    "additional_headers": [
+      {
+        "name": "test_header_presence",
+	"value": "test"
+      }
+    ],
+    "check": {"cluster_name": "local_service_with_empty_headers"}
+  },
+  {
+    "authority": "www.lyft.com",
+    "path": "/",
+    "additional_headers": [
+      {
+        "name": "test_header_pattern",
+	"value": "user=test-1223"
+      }
+    ],
+    "check": {"cluster_name": "local_service_with_header_pattern_set_regex"}
+  },
+  {
+    "authority": "www.lyft.com",
+    "path": "/",
+    "additional_headers": [
+      {
+        "name": "test_header_pattern",
+        "value": "customer=test-1223"
+      }
+    ],
+    "check": {"cluster_name": "local_service_without_headers"}
+  }
 ]

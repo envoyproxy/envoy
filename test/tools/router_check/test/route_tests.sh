@@ -20,5 +20,5 @@ APPEND=("_router" "_expected")
 for t in "${TESTS[@]}"
 do
   "$PATH_BIN" "$PATH_CONFIG/$t${APPEND[0]}.json" "$PATH_CONFIG/$t${APPEND[1]}.json"
-  "$PATH_BIN" "$PATH_CONFIG/$t${APPEND[0]}.json" "$PATH_CONFIG/$t${APPEND[1]}.json" "--details"
+  TEST_OUTPUT=$("$PATH_BIN" "$PATH_CONFIG/$t${APPEND[0]}.json" "$PATH_CONFIG/$t${APPEND[1]}.json" "--details")
 done

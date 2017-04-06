@@ -4,7 +4,7 @@
     "path": "/foo",
     "check": {
       "path_redirect": "none",
-      "cluster_name":"www2"
+      "cluster_name": "www2"
     },
     "ssl": true,
     "internal": true
