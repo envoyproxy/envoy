@@ -111,11 +111,12 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
     return {Reason::NotTraceableRequestId, false};
   }
 
-  throw std::invalid_argument("Unknown trace_status");
+  NOT_REACHED;
 }
 
 void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
-                                     const Http::AccessLog::RequestInfo& request_info) {
+                                     const Http::AccessLog::RequestInfo& request_info,
+                                     const Config& config) {
   // Pre response data.
   active_span.setTag("guid:x-request-id",
                      std::string(request_headers.RequestId()->value().c_str()));
@@ -129,6 +130,14 @@ void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& r
   if (request_headers.ClientTraceId()) {
     active_span.setTag("guid:x-client-trace-id",
                        std::string(request_headers.ClientTraceId()->value().c_str()));
+  }
+
+  // Build tags based on the custom headers.
+  for (const Http::LowerCaseString& header : config.requestHeadersForTags()) {
+    const Http::HeaderEntry* entry = request_headers.get(header);
+    if (entry) {
+      active_span.setTag(header.get(), entry->value().c_str());
+    }
   }
 
   // Post response data.

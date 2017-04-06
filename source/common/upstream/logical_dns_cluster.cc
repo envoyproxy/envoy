@@ -27,7 +27,7 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
   // This must come before startResolve(), since the resolve callback relies on
   // tls_slot_ being initialized.
   tls.set(tls_slot_, [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return ThreadLocal::ThreadLocalObjectSharedPtr{new PerThreadCurrentHostData()};
+    return std::make_shared<PerThreadCurrentHostData>();
   });
 
   startResolve();

@@ -375,6 +375,9 @@ TEST_F(OutlierDetectorImplTest, NotEnforcing) {
 
   ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
       .WillByDefault(Return(false));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]), _,
+                       EjectionType::Consecutive5xx, false));
   loadRq(cluster_.hosts_[0], 1, 503);
   EXPECT_FALSE(cluster_.hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 

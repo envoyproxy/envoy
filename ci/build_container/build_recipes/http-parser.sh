@@ -1,3 +1,5 @@
+set -e
+
 wget -O http-parser-v2.7.0.tar.gz https://github.com/nodejs/http-parser/archive/v2.7.0.tar.gz
 tar xf http-parser-v2.7.0.tar.gz
 cd http-parser-2.7.0

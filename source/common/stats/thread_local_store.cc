@@ -57,7 +57,7 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
   tls_ = &tls;
   tls_slot_ = tls_->allocateSlot();
   tls_->set(tls_slot_, [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsCache()};
+    return std::make_shared<TlsCache>();
   });
 }
 

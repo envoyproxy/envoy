@@ -34,8 +34,6 @@ public:
    * Initialize the library globally.
    */
   static void initialize();
-
-  static const int DNS_SIGNAL_ID;
 };
 
 typedef CSmartPtr<event_base, event_base_free> BasePtr;

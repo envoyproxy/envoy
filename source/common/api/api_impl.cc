@@ -15,8 +15,8 @@ Impl::Impl(std::chrono::milliseconds file_flush_interval_msec)
 
 Filesystem::FileSharedPtr Impl::createFile(const std::string& path, Event::Dispatcher& dispatcher,
                                            Thread::BasicLockable& lock, Stats::Store& stats_store) {
-  return Filesystem::FileSharedPtr{new Filesystem::FileImpl(
-      path, dispatcher, lock, *os_sys_calls_, stats_store, file_flush_interval_msec_)};
+  return std::make_shared<Filesystem::FileImpl>(path, dispatcher, lock, *os_sys_calls_, stats_store,
+                                                file_flush_interval_msec_);
 }
 
 bool Impl::fileExists(const std::string& path) { return Filesystem::fileExists(path); }

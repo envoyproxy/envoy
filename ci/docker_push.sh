@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 
 if [ "$TEST_TYPE" == "normal" ]
 then
@@ -21,6 +22,11 @@ then
       docker push lyft/envoy:latest
       docker tag lyft/envoy:latest lyft/envoy:$TRAVIS_COMMIT
       docker push lyft/envoy:$TRAVIS_COMMIT
+      make -C ci/build_alpine_container
+      docker tag lyft/envoy-alpine:latest lyft/envoy-alpine:$TRAVIS_COMMIT
+      docker push lyft/envoy-alpine:$TRAVIS_COMMIT
+      docker tag lyft/envoy-alpine-debug:latest lyft/envoy-alpine-debug:$TRAVIS_COMMIT
+      docker push lyft/envoy-alpine-debug:$TRAVIS_COMMIT
   else
       echo 'Ignoring PR branch for docker push.'
   fi
