@@ -38,7 +38,8 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
   if (!config_delay->empty()) {
     const std::string type = config_delay->getString("type");
     ASSERT(type == "fixed");
-    fixed_delay_percent_ = static_cast<uint64_t>(config_delay->getInteger("fixed_delay_percent", 0));
+    fixed_delay_percent_ =
+        static_cast<uint64_t>(config_delay->getInteger("fixed_delay_percent", 0));
     fixed_duration_ms_ = static_cast<uint64_t>(config_delay->getInteger("fixed_duration_ms", 0));
   }
 
