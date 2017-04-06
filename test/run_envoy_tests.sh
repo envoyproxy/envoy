@@ -65,8 +65,8 @@ fi
 # some test behavior lost in #650, when we switched to 0 port binding - the hot restart tests no
 # longer check socket passing. Will need to generate the second server's JSON based on the actual
 # bound ports in the first server.
-HOT_RESTART_JSON="$TEST_SRCDIR"/test/config/integration/hot_restart.json
-cat "$TEST_TMPDIR"/test/config/integration/server.json |
+HOT_RESTART_JSON="$TEST_TMPDIR"/hot_restart.json
+cat "$TEST_TMPDIR"/server.json |
   sed -e "s#{{ upstream_. }}#0#g" | \
   cat > "$HOT_RESTART_JSON"
 
