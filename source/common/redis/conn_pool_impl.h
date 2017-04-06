@@ -5,19 +5,30 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/json/json_validator.h"
 #include "common/network/filter_impl.h"
 #include "common/redis/codec_impl.h"
 
 namespace Redis {
 namespace ConnPool {
 
-// TODO(mattklein123): Op timeout
 // TODO(mattklein123): Circuit breaking
+
+class ConfigImpl : public Config, Json::Validator {
+public:
+  ConfigImpl(const Json::Object& config);
+
+  std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
+
+private:
+  const std::chrono::milliseconds op_timeout_;
+};
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
 public:
   static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                          EncoderPtr&& encoder, DecoderFactory& decoder_factory);
+                          EncoderPtr&& encoder, DecoderFactory& decoder_factory,
+                          const Config& config);
 
   ~ClientImpl();
 
@@ -54,8 +65,8 @@ private:
   };
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
-             DecoderFactory& decoder_factory);
-  void onConnectTimeout();
+             DecoderFactory& decoder_factory, const Config& config);
+  void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
 
   // Redis::DecoderCallbacks
@@ -69,14 +80,17 @@ private:
   EncoderPtr encoder_;
   Buffer::OwnedImpl encoder_buffer_;
   DecoderPtr decoder_;
+  const Config& config_;
   std::list<PendingRequest> pending_requests_;
-  Event::TimerPtr connect_timer_;
+  Event::TimerPtr connect_or_op_timer_;
+  bool connected_{};
 };
 
 class ClientFactoryImpl : public ClientFactory {
 public:
   // Redis::ConnPool::ClientFactoryImpl
-  ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher) override;
+  ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                   const Config& config) override;
 
   static ClientFactoryImpl instance_;
 
@@ -87,7 +101,8 @@ private:
 class InstanceImpl : public Instance {
 public:
   InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
-               ClientFactory& client_factory, ThreadLocal::Instance& tls);
+               ClientFactory& client_factory, ThreadLocal::Instance& tls,
+               const Json::Object& config);
 
   // Redis::ConnPool::Instance
   PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
@@ -140,6 +155,7 @@ private:
   ClientFactory& client_factory_;
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;
+  ConfigImpl config_;
 };
 
 } // ConnPool

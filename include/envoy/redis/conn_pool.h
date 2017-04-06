@@ -68,6 +68,20 @@ public:
 typedef std::unique_ptr<Client> ClientPtr;
 
 /**
+ * Configuration for a redis connection pool.
+ */
+class Config {
+public:
+  virtual ~Config() {}
+
+  /**
+   * @return std::chrono::milliseconds the timeout for an individual redis operation. Currently,
+   *         all operations use the same timeout.
+   */
+  virtual std::chrono::milliseconds opTimeout() const PURE;
+};
+
+/**
  * A factory for individual redis client connections.
  */
 class ClientFactory {
@@ -76,8 +90,13 @@ public:
 
   /**
    * Create a client given an upstream host.
+   * @param host supplies the upstream host.
+   * @param dispatcher supplies the owning thread's dispatcher.
+   * @param config supplies the connection pool configuration.
+   * @return ClientPtr a new connection pool client.
    */
-  virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher) PURE;
+  virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                           const Config& config) PURE;
 };
 
 /**
