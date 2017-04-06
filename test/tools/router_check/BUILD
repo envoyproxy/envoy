@@ -5,8 +5,7 @@ load("//bazel:envoy_build_system.bzl", "envoy_cc_binary", "envoy_cc_test_library
 envoy_cc_binary(
     name = "router_check_tool",
     testonly = 1,
-    linkstatic = 1,
-    deps = ["router_check_main_lib"],
+    deps = [":router_check_main_lib"],
 )
 
 envoy_cc_test_library(

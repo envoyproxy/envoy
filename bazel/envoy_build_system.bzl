@@ -188,17 +188,3 @@ def envoy_proto_library(name, srcs = [], deps = []):
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         deps = [internal_name],
     )
-
-# Envoy shell script tests
-def envoy_sh_test(name,
-                  srcs = [],
-                  data = [],
-                  args = [],
-                  deps = []):
-    native.sh_test(
-        name = name,
-        srcs = srcs,
-        data = data,
-        args = args,
-        deps = deps,
-    )

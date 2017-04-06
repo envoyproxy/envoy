@@ -22,14 +22,8 @@ public:
   ToolConfig(){};
   void parseFromJson(const Json::ObjectPtr& check_config);
 
-  bool internal_;
-  bool set_ssl_{false};
-  bool set_method_{false};
   int random_lb_value_;
-
   Http::TestHeaderMapImpl headers_;
-  std::string authority_;
-  std::string path_;
 };
 
 /**

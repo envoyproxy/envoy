@@ -46,19 +46,9 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
 
     // Call appropriate function for each match case
     if (check_type->hasObject("path_redirect")) {
-      if (!tool_config.set_ssl_) {
-        // Default to http if not specfied in tool config json
-        tool_config.headers_.addViaCopy("x-forwarded-proto", "http");
-      }
-
       if (!compareRedirectPath(tool_config, check_type->getString("path_redirect"))) {
         no_failures = false;
       }
-    }
-
-    if (!tool_config.set_method_) {
-      // Default to GET if not specified in tool config json
-      tool_config.headers_.addViaCopy(":method", "GET");
     }
 
     if (check_type->hasObject("cluster_name")) {
@@ -97,28 +87,26 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
 
 void ToolConfig::parseFromJson(const Json::ObjectPtr& check_config) {
   // Extract values from json object
-  authority_ = check_config->getString("authority");
-  path_ = check_config->getString("path");
+  bool internal = check_config->getBoolean("internal", false);
+  bool ssl = check_config->getBoolean("ssl", false);
+  std::string authority = check_config->getString("authority");
+  std::string method = check_config->getString("method", "GET");
+  std::string path = check_config->getString("path");
+
   random_lb_value_ = check_config->getInteger("random_lb_value", 0);
-  internal_ = check_config->getBoolean("internal", false);
 
-  // Add :method to header and set flag
-  if (check_config->hasObject("method")) {
-    headers_.addViaCopy(":method", check_config->getString("method"));
-    set_method_ = true;
-  }
+  // Add :method to header
+  headers_.addViaCopy(":method", method);
 
-  if (check_config->hasObject("ssl")) {
-    headers_.addViaCopy("x-forwarded-proto", check_config->getBoolean("ssl") ? "https" : "http");
-    set_ssl_ = true;
-  }
+  // Add ssl header
+  headers_.addViaCopy("x-forwarded-proto", ssl ? "https" : "http");
 
   // Add authority and path to header
-  headers_.addViaCopy(":authority", authority_);
-  headers_.addViaCopy(":path", path_);
+  headers_.addViaCopy(":authority", authority);
+  headers_.addViaCopy(":path", path);
 
   // Add internal route status to header
-  if (internal_) {
+  if (internal) {
     headers_.addViaCopy("x-envoy-internal", "true");
   }
 

@@ -3,7 +3,7 @@
 Route table check tool
 ======================
 
-**NOTE: The following configuration is for the router table check tool only and is not part of the envoy binary.
+**NOTE: The following configuration is for the router table check tool only and is not part of the Envoy binary.
 The route table check tool is used for testing purposes only.**
 
 Input for the route table check tool. The route table check tool checks if the route returned
@@ -63,7 +63,7 @@ path
   *(required, string)* The url path. An example path value is "/foo".
 
 additional_headers
-  *(optional, array)*  Additional headers to be added before a route is returned.
+  *(optional, array)*  Additional headers to be added as input to route determination.
 
 method
   *(optional, string)* The request method. If not specified, the default method is GET in all test cases
@@ -84,7 +84,8 @@ internal
 
 check
   *(required, object)* The check object specifies the returned router parameters to match. At least one
-  test parameter must be specificed.
+  test parameter must be specificed. Use "none" to indicate that no return value is expected. For example,
+  to test that no cluster match is expected use {"cluster_name": "none"}.
 
   cluster_name
     *(optional, string)* Match the cluster name.
