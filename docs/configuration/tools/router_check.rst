@@ -38,7 +38,7 @@ expects a cluster name match of "instant-server".::
         }
       ],
       "method": "...",
-      "random_lb_value" : "...",
+      "random_value" : "...",
       "ssl" : "...",
       "internal" : "...",
       "check": {
@@ -63,20 +63,22 @@ path
   *(required, string)* The url path. An example path value is "/foo".
 
 additional_headers
-  *(optional, array)*  Additional headers to be added as input to route determination.
+  *(optional, array)*  Additional headers to be added as input for route determination. The :authority,
+  :path, :method, x-forwarded-proto, and x-envoy-internal fields are specified by the other config
+  options and should not be set here.
 
 method
-  *(optional, string)* The request method. If not specified, the default method is GET in all test cases
-  except for the redirect path test case. In the redirect path case, this parameter is not set by default.
+  *(optional, string)* The request method. If not specified, the default method is GET. The options
+  are GET, PUT, or POST.
 
-random_lb_value
-  *(optional, integer)* A random integer used when choosing between weighted load balanced clusters.
-  The default value is 0.
+random_value
+  *(optional, integer)* An integer used to supply the random seed to use if a runtime choice is
+  required. Currently testing with valid runtime values is not supported. The default value of
+  random_value is 0.
 
 ssl
   *(optional, boolean)* A flag that determines whether to set x-forwarded-proto to https or http.
-  In the redirect path test case, this value is set to false by default. In all other test cases,
-  this value is not set by default.
+  By default ssl is false which corresponds to x-forwarded-proto set to http.
 
 internal
   *(optional, boolean)* A flag that determines whether to set x-envoy-internal to "true".

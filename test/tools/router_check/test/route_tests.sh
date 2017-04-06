@@ -3,7 +3,12 @@
 set -e
 
 # router_check_tool binary path
-PATH_BIN=$1
+if [ -z $1 ]
+then
+  PATH_BIN="test/tools/router_check/router_check_tool"
+else
+  PATH_BIN=$1
+fi
 
 # config json path
 if [ -z $2 ]

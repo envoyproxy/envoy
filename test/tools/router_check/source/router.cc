@@ -93,7 +93,7 @@ void ToolConfig::parseFromJson(const Json::ObjectPtr& check_config) {
   std::string method = check_config->getString("method", "GET");
   std::string path = check_config->getString("path");
 
-  random_lb_value_ = check_config->getInteger("random_lb_value", 0);
+  random_value_ = check_config->getInteger("random_value", 0);
 
   // Add :method to header
   headers_.addViaCopy(":method", method);
@@ -121,7 +121,7 @@ void ToolConfig::parseFromJson(const Json::ObjectPtr& check_config) {
 
 bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string expected) {
   Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_lb_value_);
+      config_->route(tool_config.headers_, tool_config.random_value_);
   std::string actual = "none";
 
   // Compare cluster name match
@@ -134,7 +134,7 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string 
 
 bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::string expected) {
   Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_lb_value_);
+      config_->route(tool_config.headers_, tool_config.random_value_);
   std::string actual = "none";
 
   if (route != nullptr && route->routeEntry() != nullptr) {
@@ -148,7 +148,7 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
 
 bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::string expected) {
   Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_lb_value_);
+      config_->route(tool_config.headers_, tool_config.random_value_);
   std::string actual = "none";
 
   if (route != nullptr && route->routeEntry() != nullptr) {
@@ -160,7 +160,7 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string expected) {
   Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_lb_value_);
+      config_->route(tool_config.headers_, tool_config.random_value_);
   std::string actual = "none";
 
   if (route != nullptr && route->routeEntry() != nullptr) {
@@ -173,7 +173,7 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string expected) {
   Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_lb_value_);
+      config_->route(tool_config.headers_, tool_config.random_value_);
   std::string actual = "none";
 
   if (route != nullptr && route->routeEntry() != nullptr) {
@@ -186,7 +186,7 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string expected) {
   Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_lb_value_);
+      config_->route(tool_config.headers_, tool_config.random_value_);
   std::string actual = "none";
 
   if (route != nullptr && route->redirectEntry() != nullptr) {

@@ -24,7 +24,7 @@ const std::string Json::ToolSchema::ROUTER_CHECK_SCHEMA(R"EOF(
             }
           },
           "method": {"type": "string", "enum": ["GET", "PUT", "POST"]},
-          "random_lb_value": {"type": "integer"},
+          "random_value": {"type": "integer"},
           "ssl": {"type": "boolean"},
           "internal": {"type": "boolean"},
           "check": {

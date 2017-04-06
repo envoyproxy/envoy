@@ -22,7 +22,7 @@ public:
   ToolConfig(){};
   void parseFromJson(const Json::ObjectPtr& check_config);
 
-  int random_lb_value_;
+  int random_value_;
   Http::TestHeaderMapImpl headers_;
 };
 
