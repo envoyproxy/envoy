@@ -1807,11 +1807,11 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
+  Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+  std::unique_ptr<ConfigImpl> config_ptr;
 
-  ConfigImpl config(*loader, runtime, cm, true);
-  EXPECT_FALSE(config.route(genHeaders("lyft.com", "/foo", "GET"), 0)
-                   ->routeEntry()
-                   ->excludeVirtualHostRateLimits());
+  config_ptr.reset(new ConfigImpl(*loader, runtime, cm, true));
+  EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->excludeVirtualHostRateLimits());
 
   json = R"EOF(
   {
@@ -1840,10 +1840,8 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   )EOF";
 
   loader = Json::Factory::LoadFromString(json);
-  ConfigImpl config1(*loader, runtime, cm, true);
-  EXPECT_TRUE(config1.route(genHeaders("lyft.com", "/foo", "GET"), 0)
-                  ->routeEntry()
-                  ->excludeVirtualHostRateLimits());
+  config_ptr.reset(new ConfigImpl(*loader, runtime, cm, true));
+  EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->excludeVirtualHostRateLimits());
 
   json = R"EOF(
   {
@@ -1873,10 +1871,8 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   )EOF";
 
   loader = Json::Factory::LoadFromString(json);
-  ConfigImpl config2(*loader, runtime, cm, true);
-  EXPECT_FALSE(config2.route(genHeaders("lyft.com", "/foo", "GET"), 0)
-                   ->routeEntry()
-                   ->excludeVirtualHostRateLimits());
+  config_ptr.reset(new ConfigImpl(*loader, runtime, cm, true));
+  EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->excludeVirtualHostRateLimits());
 }
 
 } // Router

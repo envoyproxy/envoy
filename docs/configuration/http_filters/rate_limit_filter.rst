@@ -5,7 +5,7 @@ Rate limit
 
 Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
 
-The HTTP rate limit filter will call the rate limit service when the requests' route or virtual host
+The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
 has one or more :ref:`rate limit configurations<config_http_conn_man_route_table_route_rate_limits>`
 that match the filter stage setting. By default, if the route configured rate limits, the virtual
 host rate limits are not applied to the request. This is configurable in the
