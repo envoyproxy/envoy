@@ -26,6 +26,7 @@ include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 add_executable(envoy-test
   $<TARGET_OBJECTS:envoy-server>
   $<TARGET_OBJECTS:envoy-common>
+  $<TARGET_OBJECTS:zipkin>
   ${ENVOY_TEST_EXTRA_OBJECTS}
   common/access_log/access_log_manager_impl_test.cc
   common/api/api_impl_test.cc
@@ -160,7 +161,10 @@ add_executable(envoy-test
   test_common/network_utility.cc
   test_common/network_utility_test.cc
   test_common/printers.cc
-  test_common/utility.cc)
+  test_common/utility.cc
+  zipkin/span_buffer_test.cc
+  zipkin/span_context_test.cc
+  zipkin/util_test.cc)
 
 # The MOCK_METHOD* macros from gtest triggers this clang warning and it's hard
 # to work around, so we just ignore it.

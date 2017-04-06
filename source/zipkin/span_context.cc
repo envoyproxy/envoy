@@ -34,7 +34,7 @@ SpanContext::SpanContext(const Span& span) {
 
 const std::string SpanContext::serializeToString() {
   if (!is_populated_) {
-    return "";
+    return "0000000000000000;0000000000000000;0000000000000000";
   }
 
   std::string s;
