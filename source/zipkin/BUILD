@@ -24,5 +24,4 @@ envoy_cc_library(
         "zipkin_json_field_names.h",
     ],
     external_deps = ["rapidjson"],
-    deps = [],
 )
