@@ -14,18 +14,9 @@ binary built from the latest tip of master that passed tests.
 ## Alpine envoy image
 
 Minimal images based on alpine Linux allow for quicker deployment of Envoy. Two alpine based images are built,
-one with an Envoy binary with debug symbols and one stripped of them (and consequently the smallest of the built images).
-
-The Alpine based Envoy Docker image at [`lyft/envoy-alpine:<hash>`](https://hub.docker.com/r/lyft/envoy-alpine/), and the
-Alpine based debug Envoy Docker image at [`lyft/envoy-alpine-debug:<hash>`](https://hub.docker.com/r/lyft/envoy-alpine-debug/) are
-both used for Travis CI checks, where `<hash>` is specified in [ci_steps.sh](https://github.com/lyft/envoy/blob/master/ci/ci_steps.sh).
-
-As with the Ubuntu based images, for the Alpine based images, developers
-may work with `lyft/envoy-alpine:latest` and `lyft/envoy-alpine-debug:latest` to provide a self-contained environment for
-building Envoy binaries and running tests that reflects the latest built Alpine Envoy image.
-Like the Ubuntu based images, the Alpine based images have an Envoy binary at `/usr/local/bin/envoy`, the `<hash>`
-corresponds to the master commit at which the binary was compiled, and `lyft/envoy-alpine:latest` and `lyft/envoy-alpine-debug:latest`
-contain an Envoy binary built from the latest tip of master that passed tests.
+one with an Envoy binary with debug (`lyft/envoy-alpine-debug`) symbols and one stripped of them (`lyft/envoy-alpine`).
+Both images are pushed with two different tags: `<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
+master commit at which the binary was compiled, and `latest` corresponds to a binary built from the latest tip of master that passed tests.
 
 # Building a debug image
 An example basic invocation to build a debug image and run all tests is:

@@ -315,4 +315,3 @@ the ``FROM`` line in any dockerfile.
 
 This will be particularly useful if you are interested in modifying envoy, and testing
 your changes.
-
