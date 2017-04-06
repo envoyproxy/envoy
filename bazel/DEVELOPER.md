@@ -156,14 +156,11 @@ with the `envoy_cc_binary` rule, e.g. for a new `tools/hello/world.cc` that depe
 envoy_cc_binary(
     name = "world",
     srcs = ["world.cc"],
-    linkstatic = 1,
     deps = [
         "//source/common/foo:bar_lib",
     ],
 )
 ```
-
-The `linkstatic` attribute controls whether the binary is built statically or dynamically.
 
 ## Filter linking
 
