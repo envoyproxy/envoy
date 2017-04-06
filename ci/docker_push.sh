@@ -25,8 +25,10 @@ then
       make -C ci/build_alpine_container
       docker tag lyft/envoy-alpine:latest lyft/envoy-alpine:$TRAVIS_COMMIT
       docker push lyft/envoy-alpine:$TRAVIS_COMMIT
+      docker push lyft/envoy-alpine:latest
       docker tag lyft/envoy-alpine-debug:latest lyft/envoy-alpine-debug:$TRAVIS_COMMIT
       docker push lyft/envoy-alpine-debug:$TRAVIS_COMMIT
+      docker push lyft/envoy-alpine-debug:latest
   else
       echo 'Ignoring PR branch for docker push.'
   fi
