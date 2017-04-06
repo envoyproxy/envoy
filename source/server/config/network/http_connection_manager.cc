@@ -115,10 +115,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     codec_type_ = CodecType::HTTP1;
   } else if (codec_type == "http2") {
     codec_type_ = CodecType::HTTP2;
-  } else if (codec_type == "auto") {
-    codec_type_ = CodecType::AUTO;
   } else {
-    throw EnvoyException(fmt::format("invalid connection manager codec '{}'", codec_type));
+    ASSERT(codec_type == "auto");
+    codec_type_ = CodecType::AUTO;
   }
 
   std::vector<Json::ObjectPtr> filters = config.getObjectArray("filters");
@@ -185,10 +184,9 @@ HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type
     return HttpFilterType::Decoder;
   } else if (type == "encoder") {
     return HttpFilterType::Encoder;
-  } else if (type == "both") {
-    return HttpFilterType::Both;
   } else {
-    throw EnvoyException(fmt::format("invalid http filter type '{}'", type));
+    ASSERT(type == "both");
+    return HttpFilterType::Both;
   }
 }
 

@@ -367,7 +367,8 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
                     }
                   },
                   "source_ports": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "destination_ip_list" : {
                     "type": "array",
@@ -376,7 +377,8 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
                     }
                   },
                   "destination_ports": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": ["cluster"],
@@ -501,6 +503,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
     "definitions" : {
       "weighted_clusters" : {
         "type" : "object",
+        "minItems": 1,
         "properties" : {
           "clusters" : {
             "type" : "array",

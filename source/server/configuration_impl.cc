@@ -73,12 +73,10 @@ void MainImpl::initialize(const Json::Object& json) {
   if (json.hasObject("rate_limit_service")) {
     Json::ObjectPtr rate_limit_service_config = json.getObject("rate_limit_service");
     std::string type = rate_limit_service_config->getString("type");
-    if (type == "grpc_service") {
-      ratelimit_client_factory_.reset(new RateLimit::GrpcFactoryImpl(
-          *rate_limit_service_config->getObject("config"), *cluster_manager_));
-    } else {
-      throw EnvoyException(fmt::format("unknown rate limit service type '{}'", type));
-    }
+    ASSERT(type == "grpc_service");
+    ratelimit_client_factory_.reset(new RateLimit::GrpcFactoryImpl(
+        *rate_limit_service_config->getObject("config"), *cluster_manager_));
+
   } else {
     ratelimit_client_factory_.reset(new RateLimit::NullFactoryImpl());
   }
@@ -165,10 +163,9 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json) :
       type = NetworkFilterType::Read;
     } else if (string_type == "write") {
       type = NetworkFilterType::Write;
-    } else if (string_type == "both") {
-      type = NetworkFilterType::Both;
     } else {
-      throw EnvoyException(fmt::format("invalid filter type '{}'", string_type));
+      ASSERT(string_type == "both");
+      type = NetworkFilterType::Both;
     }
 
     // Now see if there is a factory that will accept the config.
