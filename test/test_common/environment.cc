@@ -43,9 +43,8 @@ const std::string TestEnvironment::unixDomainSocketDirectory() {
 }
 
 std::string TestEnvironment::substitute(const std::string str) {
-  // TODO(htuch): Add support for {{ test_tmpdir }} etc. as needed for tests.
-  const std::regex test_cert_regex("\\{\\{ test_certs \\}\\}");
-  return std::regex_replace(str, test_cert_regex, TestEnvironment::runfilesPath("test/certs"));
+  const std::regex test_cert_regex("\\{\\{ test_tmpdir \\}\\}");
+  return std::regex_replace(str, test_cert_regex, TestEnvironment::temporaryDirectory());
 }
 
 std::string TestEnvironment::temporaryFileSubstitutePorts(const std::string& path,

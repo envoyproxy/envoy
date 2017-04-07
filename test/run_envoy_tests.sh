@@ -28,7 +28,9 @@ echo "TEST_SRCDIR=$TEST_SRCDIR"
 
 mkdir -p $TEST_TMPDIR
 
-$SOURCE_DIR/test/certs/gen_test_certs.sh $TEST_SRCDIR/test/certs
+# This places the unittest SSL certificates into $TEST_TMPDIR where the unit
+# tests in test/common/ssl expect to consume them
+$SOURCE_DIR/test/common/ssl/gen_unittest_certs.sh
 
 # Some hacks for the config file template substitution. These go away in the Bazel build.
 CONFIG_IN_DIR="$SOURCE_DIR"/test/config/integration
