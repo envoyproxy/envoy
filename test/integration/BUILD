@@ -2,6 +2,23 @@ package(default_visibility = ["//visibility:public"])
 
 load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_library", "envoy_cc_test_with_json")
 
+sh_test(
+    name = "hotrestart_test",
+    srcs = ["hotrestart_test.sh"],
+    data = [
+        "//source/exe:envoy-static",
+        "//test/common/runtime:filesystem_setup.sh",
+        "//test/common/runtime:filesystem_test_data",
+        "//test/config/integration:server_config_files",
+    ],
+    # Need to disable test execution sandboxing for this test, since it uses shmem.
+    # TODO(htuch): When most folks are using a Bazel with the recent
+    # https://github.com/bazelbuild/bazel/commit/8d739f2fad3fd0135b940170691b0119c5baca1e,
+    # we should be able to remove this workaround. See the various issues closed in the commit
+    # message for further details.
+    local = 1,
+)
+
 envoy_cc_test_with_json(
     name = "http2_integration_test",
     srcs = [
