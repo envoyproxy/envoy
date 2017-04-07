@@ -183,6 +183,7 @@ uint64_t ClusterInfoImpl::parseFeatures(const Json::Object& config) {
   uint64_t features = 0;
   for (const std::string& feature : StringUtil::split(config.getString("features", ""), ',')) {
     ASSERT(feature == "http2");
+    UNREFERENCED_PARAMETER(feature);
     features |= Features::HTTP2;
   }
 
