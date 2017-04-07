@@ -15,7 +15,7 @@ public:
   static void SetUpTestCase() {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/server_proxy_proto.json", {"http"});
+    createTestServer("server_proxy_proto.json", {"http"});
   }
 
   /**

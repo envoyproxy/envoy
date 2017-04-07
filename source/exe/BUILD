@@ -2,14 +2,13 @@ package(default_visibility = ["//visibility:public"])
 
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cc_binary")
 
-envoy_cc_binary(
+alias(
     name = "envoy",
-    deps = ["envoy_main_lib"],
+    actual = ":envoy-static",
 )
 
 envoy_cc_binary(
     name = "envoy-static",
-    linkstatic = 1,
     deps = ["envoy_main_lib"],
 )
 

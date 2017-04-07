@@ -278,8 +278,6 @@ TEST(AddressFromSockAddr, Pipe) {
   auto& sun = reinterpret_cast<sockaddr_un&>(ss);
   sun.sun_family = AF_UNIX;
 
-  std::cout << "sizeof sun.sun_path=" << sizeof sun.sun_path << std::endl;
-
   StringUtil::strlcpy(sun.sun_path, "/some/path", sizeof sun.sun_path);
 
   EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
