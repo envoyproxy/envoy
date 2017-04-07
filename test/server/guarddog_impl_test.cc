@@ -24,9 +24,7 @@ namespace Server {
 class GuardDogDeathTest : public testing::Test {
 protected:
   GuardDogDeathTest()
-      : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500) {}
-
-  void SetupMockTimeSource() {
+      : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500) {
     ON_CALL(time_source_, currentSystemTime())
         .WillByDefault(testing::Invoke([&]() {
           return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
@@ -39,7 +37,6 @@ protected:
    */
   void SetupForDeath() {
     InSequence s;
-    SetupMockTimeSource();
     guard_dog_.reset(new GuardDogImpl(fakestats_, config_kill_, time_source_));
     unpet_dog_ = guard_dog_->createWatchDog(0);
     guard_dog_->forceCheckForTest();
@@ -52,7 +49,6 @@ protected:
    */
   void SetupForMultiDeath() {
     InSequence s;
-    SetupMockTimeSource();
     guard_dog_.reset(new GuardDogImpl(fakestats_, config_multikill_, time_source_));
     auto unpet_dog_ = guard_dog_->createWatchDog(0);
     guard_dog_->forceCheckForTest();
@@ -108,7 +104,6 @@ TEST_F(GuardDogDeathTest, NearDeathTest) {
   // This ensures that if only one thread surpasses the multiple kill threshold
   // there is no death.  The positive case is covered in MultiKillDeathTest.
   InSequence s;
-  SetupMockTimeSource();
   GuardDogImpl gd(fakestats_, config_multikill_, time_source_);
   auto unpet_dog = gd.createWatchDog(0);
   auto pet_dog = gd.createWatchDog(1);
@@ -125,7 +120,12 @@ TEST_F(GuardDogDeathTest, NearDeathTest) {
 
 class GuardDogMissTest : public testing::Test {
 protected:
-  GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0) {}
+  GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0) {
+   ON_CALL(time_source_, currentSystemTime())
+      .WillByDefault(testing::Invoke([&]() {
+        return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
+      }));
+  }
 
   NiceMock<Configuration::MockMain> config_miss_;
   NiceMock<Configuration::MockMain> config_mega_;
@@ -137,10 +137,6 @@ protected:
 TEST_F(GuardDogMissTest, MissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  ON_CALL(time_source_, currentSystemTime())
-      .WillByDefault(testing::Invoke([&]() {
-        return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
-      }));
   GuardDogImpl gd(stats_store_, config_miss_, time_source_);
   // We'd better start at 0:
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_miss").value());
