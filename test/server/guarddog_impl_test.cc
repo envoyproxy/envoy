@@ -121,10 +121,10 @@ TEST_F(GuardDogDeathTest, NearDeathTest) {
 class GuardDogMissTest : public testing::Test {
 protected:
   GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0) {
-   ON_CALL(time_source_, currentSystemTime())
-      .WillByDefault(testing::Invoke([&]() {
-        return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
-      }));
+    ON_CALL(time_source_, currentSystemTime())
+        .WillByDefault(testing::Invoke([&]() {
+          return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
+        }));
   }
 
   NiceMock<Configuration::MockMain> config_miss_;
