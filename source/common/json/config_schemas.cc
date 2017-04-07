@@ -928,21 +928,40 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
     "definitions" : {
-      "driver" : {
+      "lightstep_driver" : {
         "type" : "object",
         "properties" : {
           "type" : {
             "type" : "string",
-            "enum" : ["lightstep", "zipkin"]
+            "enum" : ["lightstep"]
           },
           "config" : {
             "type" : "object",
             "properties" : {
               "collector_cluster" : {"type" : "string"},
-              "access_token_file" : {"type" : "string"},
-              "endpoint": {"type": "string"}
+              "access_token_file" : {"type" : "string"}
             },
-            "required": ["collector_cluster"],
+            "required": ["collector_cluster", "access_token_file"],
+            "additionalProperties" : false
+          }
+        },
+        "required" : ["type", "config"],
+        "additionalProperties" : false
+      },
+      "zipkin_driver" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : ["zipkin"]
+          },
+          "config" : {
+            "type" : "object",
+            "properties" : {
+              "collector_cluster" : {"type" : "string"},
+              "collector_endpoint": {"type": "string"}
+            },
+            "required": ["collector_cluster", "collector_endpoint"],
             "additionalProperties" : false
           }
         },
@@ -996,7 +1015,13 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
           "http": {
             "type" : "object",
             "properties" : {
-              "driver" : {"$ref" : "#/definitions/driver"}
+              "driver" : {
+                "type" : "object",
+                "oneOf" : [
+                  {"$ref" : "#/definitions/lightstep_driver"},
+                  {"$ref" : "#/definitions/zipkin_driver"}
+                ]
+              }
             },
             "additionalProperties" : false
           }
