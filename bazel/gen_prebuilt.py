@@ -229,8 +229,8 @@ def FormatCcLibrary(lib, has_headers):
   if hasattr(lib, 'deps'):
     params.append(('deps', QuoteList(lib.deps)))
   if hasattr(lib, 'include_path'):
-    params.append(('strip_include_prefix',
-                   Quote(SubstitueEnvPaths(lib, lib.include_path))))
+    params.append(('includes',
+                   [Quote(SubstitueEnvPaths(lib, lib.include_path))]))
   return FormatBazelRule('native.cc_library', params)
 
 
