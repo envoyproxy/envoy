@@ -27,7 +27,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "priority": "...",
     "headers": [],
     "rate_limits": [],
-    "exclude_vh_rate_limits" : "...",
+    "include_vh_rate_limits" : "...",
     "hash_policy": "{...}",
     "request_headers_to_add" : [],
     "opaque_config": []
@@ -159,9 +159,9 @@ priority
 
 .. _config_http_conn_man_route_table_route_exclude_vh:
 
-exclude_vh_rate_limits
-  *(optional, boolean)* Specifies if the virtual host rate limits should be excluded by the rate
-  limit filter. The default value is true if
+include_vh_rate_limits
+  *(optional, boolean)* Specifies if the virtual host rate limits should be include by the rate
+  limit filter. The default value is false if
   :ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>` is specified for the route.
 
 :ref:`hash_policy <config_http_conn_man_route_table_hash_policy>`

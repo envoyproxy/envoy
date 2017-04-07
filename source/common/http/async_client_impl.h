@@ -133,7 +133,7 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
-    bool excludeVirtualHostRateLimits() const override { return false; }
+    bool includeVirtualHostRateLimits() const override { return true; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;

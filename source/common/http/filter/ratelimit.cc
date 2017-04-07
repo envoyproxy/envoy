@@ -49,7 +49,7 @@ void Filter::initiateCall(const HeaderMap& headers) {
 
   // Get all applicable rate limit policy entries for the virtual host if the route opted to
   // include the virtual host rate limits.
-  if (!route_entry->excludeVirtualHostRateLimits()) {
+  if (route_entry->includeVirtualHostRateLimits()) {
     populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
                                  route_entry, headers);
   }

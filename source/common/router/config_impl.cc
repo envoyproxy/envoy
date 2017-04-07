@@ -144,13 +144,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
     }
   }
 
-  // Only set exclude_vh_rate_limits_ to true if there is a rate limit policy for the route
-  // and the route opted into excluding the virtual host.
-  if (!rate_limit_policy_.getApplicableRateLimit().empty() &&
-      route.getBoolean("exclude_vh_rate_limits", true)) {
-    exclude_vh_rate_limits_ = true;
+  // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
+  // or the route set `include_vh_rate_limits` to true.
+  if (rate_limit_policy_.empty() || route.getBoolean("include_vh_rate_limits", false)) {
+    include_vh_rate_limits_ = true;
   } else {
-    exclude_vh_rate_limits_ = false;
+    include_vh_rate_limits_ = false;
   }
 }
 

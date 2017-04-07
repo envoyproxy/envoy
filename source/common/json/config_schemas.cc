@@ -594,7 +594,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
         }
       },
       "rate_limits" : {"type" : "array"},
-      "exclude_vh_rate_limits" : {"type" : "boolean"},
+      "include_vh_rate_limits" : {"type" : "boolean"},
       "hash_policy" : {
         "type" : "object",
         "properties" : {

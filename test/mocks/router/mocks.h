@@ -148,7 +148,7 @@ public:
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
-  MOCK_CONST_METHOD0(excludeVirtualHostRateLimits, bool());
+  MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;

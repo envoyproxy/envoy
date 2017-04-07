@@ -1811,7 +1811,7 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   std::unique_ptr<ConfigImpl> config_ptr;
 
   config_ptr.reset(new ConfigImpl(*loader, runtime, cm, true));
-  EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->excludeVirtualHostRateLimits());
+  EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 
   json = R"EOF(
   {
@@ -1841,7 +1841,7 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
 
   loader = Json::Factory::LoadFromString(json);
   config_ptr.reset(new ConfigImpl(*loader, runtime, cm, true));
-  EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->excludeVirtualHostRateLimits());
+  EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 
   json = R"EOF(
   {
@@ -1853,7 +1853,7 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
           {
             "prefix": "/",
             "cluster": "www2",
-            "exclude_vh_rate_limits": false,
+            "include_vh_rate_limits": true,
             "rate_limits": [
               {
                 "actions": [
@@ -1872,7 +1872,7 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
 
   loader = Json::Factory::LoadFromString(json);
   config_ptr.reset(new ConfigImpl(*loader, runtime, cm, true));
-  EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->excludeVirtualHostRateLimits());
+  EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 }
 
 } // Router

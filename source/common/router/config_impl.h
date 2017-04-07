@@ -197,7 +197,7 @@ public:
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
-  bool excludeVirtualHostRateLimits() const override { return exclude_vh_rate_limits_; }
+  bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
 
   // Router::RedirectEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -210,7 +210,7 @@ protected:
   const bool case_sensitive_;
   const std::string prefix_rewrite_;
   const std::string host_rewrite_;
-  bool exclude_vh_rate_limits_;
+  bool include_vh_rate_limits_;
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path) const;
@@ -250,8 +250,8 @@ private:
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
-    bool excludeVirtualHostRateLimits() const override {
-      return parent_->excludeVirtualHostRateLimits();
+    bool includeVirtualHostRateLimits() const override {
+      return parent_->includeVirtualHostRateLimits();
     }
 
     // Router::Route
