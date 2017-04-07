@@ -79,21 +79,23 @@ void SpanContext::populateFromString(std::string s) {
     id_ = stoull(match.str(2), nullptr, 16);
     parent_id_ = stoull(match.str(3), nullptr, 16);
 
-    if (match.str(4).size() > 0) {
-      char* annotation_value_strings = const_cast<char*>(match.str(4).c_str());
-      char* annotation_value = strtok(annotation_value_strings, FIELD_SEPARATOR_.c_str());
+    std::string matched_annotations = match.str(4);
+    if (matched_annotations.size() > 0) {
+      char* annotation_value_strings = const_cast<char*>(matched_annotations.c_str());
+      char* annotation_value = std::strtok(annotation_value_strings, FIELD_SEPARATOR_.c_str());
+
       while (annotation_value) {
-        if (!strcmp(annotation_value, ZipkinCoreConstants::CLIENT_RECV.c_str())) {
+        if (!std::strcmp(annotation_value, ZipkinCoreConstants::CLIENT_RECV.c_str())) {
           annotation_values_.cr = true;
-        } else if (!strcmp(annotation_value, ZipkinCoreConstants::CLIENT_SEND.c_str())) {
+        } else if (!std::strcmp(annotation_value, ZipkinCoreConstants::CLIENT_SEND.c_str())) {
           annotation_values_.cs = true;
-        } else if (!strcmp(annotation_value, ZipkinCoreConstants::SERVER_RECV.c_str())) {
+        } else if (!std::strcmp(annotation_value, ZipkinCoreConstants::SERVER_RECV.c_str())) {
           annotation_values_.sr = true;
-        } else if (!strcmp(annotation_value, ZipkinCoreConstants::SERVER_SEND.c_str())) {
+        } else if (!std::strcmp(annotation_value, ZipkinCoreConstants::SERVER_SEND.c_str())) {
           annotation_values_.ss = true;
         }
 
-        annotation_value = strtok(NULL, FIELD_SEPARATOR_.c_str());
+        annotation_value = std::strtok(NULL, FIELD_SEPARATOR_.c_str());
       }
     }
 
