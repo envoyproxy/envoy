@@ -26,16 +26,20 @@ protected:
   GuardDogDeathTest()
       : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500) {}
 
+  void SetupMockTimeSource() {
+    ON_CALL(time_source_, currentSystemTime())
+        .WillByDefault(testing::Invoke([&]() {
+          return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
+        }));
+  }
+
   /**
    * This does everything but the final forceCheckForTest() that should cause
    * death for the single kill case.
    */
   void SetupForDeath() {
     InSequence s;
-    EXPECT_CALL(time_source_, currentSystemTime())
-        .WillRepeatedly(testing::Invoke([&]() {
-          return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
-        }));
+    SetupMockTimeSource();
     guard_dog_.reset(new GuardDogImpl(fakestats_, config_kill_, time_source_));
     unpet_dog_ = guard_dog_->createWatchDog(0);
     guard_dog_->forceCheckForTest();
@@ -48,10 +52,7 @@ protected:
    */
   void SetupForMultiDeath() {
     InSequence s;
-    EXPECT_CALL(time_source_, currentSystemTime())
-        .WillRepeatedly(testing::Invoke([&]() {
-          return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
-        }));
+    SetupMockTimeSource();
     guard_dog_.reset(new GuardDogImpl(fakestats_, config_multikill_, time_source_));
     auto unpet_dog_ = guard_dog_->createWatchDog(0);
     guard_dog_->forceCheckForTest();
@@ -107,10 +108,7 @@ TEST_F(GuardDogDeathTest, NearDeathTest) {
   // This ensures that if only one thread surpasses the multiple kill threshold
   // there is no death.  The positive case is covered in MultiKillDeathTest.
   InSequence s;
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillRepeatedly(testing::Invoke([&]() {
-        return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
-      }));
+  SetupMockTimeSource();
   GuardDogImpl gd(fakestats_, config_multikill_, time_source_);
   auto unpet_dog = gd.createWatchDog(0);
   auto pet_dog = gd.createWatchDog(1);
@@ -139,8 +137,8 @@ protected:
 TEST_F(GuardDogMissTest, MissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillRepeatedly(testing::Invoke([&]() {
+  ON_CALL(time_source_, currentSystemTime())
+      .WillByDefault(testing::Invoke([&]() {
         return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
       }));
   GuardDogImpl gd(stats_store_, config_miss_, time_source_);
@@ -164,8 +162,8 @@ TEST_F(GuardDogMissTest, MissTest) {
 TEST_F(GuardDogMissTest, MegaMissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillRepeatedly(testing::Invoke([&]() {
+  ON_CALL(time_source_, currentSystemTime())
+      .WillByDefault(testing::Invoke([&]() {
         return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
       }));
   GuardDogImpl gd(stats_store_, config_mega_, time_source_);
