@@ -358,17 +358,17 @@ ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager&
   }
   cluster_ = cluster->info();
 
-  std::string endpoint = config.getString("endpoint");
+  std::string collector_endpoint = config.getString("collector_endpoint");
 
-  tls_.set(
-      tls_slot_,
-      [this, endpoint](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        Zipkin::Tracer tracer(local_info_.clusterName(), local_info_.address()->asString());
-        tracer.setReporter(
-            ZipkinReporter::NewInstance(std::ref(*this), std::ref(dispatcher), endpoint));
-        return ThreadLocal::ThreadLocalObjectSharedPtr{
-            new TlsZipkinTracer(std::move(tracer), *this)};
-      });
+  tls_.set(tls_slot_, [this, collector_endpoint](Event::Dispatcher& dispatcher)
+                          -> ThreadLocal::ThreadLocalObjectSharedPtr {
+                            Zipkin::Tracer tracer(local_info_.clusterName(),
+                                                  local_info_.address()->asString());
+                            tracer.setReporter(ZipkinReporter::NewInstance(
+                                std::ref(*this), std::ref(dispatcher), collector_endpoint));
+                            return ThreadLocal::ThreadLocalObjectSharedPtr{
+                                new TlsZipkinTracer(std::move(tracer), *this)};
+                          });
 }
 
 SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::string&,
@@ -382,25 +382,16 @@ SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::str
   Zipkin::Span new_zipkin_span;
 
   if (request_headers.OtSpanContext()) {
-    std::cerr << std::endl
-              << "Found context" << std::endl;
-
-    // Get the context from the x-b3-envoy header
-    // This header contains values of annotations previously set
-    // The context built from this header allows the tracer to properly set the span id and the
-    // parent id
-    // The ids carried in x-b3-envoy also appear in the appropriate B3 headers
+    // Get the open tracing span context.
+    // This header contains B3 annotations set by the downstream caller.
+    // The context built from this header allows the zipkin tracer to
+    // properly set the span id and the parent span id.
     Zipkin::SpanContext context;
+
     context.populateFromString(request_headers.OtSpanContext()->value().c_str());
-
-    std::cerr << "Context: " << context.serializeToString() << std::endl;
-
     new_zipkin_span = tracer.startSpan(request_headers.Host()->value().c_str(),
                                        start_time.time_since_epoch().count(), context);
   } else {
-    std::cerr << std::endl
-              << "No context found. Will create a root span" << std::endl;
-
     new_zipkin_span = tracer.startSpan(request_headers.Host()->value().c_str(),
                                        start_time.time_since_epoch().count());
   }
@@ -418,21 +409,17 @@ SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::str
   request_headers.insertXB3Sampled().value(std::string(("1")));
 
   Zipkin::SpanContext new_span_context(new_zipkin_span);
-  std::cerr << "New span context: " << new_span_context.serializeToString() << std::endl;
 
   // Set the ot-span-context with the new context
   request_headers.insertOtSpanContext().value(new_span_context.serializeToString());
-
-  std::cerr << "ZipkinDriver: span's tracer: " << new_zipkin_span.tracer() << std::endl;
-
   active_span.reset(new ZipkinSpan(new_zipkin_span));
 
   return std::move(active_span);
 }
 
 ZipkinReporter::ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
-                               const std::string& endpoint)
-    : driver_(driver), endpoint_(endpoint) {
+                               const std::string& collector_endpoint)
+    : driver_(driver), collector_endpoint_(collector_endpoint) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     flushSpans();
     enableTimer();
@@ -445,10 +432,11 @@ ZipkinReporter::ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatch
   enableTimer();
 }
 
-std::unique_ptr<Zipkin::Reporter> ZipkinReporter::NewInstance(ZipkinDriver& driver,
-                                                              Event::Dispatcher& dispatcher,
-                                                              const std::string& endpoint) {
-  return std::unique_ptr<Zipkin::Reporter>(new ZipkinReporter(driver, dispatcher, endpoint));
+std::unique_ptr<Zipkin::Reporter>
+ZipkinReporter::NewInstance(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
+                            const std::string& collector_endpoint) {
+  return std::unique_ptr<Zipkin::Reporter>(
+      new ZipkinReporter(driver, dispatcher, collector_endpoint));
 }
 
 void ZipkinReporter::reportSpan(Zipkin::Span&& span) {
@@ -456,10 +444,6 @@ void ZipkinReporter::reportSpan(Zipkin::Span&& span) {
 
   uint64_t min_flush_spans =
       driver_.runtime().snapshot().getInteger("tracing.zipkin.min_flush_spans", 5U);
-
-  std::cerr << "reportSpan() has been called; min_flush: " << min_flush_spans << std::endl;
-  std::cerr << "reportSpan() span: " << span.toJson() << std::endl;
-  std::cerr << "reportSpan() pending spans: " << span_buffer_.pendingSpans() << std::endl;
 
   if (span_buffer_.pendingSpans() == min_flush_spans) {
     flushSpans();
@@ -474,15 +458,10 @@ void ZipkinReporter::enableTimer() {
 
 void ZipkinReporter::flushSpans() {
   if (span_buffer_.pendingSpans()) {
-    std::cerr << "flushSpans() will flush" << std::endl;
     std::string request_body = span_buffer_.toStringifiedJsonArray();
-    std::cerr << "HTTP request body" << request_body << std::endl;
-
-    std::cerr << "Will post spans to Zipkin. Endpoint: " << endpoint_ << std::endl;
-
     Http::MessagePtr message(new Http::RequestMessageImpl());
     message->headers().insertMethod().value(Http::Headers::get().MethodValues.Post);
-    message->headers().insertPath().value(endpoint_);
+    message->headers().insertPath().value(collector_endpoint_);
     message->headers().insertHost().value(driver_.cluster()->name());
     message->headers().insertContentType().value(std::string("application/json"));
 
@@ -501,16 +480,15 @@ void ZipkinReporter::flushSpans() {
 }
 
 void ZipkinReporter::onFailure(Http::AsyncClient::FailureReason) {
-  std::cerr << "Error posting spans to Zipkin" << std::endl;
+  // TODO: stats
 }
 
 void ZipkinReporter::onSuccess(Http::MessagePtr&& http_response) {
   if (Http::Utility::getResponseStatus(http_response->headers()) !=
       enumToInt(Http::Code::Accepted)) {
-    std::cerr << "Unexpected HTTP response code: "
-              << Http::Utility::getResponseStatus(http_response->headers()) << std::endl;
+    // TODO: stats
   } else {
-    std::cerr << "Successfully posted spans to Zipkin" << std::endl;
+    // TODO: stats
   }
 }
 

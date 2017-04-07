@@ -25,5 +25,6 @@ envoy_cc_library(
         "//source/common/http/access_log:access_log_formatter_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/runtime:uuid_util_lib",
+        "//source/zipkin:zipkin_lib",
     ],
 )

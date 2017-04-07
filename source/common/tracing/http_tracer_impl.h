@@ -223,15 +223,17 @@ private:
 
 class ZipkinReporter : public Zipkin::Reporter, Http::AsyncClient::Callbacks {
 public:
-  ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatcher, const std::string& endpoint);
+  ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
+                 const std::string& collector_endpoint);
 
   void reportSpan(Zipkin::Span&& span) override;
 
   void onSuccess(Http::MessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
-  static std::unique_ptr<Zipkin::Reporter>
-  NewInstance(ZipkinDriver& driver, Event::Dispatcher& dispatcher, const std::string& endpoint);
+  static std::unique_ptr<Zipkin::Reporter> NewInstance(ZipkinDriver& driver,
+                                                       Event::Dispatcher& dispatcher,
+                                                       const std::string& collector_endpoint);
 
 private:
   void enableTimer();
@@ -240,6 +242,6 @@ private:
   ZipkinDriver& driver_;
   Event::TimerPtr flush_timer_;
   Zipkin::SpanBuffer span_buffer_;
-  std::string endpoint_;
+  std::string collector_endpoint_;
 };
 } // Tracing
