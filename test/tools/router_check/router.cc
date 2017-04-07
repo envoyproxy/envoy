@@ -1,4 +1,4 @@
-#include "test/tools/router_check/source/router.h"
+#include "test/tools/router_check/router.h"
 
 Json::ObjectPtr RouterCheckTool::loadJson(const std::string& config_json,
                                           const std::string& schema) {
@@ -16,7 +16,7 @@ Json::ObjectPtr RouterCheckTool::loadJson(const std::string& config_json,
   }
 }
 
-bool RouterCheckTool::create(const std::string& router_config_json) {
+bool RouterCheckTool::initializeFromConfig(const std::string& router_config_json) {
 
   Json::ObjectPtr loader = loadJson(router_config_json, Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
@@ -29,7 +29,7 @@ bool RouterCheckTool::create(const std::string& router_config_json) {
 
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
   // Load tool config json
-  Json::ObjectPtr loader = loadJson(expected_route_json, Json::ToolSchema::ROUTER_CHECK_SCHEMA);
+  Json::ObjectPtr loader = loadJson(expected_route_json, Json::ToolSchema::routerCheckSchema());
 
   if (loader == nullptr) {
     return false;
@@ -41,42 +41,45 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     // Load parameters from json
     ToolConfig tool_config;
     tool_config.parseFromJson(check_config);
+    Router::RouteConstSharedPtr route =
+        config_->route(tool_config.headers_, tool_config.random_value_);
 
     Json::ObjectPtr check_type = check_config->getObject("check");
 
     // Call appropriate function for each match case
     if (check_type->hasObject("path_redirect")) {
-      if (!compareRedirectPath(tool_config, check_type->getString("path_redirect"))) {
+      if (!compareRedirectPath(tool_config, check_type->getString("path_redirect"), route)) {
         no_failures = false;
       }
     }
 
     if (check_type->hasObject("cluster_name")) {
-      if (!compareCluster(tool_config, check_type->getString("cluster_name"))) {
+      if (!compareCluster(tool_config, check_type->getString("cluster_name"), route)) {
         no_failures = false;
       }
     }
 
     if (check_type->hasObject("virtual_cluster_name")) {
-      if (!compareVirtualCluster(tool_config, check_type->getString("virtual_cluster_name"))) {
+      if (!compareVirtualCluster(tool_config, check_type->getString("virtual_cluster_name"),
+                                 route)) {
         no_failures = false;
       }
     }
 
     if (check_type->hasObject("virtual_host_name")) {
-      if (!compareVirtualHost(tool_config, check_type->getString("virtual_host_name"))) {
+      if (!compareVirtualHost(tool_config, check_type->getString("virtual_host_name"), route)) {
         no_failures = false;
       }
     }
 
     if (check_type->hasObject("path_rewrite")) {
-      if (!compareRewritePath(tool_config, check_type->getString("path_rewrite"))) {
+      if (!compareRewritePath(tool_config, check_type->getString("path_rewrite"), route)) {
         no_failures = false;
       }
     }
 
     if (check_type->hasObject("host_rewrite")) {
-      if (!compareRewriteHost(tool_config, check_type->getString("host_rewrite"))) {
+      if (!compareRewriteHost(tool_config, check_type->getString("host_rewrite"), route)) {
         no_failures = false;
       }
     }
@@ -119,9 +122,8 @@ void ToolConfig::parseFromJson(const Json::ObjectPtr& check_config) {
   }
 }
 
-bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string expected) {
-  Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_value_);
+bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string expected,
+                                     Router::RouteConstSharedPtr& route) {
   std::string actual = "none";
 
   // Compare cluster name match
@@ -129,12 +131,11 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string 
     actual = route->routeEntry()->clusterName();
   }
 
-  return compareResults(actual, expected);
+  return compareResults(actual, expected, "cluster_name");
 }
 
-bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::string expected) {
-  Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_value_);
+bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::string expected,
+                                            Router::RouteConstSharedPtr& route) {
   std::string actual = "none";
 
   if (route != nullptr && route->routeEntry() != nullptr) {
@@ -143,24 +144,22 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
     }
   }
 
-  return compareResults(actual, expected);
+  return compareResults(actual, expected, "virtual_cluster_name");
 }
 
-bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::string expected) {
-  Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_value_);
+bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::string expected,
+                                         Router::RouteConstSharedPtr& route) {
   std::string actual = "none";
 
   if (route != nullptr && route->routeEntry() != nullptr) {
     actual = route->routeEntry()->virtualHost().name();
   }
 
-  return compareResults(actual, expected);
+  return compareResults(actual, expected, "virtual_host_name");
 }
 
-bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string expected) {
-  Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_value_);
+bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string expected,
+                                         Router::RouteConstSharedPtr& route) {
   std::string actual = "none";
 
   if (route != nullptr && route->routeEntry() != nullptr) {
@@ -168,12 +167,11 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
     actual = tool_config.headers_.get_(Http::Headers::get().Path);
   }
 
-  return compareResults(actual, expected);
+  return compareResults(actual, expected, "path_rewrite");
 }
 
-bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string expected) {
-  Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_value_);
+bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string expected,
+                                         Router::RouteConstSharedPtr& route) {
   std::string actual = "none";
 
   if (route != nullptr && route->routeEntry() != nullptr) {
@@ -181,33 +179,33 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
     actual = tool_config.headers_.get_(Http::Headers::get().Host);
   }
 
-  return compareResults(actual, expected);
+  return compareResults(actual, expected, "host_rewrite");
 }
 
-bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string expected) {
-  Router::RouteConstSharedPtr route =
-      config_->route(tool_config.headers_, tool_config.random_value_);
+bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string expected,
+                                          Router::RouteConstSharedPtr& route) {
   std::string actual = "none";
 
   if (route != nullptr && route->redirectEntry() != nullptr) {
     actual = route->redirectEntry()->newPath(tool_config.headers_);
   }
 
-  return compareResults(actual, expected);
+  return compareResults(actual, expected, "path_redirect");
 }
 
-bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected) {
+bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected,
+                                     const std::string& test_type) {
   if (expected == actual || (actual.empty() && expected == "none")) {
-    // Output pass stdout if details is set to true
+    // Output pass details to stdout if details_ flag is set to true
     if (details_) {
-      std::cout << "P -----" << expected << " ----- " << actual << std::endl;
+      std::cout << "P " << expected << " " << actual << " " << test_type << std::endl;
     }
     return true;
   }
 
-  // Output failure case to stdout if details is set to true
+  // Output failure details to stdout if details_ flag is set to true
   if (details_) {
-    std::cout << "F ----- " << expected << " ----- " << actual << std::endl;
+    std::cout << "F " << expected << " " << actual << " " << test_type << std::endl;
   }
   return false;
 }

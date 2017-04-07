@@ -5,8 +5,11 @@ namespace Json {
 class ToolSchema {
 
 public:
-  // Router Check Tool Schema
-  static const std::string ROUTER_CHECK_SCHEMA;
+  /**
+   * Obtain the router check json schema
+   * @return const std::string& of the schema string
+   */
+  static const std::string& routerCheckSchema();
 };
 
 } // Json

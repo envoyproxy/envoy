@@ -20,18 +20,19 @@ Output
   The program exits with status EXIT_FAILURE if any test case does not match the expected route parameter
   value.
 
-  The - -details option prints out details for each test case. The first field indicates
-  a P for a correct match and a F for a failed match. The second field is the actual route parameter value.
-  The third field is the expected route parameter value. For example: ::
+  The ``--details`` option prints out details for each test case. The first field indicates
+  a P for a correct match and a F for a failed match. The second field is the expected route parameter value.
+  The third field is the actual route parameter value. The fourth field indicates the parameter that is
+  compared. For example: ::
 
-    P -----api.lyft.com ----- api.lyft.com
-    F -----ats ----- locations
-    P -----locations ----- locations
-    F -----www2 ----- www3
-    P -----root_www2 ----- root_www2
-    P -----https://redirect.lyft.com/new_bar ----- https://redirect.lyft.com/new_bar
+    P instant-server instant-server cluster_name
+    F default other virtual_host_name
+    P api.lyft.com api.lyft.com host_rewrite
+    P https://redirect.lyft.com/new_bar https://redirect.lyft.com/new_bar path_redirect
+    F locations ats cluster_name
+    P locations locations cluster_name
 
-  Testing with valid runtime values is not currently supported but can be added.
+  Testing with valid :ref:`runtime values <config_http_conn_man_route_table_route>` is not currently supported but can be added.
 
 Building
   The tool can be built locally using Bazel. ::
@@ -39,7 +40,7 @@ Building
     bazel build //test/tools/router_check:router_check_tool
 
 Running
-  The tool takes two input json files and an optional command line parameter - -details. The
+  The tool takes two input json files and an optional command line parameter ``--details``. The
   expected order of command line arguements is:
   1. The router configuration json file.
   2. The tool configuration json file.

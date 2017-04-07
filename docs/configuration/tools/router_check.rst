@@ -73,12 +73,13 @@ method
 
 random_value
   *(optional, integer)* An integer used to supply the random seed to use if a runtime choice is
-  required. Currently testing with valid runtime values is not supported. The default value of
-  random_value is 0.
+  required. The default value of random_value is 0.
 
 ssl
   *(optional, boolean)* A flag that determines whether to set x-forwarded-proto to https or http.
-  By default ssl is false which corresponds to x-forwarded-proto set to http.
+  By setting x-forwarded-proto to a given protocol, the tool is able to simulate the behavior of
+  a client issuing a request via http or https. By default ssl is false which corresponds to
+  x-forwarded-proto set to http.
 
 internal
   *(optional, boolean)* A flag that determines whether to set x-envoy-internal to "true".

@@ -1,5 +1,5 @@
-#include "test/tools/router_check/source/router.h"
 #include "test/precompiled/precompiled_test.h"
+#include "test/tools/router_check/router.h"
 
 int main(int argc, char* argv[]) {
 
@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
   RouterCheckTool checktool;
 
   // Load router config json
-  if (!checktool.create(argv[1])) {
+  if (!checktool.initializeFromConfig(argv[1])) {
     return EXIT_FAILURE;
   }
 

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <fstream>
-
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
@@ -14,12 +12,12 @@
 #include "test/test_common/utility.h"
 #include "test/tools/router_check/json/tool_config_schemas.h"
 
-/** Class that store the configuration parameters of the router
+/**
+ * Class that store the configuration parameters of the router
  * check tool extracted from a json input file
  */
-class ToolConfig {
-public:
-  ToolConfig(){};
+struct ToolConfig {
+  ToolConfig() : random_value_(0){};
   void parseFromJson(const Json::ObjectPtr& check_config);
 
   int random_value_;
@@ -31,14 +29,12 @@ public:
  */
 class RouterCheckTool : Logger::Loggable<Logger::Id::testing> {
 public:
-  RouterCheckTool(){};
-
   /**
    * @param config_json specifies the json config file to be loaded
    * @param schema is the json schema to validate against
-   * @return bool true if router config loaded successfully
+   * @return Json::ObjectPtr pointer to router config json object. Return
+   * nullptr if load fails.
    */
-
   Json::ObjectPtr loadJson(const std::string& config_json, const std::string& schema);
 
   /**
@@ -46,7 +42,7 @@ public:
    * @return bool if json file loaded successfully and ConfigImpl object created
    * successfully
    */
-  bool create(const std::string& router_config_json);
+  bool initializeFromConfig(const std::string& router_config_json);
 
   /**
    * @param expected_route_json specifies the tool config json file
@@ -54,25 +50,34 @@ public:
    */
   bool compareEntriesInJson(const std::string& expected_route_json);
 
-  // Set whether to print out match case details
+  /**
+   * Set whether to print out match case details
+   */
   void setShowDetails() { details_ = true; }
 
 private:
-  bool compareCluster(ToolConfig& tool_config, const std::string expected);
-  bool compareVirtualCluster(ToolConfig& tool_config, const std::string expected);
-  bool compareVirtualHost(ToolConfig& tool_config, const std::string expected);
-  bool compareRewriteHost(ToolConfig& tool_config, const std::string expected);
-  bool compareRewritePath(ToolConfig& tool_config, const std::string expected);
-  bool compareRedirectPath(ToolConfig& tool_config, const std::string expected);
+  bool compareCluster(ToolConfig& tool_config, const std::string expected,
+                      Router::RouteConstSharedPtr& route);
+  bool compareVirtualCluster(ToolConfig& tool_config, const std::string expected,
+                             Router::RouteConstSharedPtr& route);
+  bool compareVirtualHost(ToolConfig& tool_config, const std::string expected,
+                          Router::RouteConstSharedPtr& route);
+  bool compareRewriteHost(ToolConfig& tool_config, const std::string expected,
+                          Router::RouteConstSharedPtr& route);
+  bool compareRewritePath(ToolConfig& tool_config, const std::string expected,
+                          Router::RouteConstSharedPtr& route);
+  bool compareRedirectPath(ToolConfig& tool_config, const std::string expected,
+                           Router::RouteConstSharedPtr& route);
 
   /**
    * Compare the expected and acutal route parameter values. Print out
-   * match details is details_ flag is set
+   * match details if details_ flag is set
    * @param actual holds the acutal route returned by the router
    * @param expected holds the expected parameter value of the route
-   * @return true if acutal and expected match
+   * @return true if actual and expected match
    */
-  bool compareResults(const std::string& actual, const std::string& expected);
+  bool compareResults(const std::string& actual, const std::string& expected,
+                      const std::string& test_type);
 
   bool details_{false};
 
