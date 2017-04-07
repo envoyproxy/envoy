@@ -3,22 +3,19 @@ load("@protobuf_git//:protobuf.bzl", "cc_proto_library")
 ENVOY_COPTS = [
     # TODO(htuch): Remove this when Bazel bringup is done.
     "-DBAZEL_BRINGUP",
-    "-fno-omit-frame-pointer",
-    # TODO(htuch): Clang wants -ferror-limit, should support both. Commented out for now.
-    # "-fmax-errors=3",
     "-Wall",
-    # TODO(htuch): Figure out why protobuf-3.2.0 causes the CI build to fail
-    # with this but not the developer-local build.
-    #"-Wextra",
+    "-Wextra",
     "-Werror",
     "-Wnon-virtual-dtor",
     "-Woverloaded-virtual",
-    # TODO(htuch): Figure out how to use this in the presence of headers in
-    # openssl/tclap which use old style casts.
-    # "-Wold-style-cast",
+    "-Wold-style-cast",
     "-std=c++0x",
     "-includeprecompiled/precompiled.h",
-]
+] + select({
+    "//bazel:opt_build": [],
+    "//bazel:fastbuild_build": ["-DDEBUG"],
+    "//bazel:dbg_build": ["-ggdb3", "-DDEBUG"],
+})
 
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
@@ -71,6 +68,9 @@ def envoy_cc_binary(name,
         linkopts = [
             "-pthread",
             "-lrt",
+            "-static",
+            "-static-libstdc++",
+            "-static-libgcc",
         ],
         linkstatic = 1,
         visibility = visibility,
