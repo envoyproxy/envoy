@@ -1,15 +1,21 @@
 #include "common/redis/conn_pool_impl.h"
 
 #include "common/common/assert.h"
+#include "common/json/config_schemas.h"
 
 namespace Redis {
 namespace ConnPool {
 
+ConfigImpl::ConfigImpl(const Json::Object& config)
+    : Validator(config, Json::Schema::REDIS_CONN_POOL_SCHEMA),
+      op_timeout_(config.getInteger("op_timeout_ms")) {}
+
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                             EncoderPtr&& encoder, DecoderFactory& decoder_factory) {
+                             EncoderPtr&& encoder, DecoderFactory& decoder_factory,
+                             const Config& config) {
 
   std::unique_ptr<ClientImpl> client(
-      new ClientImpl(host, dispatcher, std::move(encoder), decoder_factory));
+      new ClientImpl(host, dispatcher, std::move(encoder), decoder_factory, config));
   client->connection_ = host->createConnection(dispatcher).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -19,14 +25,15 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 }
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                       EncoderPtr&& encoder, DecoderFactory& decoder_factory)
+                       EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
-      connect_timer_(dispatcher.createTimer([this]() -> void { onConnectTimeout(); })) {
+      config_(config),
+      connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })) {
   host->cluster().stats().upstream_cx_total_.inc();
   host->cluster().stats().upstream_cx_active_.inc();
   host->stats().cx_total_.inc();
   host->stats().cx_active_.inc();
-  connect_timer_->enableTimer(host->cluster().connectTimeout());
+  connect_or_op_timer_->enableTimer(host->cluster().connectTimeout());
 }
 
 ClientImpl::~ClientImpl() {
@@ -43,11 +50,23 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
   pending_requests_.emplace_back(*this, callbacks);
   encoder_->encode(request, encoder_buffer_);
   connection_->write(encoder_buffer_);
+
+  // Only boost the op timeout if we are not already connected. Otherwise, we are governed by
+  // the connect timeout and the timer will be reset when/if connection occurs. This allows a
+  // relatively long connection spin up time for example if TLS is being used.
+  if (connected_) {
+    connect_or_op_timer_->enableTimer(config_.opTimeout());
+  }
+
   return &pending_requests_.back();
 }
 
-void ClientImpl::onConnectTimeout() {
-  host_->cluster().stats().upstream_cx_connect_timeout_.inc();
+void ClientImpl::onConnectOrOpTimeout() {
+  if (connected_) {
+    host_->cluster().stats().upstream_rq_timeout_.inc();
+  } else {
+    host_->cluster().stats().upstream_cx_connect_timeout_.inc();
+  }
   connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -82,16 +101,17 @@ void ClientImpl::onEvent(uint32_t events) {
       }
       pending_requests_.pop_front();
     }
+
+    connect_or_op_timer_->disableTimer();
+  } else if (events & Network::ConnectionEvent::Connected) {
+    connected_ = true;
+    ASSERT(!pending_requests_.empty());
+    connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  if ((events & Network::ConnectionEvent::RemoteClose) && connect_timer_) {
+  if ((events & Network::ConnectionEvent::RemoteClose) && !connected_) {
     host_->cluster().stats().upstream_cx_connect_fail_.inc();
     host_->stats().cx_connect_fail_.inc();
-  }
-
-  if (connect_timer_) {
-    connect_timer_->disableTimer();
-    connect_timer_.reset();
   }
 }
 
@@ -104,6 +124,12 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     host_->cluster().stats().upstream_rq_cancelled_.inc();
   }
   pending_requests_.pop_front();
+
+  // We boost the op timeout every time we pipeline a new op. However, if there are no remaining
+  // ops in the pipeline we need to disable the timer.
+  if (pending_requests_.empty()) {
+    connect_or_op_timer_->disableTimer();
+  }
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
@@ -129,13 +155,16 @@ void ClientImpl::PendingRequest::cancel() {
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                    Event::Dispatcher& dispatcher) {
-  return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_);
+                                    Event::Dispatcher& dispatcher, const Config& config) {
+  return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
+                            config);
 }
 
 InstanceImpl::InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
-                           ClientFactory& client_factory, ThreadLocal::Instance& tls)
-    : cm_(cm), client_factory_(client_factory), tls_(tls), tls_slot_(tls.allocateSlot()) {
+                           ClientFactory& client_factory, ThreadLocal::Instance& tls,
+                           const Json::Object& config)
+    : cm_(cm), client_factory_(client_factory), tls_(tls), tls_slot_(tls.allocateSlot()),
+      config_(config) {
   tls.set(tls_slot_, [this, cluster_name](
                          Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -182,7 +211,7 @@ PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_
   if (!client) {
     client.reset(new ThreadLocalActiveClient(*this));
     client->host_ = host;
-    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_);
+    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
     client->redis_client_->addConnectionCallbacks(*client);
   }
 

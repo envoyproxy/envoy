@@ -2,7 +2,7 @@
 
 JSON=$1
 SRC_FILE="${TEST_SRCDIR}/${TEST_WORKSPACE}/${JSON}"
-DST_FILE="${TEST_TMPDIR}/${JSON}"
+DST_FILE="${TEST_TMPDIR}"/"$(basename "${JSON}")"
 
 mkdir -p "$(dirname "${DST_FILE}")"
 

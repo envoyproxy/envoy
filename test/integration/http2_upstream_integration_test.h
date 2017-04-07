@@ -12,8 +12,7 @@ public:
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-    createTestServer("test/config/integration/server_http2_upstream.json",
-                     {"http", "http_buffer", "http1_buffer"});
+    createTestServer("server_http2_upstream.json", {"http", "http_buffer", "http1_buffer"});
   }
 
   /**
