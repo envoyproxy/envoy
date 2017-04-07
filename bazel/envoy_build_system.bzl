@@ -68,7 +68,6 @@ def envoy_cc_binary(name,
         linkopts = [
             "-pthread",
             "-lrt",
-            "-static",
             "-static-libstdc++",
             "-static-libgcc",
         ],
