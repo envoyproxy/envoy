@@ -67,6 +67,10 @@ protected:
   WatchDogSharedPtr second_dog_;
 };
 
+// These tests use threads, and need to run after the real death tests, so we need to call them
+// a different name.
+class GuardDogAlmostDeadTest : public GuardDogDeathTest {};
+
 TEST_F(GuardDogDeathTest, KillDeathTest) {
   // Is it German for "The Function"? Almost...
   auto die_function = [&]() -> void {
@@ -78,7 +82,7 @@ TEST_F(GuardDogDeathTest, KillDeathTest) {
   EXPECT_DEATH(die_function(), "");
 }
 
-TEST_F(GuardDogDeathTest, KillNoFinalCheckTest) {
+TEST_F(GuardDogAlmostDeadTest, KillNoFinalCheckTest) {
   // This does everything the death test does except the final force check that
   // should actually result in dying. The death test does not verify that there
   // was not a crash *before* the expected line, so this test checks that.
@@ -93,14 +97,14 @@ TEST_F(GuardDogDeathTest, MultiKillDeathTest) {
   EXPECT_DEATH(die_function(), "");
 }
 
-TEST_F(GuardDogDeathTest, MultiKillNoFinalCheckTest) {
+TEST_F(GuardDogAlmostDeadTest, MultiKillNoFinalCheckTest) {
   // This does everything the death test does except the final force check that
   // should actually result in dying. The death test does not verify that there
   // was not a crash *before* the expected line, so this test checks that.
   SetupForMultiDeath();
 }
 
-TEST_F(GuardDogDeathTest, NearDeathTest) {
+TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
   // This ensures that if only one thread surpasses the multiple kill threshold
   // there is no death.  The positive case is covered in MultiKillDeathTest.
   InSequence s;
