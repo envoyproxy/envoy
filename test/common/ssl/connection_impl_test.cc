@@ -1,17 +1,17 @@
+#include "common/ssl/connection_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/connection_impl.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 
 using testing::_;

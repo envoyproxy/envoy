@@ -1,5 +1,5 @@
-#include "integration.h"
 #include "ssl_integration_test.h"
+#include "integration.h"
 #include "utility.h"
 
 #include "common/event/dispatcher_impl.h"
