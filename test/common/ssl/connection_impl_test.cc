@@ -76,7 +76,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
   {
     "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
     "private_key_file": "/tmp/envoy_test/unittestkey.pem",
-    "ca_cert_file": "test/common/ssl/test_data/ca_with_uri_san.crt"
+    "ca_cert_file": "test/common/ssl/test_data/ca_with_uri_san.crt",
+    "verify_subject_alt_name": [ "server1.example.com" ]
   }
   )EOF";
 

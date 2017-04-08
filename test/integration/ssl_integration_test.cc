@@ -14,16 +14,20 @@ namespace Ssl {
 std::unique_ptr<Runtime::Loader> SslIntegrationTest::runtime_;
 std::unique_ptr<ContextManager> SslIntegrationTest::context_manager_;
 ServerContextPtr SslIntegrationTest::upstream_ssl_ctx_;
+ClientContextPtr SslIntegrationTest::client_ssl_ctx_plain_;
 ClientContextPtr SslIntegrationTest::client_ssl_ctx_alpn_;
-ClientContextPtr SslIntegrationTest::client_ssl_ctx_no_alpn_;
+ClientContextPtr SslIntegrationTest::client_ssl_ctx_san_;
+ClientContextPtr SslIntegrationTest::client_ssl_ctx_alpn_san_;
 
 void SslIntegrationTest::SetUpTestCase() {
   test_server_ =
       MockRuntimeIntegrationTestServer::create("test/config/integration/server_ssl.json");
   context_manager_.reset(new ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
-  client_ssl_ctx_alpn_ = createClientSslContext(true);
-  client_ssl_ctx_no_alpn_ = createClientSslContext(false);
+  client_ssl_ctx_plain_ = createClientSslContext(false, false);
+  client_ssl_ctx_alpn_ = createClientSslContext(true, false);
+  client_ssl_ctx_san_ = createClientSslContext(false, true);
+  client_ssl_ctx_alpn_san_ = createClientSslContext(true, true);
   fake_upstreams_.emplace_back(
       new FakeUpstream(upstream_ssl_ctx_.get(), 11000, FakeHttpConnection::Type::HTTP1));
   fake_upstreams_.emplace_back(
@@ -34,8 +38,10 @@ void SslIntegrationTest::TearDownTestCase() {
   test_server_.reset();
   fake_upstreams_.clear();
   upstream_ssl_ctx_.reset();
+  client_ssl_ctx_plain_.reset();
   client_ssl_ctx_alpn_.reset();
-  client_ssl_ctx_no_alpn_.reset();
+  client_ssl_ctx_san_.reset();
+  client_ssl_ctx_alpn_san_.reset();
   context_manager_.reset();
 }
 
@@ -52,8 +58,8 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
   return context_manager_->createSslServerContext(test_server_->store(), cfg);
 }
 
-ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {
-  std::string json_no_alpn = R"EOF(
+ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn, bool san) {
+  std::string json_plain = R"EOF(
 {
   "ca_cert_file": "test/config/integration/certs/cacert.pem",
   "cert_chain_file": "test/config/integration/certs/clientcert.pem",
@@ -70,15 +76,46 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn) {
 }
 )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(alpn ? json_alpn : json_no_alpn);
+  std::string json_san = R"EOF(
+{
+  "ca_cert_file": "test/config/integration/certs/cacert.pem",
+  "cert_chain_file": "test/config/integration/certs/clientcert.pem",
+  "private_key_file": "test/config/integration/certs/clientkey.pem",
+  "verify_subject_alt_name": [ "istio:account_a.namespace_foo.cluster.local" ]
+}
+)EOF";
+
+  std::string json_alpn_san = R"EOF(
+{
+  "ca_cert_file": "test/config/integration/certs/cacert.pem",
+  "cert_chain_file": "test/config/integration/certs/clientcert.pem",
+  "private_key_file": "test/config/integration/certs/clientkey.pem",
+  "alpn_protocols": "h2,http/1.1",
+  "verify_subject_alt_name": [ "istio:account_a.namespace_foo.cluster.local" ]
+}
+)EOF";
+
+  std::string target;
+  if (alpn) {
+    target = san ? json_alpn_san : json_alpn;
+  } else {
+    target = san ? json_san : json_plain;
+  }
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(target);
   ContextConfigImpl cfg(*loader);
   return context_manager_->createSslClientContext(test_server_->store(), cfg);
 }
 
-Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn) {
-  return dispatcher_->createSslClientConnection(
-      alpn ? *client_ssl_ctx_alpn_ : *client_ssl_ctx_no_alpn_,
-      Network::Utility::resolveUrl("tcp://127.0.0.1:10001"));
+Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn, bool san) {
+  if (alpn) {
+    return dispatcher_->createSslClientConnection(
+        san ? *client_ssl_ctx_alpn_san_ : *client_ssl_ctx_alpn_,
+        Network::Utility::resolveUrl("tcp://127.0.0.1:10001"));
+  } else {
+    return dispatcher_->createSslClientConnection(
+        san ? *client_ssl_ctx_san_ : *client_ssl_ctx_plain_,
+        Network::Utility::resolveUrl("tcp://127.0.0.1:10001"));
+  }
 }
 
 void SslIntegrationTest::checkStats() {
@@ -88,44 +125,56 @@ void SslIntegrationTest::checkStats() {
 }
 
 TEST_F(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeSslClientConnection(false),
+  testRouterRequestAndResponseWithBody(makeSslClientConnection(false, false),
                                        Http::CodecClient::Type::HTTP1, 16 * 1024 * 1024,
                                        16 * 1024 * 1024, false);
   checkStats();
 }
 
 TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeSslClientConnection(false),
+  testRouterRequestAndResponseWithBody(makeSslClientConnection(false, false),
                                        Http::CodecClient::Type::HTTP1, 1024, 512, false);
   checkStats();
 }
 
 TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
-  testRouterRequestAndResponseWithBody(makeSslClientConnection(true),
+  testRouterRequestAndResponseWithBody(makeSslClientConnection(true, false),
+                                       Http::CodecClient::Type::HTTP2, 1024, 512, false);
+  checkStats();
+}
+
+TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVierfySAN) {
+  testRouterRequestAndResponseWithBody(makeSslClientConnection(false, true),
+                                       Http::CodecClient::Type::HTTP1, 1024, 512, false);
+  checkStats();
+}
+
+TEST_F(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySAN) {
+  testRouterRequestAndResponseWithBody(makeSslClientConnection(true, true),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, false);
   checkStats();
 }
 
 TEST_F(SslIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
-  testRouterHeaderOnlyRequestAndResponse(makeSslClientConnection(false),
+  testRouterHeaderOnlyRequestAndResponse(makeSslClientConnection(false, false),
                                          Http::CodecClient::Type::HTTP1);
   checkStats();
 }
 
 TEST_F(SslIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
-  testRouterUpstreamDisconnectBeforeResponseComplete(makeSslClientConnection(false),
+  testRouterUpstreamDisconnectBeforeResponseComplete(makeSslClientConnection(false, false),
                                                      Http::CodecClient::Type::HTTP1);
   checkStats();
 }
 
 TEST_F(SslIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
-  testRouterDownstreamDisconnectBeforeRequestComplete(makeSslClientConnection(false),
+  testRouterDownstreamDisconnectBeforeRequestComplete(makeSslClientConnection(false, false),
                                                       Http::CodecClient::Type::HTTP1);
   checkStats();
 }
 
 TEST_F(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
-  testRouterDownstreamDisconnectBeforeResponseComplete(makeSslClientConnection(false),
+  testRouterDownstreamDisconnectBeforeResponseComplete(makeSslClientConnection(false, false),
                                                        Http::CodecClient::Type::HTTP1);
   checkStats();
 }
@@ -144,7 +193,7 @@ TEST_F(SslIntegrationTest, AltAlpn) {
       dynamic_cast<MockRuntimeIntegrationTestServer*>(test_server_.get());
   ON_CALL(server->runtime_->snapshot_, featureEnabled("ssl.alt_alpn", 0))
       .WillByDefault(Return(true));
-  testRouterRequestAndResponseWithBody(makeSslClientConnection(true),
+  testRouterRequestAndResponseWithBody(makeSslClientConnection(true, false),
                                        Http::CodecClient::Type::HTTP1, 1024, 512, false);
   checkStats();
 }
