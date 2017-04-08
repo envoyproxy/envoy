@@ -1,12 +1,11 @@
 #pragma once
 
-#include "libevent.h"
-
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection_handler.h"
 
 #include "common/common/logger.h"
+#include "common/event/libevent.h"
 
 namespace Event {
 
@@ -26,10 +25,10 @@ public:
   // Event::Dispatcher
   void clearDeferredDeleteList() override;
   Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstancePtr address) override;
+  createClientConnection(Network::Address::InstanceConstSharedPtr address) override;
   Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                            Network::Address::InstancePtr address) override;
+                            Network::Address::InstanceConstSharedPtr address) override;
   Network::DnsResolverPtr createDnsResolver() override;
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;

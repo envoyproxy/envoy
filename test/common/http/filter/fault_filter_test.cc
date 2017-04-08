@@ -99,7 +99,7 @@ public:
     EXPECT_CALL(*timer_, disableTimer());
   }
 
-  FaultFilterConfigPtr config_;
+  FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
   NiceMock<MockStreamDecoderFilterCallbacks> filter_callbacks_;
   TestHeaderMapImpl request_headers_;

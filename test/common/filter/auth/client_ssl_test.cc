@@ -72,7 +72,7 @@ public:
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
   Http::MockAsyncClientRequest request_;
-  ConfigPtr config_;
+  ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Instance> instance_;
   Event::MockTimer* interval_timer_;
@@ -148,8 +148,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/filter/auth/test_data/vpn_response_1.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/filter/auth/test_data/vpn_response_1.json")));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(1U, stats_store_.gauge("auth.clientssl.vpn.total_principals").value());
 
@@ -199,7 +199,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl("bad_json")});
+  message->body().reset(new Buffer::OwnedImpl("bad_json"));
   callbacks_->onSuccess(std::move(message));
 
   // Interval timer fires.

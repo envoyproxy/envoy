@@ -4,6 +4,7 @@
 #include "envoy/api/api.h"
 #include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/network/listen_socket.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
@@ -87,6 +88,13 @@ public:
    * @return the fd or -1 if there is no listening socket for the address.
    */
   virtual int getListenSocketFd(const std::string& address) PURE;
+
+  /**
+   * Obtain a listen socket pointer based on the listener config array index.
+   * @param index array index.
+   * @return Network::ListenSocket* when index is in bounds, nullptr otherwise.
+   */
+  virtual Network::ListenSocket* getListenSocketByIndex(uint32_t index) PURE;
 
   /**
    * Fetch server stats specific to this process vs. global shared stats in a hot restart scenario.

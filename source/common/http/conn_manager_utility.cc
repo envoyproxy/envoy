@@ -1,4 +1,4 @@
-#include "conn_manager_utility.h"
+#include "common/http/conn_manager_utility.h"
 
 #include "common/common/empty_string.h"
 #include "common/http/access_log/access_log_formatter.h"
@@ -117,7 +117,7 @@ void ConnectionManagerUtility::mutateRequestHeaders(Http::HeaderMap& request_hea
     }
   }
 
-  if (config.tracingConfig().valid()) {
+  if (config.tracingConfig()) {
     Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
   }
 }

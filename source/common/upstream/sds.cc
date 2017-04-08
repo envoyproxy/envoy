@@ -1,4 +1,4 @@
-#include "sds.h"
+#include "common/upstream/sds.h"
 
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
@@ -20,7 +20,7 @@ SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runt
 void SdsClusterImpl::parseResponse(const Http::Message& response) {
   Json::ObjectPtr json = Json::Factory::LoadFromString(response.bodyAsString());
   json->validateSchema(Json::Schema::SDS_SCHEMA);
-  std::vector<HostPtr> new_hosts;
+  std::vector<HostSharedPtr> new_hosts;
   for (const Json::ObjectPtr& host : json->getObjectArray("hosts")) {
     bool canary = false;
     uint32_t weight = 1;
@@ -31,25 +31,25 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
       zone = host->getObject("tags")->getString("az", zone);
     }
 
-    new_hosts.emplace_back(
-        new HostImpl(info_, "", Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
-                                    host->getString("ip_address"), host->getInteger("port"))},
-                     canary, weight, zone));
+    new_hosts.emplace_back(new HostImpl(
+        info_, "", Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
+                       host->getString("ip_address"), host->getInteger("port"))},
+        canary, weight, zone));
   }
 
-  HostVectorPtr current_hosts_copy(new std::vector<HostPtr>(hosts()));
-  std::vector<HostPtr> hosts_added;
-  std::vector<HostPtr> hosts_removed;
+  HostVectorSharedPtr current_hosts_copy(new std::vector<HostSharedPtr>(hosts()));
+  std::vector<HostSharedPtr> hosts_added;
+  std::vector<HostSharedPtr> hosts_removed;
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr)) {
     log_debug("sds hosts changed for cluster: {} ({})", info_->name(), hosts().size());
-    HostListsPtr per_zone(new std::vector<std::vector<HostPtr>>());
+    HostListsSharedPtr per_zone(new std::vector<std::vector<HostSharedPtr>>());
 
     // If local zone name is not defined then skip populating per zone hosts.
     if (!local_info_.zoneName().empty()) {
-      std::map<std::string, std::vector<HostPtr>> hosts_per_zone;
+      std::map<std::string, std::vector<HostSharedPtr>> hosts_per_zone;
 
-      for (HostPtr host : *current_hosts_copy) {
+      for (HostSharedPtr host : *current_hosts_copy) {
         hosts_per_zone[host->zone()].push_back(host);
       }
 
@@ -71,7 +71,7 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
     if (initialize_callback_ && health_checker_ && pending_health_checks_ == 0) {
       pending_health_checks_ = hosts().size();
       ASSERT(pending_health_checks_ > 0);
-      health_checker_->addHostCheckCompleteCb([this](HostPtr, bool) -> void {
+      health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool) -> void {
         if (pending_health_checks_ > 0 && --pending_health_checks_ == 0) {
           initialize_callback_();
           initialize_callback_ = nullptr;

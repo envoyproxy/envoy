@@ -1,11 +1,11 @@
-#include "dispatcher_impl.h"
-#include "file_event_impl.h"
-#include "signal_impl.h"
-#include "timer_impl.h"
+#include "common/event/dispatcher_impl.h"
 
 #include "envoy/network/listener.h"
 #include "envoy/network/listen_socket.h"
 
+#include "common/event/file_event_impl.h"
+#include "common/event/signal_impl.h"
+#include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
@@ -56,13 +56,13 @@ void DispatcherImpl::clearDeferredDeleteList() {
 }
 
 Network::ClientConnectionPtr
-DispatcherImpl::createClientConnection(Network::Address::InstancePtr address) {
+DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address) {
   return Network::ClientConnectionPtr{new Network::ClientConnectionImpl(*this, address)};
 }
 
 Network::ClientConnectionPtr
 DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
-                                          Network::Address::InstancePtr address) {
+                                          Network::Address::InstanceConstSharedPtr address) {
   return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, address)};
 }
 

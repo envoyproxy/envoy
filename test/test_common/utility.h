@@ -1,8 +1,17 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
 
 #include "common/http/header_map_impl.h"
+
+#define EXPECT_THROW_WITH_MESSAGE(statement, expected_exception, message)                          \
+  try {                                                                                            \
+    statement;                                                                                     \
+    ADD_FAILURE() << "Exception should take place. It did not.";                                   \
+  } catch (expected_exception & e) {                                                               \
+    EXPECT_EQ(message, std::string(e.what()));                                                     \
+  }
 
 class TestUtility {
 public:
@@ -25,7 +34,7 @@ public:
    * Convert a string list of IP addresses into a list of network addresses usable for DNS
    * response testing.
    */
-  static std::list<Network::Address::InstancePtr>
+  static std::list<Network::Address::InstanceConstSharedPtr>
   makeDnsResponse(const std::list<std::string>& addresses);
 };
 

@@ -1,4 +1,4 @@
-#include "mocks.h"
+#include "test/mocks/upstream/mocks.h"
 
 #include "envoy/upstream/load_balancer.h"
 
@@ -41,7 +41,11 @@ MockHostDescription::MockHostDescription()
 
 MockHostDescription::~MockHostDescription() {}
 
-MockHost::MockHost() {}
+MockHost::MockHost() {
+  ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
+  ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
+}
+
 MockHost::~MockHost() {}
 
 MockClusterInfo::MockClusterInfo()

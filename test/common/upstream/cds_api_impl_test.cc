@@ -118,7 +118,7 @@ TEST_F(CdsApiImplTest, Basic) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
+  message->body().reset(new Buffer::OwnedImpl(response1_json));
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   expectAdd("cluster1");
@@ -145,7 +145,7 @@ TEST_F(CdsApiImplTest, Basic) {
 
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response2_json)});
+  message->body().reset(new Buffer::OwnedImpl(response2_json));
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1", "cluster2"})));
   expectAdd("cluster1");
@@ -171,7 +171,7 @@ TEST_F(CdsApiImplTest, Failure) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
+  message->body().reset(new Buffer::OwnedImpl(response_json));
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -198,7 +198,7 @@ TEST_F(CdsApiImplTest, FailureArray) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
+  message->body().reset(new Buffer::OwnedImpl(response_json));
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));

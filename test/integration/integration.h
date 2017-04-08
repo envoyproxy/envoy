@@ -1,11 +1,12 @@
 #pragma once
 
-#include "fake_upstream.h"
-#include "server.h"
-
 #include "common/http/codec_client.h"
 #include "common/network/filter_impl.h"
 #include "common/stats/stats_impl.h"
+
+#include "test/integration/fake_upstream.h"
+#include "test/integration/server.h"
+#include "test/test_common/environment.h"
 
 /**
  * Stream decoder wrapper used during integration testing.
@@ -50,7 +51,7 @@ typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
 class IntegrationCodecClient : public Http::CodecClientProd {
 public:
   IntegrationCodecClient(Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
-                         Upstream::HostDescriptionPtr host_description,
+                         Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecClient::Type type);
 
   void makeHeaderOnlyRequest(const Http::HeaderMap& headers, IntegrationStreamDecoder& response);
@@ -135,12 +136,6 @@ typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;
  */
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
-  static const uint32_t ECHO_PORT = 10000;
-  static const uint32_t HTTP_PORT = 10001;
-  static const uint32_t HTTP_BUFFER_PORT = 10002;
-  static const uint32_t ADMIN_PORT = 10003;
-  static const uint32_t TCP_PROXY_PORT = 10004;
-
   BaseIntegrationTest();
   ~BaseIntegrationTest();
 
@@ -159,6 +154,15 @@ public:
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn,
                                                Http::CodecClient::Type type);
   IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
+
+  // Test-wide port map.
+  static void registerPort(const std::string& key, uint32_t port);
+  static uint32_t lookupPort(const std::string& key);
+  static std::string substitutePorts(const std::string& json_path);
+
+  static void registerTestServerPorts(const std::vector<std::string>& port_names);
+  static void createTestServer(const std::string& json_path,
+                               const std::vector<std::string>& port_names);
 
   static IntegrationTestServerPtr test_server_;
   static std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
@@ -199,24 +203,9 @@ protected:
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
   void testTrailers(uint64_t request_size, uint64_t response_size);
-};
 
-class IntegrationTest : public BaseIntegrationTest, public testing::Test {
-public:
-  /**
-   * Global initializer for all integration tests.
-   */
-  static void SetUpTestCase() {
-    test_server_ = IntegrationTestServer::create("test/config/integration/server.json");
-    fake_upstreams_.emplace_back(new FakeUpstream(11000, FakeHttpConnection::Type::HTTP1));
-    fake_upstreams_.emplace_back(new FakeUpstream(11001, FakeHttpConnection::Type::HTTP1));
-  }
-
-  /**
-   * Global destructor for all integration tests.
-   */
-  static void TearDownTestCase() {
-    test_server_.reset();
-    fake_upstreams_.clear();
+  static TestEnvironment::PortMap& port_map() {
+    static auto* port_map = new TestEnvironment::PortMap();
+    return *port_map;
   }
 };

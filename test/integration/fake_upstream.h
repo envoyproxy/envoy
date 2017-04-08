@@ -74,7 +74,7 @@ public:
 
 protected:
   FakeConnectionBase(Network::Connection& connection) : connection_(connection) {
-    connection.addConnectionCallbacks(*this);
+    connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
   }
 
   Network::Connection& connection_;
@@ -123,7 +123,7 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
 class FakeRawConnection : Logger::Loggable<Logger::Id::testing>, public FakeConnectionBase {
 public:
   FakeRawConnection(Network::Connection& connection) : FakeConnectionBase(connection) {
-    connection.addReadFilter(Network::ReadFilterPtr{new ReadFilter(*this)});
+    connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
   void waitForData(uint64_t num_bytes);
@@ -157,6 +157,7 @@ public:
   FakeHttpConnection::Type httpType() { return http_type_; }
   FakeHttpConnectionPtr waitForHttpConnection(Event::Dispatcher& client_dispatcher);
   FakeRawConnectionPtr waitForRawConnection();
+  Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
 
   // Network::FilterChainFactory
   bool createFilterChain(Network::Connection& connection) override;

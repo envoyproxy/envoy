@@ -1,17 +1,17 @@
-#include "codec_impl.h"
-#include "conn_pool.h"
+#include "common/http/http2/conn_pool.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/http/http2/codec_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Http {
 namespace Http2 {
 
-ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::ConstHostPtr host,
+ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority)
     : dispatcher_(dispatcher), host_(host), priority_(priority) {}
 

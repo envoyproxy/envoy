@@ -99,7 +99,7 @@ public:
    *       knows that it has modified the headers in a way that would affect routing. In the future
    *       we may also want to allow the filter to override the route entry.
    */
-  virtual Router::RoutePtr route() PURE;
+  virtual Router::RouteConstSharedPtr route() PURE;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
@@ -136,10 +136,22 @@ public:
   virtual void continueDecoding() PURE;
 
   /**
-   * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
-   *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
+   * @return Buffer::InstancePtr& the currently buffered data as buffered by this filter or previous
+   *         ones in the filter chain. May be nullptr if nothing has been buffered yet. Callers
+   *         are free to remove, reallocate, and generally modify the buffered data.
+   *
+   *         NOTE: For common buffering cases, there is no need for each filter to manually handle
+   *         buffering. If decodeData() returns StopIterationAndBuffer, the filter manager will
+   *         buffer the data passed to the callback on behalf of the filter.
+   *
+   *         NOTE: In complex cases, the filter may wish to manually modify the buffer. One example
+   *         of this is switching a header only request to a request with body data. If a filter
+   *         receives decodeHeaders(..., true), it has the option of filling decodingBuffer() with
+   *         body data. Subsequent filters will receive decodeHeaders(..., false) followed by
+   *         decodeData(..., true). This works both in the direct iteration as well as the
+   *         continuation case.
    */
-  virtual const Buffer::Instance* decodingBuffer() PURE;
+  virtual Buffer::InstancePtr& decodingBuffer() PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -202,7 +214,7 @@ public:
   virtual void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) PURE;
 };
 
-typedef std::shared_ptr<StreamDecoderFilter> StreamDecoderFilterPtr;
+typedef std::shared_ptr<StreamDecoderFilter> StreamDecoderFilterSharedPtr;
 
 /**
  * Stream encoder filter callbacks add additional callbacks that allow a encoding filter to restart
@@ -222,10 +234,22 @@ public:
   virtual void continueEncoding() PURE;
 
   /**
-   * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
-   *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
+   * @return Buffer::InstancePtr& the currently buffered data as buffered by this filter or previous
+   *         ones in the filter chain. May be nullptr if nothing has been buffered yet. Callers
+   *         are free to remove, reallocate, and generally modify the buffered data.
+   *
+   *         NOTE: For common buffering cases, there is no need for each filter to manually handle
+   *         buffering. If encodeData() returns StopIterationAndBuffer, the filter manager will
+   *         buffer the data passed to the callback on behalf of the filter.
+   *
+   *         NOTE: In complex cases, the filter may wish to manually modify the buffer. One example
+   *         of this is switching a header only request to a request with body data. If a filter
+   *         receives encodeHeaders(..., true), it has the option of filling encodingBuffer() with
+   *         body data. Subsequent filters will receive encodeHeaders(..., false) followed by
+   *         encodeData(..., true). This works both in the direct iteration as well as the
+   *         continuation case.
    */
-  virtual const Buffer::Instance* encodingBuffer() PURE;
+  virtual Buffer::InstancePtr& encodingBuffer() PURE;
 };
 
 /**
@@ -264,14 +288,14 @@ public:
   virtual void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) PURE;
 };
 
-typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterPtr;
+typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;
 
 /**
  * A filter that handles both encoding and decoding.
  */
 class StreamFilter : public StreamDecoderFilter, public StreamEncoderFilter {};
 
-typedef std::shared_ptr<StreamFilter> StreamFilterPtr;
+typedef std::shared_ptr<StreamFilter> StreamFilterSharedPtr;
 
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
@@ -285,25 +309,25 @@ public:
    * Add a decoder filter that is used when reading stream data.
    * @param filter supplies the filter to add.
    */
-  virtual void addStreamDecoderFilter(Http::StreamDecoderFilterPtr filter) PURE;
+  virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
 
   /**
    * Add an encoder filter that is used when writing stream data.
    * @param filter supplies the filter to add.
    */
-  virtual void addStreamEncoderFilter(Http::StreamEncoderFilterPtr filter) PURE;
+  virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) PURE;
 
   /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
    * @param filter supplies the filter to add.
    */
-  virtual void addStreamFilter(Http::StreamFilterPtr filter) PURE;
+  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
 
   /**
    * Add an access log handler that is called when the stream is destroyed.
    * @param handler supplies the handler to add.
    */
-  virtual void addAccessLogHandler(Http::AccessLog::InstancePtr handler) PURE;
+  virtual void addAccessLogHandler(Http::AccessLog::InstanceSharedPtr handler) PURE;
 };
 
 /**

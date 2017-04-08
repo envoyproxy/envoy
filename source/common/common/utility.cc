@@ -1,4 +1,4 @@
-#include "utility.h"
+#include "common/common/utility.h"
 
 std::string DateFormatter::fromTime(const SystemTime& time) {
   return fromTimeT(std::chrono::system_clock::to_time_t(time));
@@ -78,9 +78,18 @@ size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
 }
 
 std::vector<std::string> StringUtil::split(const std::string& source, char split) {
+  return StringUtil::split(source, std::string{split});
+}
+
+std::vector<std::string> StringUtil::split(const std::string& source, const std::string& split) {
   std::vector<std::string> ret;
   size_t last_index = 0;
   size_t next_index;
+
+  if (split.empty()) {
+    ret.emplace_back(source);
+    return ret;
+  }
 
   do {
     next_index = source.find(split, last_index);
@@ -92,7 +101,7 @@ std::vector<std::string> StringUtil::split(const std::string& source, char split
       ret.emplace_back(subspan(source, last_index, next_index));
     }
 
-    last_index = next_index + 1;
+    last_index = next_index + split.size();
   } while (next_index != source.size());
 
   return ret;

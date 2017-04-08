@@ -11,7 +11,7 @@ using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::NiceMock;
-using testing::Return;
+using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Http {
@@ -78,8 +78,8 @@ TEST_F(BufferFilterTest, RequestTooLarge) {
   TestHeaderMapImpl headers;
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
-  Buffer::OwnedImpl buffered_data("buffered");
-  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(&buffered_data));
+  Buffer::InstancePtr buffered_data(new Buffer::OwnedImpl("buffered"));
+  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(ReturnRef(buffered_data));
 
   Buffer::OwnedImpl data1("hello");
   config_->max_request_bytes_ = 1;

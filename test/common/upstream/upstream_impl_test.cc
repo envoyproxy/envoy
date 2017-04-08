@@ -1,4 +1,5 @@
 #include "envoy/api/api.h"
+#include "envoy/http/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/json/config_schemas.h"
@@ -20,9 +21,9 @@ using testing::NiceMock;
 
 namespace Upstream {
 
-static std::list<std::string> hostListToAddresses(const std::vector<HostPtr>& hosts) {
+static std::list<std::string> hostListToAddresses(const std::vector<HostSharedPtr>& hosts) {
   std::list<std::string> addresses;
-  for (const HostPtr& host : hosts) {
+  for (const HostSharedPtr& host : hosts) {
     addresses.push_back(host->address()->asString());
   }
 
@@ -135,7 +136,8 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(Http::CodecOptions::NoCompression, cluster.info()->httpCodecOptions());
+  EXPECT_EQ(static_cast<uint64_t>(Http::CodecOptions::NoCompression),
+            cluster.info()->httpCodecOptions());
 
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats.counter("cluster.name.upstream_rq_total").value());
@@ -144,8 +146,9 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_FALSE(cluster.info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
-  cluster.addMemberUpdateCb([&](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
-                                -> void { membership_updated.ready(); });
+  cluster.addMemberUpdateCb(
+      [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
+          -> void { membership_updated.ready(); });
 
   resolver1.expectResolve(dns_resolver);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
@@ -188,7 +191,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(0UL, cluster.hostsPerZone().size());
   EXPECT_EQ(0UL, cluster.healthyHostsPerZone().size());
 
-  for (const HostPtr& host : cluster.hosts()) {
+  for (const HostSharedPtr& host : cluster.hosts()) {
     EXPECT_EQ(cluster.info().get(), &host->cluster());
   }
 
@@ -310,7 +313,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
 
   Outlier::MockDetector* detector = new Outlier::MockDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
-  cluster.setOutlierDetector(Outlier::DetectorPtr{detector});
+  cluster.setOutlierDetector(Outlier::DetectorSharedPtr{detector});
 
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
   EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
@@ -350,7 +353,7 @@ TEST(StaticClusterImplTest, HealthyStat) {
   StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
-  cluster.setOutlierDetector(Outlier::DetectorPtr{outlier_detector});
+  cluster.setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
 
   MockHealthChecker* health_checker = new NiceMock<MockHealthChecker>();
   cluster.setHealthChecker(HealthCheckerPtr{health_checker});

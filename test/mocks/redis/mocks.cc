@@ -65,14 +65,27 @@ MockClient::MockClient() {
 
 MockClient::~MockClient() {}
 
-MockActiveRequest::MockActiveRequest() {}
-MockActiveRequest::~MockActiveRequest() {}
+MockPoolRequest::MockPoolRequest() {}
+MockPoolRequest::~MockPoolRequest() {}
 
-MockActiveRequestCallbacks::MockActiveRequestCallbacks() {}
-MockActiveRequestCallbacks::~MockActiveRequestCallbacks() {}
+MockPoolCallbacks::MockPoolCallbacks() {}
+MockPoolCallbacks::~MockPoolCallbacks() {}
 
 MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
 } // ConnPool
+
+namespace CommandSplitter {
+
+MockSplitRequest::MockSplitRequest() {}
+MockSplitRequest::~MockSplitRequest() {}
+
+MockSplitCallbacks::MockSplitCallbacks() {}
+MockSplitCallbacks::~MockSplitCallbacks() {}
+
+MockInstance::MockInstance() {}
+MockInstance::~MockInstance() {}
+
+} // CommandSplitter
 } // Redis

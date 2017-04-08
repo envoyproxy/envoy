@@ -9,18 +9,22 @@ if [[ "$1" == "bazel.debug" ]]; then
   cd ci
   ln -sf /thirdparty prebuilt
   ln -sf /thirdparty_build prebuilt
-  # Not sandboxing, since non-privileged Docker can't do nested namespaces.
-  echo "Building..."
+  # Only CC is required to find g++, see
+  # https://www.bazel.build/blog/2016/03/31/autoconfiguration.html#implementation
   export CC=gcc-4.9
-  export CXX=g++-4.9
   export USER=bazel
-  export TEST_TMPDIR=/source
+  export TEST_TMPDIR=/source/build
+  # Not sandboxing, since non-privileged Docker can't do nested namespaces.
   BAZEL_OPTIONS="--strategy=CppCompile=standalone --strategy=CppLink=standalone \
-    --strategy=TestRunner=standalone --verbose_failures --package_path %workspace%:.."
+    --strategy=TestRunner=standalone --strategy=ProtoCompile=standalone \
+    --strategy=Genrule=standalone --verbose_failures --package_path %workspace%:.."
   [[ "$BAZEL_INTERACTIVE" == "1" ]] && BAZEL_BATCH="" || BAZEL_BATCH="--batch"
-  bazel $BAZEL_BATCH build $BAZEL_OPTIONS //source/...
+  [[ "$BAZEL_EXPUNGE" == "1" ]] && bazel clean --expunge
+  echo "Building..."
+  bazel $BAZEL_BATCH build $BAZEL_OPTIONS //source/exe:envoy-static
   echo "Testing..."
-  bazel $BAZEL_BATCH test $BAZEL_OPTIONS --test_output=all //test/...
+  bazel $BAZEL_BATCH test $BAZEL_OPTIONS --test_output=all \
+    --cache_test_results=no //test/...
   exit 0
 fi
 

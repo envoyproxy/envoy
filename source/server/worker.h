@@ -1,12 +1,13 @@
 #pragma once
 
-#include "connection_handler_impl.h"
-
 #include "envoy/server/configuration.h"
+#include "envoy/server/guarddog.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/thread.h"
 #include "common/network/listen_socket_impl.h"
+
+#include "server/connection_handler_impl.h"
 
 typedef std::map<Server::Configuration::Listener*, Network::TcpListenSocketPtr> SocketMap;
 
@@ -15,13 +16,13 @@ typedef std::map<Server::Configuration::Listener*, Network::TcpListenSocketPtr> 
  */
 class Worker : Logger::Loggable<Logger::Id::main> {
 public:
-  Worker(Stats::Store& stats_store, ThreadLocal::Instance& tls,
-         std::chrono::milliseconds file_flush_interval_msec);
+  Worker(ThreadLocal::Instance& tls, std::chrono::milliseconds file_flush_interval_msec);
   ~Worker();
 
   Event::Dispatcher& dispatcher() { return handler_->dispatcher(); }
   Network::ConnectionHandler* handler() { return handler_.get(); }
-  void initializeConfiguration(Server::Configuration::Main& config, const SocketMap& socket_map);
+  void initializeConfiguration(Server::Configuration::Main& config, const SocketMap& socket_map,
+                               Server::GuardDog& guard_dog);
 
   /**
    * Exit the worker. Will block until the worker thread joins. Called from the main thread.
@@ -30,7 +31,7 @@ public:
 
 private:
   void onNoExitTimer();
-  void threadRoutine();
+  void threadRoutine(Server::GuardDog& guard_dog);
 
   ThreadLocal::Instance& tls_;
   Server::ConnectionHandlerImplPtr handler_;

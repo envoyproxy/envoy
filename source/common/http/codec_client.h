@@ -1,7 +1,5 @@
 #pragma once
 
-#include "codec_wrappers.h"
-
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -10,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/http/codec_wrappers.h"
 #include "common/network/filter_impl.h"
 
 namespace Http {
@@ -106,7 +105,7 @@ protected:
    * @param host supplies the owning host.
    */
   CodecClient(Type type, Network::ClientConnectionPtr&& connection,
-              Upstream::HostDescriptionPtr host);
+              Upstream::HostDescriptionConstSharedPtr host);
 
   // Http::ConnectionCallbacks
   void onGoAway() override {
@@ -118,7 +117,7 @@ protected:
   const Type type_;
   ClientConnectionPtr codec_;
   Network::ClientConnectionPtr connection_;
-  Upstream::HostDescriptionPtr host_;
+  Upstream::HostDescriptionConstSharedPtr host_;
 
 private:
   /**
@@ -189,7 +188,7 @@ typedef std::unique_ptr<CodecClient> CodecClientPtr;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionPtr host);
+                  Upstream::HostDescriptionConstSharedPtr host);
 };
 
 } // Http

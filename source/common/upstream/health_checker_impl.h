@@ -45,7 +45,7 @@ public:
 
 protected:
   struct ActiveHealthCheckSession {
-    ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostPtr host);
+    ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
     virtual ~ActiveHealthCheckSession();
 
     void handleSuccess();
@@ -54,7 +54,7 @@ protected:
     virtual void onTimeout() PURE;
 
     HealthCheckerImplBase& parent_;
-    HostPtr host_;
+    HostSharedPtr host_;
     Event::TimerPtr interval_timer_;
     Event::TimerPtr timeout_timer_;
     uint32_t num_unhealthy_{};
@@ -68,8 +68,8 @@ protected:
 
   std::chrono::milliseconds interval();
 
-  virtual void onClusterMemberUpdate(const std::vector<HostPtr>& hosts_added,
-                                     const std::vector<HostPtr>& hosts_removed) PURE;
+  virtual void onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
+                                     const std::vector<HostSharedPtr>& hosts_removed) PURE;
 
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
@@ -86,7 +86,7 @@ private:
   HealthCheckerStats generateStats(Stats::Scope& scope);
   void incHealthy();
   void refreshHealthyStat();
-  void runCallbacks(HostPtr host, bool changed_state);
+  void runCallbacks(HostSharedPtr host, bool changed_state);
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
 
@@ -112,7 +112,7 @@ private:
                                         public Http::StreamDecoder,
                                         public Http::StreamCallbacks,
                                         public Network::ConnectionCallbacks {
-    HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, HostPtr host);
+    HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, HostSharedPtr host);
     ~HttpActiveHealthCheckSession();
 
     void onResponseComplete();
@@ -149,11 +149,11 @@ private:
   virtual Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
 
   // HealthChecker
-  void onClusterMemberUpdate(const std::vector<HostPtr>& hosts_added,
-                             const std::vector<HostPtr>& hosts_removed) override;
+  void onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
+                             const std::vector<HostSharedPtr>& hosts_removed) override;
 
   const std::string path_;
-  std::unordered_map<HostPtr, HttpActiveHealthCheckSessionPtr> active_sessions_;
+  std::unordered_map<HostSharedPtr, HttpActiveHealthCheckSessionPtr> active_sessions_;
   Optional<std::string> service_name_;
 };
 
@@ -251,7 +251,7 @@ private:
   };
 
   struct TcpActiveHealthCheckSession : public ActiveHealthCheckSession {
-    TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, HostPtr host)
+    TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, HostSharedPtr host)
         : ActiveHealthCheckSession(parent, host), parent_(parent) {
       onInterval();
     }
@@ -274,12 +274,12 @@ private:
   typedef std::unique_ptr<TcpActiveHealthCheckSession> TcpActiveHealthCheckSessionPtr;
 
   // HealthChecker
-  void onClusterMemberUpdate(const std::vector<HostPtr>& hosts_added,
-                             const std::vector<HostPtr>& hosts_removed) override;
+  void onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
+                             const std::vector<HostSharedPtr>& hosts_removed) override;
 
   const TcpHealthCheckMatcher::MatchSegments send_bytes_;
   const TcpHealthCheckMatcher::MatchSegments receive_bytes_;
-  std::unordered_map<HostPtr, TcpActiveHealthCheckSessionPtr> active_sessions_;
+  std::unordered_map<HostSharedPtr, TcpActiveHealthCheckSessionPtr> active_sessions_;
 };
 
 } // Upstream

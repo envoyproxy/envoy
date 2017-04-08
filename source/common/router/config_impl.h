@@ -1,13 +1,12 @@
 #pragma once
 
-#include "router_ratelimit.h"
-
 #include "envoy/common/optional.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/router/config_utility.h"
+#include "common/router/router_ratelimit.h"
 
 namespace Router {
 
@@ -25,11 +24,12 @@ public:
    *        allows stable choices between calls if desired.
    * @return true if input headers match this object.
    */
-  virtual RoutePtr matches(const Http::HeaderMap& headers, uint64_t random_value) const PURE;
+  virtual RouteConstSharedPtr matches(const Http::HeaderMap& headers,
+                                      uint64_t random_value) const PURE;
 };
 
 class RouteEntryImplBase;
-typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBasePtr;
+typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
 
 /**
  * Redirect entry that does an SSL redirect.
@@ -50,17 +50,23 @@ private:
   static const SslRedirector SSL_REDIRECTOR;
 };
 
+class ConfigImpl;
 /**
  * Holds all routing configuration for an entire virtual host.
  */
 class VirtualHostImpl : public VirtualHost {
 public:
-  VirtualHostImpl(const Json::Object& virtual_host, Runtime::Loader& runtime,
-                  Upstream::ClusterManager& cm, bool validate_clusters);
+  VirtualHostImpl(const Json::Object& virtual_host, const ConfigImpl& global_route_config,
+                  Runtime::Loader& runtime, Upstream::ClusterManager& cm, bool validate_clusters);
 
-  RoutePtr getRouteFromEntries(const Http::HeaderMap& headers, uint64_t random_value) const;
+  RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
+                                          uint64_t random_value) const;
   bool usesRuntime() const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
+  const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
+    return request_headers_to_add_;
+  }
+  const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
 
   // Router::VirtualHost
   const std::string& name() const override { return name_; }
@@ -96,13 +102,15 @@ private:
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
   const std::string name_;
-  std::vector<RouteEntryImplBasePtr> routes_;
+  std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
   const RateLimitPolicyImpl rate_limit_policy_;
+  const ConfigImpl& global_route_config_;
+  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
-typedef std::shared_ptr<VirtualHostImpl> VirtualHostPtr;
+typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 
 /**
  * Implementation of RetryPolicy that reads from the JSON route config.
@@ -168,6 +176,9 @@ public:
 
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
+  const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
+    return request_headers_to_add_;
+  }
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -199,7 +210,7 @@ protected:
   const std::string prefix_rewrite_;
   const std::string host_rewrite_;
 
-  RoutePtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
+  RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path) const;
 
 private:
@@ -272,7 +283,7 @@ private:
     const uint64_t cluster_weight_;
   };
 
-  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntryPtr;
+  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
   static Optional<RuntimeData> loadRuntimeData(const Json::Object& route);
 
@@ -295,8 +306,9 @@ private:
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
   std::vector<ConfigUtility::HeaderData> config_headers_;
-  std::vector<WeightedClusterEntryPtr> weighted_clusters_;
+  std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
+  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
   const std::multimap<std::string, std::string> opaque_config_;
 };
 
@@ -312,7 +324,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  RoutePtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string prefix_;
@@ -330,7 +342,7 @@ public:
   void finalizeRequestHeaders(Http::HeaderMap& headers) const override;
 
   // Router::Matchable
-  RoutePtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
 private:
   const std::string path_;
@@ -342,17 +354,17 @@ private:
  */
 class RouteMatcher {
 public:
-  RouteMatcher(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-               bool validate_clusters);
+  RouteMatcher(const Json::Object& config, const ConfigImpl& global_http_config,
+               Runtime::Loader& runtime, Upstream::ClusterManager& cm, bool validate_clusters);
 
-  RoutePtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
+  RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
   bool usesRuntime() const { return uses_runtime_; }
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
 
-  std::unordered_map<std::string, VirtualHostPtr> virtual_hosts_;
-  VirtualHostPtr default_virtual_host_;
+  std::unordered_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
+  VirtualHostSharedPtr default_virtual_host_;
   bool uses_runtime_{};
 };
 
@@ -364,8 +376,12 @@ public:
   ConfigImpl(const Json::Object& config, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
              bool validate_clusters);
 
+  const std::list<std::pair<Http::LowerCaseString, std::string>>& requestHeadersToAdd() const {
+    return request_headers_to_add_;
+  }
+
   // Router::Config
-  RoutePtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
+  RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
     return route_matcher_->route(headers, random_value);
   }
 
@@ -389,6 +405,7 @@ private:
   std::list<Http::LowerCaseString> internal_only_headers_;
   std::list<std::pair<Http::LowerCaseString, std::string>> response_headers_to_add_;
   std::list<Http::LowerCaseString> response_headers_to_remove_;
+  std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
 /**
@@ -397,7 +414,7 @@ private:
 class NullConfigImpl : public Config {
 public:
   // Router::Config
-  RoutePtr route(const Http::HeaderMap&, uint64_t) const override { return nullptr; }
+  RouteConstSharedPtr route(const Http::HeaderMap&, uint64_t) const override { return nullptr; }
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;

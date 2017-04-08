@@ -36,6 +36,8 @@ Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
   *(sometimes required, object)* If any defined clusters use the :ref:`sds
   <arch_overview_service_discovery_sds>` cluster type, a global SDS configuration must be specified.
 
+.. _config_cluster_manager_local_cluster_name:
+
 local_cluster_name
   *(optional, string)* Name of the local cluster (i.e., the cluster that owns the Envoy running this
   configuration). In order to enable

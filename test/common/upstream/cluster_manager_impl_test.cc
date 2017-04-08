@@ -35,21 +35,21 @@ public:
     ON_CALL(*this, clusterFromJson_(_, _, _, _))
         .WillByDefault(Invoke([&](const Json::Object& cluster, ClusterManager& cm,
                                   const Optional<SdsConfig>& sds_config,
-                                  Outlier::EventLoggerPtr outlier_event_logger) -> Cluster* {
+                                  Outlier::EventLoggerSharedPtr outlier_event_logger) -> Cluster* {
           return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
                                          ssl_context_manager_, runtime_, random_, dispatcher_,
                                          sds_config, local_info_, outlier_event_logger).release();
         }));
   }
 
-  Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher&, ConstHostPtr host,
+  Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host,
                                                      ResourcePriority) override {
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(host)};
   }
 
   ClusterPtr clusterFromJson(const Json::Object& cluster, ClusterManager& cm,
                              const Optional<SdsConfig>& sds_config,
-                             Outlier::EventLoggerPtr outlier_event_logger) override {
+                             Outlier::EventLoggerSharedPtr outlier_event_logger) override {
     return ClusterPtr{clusterFromJson_(cluster, cm, sds_config, outlier_event_logger)};
   }
 
@@ -57,10 +57,10 @@ public:
     return CdsApiPtr{createCds_()};
   }
 
-  MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(ConstHostPtr host));
+  MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD4(clusterFromJson_, Cluster*(const Json::Object& cluster, ClusterManager& cm,
                                           const Optional<SdsConfig>& sds_config,
-                                          Outlier::EventLoggerPtr outlier_event_logger));
+                                          Outlier::EventLoggerSharedPtr outlier_event_logger));
   MOCK_METHOD0(createCds_, CdsApi*());
 
   Stats::IsolatedStoreImpl stats_;
@@ -258,6 +258,40 @@ TEST_F(ClusterManagerImplTest, UnknownHcType) {
 
   Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
+}
+
+TEST_F(ClusterManagerImplTest, MaxClusterName) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "clusterwithareallyreallylongnamemorethanmaxcharsallowedbyschema"
+    }]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
+                            "JSON object doesn't conform to schema.\n Invalid schema: "
+                            "#/properties/name.\n Invalid keyword: maxLength.\n Invalid document "
+                            "key: #/name");
+}
+
+TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
+  std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster:"
+    }]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
+                            "JSON object doesn't conform to schema.\n Invalid schema: "
+                            "#/properties/name.\n Invalid keyword: pattern.\n Invalid document "
+                            "key: #/name");
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
@@ -537,7 +571,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 
   loader_api = Json::Factory::LoadFromString(json_api_3);
   MockCluster* cluster2 = new NiceMock<MockCluster>();
-  cluster2->hosts_ = {HostPtr{new HostImpl(
+  cluster2->hosts_ = {HostSharedPtr{new HostImpl(
       cluster2->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster2));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);

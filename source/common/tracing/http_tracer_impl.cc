@@ -1,5 +1,6 @@
-#include "http_tracer_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
+#include "common/common/assert.h"
 #include "common/common/base64.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
@@ -70,6 +71,20 @@ void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime:
   request_headers.RequestId()->value(x_request_id);
 }
 
+const std::string HttpTracerUtility::INGRESS_OPERATION = "ingress";
+const std::string HttpTracerUtility::EGRESS_OPERATION = "egress";
+
+const std::string& HttpTracerUtility::toString(OperationName operation_name) {
+  switch (operation_name) {
+  case OperationName::Ingress:
+    return INGRESS_OPERATION;
+  case OperationName::Egress:
+    return EGRESS_OPERATION;
+  }
+
+  NOT_REACHED
+}
+
 Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& request_info,
                                       const Http::HeaderMap& request_headers) {
   // Exclude HC requests immediately.
@@ -96,11 +111,12 @@ Decision HttpTracerUtility::isTracing(const Http::AccessLog::RequestInfo& reques
     return {Reason::NotTraceableRequestId, false};
   }
 
-  throw std::invalid_argument("Unknown trace_status");
+  NOT_REACHED;
 }
 
 void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
-                                     const Http::AccessLog::RequestInfo& request_info) {
+                                     const Http::AccessLog::RequestInfo& request_info,
+                                     const Config& config) {
   // Pre response data.
   active_span.setTag("guid:x-request-id",
                      std::string(request_headers.RequestId()->value().c_str()));
@@ -114,6 +130,14 @@ void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& r
   if (request_headers.ClientTraceId()) {
     active_span.setTag("guid:x-client-trace-id",
                        std::string(request_headers.ClientTraceId()->value().c_str()));
+  }
+
+  // Build tags based on the custom headers.
+  for (const Http::LowerCaseString& header : config.requestHeadersForTags()) {
+    const Http::HeaderEntry* entry = request_headers.get(header);
+    if (entry) {
+      active_span.setTag(header.get(), entry->value().c_str());
+    }
   }
 
   // Post response data.
@@ -135,8 +159,14 @@ HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& l
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
                                   const Http::AccessLog::RequestInfo& request_info) {
-  SpanPtr active_span =
-      driver_->startSpan(request_headers, config.operationName(), request_info.startTime());
+  std::string span_name = HttpTracerUtility::toString(config.operationName());
+
+  if (config.operationName() == OperationName::Egress) {
+    span_name.append(" ");
+    span_name.append(request_headers.Host()->value().c_str());
+  }
+
+  SpanPtr active_span = driver_->startSpan(request_headers, span_name, request_info.startTime());
   if (active_span) {
     active_span->setTag("node_id", local_info_.nodeName());
     active_span->setTag("zone", local_info_.zoneName());
@@ -203,7 +233,7 @@ void LightStepRecorder::flushSpans() {
                                                             lightstep::CollectorServiceFullName(),
                                                             lightstep::CollectorMethodName());
 
-    message->body(Grpc::Common::serializeBody(std::move(request)));
+    message->body() = Grpc::Common::serializeBody(std::move(request));
 
     uint64_t timeout =
         driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
@@ -236,13 +266,15 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
         fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_->name()));
   }
 
-  tls_.set(tls_slot_, [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
-    lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
-        *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this), std::ref(dispatcher),
-                             std::placeholders::_1)));
+  tls_.set(tls_slot_,
+           [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+             lightstep::Tracer tracer(lightstep::NewUserDefinedTransportLightStepTracer(
+                 *options_, std::bind(&LightStepRecorder::NewInstance, std::ref(*this),
+                                      std::ref(dispatcher), std::placeholders::_1)));
 
-    return ThreadLocal::ThreadLocalObjectPtr{new TlsLightStepTracer(std::move(tracer), *this)};
-  });
+             return ThreadLocal::ThreadLocalObjectSharedPtr{
+                 new TlsLightStepTracer(std::move(tracer), *this)};
+           });
 }
 
 SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,

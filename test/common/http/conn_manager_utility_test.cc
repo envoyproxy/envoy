@@ -24,8 +24,8 @@ public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
-    tracing_config_.value({"operation"});
-    ON_CALL(config_, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
+    tracing_config_ = {Tracing::OperationName::Ingress, {}};
+    ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -34,7 +34,7 @@ public:
   NiceMock<Router::MockConfig> route_config_;
   Optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Optional<Http::TracingConnectionManagerConfig> tracing_config_;
+  Http::TracingConnectionManagerConfig tracing_config_;
 };
 
 TEST_F(ConnectionManagerUtilityTest, generateStreamId) {

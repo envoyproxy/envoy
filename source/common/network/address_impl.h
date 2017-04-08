@@ -8,6 +8,31 @@ namespace Network {
 namespace Address {
 
 /**
+ * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
+ * a Network::Address::Instance and return a pointer to it.  Raises an EnvoyException on failure.
+ * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.
+ * @param len length of the address (e.g. from accept, getsockname or getpeername). If len > 0,
+ *        it is used to validate the structure contents; else if len == 0, it is ignored.
+ * @return InstanceConstSharedPtr the address.
+ */
+Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len);
+
+/**
+ * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
+ * @param fd file descriptor.
+ * @return InstanceConstSharedPtr for bound address.
+ */
+InstanceConstSharedPtr addressFromFd(int fd);
+
+/**
+ * Obtain the address of the peer of the socket with the specified file descriptor.
+ * Raises an EnvoyException on failure.
+ * @param fd file descriptor.
+ * @return InstanceConstSharedPtr for peer address.
+ */
+InstanceConstSharedPtr peerAddressFromFd(int fd);
+
+/**
  * Base class for all address types.
  */
 class InstanceBase : public Instance {
@@ -146,7 +171,16 @@ private:
  * @param ip_addr string to be parsed as an internet address.
  * @return pointer to the Instance, or nullptr if unable to parse the address.
  */
-InstancePtr parseInternetAddress(const std::string& ip_addr);
+InstanceConstSharedPtr parseInternetAddress(const std::string& ip_addr);
+
+/*
+ * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it.
+ * @param ip_addr string to be parsed as an internet address and port. Examples:
+ *        - "1.2.3.4:80"
+ *        - "[1234:5678::9]:443"
+ * @return pointer to the Instance, or nullptr if unable to parse the address.
+ */
+InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_addr);
 
 /**
  * Implementation of a pipe address (unix domain socket on unix).

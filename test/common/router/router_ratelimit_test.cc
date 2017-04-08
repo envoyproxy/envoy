@@ -567,4 +567,32 @@ TEST_F(RateLimitPolicyEntryTest, CompoundActions) {
               testing::ContainerEq(descriptors_));
 }
 
+TEST_F(RateLimitPolicyEntryTest, CompoundActionsNoDescriptor) {
+  std::string json = R"EOF(
+  {
+    "actions": [
+      {
+        "type": "destination_cluster"
+      },
+      {
+        "type": "header_value_match",
+        "descriptor_value": "fake_value",
+        "headers": [
+          {
+            "name": "x-header-name",
+            "value": "test_value",
+            "regex": false
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  SetUpTest(json);
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
+  EXPECT_TRUE(descriptors_.empty());
+}
+
 } // Router

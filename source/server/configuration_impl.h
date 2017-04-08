@@ -74,6 +74,14 @@ public:
   Optional<std::string> statsdTcpClusterName() override { return statsd_tcp_cluster_name_; }
   Optional<uint32_t> statsdUdpPort() override { return statsd_udp_port_; }
   std::chrono::milliseconds statsFlushInterval() override { return stats_flush_interval_; }
+  std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
+  std::chrono::milliseconds wdMegaMissTimeout() const override {
+    return watchdog_megamiss_timeout_;
+  }
+  std::chrono::milliseconds wdKillTimeout() const override { return watchdog_kill_timeout_; }
+  std::chrono::milliseconds wdMultiKillTimeout() const override {
+    return watchdog_multikill_timeout_;
+  }
 
 private:
   /**
@@ -91,7 +99,7 @@ private:
 
     // Server::Configuration::Listener
     Network::FilterChainFactory& filterChainFactory() override { return *this; }
-    Network::Address::InstancePtr address() override { return address_; }
+    Network::Address::InstanceConstSharedPtr address() override { return address_; }
     bool bindToPort() override { return bind_to_port_; }
     Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
     bool useProxyProto() override { return use_proxy_proto_; }
@@ -104,7 +112,7 @@ private:
 
   private:
     MainImpl& parent_;
-    Network::Address::InstancePtr address_;
+    Network::Address::InstanceConstSharedPtr address_;
     bool bind_to_port_{};
     Stats::ScopePtr scope_;
     Ssl::ServerContextPtr ssl_context_;
@@ -128,6 +136,10 @@ private:
   Optional<uint32_t> statsd_udp_port_;
   RateLimit::ClientFactoryPtr ratelimit_client_factory_;
   std::chrono::milliseconds stats_flush_interval_;
+  std::chrono::milliseconds watchdog_miss_timeout_;
+  std::chrono::milliseconds watchdog_megamiss_timeout_;
+  std::chrono::milliseconds watchdog_kill_timeout_;
+  std::chrono::milliseconds watchdog_multikill_timeout_;
 };
 
 /**
@@ -157,10 +169,12 @@ private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
     const std::string& accessLogPath() override { return access_log_path_; }
-    Network::Address::InstancePtr address() override { return address_; }
+    const std::string& profilePath() override { return profile_path_; }
+    Network::Address::InstanceConstSharedPtr address() override { return address_; }
 
     std::string access_log_path_;
-    Network::Address::InstancePtr address_;
+    std::string profile_path_;
+    Network::Address::InstanceConstSharedPtr address_;
   };
 
   struct RuntimeImpl : public Runtime {

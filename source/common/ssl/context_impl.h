@@ -1,8 +1,8 @@
 #pragma once
 
-#include "context_impl.h"
-#include "context_manager_impl.h"
-#include "openssl.h"
+#include "common/ssl/context_impl.h"
+#include "common/ssl/context_manager_impl.h"
+#include "common/ssl/openssl.h"
 
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context.h"

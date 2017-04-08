@@ -176,7 +176,7 @@ public:
   ~MockConfig();
 
   // Router::Config
-  MOCK_CONST_METHOD2(route, RoutePtr(const Http::HeaderMap&, uint64_t random_value));
+  MOCK_CONST_METHOD2(route, RouteConstSharedPtr(const Http::HeaderMap&, uint64_t random_value));
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());
   MOCK_CONST_METHOD0(responseHeadersToAdd,
                      const std::list<std::pair<Http::LowerCaseString, std::string>>&());

@@ -1,4 +1,4 @@
-#include "codec_impl.h"
+#include "common/http/http2/codec_impl.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codes.h"

@@ -1,10 +1,10 @@
-#include "common.h"
-#include "http1_bridge_filter.h"
+#include "common/grpc/http1_bridge_filter.h"
 
 #include "envoy/http/codes.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 
@@ -95,7 +95,7 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
 }
 
 void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
-  Router::RoutePtr route = decoder_callbacks_->route();
+  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   if (!route || !route->routeEntry()) {
     return;
   }

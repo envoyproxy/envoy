@@ -280,7 +280,9 @@ TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
       "http": {
         "driver": {
           "type": "lightstep",
-          "access_token_file": "/etc/envoy/envoy.cfg"
+          "config": {
+            "access_token_file": "/etc/envoy/envoy.cfg"
+          }
         }
       }
     }
@@ -311,7 +313,9 @@ TEST(ConfigurationImplTest, UnsupportedDriverType) {
       "http": {
         "driver": {
           "type": "unknown",
-          "access_token_file": "/etc/envoy/envoy.cfg"
+          "config": {
+            "access_token_file": "/etc/envoy/envoy.cfg"
+          }
         }
       }
     }

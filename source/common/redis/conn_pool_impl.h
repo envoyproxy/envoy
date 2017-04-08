@@ -5,21 +5,30 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/json/json_validator.h"
 #include "common/network/filter_impl.h"
 #include "common/redis/codec_impl.h"
 
 namespace Redis {
 namespace ConnPool {
 
-// TODO(mattklein123): Stats
-// TODO(mattklein123): Connect timeout
-// TODO(mattklein123): Op timeout
 // TODO(mattklein123): Circuit breaking
+
+class ConfigImpl : public Config, Json::Validator {
+public:
+  ConfigImpl(const Json::Object& config);
+
+  std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
+
+private:
+  const std::chrono::milliseconds op_timeout_;
+};
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
 public:
-  static ClientPtr create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher,
-                          EncoderPtr&& encoder, DecoderFactory& decoder_factory);
+  static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                          EncoderPtr&& encoder, DecoderFactory& decoder_factory,
+                          const Config& config);
 
   ~ClientImpl();
 
@@ -28,7 +37,7 @@ public:
     connection_->addConnectionCallbacks(callbacks);
   }
   void close() override;
-  ActiveRequest* makeRequest(const RespValue& request, ActiveRequestCallbacks& callbacks) override;
+  PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
 
 private:
   struct UpstreamReadFilter : public Network::ReadFilterBaseImpl {
@@ -43,19 +52,21 @@ private:
     ClientImpl& parent_;
   };
 
-  struct PendingRequest : public ActiveRequest {
-    PendingRequest(ActiveRequestCallbacks& callbacks) : callbacks_(callbacks) {}
+  struct PendingRequest : public PoolRequest {
+    PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks);
+    ~PendingRequest();
 
-    // Redis::ConnPool::ActiveRequest
+    // Redis::ConnPool::PoolRequest
     void cancel() override;
 
-    ActiveRequestCallbacks& callbacks_;
+    ClientImpl& parent_;
+    PoolCallbacks& callbacks_;
     bool canceled_{};
   };
 
-  ClientImpl(EncoderPtr&& encoder, DecoderFactory& decoder_factory)
-      : encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)) {}
-
+  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+             DecoderFactory& decoder_factory, const Config& config);
+  void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
 
   // Redis::DecoderCallbacks
@@ -64,17 +75,22 @@ private:
   // Network::ConnectionCallbacks
   void onEvent(uint32_t events) override;
 
+  Upstream::HostConstSharedPtr host_;
   Network::ClientConnectionPtr connection_;
   EncoderPtr encoder_;
   Buffer::OwnedImpl encoder_buffer_;
   DecoderPtr decoder_;
+  const Config& config_;
   std::list<PendingRequest> pending_requests_;
+  Event::TimerPtr connect_or_op_timer_;
+  bool connected_{};
 };
 
 class ClientFactoryImpl : public ClientFactory {
 public:
   // Redis::ConnPool::ClientFactoryImpl
-  ClientPtr create(Upstream::ConstHostPtr host, Event::Dispatcher& dispatcher) override;
+  ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                   const Config& config) override;
 
   static ClientFactoryImpl instance_;
 
@@ -85,11 +101,12 @@ private:
 class InstanceImpl : public Instance {
 public:
   InstanceImpl(const std::string& cluster_name, Upstream::ClusterManager& cm,
-               ClientFactory& client_factory, ThreadLocal::Instance& tls);
+               ClientFactory& client_factory, ThreadLocal::Instance& tls,
+               const Json::Object& config);
 
   // Redis::ConnPool::Instance
-  ActiveRequest* makeRequest(const std::string& hash_key, const RespValue& request,
-                             ActiveRequestCallbacks& callbacks) override;
+  PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
+                           PoolCallbacks& callbacks) override;
 
 private:
   struct ThreadLocalPool;
@@ -102,7 +119,7 @@ private:
     void onEvent(uint32_t events) override;
 
     ThreadLocalPool& parent_;
-    Upstream::ConstHostPtr host_;
+    Upstream::HostConstSharedPtr host_;
     ClientPtr redis_client_;
   };
 
@@ -112,9 +129,9 @@ private:
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
                     const std::string& cluster_name);
 
-    ActiveRequest* makeRequest(const std::string& hash_key, const RespValue& request,
-                               ActiveRequestCallbacks& callbacks);
-    void onHostsRemoved(const std::vector<Upstream::HostPtr>& hosts_removed);
+    PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
+                             PoolCallbacks& callbacks);
+    void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
 
     // ThreadLocal::ThreadLocalObject
     void shutdown() override;
@@ -122,7 +139,7 @@ private:
     InstanceImpl& parent_;
     Event::Dispatcher& dispatcher_;
     Upstream::ThreadLocalCluster* cluster_;
-    std::unordered_map<Upstream::ConstHostPtr, ThreadLocalActiveClientPtr> client_map_;
+    std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContext {
@@ -138,6 +155,7 @@ private:
   ClientFactory& client_factory_;
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;
+  ConfigImpl config_;
 };
 
 } // ConnPool

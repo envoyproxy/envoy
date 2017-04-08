@@ -74,11 +74,11 @@ public:
   }
 
   // Stats::Store
-  std::list<CounterPtr> counters() const override {
+  std::list<CounterSharedPtr> counters() const override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.counters();
   }
-  std::list<GaugePtr> gauges() const override {
+  std::list<GaugeSharedPtr> gauges() const override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.gauges();
   }
@@ -113,7 +113,10 @@ public:
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
-  Server::InstanceImpl& server() { return *server_; }
+  Server::InstanceImpl& server() {
+    RELEASE_ASSERT(server_ != nullptr);
+    return *server_;
+  }
   void start();
   Stats::Store& store() { return stats_store_; }
 
@@ -142,6 +145,7 @@ private:
   const std::string config_path_;
   Thread::ThreadPtr thread_;
   ConditionalInitializer server_initialized_;
+  ConditionalInitializer server_set_;
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};
   Stats::TestIsolatedStoreImpl stats_store_;

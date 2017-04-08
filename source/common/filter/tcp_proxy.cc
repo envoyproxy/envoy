@@ -1,4 +1,4 @@
-#include "tcp_proxy.h"
+#include "common/filter/tcp_proxy.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
@@ -88,7 +88,7 @@ const std::string& TcpProxyConfig::getRouteFromEntries(Network::Connection& conn
   return EMPTY_STRING;
 }
 
-TcpProxy::TcpProxy(TcpProxyConfigPtr config, Upstream::ClusterManager& cluster_manager)
+TcpProxy::TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
       upstream_callbacks_(new UpstreamCallbacks(*this)) {}
 
@@ -137,7 +137,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  Upstream::ClusterInfoPtr cluster = thread_local_cluster->info();
+  Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
     cluster->stats().upstream_cx_overflow_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);

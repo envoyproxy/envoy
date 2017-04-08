@@ -1,4 +1,4 @@
-#include "access_log_manager_impl.h"
+#include "common/access_log/access_log_manager_impl.h"
 
 namespace AccessLog {
 
@@ -8,7 +8,7 @@ void AccessLogManagerImpl::reopen() {
   }
 }
 
-Filesystem::FilePtr AccessLogManagerImpl::createAccessLog(const std::string& file_name) {
+Filesystem::FileSharedPtr AccessLogManagerImpl::createAccessLog(const std::string& file_name) {
   if (access_logs_.count(file_name)) {
     return access_logs_[file_name];
   }

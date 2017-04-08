@@ -84,6 +84,8 @@ In deployments where hosts in originating and upstream clusters belong to differ
 Envoy performs zone aware routing. There are several preconditions before zone aware routing can be
 performed:
 
+.. _arch_overview_load_balancing_zone_aware_routing_preconditions:
+
 * Both originating and upstream cluster are not in
   :ref:`panic mode <arch_overview_load_balancing_panic_threshold>`.
 * Zone aware :ref:`routing is enabled <config_cluster_manager_cluster_runtime_zone_routing>`.

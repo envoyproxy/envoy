@@ -49,11 +49,11 @@ TEST_F(NetworkFilterManagerTest, All) {
 
   NiceMock<MockConnection> connection;
   FilterManagerImpl manager(connection, *this);
-  manager.addReadFilter(ReadFilterPtr{read_filter});
-  manager.addWriteFilter(WriteFilterPtr{write_filter});
-  manager.addFilter(FilterPtr{filter});
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
+  manager.addFilter(FilterSharedPtr{filter});
 
-  read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionPtr{host_description});
+  read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
 
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::StopIteration));
@@ -111,10 +111,10 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
 
   Json::ObjectPtr rl_config_loader = Json::Factory::LoadFromString(rl_json);
 
-  RateLimit::TcpFilter::ConfigPtr rl_config(
+  RateLimit::TcpFilter::ConfigSharedPtr rl_config(
       new RateLimit::TcpFilter::Config(*rl_config_loader, stats_store, runtime));
   RateLimit::MockClient* rl_client = new RateLimit::MockClient();
-  manager.addReadFilter(ReadFilterPtr{
+  manager.addReadFilter(ReadFilterSharedPtr{
       new RateLimit::TcpFilter::Instance(rl_config, RateLimit::ClientPtr{rl_client})});
 
   std::string tcp_proxy_json = R"EOF(
@@ -131,9 +131,9 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
     )EOF";
 
   Json::ObjectPtr tcp_proxy_config_loader = Json::Factory::LoadFromString(tcp_proxy_json);
-  ::Filter::TcpProxyConfigPtr tcp_proxy_config(
+  ::Filter::TcpProxyConfigSharedPtr tcp_proxy_config(
       new ::Filter::TcpProxyConfig(*tcp_proxy_config_loader, cm, stats_store));
-  manager.addReadFilter(ReadFilterPtr{new ::Filter::TcpProxy(tcp_proxy_config, cm)});
+  manager.addReadFilter(ReadFilterSharedPtr{new ::Filter::TcpProxy(tcp_proxy_config, cm)});
 
   RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{

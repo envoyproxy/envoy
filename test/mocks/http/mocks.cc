@@ -78,12 +78,14 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
 
 MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
+  ON_CALL(*this, decodingBuffer()).WillByDefault(ReturnRef(buffer_));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
 
 MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
+  ON_CALL(*this, encodingBuffer()).WillByDefault(ReturnRef(buffer_));
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() {}
@@ -141,7 +143,10 @@ namespace AccessLog {
 MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
-MockRequestInfo::MockRequestInfo() { ON_CALL(*this, upstreamHost()).WillByDefault(Return(host_)); }
+MockRequestInfo::MockRequestInfo() {
+  ON_CALL(*this, upstreamHost()).WillByDefault(Return(host_));
+  ON_CALL(*this, startTime()).WillByDefault(Return(start_time_));
+}
 
 MockRequestInfo::~MockRequestInfo() {}
 

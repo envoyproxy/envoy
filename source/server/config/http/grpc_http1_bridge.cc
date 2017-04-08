@@ -1,4 +1,4 @@
-#include "grpc_http1_bridge.h"
+#include "server/config/http/grpc_http1_bridge.h"
 
 #include "common/grpc/http1_bridge_filter.h"
 
@@ -16,7 +16,7 @@ HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::tryCreateFilterFactory(HttpFilt
 
   return [&server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
-        Http::StreamFilterPtr{new Grpc::Http1BridgeFilter(server.clusterManager())});
+        Http::StreamFilterSharedPtr{new Grpc::Http1BridgeFilter(server.clusterManager())});
   };
 }
 

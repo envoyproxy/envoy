@@ -1,4 +1,4 @@
-#include "buffer_filter.h"
+#include "common/http/filter/buffer_filter.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -12,7 +12,7 @@
 
 namespace Http {
 
-BufferFilter::BufferFilter(BufferFilterConfigPtr config) : config_(config) {}
+BufferFilter::BufferFilter(BufferFilterConfigConstSharedPtr config) : config_(config) {}
 
 BufferFilter::~BufferFilter() { ASSERT(!request_timeout_); }
 

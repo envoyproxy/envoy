@@ -140,7 +140,7 @@ TEST_F(RdsImplTest, Basic) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
+  message->body().reset(new Buffer::OwnedImpl(response1_json));
 
   EXPECT_CALL(init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -153,7 +153,7 @@ TEST_F(RdsImplTest, Basic) {
   // 2nd request with same response. Based on hash should not reload config.
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response1_json)});
+  message->body().reset(new Buffer::OwnedImpl(response1_json));
 
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -163,7 +163,7 @@ TEST_F(RdsImplTest, Basic) {
   interval_timer_->callback_();
 
   // Load the config and verified shared count.
-  ConfigPtr config = rds_->config();
+  ConfigConstSharedPtr config = rds_->config();
   EXPECT_EQ(2, config.use_count());
 
   // Third request.
@@ -190,7 +190,7 @@ TEST_F(RdsImplTest, Basic) {
 
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response2_json)});
+  message->body().reset(new Buffer::OwnedImpl(response2_json));
 
   // Make sure we don't lookup/verify clusters.
   EXPECT_CALL(cm_, get("bar")).Times(0);
@@ -222,7 +222,7 @@ TEST_F(RdsImplTest, Failure) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
+  message->body().reset(new Buffer::OwnedImpl(response_json));
 
   EXPECT_CALL(init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -249,7 +249,7 @@ TEST_F(RdsImplTest, FailureArray) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(response_json)});
+  message->body().reset(new Buffer::OwnedImpl(response_json));
 
   EXPECT_CALL(init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));

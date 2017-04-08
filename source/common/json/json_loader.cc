@@ -1,4 +1,4 @@
-#include "json_loader.h"
+#include "common/json/json_loader.h"
 
 // Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"
@@ -182,7 +182,7 @@ public:
     }
   }
 
-  std::string asString() const {
+  std::string asString() const override {
     if (!value_.IsString()) {
       throw Exception(fmt::format("'{}' is not a string", name_));
     }

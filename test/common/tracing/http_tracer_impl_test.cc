@@ -242,7 +242,8 @@ TEST(HttpTracerUtilityTest, OriginalAndLongPath) {
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
+  NiceMock<MockConfig> config;
+  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
 TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
@@ -274,7 +275,8 @@ TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
   EXPECT_CALL(*span, finishSpan());
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
+  NiceMock<MockConfig> config;
+  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
 TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
@@ -302,6 +304,18 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("request_size", "10"));
   EXPECT_CALL(*span, setTag("guid:x-client-trace-id", "client_trace_id"));
 
+  // Check that span has tags from custom headers.
+  request_headers.addViaCopy(Http::LowerCaseString("aa"), "a");
+  request_headers.addViaCopy(Http::LowerCaseString("bb"), "b");
+  request_headers.addViaCopy(Http::LowerCaseString("cc"), "c");
+  MockConfig config;
+  config.headers_.push_back(Http::LowerCaseString("aa"));
+  config.headers_.push_back(Http::LowerCaseString("cc"));
+  config.headers_.push_back(Http::LowerCaseString("ee"));
+  EXPECT_CALL(*span, setTag("aa", "a"));
+  EXPECT_CALL(*span, setTag("cc", "c"));
+  EXPECT_CALL(config, requestHeadersForTags());
+
   Optional<uint32_t> response_code(503);
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
@@ -314,7 +328,12 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
 
   EXPECT_CALL(*span, finishSpan());
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
+  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
+}
+
+TEST(HttpTracerUtilityTest, operationTypeToString) {
+  EXPECT_EQ("ingress", HttpTracerUtility::toString(OperationName::Ingress));
+  EXPECT_EQ("egress", HttpTracerUtility::toString(OperationName::Egress));
 }
 
 class LightStepDriverTest : public Test {
@@ -353,6 +372,7 @@ public:
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
   SystemTime start_time_;
+  Http::AccessLog::MockRequestInfo request_info_;
 
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
@@ -429,50 +449,47 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   EXPECT_EQ(nullptr, null_tracer.startSpan(config, request_headers, request_info));
 }
 
-TEST(HttpTracerImplTest, BasicFunctionalityNullSpan) {
-  LocalInfo::MockLocalInfo local_info;
-  SystemTime time;
-  Http::AccessLog::MockRequestInfo request_info;
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+class HttpTracerImplTest : public Test {
+public:
+  HttpTracerImplTest() {
+    driver_ = new MockDriver();
+    DriverPtr driver_ptr(driver_);
+    tracer_.reset(new HttpTracerImpl(std::move(driver_ptr), local_info_));
+  }
 
-  MockConfig config;
-  const std::string operation_name = "operation";
-  EXPECT_CALL(config, operationName()).WillOnce(ReturnRef(operation_name));
+  Http::TestHeaderMapImpl request_headers_{
+      {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}, {":authority", "test"}};
+  Http::AccessLog::MockRequestInfo request_info_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  MockConfig config_;
+  MockDriver* driver_;
+  HttpTracerPtr tracer_;
+};
 
-  Http::TestHeaderMapImpl request_headers;
-  MockDriver* driver = new MockDriver();
-  DriverPtr driver_ptr(driver);
+TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
+  EXPECT_CALL(config_, operationName()).Times(2);
+  EXPECT_CALL(request_info_, startTime());
+  const std::string operation_name = "ingress";
+  EXPECT_CALL(*driver_, startSpan_(_, operation_name, request_info_.start_time_))
+      .WillOnce(Return(nullptr));
 
-  HttpTracerImpl tracer(std::move(driver_ptr), local_info);
-
-  EXPECT_CALL(*driver, startSpan_(_, operation_name, time)).WillOnce(Return(nullptr));
-
-  tracer.startSpan(config, request_headers, request_info);
+  tracer_->startSpan(config_, request_headers_, request_info_);
 }
 
-TEST(HttpTracerImplTest, BasicFunctionalityNodeSet) {
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  SystemTime time;
-  NiceMock<Http::AccessLog::MockRequestInfo> request_info;
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
-  EXPECT_CALL(local_info, nodeName());
-
-  MockConfig config;
-  const std::string operation_name = "operation";
-  EXPECT_CALL(config, operationName()).WillOnce(ReturnRef(operation_name));
-
-  Http::TestHeaderMapImpl request_headers{
-      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}};
-  MockDriver* driver = new MockDriver();
-  DriverPtr driver_ptr(driver);
-
-  HttpTracerImpl tracer(std::move(driver_ptr), local_info);
+TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
+  EXPECT_CALL(request_info_, startTime());
+  EXPECT_CALL(local_info_, nodeName());
+  EXPECT_CALL(config_, operationName()).Times(2).WillRepeatedly(Return(OperationName::Egress));
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
-  EXPECT_CALL(*driver, startSpan_(_, operation_name, time)).WillOnce(Return(span));
+  const std::string operation_name = "egress test";
+  EXPECT_CALL(*driver_, startSpan_(_, operation_name, request_info_.start_time_))
+      .WillOnce(Return(span));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  tracer.startSpan(config, request_headers, request_info);
+  EXPECT_CALL(*span, setTag("node_id", "node_name"));
+
+  tracer_->startSpan(config_, request_headers_, request_info_);
 }
 
 TEST_F(LightStepDriverTest, FlushSeveralSpans) {

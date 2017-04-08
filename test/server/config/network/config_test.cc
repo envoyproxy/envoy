@@ -16,7 +16,11 @@ namespace Configuration {
 TEST(NetworkFilterConfigTest, RedisProxy) {
   std::string json_string = R"EOF(
   {
-    "cluster_name": "fake_cluster"
+    "cluster_name": "fake_cluster",
+    "stat_prefix": "foo",
+    "conn_pool": {
+      "op_timeout_ms": 20
+    }
   }
   )EOF";
 

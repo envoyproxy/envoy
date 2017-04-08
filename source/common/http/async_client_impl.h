@@ -1,7 +1,5 @@
 #pragma once
 
-#include "message_impl.h"
-
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
@@ -15,6 +13,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
 #include "common/http/access_log/request_info_impl.h"
+#include "common/http/message_impl.h"
 #include "common/router/router.h"
 
 namespace Http {
@@ -168,12 +167,12 @@ private:
   Ssl::Connection* ssl() override { return nullptr; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
-  Router::RoutePtr route() override { return route_; }
+  Router::RouteConstSharedPtr route() override { return route_; }
   uint64_t streamId() override { return stream_id_; }
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
-  const Buffer::Instance* decodingBuffer() override {
+  Buffer::InstancePtr& decodingBuffer() override {
     throw EnvoyException("buffering is not supported in streaming");
   }
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -212,7 +211,7 @@ private:
   void onReset() override;
 
   // Http::StreamDecoderFilterCallbacks
-  const Buffer::Instance* decodingBuffer() override { return request_->body(); }
+  Buffer::InstancePtr& decodingBuffer() override { return request_->body(); }
 
   MessagePtr request_;
   AsyncClient::Callbacks& callbacks_;

@@ -1,4 +1,4 @@
-#include "mocks.h"
+#include "test/mocks/access_log/mocks.h"
 
 using testing::_;
 using testing::Return;

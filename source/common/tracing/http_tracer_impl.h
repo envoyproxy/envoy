@@ -38,6 +38,13 @@ struct Decision {
 class HttpTracerUtility {
 public:
   /**
+   * Get string representation of the operation.
+   * @param operation name to convert.
+   * @return string representation of the operation.
+   */
+  static const std::string& toString(OperationName operation_name);
+
+  /**
    * Request might be traceable if x-request-id is traceable uuid or we do sampling tracing.
    * Note: there is a global switch which turns off tracing completely on server side.
    *
@@ -56,7 +63,11 @@ public:
    * 2) Finish active span.
    */
   static void finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
-                           const Http::AccessLog::RequestInfo& request_info);
+                           const Http::AccessLog::RequestInfo& request_info,
+                           const Config& tracing_config);
+
+  static const std::string INGRESS_OPERATION;
+  static const std::string EGRESS_OPERATION;
 };
 
 class HttpNullTracer : public HttpTracer {
@@ -113,7 +124,7 @@ public:
                     SystemTime start_time) override;
 
   Upstream::ClusterManager& clusterManager() { return cm_; }
-  Upstream::ClusterInfoPtr cluster() { return cluster_; }
+  Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
@@ -128,7 +139,7 @@ private:
   };
 
   Upstream::ClusterManager& cm_;
-  Upstream::ClusterInfoPtr cluster_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
   LightstepTracerStats tracer_stats_;
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;

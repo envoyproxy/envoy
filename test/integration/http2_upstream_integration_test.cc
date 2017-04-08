@@ -1,4 +1,4 @@
-#include "http2_upstream_integration_test.h"
+#include "test/integration/http2_upstream_integration_test.h"
 
 #include "common/http/header_map_impl.h"
 
@@ -15,67 +15,67 @@ TEST_F(Http2UpstreamIntegrationTest, RouterRedirect) {
 TEST_F(Http2UpstreamIntegrationTest, DrainClose) { testDrainClose(Http::CodecClient::Type::HTTP2); }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(IntegrationTest::HTTP_PORT),
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, false);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(IntegrationTest::HTTP_BUFFER_PORT),
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
                                        Http::CodecClient::Type::HTTP2, 1024, 512, false);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithZeroByteBodyNoBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(IntegrationTest::HTTP_PORT),
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP2, 0, 0, false);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuffer) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(IntegrationTest::HTTP_BUFFER_PORT),
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http_buffer")),
                                        Http::CodecClient::Type::HTTP2, 0, 0, false);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyHttp1) {
-  testRouterRequestAndResponseWithBody(makeClientConnection(10004), Http::CodecClient::Type::HTTP1,
-                                       1024, 512, false);
+  testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http1_buffer")),
+                                       Http::CodecClient::Type::HTTP1, 1024, 512, false);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(IntegrationTest::HTTP_PORT),
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http")),
                                          Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(IntegrationTest::HTTP_BUFFER_PORT),
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http_buffer")),
                                          Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseHttp1) {
-  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(10004),
+  testRouterHeaderOnlyRequestAndResponse(makeClientConnection(lookupPort("http1_buffer")),
                                          Http::CodecClient::Type::HTTP1);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
-  testRouterUpstreamDisconnectBeforeRequestComplete(
-      makeClientConnection(IntegrationTest::HTTP_PORT), Http::CodecClient::Type::HTTP2);
+  testRouterUpstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
+                                                    Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
-  testRouterUpstreamDisconnectBeforeResponseComplete(
-      makeClientConnection(IntegrationTest::HTTP_PORT), Http::CodecClient::Type::HTTP2);
+  testRouterUpstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
+                                                     Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
-  testRouterDownstreamDisconnectBeforeRequestComplete(
-      makeClientConnection(IntegrationTest::HTTP_PORT), Http::CodecClient::Type::HTTP2);
+  testRouterDownstreamDisconnectBeforeRequestComplete(makeClientConnection(lookupPort("http")),
+                                                      Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
-  testRouterDownstreamDisconnectBeforeResponseComplete(
-      makeClientConnection(IntegrationTest::HTTP_PORT), Http::CodecClient::Type::HTTP2);
+  testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
+                                                       Http::CodecClient::Type::HTTP2);
 }
 
 TEST_F(Http2UpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
-  testRouterUpstreamResponseBeforeRequestComplete(makeClientConnection(IntegrationTest::HTTP_PORT),
+  testRouterUpstreamResponseBeforeRequestComplete(makeClientConnection(lookupPort("http")),
                                                   Http::CodecClient::Type::HTTP2);
 }
 
@@ -99,8 +99,7 @@ TEST_F(Http2UpstreamIntegrationTest, BidirectionalStreaming) {
   FakeStreamPtr upstream_request;
   executeActions(
       {[&]() -> void {
-        codec_client =
-            makeHttpConnection(IntegrationTest::HTTP_PORT, Http::CodecClient::Type::HTTP2);
+        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
       },
        // Start request
        [&]() -> void {
@@ -158,8 +157,7 @@ TEST_F(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   FakeStreamPtr upstream_request;
   executeActions(
       {[&]() -> void {
-        codec_client =
-            makeHttpConnection(IntegrationTest::HTTP_PORT, Http::CodecClient::Type::HTTP2);
+        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
       },
        // Start request
        [&]() -> void {
@@ -218,8 +216,7 @@ TEST_F(Http2UpstreamIntegrationTest, SimultaneousRequest) {
   FakeStreamPtr upstream_request2;
   executeActions(
       {[&]() -> void {
-        codec_client =
-            makeHttpConnection(IntegrationTest::HTTP_PORT, Http::CodecClient::Type::HTTP2);
+        codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP2);
       },
        // Start request 1
        [&]() -> void {

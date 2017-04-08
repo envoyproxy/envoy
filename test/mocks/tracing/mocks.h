@@ -14,7 +14,11 @@ public:
   MockConfig();
   ~MockConfig();
 
-  MOCK_CONST_METHOD0(operationName, const std::string&());
+  MOCK_CONST_METHOD0(operationName, OperationName());
+  MOCK_CONST_METHOD0(requestHeadersForTags, const std::vector<Http::LowerCaseString>&());
+
+  OperationName operation_name_{OperationName::Ingress};
+  std::vector<Http::LowerCaseString> headers_;
 };
 
 class MockSpan : public Span {

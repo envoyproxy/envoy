@@ -1,4 +1,4 @@
-#include "connection_impl.h"
+#include "common/ssl/connection_impl.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -11,8 +11,8 @@
 namespace Ssl {
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
-                               Network::Address::InstancePtr remote_address,
-                               Network::Address::InstancePtr local_address, Context& ctx,
+                               Network::Address::InstanceConstSharedPtr remote_address,
+                               Network::Address::InstanceConstSharedPtr local_address, Context& ctx,
                                InitialState state)
     : Network::ConnectionImpl(dispatcher, fd, remote_address, local_address),
       ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
@@ -119,7 +119,13 @@ Network::ConnectionImpl::PostIoAction ConnectionImpl::doHandshake() {
 }
 
 void ConnectionImpl::drainErrorQueue() {
+  bool saw_error = false;
   while (uint64_t err = ERR_get_error()) {
+    if (!saw_error) {
+      ctx_.stats().connection_error_.inc();
+      saw_error = true;
+    }
+
     conn_log_debug("SSL error: {}:{}:{}:{}", *this, err, ERR_lib_error_string(err),
                    ERR_func_error_string(err), ERR_reason_error_string(err));
     UNREFERENCED_PARAMETER(err);
@@ -236,7 +242,7 @@ std::string ConnectionImpl::uriSanPeerCertificate() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher, Context& ctx,
-                                           Network::Address::InstancePtr address)
+                                           Network::Address::InstanceConstSharedPtr address)
     : ConnectionImpl(dispatcher, address->socket(Network::Address::SocketType::Stream), address,
                      null_local_address_, ctx, InitialState::Client) {}
 

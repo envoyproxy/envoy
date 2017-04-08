@@ -1,4 +1,4 @@
-#include "http_connection_manager.h"
+#include "server/config/network/http_connection_manager.h"
 
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
@@ -28,7 +28,7 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::tryCreateFilter
   std::shared_ptr<HttpConnectionManagerConfig> http_config(
       new HttpConnectionManagerConfig(config, server));
   return [http_config, &server](Network::FilterManager& filter_manager) mutable -> void {
-    filter_manager.addReadFilter(Network::ReadFilterPtr{
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         new Http::ConnectionManagerImpl(*http_config, server.drainManager(), server.random(),
                                         server.httpTracer(), server.runtime())});
   };
@@ -86,8 +86,27 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("tracing")) {
-    const std::string operation_name = config.getObject("tracing")->getString("operation_name");
-    tracing_config_.value({operation_name});
+    Json::ObjectPtr tracing_config = config.getObject("tracing");
+
+    const std::string operation_name = tracing_config->getString("operation_name");
+    Tracing::OperationName tracing_operation_name;
+    std::vector<Http::LowerCaseString> request_headers_for_tags;
+
+    if (operation_name == "ingress") {
+      tracing_operation_name = Tracing::OperationName::Ingress;
+    } else {
+      ASSERT(operation_name == "egress");
+      tracing_operation_name = Tracing::OperationName::Egress;
+    }
+
+    if (tracing_config->hasObject("request_headers_for_tags")) {
+      for (const std::string& header : tracing_config->getStringArray("request_headers_for_tags")) {
+        request_headers_for_tags.push_back(Http::LowerCaseString(header));
+      }
+    }
+
+    tracing_config_.reset(new Http::TracingConnectionManagerConfig(
+        {tracing_operation_name, request_headers_for_tags}));
   }
 
   if (config.hasObject("idle_timeout_s")) {
@@ -96,8 +115,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
 
   if (config.hasObject("access_log")) {
     for (Json::ObjectPtr& access_log : config.getObjectArray("access_log")) {
-      Http::AccessLog::InstancePtr current_access_log = Http::AccessLog::InstanceImpl::fromJson(
-          *access_log, server.runtime(), server.accessLogManager());
+      Http::AccessLog::InstanceSharedPtr current_access_log =
+          Http::AccessLog::InstanceImpl::fromJson(*access_log, server.runtime(),
+                                                  server.accessLogManager());
       access_logs_.push_back(current_access_log);
     }
   }

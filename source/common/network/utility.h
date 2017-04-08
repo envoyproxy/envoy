@@ -55,9 +55,9 @@ public:
   /**
    * Resolve a URL.
    * @param url supplies the url to resolve.
-   * @return Address::InstancePtr the resolved address.
+   * @return Address::InstanceConstSharedPtr the resolved address.
    */
-  static Address::InstancePtr resolveUrl(const std::string& url);
+  static Address::InstanceConstSharedPtr resolveUrl(const std::string& url);
 
   /**
    * Parses the host from a TCP URL
@@ -76,7 +76,7 @@ public:
   /**
    * @return the local IP address of the server
    */
-  static Address::InstancePtr getLocalAddress();
+  static Address::InstanceConstSharedPtr getLocalAddress();
 
   /**
    * Determine whether this is an internal (RFC1918) address.
@@ -91,18 +91,31 @@ public:
   static bool isLoopbackAddress(const Address::Instance& address);
 
   /**
-   * @return Address::InstancePtr an address that represents the IPv4 wildcard address
+   * @return Address::InstanceConstSharedPtr an address that represents the canonical IPv4 loopback
+   *         address (i.e. "127.0.0.1"). Note that the range "127.0.0.0/8" is all defined as the
+   *         loopback range, but the address typically used (e.g. in tests) is "127.0.0.1".
+   */
+  static Address::InstanceConstSharedPtr getCanonicalIpv4LoopbackAddress();
+
+  /**
+   * @return Address::InstanceConstSharedPtr an address that represents the IPv6 loopback address
+   *         (i.e. "::1").
+   */
+  static Address::InstanceConstSharedPtr getIpv6LoopbackAddress();
+
+  /**
+   * @return Address::InstanceConstSharedPtr an address that represents the IPv4 wildcard address
    *         (i.e. "0.0.0.0"). Used during binding to indicate that incoming connections to any
    *         local IPv4 address are to be accepted.
    */
-  static Address::InstancePtr getIpv4AnyAddress();
+  static Address::InstanceConstSharedPtr getIpv4AnyAddress();
 
   /**
-   * @return Address::InstancePtr an address that represents the IPv6 wildcard address (i.e. "::").
-   *         Used during binding to indicate that incoming connections to any local IPv6 address
-   *         are to be accepted.
+   * @return Address::InstanceConstSharedPtr an address that represents the IPv6 wildcard address
+   *         (i.e. "::"). Used during binding to indicate that incoming connections to any local
+   *         IPv6 address are to be accepted.
    */
-  static Address::InstancePtr getIpv6AnyAddress();
+  static Address::InstanceConstSharedPtr getIpv6AnyAddress();
 
   /**
    * Retrieve the original destination address from an accepted fd.
@@ -111,7 +124,7 @@ public:
    * @param fd is the descriptor returned by accept()
    * @return the original destination or nullptr if not available.
    */
-  static Address::InstancePtr getOriginalDst(int fd);
+  static Address::InstanceConstSharedPtr getOriginalDst(int fd);
 
   /**
    * Parses a string containing a comma-separated list of port numbers and/or

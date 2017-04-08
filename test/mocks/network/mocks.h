@@ -28,7 +28,7 @@ public:
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::list<Network::ConnectionCallbacks*> callbacks_;
   uint64_t id_{next_id_++};
-  Address::InstancePtr remote_address_;
+  Address::InstanceConstSharedPtr remote_address_;
   bool read_enabled_{true};
   Connection::State state_{Connection::State::Open};
 };
@@ -40,9 +40,9 @@ public:
 
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
-  MOCK_METHOD1(addWriteFilter, void(WriteFilterPtr filter));
-  MOCK_METHOD1(addFilter, void(FilterPtr filter));
-  MOCK_METHOD1(addReadFilter, void(ReadFilterPtr filter));
+  MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
+  MOCK_METHOD1(addFilter, void(FilterSharedPtr filter));
+  MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));
   MOCK_METHOD1(close, void(ConnectionCloseType type));
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(id, uint64_t());
@@ -72,9 +72,9 @@ public:
 
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
-  MOCK_METHOD1(addWriteFilter, void(WriteFilterPtr filter));
-  MOCK_METHOD1(addFilter, void(FilterPtr filter));
-  MOCK_METHOD1(addReadFilter, void(ReadFilterPtr filter));
+  MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
+  MOCK_METHOD1(addFilter, void(FilterSharedPtr filter));
+  MOCK_METHOD1(addReadFilter, void(ReadFilterSharedPtr filter));
   MOCK_METHOD1(close, void(ConnectionCloseType type));
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(id, uint64_t());
@@ -123,11 +123,11 @@ public:
 
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD0(continueReading, void());
-  MOCK_METHOD0(upstreamHost, Upstream::HostDescriptionPtr());
-  MOCK_METHOD1(upstreamHost, void(Upstream::HostDescriptionPtr host));
+  MOCK_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
+  MOCK_METHOD1(upstreamHost, void(Upstream::HostDescriptionConstSharedPtr host));
 
   testing::NiceMock<MockConnection> connection_;
-  Upstream::HostDescriptionPtr host_;
+  Upstream::HostDescriptionConstSharedPtr host_;
 };
 
 class MockReadFilter : public ReadFilter {
@@ -194,11 +194,11 @@ public:
   MockListenSocket();
   ~MockListenSocket();
 
-  MOCK_METHOD0(localAddress, Address::InstancePtr());
+  MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr());
   MOCK_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
 
-  Address::InstancePtr local_address_;
+  Address::InstanceConstSharedPtr local_address_;
 };
 
 class MockListener : public Listener {

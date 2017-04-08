@@ -1,4 +1,4 @@
-#include "client_ssl_auth.h"
+#include "server/config/network/client_ssl_auth.h"
 
 #include "envoy/network/connection.h"
 #include "envoy/server/instance.h"
@@ -16,12 +16,12 @@ ClientSslAuthConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const
     return nullptr;
   }
 
-  Filter::Auth::ClientSsl::ConfigPtr config(Filter::Auth::ClientSsl::Config::create(
+  Filter::Auth::ClientSsl::ConfigSharedPtr config(Filter::Auth::ClientSsl::Config::create(
       json_config, server.threadLocal(), server.clusterManager(), server.dispatcher(),
       server.stats(), server.random()));
   return [config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
-        Network::ReadFilterPtr{new Filter::Auth::ClientSsl::Instance(config)});
+        Network::ReadFilterSharedPtr{new Filter::Auth::ClientSsl::Instance(config)});
   };
 }
 

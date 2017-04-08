@@ -1,8 +1,5 @@
 #pragma once
 
-#include "connection_handler_impl.h"
-#include "worker.h"
-
 #include "envoy/common/optional.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
@@ -14,8 +11,10 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/thread_local/thread_local_impl.h"
+#include "server/connection_handler_impl.h"
 #include "server/http/admin.h"
 #include "server/test_hooks.h"
+#include "server/worker.h"
 
 namespace Server {
 
@@ -94,7 +93,6 @@ public:
   InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                const LocalInfo::LocalInfo& local_info);
-  ~InstanceImpl();
 
   void run();
 
@@ -111,6 +109,7 @@ public:
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool fail) override;
   int getListenSocketFd(const std::string& address) override;
+  Network::ListenSocket* getListenSocketByIndex(uint32_t index) override;
   void getParentStats(HotRestart::GetParentStatsInfo& info) override;
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
@@ -165,6 +164,7 @@ private:
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   InitManagerImpl init_manager_;
+  std::unique_ptr<Server::GuardDog> guard_dog_;
 };
 
 } // Server

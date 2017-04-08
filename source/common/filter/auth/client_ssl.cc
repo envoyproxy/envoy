@@ -1,4 +1,4 @@
-#include "client_ssl.h"
+#include "common/filter/auth/client_ssl.h"
 
 #include "envoy/network/connection.h"
 
@@ -29,15 +29,15 @@ Config::Config(const Json::Object& config, ThreadLocal::Instance& tls, Upstream:
         fmt::format("unknown cluster '{}' in client ssl auth config", remote_cluster_name_));
   }
 
-  AllowedPrincipalsPtr empty(new AllowedPrincipals());
-  tls_.set(tls_slot_,
-           [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectPtr { return empty; });
+  AllowedPrincipalsSharedPtr empty(new AllowedPrincipals());
+  tls_.set(tls_slot_, [empty](Event::Dispatcher&)
+                          -> ThreadLocal::ThreadLocalObjectSharedPtr { return empty; });
 }
 
-ConfigPtr Config::create(const Json::Object& config, ThreadLocal::Instance& tls,
-                         Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                         Stats::Store& stats_store, Runtime::RandomGenerator& random) {
-  ConfigPtr new_config(new Config(config, tls, cm, dispatcher, stats_store, random));
+ConfigSharedPtr Config::create(const Json::Object& config, ThreadLocal::Instance& tls,
+                               Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+                               Stats::Store& stats_store, Runtime::RandomGenerator& random) {
+  ConfigSharedPtr new_config(new Config(config, tls, cm, dispatcher, stats_store, random));
   new_config->initialize();
   return new_config;
 }
@@ -54,14 +54,14 @@ GlobalStats Config::generateStats(Stats::Store& store, const std::string& prefix
 }
 
 void Config::parseResponse(const Http::Message& message) {
-  AllowedPrincipalsPtr new_principals(new AllowedPrincipals());
+  AllowedPrincipalsSharedPtr new_principals(new AllowedPrincipals());
   Json::ObjectPtr loader = Json::Factory::LoadFromString(message.bodyAsString());
   for (const Json::ObjectPtr& certificate : loader->getObjectArray("certificates")) {
     new_principals->add(certificate->getString("fingerprint_sha256"));
   }
 
   tls_.set(tls_slot_, [new_principals](Event::Dispatcher&)
-                          -> ThreadLocal::ThreadLocalObjectPtr { return new_principals; });
+                          -> ThreadLocal::ThreadLocalObjectSharedPtr { return new_principals; });
 
   stats_.update_success_.inc();
   stats_.total_principals_.set(new_principals->size());

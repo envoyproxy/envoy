@@ -1,4 +1,4 @@
-#include "fault_filter.h"
+#include "common/http/filter/fault_filter.h"
 
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
@@ -74,7 +74,7 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
   upstream_cluster_ = json_config.getString("upstream_cluster", EMPTY_STRING);
 }
 
-FaultFilter::FaultFilter(FaultFilterConfigPtr config) : config_(config) {}
+FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
 FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 
@@ -158,7 +158,7 @@ bool FaultFilter::matchesTargetCluster() {
   bool matches = true;
 
   if (!config_->upstreamCluster().empty()) {
-    Router::RoutePtr route = callbacks_->route();
+    Router::RouteConstSharedPtr route = callbacks_->route();
     matches = route && route->routeEntry() &&
               (route->routeEntry()->clusterName() == config_->upstreamCluster());
   }

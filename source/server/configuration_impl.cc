@@ -1,4 +1,4 @@
-#include "configuration_impl.h"
+#include "server/configuration_impl.h"
 
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
@@ -55,6 +55,15 @@ void MainImpl::initialize(const Json::Object& json) {
   stats_flush_interval_ =
       std::chrono::milliseconds(json.getInteger("stats_flush_interval_ms", 5000));
 
+  watchdog_miss_timeout_ =
+      std::chrono::milliseconds(json.getInteger("watchdog_miss_timeout_ms", 200));
+  watchdog_megamiss_timeout_ =
+      std::chrono::milliseconds(json.getInteger("watchdog_megamiss_timeout_ms", 1000));
+  watchdog_kill_timeout_ =
+      std::chrono::milliseconds(json.getInteger("watchdog_kill_timeout_ms", 0));
+  watchdog_multikill_timeout_ =
+      std::chrono::milliseconds(json.getInteger("watchdog_multikill_timeout_ms", 0));
+
   if (json.hasObject("tracing")) {
     initializeTracers(*json.getObject("tracing"));
   } else {
@@ -88,8 +97,11 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
 
     if (type == "lightstep") {
       ::Runtime::RandomGenerator& rand = server_.random();
+      Json::ObjectPtr lightstep_config = driver->getObject("config");
+
       std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
-      opts->access_token = server_.api().fileReadToEnd(driver->getString("access_token_file"));
+      opts->access_token =
+          server_.api().fileReadToEnd(lightstep_config->getString("access_token_file"));
       StringUtil::rtrim(opts->access_token);
 
       if (server_.localInfo().clusterName().empty()) {
@@ -99,9 +111,9 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
       opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
       opts->guid_generator = [&rand]() { return rand.random(); };
 
-      Tracing::DriverPtr lightstep_driver(new Tracing::LightStepDriver(
-          *driver->getObject("config"), *cluster_manager_, server_.stats(), server_.threadLocal(),
-          server_.runtime(), std::move(opts)));
+      Tracing::DriverPtr lightstep_driver(
+          new Tracing::LightStepDriver(*lightstep_config, *cluster_manager_, server_.stats(),
+                                       server_.threadLocal(), server_.runtime(), std::move(opts)));
 
       http_tracer_.reset(
           new Tracing::HttpTracerImpl(std::move(lightstep_driver), server_.localInfo()));
@@ -185,6 +197,7 @@ bool MainImpl::ListenerConfig::createFilterChain(Network::Connection& connection
 InitialImpl::InitialImpl(const Json::Object& json) {
   Json::ObjectPtr admin = json.getObject("admin");
   admin_.access_log_path_ = admin->getString("access_log_path");
+  admin_.profile_path_ = admin->getString("profile_path", "/var/log/envoy/envoy.prof");
   admin_.address_ = Network::Utility::resolveUrl(admin->getString("address"));
 
   if (json.hasObject("flags_path")) {

@@ -11,7 +11,6 @@ class Stream;
 
 /**
  * Encodes an HTTP stream.
- * NOTE: Currently we do not support trailers/intermediate header frames.
  */
 class StreamEncoder {
 public:
@@ -45,7 +44,6 @@ public:
 
 /**
  * Decodes an HTTP stream. These are callbacks fired into a sink.
- * NOTE: Currently we do not support trailers/intermediate header frames.
  */
 class StreamDecoder {
 public:

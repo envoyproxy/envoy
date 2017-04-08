@@ -1,4 +1,4 @@
-#include "connection_handler_impl.h"
+#include "server/connection_handler_impl.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -9,11 +9,8 @@
 
 namespace Server {
 
-ConnectionHandlerImpl::ConnectionHandlerImpl(Stats::Store& stats_store, spdlog::logger& logger,
-                                             Api::ApiPtr&& api)
-    : logger_(logger), api_(std::move(api)), dispatcher_(api_->allocateDispatcher()),
-      watchdog_miss_counter_(stats_store.counter("server.watchdog_miss")),
-      watchdog_mega_miss_counter_(stats_store.counter("server.watchdog_mega_miss")) {}
+ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Api::ApiPtr&& api)
+    : logger_(logger), api_(std::move(api)), dispatcher_(api_->allocateDispatcher()) {}
 
 ConnectionHandlerImpl::~ConnectionHandlerImpl() { closeConnections(); }
 
@@ -84,7 +81,7 @@ ConnectionHandlerImpl::findListenerByAddress(const Network::Address::Instance& a
   // However, linear performance might be adequate since the number of listeners is small.
   auto listener = std::find_if(
       listeners_.begin(), listeners_.end(),
-      [&address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
+      [&address](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
         return p.first->type() == Network::Address::Type::Ip && *(p.first) == address;
       });
 
@@ -97,7 +94,7 @@ ConnectionHandlerImpl::findListenerByAddress(const Network::Address::Instance& a
   // TODO(wattli): consolidate with previous search for more efficiency.
   listener = std::find_if(
       listeners_.begin(), listeners_.end(),
-      [&address](const std::pair<Network::Address::InstancePtr, ActiveListenerPtr>& p) {
+      [&address](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
         return p.first->type() == Network::Address::Type::Ip &&
                p.first->ip()->port() == address.ip()->port() && p.first->ip()->isAnyAddress();
       });
@@ -146,24 +143,6 @@ ConnectionHandlerImpl::ActiveConnection::~ActiveConnection() {
 
 ListenerStats ConnectionHandlerImpl::generateStats(Stats::Scope& scope) {
   return {ALL_LISTENER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TIMER(scope))};
-}
-
-void ConnectionHandlerImpl::startWatchdog() {
-  watchdog_timer_ = dispatcher_->createTimer([this]() -> void {
-    auto delta = std::chrono::system_clock::now() - last_watchdog_time_;
-    if (delta > std::chrono::milliseconds(200)) {
-      watchdog_miss_counter_.inc();
-    }
-    if (delta > std::chrono::milliseconds(1000)) {
-      watchdog_mega_miss_counter_.inc();
-    }
-
-    last_watchdog_time_ = std::chrono::system_clock::now();
-    watchdog_timer_->enableTimer(std::chrono::milliseconds(100));
-  });
-
-  last_watchdog_time_ = std::chrono::system_clock::now();
-  watchdog_timer_->enableTimer(std::chrono::milliseconds(100));
 }
 
 } // Server

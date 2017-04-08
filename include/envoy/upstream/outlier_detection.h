@@ -7,10 +7,10 @@
 namespace Upstream {
 
 class Host;
-typedef std::shared_ptr<Host> HostPtr;
+typedef std::shared_ptr<Host> HostSharedPtr;
 
 class HostDescription;
-typedef std::shared_ptr<const HostDescription> HostDescriptionPtr;
+typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
 
 namespace Outlier {
 
@@ -48,34 +48,16 @@ public:
    * @return the last time this host was unejected, if the host has been unejected previously.
    */
   virtual const Optional<SystemTime>& lastUnejectionTime() PURE;
+
+  /**
+   * @return the success rate of the host in the last calculated interval, in the range 0-100.
+   *         -1 means that the host did not have enough request volume to calculate success rate
+   *         or the cluster did not have enough hosts to run through success rate outlier ejection.
+   */
+  virtual double successRate() const PURE;
 };
 
 typedef std::unique_ptr<DetectorHostSink> DetectorHostSinkPtr;
-
-enum class EjectionType { Consecutive5xx };
-
-/**
- * Sink for outlier detection event logs.
- */
-class EventLogger {
-public:
-  virtual ~EventLogger() {}
-
-  /**
-   * Log an ejection event.
-   * @param host supplies the host that generated the event.
-   * @param type supplies the type of the event.
-   */
-  virtual void logEject(HostDescriptionPtr host, EjectionType type) PURE;
-
-  /**
-   * Log an unejection event.
-   * @param host supplies the host that generated the event.
-   */
-  virtual void logUneject(HostDescriptionPtr host) PURE;
-};
-
-typedef std::shared_ptr<EventLogger> EventLoggerPtr;
 
 /**
  * Interface for an outlier detection engine. Uses per host data to determine which hosts in a
@@ -88,16 +70,60 @@ public:
   /**
    * Outlier detection change state callback.
    */
-  typedef std::function<void(HostPtr host)> ChangeStateCb;
+  typedef std::function<void(HostSharedPtr host)> ChangeStateCb;
 
   /**
    * Add a changed state callback to the detector. The callback will be called whenever any host
    * changes state (either ejected or brought back in) due to outlier status.
    */
   virtual void addChangedStateCb(ChangeStateCb cb) PURE;
+
+  /**
+   * Returns the average success rate of the hosts in the Detector for the last aggregation
+   * interval.
+   * @return the average success rate, or -1 if there were not enough hosts with enough request
+   *         volume to proceed with success rate based outlier ejection.
+   */
+  virtual double successRateAverage() const PURE;
+
+  /**
+   * Returns the success rate threshold used in the last interval. The threshold is used to eject
+   * hosts based on their success rate.
+   * @return the threshold, or -1 if there were not enough hosts with enough request volume to
+   *         proceed with success rate based outlier ejection.
+   */
+  virtual double successRateEjectionThreshold() const PURE;
 };
 
-typedef std::shared_ptr<Detector> DetectorPtr;
+typedef std::shared_ptr<Detector> DetectorSharedPtr;
+
+enum class EjectionType { Consecutive5xx, SuccessRate };
+
+/**
+ * Sink for outlier detection event logs.
+ */
+class EventLogger {
+public:
+  virtual ~EventLogger() {}
+
+  /**
+   * Log an ejection event.
+   * @param host supplies the host that generated the event.
+   * @param detector supplies the detector that is doing the ejection.
+   * @param type supplies the type of the event.
+   * @param enforced is true if the ejection took place; false, if only logging took place.
+   */
+  virtual void logEject(HostDescriptionConstSharedPtr host, Detector& detector, EjectionType type,
+                        bool enforced) PURE;
+
+  /**
+   * Log an unejection event.
+   * @param host supplies the host that generated the event.
+   */
+  virtual void logUneject(HostDescriptionConstSharedPtr host) PURE;
+};
+
+typedef std::shared_ptr<EventLogger> EventLoggerSharedPtr;
 
 } // Outlier
 } // Upstream

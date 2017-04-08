@@ -1,20 +1,21 @@
-#include "bson_impl.h"
-#include "codec_impl.h"
+#include "common/mongo/codec_impl.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
+#include "common/mongo/bson_impl.h"
 
 namespace Mongo {
 
-std::string MessageImpl::documentListToString(const std::list<Bson::DocumentPtr>& documents) const {
+std::string
+MessageImpl::documentListToString(const std::list<Bson::DocumentSharedPtr>& documents) const {
   std::stringstream out;
   out << "[";
 
   bool first = true;
-  for (const Bson::DocumentPtr& document : documents) {
+  for (const Bson::DocumentSharedPtr& document : documents) {
     if (!first) {
       out << ", ";
     }
@@ -310,14 +311,14 @@ void EncoderImpl::encodeInsert(const InsertMessage& message) {
 
   // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-insert
   int32_t total_size = 16 + 4 + message.fullCollectionName().size() + 1;
-  for (const Bson::DocumentPtr& document : message.documents()) {
+  for (const Bson::DocumentSharedPtr& document : message.documents()) {
     total_size += document->byteSize();
   }
 
   encodeCommonHeader(total_size, message, Message::OpCode::OP_INSERT);
   Bson::BufferHelper::writeInt32(output_, message.flags());
   Bson::BufferHelper::writeCString(output_, message.fullCollectionName());
-  for (const Bson::DocumentPtr& document : message.documents()) {
+  for (const Bson::DocumentSharedPtr& document : message.documents()) {
     document->encode(output_);
   }
 }
@@ -366,7 +367,7 @@ void EncoderImpl::encodeQuery(const QueryMessage& message) {
 void EncoderImpl::encodeReply(const ReplyMessage& message) {
   // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-reply
   int32_t total_size = 16 + 20;
-  for (const Bson::DocumentPtr& document : message.documents()) {
+  for (const Bson::DocumentSharedPtr& document : message.documents()) {
     total_size += document->byteSize();
   }
 
@@ -375,7 +376,7 @@ void EncoderImpl::encodeReply(const ReplyMessage& message) {
   Bson::BufferHelper::writeInt64(output_, message.cursorId());
   Bson::BufferHelper::writeInt32(output_, message.startingFrom());
   Bson::BufferHelper::writeInt32(output_, message.numberReturned());
-  for (const Bson::DocumentPtr& document : message.documents()) {
+  for (const Bson::DocumentSharedPtr& document : message.documents()) {
     document->encode(output_);
   }
 }

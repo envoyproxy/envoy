@@ -42,8 +42,8 @@ protected:
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
-  HostPtr findHost(const std::string& address) {
-    for (HostPtr host : cluster_->hosts()) {
+  HostSharedPtr findHost(const std::string& address) {
+    for (HostSharedPtr host : cluster_->hosts()) {
       if (host->address()->ip()->addressAsString() == address) {
         return host;
       }
@@ -54,7 +54,7 @@ protected:
 
   uint64_t numHealthy() {
     uint64_t healthy = 0;
-    for (HostPtr host : cluster_->hosts()) {
+    for (HostSharedPtr host : cluster_->hosts()) {
       if (host->healthy()) {
         healthy++;
       }
@@ -115,14 +115,15 @@ TEST_F(SdsTest, NoHealthChecker) {
   cluster_->initialize();
 
   EXPECT_CALL(membership_updated_, ready()).Times(3);
-  cluster_->addMemberUpdateCb([&](const std::vector<HostPtr>&, const std::vector<HostPtr>&)
-                                  -> void { membership_updated_.ready(); });
+  cluster_->addMemberUpdateCb(
+      [&](const std::vector<HostSharedPtr>&, const std::vector<HostSharedPtr>&)
+          -> void { membership_updated_.ready(); });
   cluster_->setInitializedCb([&]() -> void { membership_updated_.ready(); });
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json")));
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -137,7 +138,7 @@ TEST_F(SdsTest, NoHealthChecker) {
   // Hosts in SDS and static clusters should have empty hostname
   EXPECT_EQ("", cluster_->hosts()[0]->hostname());
 
-  HostPtr canary_host = findHost("10.0.16.43");
+  HostSharedPtr canary_host = findHost("10.0.16.43");
   EXPECT_TRUE(canary_host->canary());
   EXPECT_EQ("us-east-1d", canary_host->zone());
   EXPECT_EQ(40U, canary_host->weight());
@@ -149,8 +150,8 @@ TEST_F(SdsTest, NoHealthChecker) {
 
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
-      "test/common/upstream/test_data/sds_response_weight_change.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_weight_change.json")));
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
@@ -209,8 +210,8 @@ TEST_F(SdsTest, HealthChecker) {
   // all the hosts to load in unhealthy.
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json")));
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -255,8 +256,8 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json")));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(14UL, cluster_->hosts().size());
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
@@ -275,8 +276,8 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json")));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
@@ -294,8 +295,8 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_3.json"))});
+  message->body().reset(new Buffer::OwnedImpl(
+      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_3.json")));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
@@ -319,7 +320,7 @@ TEST_F(SdsTest, Failure) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(bad_response_json)});
+  message->body().reset(new Buffer::OwnedImpl(bad_response_json));
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -337,7 +338,7 @@ TEST_F(SdsTest, FailureArray) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body(Buffer::InstancePtr{new Buffer::OwnedImpl(bad_response_json)});
+  message->body().reset(new Buffer::OwnedImpl(bad_response_json));
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));

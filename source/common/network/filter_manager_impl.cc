@@ -1,4 +1,4 @@
-#include "filter_manager_impl.h"
+#include "common/network/filter_manager_impl.h"
 
 #include "envoy/network/connection.h"
 
@@ -6,17 +6,17 @@
 
 namespace Network {
 
-void FilterManagerImpl::addWriteFilter(WriteFilterPtr filter) {
+void FilterManagerImpl::addWriteFilter(WriteFilterSharedPtr filter) {
   ASSERT(connection_.state() == Connection::State::Open);
   downstream_filters_.emplace_back(filter);
 }
 
-void FilterManagerImpl::addFilter(FilterPtr filter) {
+void FilterManagerImpl::addFilter(FilterSharedPtr filter) {
   addReadFilter(filter);
   addWriteFilter(filter);
 }
 
-void FilterManagerImpl::addReadFilter(ReadFilterPtr filter) {
+void FilterManagerImpl::addReadFilter(ReadFilterSharedPtr filter) {
   ASSERT(connection_.state() == Connection::State::Open);
   ActiveReadFilterPtr new_filter(new ActiveReadFilter{*this, filter});
   filter->initializeReadFilterCallbacks(*new_filter);
@@ -69,7 +69,7 @@ void FilterManagerImpl::onRead() {
 }
 
 FilterStatus FilterManagerImpl::onWrite() {
-  for (const WriteFilterPtr& filter : downstream_filters_) {
+  for (const WriteFilterSharedPtr& filter : downstream_filters_) {
     FilterStatus status = filter->onWrite(buffer_source_.getWriteBuffer());
     if (status == FilterStatus::StopIteration) {
       return status;

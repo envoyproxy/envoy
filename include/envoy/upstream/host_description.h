@@ -59,7 +59,7 @@ public:
   /**
    * @return the address used to connect to the host.
    */
-  virtual Network::Address::InstancePtr address() const PURE;
+  virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
    * @return host specific stats.
@@ -72,6 +72,6 @@ public:
   virtual const std::string& zone() const PURE;
 };
 
-typedef std::shared_ptr<const HostDescription> HostDescriptionPtr;
+typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
 
 } // Upstream

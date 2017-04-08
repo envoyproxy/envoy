@@ -46,7 +46,19 @@ If an upstream host returns some number of consecutive 5xx, it will be ejected. 
 case a 5xx means an actual 5xx respond code, or an event that would cause the HTTP router to return
 one on the upstream's behalf (reset, connection failure, etc.). The number of consecutive 5xx
 required for ejection is controlled by the :ref:`outlier_detection.consecutive_5xx
-<config_cluster_manager_cluster_outlier_detection>` value.
+<config_cluster_manager_cluster_outlier_detection_consecutive_5xx>` value.
+
+Success Rate
+^^^^^^^^^^^^
+
+Success Rate based outlier ejection aggregates success rate data from every host in a cluster. Then at given
+intervals ejects hosts based on statistical outlier detection. Success Rate outlier ejection will not be
+calculated for a host if its request volume over the aggregation interval is less than the
+:ref:`outlier_detection.success_rate_request_volume<config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
+value. Moreover, detection will not be performed for a cluster if the number of hosts
+with the minimum required request volume in an interval is less than the
+:ref:`outlier_detection.success_rate_minimum_hosts<config_cluster_manager_cluster_outlier_detection_success_rate_minimum_hosts>`
+value.
 
 Ejection event logging
 ----------------------
@@ -64,7 +76,11 @@ being ejected and for what reasons. The log uses a JSON format with one object p
     "upstream_url": "...",
     "action": "...",
     "type": "...",
-    "num_ejections": "..."
+    "num_ejections": "...",
+    "enforced": "...",
+    "host_success_rate": "...",
+    "cluster_success_rate_average": "...",
+    "cluster_success_rate_ejection_threshold": "..."
   }
 
 time
@@ -72,7 +88,7 @@ time
 
 secs_since_last_action
   The time in seconds since the last action (either an ejection or unejection)
-  took place. This time will be -1 for the first ejection given there is no
+  took place. This value will be ``-1`` for the first ejection given there is no
   action before the first ejection.
 
 cluster
@@ -86,12 +102,33 @@ action
   brought back into service.
 
 type
-  If ``action`` is ``eject``, species the type of ejection that took place. Currently this can
-  only be ``5xx``.
+  If ``action`` is ``eject``, specifies the type of ejection that took place. Currently type can
+  be either ``5xx`` or ``SuccessRate``.
 
 num_ejections
-  The number of times the host has been ejected (local to that Envoy and gets reset if the host
-  gets removed from the upstream cluster for any reason and then re-added).
+  If ``action`` is ``eject``, specifies the number of times the host has been ejected
+  (local to that Envoy and gets reset if the host gets removed from the upstream cluster for any
+  reason and then re-added).
+
+enforced
+  If ``action`` is ``eject``, specifies if the ejection was enforced. ``true`` means the host was ejected.
+  ``false`` means the event was logged but the host was not actually ejected.
+
+host_success_rate
+  If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies the host's success rate
+  at the time of the ejection event on a ``0-100`` range.
+
+.. _arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average:
+
+cluster_success_rate_average
+  If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies the average success
+  rate of the hosts in the cluster at the time of the ejection event on a ``0-100`` range.
+
+.. _arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_ejection_threshold:
+
+cluster_success_rate_ejection_threshold
+  If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies success rate ejection
+  threshold at the time of the ejection event.
 
 Configuration reference
 -----------------------

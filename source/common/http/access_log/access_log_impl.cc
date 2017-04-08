@@ -1,5 +1,4 @@
-#include "access_log_impl.h"
-#include "access_log_formatter.h"
+#include "common/http/access_log/access_log_impl.h"
 
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
@@ -8,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/http/access_log/access_log_formatter.h"
 #include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
@@ -164,8 +164,8 @@ InstanceImpl::InstanceImpl(const std::string& access_log_path, FilterPtr&& filte
   log_file_ = log_manager.createAccessLog(access_log_path);
 }
 
-InstancePtr InstanceImpl::fromJson(Json::Object& json, Runtime::Loader& runtime,
-                                   ::AccessLog::AccessLogManager& log_manager) {
+InstanceSharedPtr InstanceImpl::fromJson(Json::Object& json, Runtime::Loader& runtime,
+                                         ::AccessLog::AccessLogManager& log_manager) {
   std::string access_log_path = json.getString("path");
 
   FilterPtr filter;
@@ -181,7 +181,7 @@ InstancePtr InstanceImpl::fromJson(Json::Object& json, Runtime::Loader& runtime,
     formatter = AccessLogFormatUtils::defaultAccessLogFormatter();
   }
 
-  return InstancePtr{
+  return InstanceSharedPtr{
       new InstanceImpl(access_log_path, std::move(filter), std::move(formatter), log_manager)};
 }
 

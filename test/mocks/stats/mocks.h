@@ -66,10 +66,10 @@ public:
   MOCK_METHOD2(deliverHistogramToSinks, void(const std::string& name, uint64_t value));
   MOCK_METHOD2(deliverTimingToSinks, void(const std::string&, std::chrono::milliseconds));
   MOCK_METHOD1(counter, Counter&(const std::string&));
-  MOCK_CONST_METHOD0(counters, std::list<CounterPtr>());
+  MOCK_CONST_METHOD0(counters, std::list<CounterSharedPtr>());
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
   MOCK_METHOD1(gauge, Gauge&(const std::string&));
-  MOCK_CONST_METHOD0(gauges, std::list<GaugePtr>());
+  MOCK_CONST_METHOD0(gauges, std::list<GaugeSharedPtr>());
   MOCK_METHOD1(timer, Timer&(const std::string& name));
 
   testing::NiceMock<MockCounter> counter_;

@@ -1,4 +1,4 @@
-#include "dynamo.h"
+#include "server/config/http/dynamo.h"
 
 #include "common/dynamo/dynamo_filter.h"
 
@@ -15,7 +15,7 @@ HttpFilterFactoryCb DynamoFilterConfig::tryCreateFilterFactory(HttpFilterType ty
   }
 
   return [&server, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(Http::StreamFilterPtr{
+    callbacks.addStreamFilter(Http::StreamFilterSharedPtr{
         new Dynamo::DynamoFilter(server.runtime(), stat_prefix, server.stats())});
   };
 }

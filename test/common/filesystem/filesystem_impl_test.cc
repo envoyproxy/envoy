@@ -5,6 +5,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+#include "test/test_common/environment.h"
 
 using testing::_;
 using testing::InSequence;
@@ -37,7 +38,7 @@ TEST(FileSystemImpl, directoryExists) {
 }
 
 TEST(FileSystemImpl, fileReadToEndSuccess) {
-  const std::string file_path = "/tmp/test_envoy";
+  const std::string file_path = TestEnvironment::temporaryPath("test_envoy");
   unlink(file_path.c_str());
   std::ofstream file(file_path);
 
@@ -49,8 +50,9 @@ TEST(FileSystemImpl, fileReadToEndSuccess) {
 }
 
 TEST(FileSystemImpl, fileReadToEndDoesNotExist) {
-  unlink("/tmp/envoy_this_not_exist");
-  EXPECT_THROW(Filesystem::fileReadToEnd("/tmp/envoy_this_not_exist"), EnvoyException);
+  unlink(TestEnvironment::temporaryPath("envoy_this_not_exist").c_str());
+  EXPECT_THROW(Filesystem::fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
+               EnvoyException);
 }
 
 TEST(FileSystemImpl, flushToLogFilePeriodically) {

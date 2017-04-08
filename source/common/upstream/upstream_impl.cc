@@ -1,7 +1,4 @@
-#include "health_checker_impl.h"
-#include "logical_dns_cluster.h"
-#include "sds.h"
-#include "upstream_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -18,6 +15,9 @@
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
 #include "common/ssl/context_config_impl.h"
+#include "common/upstream/health_checker_impl.h"
+#include "common/upstream/logical_dns_cluster.h"
+#include "common/upstream/sds.h"
 
 namespace Upstream {
 
@@ -27,9 +27,9 @@ Host::CreateConnectionData HostImpl::createConnection(Event::Dispatcher& dispatc
   return {createConnection(dispatcher, *cluster_, address_), shared_from_this()};
 }
 
-Network::ClientConnectionPtr HostImpl::createConnection(Event::Dispatcher& dispatcher,
-                                                        const ClusterInfo& cluster,
-                                                        Network::Address::InstancePtr address) {
+Network::ClientConnectionPtr
+HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+                           Network::Address::InstanceConstSharedPtr address) {
   Network::ClientConnectionPtr connection =
       cluster.sslContext() ? dispatcher.createSslClientConnection(*cluster.sslContext(), address)
                            : dispatcher.createClientConnection(address);
@@ -47,8 +47,8 @@ ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
   return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TIMER(scope))};
 }
 
-void HostSetImpl::runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
-                                     const std::vector<HostPtr>& hosts_removed) {
+void HostSetImpl::runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
+                                     const std::vector<HostSharedPtr>& hosts_removed) {
   for (MemberUpdateCb& callback : callbacks_) {
     callback(hosts_added, hosts_removed);
   }
@@ -87,7 +87,8 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
   }
 }
 
-const ConstHostListsPtr ClusterImplBase::empty_host_lists_{new std::vector<std::vector<HostPtr>>()};
+const HostListsConstSharedPtr ClusterImplBase::empty_host_lists_{
+    new std::vector<std::vector<HostSharedPtr>>()};
 
 ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& cm,
                                    Stats::Store& stats, ThreadLocal::Instance& tls,
@@ -97,7 +98,7 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
                                    Event::Dispatcher& dispatcher,
                                    const Optional<SdsConfig>& sds_config,
                                    const LocalInfo::LocalInfo& local_info,
-                                   Outlier::EventLoggerPtr outlier_event_logger) {
+                                   Outlier::EventLoggerSharedPtr outlier_event_logger) {
 
   cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
 
@@ -145,8 +146,9 @@ ClusterImplBase::ClusterImplBase(const Json::Object& config, Runtime::Loader& ru
                                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
     : runtime_(runtime), info_(new ClusterInfoImpl(config, runtime, stats, ssl_context_manager)) {}
 
-ConstHostVectorPtr ClusterImplBase::createHealthyHostList(const std::vector<HostPtr>& hosts) {
-  HostVectorPtr healthy_list(new std::vector<HostPtr>());
+HostVectorConstSharedPtr
+ClusterImplBase::createHealthyHostList(const std::vector<HostSharedPtr>& hosts) {
+  HostVectorSharedPtr healthy_list(new std::vector<HostSharedPtr>());
   for (const auto& host : hosts) {
     if (host->healthy()) {
       healthy_list->emplace_back(host);
@@ -156,12 +158,12 @@ ConstHostVectorPtr ClusterImplBase::createHealthyHostList(const std::vector<Host
   return healthy_list;
 }
 
-ConstHostListsPtr
-ClusterImplBase::createHealthyHostLists(const std::vector<std::vector<HostPtr>>& hosts) {
-  HostListsPtr healthy_list(new std::vector<std::vector<HostPtr>>());
+HostListsConstSharedPtr
+ClusterImplBase::createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts) {
+  HostListsSharedPtr healthy_list(new std::vector<std::vector<HostSharedPtr>>());
 
   for (const auto& hosts_zone : hosts) {
-    std::vector<HostPtr> current_zone_hosts;
+    std::vector<HostSharedPtr> current_zone_hosts;
     for (const auto& host : hosts_zone) {
       if (host->healthy()) {
         current_zone_hosts.emplace_back(host);
@@ -195,8 +197,8 @@ ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) con
   return *resource_managers_.managers_[enumToInt(priority)];
 }
 
-void ClusterImplBase::runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
-                                         const std::vector<HostPtr>& hosts_removed) {
+void ClusterImplBase::runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
+                                         const std::vector<HostSharedPtr>& hosts_removed) {
   if (!hosts_added.empty() || !hosts_removed.empty()) {
     info_->stats().membership_change_.inc();
   }
@@ -210,7 +212,7 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
   ASSERT(!health_checker_);
   health_checker_ = std::move(health_checker);
   health_checker_->start();
-  health_checker_->addHostCheckCompleteCb([this](HostPtr, bool changed_state) -> void {
+  health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool changed_state) -> void {
     // If we get a health check completion that resulted in a state change, signal to
     // update the host sets on all threads.
     if (changed_state) {
@@ -219,18 +221,19 @@ void ClusterImplBase::setHealthChecker(HealthCheckerPtr&& health_checker) {
   });
 }
 
-void ClusterImplBase::setOutlierDetector(Outlier::DetectorPtr outlier_detector) {
+void ClusterImplBase::setOutlierDetector(Outlier::DetectorSharedPtr outlier_detector) {
   if (!outlier_detector) {
     return;
   }
 
   outlier_detector_ = std::move(outlier_detector);
-  outlier_detector_->addChangedStateCb([this](HostPtr) -> void { reloadHealthyHosts(); });
+  outlier_detector_->addChangedStateCb([this](HostSharedPtr) -> void { reloadHealthyHosts(); });
 }
 
 void ClusterImplBase::reloadHealthyHosts() {
-  ConstHostVectorPtr hosts_copy(new std::vector<HostPtr>(hosts()));
-  ConstHostListsPtr hosts_per_zone_copy(new std::vector<std::vector<HostPtr>>(hostsPerZone()));
+  HostVectorConstSharedPtr hosts_copy(new std::vector<HostSharedPtr>(hosts()));
+  HostListsConstSharedPtr hosts_per_zone_copy(
+      new std::vector<std::vector<HostSharedPtr>>(hostsPerZone()));
   updateHosts(hosts_copy, createHealthyHostList(hosts()), hosts_per_zone_copy,
               createHealthyHostLists(hostsPerZone()), {}, {});
 }
@@ -266,9 +269,9 @@ StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader
                                      Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
     : ClusterImplBase(config, runtime, stats, ssl_context_manager) {
   std::vector<Json::ObjectPtr> hosts_json = config.getObjectArray("hosts");
-  HostVectorPtr new_hosts(new std::vector<HostPtr>());
+  HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
   for (Json::ObjectPtr& host : hosts_json) {
-    new_hosts->emplace_back(HostPtr{new HostImpl(
+    new_hosts->emplace_back(HostSharedPtr{new HostImpl(
         info_, "", Network::Utility::resolveUrl(host->getString("url")), false, 1, "")});
   }
 
@@ -276,10 +279,10 @@ StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader
               {}, {});
 }
 
-bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& new_hosts,
-                                                   std::vector<HostPtr>& current_hosts,
-                                                   std::vector<HostPtr>& hosts_added,
-                                                   std::vector<HostPtr>& hosts_removed,
+bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostSharedPtr>& new_hosts,
+                                                   std::vector<HostSharedPtr>& current_hosts,
+                                                   std::vector<HostSharedPtr>& hosts_added,
+                                                   std::vector<HostSharedPtr>& hosts_removed,
                                                    bool depend_on_hc) {
   uint64_t max_host_weight = 1;
 
@@ -289,8 +292,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const std::vector<HostPtr>& n
   // duplicates here. It's possible for DNS to return the same address multiple times, and a bad
   // SDS implementation could do the same thing.
   std::unordered_set<std::string> host_addresses;
-  std::vector<HostPtr> final_hosts;
-  for (HostPtr host : new_hosts) {
+  std::vector<HostSharedPtr> final_hosts;
+  for (HostSharedPtr host : new_hosts) {
     if (host_addresses.count(host->address()->asString())) {
       continue;
     }
@@ -378,12 +381,12 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
   }
 }
 
-void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostPtr>& hosts_added,
-                                          const std::vector<HostPtr>& hosts_removed) {
+void StrictDnsClusterImpl::updateAllHosts(const std::vector<HostSharedPtr>& hosts_added,
+                                          const std::vector<HostSharedPtr>& hosts_removed) {
   // At this point we know that we are different so make a new host list and notify.
-  HostVectorPtr new_hosts(new std::vector<HostPtr>());
+  HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
   for (const ResolveTargetPtr& target : resolve_targets_) {
-    for (const HostPtr& host : target->hosts_) {
+    for (const HostSharedPtr& host : target->hosts_) {
       new_hosts->emplace_back(host);
     }
   }
@@ -410,25 +413,26 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   parent_.info_->stats().update_attempt_.inc();
 
   active_query_ = parent_.dns_resolver_.resolve(
-      dns_address_, [this](std::list<Network::Address::InstancePtr>&& address_list) -> void {
+      dns_address_,
+      [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
-        std::vector<HostPtr> new_hosts;
-        for (Network::Address::InstancePtr address : address_list) {
+        std::vector<HostSharedPtr> new_hosts;
+        for (Network::Address::InstanceConstSharedPtr address : address_list) {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
           // a new address that has port in it. We need to both support IPv6 as well as potentially
           // move port handling into the DNS interface itself, which would work better for SRV.
-          new_hosts.emplace_back(
-              new HostImpl(parent_.info_, dns_address_,
-                           Network::Address::InstancePtr{new Network::Address::Ipv4Instance(
-                               address->ip()->addressAsString(), port_)},
-                           false, 1, ""));
+          new_hosts.emplace_back(new HostImpl(
+              parent_.info_, dns_address_,
+              Network::Address::InstanceConstSharedPtr{
+                  new Network::Address::Ipv4Instance(address->ip()->addressAsString(), port_)},
+              false, 1, ""));
         }
 
-        std::vector<HostPtr> hosts_added;
-        std::vector<HostPtr> hosts_removed;
+        std::vector<HostSharedPtr> hosts_added;
+        std::vector<HostSharedPtr> hosts_removed;
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, false)) {
           log_debug("DNS hosts have changed for {}", dns_address_);
           parent_.updateAllHosts(hosts_added, hosts_removed);

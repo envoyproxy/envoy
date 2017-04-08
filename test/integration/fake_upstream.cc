@@ -7,6 +7,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 
 #include "test/test_common/utility.h"
@@ -123,7 +124,7 @@ FakeHttpConnection::FakeHttpConnection(Network::Connection& connection, Stats::S
     ASSERT(type == Type::HTTP2);
   }
 
-  connection.addReadFilter(Network::ReadFilterPtr{new ReadFilter(*this)});
+  connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
 }
 
 void FakeConnectionBase::close() {
@@ -185,23 +186,27 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
   log().info("starting fake server on unix domain socket {}", uds_path);
 }
 
+static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port) {
+  auto addr =
+      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("0.0.0.0", port)};
+  return Network::ListenSocketPtr{new Network::TcpListenSocket(addr, true)};
+}
+
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type)
-    : FakeUpstream(nullptr, Network::ListenSocketPtr{new Network::TcpListenSocket(port, true)},
-                   type) {
-  log().info("starting fake server on port {}", port);
+    : FakeUpstream(nullptr, makeTcpListenSocket(port), type) {
+  log().info("starting fake server on port {}", this->localAddress()->ip()->port());
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
                            FakeHttpConnection::Type type)
-    : FakeUpstream(ssl_ctx, Network::ListenSocketPtr{new Network::TcpListenSocket(port, true)},
-                   type) {
-  log().info("starting fake SSL server on port {}", port);
+    : FakeUpstream(ssl_ctx, makeTcpListenSocket(port), type) {
+  log().info("starting fake SSL server on port {}", this->localAddress()->ip()->port());
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, Network::ListenSocketPtr&& listen_socket,
                            FakeHttpConnection::Type type)
     : ssl_ctx_(ssl_ctx), socket_(std::move(listen_socket)),
-      handler_(stats_store_, log(), Api::ApiPtr{new Api::Impl(std::chrono::milliseconds(10000))}),
+      handler_(log(), Api::ApiPtr{new Api::Impl(std::chrono::milliseconds(10000))}),
       http_type_(type) {
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
   server_initialized_.waitReady();

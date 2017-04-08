@@ -4,13 +4,13 @@
 namespace Bson {
 
 TEST(BsonImplTest, BadCast) {
-  DocumentPtr doc = DocumentImpl::create()->addString("hello", "world");
+  DocumentSharedPtr doc = DocumentImpl::create()->addString("hello", "world");
   EXPECT_THROW(doc->values().front()->asDouble(), EnvoyException);
 }
 
 TEST(BsonImplTest, Equal) {
-  DocumentPtr doc1 = DocumentImpl::create();
-  DocumentPtr doc2 = DocumentImpl::create()->addString("hello", "world");
+  DocumentSharedPtr doc1 = DocumentImpl::create();
+  DocumentSharedPtr doc2 = DocumentImpl::create()->addString("hello", "world");
   EXPECT_FALSE(*doc1 == *doc2);
 
   doc1->addDouble("hello", 2.0);

@@ -1,8 +1,5 @@
 #pragma once
 
-#include "date_provider.h"
-#include "user_agent.h"
-
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"
@@ -19,6 +16,8 @@
 
 #include "common/common/linked_object.h"
 #include "common/http/access_log/request_info_impl.h"
+#include "common/http/date_provider.h"
+#include "common/http/user_agent.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
@@ -104,8 +103,11 @@ struct ConnectionManagerTracingStats {
  * Here we specify some specific for connection manager settings.
  */
 struct TracingConnectionManagerConfig {
-  std::string operation_name_;
+  Tracing::OperationName operation_name_;
+  std::vector<Http::LowerCaseString> request_headers_for_tags_;
 };
+
+typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;
 
 /**
  * Abstract configuration for the connection manager.
@@ -115,9 +117,9 @@ public:
   virtual ~ConnectionManagerConfig() {}
 
   /**
-   *  @return const std::list<AccessLog::InstancePtr>& the access logs to write to.
+   *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.
    */
-  virtual const std::list<AccessLog::InstancePtr>& accessLogs() PURE;
+  virtual const std::list<AccessLog::InstanceSharedPtr>& accessLogs() PURE;
 
   /**
    * Called to create a codec for the connection manager. This function will be called when the
@@ -203,7 +205,7 @@ public:
   /**
    * @return tracing config.
    */
-  virtual const Optional<TracingConnectionManagerConfig>& tracingConfig() PURE;
+  virtual const TracingConnectionManagerConfig* tracingConfig() PURE;
 };
 
 /**
@@ -269,7 +271,7 @@ private:
     Ssl::Connection* ssl() override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
-    Router::RoutePtr route() override;
+    Router::RouteConstSharedPtr route() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
     const std::string& downstreamAddress() override;
@@ -285,7 +287,7 @@ private:
   struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                      public StreamDecoderFilterCallbacks,
                                      LinkedObject<ActiveStreamDecoderFilter> {
-    ActiveStreamDecoderFilter(ActiveStream& parent, StreamDecoderFilterPtr filter)
+    ActiveStreamDecoderFilter(ActiveStream& parent, StreamDecoderFilterSharedPtr filter)
         : ActiveStreamFilterBase(parent), handle_(filter) {}
 
     // ActiveStreamFilterBase
@@ -302,14 +304,12 @@ private:
 
     // Http::StreamDecoderFilterCallbacks
     void continueDecoding() override;
-    const Buffer::Instance* decodingBuffer() override {
-      return parent_.buffered_request_data_.get();
-    }
+    Buffer::InstancePtr& decodingBuffer() override { return parent_.buffered_request_data_; }
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
 
-    StreamDecoderFilterPtr handle_;
+    StreamDecoderFilterSharedPtr handle_;
   };
 
   typedef std::unique_ptr<ActiveStreamDecoderFilter> ActiveStreamDecoderFilterPtr;
@@ -320,7 +320,7 @@ private:
   struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                      public StreamEncoderFilterCallbacks,
                                      LinkedObject<ActiveStreamEncoderFilter> {
-    ActiveStreamEncoderFilter(ActiveStream& parent, StreamEncoderFilterPtr filter)
+    ActiveStreamEncoderFilter(ActiveStream& parent, StreamEncoderFilterSharedPtr filter)
         : ActiveStreamFilterBase(parent), handle_(filter) {}
 
     // ActiveStreamFilterBase
@@ -337,11 +337,9 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void continueEncoding() override;
-    const Buffer::Instance* encodingBuffer() override {
-      return parent_.buffered_response_data_.get();
-    }
+    Buffer::InstancePtr& encodingBuffer() override { return parent_.buffered_response_data_; }
 
-    StreamEncoderFilterPtr handle_;
+    StreamEncoderFilterSharedPtr handle_;
   };
 
   typedef std::unique_ptr<ActiveStreamEncoderFilter> ActiveStreamEncoderFilterPtr;
@@ -382,13 +380,14 @@ private:
     void decodeTrailers(HeaderMapPtr&& trailers) override;
 
     // Http::FilterChainFactoryCallbacks
-    void addStreamDecoderFilter(StreamDecoderFilterPtr filter) override;
-    void addStreamEncoderFilter(StreamEncoderFilterPtr filter) override;
-    void addStreamFilter(StreamFilterPtr filter) override;
-    void addAccessLogHandler(Http::AccessLog::InstancePtr handler) override;
+    void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override;
+    void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override;
+    void addStreamFilter(StreamFilterSharedPtr filter) override;
+    void addAccessLogHandler(Http::AccessLog::InstanceSharedPtr handler) override;
 
     // Tracing::TracingConfig
-    virtual const std::string& operationName() const override;
+    virtual Tracing::OperationName operationName() const override;
+    virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
 
     // All state for the stream. Put here for readability. We could move this to a bit field
     // eventually if we want.
@@ -401,7 +400,7 @@ private:
     };
 
     ConnectionManagerImpl& connection_manager_;
-    Router::ConfigPtr snapped_route_config_;
+    Router::ConfigConstSharedPtr snapped_route_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
@@ -413,13 +412,13 @@ private:
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
-    std::list<Http::AccessLog::InstancePtr> access_log_handlers_;
+    std::list<Http::AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_timer_;
     std::list<std::function<void()>> reset_callbacks_;
     State state_;
     AccessLog::RequestInfoImpl request_info_;
     std::string downstream_address_;
-    Optional<Router::RoutePtr> cached_route_;
+    Optional<Router::RouteConstSharedPtr> cached_route_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

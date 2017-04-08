@@ -75,7 +75,8 @@ public:
   TestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
-  Network::Address::InstancePtr host_address_{Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
+  Network::Address::InstanceConstSharedPtr host_address_{
+      Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
 };
 
 TEST_F(RouterTest, RouteNotFound) {
@@ -122,7 +123,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_CALL(callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamConnectionFailure));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   Http::TestHeaderMapImpl headers;
@@ -248,7 +249,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
                              return nullptr;
                            }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   expectResponseTimerCreate();
@@ -287,7 +288,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
                              return nullptr;
                            }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   expectResponseTimerCreate();
@@ -325,7 +326,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
                              return nullptr;
                            }));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   expectResponseTimerCreate();
@@ -368,7 +369,7 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
   EXPECT_CALL(callbacks_.request_info_,
               setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamRemoteReset));
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
@@ -393,7 +394,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
 
   expectResponseTimerCreate();
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
@@ -655,9 +656,9 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
 
-  Buffer::OwnedImpl body_data("hello");
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(body_data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   router_.decodeTrailers(trailers);
@@ -678,7 +679,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
                              callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
                              return nullptr;
                            }));
-  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(&body_data));
+  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(ReturnRef(body_data));
   EXPECT_CALL(encoder2, encodeHeaders(_, false));
   EXPECT_CALL(encoder2, encodeData(_, false));
   EXPECT_CALL(encoder2, encodeTrailers(_));
@@ -726,11 +727,11 @@ TEST_F(RouterTest, Shadow) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
 
-  Buffer::OwnedImpl body_data("hello");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(body_data, false));
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(AtLeast(1)).WillRepeatedly(Return(&body_data));
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(body_data));
   EXPECT_CALL(*shadow_writer_, shadow_("foo", _, std::chrono::milliseconds(10)))
       .WillOnce(Invoke([](const std::string&, Http::MessagePtr& request, std::chrono::milliseconds)
                            -> void {
@@ -1002,7 +1003,7 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
       }));
 
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
   router_.decodeHeaders(incoming_headers, true);
@@ -1036,7 +1037,7 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
       }));
 
   EXPECT_CALL(callbacks_.request_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionPtr host)
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host)
                            -> void { EXPECT_EQ(host_address_, host->address()); }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(false));
   router_.decodeHeaders(incoming_headers, true);

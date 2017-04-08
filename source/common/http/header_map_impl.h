@@ -1,10 +1,9 @@
 #pragma once
 
-#include "headers.h"
-
 #include "envoy/http/header_map.h"
 
 #include "common/common/non_copyable.h"
+#include "common/http/headers.h"
 
 namespace Http {
 
@@ -70,6 +69,7 @@ protected:
     void value(uint64_t value) override;
     void value(const HeaderEntry& header) override;
     const HeaderString& value() const override { return value_; }
+    HeaderString& value() override { return value_; }
 
     HeaderString key_;
     HeaderString value_;

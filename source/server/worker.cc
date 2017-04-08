@@ -1,4 +1,4 @@
-#include "worker.h"
+#include "server/worker.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -8,17 +8,16 @@
 #include "common/api/api_impl.h"
 #include "common/common/thread.h"
 
-Worker::Worker(Stats::Store& stats_store, ThreadLocal::Instance& tls,
-               std::chrono::milliseconds file_flush_interval_msec)
+Worker::Worker(ThreadLocal::Instance& tls, std::chrono::milliseconds file_flush_interval_msec)
     : tls_(tls), handler_(new Server::ConnectionHandlerImpl(
-                     stats_store, log(), Api::ApiPtr{new Api::Impl(file_flush_interval_msec)})) {
+                     log(), Api::ApiPtr{new Api::Impl(file_flush_interval_msec)})) {
   tls_.registerThread(handler_->dispatcher(), false);
 }
 
 Worker::~Worker() {}
 
 void Worker::initializeConfiguration(Server::Configuration::Main& config,
-                                     const SocketMap& socket_map) {
+                                     const SocketMap& socket_map, Server::GuardDog& guard_dog) {
   for (const Server::Configuration::ListenerPtr& listener : config.listeners()) {
     const Network::ListenerOptions listener_options = {
         .bind_to_port_ = listener->bindToPort(),
@@ -39,7 +38,7 @@ void Worker::initializeConfiguration(Server::Configuration::Main& config,
   no_exit_timer_ = handler_->dispatcher().createTimer([this]() -> void { onNoExitTimer(); });
   onNoExitTimer();
 
-  thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
+  thread_.reset(new Thread::Thread([this, &guard_dog]() -> void { threadRoutine(guard_dog); }));
 }
 
 void Worker::exit() {
@@ -56,11 +55,13 @@ void Worker::onNoExitTimer() {
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::hours(1)));
 }
 
-void Worker::threadRoutine() {
+void Worker::threadRoutine(Server::GuardDog& guard_dog) {
   log().info("worker entering dispatch loop");
-  handler_->startWatchdog();
+  auto watchdog = guard_dog.createWatchDog(Thread::Thread::currentThreadId());
+  watchdog->startWatchdog(handler_->dispatcher());
   handler_->dispatcher().run(Event::Dispatcher::RunType::Block);
   log().info("worker exited dispatch loop");
+  guard_dog.stopWatching(watchdog);
 
   // We must close all active connections before we actually exit the thread. This prevents any
   // destructors from running on the main thread which might reference thread locals. Destroying

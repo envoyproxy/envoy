@@ -48,7 +48,7 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   Api::Impl api(std::chrono::milliseconds(9000));
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionPtr host_description{new Upstream::HostDescriptionImpl(
+  Upstream::HostDescriptionConstSharedPtr host_description{new Upstream::HostDescriptionImpl(
       cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
   Http::CodecClientProd client(type,
                                dispatcher->createClientConnection(Network::Utility::resolveUrl(
@@ -79,7 +79,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
   dispatcher_ = api_->allocateDispatcher();
   client_ = dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", port)));
-  client_->addReadFilter(Network::ReadFilterPtr{new ForwardingFilter(*this, data_callback)});
+  client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
   client_->write(initial_data);
   client_->connect();
 }

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "macros.h"
-
 #include "envoy/thread/thread.h"
+
+#include "common/common/macros.h"
 
 namespace Logger {
 

@@ -1,6 +1,4 @@
-#include "conn_manager_impl.h"
-#include "conn_manager_utility.h"
-#include "headers.h"
+#include "common/http/conn_manager_impl.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
@@ -15,8 +13,10 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
+#include "common/http/conn_manager_utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
@@ -304,7 +304,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
-  for (AccessLog::InstancePtr access_log : connection_manager_.config_.accessLogs()) {
+  for (AccessLog::InstanceSharedPtr access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
   }
   for (const auto& log_handler : access_log_handlers_) {
@@ -315,30 +315,33 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     if (request_info_.healthCheck()) {
       connection_manager_.config_.tracingStats().health_check_.inc();
     } else {
-      Tracing::HttpTracerUtility::finalizeSpan(*active_span_, *request_headers_, request_info_);
+      Tracing::HttpTracerUtility::finalizeSpan(*active_span_, *request_headers_, request_info_,
+                                               *this);
     }
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilter(StreamDecoderFilterPtr filter) {
+void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilter(
+    StreamDecoderFilterSharedPtr filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter));
   filter->setDecoderFilterCallbacks(*wrapper);
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
-void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilter(StreamEncoderFilterPtr filter) {
+void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilter(
+    StreamEncoderFilterSharedPtr filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter));
   filter->setEncoderFilterCallbacks(*wrapper);
   wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
 }
 
-void ConnectionManagerImpl::ActiveStream::addStreamFilter(StreamFilterPtr filter) {
+void ConnectionManagerImpl::ActiveStream::addStreamFilter(StreamFilterSharedPtr filter) {
   addStreamDecoderFilter(filter);
   addStreamEncoderFilter(filter);
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
-    Http::AccessLog::InstancePtr handler) {
+    Http::AccessLog::InstanceSharedPtr handler) {
   access_log_handlers_.push_back(handler);
 }
 
@@ -444,7 +447,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.runtime_);
 
   // Check if tracing is enabled at all.
-  if (connection_manager_.config_.tracingConfig().valid()) {
+  if (connection_manager_.config_.tracingConfig()) {
     Tracing::Decision tracing_decision =
         Tracing::HttpTracerUtility::isTracing(request_info_, *request_headers_);
     ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
@@ -463,6 +466,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
@@ -470,12 +474,27 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
-    FilterHeadersStatus status = (*entry)->handle_->decodeHeaders(headers, end_stream);
+    FilterHeadersStatus status = (*entry)->handle_->decodeHeaders(
+        headers, end_stream && continue_data_entry == decoder_filters_.end());
     stream_log_trace("decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterHeadersCallback(status)) {
       return;
     }
+
+    // Here we handle the case where we have a header only request, but a filter adds a body
+    // to it. We need to not raise end_stream = true to further filters during inline iteration.
+    if (end_stream && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
+      continue_data_entry = entry;
+    }
+  }
+
+  if (continue_data_entry != decoder_filters_.end()) {
+    // We use the continueDecoding() code since it will correctly handle not calling
+    // decodeHeaders() again. Fake setting stopped_ since the continueDecoding() code expects it.
+    ASSERT(buffered_request_data_);
+    (*continue_data_entry)->stopped_ = true;
+    (*continue_data_entry)->continueDecoding();
   }
 }
 
@@ -575,12 +594,21 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
+  std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
+
   for (; entry != encoder_filters_.end(); entry++) {
-    FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, end_stream);
+    FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(
+        headers, end_stream && continue_data_entry == encoder_filters_.end());
     stream_log_trace("encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterHeadersCallback(status)) {
       return;
+    }
+
+    // Here we handle the case where we have a header only response, but a filter adds a body
+    // to it. We need to not raise end_stream = true to further filters during inline iteration.
+    if (end_stream && buffered_response_data_ && continue_data_entry == encoder_filters_.end()) {
+      continue_data_entry = entry;
     }
   }
 
@@ -626,7 +654,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   chargeStats(headers);
 
-  stream_log_debug("encoding headers via codec (end_stream={}):", *this, end_stream);
+  stream_log_debug("encoding headers via codec (end_stream={}):", *this,
+                   end_stream && continue_data_entry == encoder_filters_.end());
 #ifndef NDEBUG
   headers.iterate([](const HeaderEntry& header, void* context) -> void {
     stream_log_debug("  '{}':'{}'", *static_cast<ActiveStream*>(context), header.key().c_str(),
@@ -635,8 +664,18 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 #endif
 
   // Now actually encode via the codec.
-  response_encoder_->encodeHeaders(headers, end_stream);
-  maybeEndEncode(end_stream);
+  response_encoder_->encodeHeaders(headers,
+                                   end_stream && continue_data_entry == encoder_filters_.end());
+
+  if (continue_data_entry != encoder_filters_.end()) {
+    // We use the continueEncoding() code since it will correctly handle not calling
+    // encodeHeaders() again. Fake setting stopped_ since the continueEncoding() code expects it.
+    ASSERT(buffered_response_data_);
+    (*continue_data_entry)->stopped_ = true;
+    (*continue_data_entry)->continueEncoding();
+  } else {
+    maybeEndEncode(end_stream);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* filter,
@@ -706,8 +745,13 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
       removeFromList(connection_manager_.streams_));
 }
 
-const std::string& ConnectionManagerImpl::ActiveStream::operationName() const {
-  return connection_manager_.config_.tracingConfig().value().operation_name_;
+Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
+  return connection_manager_.config_.tracingConfig()->operation_name_;
+}
+
+const std::vector<Http::LowerCaseString>&
+ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
+  return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::addResetStreamCallback(
@@ -826,7 +870,7 @@ AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestIn
   return parent_.request_info_;
 }
 
-Router::RoutePtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
+Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
   if (!parent_.cached_route_.valid()) {
     parent_.cached_route_.value(
         parent_.snapped_route_config_->route(*parent_.request_headers_, parent_.stream_id_));

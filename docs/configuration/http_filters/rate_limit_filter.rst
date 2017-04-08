@@ -20,7 +20,8 @@ If the rate limit service is called, and the response for any of the descriptors
     "name": "rate_limit",
     "config": {
       "domain": "...",
-      "stage": "..."
+      "stage": "...",
+      "request_type": "..."
     }
   }
 
@@ -32,6 +33,14 @@ stage
   number. If not set, the default stage number is 0.
 
   **NOTE:** The filter supports a range of 0 - 10 inclusively for stage numbers.
+
+request_type
+  *(optional, string)* The type of requests the filter should apply to. The supported
+  types are *internal*, *external* or *both*. A request is considered internal if
+  :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is set to true. If
+  :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is not set or false, a
+  request is considered external. The filter defaults to *both*, and it will apply to all request
+  types.
 
 Statistics
 ----------

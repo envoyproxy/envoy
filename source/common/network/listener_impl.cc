@@ -1,5 +1,4 @@
-#include "listener_impl.h"
-#include "utility.h"
+#include "common/network/listener_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/network/connection_handler.h"
@@ -9,21 +8,24 @@
 #include "common/event/file_event_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/connection_impl.h"
+#include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
 
 #include "event2/listener.h"
 
 namespace Network {
 
-Address::InstancePtr ListenerImpl::getOriginalDst(int fd) { return Utility::getOriginalDst(fd); }
+Address::InstanceConstSharedPtr ListenerImpl::getOriginalDst(int fd) {
+  return Utility::getOriginalDst(fd);
+}
 
-void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr, int,
-                                  void* arg) {
+void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
+                                  int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
-  Address::InstancePtr final_local_address = listener->socket_.localAddress();
+  Address::InstanceConstSharedPtr final_local_address = listener->socket_.localAddress();
   if (listener->options_.use_original_dst_ && final_local_address->type() == Address::Type::Ip) {
-    Address::InstancePtr original_local_address = listener->getOriginalDst(fd);
+    Address::InstanceConstSharedPtr original_local_address = listener->getOriginalDst(fd);
     if (original_local_address) {
       final_local_address = original_local_address;
     }
@@ -48,16 +50,20 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   if (listener->options_.use_proxy_proto_) {
     listener->proxy_protocol_.newConnection(listener->dispatcher_, fd, *listener);
   } else {
-    Address::InstancePtr final_remote_address;
-    if (remote_addr->sa_family == AF_INET) {
-      final_remote_address.reset(
-          new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(remote_addr)));
+    Address::InstanceConstSharedPtr final_remote_address;
+    if (remote_addr->sa_family == AF_UNIX) {
+      // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
+      // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
+      // sockaddr_un associated with the client socket when starting from the server socket.
+      // We work around this by using our own name for the socket in this case.
+      final_remote_address = Address::peerAddressFromFd(fd);
     } else {
-      // TODO(mattklein123): IPv6 support.
-      ASSERT(remote_addr->sa_family == AF_UNIX);
-      final_remote_address.reset(
-          new Address::PipeInstance(reinterpret_cast<sockaddr_un*>(remote_addr)));
+      final_remote_address = Address::addressFromSockAddr(
+          *reinterpret_cast<const sockaddr_storage*>(remote_addr), remote_addr_len);
     }
+    // TODO(jamessynge): We need to keep per-family stats. BUT, should it be based on the original
+    // family or the local family? Probably local family, as the original proxy can take care of
+    // stats for the original family.
     listener->newConnection(fd, final_remote_address, final_local_address);
   }
 }
@@ -88,15 +94,15 @@ void ListenerImpl::errorCallback(evconnlistener*, void*) {
   PANIC(fmt::format("listener accept failure: {}", strerror(errno)));
 }
 
-void ListenerImpl::newConnection(int fd, Address::InstancePtr remote_address,
-                                 Address::InstancePtr local_address) {
+void ListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
+                                 Address::InstanceConstSharedPtr local_address) {
   ConnectionPtr new_connection(new ConnectionImpl(dispatcher_, fd, remote_address, local_address));
   new_connection->setReadBufferLimit(options_.per_connection_buffer_limit_bytes_);
   cb_.onNewConnection(std::move(new_connection));
 }
 
-void SslListenerImpl::newConnection(int fd, Address::InstancePtr remote_address,
-                                    Address::InstancePtr local_address) {
+void SslListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remote_address,
+                                    Address::InstanceConstSharedPtr local_address) {
   ConnectionPtr new_connection(new Ssl::ConnectionImpl(dispatcher_, fd, remote_address,
                                                        local_address, ssl_ctx_,
                                                        Ssl::ConnectionImpl::InitialState::Server));

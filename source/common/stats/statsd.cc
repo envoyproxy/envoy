@@ -1,4 +1,4 @@
-#include "statsd.h"
+#include "common/stats/statsd.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
@@ -13,7 +13,7 @@ namespace Stats {
 namespace Statsd {
 
 Writer::Writer(uint32_t port) {
-  Network::Address::InstancePtr address(new Network::Address::Ipv4Instance(port));
+  Network::Address::InstanceConstSharedPtr address(new Network::Address::Ipv4Instance(port));
   fd_ = address->socket(Network::Address::SocketType::Datagram);
   ASSERT(fd_ != -1);
 
@@ -70,9 +70,10 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
         fmt::format("TCP statsd requires setting --service-cluster and --service-node"));
   }
 
-  tls.set(tls_slot_, [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectPtr {
-    return ThreadLocal::ThreadLocalObjectPtr{new TlsSink(*this, dispatcher)};
-  });
+  tls.set(tls_slot_,
+          [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+            return std::make_shared<TlsSink>(*this, dispatcher);
+          });
 }
 
 TcpStatsdSink::TlsSink::TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher)

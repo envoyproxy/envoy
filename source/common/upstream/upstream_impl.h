@@ -1,8 +1,5 @@
 #pragma once
 
-#include "outlier_detection_impl.h"
-#include "resource_manager_impl.h"
-
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -17,6 +14,8 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/stats/stats_impl.h"
+#include "common/upstream/outlier_detection_impl.h"
+#include "common/upstream/resource_manager_impl.h"
 
 namespace Upstream {
 
@@ -25,8 +24,9 @@ namespace Upstream {
  */
 class HostDescriptionImpl : virtual public HostDescription {
 public:
-  HostDescriptionImpl(ClusterInfoPtr cluster, const std::string& hostname,
-                      Network::Address::InstancePtr address, bool canary, const std::string& zone)
+  HostDescriptionImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+                      Network::Address::InstanceConstSharedPtr address, bool canary,
+                      const std::string& zone)
       : cluster_(cluster), hostname_(hostname), address_(address), canary_(canary), zone_(zone),
         stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {}
 
@@ -42,13 +42,13 @@ public:
   }
   const HostStats& stats() const override { return stats_; }
   const std::string& hostname() const override { return hostname_; }
-  Network::Address::InstancePtr address() const override { return address_; }
+  Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const std::string& zone() const override { return zone_; }
 
 protected:
-  ClusterInfoPtr cluster_;
+  ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
-  Network::Address::InstancePtr address_;
+  Network::Address::InstanceConstSharedPtr address_;
   const bool canary_;
   const std::string zone_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -66,17 +66,17 @@ class HostImpl : public HostDescriptionImpl,
                  public Host,
                  public std::enable_shared_from_this<HostImpl> {
 public:
-  HostImpl(ClusterInfoPtr cluster, const std::string& hostname,
-           Network::Address::InstancePtr address, bool canary, uint32_t initial_weight,
+  HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+           Network::Address::InstanceConstSharedPtr address, bool canary, uint32_t initial_weight,
            const std::string& zone)
       : HostDescriptionImpl(cluster, hostname, address, canary, zone) {
     weight(initial_weight);
   }
 
   // Upstream::Host
-  std::list<Stats::CounterPtr> counters() const override { return stats_store_.counters(); }
+  std::list<Stats::CounterSharedPtr> counters() const override { return stats_store_.counters(); }
   CreateConnectionData createConnection(Event::Dispatcher& dispatcher) const override;
-  std::list<Stats::GaugePtr> gauges() const override { return stats_store_.gauges(); }
+  std::list<Stats::GaugeSharedPtr> gauges() const override { return stats_store_.gauges(); }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
@@ -88,19 +88,19 @@ public:
   void weight(uint32_t new_weight) override;
 
 protected:
-  static Network::ClientConnectionPtr createConnection(Event::Dispatcher& dispatcher,
-                                                       const ClusterInfo& cluster,
-                                                       Network::Address::InstancePtr address);
+  static Network::ClientConnectionPtr
+  createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+                   Network::Address::InstanceConstSharedPtr address);
 
 private:
   std::atomic<uint64_t> health_flags_{};
   std::atomic<uint32_t> weight_;
 };
 
-typedef std::shared_ptr<std::vector<HostPtr>> HostVectorPtr;
-typedef std::shared_ptr<const std::vector<HostPtr>> ConstHostVectorPtr;
-typedef std::shared_ptr<std::vector<std::vector<HostPtr>>> HostListsPtr;
-typedef std::shared_ptr<const std::vector<std::vector<HostPtr>>> ConstHostListsPtr;
+typedef std::shared_ptr<std::vector<HostSharedPtr>> HostVectorSharedPtr;
+typedef std::shared_ptr<const std::vector<HostSharedPtr>> HostVectorConstSharedPtr;
+typedef std::shared_ptr<std::vector<std::vector<HostSharedPtr>>> HostListsSharedPtr;
+typedef std::shared_ptr<const std::vector<std::vector<HostSharedPtr>>> HostListsConstSharedPtr;
 
 /**
  * Base class for all clusters as well as thread local host sets.
@@ -108,14 +108,15 @@ typedef std::shared_ptr<const std::vector<std::vector<HostPtr>>> ConstHostListsP
 class HostSetImpl : public virtual HostSet {
 public:
   HostSetImpl()
-      : hosts_(new std::vector<HostPtr>()), healthy_hosts_(new std::vector<HostPtr>()),
-        hosts_per_zone_(new std::vector<std::vector<HostPtr>>()),
-        healthy_hosts_per_zone_(new std::vector<std::vector<HostPtr>>()) {}
+      : hosts_(new std::vector<HostSharedPtr>()), healthy_hosts_(new std::vector<HostSharedPtr>()),
+        hosts_per_zone_(new std::vector<std::vector<HostSharedPtr>>()),
+        healthy_hosts_per_zone_(new std::vector<std::vector<HostSharedPtr>>()) {}
 
-  void updateHosts(ConstHostVectorPtr hosts, ConstHostVectorPtr healthy_hosts,
-                   ConstHostListsPtr hosts_per_zone, ConstHostListsPtr healthy_hosts_per_zone,
-                   const std::vector<HostPtr>& hosts_added,
-                   const std::vector<HostPtr>& hosts_removed) {
+  void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
+                   HostListsConstSharedPtr hosts_per_zone,
+                   HostListsConstSharedPtr healthy_hosts_per_zone,
+                   const std::vector<HostSharedPtr>& hosts_added,
+                   const std::vector<HostSharedPtr>& hosts_removed) {
     hosts_ = hosts;
     healthy_hosts_ = healthy_hosts;
     hosts_per_zone_ = hosts_per_zone;
@@ -124,25 +125,25 @@ public:
   }
 
   // Upstream::HostSet
-  const std::vector<HostPtr>& hosts() const override { return *hosts_; }
-  const std::vector<HostPtr>& healthyHosts() const override { return *healthy_hosts_; }
-  const std::vector<std::vector<HostPtr>>& hostsPerZone() const override {
+  const std::vector<HostSharedPtr>& hosts() const override { return *hosts_; }
+  const std::vector<HostSharedPtr>& healthyHosts() const override { return *healthy_hosts_; }
+  const std::vector<std::vector<HostSharedPtr>>& hostsPerZone() const override {
     return *hosts_per_zone_;
   }
-  const std::vector<std::vector<HostPtr>>& healthyHostsPerZone() const override {
+  const std::vector<std::vector<HostSharedPtr>>& healthyHostsPerZone() const override {
     return *healthy_hosts_per_zone_;
   }
   void addMemberUpdateCb(MemberUpdateCb callback) const override;
 
 protected:
-  virtual void runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
-                                  const std::vector<HostPtr>& hosts_removed);
+  virtual void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
+                                  const std::vector<HostSharedPtr>& hosts_removed);
 
 private:
-  ConstHostVectorPtr hosts_;
-  ConstHostVectorPtr healthy_hosts_;
-  ConstHostListsPtr hosts_per_zone_;
-  ConstHostListsPtr healthy_hosts_per_zone_;
+  HostVectorConstSharedPtr hosts_;
+  HostVectorConstSharedPtr healthy_hosts_;
+  HostListsConstSharedPtr hosts_per_zone_;
+  HostListsConstSharedPtr healthy_hosts_per_zone_;
   mutable std::list<MemberUpdateCb> callbacks_;
 };
 
@@ -217,7 +218,7 @@ public:
                            Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                            const Optional<SdsConfig>& sds_config,
                            const LocalInfo::LocalInfo& local_info,
-                           Outlier::EventLoggerPtr outlier_event_logger);
+                           Outlier::EventLoggerSharedPtr outlier_event_logger);
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
@@ -230,27 +231,30 @@ public:
    * Optionally set the outlier detector for the primary cluster. Done for the same reason as
    * documented in setHealthChecker().
    */
-  void setOutlierDetector(Outlier::DetectorPtr outlier_detector);
+  void setOutlierDetector(Outlier::DetectorSharedPtr outlier_detector);
 
   // Upstream::Cluster
-  ClusterInfoPtr info() const override { return info_; }
+  ClusterInfoConstSharedPtr info() const override { return info_; }
+  const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
 
 protected:
   ClusterImplBase(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                   Ssl::ContextManager& ssl_context_manager);
 
-  static ConstHostVectorPtr createHealthyHostList(const std::vector<HostPtr>& hosts);
-  static ConstHostListsPtr createHealthyHostLists(const std::vector<std::vector<HostPtr>>& hosts);
-  void runUpdateCallbacks(const std::vector<HostPtr>& hosts_added,
-                          const std::vector<HostPtr>& hosts_removed) override;
+  static HostVectorConstSharedPtr createHealthyHostList(const std::vector<HostSharedPtr>& hosts);
+  static HostListsConstSharedPtr
+  createHealthyHostLists(const std::vector<std::vector<HostSharedPtr>>& hosts);
+  void runUpdateCallbacks(const std::vector<HostSharedPtr>& hosts_added,
+                          const std::vector<HostSharedPtr>& hosts_removed) override;
 
-  static const ConstHostListsPtr empty_host_lists_;
+  static const HostListsConstSharedPtr empty_host_lists_;
 
   Runtime::Loader& runtime_;
-  ClusterInfoPtr info_; // This cluster info stores the stats scope so it must be initialized first
-                        // and destroyed last.
+  ClusterInfoConstSharedPtr
+      info_; // This cluster info stores the stats scope so it must be initialized first
+             // and destroyed last.
   HealthCheckerPtr health_checker_;
-  Outlier::DetectorPtr outlier_detector_;
+  Outlier::DetectorSharedPtr outlier_detector_;
 
 private:
   void reloadHealthyHosts();
@@ -288,9 +292,10 @@ public:
 protected:
   using ClusterImplBase::ClusterImplBase;
 
-  bool updateDynamicHostList(const std::vector<HostPtr>& new_hosts,
-                             std::vector<HostPtr>& current_hosts, std::vector<HostPtr>& hosts_added,
-                             std::vector<HostPtr>& hosts_removed, bool depend_on_hc);
+  bool updateDynamicHostList(const std::vector<HostSharedPtr>& new_hosts,
+                             std::vector<HostSharedPtr>& current_hosts,
+                             std::vector<HostSharedPtr>& hosts_added,
+                             std::vector<HostSharedPtr>& hosts_removed, bool depend_on_hc);
 
   std::function<void()> initialize_callback_;
   // Set once the first resolve completes.
@@ -323,13 +328,13 @@ private:
     std::string dns_address_;
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
-    std::vector<HostPtr> hosts_;
+    std::vector<HostSharedPtr> hosts_;
   };
 
   typedef std::unique_ptr<ResolveTarget> ResolveTargetPtr;
 
-  void updateAllHosts(const std::vector<HostPtr>& hosts_added,
-                      const std::vector<HostPtr>& hosts_removed);
+  void updateAllHosts(const std::vector<HostSharedPtr>& hosts_added,
+                      const std::vector<HostSharedPtr>& hosts_removed);
 
   Network::DnsResolver& dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;

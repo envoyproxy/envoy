@@ -1,9 +1,69 @@
 bind(
-    name = "googletest_main",
-    actual = "//ci/prebuilt:googletest_main",
+    name = "ares",
+    actual = "//ci/prebuilt:ares",
+)
+
+bind(
+    name = "event",
+    actual = "//ci/prebuilt:event",
+)
+
+bind(
+    name = "event_pthreads",
+    actual = "//ci/prebuilt:event_pthreads",
+)
+
+bind(
+    name = "googletest",
+    actual = "//ci/prebuilt:googletest",
+)
+
+bind(
+    name = "http_parser",
+    actual = "//ci/prebuilt:http_parser",
+)
+
+bind(
+    name = "lightstep",
+    actual = "//ci/prebuilt:lightstep",
+)
+
+bind(
+    name = "nghttp2",
+    actual = "//ci/prebuilt:nghttp2",
+)
+
+bind(
+    name = "protobuf",
+    actual = "//ci/prebuilt:protobuf",
+)
+
+local_repository(
+    name = "protobuf_git",
+    path = "/thirdparty/protobuf-3.2.0",
+)
+
+bind(
+    name = "protoc",
+    actual = "//ci/prebuilt:protoc",
+)
+
+bind(
+    name = "rapidjson",
+    actual = "//ci/prebuilt:rapidjson",
 )
 
 bind(
     name = "spdlog",
     actual = "//ci/prebuilt:spdlog",
+)
+
+bind(
+    name = "ssl",
+    actual = "//ci/prebuilt:ssl",
+)
+
+bind(
+    name = "tclap",
+    actual = "//ci/prebuilt:tclap",
 )

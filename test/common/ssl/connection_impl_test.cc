@@ -12,35 +12,38 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/environment.h"
 
 using testing::_;
 using testing::Invoke;
 
 namespace Ssl {
 
-static void testUtil(std::string client_ctx_json, std::string server_ctx_json,
-                     std::string expected_digest, std::string expected_uri) {
+namespace {
+
+void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_json,
+              const std::string& expected_digest, const std::string& expected_uri) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
-  Json::ObjectPtr server_ctx_loader = Json::Factory::LoadFromString(server_ctx_json);
+  Json::ObjectPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-  Json::ObjectPtr client_ctx_loader = Json::Factory::LoadFromString(client_ctx_json);
+  Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-      *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -64,6 +67,8 @@ static void testUtil(std::string client_ctx_json, std::string server_ctx_json,
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
+} // namespace
+
 TEST(SslConnectionImplTest, ClientAuth) {
   std::string client_ctx_json = R"EOF(
   {
@@ -74,8 +79,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   std::string server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
-    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca_with_uri_san.crt",
     "verify_subject_alt_name": [ "server1.example.com" ]
   }
@@ -94,8 +99,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
-    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca_with_dns_san.crt"
   }
   )EOF";
@@ -112,8 +117,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
-    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": ""
   }
   )EOF";
@@ -130,8 +135,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
-    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt"
   }
   )EOF";
@@ -146,20 +151,20 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
 
   std::string server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
-    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt",
     "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
   }
   )EOF";
 
-  Json::ObjectPtr server_ctx_loader = Json::Factory::LoadFromString(server_ctx_json);
+  Json::ObjectPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -173,11 +178,11 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   }
   )EOF";
 
-  Json::ObjectPtr client_ctx_loader = Json::Factory::LoadFromString(client_ctx_json);
+  Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-      *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -203,20 +208,20 @@ TEST(SslConnectionImplTest, SslError) {
 
   std::string server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
-    "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt",
     "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
   }
   )EOF";
 
-  Json::ObjectPtr server_ctx_loader = Json::Factory::LoadFromString(server_ctx_json);
+  Json::ObjectPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -224,7 +229,7 @@ TEST(SslConnectionImplTest, SslError) {
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+      dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
   client_connection->write(bad_data);
@@ -244,6 +249,8 @@ TEST(SslConnectionImplTest, SslError) {
       }));
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(1UL, stats_store.counter("ssl.connection_error").value());
 }
 
 class SslReadBufferLimitTest : public testing::Test {
@@ -252,18 +259,18 @@ public:
                            uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
-    Network::TcpListenSocket socket(uint32_t(10000), true);
+    Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
 
     std::string server_ctx_json = R"EOF(
     {
-      "cert_chain_file": "/tmp/envoy_test/unittestcert.pem",
-      "private_key_file": "/tmp/envoy_test/unittestkey.pem",
+      "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+      "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
       "ca_cert_file": "test/common/ssl/test_data/ca.crt"
     }
     )EOF";
-    Json::ObjectPtr server_ctx_loader = Json::Factory::LoadFromString(server_ctx_json);
+    Json::ObjectPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
     ContextConfigImpl server_ctx_config(*server_ctx_loader);
     Runtime::MockLoader runtime;
     ContextManagerImpl manager(runtime);
@@ -283,12 +290,12 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr client_ctx_loader = Json::Factory::LoadFromString(client_ctx_json);
+    Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
     ContextConfigImpl client_ctx_config(*client_ctx_loader);
     ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
 
-    Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-        *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+    Network::ClientConnectionPtr client_connection =
+        dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
     client_connection->connect();
 
     Network::ConnectionPtr server_connection;
@@ -340,6 +347,8 @@ public:
     }
 
     dispatcher.run(Event::Dispatcher::RunType::Block);
+
+    EXPECT_EQ(0UL, stats_store.counter("ssl.connection_error").value());
   }
 };
 

@@ -1,4 +1,4 @@
-#include "thread_local_impl.h"
+#include "common/thread_local/thread_local_impl.h"
 
 #include "envoy/event/dispatcher.h"
 
@@ -13,7 +13,7 @@ std::list<std::reference_wrapper<Event::Dispatcher>> InstanceImpl::registered_th
 
 InstanceImpl::~InstanceImpl() { reset(); }
 
-ThreadLocalObjectPtr InstanceImpl::get(uint32_t index) {
+ThreadLocalObjectSharedPtr InstanceImpl::get(uint32_t index) {
   ASSERT(thread_local_data_.data_.size() > index);
   return thread_local_data_.data_[index];
 }
@@ -49,7 +49,7 @@ void InstanceImpl::set(uint32_t index, InitializeCb cb) {
   setThreadLocal(index, cb(*main_thread_dispatcher_));
 }
 
-void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectPtr object) {
+void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr object) {
   if (thread_local_data_.data_.size() <= index) {
     thread_local_data_.data_.resize(index + 1);
   }

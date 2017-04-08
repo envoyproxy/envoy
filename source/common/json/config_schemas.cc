@@ -1,4 +1,4 @@
-#include "config_schemas.h"
+#include "common/json/config_schemas.h"
 
 const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
   {
@@ -211,7 +211,15 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       "tracing" : {
         "type" : "object",
         "properties" : {
-          "operation_name" : {"type" : "string"}
+          "operation_name" : {
+            "type" : "string",
+            "enum": ["ingress", "egress"]
+          },
+          "request_headers_for_tags": {
+            "type" : "array",
+            "uniqueItems": true,
+            "items" : {"type" : "string"}
+          }
         },
         "required" : ["operation_name"],
         "additionalProperties" : false
@@ -332,9 +340,27 @@ const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
     "properties":{
-      "cluster_name" : {"type" : "string"}
+      "cluster_name" : {"type" : "string"},
+      "stat_prefix" : {"type" : "string"},
+      "conn_pool" : {"type" : "object"}
     },
-    "required": ["cluster_name"],
+    "required": ["cluster_name", "stat_prefix", "conn_pool"],
+    "additionalProperties": false
+  }
+  )EOF");
+
+const std::string Json::Schema::REDIS_CONN_POOL_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties":{
+      "op_timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      }
+    },
+    "required": ["op_timeout_ms"],
     "additionalProperties": false
   }
   )EOF");
@@ -416,6 +442,20 @@ const std::string Json::Schema::ROUTE_CONFIGURATION_SCHEMA(R"EOF(
       "response_headers_to_remove" : {
         "type" : "array",
         "items" : {"type" : "string"}
+      },
+      "request_headers_to_add" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "object",
+          "properties": {
+            "key" : {"type" : "string"},
+            "value" : {"type" : "string"}
+          },
+          "required": ["key", "value"],
+          "additionalProperties": false
+        }
       }
     },
     "required": ["virtual_hosts"],
@@ -456,7 +496,21 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
         "minItems" : 1,
         "properties" : {"$ref" : "#/definitions/virtual_clusters"}
       },
-      "rate_limits" : {"type" : "array"}
+      "rate_limits" : {"type" : "array"},
+      "request_headers_to_add" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "object",
+          "properties": {
+            "key" : {"type" : "string"},
+            "value" : {"type" : "string"}
+          },
+          "required": ["key", "value"],
+          "additionalProperties": false
+        }
+      }
     },
     "required" : ["name", "domains", "routes"],
     "additionalProperties" : false
@@ -547,6 +601,20 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : ["header_name"],
         "additionalProperties" : false
+      },
+      "request_headers_to_add" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "object",
+          "properties": {
+            "key" : {"type" : "string"},
+            "value" : {"type" : "string"}
+          },
+          "required": ["key", "value"],
+          "additionalProperties": false
+        }
       },
       "opaque_config" : {
         "type" : "object",
@@ -774,6 +842,10 @@ const std::string Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA(R"EOF(
         "type" : "integer",
         "minimum" : 0,
         "maximum" : 10
+      },
+      "request_type" : {
+        "type" : "string",
+        "enum" : ["internal", "external", "both"]
       }
     },
     "required" : ["domain"],
@@ -856,17 +928,17 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
             "type" : "string",
             "enum" : ["lightstep"]
           },
-          "access_token_file" : {"type" : "string"},
           "config" : {
             "type" : "object",
             "properties" : {
-              "collector_cluster" : {"type" : "string"}
+              "collector_cluster" : {"type" : "string"},
+              "access_token_file" : {"type" : "string"}
             },
-            "required": ["collector_cluster"],
+            "required": ["collector_cluster", "access_token_file"],
             "additionalProperties" : false
           }
         },
-        "required" : ["type", "access_token_file", "config"],
+        "required" : ["type", "config"],
         "additionalProperties" : false
       },
       "rate_limit_service" : {
@@ -899,6 +971,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
         "type" : "object",
         "properties" : {
           "access_log_path" : {"type" : "string"},
+          "profile_path" : {"type" : "string"},
           "address" : {"type" : "string"}
         },
         "required" : ["access_log_path", "address"],
@@ -1027,7 +1100,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
     },
     "type" : "object",
     "properties" : {
-      "name" : {"type" : "string"},
+      "name" : {
+        "type" : "string",
+        "pattern" : "^[^:]+$",
+        "minLength" : 1,
+        "maxLength" : 60
+      },
       "type" : {
         "type" : "string",
         "enum" : ["static", "strict_dns", "logical_dns", "sds"]
@@ -1089,6 +1167,16 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "exclusiveMinimum" : true
           },
+          "success_rate_minimum_hosts" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "success_rate_request_volume" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
           "interval_ms" : {
             "type" : "integer",
             "minimum" : 0,
@@ -1104,7 +1192,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "maximum" : 100
           },
-          "enforcing" : {
+          "enforcing_consecutive_5xx" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "maximum" : 100
+          },
+          "enforcing_success_rate" : {
             "type" : "integer",
             "minimum" : 0,
             "maximum" : 100

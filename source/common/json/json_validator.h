@@ -7,9 +7,9 @@ namespace Json {
 /**
  * Base class to inherit from to validate config schema before initializing member variables.
  */
-class JsonValidator {
+class Validator {
 public:
-  JsonValidator(const Json::Object& config, const std::string& schema) {
+  Validator(const Json::Object& config, const std::string& schema) {
     config.validateSchema(schema);
   }
 };

@@ -1,7 +1,4 @@
-#include "configuration_impl.h"
-#include "server.h"
-#include "test_hooks.h"
-#include "worker.h"
+#include "server/server.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
@@ -19,6 +16,11 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/statsd.h"
+
+#include "server/configuration_impl.h"
+#include "server/guarddog_impl.h"
+#include "server/test_hooks.h"
+#include "server/worker.h"
 
 namespace Server {
 
@@ -55,7 +57,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store),
       server_stats_{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))},
-      handler_(stats_store_, log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
+      handler_(log(), Api::ApiPtr{new Api::Impl(options.fileFlushIntervalMsec())}),
       dns_resolver_(handler_.dispatcher().createDnsResolver()), local_info_(local_info),
       access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {
 
@@ -115,7 +117,7 @@ void InstanceImpl::flushStats() {
   server_stats_.days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  for (Stats::CounterPtr counter : stats_store_.counters()) {
+  for (Stats::CounterSharedPtr counter : stats_store_.counters()) {
     uint64_t delta = counter->latch();
     if (counter->used()) {
       for (const auto& sink : stat_sinks_) {
@@ -124,7 +126,7 @@ void InstanceImpl::flushStats() {
     }
   }
 
-  for (Stats::GaugePtr gauge : stats_store_.gauges()) {
+  for (Stats::GaugeSharedPtr gauge : stats_store_.gauges()) {
     if (gauge->used()) {
       for (const auto& sink : stat_sinks_) {
         sink->flushGauge(gauge->name(), gauge->value());
@@ -136,7 +138,7 @@ void InstanceImpl::flushStats() {
 }
 
 int InstanceImpl::getListenSocketFd(const std::string& address) {
-  Network::Address::InstancePtr addr = Network::Utility::resolveUrl(address);
+  Network::Address::InstanceConstSharedPtr addr = Network::Utility::resolveUrl(address);
   for (const auto& entry : socket_map_) {
     if (entry.second->localAddress()->asString() == addr->asString()) {
       return entry.second->fd();
@@ -144,6 +146,14 @@ int InstanceImpl::getListenSocketFd(const std::string& address) {
   }
 
   return -1;
+}
+
+Network::ListenSocket* InstanceImpl::getListenSocketByIndex(uint32_t index) {
+  if (index < config_->listeners().size()) {
+    auto it = std::next(config_->listeners().begin(), index);
+    return socket_map_[it->get()].get();
+  }
+  return nullptr;
 }
 
 void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
@@ -170,16 +180,17 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   drain_manager_->startParentShutdownSequence();
   original_start_time_ = info.original_start_time_;
   admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
-                             initial_config.admin().address(), *this));
+                             initial_config.admin().profilePath(), initial_config.admin().address(),
+                             *this));
   admin_scope_ = stats_store_.createScope("listener.admin.");
-  handler_.addListener(*admin_, admin_->socket(), *admin_scope_,
+  handler_.addListener(*admin_, admin_->mutable_socket(), *admin_scope_,
                        Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   loadServerFlags(initial_config.flagsPath());
 
   // Workers get created first so they register for thread local updates.
   for (uint32_t i = 0; i < std::max(1U, options.concurrency()); i++) {
-    workers_.emplace_back(new Worker(stats_store_, thread_local_, options.fileFlushIntervalMsec()));
+    workers_.emplace_back(new Worker(thread_local_, options.fileFlushIntervalMsec()));
   }
 
   // The main thread is also registered for thread local updates so that code that does not care
@@ -233,7 +244,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
     access_log_manager_.reopen();
   });
 
-  sig_hup_ = handler_.dispatcher().listenForSignal(SIGHUP, [this]() -> void {
+  sig_hup_ = handler_.dispatcher().listenForSignal(SIGHUP, []() -> void {
     log().warn("caught and eating SIGHUP. See documentation for how to hot restart.");
   });
 
@@ -243,6 +254,11 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // Just setup the timer.
   stat_flush_timer_ = handler_.dispatcher().createTimer([this]() -> void { flushStats(); });
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+
+  // GuardDog (deadlock detection) object and thread setup before workers are
+  // started and before our own run() loop runs.
+  guard_dog_.reset(
+      new Server::GuardDogImpl(*admin_scope_, *config_, ProdSystemTimeSource::instance_));
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
@@ -257,7 +273,7 @@ void InstanceImpl::startWorkers(TestHooks& hooks) {
   log().warn("all dependencies initialized. starting workers");
   for (const WorkerPtr& worker : workers_) {
     try {
-      worker->initializeConfiguration(*config_, socket_map_);
+      worker->initializeConfiguration(*config_, socket_map_, *guard_dog_);
     } catch (const Network::CreateListenerException& e) {
       // It is possible that we fail to start listening on a port, even though we were able to
       // bind to it above. This happens when there is a race between two applications to listen
@@ -334,9 +350,12 @@ uint64_t InstanceImpl::numConnections() {
 void InstanceImpl::run() {
   // Run the main dispatch loop waiting to exit.
   log().warn("starting main dispatch loop");
-  handler_.startWatchdog();
+  auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
+  watchdog->startWatchdog(handler_.dispatcher());
   handler_.dispatcher().run(Event::Dispatcher::RunType::Block);
   log().warn("main dispatch loop exited");
+  guard_dog_->stopWatching(watchdog);
+  watchdog.reset();
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
@@ -360,8 +379,6 @@ void InstanceImpl::run() {
 
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
 
-InstanceImpl::~InstanceImpl() {}
-
 void InstanceImpl::shutdown() {
   log().warn("shutdown invoked. sending SIGTERM to self");
   kill(getpid(), SIGTERM);
@@ -371,7 +388,7 @@ void InstanceImpl::shutdownAdmin() {
   log().warn("shutting down admin due to child startup");
   stat_flush_timer_.reset();
   handler_.closeListeners();
-  admin_->socket().close();
+  admin_->mutable_socket().close();
 
   log().warn("terminating parent process");
   restarter_.terminateParent();

@@ -32,14 +32,14 @@ struct BufferFilterConfig {
   std::chrono::seconds max_request_time_;
 };
 
-typedef std::shared_ptr<const BufferFilterConfig> BufferFilterConfigPtr;
+typedef std::shared_ptr<const BufferFilterConfig> BufferFilterConfigConstSharedPtr;
 
 /**
  * A filter that is capable of buffering an entire request before dispatching it upstream.
  */
 class BufferFilter : public StreamDecoderFilter {
 public:
-  BufferFilter(BufferFilterConfigPtr config);
+  BufferFilter(BufferFilterConfigConstSharedPtr config);
   ~BufferFilter();
 
   static BufferFilterStats generateStats(const std::string& prefix, Stats::Store& store);
@@ -55,7 +55,7 @@ private:
   void onRequestTimeout();
   void resetInternalState();
 
-  BufferFilterConfigPtr config_;
+  BufferFilterConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr request_timeout_;
 };

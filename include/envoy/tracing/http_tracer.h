@@ -6,6 +6,8 @@
 
 namespace Tracing {
 
+enum class OperationName { Ingress, Egress };
+
 /*
  * Tracing configuration, it carries additional data needed to populate the span.
  */
@@ -13,7 +15,15 @@ class Config {
 public:
   virtual ~Config() {}
 
-  virtual const std::string& operationName() const PURE;
+  /**
+   * @return operation name for tracing, e.g., ingress.
+   */
+  virtual OperationName operationName() const PURE;
+
+  /**
+   * @return list of headers to populate tags on the active span.
+   */
+  virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const PURE;
 };
 
 /*

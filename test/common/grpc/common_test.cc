@@ -1,7 +1,11 @@
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 
+#ifdef BAZEL_BRINGUP
+#include "test/proto/helloworld.pb.h"
+#else
 #include "test/generated/helloworld.pb.h"
+#endif
 #include "test/mocks/upstream/mocks.h"
 
 namespace Grpc {
