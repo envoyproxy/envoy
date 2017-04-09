@@ -4,7 +4,7 @@ set -e
 
 # Setup basic requirements and install them.
 apt-get update
-apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc libtool automake
+apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc libtool automake lcov zip
 apt-get install -y golang
 # For debugging.
 apt-get install -y gdb strace
@@ -18,6 +18,14 @@ curl https://bazel.build/bazel-release.pub.gpg | apt-key add -
 apt-get update
 apt-get install -y bazel
 rm -rf /var/lib/apt/lists/*
+
+# Build a version of Bazel suitable for C++ code coverage collection. See
+# https://github.com/bazelbuild/bazel/issues/1118 for why we need this. This is the envoy-coverage
+# branch on the cloned repository.
+git clone https://github.com/htuch/bazel.git /tmp/bazel-coverage
+BAZEL_OPTIONS="--spawn_strategy=standalone --genrule_strategy=standalone"
+(cd /tmp/bazel-coverage; git checkout b510cf58afad1c60e917b0ab160ca74672f08599; \
+  bazel build ${BAZEL_OPTIONS} //src:bazel; cp bazel-bin/src/bazel /usr/bin/bazel-coverage)
 
 # virtualenv
 pip install virtualenv
