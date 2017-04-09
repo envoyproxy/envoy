@@ -1,12 +1,12 @@
 # What are the identities, certificates and keys
 There are 5 identities:
-- **CA**: Certificate Authority for Client and Server. It has the self-signed
-  certificate *cacert.pem*. *cakey.pem* is its private key.
+- **CA**: Certificate Authority for **Client** and **Server**. It has the
+  self-signed certificate *cacert.pem*. *cakey.pem* is its private key.
 - **Client**: It has the certificate *clientcert.pem*, signed by the **CA**.
   *clientkey.pem* is its private key.
 - **Server**: It has the certificate *servercert.pem*, which is signed by the
   **CA** using the config *servercert.cfg*. *serverkey.pem* is its private key.
-- **Upsteam CA**: Certificate Authority for Upstream. It has the self-signed
+- **Upsteam CA**: Certificate Authority for **Upstream**. It has the self-signed
   certificate *upstreamcacert.pem*. *upstreamcakey.pem* is its private key.
 - **Upstream**: It has the certificate *upstreamcert.pem*, which is signed by
   the **Upstream CA** using the config *upstreamcert.cfg*. *upstreamkey.pem* is
