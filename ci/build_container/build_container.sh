@@ -23,9 +23,12 @@ rm -rf /var/lib/apt/lists/*
 # https://github.com/bazelbuild/bazel/issues/1118 for why we need this. This is the envoy-coverage
 # branch on the cloned repository.
 git clone https://github.com/htuch/bazel.git /tmp/bazel-coverage
-BAZEL_OPTIONS="--spawn_strategy=standalone --genrule_strategy=standalone"
-(cd /tmp/bazel-coverage; git checkout b510cf58afad1c60e917b0ab160ca74672f08599; \
-  bazel build ${BAZEL_OPTIONS} //src:bazel; cp bazel-bin/src/bazel /usr/bin/bazel-coverage)
+pushd /tmp/bazel-coverage
+git checkout b510cf58afad1c60e917b0ab160ca74672f08599
+bazel build --spawn_strategy=standalone --genrule_strategy=standalone //src:bazel
+cp bazel-bin/src/bazel /usr/bin/bazel-coverage
+popd
+rm -rf /root/.cache /tmp/bazel-coverage
 
 # virtualenv
 pip install virtualenv
