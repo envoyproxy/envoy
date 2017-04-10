@@ -48,8 +48,8 @@ public:
 class ServerInstanceImplTest : public testing::Test {
 protected:
   ServerInstanceImplTest()
-      : options_(TestEnvironment::temporaryFileSubstitutePorts(
-            "server.json", {{"upstream_0", 0}, {"upstream_1", 0}})),
+      : options_(TestEnvironment::temporaryFileSubstitute("test/config/integration/server.json",
+                                                          {{"upstream_0", 0}, {"upstream_1", 0}})),
         server_(options_, hooks_, restart_, stats_store_, fakelock_, component_factory_,
                 local_info_) {}
   void TearDown() override {

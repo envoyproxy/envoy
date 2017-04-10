@@ -40,8 +40,7 @@ def envoy_cc_library(name,
                      visibility = None,
                      external_deps = [],
                      repository = "",
-                     deps = [],
-                     alwayslink = None):
+                     deps = []):
     native.cc_library(
         name = name,
         srcs = srcs,
@@ -53,7 +52,7 @@ def envoy_cc_library(name,
             repository + "//source/precompiled:precompiled_includes",
         ],
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
-        alwayslink = alwayslink,
+        alwayslink = 1,
     )
 
 # Envoy C++ binary targets should be specified with this function.
@@ -83,51 +82,31 @@ def envoy_cc_binary(name,
 def envoy_cc_test(name,
                   srcs = [],
                   data = [],
-                  args = [],
                   # List of pairs (Bazel shell script target, shell script args)
-                  setup_cmds = [],
                   repository = "",
-                  deps = []):
-    if setup_cmds:
-        setup_cmd = "; ".join(["$(location " + setup_sh + ") " + " ".join(setup_args) for
-                               setup_sh, setup_args in setup_cmds])
-        envoy_test_setup_flag = "--envoy_test_setup=\"" + setup_cmd + "\""
-        data += [setup_sh for setup_sh, _ in setup_cmds]
-        args += [envoy_test_setup_flag]
-    native.cc_test(
-        name = name,
+                  deps = [],
+                  tags = [],
+                  coverage=True):
+    test_lib_tags = []
+    if coverage:
+      test_lib_tags.append("coverage_test_lib")
+    envoy_cc_test_library(
+        name = name + "_lib",
         srcs = srcs,
         data = data,
-        copts = ENVOY_COPTS + ["-includetest/precompiled/precompiled_test.h"],
+        deps = deps,
+        tags = test_lib_tags,
+    )
+    native.cc_test(
+        name = name,
+        copts = ENVOY_COPTS,
         linkopts = ["-pthread"],
         linkstatic = 1,
-        args = args,
-        deps = deps + [
-            repository + "//source/precompiled:precompiled_includes",
-            repository + "//test/precompiled:precompiled_includes",
-            repository + "//test:main",
+        deps = [
+            repository + name + "_lib",
+            repository + "//test:main"
         ],
-    )
-
-# Envoy C++ test targets that depend on JSON config files subject to template
-# environment substitution should be specified with this function.
-def envoy_cc_test_with_json(name,
-                            data = [],
-                            jsons = [],
-                            setup_cmds = [],
-                            repository = "",
-                            deps = [],
-                            **kargs):
-    envoy_cc_test(
-        name = name,
-        data = data + jsons,
-        setup_cmds = setup_cmds + [(
-            repository + "//test/test_common:environment_sub.sh",
-            ["$(location " + f + ")" for f in jsons],
-        )],
-        repository = repository,
-        deps = deps,
-        **kargs
+        tags = tags,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -139,7 +118,7 @@ def envoy_cc_test_library(name,
                           external_deps = [],
                           deps = [],
                           repository = "",
-                          alwayslink = None):
+                          tags = []):
     native.cc_library(
         name = name,
         srcs = srcs,
@@ -151,7 +130,8 @@ def envoy_cc_test_library(name,
             repository + "//source/precompiled:precompiled_includes",
             repository + "//test/precompiled:precompiled_includes",
         ],
-        alwayslink = alwayslink,
+        tags = tags,
+        alwayslink = 1,
     )
 
 # Envoy C++ mock targets should be specified with this function.

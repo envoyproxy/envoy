@@ -2,6 +2,8 @@
 
 #include "common/common/assert.h"
 
+#include "server/options_impl.h"
+
 namespace {
 
 std::string getCheckedEnvVar(const std::string& var) {
@@ -24,7 +26,21 @@ std::string getOrCreateUnixDomainSocketDirectory() {
   return std::string(test_udsdir);
 }
 
+// Allow initializeOptions() to remember CLI args for getOptions().
+int argc_;
+char** argv_;
+
 } // namespace
+
+void TestEnvironment::initializeOptions(int argc, char** argv) {
+  argc_ = argc;
+  argv_ = argv;
+}
+
+Server::Options& TestEnvironment::getOptions() {
+  static OptionsImpl* options = new OptionsImpl(argc_, argv_, "1", spdlog::level::err);
+  return *options;
+}
 
 const std::string& TestEnvironment::temporaryDirectory() {
   static const std::string* temporary_directory = new std::string(getCheckedEnvVar("TEST_TMPDIR"));
@@ -47,11 +63,11 @@ std::string TestEnvironment::substitute(const std::string str) {
   return std::regex_replace(str, test_cert_regex, TestEnvironment::temporaryDirectory());
 }
 
-std::string TestEnvironment::temporaryFileSubstitutePorts(const std::string& path,
-                                                          const PortMap& port_map) {
+std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
+                                                     const PortMap& port_map) {
   // Load the entire file as a string, regex replace one at a time and write it back out. Proper
   // templating might be better one day, but this works for now.
-  const std::string tmp_json_path = TestEnvironment::temporaryPath(path);
+  const std::string tmp_json_path = TestEnvironment::runfilesPath(path);
   std::string out_json_string;
   {
     std::ifstream file(tmp_json_path);
@@ -59,9 +75,20 @@ std::string TestEnvironment::temporaryFileSubstitutePorts(const std::string& pat
     file_string_stream << file.rdbuf();
     out_json_string = file_string_stream.str();
   }
+  // Substitute ports.
   for (auto it : port_map) {
     const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
     out_json_string = std::regex_replace(out_json_string, port_regex, std::to_string(it.second));
+  }
+  // Substitute paths.
+  const std::unordered_map<std::string, std::string> path_map = {
+      {"test_tmpdir", TestEnvironment::temporaryDirectory()},
+      {"test_udsdir", TestEnvironment::unixDomainSocketDirectory()},
+      {"test_srcdir", TestEnvironment::runfilesDirectory()},
+  };
+  for (auto it : path_map) {
+    const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
+    out_json_string = std::regex_replace(out_json_string, port_regex, it.second);
   }
   const std::string out_json_path = tmp_json_path + ".with.ports.json";
   {
@@ -73,4 +100,15 @@ std::string TestEnvironment::temporaryFileSubstitutePorts(const std::string& pat
 
 Json::ObjectPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
   return Json::Factory::LoadFromString(substitute(json));
+}
+
+void TestEnvironment::exec(const std::vector<std::string>& args) {
+  std::stringstream cmd;
+  for (auto& arg : args) {
+    cmd << arg << " ";
+  }
+  if (::system(cmd.str().c_str()) != 0) {
+    std::cerr << "Failed " << cmd.str() << "\n";
+    RELEASE_ASSERT(false);
+  }
 }

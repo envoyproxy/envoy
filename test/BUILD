@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test_library")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_library")
 
 envoy_cc_test_library(
     name = "main",
@@ -14,8 +14,7 @@ envoy_cc_test_library(
         "//source/common/common:version_lib",
         "//source/common/event:libevent_lib",
         "//source/common/ssl:openssl_lib",
-        "//source/server:options_lib",
-        "//test/integration:integration_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:printers_lib",
     ],
 )

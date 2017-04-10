@@ -29,8 +29,8 @@ void SslIntegrationTest::SetUpTestCase() {
   fake_upstreams_.emplace_back(
       new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
   registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-  test_server_ = MockRuntimeIntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitutePorts("server_ssl.json", port_map()));
+  test_server_ = MockRuntimeIntegrationTestServer::create(TestEnvironment::temporaryFileSubstitute(
+      "test/config/integration/server_ssl.json", port_map()));
   registerTestServerPorts({"http"});
   client_ssl_ctx_plain_ = createClientSslContext(false, false);
   client_ssl_ctx_alpn_ = createClientSslContext(true, false);

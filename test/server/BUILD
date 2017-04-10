@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_with_json")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
 
 envoy_cc_test(
     name = "configuration_impl_test",
@@ -56,14 +56,19 @@ envoy_cc_test(
 envoy_cc_test(
     name = "options_impl_test",
     srcs = ["options_impl_test.cc"],
-    deps = ["//source/server:options_lib"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/server:options_lib",
+    ],
 )
 
-envoy_cc_test_with_json(
+envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
-    data = ["//test/config/integration:server_config_files"],
-    jsons = ["//test/config/integration:server.json"],
+    data = [
+        "//test/config/integration:server.json",
+        "//test/config/integration:server_config_files",
+    ],
     deps = [
         "//source/server:server_lib",
         "//test/integration:integration_lib",

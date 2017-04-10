@@ -4,14 +4,14 @@ load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
 
 envoy_cc_test(
     name = "connection_impl_test",
-    srcs = ["connection_impl_test.cc"],
+    srcs = [
+        "connection_impl_test.cc",
+        "ssl_certs_test.h",
+    ],
     data = [
+        "gen_unittest_certs.sh",
         "//test/common/ssl/test_data:certs",
     ],
-    setup_cmds = [(
-        "gen_unittest_certs.sh",
-        [],
-    )],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
@@ -33,14 +33,14 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "context_impl_test",
-    srcs = ["context_impl_test.cc"],
+    srcs = [
+        "context_impl_test.cc",
+        "ssl_certs_test.h",
+    ],
     data = [
+        "gen_unittest_certs.sh",
         "//test/common/ssl/test_data:certs",
     ],
-    setup_cmds = [(
-        "gen_unittest_certs.sh",
-        [],
-    )],
     deps = [
         "//source/common/json:json_loader_lib",
         "//source/common/ssl:context_config_lib",
