@@ -13,18 +13,9 @@ EOF
 openssl x509 -req -days 730 -in cacert.csr -sha256 -signkey cakey.pem -out cacert.pem
 
 openssl genrsa -out serverkey.pem 1024
-openssl req -new -key serverkey.pem -out servercert.csr -sha256  <<EOF
-US
-California
-San Francisco
-Lyft
-Test
-Test Server
-test@lyft.com
+openssl req -new -key serverkey.pem -out servercert.csr -config servercert.cfg -batch -sha256
 
-
-EOF
-openssl x509 -req -days 730 -in servercert.csr -sha256 -CA cacert.pem -CAkey cakey.pem -CAcreateserial -out servercert.pem
+openssl x509 -req -days 730 -in servercert.csr -sha256 -CA cacert.pem -CAkey cakey.pem -CAcreateserial -out servercert.pem -extensions v3_req -extfile servercert.cfg
 
 openssl genrsa -out clientkey.pem 1024
 openssl req -new -key clientkey.pem -out clientcert.csr -sha256  <<EOF
