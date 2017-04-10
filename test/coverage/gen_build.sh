@@ -39,4 +39,4 @@ EOF
 
 ) > "${BUILD_PATH}"
 
-buildifier "${BUILD_PATH}"
+"${BUILDIFIER_BIN}" "${BUILD_PATH}"
