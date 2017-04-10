@@ -5,14 +5,12 @@ load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
 envoy_cc_library(
     name = "http_tracer_lib",
     srcs = [
-    	"http_tracer_impl.cc",
-	"lightstep_tracer_impl.cc",
-	"zipkin_tracer_impl.cc",
+        "http_tracer_impl.cc",
+        "zipkin_tracer_impl.cc",
     ],
     hdrs = [
         "http_tracer_impl.h",
-	"lightstep_tracer_impl.h",
-	"zipkin_tracer_impl.h",
+        "zipkin_tracer_impl.h",
     ],
     external_deps = ["lightstep"],
     deps = [

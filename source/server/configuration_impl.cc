@@ -10,6 +10,7 @@
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/tracing/http_tracer_impl.h"
+#include "common/tracing/zipkin_tracer_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 namespace Server {
@@ -123,9 +124,9 @@ void MainImpl::initializeTracers(const Json::Object& tracing_configuration) {
                              "--service-cluster option.");
       }
 
-      Tracing::DriverPtr zipkin_driver(
-          new Tracing::ZipkinDriver(*driver->getObject("config"), *cluster_manager_,
-                                    server_.threadLocal(), server_.runtime(), server_.localInfo()));
+      Tracing::DriverPtr zipkin_driver(new Tracing::ZipkinDriver(
+          *driver->getObject("config"), *cluster_manager_, server_.stats(), server_.threadLocal(),
+          server_.runtime(), server_.localInfo()));
 
       http_tracer_.reset(
           new Tracing::HttpTracerImpl(std::move(zipkin_driver), server_.localInfo()));
