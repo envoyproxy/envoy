@@ -106,7 +106,7 @@ def envoy_cc_test(name,
             repository + name + "_lib",
             repository + "//test:main"
         ],
-        tags = tags,
+        tags = tags + ["coverage_test"],
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -137,6 +137,33 @@ def envoy_cc_test_library(name,
 # Envoy C++ mock targets should be specified with this function.
 def envoy_cc_mock(name, **kargs):
     envoy_cc_test_library(name = name, **kargs)
+
+# Envoy shell tests that need to be included in coverage run should be specified with this function.
+def envoy_sh_test(name,
+                  srcs = [],
+                  data = [],
+                  **kargs):
+  test_runner_cc = name + "_test_runner.cc"
+  native.genrule(
+      name = name + "_gen_test_runner",
+      srcs = srcs,
+      outs = [test_runner_cc],
+      cmd = "$(location //bazel:gen_sh_test_runner.sh) $(location " + srcs[0] + ") >> $@",
+      tools = ["//bazel:gen_sh_test_runner.sh"],
+  )
+  envoy_cc_test_library(
+      name = name + "_lib",
+      srcs = [test_runner_cc],
+      data = srcs + data,
+      tags = ["coverage_test_lib"],
+      deps = ["//test/test_common:environment_lib"],
+  )
+  native.sh_test(
+      name = name,
+      srcs = srcs,
+      data = srcs + data,
+      **kargs
+  )
 
 def _proto_header(proto_path):
   if proto_path.endswith(".proto"):

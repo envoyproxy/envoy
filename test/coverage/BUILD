@@ -92,6 +92,7 @@ envoy_cc_test(
         "//test/common/upstream:ring_hash_lb_test_lib",
         "//test/common/upstream:sds_test_lib",
         "//test/common/upstream:upstream_impl_test_lib",
+        "//test/integration:hotrestart_test_lib",
         "//test/integration:http2_integration_test_lib",
         "//test/integration:http2_upstream_integration_test_lib",
         "//test/integration:integration_admin_test_lib",
