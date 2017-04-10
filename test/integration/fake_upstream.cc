@@ -7,6 +7,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 
 #include "test/test_common/utility.h"
@@ -185,16 +186,20 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
   log().info("starting fake server on unix domain socket {}", uds_path);
 }
 
+static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port) {
+  auto addr =
+      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("0.0.0.0", port)};
+  return Network::ListenSocketPtr{new Network::TcpListenSocket(addr, true)};
+}
+
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type)
-    : FakeUpstream(nullptr, Network::ListenSocketPtr{new Network::TcpListenSocket(port, true)},
-                   type) {
+    : FakeUpstream(nullptr, makeTcpListenSocket(port), type) {
   log().info("starting fake server on port {}", this->localAddress()->ip()->port());
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
                            FakeHttpConnection::Type type)
-    : FakeUpstream(ssl_ctx, Network::ListenSocketPtr{new Network::TcpListenSocket(port, true)},
-                   type) {
+    : FakeUpstream(ssl_ctx, makeTcpListenSocket(port), type) {
   log().info("starting fake SSL server on port {}", this->localAddress()->ip()->port());
 }
 

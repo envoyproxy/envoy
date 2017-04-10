@@ -179,6 +179,18 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
   return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
 }
 
+Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
+  // Initialized on first call in a thread-safe manner.
+  static Address::InstanceConstSharedPtr loopback(new Address::Ipv4Instance("127.0.0.1", 0));
+  return loopback;
+}
+
+Address::InstanceConstSharedPtr Utility::getIpv6LoopbackAddress() {
+  // Initialized on first call in a thread-safe manner.
+  static Address::InstanceConstSharedPtr loopback(new Address::Ipv6Instance("::1", 0));
+  return loopback;
+}
+
 Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {
   // Initialized on first call in a thread-safe manner.
   static Address::InstanceConstSharedPtr any(new Address::Ipv4Instance(static_cast<uint32_t>(0)));

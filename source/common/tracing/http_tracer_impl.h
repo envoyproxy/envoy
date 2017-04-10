@@ -63,7 +63,8 @@ public:
    * 2) Finish active span.
    */
   static void finalizeSpan(Span& active_span, const Http::HeaderMap& request_headers,
-                           const Http::AccessLog::RequestInfo& request_info);
+                           const Http::AccessLog::RequestInfo& request_info,
+                           const Config& tracing_config);
 
   static const std::string INGRESS_OPERATION;
   static const std::string EGRESS_OPERATION;

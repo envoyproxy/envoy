@@ -60,5 +60,19 @@ the units tests in
 [test/common/http/async_client_impl_test.cc](https://github.com/lyft/envoy/blob/master/test/common/http/async_client_impl_test.cc):
 
 ```
-bazel test //test/commont/http:async_client_impl_test
+bazel test //test/common/http:async_client_impl_test
 ```
+
+# Additional Envoy build and test options
+
+To build and run tests with the compiler's address sanitizer (ASAN) enabled:
+
+```
+bazel test -c dbg --config=asan //test/...
+```
+
+The ASAN failure stack traces include numbers as a results of running ASAN with a `dbg` build above.
+
+# Adding or maintaining Envoy build rules
+
+See the [developer guide for writing Envoy Bazel rules](DEVELOPER.md).

@@ -30,5 +30,24 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
                                                     Address::SocketType type);
 
+/**
+ * Returns a loopback address for the specified IP version. For IPv6 this is always the same,
+ * but for IPv4 it is anywhere in the range 127.0.0.0/8.
+ * @param version the IP version of the loopback address.
+ * @returns a loopback address for the specified IP version.
+ */
+Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion version);
+
+/**
+ * Bind a socket to a free port on a loopback address, and return the socket's fd and bound address.
+ * Enables a test server to reliably "select" a port to listen on. Note that the socket option
+ * SO_REUSEADDR has NOT been set on the socket.
+ * @param version the IP version of the loopback address.
+ * @param type the type of socket to be bound.
+ * @returns the address and the fd of the socket bound to that address.
+ */
+std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
+                                                                     Address::SocketType type);
+
 } // Test
 } // Network

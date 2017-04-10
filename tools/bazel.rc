@@ -1,0 +1,5 @@
+# Envoy specific Bazel build/test options.
+
+build:asan --copt -fsanitize=address
+build:asan --linkopt -fsanitize=address
+build:asan --linkopt -ldl

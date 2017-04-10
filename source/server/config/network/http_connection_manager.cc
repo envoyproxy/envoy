@@ -86,13 +86,27 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("tracing")) {
-    const std::string operation_name = config.getObject("tracing")->getString("operation_name");
+    Json::ObjectPtr tracing_config = config.getObject("tracing");
+
+    const std::string operation_name = tracing_config->getString("operation_name");
+    Tracing::OperationName tracing_operation_name;
+    std::vector<Http::LowerCaseString> request_headers_for_tags;
+
     if (operation_name == "ingress") {
-      tracing_config_.value({Tracing::OperationName::Ingress});
+      tracing_operation_name = Tracing::OperationName::Ingress;
     } else {
       ASSERT(operation_name == "egress");
-      tracing_config_.value({Tracing::OperationName::Egress});
+      tracing_operation_name = Tracing::OperationName::Egress;
     }
+
+    if (tracing_config->hasObject("request_headers_for_tags")) {
+      for (const std::string& header : tracing_config->getStringArray("request_headers_for_tags")) {
+        request_headers_for_tags.push_back(Http::LowerCaseString(header));
+      }
+    }
+
+    tracing_config_.reset(new Http::TracingConnectionManagerConfig(
+        {tracing_operation_name, request_headers_for_tags}));
   }
 
   if (config.hasObject("idle_timeout_s")) {

@@ -54,7 +54,8 @@ public:
                "",
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))} {
-    tracing_config_.value({Tracing::OperationName::Ingress});
+    tracing_config_.reset(new Http::TracingConnectionManagerConfig(
+        {Tracing::OperationName::Ingress, {Http::LowerCaseString(":method")}}));
   }
 
   ~HttpConnectionManagerImplTest() {
@@ -94,8 +95,8 @@ public:
   bool useRemoteAddress() override { return use_remote_address_; }
   const Network::Address::Instance& localAddress() override { return local_address_; }
   const Optional<std::string>& userAgent() override { return user_agent_; }
-  const Optional<Http::TracingConnectionManagerConfig>& tracingConfig() override {
-    return tracing_config_;
+  const Http::TracingConnectionManagerConfig* tracingConfig() override {
+    return tracing_config_.get();
   }
 
   NiceMock<Tracing::MockHttpTracer> tracer_;
@@ -121,7 +122,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
   RouteConfigProvider route_config_provider_;
-  Optional<Http::TracingConnectionManagerConfig> tracing_config_;
+  Http::TracingConnectionManagerConfigPtr tracing_config_;
   Http::SlowDateProviderImpl date_provider_;
 };
 
@@ -221,6 +222,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
         return span;
       }));
   EXPECT_CALL(*span, finishSpan());
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  // Verify tag is set based on the request headers.
+  EXPECT_CALL(*span, setTag(":method", "GET"));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
 
@@ -305,7 +309,7 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   setup(false, "");
 
   // Disable tracing.
-  tracing_config_ = Optional<Http::TracingConnectionManagerConfig>();
+  tracing_config_.reset();
 
   EXPECT_CALL(tracer_, startSpan_(_, _, _)).Times(0);
   ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))

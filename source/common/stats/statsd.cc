@@ -72,7 +72,7 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
 
   tls.set(tls_slot_,
           [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-            return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsSink(*this, dispatcher)};
+            return std::make_shared<TlsSink>(*this, dispatcher);
           });
 }
 

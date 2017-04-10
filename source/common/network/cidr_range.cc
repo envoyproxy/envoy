@@ -132,7 +132,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
       return address;
     } else if (length == 0) {
       // Create an Ipv4Instance with only a port, which will thus have the any address.
-      return InstanceConstSharedPtr(new Ipv4Instance(uint32_t(0)));
+      return std::make_shared<Ipv4Instance>(uint32_t(0));
     }
     // Need to mask out the unused bits, and create an Ipv4Instance with this address.
     uint32_t ip4 = ntohl(address->ip()->ipv4()->address());
@@ -141,7 +141,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(0);
     sa4.sin_addr.s_addr = htonl(ip4);
-    return InstanceConstSharedPtr(new Ipv4Instance(&sa4));
+    return std::make_shared<Ipv4Instance>(&sa4);
   }
 
   case IpVersion::v6: {
@@ -151,7 +151,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
       return address;
     } else if (length == 0) {
       // Create an Ipv6Instance with only a port, which will thus have the any address.
-      return InstanceConstSharedPtr(new Ipv6Instance(uint32_t(0)));
+      return std::make_shared<Ipv6Instance>(uint32_t(0));
     }
     // We need to mask out the unused bits, but we don't have a uint128_t available.
     // However, we know that the array returned by Ipv6::address() represents the address
@@ -175,7 +175,7 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
         length -= 8;
       }
     }
-    return InstanceConstSharedPtr(new Ipv6Instance(sa6));
+    return std::make_shared<Ipv6Instance>(sa6);
   }
   }
   NOT_REACHED

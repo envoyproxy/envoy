@@ -1,6 +1,7 @@
+#include "common/ssl/context_impl.h"
+
 #include "common/json/json_loader.h"
 #include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -73,8 +74,8 @@ TEST(SslContextImplTest, TestCipherSuites) {
 TEST(SslContextImplTest, TestExpiringCert) {
   std::string json = R"EOF(
   {
-      "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-      "private_key_file": "{{ test_certs }}/unittestkey.pem"
+      "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+      "private_key_file": "{{ test_tmpdir }}/unittestkey.pem"
   }
   )EOF";
 
@@ -96,8 +97,8 @@ TEST(SslContextImplTest, TestExpiringCert) {
 TEST(SslContextImplTest, TestExpiredCert) {
   std::string json = R"EOF(
   {
-      "cert_chain_file": "{{ test_certs }}/unittestcert_expired.pem",
-      "private_key_file": "{{ test_certs }}/unittestkey_expired.pem"
+      "cert_chain_file": "{{ test_tmpdir }}/unittestcert_expired.pem",
+      "private_key_file": "{{ test_tmpdir }}/unittestkey_expired.pem"
   }
   )EOF";
 
@@ -113,8 +114,8 @@ TEST(SslContextImplTest, TestExpiredCert) {
 TEST(SslContextImplTest, TestGetCertInformation) {
   std::string json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt"
   }
   )EOF";
@@ -136,7 +137,7 @@ TEST(SslContextImplTest, TestGetCertInformation) {
       "Certificate Path: test/common/ssl/test_data/ca.crt, Serial Number: F0DE921A0515EB45, "
       "Days until Expiration: ");
   std::string cert_chain_partial_output(
-      TestEnvironment::substitute("Certificate Path: {{ test_certs }}/unittestcert.pem"));
+      TestEnvironment::substitute("Certificate Path: {{ test_tmpdir }}/unittestcert.pem"));
 
   EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
   EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=

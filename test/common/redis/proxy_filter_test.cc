@@ -22,7 +22,8 @@ TEST(RedisProxyFilterConfigTest, Normal) {
   std::string json_string = R"EOF(
   {
     "cluster_name": "fake_cluster",
-    "stat_prefix": "foo"
+    "stat_prefix": "foo",
+    "conn_pool": {}
   }
   )EOF";
 
@@ -37,7 +38,8 @@ TEST(RedisProxyFilterConfigTest, InvalidCluster) {
   std::string json_string = R"EOF(
   {
     "cluster_name": "fake_cluster",
-    "stat_prefix": "foo"
+    "stat_prefix": "foo",
+    "conn_pool": {}
   }
   )EOF";
 
@@ -68,7 +70,8 @@ public:
     std::string json_string = R"EOF(
     {
       "cluster_name": "fake_cluster",
-      "stat_prefix": "foo"
+      "stat_prefix": "foo",
+      "conn_pool": {}
     }
     )EOF";
 

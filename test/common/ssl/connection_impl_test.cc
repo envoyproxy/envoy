@@ -1,17 +1,18 @@
+#include "common/ssl/connection_impl.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/connection_impl.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 
 using testing::_;
@@ -32,7 +33,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -42,8 +43,8 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-      *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -79,9 +80,10 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   std::string server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
-    "ca_cert_file": "test/common/ssl/test_data/ca_with_uri_san.crt"
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "test/common/ssl/test_data/ca_with_uri_san.crt",
+    "verify_subject_alt_name": [ "server1.example.com" ]
   }
   )EOF";
 
@@ -98,8 +100,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca_with_dns_san.crt"
   }
   )EOF";
@@ -116,8 +118,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": ""
   }
   )EOF";
@@ -134,8 +136,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt"
   }
   )EOF";
@@ -150,8 +152,8 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
 
   std::string server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt",
     "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
   }
@@ -163,7 +165,7 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -180,8 +182,8 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-      *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -207,8 +209,8 @@ TEST(SslConnectionImplTest, SslError) {
 
   std::string server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt",
     "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
   }
@@ -220,7 +222,7 @@ TEST(SslConnectionImplTest, SslError) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(uint32_t(10000), true);
+  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -228,7 +230,7 @@ TEST(SslConnectionImplTest, SslError) {
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
   Network::ClientConnectionPtr client_connection =
-      dispatcher.createClientConnection(Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+      dispatcher.createClientConnection(socket.localAddress());
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
   client_connection->write(bad_data);
@@ -258,14 +260,14 @@ public:
                            uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
-    Network::TcpListenSocket socket(uint32_t(10000), true);
+    Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
 
     std::string server_ctx_json = R"EOF(
     {
-      "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-      "private_key_file": "{{ test_certs }}/unittestkey.pem",
+      "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+      "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
       "ca_cert_file": "test/common/ssl/test_data/ca.crt"
     }
     )EOF";
@@ -293,8 +295,8 @@ public:
     ContextConfigImpl client_ctx_config(*client_ctx_loader);
     ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
 
-    Network::ClientConnectionPtr client_connection = dispatcher.createSslClientConnection(
-        *client_ctx, Network::Utility::resolveUrl("tcp://127.0.0.1:10000"));
+    Network::ClientConnectionPtr client_connection =
+        dispatcher.createSslClientConnection(*client_ctx, socket.localAddress());
     client_connection->connect();
 
     Network::ConnectionPtr server_connection;

@@ -138,6 +138,8 @@ TEST(NetworkUtility, loopbackAddress) {
     Address::PipeInstance address("/foo");
     EXPECT_FALSE(Utility::isLoopbackAddress(address));
   }
+  EXPECT_EQ("127.0.0.1:0", Utility::getCanonicalIpv4LoopbackAddress()->asString());
+  EXPECT_EQ("[::1]:0", Utility::getIpv6LoopbackAddress()->asString());
 }
 
 TEST(NetworkUtility, AnyAddress) {

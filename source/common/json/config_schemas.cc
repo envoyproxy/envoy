@@ -214,6 +214,11 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           "operation_name" : {
             "type" : "string",
             "enum": ["ingress", "egress"]
+          },
+          "request_headers_for_tags": {
+            "type" : "array",
+            "uniqueItems": true,
+            "items" : {"type" : "string"}
           }
         },
         "required" : ["operation_name"],
@@ -336,9 +341,26 @@ const std::string Json::Schema::REDIS_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
     "type" : "object",
     "properties":{
       "cluster_name" : {"type" : "string"},
-      "stat_prefix" : {"type" : "string"}
+      "stat_prefix" : {"type" : "string"},
+      "conn_pool" : {"type" : "object"}
     },
-    "required": ["cluster_name", "stat_prefix"],
+    "required": ["cluster_name", "stat_prefix", "conn_pool"],
+    "additionalProperties": false
+  }
+  )EOF");
+
+const std::string Json::Schema::REDIS_CONN_POOL_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "type" : "object",
+    "properties":{
+      "op_timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      }
+    },
+    "required": ["op_timeout_ms"],
     "additionalProperties": false
   }
   )EOF");
@@ -420,6 +442,20 @@ const std::string Json::Schema::ROUTE_CONFIGURATION_SCHEMA(R"EOF(
       "response_headers_to_remove" : {
         "type" : "array",
         "items" : {"type" : "string"}
+      },
+      "request_headers_to_add" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "object",
+          "properties": {
+            "key" : {"type" : "string"},
+            "value" : {"type" : "string"}
+          },
+          "required": ["key", "value"],
+          "additionalProperties": false
+        }
       }
     },
     "required": ["virtual_hosts"],
@@ -460,7 +496,21 @@ const std::string Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA(R"EOF(
         "minItems" : 1,
         "properties" : {"$ref" : "#/definitions/virtual_clusters"}
       },
-      "rate_limits" : {"type" : "array"}
+      "rate_limits" : {"type" : "array"},
+      "request_headers_to_add" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "object",
+          "properties": {
+            "key" : {"type" : "string"},
+            "value" : {"type" : "string"}
+          },
+          "required": ["key", "value"],
+          "additionalProperties": false
+        }
+      }
     },
     "required" : ["name", "domains", "routes"],
     "additionalProperties" : false
@@ -551,6 +601,20 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
         },
         "required" : ["header_name"],
         "additionalProperties" : false
+      },
+      "request_headers_to_add" : {
+        "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
+        "items" : {
+          "type": "object",
+          "properties": {
+            "key" : {"type" : "string"},
+            "value" : {"type" : "string"}
+          },
+          "required": ["key", "value"],
+          "additionalProperties": false
+        }
       },
       "opaque_config" : {
         "type" : "object",
@@ -1062,7 +1126,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
     },
     "type" : "object",
     "properties" : {
-      "name" : {"type" : "string"},
+      "name" : {
+        "type" : "string",
+        "pattern" : "^[^:]+$",
+        "minLength" : 1,
+        "maxLength" : 60
+      },
       "type" : {
         "type" : "string",
         "enum" : ["static", "strict_dns", "logical_dns", "sds"]

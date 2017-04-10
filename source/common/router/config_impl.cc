@@ -136,6 +136,13 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   if (route.hasObject("hash_policy")) {
     hash_policy_.reset(new HashPolicyImpl(*route.getObject("hash_policy")));
   }
+
+  if (route.hasObject("request_headers_to_add")) {
+    for (const Json::ObjectPtr& header : route.getObjectArray("request_headers_to_add")) {
+      request_headers_to_add_.push_back(
+          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
+    }
+  }
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -154,6 +161,19 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers) const {
+  // Append user-specified request headers in the following order: route-level headers,
+  // virtual host level headers and finally global connection manager level headers.
+  for (const std::pair<Http::LowerCaseString, std::string>& to_add : requestHeadersToAdd()) {
+    headers.addStatic(to_add.first, to_add.second);
+  }
+  for (const std::pair<Http::LowerCaseString, std::string>& to_add : vhost_.requestHeadersToAdd()) {
+    headers.addStatic(to_add.first, to_add.second);
+  }
+  for (const std::pair<Http::LowerCaseString, std::string>& to_add :
+       vhost_.globalRouteConfig().requestHeadersToAdd()) {
+    headers.addStatic(to_add.first, to_add.second);
+  }
+
   if (host_rewrite_.empty()) {
     return;
   }
@@ -364,9 +384,11 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
   return nullptr;
 }
 
-VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Loader& runtime,
+VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
+                                 const ConfigImpl& global_route_config, Runtime::Loader& runtime,
                                  Upstream::ClusterManager& cm, bool validate_clusters)
-    : name_(virtual_host.getString("name")), rate_limit_policy_(virtual_host) {
+    : name_(virtual_host.getString("name")), rate_limit_policy_(virtual_host),
+      global_route_config_(global_route_config) {
 
   virtual_host.validateSchema(Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA);
 
@@ -379,6 +401,13 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host, Runtime::Load
     ssl_requirements_ = SslRequirements::EXTERNAL_ONLY;
   } else {
     throw EnvoyException(fmt::format("unknown 'require_ssl' type '{}'", require_ssl));
+  }
+
+  if (virtual_host.hasObject("request_headers_to_add")) {
+    for (const Json::ObjectPtr& header : virtual_host.getObjectArray("request_headers_to_add")) {
+      request_headers_to_add_.push_back(
+          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
+    }
   }
 
   for (const Json::ObjectPtr& route : virtual_host.getObjectArray("routes")) {
@@ -433,14 +462,15 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
   priority_ = ConfigUtility::parsePriority(virtual_cluster);
 }
 
-RouteMatcher::RouteMatcher(const Json::Object& config, Runtime::Loader& runtime,
-                           Upstream::ClusterManager& cm, bool validate_clusters) {
+RouteMatcher::RouteMatcher(const Json::Object& json_config, const ConfigImpl& global_route_config,
+                           Runtime::Loader& runtime, Upstream::ClusterManager& cm,
+                           bool validate_clusters) {
 
-  config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
+  json_config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
-  for (const Json::ObjectPtr& virtual_host_config : config.getObjectArray("virtual_hosts")) {
-    VirtualHostSharedPtr virtual_host(
-        new VirtualHostImpl(*virtual_host_config, runtime, cm, validate_clusters));
+  for (const Json::ObjectPtr& virtual_host_config : json_config.getObjectArray("virtual_hosts")) {
+    VirtualHostSharedPtr virtual_host(new VirtualHostImpl(*virtual_host_config, global_route_config,
+                                                          runtime, cm, validate_clusters));
     uses_runtime_ |= virtual_host->usesRuntime();
 
     for (const std::string& domain : virtual_host_config->getStringArray("domains")) {
@@ -533,7 +563,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 
 ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
                        Upstream::ClusterManager& cm, bool validate_clusters) {
-  route_matcher_.reset(new RouteMatcher(config, runtime, cm, validate_clusters));
+  route_matcher_.reset(new RouteMatcher(config, *this, runtime, cm, validate_clusters));
 
   if (config.hasObject("internal_only_headers")) {
     for (std::string header : config.getStringArray("internal_only_headers")) {
@@ -551,6 +581,13 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
   if (config.hasObject("response_headers_to_remove")) {
     for (std::string header : config.getStringArray("response_headers_to_remove")) {
       response_headers_to_remove_.push_back(Http::LowerCaseString(header));
+    }
+  }
+
+  if (config.hasObject("request_headers_to_add")) {
+    for (const Json::ObjectPtr& header : config.getObjectArray("request_headers_to_add")) {
+      request_headers_to_add_.push_back(
+          {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
   }
 }

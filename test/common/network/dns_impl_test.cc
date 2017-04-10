@@ -6,6 +6,7 @@
 #include "common/network/dns_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -190,19 +191,20 @@ public:
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver();
 
-    // Point c-ares at 127.0.0.1:10000 with no search domains and TCP-only.
-    peer_.reset(new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver_.get())));
-    peer_->resetChannelTcpOnly(zero_timeout());
-    ares_set_servers_ports_csv(peer_->channel(), "127.0.0.1:10000");
-
-    // Instantiate TestDnsServer and listen on 127.0.0.1:10000.
+    // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_.reset(new TestDnsServer());
-    socket_.reset(new Network::TcpListenSocket(uint32_t(10000), true));
+    socket_.reset(
+        new Network::TcpListenSocket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true));
     listener_ = dispatcher_.createListener(connection_handler_, *socket_, *server_, stats_store_,
                                            {.bind_to_port_ = true,
                                             .use_proxy_proto_ = false,
                                             .use_original_dst_ = false,
                                             .per_connection_buffer_limit_bytes_ = 0});
+
+    // Point c-ares at the listener with no search domains and TCP-only.
+    peer_.reset(new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver_.get())));
+    peer_->resetChannelTcpOnly(zero_timeout());
+    ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
   }
 
 protected:

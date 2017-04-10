@@ -242,7 +242,8 @@ TEST(HttpTracerUtilityTest, OriginalAndLongPath) {
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag("request_line", "GET " + expected_path + " HTTP/2"));
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
+  NiceMock<MockConfig> config;
+  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
 TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
@@ -274,7 +275,8 @@ TEST(HttpTracerUtilityTest, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag("response_flags", "-"));
 
   EXPECT_CALL(*span, finishSpan());
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
+  NiceMock<MockConfig> config;
+  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
 TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
@@ -302,6 +304,18 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("request_size", "10"));
   EXPECT_CALL(*span, setTag("guid:x-client-trace-id", "client_trace_id"));
 
+  // Check that span has tags from custom headers.
+  request_headers.addViaCopy(Http::LowerCaseString("aa"), "a");
+  request_headers.addViaCopy(Http::LowerCaseString("bb"), "b");
+  request_headers.addViaCopy(Http::LowerCaseString("cc"), "c");
+  MockConfig config;
+  config.headers_.push_back(Http::LowerCaseString("aa"));
+  config.headers_.push_back(Http::LowerCaseString("cc"));
+  config.headers_.push_back(Http::LowerCaseString("ee"));
+  EXPECT_CALL(*span, setTag("aa", "a"));
+  EXPECT_CALL(*span, setTag("cc", "c"));
+  EXPECT_CALL(config, requestHeadersForTags());
+
   Optional<uint32_t> response_code(503);
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
@@ -314,7 +328,7 @@ TEST(HttpTracerUtilityTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(*span, setTag("response_flags", "UT"));
 
   EXPECT_CALL(*span, finishSpan());
-  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info);
+  HttpTracerUtility::finalizeSpan(*span, request_headers, request_info, config);
 }
 
 TEST(HttpTracerUtilityTest, operationTypeToString) {

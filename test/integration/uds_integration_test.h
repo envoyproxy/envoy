@@ -18,7 +18,7 @@ public:
         TestEnvironment::unixDomainSocketPath("udstest.1.sock"), FakeHttpConnection::Type::HTTP1));
     fake_upstreams_.emplace_back(new FakeUpstream(
         TestEnvironment::unixDomainSocketPath("udstest.2.sock"), FakeHttpConnection::Type::HTTP1));
-    createTestServer("test/config/integration/server_uds.json", {"http"});
+    createTestServer("server_uds.json", {"http"});
   }
 
   /**

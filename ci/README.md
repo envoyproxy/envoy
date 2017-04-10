@@ -1,13 +1,24 @@
-# Developer use of CI Docker image
+# Developer use of CI Docker images
 
-The Docker image at [`lyft/envoy-build:<hash>`](https://hub.docker.com/r/lyft/envoy-build/) is used for Travis CI checks, where `<hash>` is specified in
-[ci_steps.sh](https://github.com/lyft/envoy/blob/master/ci/ci_steps.sh). Developers
-may work with `lyft/envoy-build:latest` to provide a self-contained environment for
-building Envoy binaries and running tests that reflects the latest built image. Moreover, the Docker
-image at [`lyft/envoy:<hash>`](https://hub.docker.com/r/lyft/envoy/) is an image that has an Envoy binary at `usr/local/bin/envoy`. The `<hash>`
-corresponds to the master commit at which the binary was compiled. Lastly, `lyft/envoy:latest` contains
-an Envoy binary built from the latest tip of master that passed tests.
+Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
 
+## Ubuntu envoy image
+The Ubuntu based Envoy Docker image at [`lyft/envoy-build:<hash>`](https://hub.docker.com/r/lyft/envoy-build/) is used for Travis CI checks,
+where `<hash>` is specified in [ci_steps.sh](https://github.com/lyft/envoy/blob/master/ci/ci_steps.sh). Developers
+may work with `lyft/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
+running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
+at [`lyft/envoy:<hash>`](https://hub.docker.com/r/lyft/envoy/) is an image that has an Envoy binary at `/usr/local/bin/envoy`. The `<hash>`
+corresponds to the master commit at which the binary was compiled. Lastly, `lyft/envoy:latest` contains an Envoy
+binary built from the latest tip of master that passed tests.
+
+## Alpine envoy image
+
+Minimal images based on alpine Linux allow for quicker deployment of Envoy. Two alpine based images are built,
+one with an Envoy binary with debug (`lyft/envoy-alpine-debug`) symbols and one stripped of them (`lyft/envoy-alpine`).
+Both images are pushed with two different tags: `<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
+master commit at which the binary was compiled, and `latest` corresponds to a binary built from the latest tip of master that passed tests.
+
+# Building a debug image
 An example basic invocation to build a debug image and run all tests is:
 
 ```bash

@@ -7,6 +7,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/network_utility.h"
 
 using testing::_;
 using testing::Invoke;
@@ -17,13 +18,13 @@ namespace Network {
 class ProxyProtocolTest : public testing::Test {
 public:
   ProxyProtocolTest()
-      : socket_(uint32_t(1234), true),
+      : socket_(Network::Utility::getCanonicalIpv4LoopbackAddress(), true),
         listener_(connection_handler_, dispatcher_, socket_, callbacks_, stats_store_,
                   {.bind_to_port_ = true,
                    .use_proxy_proto_ = true,
                    .use_original_dst_ = false,
                    .per_connection_buffer_limit_bytes_ = 0}) {
-    conn_ = dispatcher_.createClientConnection(Utility::resolveUrl("tcp://127.0.0.1:1234"));
+    conn_ = dispatcher_.createClientConnection(socket_.localAddress());
     conn_->addConnectionCallbacks(connection_callbacks_);
     conn_->connect();
   }

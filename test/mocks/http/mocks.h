@@ -81,7 +81,7 @@ public:
   MOCK_METHOD0(useRemoteAddress, bool());
   MOCK_METHOD0(localAddress, const Network::Address::Instance&());
   MOCK_METHOD0(userAgent, const Optional<std::string>&());
-  MOCK_METHOD0(tracingConfig, const Optional<Http::TracingConnectionManagerConfig>&());
+  MOCK_METHOD0(tracingConfig, const Http::TracingConnectionManagerConfig*());
 };
 
 class MockConnectionCallbacks : public virtual ConnectionCallbacks {

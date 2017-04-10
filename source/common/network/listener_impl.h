@@ -47,7 +47,8 @@ protected:
 
 private:
   static void errorCallback(evconnlistener* listener, void* context);
-  static void listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* addr, int, void* arg);
+  static void listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
+                             int remote_addr_len, void* arg);
 
   Event::Libevent::ListenerPtr listener_;
 };
