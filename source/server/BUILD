@@ -14,6 +14,7 @@ envoy_cc_library(
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/ssl:context_manager_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/json:config_schemas_lib",

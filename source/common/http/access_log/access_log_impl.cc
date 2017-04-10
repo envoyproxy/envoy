@@ -105,9 +105,7 @@ bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header
 }
 
 OperatorFilter::OperatorFilter(const Json::Object& json, Runtime::Loader& runtime) {
-  std::vector<Json::ObjectPtr> filters = json.getObjectArray("filters");
-
-  for (Json::ObjectPtr& filter : filters) {
+  for (Json::ObjectPtr& filter : json.getObjectArray("filters")) {
     filters_.emplace_back(FilterImpl::fromJson(*filter, runtime));
   }
 }
