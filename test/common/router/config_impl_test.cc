@@ -1786,4 +1786,93 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
   EXPECT_EQ("value2", opaque_config.find("name2")->second);
 }
 
+TEST(RoutePropertyTest, excludeVHRateLimits) {
+  std::string json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "cluster": "www2"
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+  std::unique_ptr<ConfigImpl> config_ptr;
+
+  config_ptr.reset(new ConfigImpl(*loader, runtime, cm, true));
+  EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
+
+  json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "cluster": "www2",
+            "rate_limits": [
+              {
+                "actions": [
+                  {
+                    "type": "remote_address"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  loader = Json::Factory::LoadFromString(json);
+  config_ptr.reset(new ConfigImpl(*loader, runtime, cm, true));
+  EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
+
+  json = R"EOF(
+  {
+    "virtual_hosts": [
+      {
+        "name": "www2",
+        "domains": ["*"],
+        "routes": [
+          {
+            "prefix": "/",
+            "cluster": "www2",
+            "include_vh_rate_limits": true,
+            "rate_limits": [
+              {
+                "actions": [
+                  {
+                    "type": "remote_address"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  loader = Json::Factory::LoadFromString(json);
+  config_ptr.reset(new ConfigImpl(*loader, runtime, cm, true));
+  EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
+}
+
 } // Router

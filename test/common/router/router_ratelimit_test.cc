@@ -159,11 +159,9 @@ TEST_F(RateLimitConfiguration, NoRateLimitPolicy) {
 
   SetUpTest(json);
 
-  EXPECT_EQ(0U, config_->route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                    ->routeEntry()
-                    ->rateLimitPolicy()
-                    .getApplicableRateLimit(0)
-                    .size());
+  route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry();
+  EXPECT_EQ(0U, route_->rateLimitPolicy().getApplicableRateLimit(0).size());
+  EXPECT_TRUE(route_->rateLimitPolicy().empty());
 }
 
 TEST_F(RateLimitConfiguration, TestGetApplicationRateLimit) {
@@ -197,6 +195,7 @@ TEST_F(RateLimitConfiguration, TestGetApplicationRateLimit) {
   std::string address = "10.0.0.1";
 
   route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry();
+  EXPECT_FALSE(route_->rateLimitPolicy().empty());
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route_->rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(1U, rate_limits.size());
