@@ -101,6 +101,7 @@ add_executable(envoy-test
   common/stats/thread_local_store_test.cc
   common/tracing/http_tracer_impl_test.cc
   common/tracing/lightstep_tracer_impl_test.cc
+  common/tracing/zipkin_tracer_impl_test.cc
   common/upstream/cds_api_impl_test.cc
   common/upstream/cluster_manager_impl_test.cc
   common/upstream/health_checker_impl_test.cc
