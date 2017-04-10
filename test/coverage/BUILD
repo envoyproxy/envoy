@@ -8,6 +8,8 @@ load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_library")
 envoy_cc_test(
     name = "coverage_tests",
     coverage = False,
+    # Needed when invoking external shell tests etc.
+    local = True,
     tags = ["manual"],
     deps = [
         "//test/common/access_log:access_log_manager_impl_test_lib",

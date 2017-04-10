@@ -86,7 +86,8 @@ def envoy_cc_test(name,
                   repository = "",
                   deps = [],
                   tags = [],
-                  coverage=True):
+                  coverage = True,
+                  local = False):
     test_lib_tags = []
     if coverage:
       test_lib_tags.append("coverage_test_lib")
@@ -107,6 +108,7 @@ def envoy_cc_test(name,
             repository + "//test:main"
         ],
         tags = tags + ["coverage_test"],
+        local = local,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified

@@ -34,6 +34,8 @@ EOF
     ],
     tags = ["manual"],
     coverage = False,
+    # Needed when invoking external shell tests etc.
+    local = True,
 )
 EOF
 
