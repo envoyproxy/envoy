@@ -76,6 +76,8 @@ SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::str
   ZipkinSpanPtr active_span;
   Zipkin::Span new_zipkin_span;
 
+  // TODO (fabolive): What happens if Host header is null ?
+
   if (request_headers.OtSpanContext()) {
     // Get the open tracing span context.
     // This header contains B3 annotations set by the downstream caller.
@@ -184,9 +186,9 @@ void ZipkinReporter::onFailure(Http::AsyncClient::FailureReason) {
 void ZipkinReporter::onSuccess(Http::MessagePtr&& http_response) {
   if (Http::Utility::getResponseStatus(http_response->headers()) !=
       enumToInt(Http::Code::Accepted)) {
-    driver_.tracerStats().reports_sent_.inc();
-  } else {
     driver_.tracerStats().reports_dropped_.inc();
+  } else {
+    driver_.tracerStats().reports_sent_.inc();
   }
 }
 
