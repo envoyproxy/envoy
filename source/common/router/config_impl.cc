@@ -146,11 +146,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
 
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
   // or the route set `include_vh_rate_limits` to true.
-  if (rate_limit_policy_.empty() || route.getBoolean("include_vh_rate_limits", false)) {
-    include_vh_rate_limits_ = true;
-  } else {
-    include_vh_rate_limits_ = false;
-  }
+  include_vh_rate_limits_ =
+      (rate_limit_policy_.empty() || route.getBoolean("include_vh_rate_limits", false));
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
