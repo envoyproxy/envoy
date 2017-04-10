@@ -47,6 +47,12 @@ ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager&
   }
   cluster_ = cluster->info();
 
+  if (cluster_->features() & Upstream::ClusterInfo::Features::HTTP2) {
+    throw EnvoyException(
+        fmt::format("Zipkin collector service (cluster {}) can be accessed over http1.1 only",
+                    cluster_->name()));
+  }
+
   std::string collector_endpoint = config.getString("collector_endpoint");
 
   tls_.set(tls_slot_, [this, collector_endpoint](Event::Dispatcher& dispatcher)
