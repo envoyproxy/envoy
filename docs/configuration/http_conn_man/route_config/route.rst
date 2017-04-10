@@ -160,9 +160,10 @@ priority
 .. _config_http_conn_man_route_table_route_include_vh:
 
 include_vh_rate_limits
-  *(optional, boolean)* Specifies if the rate limit filter should include the virtual host rate limits.
-  The default value is false if
-  :ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>` is specified for the route.
+  *(optional, boolean)* Specifies if the rate limit filter should include the virtual host rate
+  limits. By default, if the route configured rate limits, the virtual host
+  :ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>` are not applied to the
+  request.
 
 :ref:`hash_policy <config_http_conn_man_route_table_hash_policy>`
   *(optional, array)* Specifies the route's hashing policy if the upstream cluster uses a hashing

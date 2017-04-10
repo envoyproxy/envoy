@@ -69,7 +69,7 @@ public:
   virtual ~RateLimitPolicy() {}
 
   /**
-   * @return true if there is no rate limit policy.
+   * @return true if there is no rate limit policy for all stage settings.
    */
   virtual bool empty() const PURE;
 
