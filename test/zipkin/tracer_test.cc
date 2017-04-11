@@ -164,5 +164,38 @@ TEST(ZipkinTracerTest, finishSpan) {
   EXPECT_EQ(9000, endpoint.port());
   EXPECT_EQ("my_service_name", endpoint.serviceName());
   EXPECT_FALSE(endpoint.isSetIpv6());
+
+  // ==============
+  // Test finishing a span containing an SR annotation
+  // ==============
+
+  SpanContext context(span);
+  Span server_side = tracer.startSpan("my_span", timestamp, context);
+
+  // Finishing a server-side span with an SR annotation must add an SS annotation
+  server_side.finish();
+  EXPECT_EQ(2ULL, server_side.annotations().size());
+
+  // Check the SR annotation added at span-creation time
+  ann = server_side.annotations()[0];
+  EXPECT_EQ(ZipkinCoreConstants::SERVER_RECV, ann.value());
+  EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
+  EXPECT_TRUE(ann.isSetEndpoint());
+  endpoint = ann.endpoint();
+  EXPECT_EQ("127.0.0.1", endpoint.ipv4());
+  EXPECT_EQ(9000, endpoint.port());
+  EXPECT_EQ("my_service_name", endpoint.serviceName());
+  EXPECT_FALSE(endpoint.isSetIpv6());
+
+  // Check the SS annotation added when ending the span
+  ann = server_side.annotations()[1];
+  EXPECT_EQ(ZipkinCoreConstants::SERVER_SEND, ann.value());
+  EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
+  EXPECT_TRUE(ann.isSetEndpoint());
+  endpoint = ann.endpoint();
+  EXPECT_EQ("127.0.0.1", endpoint.ipv4());
+  EXPECT_EQ(9000, endpoint.port());
+  EXPECT_EQ("my_service_name", endpoint.serviceName());
+  EXPECT_FALSE(endpoint.isSetIpv6());
 }
 } // Zipkin
