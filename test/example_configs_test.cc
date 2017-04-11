@@ -3,6 +3,7 @@
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/environment.h"
 
 #include <dirent.h>
 
@@ -42,8 +43,8 @@ public:
   Server::TestOptionsImpl options_;
 };
 
-void runConfigTest(const std::string& dir_path) {
-  DIR* dir = opendir(dir_path.c_str());
+void runConfigTest() {
+  DIR* dir = opendir(TestEnvironment::runfilesDirectory().c_str());
   if (!dir) {
     throw std::runtime_error("Generated configs directory not found");
   }
@@ -53,7 +54,8 @@ void runConfigTest(const std::string& dir_path) {
       continue;
     }
 
-    std::string file_name = fmt::format("{}/{}", dir_path, std::string(entry->d_name));
+    std::string file_name =
+        fmt::format("{}/{}", TestEnvironment::runfilesDirectory(), std::string(entry->d_name));
     Logger::Registry::getLog(Logger::Id::testing).info("testing config: {}", file_name);
     ConfigTest config(file_name);
   }
@@ -61,4 +63,7 @@ void runConfigTest(const std::string& dir_path) {
   closedir(dir);
 }
 
-TEST(ExampleConfigsTest, All) { runConfigTest("generated/configs"); }
+TEST(ExampleConfigsTest, All) {
+  TestEnvironment::exec({TestEnvironment::runfilesPath("test/example_configs_test_setup.sh")});
+  runConfigTest();
+}

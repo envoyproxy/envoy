@@ -1,6 +1,6 @@
 #pragma once
 
 /**
- * Load all configurations from a directory with sufficient mocking to be reasonably sure they work.
+ * Load all configurations from a tar file and make sure they are valid.
  */
-void runConfigTest(const std::string& dir_path);
+void runConfigTest();
