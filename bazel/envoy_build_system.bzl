@@ -96,6 +96,7 @@ def envoy_cc_test(name,
         srcs = srcs,
         data = data,
         deps = deps,
+        repository = repository,
         tags = test_lib_tags,
     )
     native.cc_test(
@@ -104,7 +105,7 @@ def envoy_cc_test(name,
         linkopts = ["-pthread"],
         linkstatic = 1,
         deps = [
-            repository + name + "_lib",
+            ":" + name + "_lib",
             repository + "//test:main"
         ],
         tags = tags + ["coverage_test"],
