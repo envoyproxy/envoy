@@ -2,3 +2,21 @@ Envoy
 Copyright (c) 2016-2017 Lyft Inc.  All rights reserved.
 
 Licensed under Apache License 2.0.  See LICENSE for terms.
+
+Zipkin (Apache V2)
+Libevent (BSD 3-Clause)
+Boring SSL (https://boringssl.googlesource.com/boringssl/+/2564/LICENSE)
+Google Perf tools (https://github.com/gperftools/gperftools/blob/master/COPYING)
+nghttp2 library (MIT)
+c-ares DNS library (MIT)
+Google Protobuf (https://github.com/google/protobuf/blob/master/LICENSE)
+Cotire (https://github.com/sakra/cotire/blob/master/license)
+Spdlog library (MIT)
+nodejs/http-parser (https://github.com/nodejs/http-parser/blob/master/LICENSE-MIT)
+tclap library (MIT)
+rapidjson library (MIT) + (https://github.com/miloyip/rapidjson/blob/master/license.txt)
+Googletest (New BSD License)
+gcovr library (https://github.com/gcovr/gcovr/blob/master/LICENSE.txt)
+Lightstep tracer cpp library (MIT)
+Clang (LLVM BSD license - http://llvm.org/docs/DeveloperPolicy.html#license)
+Bazel build (Apache V2)
