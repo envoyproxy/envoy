@@ -15,6 +15,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "command_splitter_impl_test",
+    srcs = ["command_splitter_impl_test.cc"],
+    deps = [
+        "//source/common/redis:command_splitter_lib",
+        "//source/common/stats:stats_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/redis:redis_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "conn_pool_impl_test",
     srcs = ["conn_pool_impl_test.cc"],
     deps = [
