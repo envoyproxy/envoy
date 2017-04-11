@@ -20,6 +20,7 @@ done
 BAD_CONFIG_OUTPUT=$(("${PATH_BIN}" "${PATH_CONFIG}/Redirect.golden.json" "${PATH_CONFIG}/TestRoutes.json") 2>&1) ||
   if [[ "${BAD_CONFIG_OUTPUT}" == *"config schema JSON load failed"* ]]; then
     echo testing bad config output
+    echo ${BAD_CONFIG_OUTPUT}
   else
     exit 1
   fi
@@ -28,6 +29,7 @@ BAD_CONFIG_OUTPUT=$(("${PATH_BIN}" "${PATH_CONFIG}/Redirect.golden.json" "${PATH
 FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.json" "${PATH_CONFIG}/Weighted.golden.json" "--details") ||
   if [[ "${FAILURE_OUTPUT}" == *"cluster1 instant-server cluster_name"* ]]; then
     echo testing failure test case
+    echo ${FAILURE_OUTPUT}
   else
     exit 1
   fi
