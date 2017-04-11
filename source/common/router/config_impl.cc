@@ -476,10 +476,9 @@ const VirtualHostSharedPtr RouteMatcher::findWildcardVirtualHost(const std::stri
       continue;
     }
     const auto& match = wildcard_map.find(host.substr(host.size() - i));
-    if (match == wildcard_map.end()) {
-      continue;
+    if (match != wildcard_map.end()) {
+      return match->second;
     }
-    return match->second;
   }
   return nullptr;
 }
