@@ -7,13 +7,11 @@ namespace Zipkin {
 class ZipkinJsonFieldNames {
 public:
   static const std::string SPAN_TRACE_ID;
-  static const std::string SPAN_TRACE_ID_HIGH;
   static const std::string SPAN_PARENT_ID;
   static const std::string SPAN_NAME;
   static const std::string SPAN_ID;
   static const std::string SPAN_TIMESTAMP;
   static const std::string SPAN_DURATION;
-  static const std::string SPAN_DEBUG;
   static const std::string SPAN_ANNOTATIONS;
   static const std::string SPAN_BINARY_ANNOTATIONS;
 

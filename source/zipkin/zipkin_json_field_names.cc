@@ -1,13 +1,11 @@
 #include "zipkin/zipkin_json_field_names.h"
 
 const std::string Zipkin::ZipkinJsonFieldNames::SPAN_TRACE_ID = "traceId";
-const std::string Zipkin::ZipkinJsonFieldNames::SPAN_TRACE_ID_HIGH = "traceIdHigh";
 const std::string Zipkin::ZipkinJsonFieldNames::SPAN_PARENT_ID = "parentId";
 const std::string Zipkin::ZipkinJsonFieldNames::SPAN_NAME = "name";
 const std::string Zipkin::ZipkinJsonFieldNames::SPAN_ID = "id";
 const std::string Zipkin::ZipkinJsonFieldNames::SPAN_TIMESTAMP = "timestamp";
 const std::string Zipkin::ZipkinJsonFieldNames::SPAN_DURATION = "duration";
-const std::string Zipkin::ZipkinJsonFieldNames::SPAN_DEBUG = "debug";
 const std::string Zipkin::ZipkinJsonFieldNames::SPAN_ANNOTATIONS = "annotations";
 const std::string Zipkin::ZipkinJsonFieldNames::SPAN_BINARY_ANNOTATIONS = "binaryAnnotations";
 
