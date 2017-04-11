@@ -52,5 +52,6 @@ int main(int argc, char** argv) {
                               restarter->accessLogLock(), component_factory, local_info);
   server.run();
   ares_library_cleanup();
+  restarter->reset(); // The restarter needs to be deleted before the server.
   return 0;
 }
