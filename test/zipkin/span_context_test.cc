@@ -114,6 +114,14 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_FALSE(spanContext2.isSetAnnotation().ss);
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c", spanContext2.serializeToString());
 
+  // Test if we can handle 128-bit trace ids
+  EXPECT_FALSE(span.isSet().trace_id_high);
+  span.setTraceIdHigh(9922130815203937912ULL);
+  EXPECT_TRUE(span.isSet().trace_id_high);
+  SpanContext spanContext5(span);
+  // We currently drop the high bits. So, we expect the same context as above
+  EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c", spanContext5.serializeToString());
+
   // Span context populated with trace id, id, parent id, and one annotation
   Annotation ann;
   ann.setValue(ZipkinCoreConstants::SERVER_RECV);
