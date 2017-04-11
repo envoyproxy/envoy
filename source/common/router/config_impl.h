@@ -367,7 +367,7 @@ public:
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
-  const VirtualHostSharedPtr findWildcardVirtualHost(const std::string& host) const;
+  const VirtualHostImpl* findWildcardVirtualHost(const std::string& host) const;
 
   std::unordered_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
