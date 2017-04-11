@@ -13,5 +13,5 @@ TESTS=("ContentType" "ClusterHeader" "HeaderMatchedRouting" "Redirect" "Redirect
 # Testing expected matches
 for t in "${TESTS[@]}"
 do
-  "${PATH_BIN}" "${PATH_CONFIG}/${t}_router.json" "${PATH_CONFIG}/${t}_golden.json"
+  "${PATH_BIN}" "${PATH_CONFIG}/${t}.json" "${PATH_CONFIG}/${t}.golden.json"
 done

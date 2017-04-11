@@ -408,8 +408,6 @@ private:
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
 };
 
-typedef std::unique_ptr<ConfigImpl> ConfigImplPtr;
-
 /**
  * Implementation of Config that is empty.
  */

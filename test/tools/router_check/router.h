@@ -82,5 +82,5 @@ private:
   // also switches away from mocks.
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  Router::ConfigImplPtr config_;
+  std::unique_ptr<Router::ConfigImpl> config_;
 };
