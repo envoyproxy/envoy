@@ -371,7 +371,7 @@ private:
 
   std::unordered_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
-  std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater>
+  std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<int64_t>>
       wildcard_virtual_host_suffixes_;
   VirtualHostSharedPtr default_virtual_host_;
   bool uses_runtime_{};

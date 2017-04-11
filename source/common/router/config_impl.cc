@@ -468,12 +468,15 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
 }
 
 const VirtualHostSharedPtr RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
-  for (auto& iter : wildcard_virtual_host_suffixes_) {
+  for (const auto& iter : wildcard_virtual_host_suffixes_) {
     uint32_t i = iter.first;
     const auto& wildcard_map = iter.second;
     // >= because *.foo.com shouldn't match .foo.com.
-    if (i >= host.size() ||
-        wildcard_map.find(host.substr(host.size() - i)) == wildcard_map.end()) {
+    if (i >= host.size()) {
+      continue;
+    }
+    const auto& match = wildcard_map.find(host.substr(host.size() - i));
+    if (match == wildcard_map.end()) {
       continue;
     }
     return wildcard_map.find(host.substr(host.size() - i))->second;
@@ -540,7 +543,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   }
 
   const char* host = headers.Host()->value().c_str();
-  auto iter = virtual_hosts_.find(host);
+  const auto& iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
   }
