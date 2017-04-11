@@ -12,7 +12,6 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -23,7 +22,6 @@ envoy_cc_library(
         "//source/common/dynamo:dynamo_filter_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -36,7 +34,6 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -48,7 +45,6 @@ envoy_cc_library(
         "//source/common/grpc:http1_bridge_filter_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -61,7 +57,6 @@ envoy_cc_library(
         "//source/common/http/filter:ratelimit_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -75,5 +70,4 @@ envoy_cc_library(
         "//source/common/router:shadow_writer_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
-    alwayslink = 1,
 )

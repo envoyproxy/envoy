@@ -166,7 +166,6 @@ public:
 
   static IntegrationTestServerPtr test_server_;
   static std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
-  static spdlog::level::level_enum default_log_level_;
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -208,4 +207,6 @@ protected:
     static auto* port_map = new TestEnvironment::PortMap();
     return *port_map;
   }
+
+  spdlog::level::level_enum default_log_level_;
 };

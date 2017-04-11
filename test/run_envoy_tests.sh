@@ -45,10 +45,15 @@ do
 done
 
 # Some hacks for the runtime test filesystem. These go away in the Bazel build.
-TEST_RUNTIME_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/common/runtime/test_data
-mkdir -p "$TEST_RUNTIME_DIR"
-cp -r "$SOURCE_DIR"/test/common/runtime/test_data/* "$TEST_RUNTIME_DIR"
-"$SOURCE_DIR"/test/common/runtime/filesystem_setup.sh
+TEST_RUNTIME_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/common/runtime
+mkdir -p "$TEST_RUNTIME_DIR/test_data"
+cp -r "$SOURCE_DIR"/test/common/runtime/test_data/* "$TEST_RUNTIME_DIR"/test_data
+cp "$SOURCE_DIR"/test/common/runtime/filesystem_setup.sh "$TEST_RUNTIME_DIR"
+
+# Some hacks for the SSL cert generation. These go away in the Bazel build.
+TEST_SSL_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/common/ssl
+mkdir -p "$TEST_SSL_DIR"
+cp "$SOURCE_DIR"/test/common/ssl/gen_unittest_certs.sh "$TEST_SSL_DIR"
 
 if [ -n "$EXTRA_SETUP_SCRIPT" ]; then
   $EXTRA_SETUP_SCRIPT

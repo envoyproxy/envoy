@@ -1,10 +1,25 @@
 #pragma once
 
+#include "envoy/server/options.h"
+
 #include "common/json/json_loader.h"
 
 class TestEnvironment {
 public:
   typedef std::unordered_map<std::string, uint32_t> PortMap;
+
+  /**
+   * Initialize command-line options for later access by tests in getOptions().
+   * @param argc number of command-line args.
+   * @param argv array of command-line args.
+   */
+  static void initializeOptions(int argc, char** argv);
+
+  /**
+   * Obtain command-line options reference.
+   * @return Server::Options& with command-line options.
+   */
+  static Server::Options& getOptions();
 
   /**
    * Obtain a private writable temporary directory.
@@ -59,12 +74,12 @@ public:
   static std::string substitute(const std::string str);
 
   /**
-   * Substitue ports in a JSON file in the private writable test temporary directory.
-   * @param path path prefix for the input file with port templates.
+   * Substitue ports and paths in a JSON file in the private writable test temporary directory.
+   * @param path path prefix for the input file with port and path templates.
    * @param port_map map from port name to port number.
-   * @return std::string path prefix for the generated file.
+   * @return std::string path for the generated file.
    */
-  static std::string temporaryFileSubstitutePorts(const std::string& path, const PortMap& port_map);
+  static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map);
 
   /**
    * Build JSON object from a string subject to environment path substitution.
@@ -72,4 +87,10 @@ public:
    * @return Json::ObjectPtr with built JSON object.
    */
   static Json::ObjectPtr jsonLoadFromString(const std::string& json);
+
+  /**
+   * Execute a program under ::system. Any failure is fatal.
+   * @param args program path and arguments.
+   */
+  static void exec(const std::vector<std::string>& args);
 };

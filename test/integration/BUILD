@@ -1,8 +1,8 @@
 package(default_visibility = ["//visibility:public"])
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_library", "envoy_cc_test_with_json")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_sh_test", "envoy_cc_test_library")
 
-sh_test(
+envoy_sh_test(
     name = "hotrestart_test",
     srcs = ["hotrestart_test.sh"],
     data = [
@@ -19,18 +19,16 @@ sh_test(
     local = 1,
 )
 
-envoy_cc_test_with_json(
+envoy_cc_test(
     name = "http2_integration_test",
     srcs = [
         "http2_integration_test.cc",
         "http2_integration_test.h",
     ],
-    data = ["//test/config/integration:server_config_files"],
-    jsons = ["//test/config/integration:server_http2.json"],
-    setup_cmds = [(
-        "//test/common/runtime:filesystem_setup.sh",
-        [],
-    )],
+    data = [
+        "//test/config/integration:server_config_files",
+        "//test/config/integration:server_http2.json",
+    ],
     deps = [
         ":integration_lib",
         "//source/common/buffer:buffer_lib",
@@ -41,17 +39,13 @@ envoy_cc_test_with_json(
     ],
 )
 
-envoy_cc_test_with_json(
+envoy_cc_test(
     name = "http2_upstream_integration_test",
     srcs = [
         "http2_upstream_integration_test.cc",
         "http2_upstream_integration_test.h",
     ],
-    jsons = ["//test/config/integration:server_http2_upstream.json"],
-    setup_cmds = [(
-        "//test/common/runtime:filesystem_setup.sh",
-        [],
-    )],
+    data = ["//test/config/integration:server_http2_upstream.json"],
     deps = [
         ":integration_lib",
         "//source/common/http:header_map_lib",
@@ -59,18 +53,16 @@ envoy_cc_test_with_json(
     ],
 )
 
-envoy_cc_test_with_json(
+envoy_cc_test(
     name = "integration_admin_test",
     srcs = [
         "integration_admin_test.cc",
         "integration_test.h",
     ],
-    data = ["//test/config/integration:server_config_files"],
-    jsons = ["//test/config/integration:server.json"],
-    setup_cmds = [(
-        "//test/common/runtime:filesystem_setup.sh",
-        [],
-    )],
+    data = [
+        "//test/config/integration:server.json",
+        "//test/config/integration:server_config_files",
+    ],
     deps = [
         ":integration_lib",
         "//include/envoy/http:header_map_interface",
@@ -143,14 +135,16 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_with_json(
+envoy_cc_test(
     name = "integration_test",
     srcs = [
         "integration_test.cc",
         "integration_test.h",
     ],
-    data = ["//test/config/integration:server_config_files"],
-    jsons = ["//test/config/integration:server.json"],
+    data = [
+        "//test/config/integration:server.json",
+        "//test/config/integration:server_config_files",
+    ],
     deps = [
         ":integration_lib",
         "//source/common/http:header_map_lib",
@@ -158,13 +152,13 @@ envoy_cc_test_with_json(
     ],
 )
 
-envoy_cc_test_with_json(
+envoy_cc_test(
     name = "proxy_proto_integration_test",
     srcs = [
         "proxy_proto_integration_test.cc",
         "proxy_proto_integration_test.h",
     ],
-    jsons = ["//test/config/integration:server_proxy_proto.json"],
+    data = ["//test/config/integration:server_proxy_proto.json"],
     deps = [
         ":integration_lib",
         "//source/common/buffer:buffer_lib",
@@ -173,14 +167,16 @@ envoy_cc_test_with_json(
     ],
 )
 
-envoy_cc_test_with_json(
+envoy_cc_test(
     name = "ssl_integration_test",
     srcs = [
         "ssl_integration_test.cc",
         "ssl_integration_test.h",
     ],
-    data = ["//test/config/integration/certs"],
-    jsons = ["//test/config/integration:server_ssl.json"],
+    data = [
+        "//test/config/integration:server_ssl.json",
+        "//test/config/integration/certs",
+    ],
     deps = [
         ":integration_lib",
         "//source/common/event:dispatcher_includes",
@@ -192,13 +188,13 @@ envoy_cc_test_with_json(
     ],
 )
 
-envoy_cc_test_with_json(
+envoy_cc_test(
     name = "uds_integration_test",
     srcs = [
         "uds_integration_test.cc",
         "uds_integration_test.h",
     ],
-    jsons = ["//test/config/integration:server_uds.json"],
+    data = ["//test/config/integration:server_uds.json"],
     deps = [
         ":integration_lib",
         "//source/common/event:dispatcher_includes",
