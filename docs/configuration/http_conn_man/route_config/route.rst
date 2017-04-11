@@ -27,6 +27,7 @@ next (e.g., redirect, forward, rewrite, etc.).
     "priority": "...",
     "headers": [],
     "rate_limits": [],
+    "include_vh_rate_limits" : "...",
     "hash_policy": "{...}",
     "request_headers_to_add" : [],
     "opaque_config": []
@@ -155,6 +156,14 @@ priority
 :ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>`
   *(optional, array)* Specifies a set of rate limit configurations that could be applied to the
   route.
+
+.. _config_http_conn_man_route_table_route_include_vh:
+
+include_vh_rate_limits
+  *(optional, boolean)* Specifies if the rate limit filter should include the virtual host rate
+  limits. By default, if the route configured rate limits, the virtual host
+  :ref:`rate_limits <config_http_conn_man_route_table_rate_limit_config>` are not applied to the
+  request.
 
 :ref:`hash_policy <config_http_conn_man_route_table_hash_policy>`
   *(optional, array)* Specifies the route's hashing policy if the upstream cluster uses a hashing
@@ -369,7 +378,7 @@ Opaque Config
 
 Additional configuration can be provided to filters through the "Opaque Config" mechanism. A
 list of properties are specified in the route config. The configuration is uninterpreted
-by envoy and can be accessed within a user-defined filter. The configuration is a generic 
+by envoy and can be accessed within a user-defined filter. The configuration is a generic
 string map.  Nested objects are not supported.
 
 .. code-block:: json
@@ -377,4 +386,3 @@ string map.  Nested objects are not supported.
   [
     {"...": "..."}
   ]
-

@@ -77,6 +77,7 @@ private:
         getApplicableRateLimit(uint64_t) const override {
       return rate_limit_policy_entry_;
     }
+    bool empty() const override { return true; }
 
     static const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
         rate_limit_policy_entry_;
@@ -132,6 +133,7 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
+    bool includeVirtualHostRateLimits() const override { return true; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;

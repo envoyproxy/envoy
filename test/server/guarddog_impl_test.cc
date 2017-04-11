@@ -60,7 +60,7 @@ protected:
   NiceMock<Configuration::MockMain> config_kill_;
   NiceMock<Configuration::MockMain> config_multikill_;
   NiceMock<Stats::MockStore> fakestats_;
-  MockSystemTimeSource time_source_;
+  NiceMock<MockSystemTimeSource> time_source_;
   std::atomic<unsigned int> mock_time_;
   std::unique_ptr<GuardDogImpl> guard_dog_;
   WatchDogSharedPtr unpet_dog_;
@@ -134,7 +134,7 @@ protected:
   NiceMock<Configuration::MockMain> config_miss_;
   NiceMock<Configuration::MockMain> config_mega_;
   Stats::IsolatedStoreImpl stats_store_;
-  MockSystemTimeSource time_source_;
+  NiceMock<MockSystemTimeSource> time_source_;
   std::atomic<unsigned int> mock_time_;
 };
 
