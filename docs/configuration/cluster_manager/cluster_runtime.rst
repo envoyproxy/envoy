@@ -30,8 +30,7 @@ Outlier detection
 
 See the outlier detection :ref:`architecture overview <arch_overview_outlier_detection>` for more
 information on outlier detection. The runtime parameters supported by outlier detection are the 
-same as the :ref:`static configuration parameters <config_cluster_manager_cluster_outlier_detection>`, namely:cd
-
+same as the :ref:`static configuration parameters <config_cluster_manager_cluster_outlier_detection>`, namely:
 
 outlier_detection.consecutive_5xx
   :ref:`consecutive_5XX
