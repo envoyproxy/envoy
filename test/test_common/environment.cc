@@ -71,6 +71,11 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   std::string out_json_string;
   {
     std::ifstream file(tmp_json_path);
+    if (file.fail()) {
+      std::cerr << "failed to open: " << tmp_json_path << std::endl;
+      RELEASE_ASSERT(false);
+    }
+
     std::stringstream file_string_stream;
     file_string_stream << file.rdbuf();
     out_json_string = file_string_stream.str();
