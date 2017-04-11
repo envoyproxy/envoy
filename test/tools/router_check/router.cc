@@ -10,8 +10,9 @@ Json::ObjectPtr RouterCheckTool::loadJson(const std::string& config_json,
     return loader;
 
   } catch (const EnvoyException& ex) {
-    throw EnvoyException(
-        fmt::format("config schema JSON load failed: '{}'\n'{}'", config_json, ex.what()));
+    std::cerr << "config schema JSON load failed: " << config_json << std::endl;
+    std::cerr << ex.what() << std::endl;
+    return nullptr;
   }
 }
 
@@ -49,22 +50,22 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     Json::ObjectPtr validate = check_config->getObject("_validate");
 
     // Call appropriate function for each match case
-    std::unordered_map<std::string, std::function<bool(ToolConfig&, const std::string&)>> checkers =
-        {
-         {"cluster_name", [this](ToolConfig& tool_config, const std::string& expected)
-                              -> bool { return compareCluster(tool_config, expected); }},
-         {"virtual_cluster_name",
-          [this](ToolConfig& tool_config, const std::string& expected)
-              -> bool { return compareVirtualCluster(tool_config, expected); }},
-         {"virtual_host_name", [this](ToolConfig& tool_config, const std::string& expected)
-                                   -> bool { return compareVirtualHost(tool_config, expected); }},
-         {"path_rewrite", [this](ToolConfig& tool_config, const std::string& expected)
-                              -> bool { return compareRewritePath(tool_config, expected); }},
-         {"host_rewrite", [this](ToolConfig& tool_config, const std::string& expected)
-                              -> bool { return compareRewriteHost(tool_config, expected); }},
-         {"path_redirect", [this](ToolConfig& tool_config, const std::string& expected)
-                               -> bool { return compareRedirectPath(tool_config, expected); }},
-        };
+    const std::unordered_map<std::string,
+                             std::function<bool(ToolConfig&, const std::string&)>> checkers = {
+        {"cluster_name", [this](ToolConfig& tool_config, const std::string& expected)
+                             -> bool { return compareCluster(tool_config, expected); }},
+        {"virtual_cluster_name",
+         [this](ToolConfig& tool_config, const std::string& expected)
+             -> bool { return compareVirtualCluster(tool_config, expected); }},
+        {"virtual_host_name", [this](ToolConfig& tool_config, const std::string& expected)
+                                  -> bool { return compareVirtualHost(tool_config, expected); }},
+        {"path_rewrite", [this](ToolConfig& tool_config, const std::string& expected)
+                             -> bool { return compareRewritePath(tool_config, expected); }},
+        {"host_rewrite", [this](ToolConfig& tool_config, const std::string& expected)
+                             -> bool { return compareRewriteHost(tool_config, expected); }},
+        {"path_redirect", [this](ToolConfig& tool_config, const std::string& expected)
+                              -> bool { return compareRedirectPath(tool_config, expected); }},
+    };
 
     for (std::pair<std::string, std::function<bool(ToolConfig&, std::string)>> test : checkers) {
       if (validate->hasObject(test.first)) {
