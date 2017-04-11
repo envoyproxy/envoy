@@ -27,12 +27,12 @@ public:
 
   Endpoint() : ipv4_(), port_(0), service_name_(), isset_ipv6_(false) {}
 
-  Endpoint(std::string& ipv4, uint16_t port, const std::string& service_name)
+  Endpoint(const std::string& ipv4, uint16_t port, const std::string& service_name)
       : ipv4_(ipv4), port_(port), service_name_(service_name), isset_ipv6_(false) {}
 
   const std::string& ipv4() const { return ipv4_; }
 
-  void setIpv4(std::string& ipv4) { ipv4_ = ipv4; }
+  void setIpv4(const std::string& ipv4) { ipv4_ = ipv4; }
 
   const std::string& ipv6() const { return ipv6_; }
 
@@ -68,21 +68,21 @@ public:
 
   Annotation& operator=(const Annotation&);
 
-  Annotation() : timestamp_(0), value_(), isset_host_(false) {}
+  Annotation() : timestamp_(0), value_(), isset_endpoint_(false) {}
 
-  Annotation(uint64_t timestamp, const std::string value, Endpoint& host)
-      : timestamp_(timestamp), value_(value), host_(host), isset_host_(true) {}
+  Annotation(uint64_t timestamp, const std::string value, Endpoint& endpoint)
+      : timestamp_(timestamp), value_(value), endpoint_(endpoint), isset_endpoint_(true) {}
 
-  const Endpoint& host() const { return host_; }
+  const Endpoint& endpoint() const { return endpoint_; }
 
-  void setHost(const Endpoint& host) {
-    host_ = host;
-    isset_host_ = true;
+  void setEndpoint(const Endpoint& endpoint) {
+    endpoint_ = endpoint;
+    isset_endpoint_ = true;
   }
 
-  void setHost(const Endpoint&& host) {
-    host_ = host;
-    isset_host_ = true;
+  void setEndpoint(const Endpoint&& endpoint) {
+    endpoint_ = endpoint;
+    isset_endpoint_ = true;
   }
 
   uint64_t timestamp() const { return timestamp_; }
@@ -93,19 +93,19 @@ public:
 
   void setValue(const std::string& value) { value_ = value; }
 
-  bool isSetHost() const { return isset_host_; }
+  bool isSetEndpoint() const { return isset_endpoint_; }
 
   const std::string& toJson() override;
 
 private:
   uint64_t timestamp_;
   std::string value_;
-  Endpoint host_;
+  Endpoint endpoint_;
 
-  bool isset_host_;
+  bool isset_endpoint_;
 };
 
-enum AnnotationType { BOOL = 0, BYTES = 1, I16 = 2, I32 = 3, I64 = 4, DOUBLE = 5, STRING = 6 };
+enum AnnotationType { BOOL = 0, STRING = 1 };
 
 class BinaryAnnotation : public ZipkinBase {
 public:
@@ -113,28 +113,28 @@ public:
 
   BinaryAnnotation& operator=(const BinaryAnnotation&);
 
-  BinaryAnnotation() : key_(), value_(), annotation_type_(STRING), isset_host_(false) {}
+  BinaryAnnotation() : key_(), value_(), annotation_type_(STRING), isset_endpoint_(false) {}
 
   BinaryAnnotation(const std::string& key, const std::string& value)
-      : key_(key), value_(value), annotation_type_(STRING), isset_host_(false) {}
+      : key_(key), value_(value), annotation_type_(STRING), isset_endpoint_(false) {}
 
   AnnotationType annotationType() const { return annotation_type_; }
 
   void setAnnotationType(AnnotationType annotationType) { annotation_type_ = annotationType; }
 
-  const Endpoint& host() const { return host_; }
+  const Endpoint& endpoint() const { return endpoint_; }
 
-  void setHost(const Endpoint& host) {
-    host_ = host;
-    isset_host_ = true;
+  void setEndpoint(const Endpoint& endpoint) {
+    endpoint_ = endpoint;
+    isset_endpoint_ = true;
   }
 
-  void setHost(const Endpoint&& host) {
-    host_ = host;
-    isset_host_ = true;
+  void setEndpoint(const Endpoint&& endpoint) {
+    endpoint_ = endpoint;
+    isset_endpoint_ = true;
   }
 
-  bool isSetHost() const { return isset_host_; }
+  bool isSetEndpoint() const { return isset_endpoint_; }
 
   const std::string& key() const { return key_; }
 
@@ -149,11 +149,11 @@ public:
 private:
   std::string key_;
   std::string value_;
-  Endpoint host_;
+  Endpoint endpoint_;
 
   AnnotationType annotation_type_;
 
-  bool isset_host_;
+  bool isset_endpoint_;
 };
 
 typedef struct _Span__isset {
@@ -173,7 +173,7 @@ public:
   Span& operator=(const Span&);
 
   Span()
-      : trace_id_(0), name_(), id_(0), parent_id_(0), debug_(false), timestamp_(0), duration_(0),
+      : trace_id_(0), name_(), id_(0), parent_id_(0), timestamp_(0), duration_(0),
         trace_id_high_(0), start_time_(0), tracer_(nullptr) {}
 
   void setTraceId(const uint64_t val) { trace_id_ = val; }
@@ -201,10 +201,7 @@ public:
 
   void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
 
-  void setDebug(const bool val) {
-    debug_ = val;
-    isset_.debug = true;
-  }
+  void setDebug() { isset_.debug = true; }
 
   void setTimestamp(const int64_t val) {
     timestamp_ = val;
@@ -216,7 +213,7 @@ public:
     isset_.duration = true;
   }
 
-  void setTraceIdHigh(const int64_t val) {
+  void setTraceIdHigh(const uint64_t val) {
     trace_id_high_ = val;
     isset_.trace_id_high = true;
   }
@@ -226,8 +223,6 @@ public:
   const std::vector<Annotation>& annotations() const { return annotations_; }
 
   const std::vector<BinaryAnnotation>& binaryAnnotations() const { return binary_annotations_; }
-
-  bool isDebug() const { return debug_; }
 
   int64_t duration() const { return duration_; }
 
@@ -270,7 +265,6 @@ private:
   uint64_t parent_id_;
   std::vector<Annotation> annotations_;
   std::vector<BinaryAnnotation> binary_annotations_;
-  bool debug_;
   int64_t timestamp_;
   int64_t duration_;
   uint64_t trace_id_high_;

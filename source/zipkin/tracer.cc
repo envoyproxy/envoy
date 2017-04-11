@@ -4,8 +4,6 @@
 #include "zipkin/tracer.h"
 #include "zipkin/zipkin_core_constants.h"
 
-#include <iostream>
-
 namespace Zipkin {
 
 Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
@@ -23,7 +21,7 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   ep.setServiceName(service_name_);
 
   // Build the CS annotation
-  cs.setHost(std::move(ep));
+  cs.setEndpoint(std::move(ep));
   cs.setValue(ZipkinCoreConstants::CLIENT_SEND);
 
   // Create an all-new span, with no parent id
@@ -41,9 +39,7 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   // Add CS annotation to the span
   span.addAnnotation(std::move(cs));
 
-  std::cerr << "Span's tracer pointer before: " << span.tracer() << std::endl;
   span.setTracer(this);
-  std::cerr << "Span's tracer pointer after: " << span.tracer() << std::endl;
 
   return span;
 }
@@ -103,7 +99,7 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
   ep.setServiceName(service_name_);
 
   // Add the newly-created annotation to the span
-  annotation.setHost(std::move(ep));
+  annotation.setEndpoint(std::move(ep));
   annotation.setTimestamp(timestampMicro);
   span.addAnnotation(std::move(annotation));
 
@@ -112,18 +108,14 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
 
   span.setStartTime(start_time);
 
-  std::cerr << "Span's tracer pointer before: " << span.tracer() << std::endl;
   span.setTracer(this);
-  std::cerr << "Span's tracer pointer after: " << span.tracer() << std::endl;
 
   return span;
 }
 
 void Tracer::reportSpan(Span&& span) {
-  std::cerr << "Tracer::reportSpan() called." << std::endl;
   auto r = reporter();
   if (r) {
-    std::cerr << "Will call Reporter::reportSpan()" << std::endl;
     r->reportSpan(std::move(span));
   }
 }

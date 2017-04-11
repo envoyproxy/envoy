@@ -7,8 +7,6 @@
 #include "zipkin/util.h"
 #include "zipkin/span_context.h"
 
-#include <iostream>
-
 namespace Zipkin {
 
 Endpoint::Endpoint(const Endpoint& ep) {
@@ -52,15 +50,15 @@ const std::string& Endpoint::toJson() {
 Annotation::Annotation(const Annotation& ann) {
   timestamp_ = ann.timestamp();
   value_ = ann.value();
-  host_ = ann.host();
-  isset_host_ = ann.isSetHost();
+  endpoint_ = ann.endpoint();
+  isset_endpoint_ = ann.isSetEndpoint();
 }
 
 Annotation& Annotation::operator=(const Annotation& ann) {
   timestamp_ = ann.timestamp();
   value_ = ann.value();
-  host_ = ann.host();
-  isset_host_ = ann.isSetHost();
+  endpoint_ = ann.endpoint();
+  isset_endpoint_ = ann.isSetEndpoint();
 
   return *this;
 }
@@ -77,8 +75,8 @@ const std::string& Annotation::toJson() {
 
   json_string_ = s.GetString();
 
-  if (isset_host_) {
-    Util::mergeJsons(json_string_, host_.toJson(),
+  if (isset_endpoint_) {
+    Util::mergeJsons(json_string_, endpoint_.toJson(),
                      ZipkinJsonFieldNames::ANNOTATION_ENDPOINT.c_str());
   }
 
@@ -89,16 +87,16 @@ BinaryAnnotation::BinaryAnnotation(const BinaryAnnotation& ann) {
   key_ = ann.key();
   value_ = ann.value();
   annotation_type_ = ann.annotationType();
-  host_ = ann.host();
-  isset_host_ = ann.isSetHost();
+  endpoint_ = ann.endpoint();
+  isset_endpoint_ = ann.isSetEndpoint();
 }
 
 BinaryAnnotation& BinaryAnnotation::operator=(const BinaryAnnotation& ann) {
   key_ = ann.key();
   value_ = ann.value();
   annotation_type_ = ann.annotationType();
-  host_ = ann.host();
-  isset_host_ = ann.isSetHost();
+  endpoint_ = ann.endpoint();
+  isset_endpoint_ = ann.isSetEndpoint();
 
   return *this;
 }
@@ -115,8 +113,8 @@ const std::string& BinaryAnnotation::toJson() {
 
   json_string_ = s.GetString();
 
-  if (isset_host_) {
-    Util::mergeJsons(json_string_, host_.toJson(),
+  if (isset_endpoint_) {
+    Util::mergeJsons(json_string_, endpoint_.toJson(),
                      ZipkinJsonFieldNames::BINARY_ANNOTATION_ENDPOINT.c_str());
   }
 
@@ -130,7 +128,6 @@ Span::Span(const Span& span) {
   parent_id_ = span.parentId();
   annotations_ = span.annotations();
   binary_annotations_ = span.binaryAnnotations();
-  debug_ = span.isDebug();
   timestamp_ = span.timestamp();
   duration_ = span.duration();
   trace_id_high_ = span.traceIdHigh();
@@ -146,7 +143,6 @@ Span& Span::operator=(const Span& span) {
   parent_id_ = span.parentId();
   annotations_ = span.annotations();
   binary_annotations_ = span.binaryAnnotations();
-  debug_ = span.isDebug();
   timestamp_ = span.timestamp();
   duration_ = span.duration();
   trace_id_high_ = span.traceIdHigh();
@@ -183,16 +179,6 @@ const std::string& Span::toJson() {
     writer.Int64(duration_);
   }
 
-  if (isset_.debug) {
-    writer.Key(ZipkinJsonFieldNames::SPAN_DEBUG.c_str());
-    writer.Bool(debug_);
-  }
-
-  if (isset_.trace_id_high) {
-    writer.Key(ZipkinJsonFieldNames::SPAN_TRACE_ID_HIGH.c_str());
-    writer.Int64(trace_id_high_);
-  }
-
   writer.EndObject();
 
   json_string_ = s.GetString();
@@ -221,7 +207,7 @@ void Span::finish() {
   if ((context.isSetAnnotation().sr) && (!context.isSetAnnotation().ss)) {
     // Need to set the SS annotation
     Annotation ss;
-    ss.setHost(annotations_[0].host());
+    ss.setEndpoint(annotations_[0].endpoint());
     ss.setTimestamp(Util::timeSinceEpochMicro());
     ss.setValue(ZipkinCoreConstants::SERVER_SEND);
     annotations_.push_back(std::move(ss));
@@ -229,23 +215,20 @@ void Span::finish() {
     // Need to set the CR annotation
     Annotation cr;
     uint64_t stop_time = Util::timeSinceEpochMicro();
-    cr.setHost(annotations_[0].host());
+    cr.setEndpoint(annotations_[0].endpoint());
     cr.setTimestamp(stop_time);
     cr.setValue(ZipkinCoreConstants::CLIENT_RECV);
     annotations_.push_back(std::move(cr));
     setDuration(stop_time - timestamp_);
   }
 
-  std::cerr << "Span: " << toJson() << std::endl;
   auto t = tracer();
   if (t) {
-    std::cerr << "Will call Tracer::reportSpan" << std::endl;
     t->reportSpan(std::move(*this));
   }
 }
 
 void Span::setTag(const std::string& name, const std::string& value) {
-  std::cerr << "setTag called --> Name: " << name << "; Value: " << value << std::endl;
   if ((name.size() > 0) && (value.size() > 0)) {
     addBinaryAnnotation(BinaryAnnotation(name, value));
   }
