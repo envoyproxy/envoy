@@ -164,7 +164,9 @@ add_executable(envoy-test
   test_common/utility.cc
   zipkin/span_buffer_test.cc
   zipkin/span_context_test.cc
-  zipkin/util_test.cc)
+  zipkin/util_test.cc
+  zipkin/tracer_test.cc
+  zipkin/zipkin_core_types_test.cc)
 
 # The MOCK_METHOD* macros from gtest triggers this clang warning and it's hard
 # to work around, so we just ignore it.
