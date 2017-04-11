@@ -1,3 +1,5 @@
+workspace(name = "ci")
+
 bind(
     name = "ares",
     actual = "//ci/prebuilt:ares",
