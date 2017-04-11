@@ -69,7 +69,7 @@ DetectorConfig::DetectorConfig(const Json::Object& json_config)
       success_rate_request_volume_(
           static_cast<uint64_t>(json_config.getInteger("success_rate_request_volume", 100))),
       success_rate_stdev_factor_(
-        static_cast<uint64_t>(json_config.getInteger("success_rate_stdev_factor", 1900))),
+          static_cast<uint64_t>(json_config.getInteger("success_rate_stdev_factor", 1900))),
       enforcing_consecutive_5xx_(
           static_cast<uint64_t>(json_config.getInteger("enforcing_consecutive_5xx", 100))),
       enforcing_success_rate_(

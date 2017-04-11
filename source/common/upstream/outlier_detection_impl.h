@@ -156,7 +156,7 @@ public:
   uint64_t maxEjectionPercent() { return max_ejection_percent_; }
   uint64_t successRateMinimumHosts() { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() { return success_rate_request_volume_; }
-  uint64_t successRateStdevFactor() { return  success_rate_stdev_factor_; }
+  uint64_t successRateStdevFactor() { return success_rate_stdev_factor_; }
   uint64_t enforcingConsecutive5xx() { return enforcing_consecutive_5xx_; }
   uint64_t enforcingSuccessRate() { return enforcing_success_rate_; }
 
