@@ -10,16 +10,11 @@ envoy_cc_binary(
 
 envoy_cc_test_library(
     name = "router_check_main_lib",
-    srcs = ["router_check.cc"],
-    deps = [
-        ":router_tool_lib",
+    srcs = [
+        "router.cc",
+        "router.h",
+        "router_check.cc",
     ],
-)
-
-envoy_cc_test_library(
-    name = "router_tool_lib",
-    srcs = ["router.cc"],
-    hdrs = ["router.h"],
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",

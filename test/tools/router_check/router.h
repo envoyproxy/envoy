@@ -6,6 +6,7 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
+
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/precompiled/precompiled_test.h"
@@ -13,8 +14,8 @@
 #include "test/tools/router_check/json/tool_config_schemas.h"
 
 /**
- * Class that store the configuration parameters of the router
- * check tool extracted from a json input file
+ * Class that stores the configuration parameters of the router
+ * check tool extracted from a json input file.
  */
 struct ToolConfig {
   ToolConfig() : random_value_(0){};
@@ -22,6 +23,7 @@ struct ToolConfig {
 
   int random_value_;
   Http::TestHeaderMapImpl headers_;
+  Router::RouteConstSharedPtr route_;
 };
 
 /**
@@ -56,23 +58,18 @@ public:
   void setShowDetails() { details_ = true; }
 
 private:
-  bool compareCluster(ToolConfig& tool_config, const std::string expected,
-                      Router::RouteConstSharedPtr& route);
-  bool compareVirtualCluster(ToolConfig& tool_config, const std::string expected,
-                             Router::RouteConstSharedPtr& route);
-  bool compareVirtualHost(ToolConfig& tool_config, const std::string expected,
-                          Router::RouteConstSharedPtr& route);
-  bool compareRewriteHost(ToolConfig& tool_config, const std::string expected,
-                          Router::RouteConstSharedPtr& route);
-  bool compareRewritePath(ToolConfig& tool_config, const std::string expected,
-                          Router::RouteConstSharedPtr& route);
-  bool compareRedirectPath(ToolConfig& tool_config, const std::string expected,
-                           Router::RouteConstSharedPtr& route);
-
+  bool compareCluster(ToolConfig& tool_config, const std::string& expected);
+  bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected);
+  bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected);
+  bool compareRewriteHost(ToolConfig& tool_config, const std::string& expected);
+  bool compareRewritePath(ToolConfig& tool_config, const std::string& expected);
+  bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected);
+  bool compareHeaderField(ToolConfig& tool_config, const std::string& field,
+                          const std::string& expected);
   /**
-   * Compare the expected and acutal route parameter values. Print out
-   * match details if details_ flag is set
-   * @param actual holds the acutal route returned by the router
+   * Compare the expected and acutal route parameter values. Print out match details if details_
+   * flag is set.
+   * @param actual holds the actual route returned by the router
    * @param expected holds the expected parameter value of the route
    * @return true if actual and expected match
    */
@@ -81,7 +78,8 @@ private:
 
   bool details_{false};
 
-  // TODO(hennna): Switch away from mocks depending on feedback
+  // TODO(hennna): Switch away from mocks depending on whether envoy testing
+  // also switches away from mocks.
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Router::ConfigImplPtr config_;

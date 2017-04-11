@@ -9,41 +9,62 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
       "items": {
         "type": "object",
         "properties": {
-          "authority": {"type": "string"},
-          "path": {"type": "string"},
-          "additional_headers": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": {"type": "string"},
-                "value": {"type": "string"}
+          "test_name": {"type": "string"},
+          "input": {
+            "type": "object",
+            "properties": {
+              ":authority": {"type": "string", "required": true},
+              ":path": {"type": "string"},
+              ":method": {"type": "string", "enum": ["GET", "PUT", "POST"]},
+              "random_value": {"type": "integer"},
+              "ssl": {"type": "boolean"},
+              "internal": {"type": "boolean"},
+              "additional_headers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {"type": "string"},
+                    "value": {"type": "string"}
+                  },
+                  "additionalProperties": false,
+                  "required": ["field", "value"],
+                  "maxProperties": 2
+                }
               },
               "additionalProperties": false,
-              "required": ["name", "value"],
-              "maxProperties": 2
+              "required": [":authority", ":path"]
             }
           },
-          "method": {"type": "string", "enum": ["GET", "PUT", "POST"]},
-          "random_value": {"type": "integer"},
-          "ssl": {"type": "boolean"},
-          "internal": {"type": "boolean"},
-          "check": {
+          "_validate": {
             "type": "object",
             "properties": {
               "cluster_name": {"type": "string"},
               "virtual_cluster_name": {"type": "string"},
               "virtual_host_name": {"type": "string"},
-              "path_rewrite": {"type": "string"},
               "host_rewrite": {"type": "string"},
-              "path_redirect": {"type": "string"}
+              "path_rewrite": {"type": "string"},
+              "path_redirect": {"type": "string"},
+              "header_fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {"type": "string"},
+                    "value": {"type": "string"}
+                  },
+                 "additionalProperties": false,
+                 "required": ["field", "value"],
+                 "maxProperties": 2
+                }
+              }
             },
             "minProperties": 1,
             "additionalProperties": false
           }
         },
         "additionalProperties": false,
-        "required": ["authority", "path", "check"]
+        "required": ["test_name", "input", "_validate"]
       }
     }
   )EOF");

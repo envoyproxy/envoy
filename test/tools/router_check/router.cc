@@ -10,9 +10,8 @@ Json::ObjectPtr RouterCheckTool::loadJson(const std::string& config_json,
     return loader;
 
   } catch (const EnvoyException& ex) {
-    std::cerr << "config schema JSON load failed: " << config_json << std::endl;
-    std::cerr << ex.what() << std::endl;
-    return nullptr;
+    throw EnvoyException(
+        fmt::format("config schema JSON load failed: '{}'\n'{}'", config_json, ex.what()));
   }
 }
 
@@ -41,171 +40,159 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     // Load parameters from json
     ToolConfig tool_config;
     tool_config.parseFromJson(check_config);
-    Router::RouteConstSharedPtr route =
-        config_->route(tool_config.headers_, tool_config.random_value_);
+    tool_config.route_ = config_->route(tool_config.headers_, tool_config.random_value_);
 
-    Json::ObjectPtr check_type = check_config->getObject("check");
+    std::string test_name = check_config->getString("test_name", "");
+    if (details_) {
+      std::cout << test_name << std::endl;
+    }
+    Json::ObjectPtr validate = check_config->getObject("_validate");
 
     // Call appropriate function for each match case
-    if (check_type->hasObject("path_redirect")) {
-      if (!compareRedirectPath(tool_config, check_type->getString("path_redirect"), route)) {
-        no_failures = false;
+    std::unordered_map<std::string, std::function<bool(ToolConfig&, const std::string&)>> checkers =
+        {
+         {"cluster_name", [this](ToolConfig& tool_config, const std::string& expected)
+                              -> bool { return compareCluster(tool_config, expected); }},
+         {"virtual_cluster_name",
+          [this](ToolConfig& tool_config, const std::string& expected)
+              -> bool { return compareVirtualCluster(tool_config, expected); }},
+         {"virtual_host_name", [this](ToolConfig& tool_config, const std::string& expected)
+                                   -> bool { return compareVirtualHost(tool_config, expected); }},
+         {"path_rewrite", [this](ToolConfig& tool_config, const std::string& expected)
+                              -> bool { return compareRewritePath(tool_config, expected); }},
+         {"host_rewrite", [this](ToolConfig& tool_config, const std::string& expected)
+                              -> bool { return compareRewriteHost(tool_config, expected); }},
+         {"path_redirect", [this](ToolConfig& tool_config, const std::string& expected)
+                               -> bool { return compareRedirectPath(tool_config, expected); }},
+        };
+
+    for (std::pair<std::string, std::function<bool(ToolConfig&, std::string)>> test : checkers) {
+      if (validate->hasObject(test.first)) {
+        std::string expected = validate->getString(test.first);
+        if (tool_config.route_ == nullptr) {
+          compareResults("", expected, test.first);
+        } else {
+          if (!test.second(tool_config, validate->getString(test.first))) {
+            no_failures = false;
+          }
+        }
       }
     }
 
-    if (check_type->hasObject("cluster_name")) {
-      if (!compareCluster(tool_config, check_type->getString("cluster_name"), route)) {
-        no_failures = false;
-      }
-    }
-
-    if (check_type->hasObject("virtual_cluster_name")) {
-      if (!compareVirtualCluster(tool_config, check_type->getString("virtual_cluster_name"),
-                                 route)) {
-        no_failures = false;
-      }
-    }
-
-    if (check_type->hasObject("virtual_host_name")) {
-      if (!compareVirtualHost(tool_config, check_type->getString("virtual_host_name"), route)) {
-        no_failures = false;
-      }
-    }
-
-    if (check_type->hasObject("path_rewrite")) {
-      if (!compareRewritePath(tool_config, check_type->getString("path_rewrite"), route)) {
-        no_failures = false;
-      }
-    }
-
-    if (check_type->hasObject("host_rewrite")) {
-      if (!compareRewriteHost(tool_config, check_type->getString("host_rewrite"), route)) {
-        no_failures = false;
+    if (validate->hasObject("header_fields")) {
+      for (const Json::ObjectPtr& header_field : validate->getObjectArray("header_fields")) {
+        if (!compareHeaderField(tool_config, header_field->getString("field"),
+                                header_field->getString("value"))) {
+          no_failures = false;
+        }
       }
     }
   }
-
   return no_failures;
 }
 
 void ToolConfig::parseFromJson(const Json::ObjectPtr& check_config) {
   // Extract values from json object
-  bool internal = check_config->getBoolean("internal", false);
-  bool ssl = check_config->getBoolean("ssl", false);
-  std::string authority = check_config->getString("authority");
-  std::string method = check_config->getString("method", "GET");
-  std::string path = check_config->getString("path");
+  Json::ObjectPtr input = check_config->getObject("input");
 
-  random_value_ = check_config->getInteger("random_value", 0);
-
-  // Add :method to header
-  headers_.addViaCopy(":method", method);
-
-  // Add ssl header
-  headers_.addViaCopy("x-forwarded-proto", ssl ? "https" : "http");
+  random_value_ = input->getInteger("random_value", 0);
 
   // Add authority and path to header
-  headers_.addViaCopy(":authority", authority);
-  headers_.addViaCopy(":path", path);
+  headers_.addViaCopy(":authority", input->getString(":authority", ""));
+  headers_.addViaCopy(":path", input->getString(":path", ""));
+
+  // Add :method to header
+  headers_.addViaCopy(":method", input->getString(":method", "GET"));
+
+  // Add ssl header
+  headers_.addViaCopy("x-forwarded-proto", input->getBoolean("ssl", false) ? "https" : "http");
 
   // Add internal route status to header
-  if (internal) {
+  if (input->getBoolean("internal", false)) {
     headers_.addViaCopy("x-envoy-internal", "true");
   }
 
   // Add additional headers
-  if (check_config->hasObject("additional_headers")) {
-    for (const Json::ObjectPtr& header_config :
-         check_config->getObjectArray("additional_headers")) {
-      headers_.addViaCopy(header_config->getString("name"), header_config->getString("value"));
+  if (input->hasObject("additional_headers")) {
+    for (const Json::ObjectPtr& header_config : input->getObjectArray("additional_headers")) {
+      headers_.addViaCopy(header_config->getString("field"), header_config->getString("value"));
     }
   }
 }
 
-bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string expected,
-                                     Router::RouteConstSharedPtr& route) {
-  std::string actual = "none";
-
-  // Compare cluster name match
-  if (route != nullptr && route->routeEntry() != nullptr) {
-    actual = route->routeEntry()->clusterName();
+bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string& expected) {
+  std::string actual = "";
+  if (tool_config.route_->routeEntry() != nullptr) {
+    actual = tool_config.route_->routeEntry()->clusterName();
   }
-
   return compareResults(actual, expected, "cluster_name");
 }
 
-bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::string expected,
-                                            Router::RouteConstSharedPtr& route) {
-  std::string actual = "none";
+bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::string& expected) {
+  std::string actual = "";
 
-  if (route != nullptr && route->routeEntry() != nullptr) {
-    if (route->routeEntry()->virtualCluster(tool_config.headers_)) {
-      actual = route->routeEntry()->virtualCluster(tool_config.headers_)->name();
-    }
+  if (tool_config.route_->routeEntry() != nullptr &&
+      tool_config.route_->routeEntry()->virtualCluster(tool_config.headers_) != nullptr) {
+    actual = tool_config.route_->routeEntry()->virtualCluster(tool_config.headers_)->name();
   }
-
   return compareResults(actual, expected, "virtual_cluster_name");
 }
 
-bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::string expected,
-                                         Router::RouteConstSharedPtr& route) {
-  std::string actual = "none";
+bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::string& expected) {
+  std::string actual = "";
 
-  if (route != nullptr && route->routeEntry() != nullptr) {
-    actual = route->routeEntry()->virtualHost().name();
+  if (tool_config.route_->routeEntry() != nullptr) {
+    actual = tool_config.route_->routeEntry()->virtualHost().name();
   }
-
   return compareResults(actual, expected, "virtual_host_name");
 }
 
-bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string expected,
-                                         Router::RouteConstSharedPtr& route) {
-  std::string actual = "none";
+bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
+  std::string actual = "";
 
-  if (route != nullptr && route->routeEntry() != nullptr) {
-    route->routeEntry()->finalizeRequestHeaders(tool_config.headers_);
+  if (tool_config.route_->routeEntry() != nullptr) {
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(tool_config.headers_);
     actual = tool_config.headers_.get_(Http::Headers::get().Path);
   }
-
   return compareResults(actual, expected, "path_rewrite");
 }
 
-bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string expected,
-                                         Router::RouteConstSharedPtr& route) {
-  std::string actual = "none";
+bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
+  std::string actual = "";
 
-  if (route != nullptr && route->routeEntry() != nullptr) {
-    route->routeEntry()->finalizeRequestHeaders(tool_config.headers_);
+  if (tool_config.route_->routeEntry() != nullptr) {
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(tool_config.headers_);
     actual = tool_config.headers_.get_(Http::Headers::get().Host);
   }
-
   return compareResults(actual, expected, "host_rewrite");
 }
 
-bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string expected,
-                                          Router::RouteConstSharedPtr& route) {
-  std::string actual = "none";
+bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
+  std::string actual = "";
 
-  if (route != nullptr && route->redirectEntry() != nullptr) {
-    actual = route->redirectEntry()->newPath(tool_config.headers_);
+  if (tool_config.route_->redirectEntry() != nullptr) {
+    actual = tool_config.route_->redirectEntry()->newPath(tool_config.headers_);
   }
 
   return compareResults(actual, expected, "path_redirect");
 }
 
+bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::string& field,
+                                         const std::string& expected) {
+  std::string actual = tool_config.headers_.get_(field);
+
+  return compareResults(actual, expected, "check_header");
+}
+
 bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected,
                                      const std::string& test_type) {
-  if (expected == actual || (actual.empty() && expected == "none")) {
-    // Output pass details to stdout if details_ flag is set to true
-    if (details_) {
-      std::cout << "P " << expected << " " << actual << " " << test_type << std::endl;
-    }
+  if (expected == actual) {
     return true;
   }
 
   // Output failure details to stdout if details_ flag is set to true
   if (details_) {
-    std::cout << "F " << expected << " " << actual << " " << test_type << std::endl;
+    std::cout << expected << " " << actual << " " << test_type << std::endl;
   }
   return false;
 }
