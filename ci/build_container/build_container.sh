@@ -24,7 +24,7 @@ rm -rf /var/lib/apt/lists/*
 # branch on the cloned repository.
 git clone https://github.com/htuch/bazel.git /tmp/bazel-coverage
 pushd /tmp/bazel-coverage
-git checkout b510cf58afad1c60e917b0ab160ca74672f08599
+git checkout 63f0542560773e973c9963845d5bbc30be75441a
 bazel build --spawn_strategy=standalone --genrule_strategy=standalone //src:bazel
 cp bazel-bin/src/bazel /usr/bin/bazel-coverage
 popd
