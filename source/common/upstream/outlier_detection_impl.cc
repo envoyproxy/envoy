@@ -307,7 +307,7 @@ void DetectorImpl::processSuccessRateEjections() {
   if (valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
     double success_rate_stdev_factor =
         runtime_.snapshot().getInteger("outlier_detection.success_rate_stdev_factor",
-                                       Utility::stdevFactor()) /
+                                       Utility::defaultStdevFactor()) /
         1000.0;
     Utility::EjectionPair ejection_pair = Utility::successRateEjectionThreshold(
         success_rate_sum, valid_success_rate_hosts, success_rate_stdev_factor);

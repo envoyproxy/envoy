@@ -265,7 +265,7 @@ public:
   successRateEjectionThreshold(double success_rate_sum,
                                const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
                                double success_rate_stdev_factor);
-  static uint64_t stdevFactor() { return DEFAULT_SUCCESS_RATE_STDEV_FACTOR; }
+  static uint64_t defaultStdevFactor() { return DEFAULT_SUCCESS_RATE_STDEV_FACTOR; }
 
 private:
   // Default factor to multiply the stdev of a cluster's success rate for success rate outlier
