@@ -1,14 +1,18 @@
+#include "common/ssl/context_impl.h"
+
 #include "common/json/json_loader.h"
 #include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_impl.h"
 #include "common/stats/stats_impl.h"
 
+#include "test/common/ssl/ssl_certs_test.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
 
 namespace Ssl {
 
-TEST(SslContextImplTest, TestdNSNameMatching) {
+class SslContextImplTest : public SslCertsTest {};
+
+TEST_F(SslContextImplTest, TestdNSNameMatching) {
   EXPECT_TRUE(ContextImpl::dNSNameMatch("lyft.com", "lyft.com"));
   EXPECT_TRUE(ContextImpl::dNSNameMatch("a.lyft.com", "*.lyft.com"));
   EXPECT_TRUE(ContextImpl::dNSNameMatch("a.b.lyft.com", "*.lyft.com"));
@@ -21,7 +25,7 @@ TEST(SslContextImplTest, TestdNSNameMatching) {
   EXPECT_FALSE(ContextImpl::dNSNameMatch("lyft.com", ""));
 }
 
-TEST(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
+TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
   FILE* fp = fopen("test/common/ssl/test_data/san_dns.crt", "r");
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
@@ -32,7 +36,7 @@ TEST(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
   fclose(fp);
 }
 
-TEST(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
+TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
   FILE* fp = fopen("test/common/ssl/test_data/san_uri.crt", "r");
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
@@ -44,7 +48,7 @@ TEST(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
   fclose(fp);
 }
 
-TEST(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
+TEST_F(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
   FILE* fp = fopen("test/common/ssl/test_data/san_dns.crt", "r");
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
@@ -55,7 +59,7 @@ TEST(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
   fclose(fp);
 }
 
-TEST(SslContextImplTest, TestCipherSuites) {
+TEST_F(SslContextImplTest, TestCipherSuites) {
   std::string json = R"EOF(
   {
     "cipher_suites": "AES128-SHA:BOGUS:AES256-SHA"
@@ -70,11 +74,11 @@ TEST(SslContextImplTest, TestCipherSuites) {
   EXPECT_THROW(manager.createSslClientContext(store, cfg), EnvoyException);
 }
 
-TEST(SslContextImplTest, TestExpiringCert) {
+TEST_F(SslContextImplTest, TestExpiringCert) {
   std::string json = R"EOF(
   {
-      "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-      "private_key_file": "{{ test_certs }}/unittestkey.pem"
+      "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+      "private_key_file": "{{ test_tmpdir }}/unittestkey.pem"
   }
   )EOF";
 
@@ -93,11 +97,11 @@ TEST(SslContextImplTest, TestExpiringCert) {
               14 == context->daysUntilFirstCertExpires());
 }
 
-TEST(SslContextImplTest, TestExpiredCert) {
+TEST_F(SslContextImplTest, TestExpiredCert) {
   std::string json = R"EOF(
   {
-      "cert_chain_file": "{{ test_certs }}/unittestcert_expired.pem",
-      "private_key_file": "{{ test_certs }}/unittestkey_expired.pem"
+      "cert_chain_file": "{{ test_tmpdir }}/unittestcert_expired.pem",
+      "private_key_file": "{{ test_tmpdir }}/unittestkey_expired.pem"
   }
   )EOF";
 
@@ -110,11 +114,11 @@ TEST(SslContextImplTest, TestExpiredCert) {
   EXPECT_EQ(0U, context->daysUntilFirstCertExpires());
 }
 
-TEST(SslContextImplTest, TestGetCertInformation) {
+TEST_F(SslContextImplTest, TestGetCertInformation) {
   std::string json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt"
   }
   )EOF";
@@ -136,14 +140,14 @@ TEST(SslContextImplTest, TestGetCertInformation) {
       "Certificate Path: test/common/ssl/test_data/ca.crt, Serial Number: F0DE921A0515EB45, "
       "Days until Expiration: ");
   std::string cert_chain_partial_output(
-      TestEnvironment::substitute("Certificate Path: {{ test_certs }}/unittestcert.pem"));
+      TestEnvironment::substitute("Certificate Path: {{ test_tmpdir }}/unittestcert.pem"));
 
   EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
   EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
               std::string::npos);
 }
 
-TEST(SslContextImplTest, TestNoCert) {
+TEST_F(SslContextImplTest, TestNoCert) {
   Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString("{}");
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;

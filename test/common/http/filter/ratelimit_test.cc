@@ -427,6 +427,40 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
 }
 
+TEST_F(HttpRateLimitFilterTest, ExcludeVirtualHost) {
+  std::string external_filter_config = R"EOF(
+  {
+    "domain": "foo"
+  }
+  )EOF";
+  SetUpTest(external_filter_config);
+  InSequence s;
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
+      .WillOnce(SetArgReferee<1>(descriptor_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(false));
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+              getApplicableRateLimit(0)).Times(0);
+
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<::RateLimit::Descriptor>{
+                                            {{{"descriptor_key", "descriptor_value"}}}}),
+                              Tracing::EMPTY_CONTEXT))
+      .WillOnce(WithArgs<0>(Invoke([&](::RateLimit::RequestCallbacks& callbacks) -> void {
+        callbacks.complete(::RateLimit::LimitStatus::OK);
+      })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
+}
+
 TEST_F(HttpRateLimitFilterTest, ConfigValueTest) {
   std::string stage_filter_config = R"EOF(
   {

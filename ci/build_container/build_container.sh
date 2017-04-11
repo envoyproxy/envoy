@@ -4,7 +4,7 @@ set -e
 
 # Setup basic requirements and install them.
 apt-get update
-apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc libtool automake
+apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc libtool automake lcov zip
 apt-get install -y golang
 # For debugging.
 apt-get install -y gdb strace
@@ -18,6 +18,17 @@ curl https://bazel.build/bazel-release.pub.gpg | apt-key add -
 apt-get update
 apt-get install -y bazel
 rm -rf /var/lib/apt/lists/*
+
+# Build a version of Bazel suitable for C++ code coverage collection. See
+# https://github.com/bazelbuild/bazel/issues/1118 for why we need this. This is the envoy-coverage
+# branch on the cloned repository.
+git clone https://github.com/htuch/bazel.git /tmp/bazel-coverage
+pushd /tmp/bazel-coverage
+git checkout 63f0542560773e973c9963845d5bbc30be75441a
+bazel build --spawn_strategy=standalone --genrule_strategy=standalone //src:bazel
+cp bazel-bin/src/bazel /usr/bin/bazel-coverage
+popd
+rm -rf /root/.cache /tmp/bazel-coverage
 
 # virtualenv
 pip install virtualenv
@@ -33,4 +44,10 @@ export CXX=g++-4.9
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty
 export THIRDPARTY_BUILD=/thirdparty_build
+# TODO(htuch): Remove the first build of the libraries in non-distinct locations when cmake is gone.
+# Below we now build/install twice and this requires 2x the space in the Docker image as is to
+# support both Bazel and cmake, but it's not worth fixing up all the cmake stuff since it's going
+# soon.
 "$(dirname "$0")"/build_and_install_deps.sh
+rm -f /tmp/*.dep
+BUILD_DISTINCT=1 "$(dirname "$0")"/build_and_install_deps.sh

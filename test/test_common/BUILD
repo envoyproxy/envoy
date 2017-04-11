@@ -2,8 +2,6 @@ package(default_visibility = ["//visibility:public"])
 
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cc_test_library")
 
-exports_files(["environment_sub.sh"])
-
 cc_library(
     name = "printers_includes",
     hdrs = ["printers.h"],
@@ -14,8 +12,10 @@ envoy_cc_test_library(
     srcs = ["environment.cc"],
     hdrs = ["environment.h"],
     deps = [
+        "//include/envoy/server:options_interface",
         "//source/common/common:assert_lib",
         "//source/common/json:json_loader_lib",
+        "//source/server:options_lib",
     ],
 )
 

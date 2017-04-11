@@ -1,17 +1,19 @@
+#include "common/ssl/connection_impl.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/connection_impl.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
 #include "common/stats/stats_impl.h"
 
+#include "test/common/ssl/ssl_certs_test.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 
 using testing::_;
@@ -69,7 +71,9 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
 
 } // namespace
 
-TEST(SslConnectionImplTest, ClientAuth) {
+class SslConnectionImplTest : public SslCertsTest {};
+
+TEST_F(SslConnectionImplTest, ClientAuth) {
   std::string client_ctx_json = R"EOF(
   {
     "cert_chain_file": "test/common/ssl/test_data/approved_with_uri_san.crt",
@@ -79,9 +83,10 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   std::string server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
-    "ca_cert_file": "test/common/ssl/test_data/ca_with_uri_san.crt"
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "test/common/ssl/test_data/ca_with_uri_san.crt",
+    "verify_subject_alt_name": [ "server1.example.com" ]
   }
   )EOF";
 
@@ -98,8 +103,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca_with_dns_san.crt"
   }
   )EOF";
@@ -116,8 +121,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": ""
   }
   )EOF";
@@ -134,8 +139,8 @@ TEST(SslConnectionImplTest, ClientAuth) {
 
   server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt"
   }
   )EOF";
@@ -144,14 +149,14 @@ TEST(SslConnectionImplTest, ClientAuth) {
            "2ff7d57d2e5cb9cc0bfe56727a114de8039cabcc7658715db4e80e1a75e108ed", "");
 }
 
-TEST(SslConnectionImplTest, ClientAuthBadVerification) {
+TEST_F(SslConnectionImplTest, ClientAuthBadVerification) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
   std::string server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt",
     "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
   }
@@ -201,14 +206,14 @@ TEST(SslConnectionImplTest, ClientAuthBadVerification) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-TEST(SslConnectionImplTest, SslError) {
+TEST_F(SslConnectionImplTest, SslError) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
   std::string server_ctx_json = R"EOF(
   {
-    "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-    "private_key_file": "{{ test_certs }}/unittestkey.pem",
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "test/common/ssl/test_data/ca.crt",
     "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
   }
@@ -252,7 +257,7 @@ TEST(SslConnectionImplTest, SslError) {
   EXPECT_EQ(1UL, stats_store.counter("ssl.connection_error").value());
 }
 
-class SslReadBufferLimitTest : public testing::Test {
+class SslReadBufferLimitTest : public SslCertsTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
                            uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
@@ -264,8 +269,8 @@ public:
 
     std::string server_ctx_json = R"EOF(
     {
-      "cert_chain_file": "{{ test_certs }}/unittestcert.pem",
-      "private_key_file": "{{ test_certs }}/unittestkey.pem",
+      "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+      "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
       "ca_cert_file": "test/common/ssl/test_data/ca.crt"
     }
     )EOF";

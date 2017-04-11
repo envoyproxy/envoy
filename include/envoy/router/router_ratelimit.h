@@ -69,6 +69,11 @@ public:
   virtual ~RateLimitPolicy() {}
 
   /**
+   * @return true if there is no rate limit policy for all stage settings.
+   */
+  virtual bool empty() const PURE;
+
+  /**
    * @param stage the value for finding applicable rate limit configurations.
    * @return set of RateLimitPolicyEntry that are applicable for a stage.
    */

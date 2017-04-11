@@ -36,6 +36,11 @@ TEST(UUID, sanityCheckOfUniqueness) {
 
 class RuntimeImplTest : public testing::Test {
 public:
+  static void SetUpTestCase() {
+    TestEnvironment::exec(
+        {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
+  }
+
   void setup(const std::string& primary_dir, const std::string& override_dir) {
     EXPECT_CALL(dispatcher, createFilesystemWatcher_())
         .WillOnce(ReturnNew<NiceMock<Filesystem::MockWatcher>>());
