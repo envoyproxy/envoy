@@ -30,8 +30,8 @@ Outlier detection
 
 See the outlier detection :ref:`architecture overview <arch_overview_outlier_detection>` for more
 information on outlier detection. The runtime parameters supported by outlier detection are the 
-same as the :ref:`static configuration parameters <config_cluster_manager_cluster_outlier_detection>`, with
-the exception of ``success_rate_stdev_factor``.
+same as the :ref:`static configuration parameters <config_cluster_manager_cluster_outlier_detection>`, namely:cd
+
 
 outlier_detection.consecutive_5xx
   :ref:`consecutive_5XX
@@ -74,12 +74,9 @@ outlier_detection.success_rate_request_volume
   setting in outlier detection
 
 outlier_detection.success_rate_stdev_factor
-  This factor is used to determine the ejection threshold for success rate outlier ejection.
-  The ejection threshold is the difference between the mean success rate, and the product of
-  this factor and the standard deviation of the mean success rate:
-  ``mean - (stdev * success_rate_stdev_factor)``. This factor is divided by a thousand to
-  get a ``double``. That is, if the desired factor is ``1.9``, the runtime value should be ``1900``.
-  Defaults to ``1900``.
+  :ref:`success_rate_stdev_factor
+  <config_cluster_manager_cluster_outlier_detection_success_rate_stdev_factor>`
+  setting in outlier detection
 
 Core
 ----

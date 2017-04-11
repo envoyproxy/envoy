@@ -156,6 +156,7 @@ public:
   uint64_t maxEjectionPercent() { return max_ejection_percent_; }
   uint64_t successRateMinimumHosts() { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() { return success_rate_request_volume_; }
+  uint64_t successRateStdevFactor() { return  success_rate_stdev_factor_; }
   uint64_t enforcingConsecutive5xx() { return enforcing_consecutive_5xx_; }
   uint64_t enforcingSuccessRate() { return enforcing_success_rate_; }
 
@@ -166,6 +167,7 @@ private:
   const uint64_t max_ejection_percent_;
   const uint64_t success_rate_minimum_hosts_;
   const uint64_t success_rate_request_volume_;
+  const uint64_t success_rate_stdev_factor_;
   const uint64_t enforcing_consecutive_5xx_;
   const uint64_t enforcing_success_rate_;
 };
@@ -264,18 +266,6 @@ public:
   successRateEjectionThreshold(double success_rate_sum,
                                const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
                                double success_rate_stdev_factor);
-  static uint64_t defaultStdevFactor() { return DEFAULT_SUCCESS_RATE_STDEV_FACTOR; }
-
-private:
-  // Default factor to multiply the stdev of a cluster's success rate for success rate outlier
-  // ejection.
-  // The canonical factor for outlier detection in normal distributions is 2. However, host
-  // success rates are intuitively a distribution with negative skew, with most of the mass around
-  // 100 and a left tail. Therefore, a more aggressive (lower) factor is needed to detect
-  // outliers.
-  // The factor will be divided by 1000.0 to get a double out of it. This makes runtime
-  // fetching faster with getInteger.
-  static const uint64_t DEFAULT_SUCCESS_RATE_STDEV_FACTOR = 1900;
 };
 
 } // Outlier

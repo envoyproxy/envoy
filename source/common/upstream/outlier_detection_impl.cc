@@ -68,6 +68,8 @@ DetectorConfig::DetectorConfig(const Json::Object& json_config)
           static_cast<uint64_t>(json_config.getInteger("success_rate_minimum_hosts", 5))),
       success_rate_request_volume_(
           static_cast<uint64_t>(json_config.getInteger("success_rate_request_volume", 100))),
+      success_rate_stdev_factor_(
+        static_cast<uint64_t>(json_config.getInteger("success_rate_stdev_factor", 1900))),
       enforcing_consecutive_5xx_(
           static_cast<uint64_t>(json_config.getInteger("enforcing_consecutive_5xx", 100))),
       enforcing_success_rate_(
@@ -307,7 +309,7 @@ void DetectorImpl::processSuccessRateEjections() {
   if (valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
     double success_rate_stdev_factor =
         runtime_.snapshot().getInteger("outlier_detection.success_rate_stdev_factor",
-                                       Utility::defaultStdevFactor()) /
+                                       config_.successRateStdevFactor()) /
         1000.0;
     Utility::EjectionPair ejection_pair = Utility::successRateEjectionThreshold(
         success_rate_sum, valid_success_rate_hosts, success_rate_stdev_factor);
