@@ -20,7 +20,7 @@ TARGETS=$("${BAZEL_BIN}" query "attr('tags', 'coverage_test_lib', //test/...)")
 # coverage runs. It is under .gitignore. DO NOT EDIT, DO NOT CHECK IN.
 package(default_visibility = ["//visibility:public"])
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_library")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
 
 envoy_cc_test(
     name = "coverage_tests",
