@@ -500,7 +500,7 @@ RouteMatcher::RouteMatcher(const Json::Object& json_config, const ConfigImpl& gl
           throw EnvoyException(fmt::format("Only a single single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
-      } else if ('*' == domain[0]) {
+      } else if (domain.size() > 0 && '*' == domain[0]) {
         wildcard_virtual_host_suffixes_[domain.size() - 1].emplace(domain.substr(1), virtual_host);
       } else {
         if (virtual_hosts_.find(domain) != virtual_hosts_.end()) {
