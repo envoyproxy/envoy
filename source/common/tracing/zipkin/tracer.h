@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/pure.h"
+
 #include "common/tracing/zipkin/span_context.h"
 #include "common/tracing/zipkin/tracer_interface.h"
 #include "common/tracing/zipkin/zipkin_core_types.h"
@@ -7,51 +9,86 @@
 namespace Zipkin {
 
 /**
- * Abstract class for Tracer users to implement their own span-buffer management policies
+ * Abstract class that delegates to users of the Tracer class the responsibility
+ * of "reporting" a Zipkin span that has ended its life cycle. "Reporting" can mean that the
+ * span will be sent to out to Zipkin, or buffered so that it can be sent out later.
  */
 class Reporter {
 public:
+  /**
+   * Destructor
+   */
   virtual ~Reporter() {}
 
   /**
-   * Span-buffer management policy to be implemented by users of the Trace class
+   * Method that a concrete Reporter class must implement to handle finished spans.
+   * For example, a span-buffer management policy could be implemented.
+   *
+   * @param span The span that needs action
    */
-  virtual void reportSpan(Span&& span) = 0;
+  virtual void reportSpan(Span&& span) PURE;
 };
 
 typedef std::shared_ptr<Reporter> ReporterSharedPtr;
 
 typedef std::unique_ptr<Reporter> ReporterUniquePtr;
 
+/**
+ * This class implements the Zipkin tracer. It has methods to create the appropriate Zipkin span
+ * type, i.e., root span, child span, or shared-context span.
+ *
+ * This class allows its users to supply a concrete Reporter class whose reportSpan method
+ * is called by its own reportSpan method. By doing so, we have cleanly separated the logic
+ * of dealing with finished spans from the span-creation and tracing logic.
+ */
 class Tracer : public TracerInterface {
 public:
+  /**
+   * Constructor
+   *
+   * @param service_name The name of the service where the Tracer is running. This name is
+   * used in all annotations' endpoints of the spans created by the Tracer.
+   * @param address A string in the format <IP address>:<port>. The IP address and port are used
+   * in all annotations' endpoints of the spans created by the Tracer.
+   */
   Tracer(const std::string& service_name, const std::string& address)
       : service_name_(service_name), address_(address) {}
 
   virtual ~Tracer() {}
 
   /**
-   * Creates a "root" span
+   * Creates a "root" Zipkin span.
+   *
+   * @param span_name Name of the new span
+   * @param start_time The time indicating the beginning of the span
    */
   Span startSpan(const std::string& span_name, uint64_t start_time);
 
   /**
-   * Based on the given context, creates either a "child" or a "shared-context" span
+   * Depending on the given context, creates either a "child" or a "shared-context" Zipkin span.
+   *
+   * @param span_name Name of the new span
+   * @param start_time The time indicating the beginning of the span
+   * @param previous_context The context of the span preceding the one to be created
    */
   Span startSpan(const std::string& span_name, uint64_t start_time, SpanContext& previous_context);
 
   /**
-   * Called when the Span is finished
+   * TracerInterface::reportSpan
    */
   void reportSpan(Span&& span) override;
 
+  /**
+   * @return the Reporter associated with the Tracer object
+   */
   ReporterSharedPtr reporter() { return reporter_; }
 
+  /**
+   * Associates a Reporter object with this Tracer
+   */
   void setReporter(ReporterUniquePtr reporter);
 
 private:
-  void getIPAndPort(const std::string& address, std::string& ip, uint16_t& port);
-
   std::string service_name_;
   std::string address_;
 

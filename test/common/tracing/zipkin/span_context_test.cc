@@ -15,10 +15,10 @@ TEST(ZipkinSpanContextTest, populateFromString) {
   EXPECT_EQ("0000000000000000", span_context.idAsHexString());
   EXPECT_EQ(0ULL, span_context.parent_id());
   EXPECT_EQ("0000000000000000", span_context.parentIdAsHexString());
-  EXPECT_FALSE(span_context.isSetAnnotation().cr);
-  EXPECT_FALSE(span_context.isSetAnnotation().cs);
-  EXPECT_FALSE(span_context.isSetAnnotation().sr);
-  EXPECT_FALSE(span_context.isSetAnnotation().ss);
+  EXPECT_FALSE(span_context.isSetAnnotation().cr_);
+  EXPECT_FALSE(span_context.isSetAnnotation().cs_);
+  EXPECT_FALSE(span_context.isSetAnnotation().sr_);
+  EXPECT_FALSE(span_context.isSetAnnotation().ss_);
   EXPECT_EQ("0000000000000000;0000000000000000;0000000000000000", span_context.serializeToString());
 
   // Span context populated with trace id, id, parent id, and no annotations
@@ -29,10 +29,10 @@ TEST(ZipkinSpanContextTest, populateFromString) {
   EXPECT_EQ("56707c7b3e1092af", span_context.idAsHexString());
   EXPECT_EQ(14164264937399213340ULL, span_context.parent_id());
   EXPECT_EQ("c49193ea42335d1c", span_context.parentIdAsHexString());
-  EXPECT_FALSE(span_context.isSetAnnotation().cr);
-  EXPECT_FALSE(span_context.isSetAnnotation().cs);
-  EXPECT_FALSE(span_context.isSetAnnotation().sr);
-  EXPECT_FALSE(span_context.isSetAnnotation().ss);
+  EXPECT_FALSE(span_context.isSetAnnotation().cr_);
+  EXPECT_FALSE(span_context.isSetAnnotation().cs_);
+  EXPECT_FALSE(span_context.isSetAnnotation().sr_);
+  EXPECT_FALSE(span_context.isSetAnnotation().ss_);
   EXPECT_EQ("25c6f38dd0600e79;56707c7b3e1092af;c49193ea42335d1c", span_context.serializeToString());
 
   // Span context populated with trace id, id, parent id, and one annotation
@@ -43,10 +43,10 @@ TEST(ZipkinSpanContextTest, populateFromString) {
   EXPECT_EQ("56707c7b3e1092af", span_context.idAsHexString());
   EXPECT_EQ(14164264937399213340ULL, span_context.parent_id());
   EXPECT_EQ("c49193ea42335d1c", span_context.parentIdAsHexString());
-  EXPECT_FALSE(span_context.isSetAnnotation().cr);
-  EXPECT_TRUE(span_context.isSetAnnotation().cs);
-  EXPECT_FALSE(span_context.isSetAnnotation().sr);
-  EXPECT_FALSE(span_context.isSetAnnotation().ss);
+  EXPECT_FALSE(span_context.isSetAnnotation().cr_);
+  EXPECT_TRUE(span_context.isSetAnnotation().cs_);
+  EXPECT_FALSE(span_context.isSetAnnotation().sr_);
+  EXPECT_FALSE(span_context.isSetAnnotation().ss_);
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cs",
             span_context.serializeToString());
 
@@ -58,10 +58,10 @@ TEST(ZipkinSpanContextTest, populateFromString) {
   EXPECT_EQ("56707c7b3e1092af", span_context.idAsHexString());
   EXPECT_EQ(14164264937399213340ULL, span_context.parent_id());
   EXPECT_EQ("c49193ea42335d1c", span_context.parentIdAsHexString());
-  EXPECT_TRUE(span_context.isSetAnnotation().cr);
-  EXPECT_TRUE(span_context.isSetAnnotation().cs);
-  EXPECT_FALSE(span_context.isSetAnnotation().sr);
-  EXPECT_FALSE(span_context.isSetAnnotation().ss);
+  EXPECT_TRUE(span_context.isSetAnnotation().cr_);
+  EXPECT_TRUE(span_context.isSetAnnotation().cs_);
+  EXPECT_FALSE(span_context.isSetAnnotation().sr_);
+  EXPECT_FALSE(span_context.isSetAnnotation().ss_);
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cr;cs",
             span_context.serializeToString());
 
@@ -73,10 +73,10 @@ TEST(ZipkinSpanContextTest, populateFromString) {
   EXPECT_EQ("0000000000000000", span_context.idAsHexString());
   EXPECT_EQ(0ULL, span_context.parent_id());
   EXPECT_EQ("0000000000000000", span_context.parentIdAsHexString());
-  EXPECT_FALSE(span_context.isSetAnnotation().cr);
-  EXPECT_FALSE(span_context.isSetAnnotation().cs);
-  EXPECT_FALSE(span_context.isSetAnnotation().sr);
-  EXPECT_FALSE(span_context.isSetAnnotation().ss);
+  EXPECT_FALSE(span_context.isSetAnnotation().cr_);
+  EXPECT_FALSE(span_context.isSetAnnotation().cs_);
+  EXPECT_FALSE(span_context.isSetAnnotation().sr_);
+  EXPECT_FALSE(span_context.isSetAnnotation().ss_);
   EXPECT_EQ("0000000000000000;0000000000000000;0000000000000000", span_context.serializeToString());
 }
 
@@ -91,10 +91,10 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_EQ("0000000000000000", span_context.idAsHexString());
   EXPECT_EQ(0ULL, span_context.parent_id());
   EXPECT_EQ("0000000000000000", span_context.parentIdAsHexString());
-  EXPECT_FALSE(span_context.isSetAnnotation().cr);
-  EXPECT_FALSE(span_context.isSetAnnotation().cs);
-  EXPECT_FALSE(span_context.isSetAnnotation().sr);
-  EXPECT_FALSE(span_context.isSetAnnotation().ss);
+  EXPECT_FALSE(span_context.isSetAnnotation().cr_);
+  EXPECT_FALSE(span_context.isSetAnnotation().cs_);
+  EXPECT_FALSE(span_context.isSetAnnotation().sr_);
+  EXPECT_FALSE(span_context.isSetAnnotation().ss_);
   EXPECT_EQ("0000000000000000;0000000000000000;0000000000000000", span_context.serializeToString());
 
   // Span context populated with trace id, id, parent id, and no annotations
@@ -108,17 +108,17 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_EQ("56707c7b3e1092af", span_context_2.idAsHexString());
   EXPECT_EQ(14164264937399213340ULL, span_context_2.parent_id());
   EXPECT_EQ("c49193ea42335d1c", span_context_2.parentIdAsHexString());
-  EXPECT_FALSE(span_context_2.isSetAnnotation().cr);
-  EXPECT_FALSE(span_context_2.isSetAnnotation().cs);
-  EXPECT_FALSE(span_context_2.isSetAnnotation().sr);
-  EXPECT_FALSE(span_context_2.isSetAnnotation().ss);
+  EXPECT_FALSE(span_context_2.isSetAnnotation().cr_);
+  EXPECT_FALSE(span_context_2.isSetAnnotation().cs_);
+  EXPECT_FALSE(span_context_2.isSetAnnotation().sr_);
+  EXPECT_FALSE(span_context_2.isSetAnnotation().ss_);
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c",
             span_context_2.serializeToString());
 
   // Test if we can handle 128-bit trace ids
-  EXPECT_FALSE(span.isSet().trace_id_high);
+  EXPECT_FALSE(span.isSet().trace_id_high_);
   span.setTraceIdHigh(9922130815203937912ULL);
-  EXPECT_TRUE(span.isSet().trace_id_high);
+  EXPECT_TRUE(span.isSet().trace_id_high_);
   SpanContext span_context_5(span);
   // We currently drop the high bits. So, we expect the same context as above
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c",
@@ -135,10 +135,10 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_EQ("56707c7b3e1092af", span_context_3.idAsHexString());
   EXPECT_EQ(14164264937399213340ULL, span_context_3.parent_id());
   EXPECT_EQ("c49193ea42335d1c", span_context_3.parentIdAsHexString());
-  EXPECT_FALSE(span_context_3.isSetAnnotation().cr);
-  EXPECT_FALSE(span_context_3.isSetAnnotation().cs);
-  EXPECT_TRUE(span_context_3.isSetAnnotation().sr);
-  EXPECT_FALSE(span_context_3.isSetAnnotation().ss);
+  EXPECT_FALSE(span_context_3.isSetAnnotation().cr_);
+  EXPECT_FALSE(span_context_3.isSetAnnotation().cs_);
+  EXPECT_TRUE(span_context_3.isSetAnnotation().sr_);
+  EXPECT_FALSE(span_context_3.isSetAnnotation().ss_);
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;sr",
             span_context_3.serializeToString());
 
@@ -152,10 +152,10 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_EQ("56707c7b3e1092af", span_context_4.idAsHexString());
   EXPECT_EQ(14164264937399213340ULL, span_context_4.parent_id());
   EXPECT_EQ("c49193ea42335d1c", span_context_4.parentIdAsHexString());
-  EXPECT_FALSE(span_context_4.isSetAnnotation().cr);
-  EXPECT_FALSE(span_context_4.isSetAnnotation().cs);
-  EXPECT_TRUE(span_context_4.isSetAnnotation().sr);
-  EXPECT_TRUE(span_context_4.isSetAnnotation().ss);
+  EXPECT_FALSE(span_context_4.isSetAnnotation().cr_);
+  EXPECT_FALSE(span_context_4.isSetAnnotation().cs_);
+  EXPECT_TRUE(span_context_4.isSetAnnotation().sr_);
+  EXPECT_TRUE(span_context_4.isSetAnnotation().ss_);
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;sr;ss",
             span_context_4.serializeToString());
 }

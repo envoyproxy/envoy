@@ -12,16 +12,16 @@ SpanContext::SpanContext(const Span& span) {
 
   for (Annotation ann : span.annotations()) {
     if (ann.value() == ZipkinCoreConstants::CLIENT_RECV) {
-      annotation_values_.cr = true;
+      annotation_values_.cr_ = true;
     }
     if (ann.value() == ZipkinCoreConstants::CLIENT_SEND) {
-      annotation_values_.cs = true;
+      annotation_values_.cs_ = true;
     }
     if (ann.value() == ZipkinCoreConstants::SERVER_RECV) {
-      annotation_values_.sr = true;
+      annotation_values_.sr_ = true;
     }
     if (ann.value() == ZipkinCoreConstants::SERVER_SEND) {
-      annotation_values_.ss = true;
+      annotation_values_.ss_ = true;
     }
   }
 
@@ -37,16 +37,16 @@ const std::string SpanContext::serializeToString() {
   s = traceIdAsHexString() + FIELD_SEPARATOR_ + idAsHexString() + FIELD_SEPARATOR_ +
       parentIdAsHexString();
 
-  if (annotation_values_.cr) {
+  if (annotation_values_.cr_) {
     s += FIELD_SEPARATOR_ + ZipkinCoreConstants::CLIENT_RECV;
   }
-  if (annotation_values_.cs) {
+  if (annotation_values_.cs_) {
     s += FIELD_SEPARATOR_ + ZipkinCoreConstants::CLIENT_SEND;
   }
-  if (annotation_values_.sr) {
+  if (annotation_values_.sr_) {
     s += FIELD_SEPARATOR_ + ZipkinCoreConstants::SERVER_RECV;
   }
-  if (annotation_values_.ss) {
+  if (annotation_values_.ss_) {
     s += FIELD_SEPARATOR_ + ZipkinCoreConstants::SERVER_SEND;
   }
 
@@ -66,8 +66,8 @@ void SpanContext::populateFromString(std::string s) {
   std::smatch match;
 
   trace_id_ = parent_id_ = id_ = 0;
-  annotation_values_.cs = annotation_values_.cr = annotation_values_.ss = annotation_values_.sr =
-      false;
+  annotation_values_.cs_ = annotation_values_.cr_ = annotation_values_.ss_ =
+      annotation_values_.sr_ = false;
 
   if (std::regex_search(s, match, re)) {
     // This is a valid string encoding of the context
@@ -82,13 +82,13 @@ void SpanContext::populateFromString(std::string s) {
 
       while (annotation_value) {
         if (!std::strcmp(annotation_value, ZipkinCoreConstants::CLIENT_RECV.c_str())) {
-          annotation_values_.cr = true;
+          annotation_values_.cr_ = true;
         } else if (!std::strcmp(annotation_value, ZipkinCoreConstants::CLIENT_SEND.c_str())) {
-          annotation_values_.cs = true;
+          annotation_values_.cs_ = true;
         } else if (!std::strcmp(annotation_value, ZipkinCoreConstants::SERVER_RECV.c_str())) {
-          annotation_values_.sr = true;
+          annotation_values_.sr_ = true;
         } else if (!std::strcmp(annotation_value, ZipkinCoreConstants::SERVER_SEND.c_str())) {
-          annotation_values_.ss = true;
+          annotation_values_.ss_ = true;
         }
 
         annotation_value = std::strtok(NULL, FIELD_SEPARATOR_.c_str());

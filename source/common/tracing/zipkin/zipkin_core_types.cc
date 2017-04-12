@@ -164,17 +164,17 @@ const std::string& Span::toJson() {
   writer.Key(ZipkinJsonFieldNames::SPAN_ID.c_str());
   writer.String(Util::uint64ToBase16(id_).c_str());
 
-  if (isset_.parent_id && parent_id_) {
+  if (isset_.parent_id_ && parent_id_) {
     writer.Key(ZipkinJsonFieldNames::SPAN_PARENT_ID.c_str());
     writer.String(Util::uint64ToBase16(parent_id_).c_str());
   }
 
-  if (isset_.timestamp) {
+  if (isset_.timestamp_) {
     writer.Key(ZipkinJsonFieldNames::SPAN_TIMESTAMP.c_str());
     writer.Int64(timestamp_);
   }
 
-  if (isset_.duration) {
+  if (isset_.duration_) {
     writer.Key(ZipkinJsonFieldNames::SPAN_DURATION.c_str());
     writer.Int64(duration_);
   }
@@ -204,14 +204,14 @@ const std::string& Span::toJson() {
 void Span::finish() {
   // Assumption: Span will have only one annotation when this method is called
   SpanContext context(*this);
-  if ((context.isSetAnnotation().sr) && (!context.isSetAnnotation().ss)) {
+  if ((context.isSetAnnotation().sr_) && (!context.isSetAnnotation().ss_)) {
     // Need to set the SS annotation
     Annotation ss;
     ss.setEndpoint(annotations_[0].endpoint());
     ss.setTimestamp(Util::timeSinceEpochMicro());
     ss.setValue(ZipkinCoreConstants::SERVER_SEND);
     annotations_.push_back(std::move(ss));
-  } else if ((context.isSetAnnotation().cs) && (!context.isSetAnnotation().cr)) {
+  } else if ((context.isSetAnnotation().cs_) && (!context.isSetAnnotation().cr_)) {
     // Need to set the CR annotation
     Annotation cr;
     uint64_t stop_time = Util::timeSinceEpochMicro();

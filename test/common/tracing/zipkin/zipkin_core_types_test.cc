@@ -293,11 +293,11 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(0LL, span.timestamp());
   EXPECT_EQ(0LL, span.duration());
   EXPECT_EQ(0LL, span.startTime());
-  EXPECT_FALSE(span.isSet().debug);
-  EXPECT_FALSE(span.isSet().duration);
-  EXPECT_FALSE(span.isSet().parent_id);
-  EXPECT_FALSE(span.isSet().timestamp);
-  EXPECT_FALSE(span.isSet().trace_id_high);
+  EXPECT_FALSE(span.isSet().debug_);
+  EXPECT_FALSE(span.isSet().duration_);
+  EXPECT_FALSE(span.isSet().parent_id_);
+  EXPECT_FALSE(span.isSet().timestamp_);
+  EXPECT_FALSE(span.isSet().trace_id_high_);
   EXPECT_EQ("{\"traceId\":\"0000000000000000\",\"name\":\"\",\"id\":\"0000000000000000\","
             "\"annotations\":[],\"binaryAnnotations\":[]}",
             span.toJson());
@@ -313,7 +313,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   span.setParentId(id);
   EXPECT_EQ(id, span.parentId());
   EXPECT_EQ(id_hex, span.parentIdAsHexString());
-  EXPECT_TRUE(span.isSet().parent_id);
+  EXPECT_TRUE(span.isSet().parent_id_);
 
   id = Util::generateRandom64();
   id_hex = Util::uint64ToBase16(id);
@@ -325,25 +325,25 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   id_hex = Util::uint64ToBase16(id);
   span.setTraceIdHigh(id);
   EXPECT_EQ(id, span.traceIdHigh());
-  EXPECT_TRUE(span.isSet().trace_id_high);
+  EXPECT_TRUE(span.isSet().trace_id_high_);
 
   int64_t timestamp = Util::timeSinceEpochMicro();
   span.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, span.timestamp());
-  EXPECT_TRUE(span.isSet().timestamp);
+  EXPECT_TRUE(span.isSet().timestamp_);
 
   span.setStartTime(timestamp);
   EXPECT_EQ(timestamp, span.startTime());
 
   span.setDuration(3000LL);
   EXPECT_EQ(3000LL, span.duration());
-  EXPECT_TRUE(span.isSet().duration);
+  EXPECT_TRUE(span.isSet().duration_);
 
   span.setName("span_name");
   EXPECT_EQ("span_name", span.name());
 
   span.setDebug();
-  EXPECT_TRUE(span.isSet().debug);
+  EXPECT_TRUE(span.isSet().debug_);
 
   Endpoint endpoint;
   Annotation ann;
@@ -464,11 +464,11 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
   EXPECT_EQ(span.timestamp(), span2.timestamp());
   EXPECT_EQ(span.duration(), span2.duration());
   EXPECT_EQ(span.startTime(), span2.startTime());
-  EXPECT_EQ(span.isSet().debug, span2.isSet().debug);
-  EXPECT_EQ(span.isSet().duration, span2.isSet().duration);
-  EXPECT_EQ(span.isSet().parent_id, span2.isSet().parent_id);
-  EXPECT_EQ(span.isSet().timestamp, span2.isSet().timestamp);
-  EXPECT_EQ(span.isSet().trace_id_high, span2.isSet().trace_id_high);
+  EXPECT_EQ(span.isSet().debug_, span2.isSet().debug_);
+  EXPECT_EQ(span.isSet().duration_, span2.isSet().duration_);
+  EXPECT_EQ(span.isSet().parent_id_, span2.isSet().parent_id_);
+  EXPECT_EQ(span.isSet().timestamp_, span2.isSet().timestamp_);
+  EXPECT_EQ(span.isSet().trace_id_high_, span2.isSet().trace_id_high_);
 }
 
 TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
@@ -499,11 +499,11 @@ TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
   EXPECT_EQ(span.timestamp(), span2.timestamp());
   EXPECT_EQ(span.duration(), span2.duration());
   EXPECT_EQ(span.startTime(), span2.startTime());
-  EXPECT_EQ(span.isSet().debug, span2.isSet().debug);
-  EXPECT_EQ(span.isSet().duration, span2.isSet().duration);
-  EXPECT_EQ(span.isSet().parent_id, span2.isSet().parent_id);
-  EXPECT_EQ(span.isSet().timestamp, span2.isSet().timestamp);
-  EXPECT_EQ(span.isSet().trace_id_high, span2.isSet().trace_id_high);
+  EXPECT_EQ(span.isSet().debug_, span2.isSet().debug_);
+  EXPECT_EQ(span.isSet().duration_, span2.isSet().duration_);
+  EXPECT_EQ(span.isSet().parent_id_, span2.isSet().parent_id_);
+  EXPECT_EQ(span.isSet().timestamp_, span2.isSet().timestamp_);
+  EXPECT_EQ(span.isSet().trace_id_high_, span2.isSet().trace_id_high_);
 }
 
 TEST(ZipkinCoreTypesSpanTest, setTag) {

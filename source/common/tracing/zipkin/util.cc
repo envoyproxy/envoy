@@ -60,4 +60,15 @@ std::string Util::uint64ToBase16(uint64_t value) {
   stream << std::setfill('0') << std::setw(16) << std::hex << value;
   return stream.str();
 }
+
+void Util::getIPAndPort(const std::string& address, std::string& ip, uint16_t& port) {
+  std::regex re("^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})(:(\\d+))?$");
+  std::smatch match;
+  if (std::regex_search(address, match, re)) {
+    ip = match.str(1);
+    if (match.str(3).size() > 0) {
+      port = std::stoi(match.str(3));
+    }
+  }
+}
 } // Zipkin

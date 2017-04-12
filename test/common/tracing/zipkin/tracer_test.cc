@@ -21,7 +21,7 @@ TEST(ZipkinTracerTest, spanCreation) {
 
   EXPECT_NE(0ULL, root_span.traceId());           // trace id must be set
   EXPECT_EQ(root_span.traceId(), root_span.id()); // span id and trace id must be the same
-  EXPECT_FALSE(root_span.isSet().parent_id);      // no parent set
+  EXPECT_FALSE(root_span.isSet().parent_id_);     // no parent set
   EXPECT_NE(0LL, root_span.timestamp());          // span's timestamp must be set
 
   // A CS annotation must have been added
@@ -40,7 +40,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_EQ(dynamic_cast<TracerRawPtr>(&tracer), root_span.tracer());
 
   // Duration is not set at span-creation time
-  EXPECT_FALSE(root_span.isSet().duration);
+  EXPECT_FALSE(root_span.isSet().duration_);
 
   // ==============
   // Test the creation of a shared-context span --> SR
@@ -61,11 +61,11 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_EQ(root_span.id(), server_side_shared_context_span.id());
 
   // The parent should be the same as in the CS side (none in this case)
-  EXPECT_FALSE(server_side_shared_context_span.isSet().parent_id);
+  EXPECT_FALSE(server_side_shared_context_span.isSet().parent_id_);
 
   // span timestamp should not be set (it was set in the CS side)
   EXPECT_EQ(0LL, server_side_shared_context_span.timestamp());
-  EXPECT_FALSE(server_side_shared_context_span.isSet().timestamp);
+  EXPECT_FALSE(server_side_shared_context_span.isSet().timestamp_);
 
   // An SR annotation must have been added
   EXPECT_EQ(1ULL, server_side_shared_context_span.annotations().size());
@@ -83,7 +83,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_EQ(dynamic_cast<TracerRawPtr>(&tracer), server_side_shared_context_span.tracer());
 
   // Duration is not set at span-creation time
-  EXPECT_FALSE(server_side_shared_context_span.isSet().duration);
+  EXPECT_FALSE(server_side_shared_context_span.isSet().duration_);
 
   // ==============
   // Test the creation of a child span --> CS
@@ -103,7 +103,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_NE(child_span.traceId(), child_span.id());
 
   // parent should be the previous span
-  EXPECT_TRUE(child_span.isSet().parent_id);
+  EXPECT_TRUE(child_span.isSet().parent_id_);
   EXPECT_EQ(server_side_shared_context_span.id(), child_span.parentId());
 
   // span's timestamp must be set
@@ -125,7 +125,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_EQ(dynamic_cast<TracerRawPtr>(&tracer), child_span.tracer());
 
   // Duration is not set at span-creation time
-  EXPECT_FALSE(child_span.isSet().duration);
+  EXPECT_FALSE(child_span.isSet().duration_);
 }
 
 TEST(ZipkinTracerTest, finishSpan) {

@@ -13,7 +13,7 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   uint64_t timestamp_micro;
 
   // Build the endpoint
-  getIPAndPort(address_, ip, port);
+  Util::getIPAndPort(address_, ip, port);
   ep.setIpv4(ip);
   ep.setPort(port);
   ep.setServiceName(service_name_);
@@ -51,11 +51,11 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
   Endpoint ep;
   uint64_t timestamp_micro;
 
-  // TODO We currently ignore the start_time to set the span/annotation timestamps
+  // TODO(fabolive) We currently ignore the start_time to set the span/annotation timestamps
   // Is start_time really needed?
   timestamp_micro = Util::timeSinceEpochMicro();
 
-  if ((previous_context.isSetAnnotation().sr) && (!previous_context.isSetAnnotation().cs)) {
+  if ((previous_context.isSetAnnotation().sr_) && (!previous_context.isSetAnnotation().cs_)) {
     // We need to create a new span that is a child of the previous span; no shared context
 
     // Create a new span id
@@ -72,7 +72,8 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
 
     // Set the timestamp globally for the span
     span.setTimestamp(timestamp_micro);
-  } else if ((previous_context.isSetAnnotation().cs) && (!previous_context.isSetAnnotation().sr)) {
+  } else if ((previous_context.isSetAnnotation().cs_) &&
+             (!previous_context.isSetAnnotation().sr_)) {
     // We need to create a new span that will share context with the previous span
 
     // Initialize the shared context for the new span
@@ -86,12 +87,12 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
   } else {
     // Unexpected condition
 
-    // TODO Log an error
+    // TODO(fabolive) Log an error
     return span; // return an empty span
   }
 
   // Build the endpoint
-  getIPAndPort(address_, ip, port);
+  Util::getIPAndPort(address_, ip, port);
   ep.setIpv4(ip);
   ep.setPort(port);
   ep.setServiceName(service_name_);
@@ -120,16 +121,5 @@ void Tracer::reportSpan(Span&& span) {
 
 void Tracer::setReporter(ReporterUniquePtr reporter) {
   reporter_ = ReporterSharedPtr(std::move(reporter));
-}
-
-void Tracer::getIPAndPort(const std::string& address, std::string& ip, uint16_t& port) {
-  std::regex re("^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})(:(\\d+))?$");
-  std::smatch match;
-  if (std::regex_search(address, match, re)) {
-    ip = match.str(1);
-    if (match.str(3).size() > 0) {
-      port = std::stoi(match.str(3));
-    }
-  }
 }
 } // Zipkin
