@@ -2,20 +2,7 @@
 # version number, etc.) to uniquely identify the revision of the upstream dependency.  This allows
 # make to pick up changes with a simple direct dependency on the build recipe.
 
-all: $(THIRDPARTY_DEPS)/libevent.dep \
-	$(THIRDPARTY_DEPS)/boringssl.dep \
-	$(THIRDPARTY_DEPS)/gperftools.dep \
-	$(THIRDPARTY_DEPS)/nghttp2.dep \
-	$(THIRDPARTY_DEPS)/cares.dep \
-	$(THIRDPARTY_DEPS)/protobuf.dep \
-	$(THIRDPARTY_DEPS)/cotire.dep \
-	$(THIRDPARTY_DEPS)/spdlog.dep \
-	$(THIRDPARTY_DEPS)/http-parser.dep \
-	$(THIRDPARTY_DEPS)/tclap.dep \
-	$(THIRDPARTY_DEPS)/lightstep.dep \
-	$(THIRDPARTY_DEPS)/rapidjson.dep \
-	$(THIRDPARTY_DEPS)/googletest.dep \
-	$(THIRDPARTY_DEPS)/gcovr.dep
+all: $(addprefix $(THIRDPARTY_DEPS)/,$(shell ./print_recipe_deps.sh))
 
 RECIPES := build_recipes
 

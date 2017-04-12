@@ -1,0 +1,16 @@
+RECIPES = [
+    "boringssl",
+    "cares",
+    "cotire",
+    "gcovr",
+    "googletest",
+    "gperftools",
+    "http-parser",
+    "libevent",
+    "lightstep",
+    "nghttp2",
+    "protobuf",
+    "rapidjson",
+    "spdlog",
+    "tclap",
+]

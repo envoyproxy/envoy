@@ -1,11 +1,12 @@
 #!/bin/bash
+
 read -r -p "Do you have master checked out with most recent changes? [y/N] " response
 if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]
 then
   TAG="$(git rev-parse master)"
   docker-machine start default
   eval $(docker-machine env default)
-  docker build --rm -t lyft/envoy-build:$TAG .
+  ./docker_build_container.sh
   docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
   docker push lyft/envoy-build:$TAG
   echo Pushed lyft/envoy-build:$TAG
