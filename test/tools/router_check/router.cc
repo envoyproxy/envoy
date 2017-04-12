@@ -28,6 +28,10 @@ bool RouterCheckTool::initializeFromConfig(const std::string& router_config_json
 }
 
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
+  if (config_ == nullptr) {
+    return false;
+  }
+
   // Load tool config json
   Json::ObjectPtr loader = loadJson(expected_route_json, Json::ToolSchema::routerCheckSchema());
 
