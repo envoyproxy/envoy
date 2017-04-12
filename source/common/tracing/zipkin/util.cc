@@ -4,6 +4,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/document.h"
 
+#include "common/common/hex.h"
 #include "common/tracing/zipkin/util.h"
 
 namespace Zipkin {
@@ -56,9 +57,18 @@ uint64_t Util::generateRandom64() {
 }
 
 std::string Util::uint64ToBase16(uint64_t value) {
-  std::stringstream stream;
-  stream << std::setfill('0') << std::setw(16) << std::hex << value;
-  return stream.str();
+  std::vector<uint8_t> data(8);
+
+  data[7] = (value & 0x00000000000000FF);
+  data[6] = (value & 0x000000000000FF00) >> 8;
+  data[5] = (value & 0x0000000000FF0000) >> 16;
+  data[4] = (value & 0x00000000FF000000) >> 24;
+  data[3] = (value & 0x000000FF00000000) >> 32;
+  data[2] = (value & 0x0000FF0000000000) >> 40;
+  data[1] = (value & 0x00FF000000000000) >> 48;
+  data[0] = (value & 0xFF00000000000000) >> 56;
+
+  return Hex::encode(&data[0], data.size());
 }
 
 void Util::getIPAndPort(const std::string& address, std::string& ip, uint16_t& port) {
