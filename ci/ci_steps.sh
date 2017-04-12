@@ -15,7 +15,8 @@ then
   ./docs/publish.sh
   exit 0
 else
-  docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:$ENVOY_BUILD_SHA /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
+  docker run -t -i -v /tmp/envoy-docker-build:/build -v $TRAVIS_BUILD_DIR:/source \
+    lyft/envoy-build:$ENVOY_BUILD_SHA /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
 fi
 
 # The following scripts are only relevant on a `normal` run.
