@@ -2,10 +2,10 @@ load(":recipes.bzl", "RECIPES")
 
 def _repository_impl(ctxt):
     # Setup the build directory with links to the relevant files.
+    ctxt.symlink(Label("//bazel:recipes.bzl"), "recipes.bzl")
     ctxt.symlink(Label("//bazel:repositories.sh"), "repositories.sh")
     ctxt.symlink(Label("//ci/build_container:build_and_install_deps.sh"),
                  "build_and_install_deps.sh")
-    ctxt.symlink(Label("//ci/build_container:recipes.bzl"), "recipes.bzl")
     ctxt.symlink(Label("//ci/build_container:print_recipe_deps.sh"), "print_recipe_deps.sh")
     ctxt.symlink(Label("//ci/build_container:Makefile"), "Makefile")
     for r in RECIPES:
