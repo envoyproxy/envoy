@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -x
 set -e
 
 # We need to use /tmp for building the venv, since the sandboxed env does not allow execution in

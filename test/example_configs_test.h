@@ -4,4 +4,4 @@
  * Load all configurations from a tar file and make sure they are valid.
  * @return uint32_t the number of configs tested.
  */
-void uint32_t runConfigTest();
+uint32_t runConfigTest();
