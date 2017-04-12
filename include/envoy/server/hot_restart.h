@@ -65,6 +65,11 @@ public:
   virtual void terminateParent() PURE;
 
   /**
+   * Shutdown admin processing in the current process.
+   */
+  virtual void shutdownAdmin() PURE;
+
+  /**
    * Return the hot restart compatability version so that operations code can decide whether to
    * perform a full or hot restart.
    */
