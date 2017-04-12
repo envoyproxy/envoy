@@ -14,7 +14,7 @@
       ":path": "/",
       "additional_headers": [
         {
-          "field": "test_header",
+	  "field": "test_header",
 	  "value": "test"
         }
       ]
@@ -28,7 +28,7 @@
       ":path": "/",
       "additional_headers": [
         {
-          "field": "test_header_multiple1",
+	  "field": "test_header_multiple1",
 	  "value": "test1"
         },
         {
@@ -60,8 +60,8 @@
       ":path": "/",
       "additional_headers": [
         {
-          "field": "test_header_presence",
-  	  "value": "test"
+	  "field": "test_header_presence",
+	  "value": "test"
         }
       ]
     },
@@ -74,7 +74,7 @@
       ":path": "/",
       "additional_headers": [
         {
-          "field": "test_header_pattern",
+	  "field": "test_header_pattern",
 	  "value": "user=test-1223"
         }
       ]

@@ -62,7 +62,7 @@
     "_validate":
       {
 	"cluster_name": "www2",
-        "virtual_host_name": "www2"
+	"virtual_host_name": "www2"
       }
   },
   {
@@ -91,7 +91,7 @@
   },
   {
     "test_name": "Test11",
-   "input": {
+    "input": {
       ":authority": "api.lyft.com",
       ":path": "/host/rewrite/me"
    },

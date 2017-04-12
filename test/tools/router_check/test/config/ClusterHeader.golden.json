@@ -22,7 +22,7 @@
       ":path": "/bar",
       "additional_headers": [
         {
-          "field": "some_header",
+	  "field": "some_header",
 	  "value": "some_cluster"
         }
       ]

@@ -7,7 +7,7 @@
         {
           "prefix": "/",
           "weighted_clusters": {
-           "clusters" : [{ "name" : "www2", "weight" : 100 }]
+            "clusters" : [{ "name" : "www2", "weight" : 100 }]
           }
         }
       ]
