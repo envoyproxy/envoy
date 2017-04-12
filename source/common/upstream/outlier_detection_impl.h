@@ -156,6 +156,7 @@ public:
   uint64_t maxEjectionPercent() { return max_ejection_percent_; }
   uint64_t successRateMinimumHosts() { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() { return success_rate_request_volume_; }
+  uint64_t successRateStdevFactor() { return success_rate_stdev_factor_; }
   uint64_t enforcingConsecutive5xx() { return enforcing_consecutive_5xx_; }
   uint64_t enforcingSuccessRate() { return enforcing_success_rate_; }
 
@@ -166,6 +167,7 @@ private:
   const uint64_t max_ejection_percent_;
   const uint64_t success_rate_minimum_hosts_;
   const uint64_t success_rate_request_volume_;
+  const uint64_t success_rate_stdev_factor_;
   const uint64_t enforcing_consecutive_5xx_;
   const uint64_t enforcing_success_rate_;
 };
@@ -262,11 +264,8 @@ public:
    */
   static EjectionPair
   successRateEjectionThreshold(double success_rate_sum,
-                               const std::vector<HostSuccessRatePair>& valid_success_rate_hosts);
-
-private:
-  // Factor to multiply the stdev of a cluster's success rate for success rate outlier ejection.
-  static const double SUCCESS_RATE_STDEV_FACTOR;
+                               const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
+                               double success_rate_stdev_factor);
 };
 
 } // Outlier
