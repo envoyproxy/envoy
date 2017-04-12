@@ -3,13 +3,14 @@
 set -e
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
+[[ -z "${REAL_SRCDIR}" ]] && REAL_SRCDIR="${SRCDIR}"
 [[ -z "${GCOVR_DIR}" ]] && GCOVR_DIR="${SRCDIR}/bazel-envoy"
 [[ -z "${TESTLOGS_DIR}" ]] && TESTLOGS_DIR="${SRCDIR}/bazel-testlogs"
 [[ -z "${BAZEL_COVERAGE}" ]] && BAZEL_COVERAGE=bazel
 [[ -z "${GCOVR}" ]] && GCOVR=gcovr
 
 # Make sure //test/coverage is up-to-date.
-(cd "${SRCDIR}"; BAZEL_BIN="${BAZEL_COVERAGE}" test/coverage/gen_build.sh)
+(cd "${REAL_SRCDIR}"; BAZEL_BIN="${BAZEL_COVERAGE}" test/coverage/gen_build.sh)
 
 # Run all tests under bazel coverage.
 "${BAZEL_COVERAGE}" coverage //test/coverage:coverage_tests ${BAZEL_BUILD_OPTIONS} \
@@ -36,6 +37,9 @@ COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
 COVERAGE_SUMMAY="${COVERAGE_DIR}/coverage_summary.txt"
 
+# gcovr is extremely picky about where it is run and where the paths of the
+# original source are relative to its execution location.
+cd "${SRCDIR}"
 time "${GCOVR}" --gcov-exclude="${GCOVR_EXCLUDE_REGEX}" \
   --exclude-directories=".*/external/.*" --object-directory="${GCOVR_DIR}" -r "${SRCDIR}" \
   --html --html-details --exclude-unreachable-branches --print-summary \

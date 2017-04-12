@@ -14,23 +14,58 @@ NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 
 if [[ "$1" == bazel* ]]
 then
+  export BUILD_DIR=/build
+  # Make sure that "docker run" has a -v bind mount for /build, since cmake
+  # users will only have a bind mount for /source.
+  if [[ ! -a "${BUILD_DIR}" ]]
+  then
+    echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}?"
+    exit 1
+  fi
+  export ENVOY_SRCDIR=/source
+  export ENVOY_CONSUMER_SRCDIR="${BUILD_DIR}/envoy-consumer"
+
+  # Make sure that /source doesn't contain /build on the underlying host
+  # filesystem, including via hard links or symlinks. We can get into weird
+  # loops with Bazel symlinking and gcovr's path traversal if this is true, so
+  # best to keep /source and /build in distinct directories on the host
+  # filesystem.
+  SENTINEL="${BUILD_DIR}"/bazel.sentinel
+  touch "${SENTINEL}"
+  if [[ -n "$(find -L "${ENVOY_SRCDIR}" -name "$(basename "${SENTINEL}")")" ]]
+  then
+    rm -f "${SENTINEL}"
+    echo "/source mount must not contain /build mount"
+    exit 1
+  fi
+  rm -f "${SENTINEL}"
+
+  # Environment setup.
   export USER=bazel
-  # Prefixing with bazel- is necessary to prevent creating symlink loops that
-  # confuses gcovr.
-  export TEST_TMPDIR=/source/bazel-build
-  export SRCDIR="$(realpath "${PWD}")"
+  export TEST_TMPDIR=/build/tmp
   export BAZEL="bazel"
   export BAZEL_COVERAGE="bazel-coverage"
   # Not sandboxing, since non-privileged Docker can't do nested namespaces.
-  export BAZEL_BUILD_OPTIONS="--strategy=CppCompile=standalone --strategy=CppLink=standalone \
-    --strategy=TestRunner=standalone --strategy=ProtoCompile=standalone \
-    --strategy=Genrule=standalone --verbose_failures --package_path %workspace%:.."
+  export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
+    --verbose_failures --package_path %workspace%:/source"
   [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
-  mkdir -p "${TEST_TMPDIR}"
-  cp ci/WORKSPACE "${TEST_TMPDIR}"
-  ln -sf /thirdparty ci/prebuilt
-  ln -sf /thirdparty_build ci/prebuilt
-  cd "${TEST_TMPDIR}"
+  ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
+  ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
+
+  # Setup Envoy consuming project.
+  if [[ ! -a "${ENVOY_CONSUMER_SRCDIR}" ]]
+  then
+    # TODO(htuch): Update to non-htuch when https://github.com/lyft/envoy/issues/404 is sorted.
+    git clone https://github.com/htuch/envoy-consumer.git "${ENVOY_CONSUMER_SRCDIR}"
+  fi
+  cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.consumer "${ENVOY_CONSUMER_SRCDIR}"/WORKSPACE
+  # This is the hash on https://github.com/htuch/envoy-consumer.git we pin to.
+  (cd "${ENVOY_CONSUMER_SRCDIR}" && git checkout 94e11fa753a1e787c82cccaec642eda5e5b61ed8)
+
+  # Also setup some space for building Envoy standadlone.
+  export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
+  mkdir -p "${ENVOY_BUILD_DIR}"
+  cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE "${ENVOY_BUILD_DIR}"
 else
   # TODO(htuch): Remove everything below this comment when we turn off cmake.
   if [[ "$1" == "coverage" ]]; then

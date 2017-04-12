@@ -22,7 +22,7 @@ master commit at which the binary was compiled, and `latest` corresponds to a bi
 An example basic invocation to build a debug image and run all tests is:
 
 ```bash
-docker pull lyft/envoy-build:latest && docker run -t -i -u $(id -u):$(id -g) -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"
+docker pull lyft/envoy-build:latest && docker run -t -i -u $(id -u):$(id -g) -v <BUILD_DIR>:/build -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"
 ```
 
 On OSX using the command below may work better. Unlike on Linux, users are not
@@ -31,7 +31,7 @@ create artifacts with the same ownership as in the container ([read more about
 osxfs][osxfs]).
 
 ```bash
-docker pull lyft/envoy-build:latest && docker run -t -i -u root:root -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"
+docker pull lyft/envoy-build:latest && docker run -t -i -u root:root -v <BUILD_DIR>:/build -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"
 ```
 
 This bind mounts `<SOURCE_DIR>`, which allows for changes on the local
@@ -52,13 +52,13 @@ The `do_ci.sh` targets are:
 A convenient shell function to define is:
 
 ```bash
-run_envoy_docker() { docker pull lyft/envoy-build:latest && docker run -t -i -u $(id -u):$(id -g) -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}
+run_envoy_docker() { docker pull lyft/envoy-build:latest && docker run -t -i -u $(id -u):$(id -g) -v /tmp/envoy-docker-build:/build -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}
 ```
 
 Or on OSX.
 
 ```bash
-run_envoy_docker() { docker pull lyft/envoy-build:latest && docker run -t -i -u root:root -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}
+run_envoy_docker() { docker pull lyft/envoy-build:latest && docker run -t -i -u root:root -v /tmp/envoy-docker-build:/build -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}
 ```
 
 This then allows for a simple invocation of `run_envoy_docker './ci/do_ci.sh debug'` from the
