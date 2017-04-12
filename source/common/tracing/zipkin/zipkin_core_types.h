@@ -1,11 +1,7 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <memory>
-
-#include "zipkin/util.h"
-#include "zipkin/tracer_interface.h"
+#include "common/tracing/zipkin/tracer_interface.h"
+#include "common/tracing/zipkin/util.h"
 
 namespace Zipkin {
 

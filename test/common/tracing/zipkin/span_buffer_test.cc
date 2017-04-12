@@ -1,4 +1,4 @@
-#include "zipkin/span_buffer.h"
+#include "common/tracing/zipkin/span_buffer.h"
 
 #include "gtest/gtest.h"
 

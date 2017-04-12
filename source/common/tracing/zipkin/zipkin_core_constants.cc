@@ -1,4 +1,4 @@
-#include "zipkin/zipkin_core_constants.h"
+#include "common/tracing/zipkin/zipkin_core_constants.h"
 
 const std::string Zipkin::ZipkinCoreConstants::CLIENT_SEND = "cs";
 const std::string Zipkin::ZipkinCoreConstants::CLIENT_RECV = "cr";

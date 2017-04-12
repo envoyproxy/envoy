@@ -1,9 +1,5 @@
-#include <regex>
-#include <string>
-#include <cstring>
-
-#include "zipkin/zipkin_core_constants.h"
-#include "zipkin/span_context.h"
+#include "common/tracing/zipkin/zipkin_core_constants.h"
+#include "common/tracing/zipkin/span_context.h"
 
 namespace Zipkin {
 

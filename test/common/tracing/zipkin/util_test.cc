@@ -1,4 +1,4 @@
-#include "zipkin/util.h"
+#include "common/tracing/zipkin/util.h"
 
 #include "gtest/gtest.h"
 

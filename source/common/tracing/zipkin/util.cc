@@ -1,13 +1,10 @@
-#include <chrono>
-#include <random>
-#include <sstream>
 #include <iomanip>
 
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/document.h"
 
-#include "zipkin/util.h"
+#include "common/tracing/zipkin/util.h"
 
 namespace Zipkin {
 

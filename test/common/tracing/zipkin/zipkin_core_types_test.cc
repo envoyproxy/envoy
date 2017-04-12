@@ -1,5 +1,5 @@
-#include "zipkin/zipkin_core_types.h"
-#include "zipkin/zipkin_core_constants.h"
+#include "common/tracing/zipkin/zipkin_core_types.h"
+#include "common/tracing/zipkin/zipkin_core_constants.h"
 
 #include "gtest/gtest.h"
 

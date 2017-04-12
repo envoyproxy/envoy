@@ -1,11 +1,11 @@
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
 
-#include "zipkin/zipkin_core_types.h"
-#include "zipkin/zipkin_core_constants.h"
-#include "zipkin/zipkin_json_field_names.h"
-#include "zipkin/util.h"
-#include "zipkin/span_context.h"
+#include "common/tracing/zipkin/span_context.h"
+#include "common/tracing/zipkin/util.h"
+#include "common/tracing/zipkin/zipkin_core_constants.h"
+#include "common/tracing/zipkin/zipkin_json_field_names.h"
+#include "common/tracing/zipkin/zipkin_core_types.h"
 
 namespace Zipkin {
 

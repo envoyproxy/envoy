@@ -1,4 +1,4 @@
-#include "zipkin/zipkin_json_field_names.h"
+#include "common/tracing/zipkin/zipkin_json_field_names.h"
 
 const std::string Zipkin::ZipkinJsonFieldNames::SPAN_TRACE_ID = "traceId";
 const std::string Zipkin::ZipkinJsonFieldNames::SPAN_PARENT_ID = "parentId";

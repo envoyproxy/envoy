@@ -1,8 +1,6 @@
-#include <regex>
-
-#include "zipkin/util.h"
-#include "zipkin/tracer.h"
-#include "zipkin/zipkin_core_constants.h"
+#include "common/tracing/zipkin/util.h"
+#include "common/tracing/zipkin/zipkin_core_constants.h"
+#include "common/tracing/zipkin/tracer.h"
 
 namespace Zipkin {
 

@@ -1,4 +1,4 @@
-#include "zipkin/span_buffer.h"
+#include "common/tracing/zipkin/span_buffer.h"
 
 namespace Zipkin {
 
@@ -12,7 +12,6 @@ bool SpanBuffer::addSpan(Span&& span) {
     // Buffer full
     return false;
   }
-  // span_buffer_[next_position_++] = &span;
   span_buffer_[next_position_++] = std::make_shared<Span>(span);
 
   return true;

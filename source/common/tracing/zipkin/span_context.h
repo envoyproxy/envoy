@@ -1,10 +1,7 @@
 #pragma once
 
-#include <vector>
-#include <string>
-
-#include "zipkin/zipkin_core_types.h"
-#include "zipkin/util.h"
+#include "common/tracing/zipkin/util.h"
+#include "common/tracing/zipkin/zipkin_core_types.h"
 
 namespace Zipkin {
 

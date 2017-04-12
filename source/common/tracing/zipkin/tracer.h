@@ -1,8 +1,8 @@
 #pragma once
 
-#include "zipkin/zipkin_core_types.h"
-#include "zipkin/span_context.h"
-#include "zipkin/tracer_interface.h"
+#include "common/tracing/zipkin/span_context.h"
+#include "common/tracing/zipkin/tracer_interface.h"
+#include "common/tracing/zipkin/zipkin_core_types.h"
 
 namespace Zipkin {
 

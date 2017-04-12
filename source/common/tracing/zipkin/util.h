@@ -1,9 +1,5 @@
 #pragma once
 
-#include <vector>
-#include <string>
-#include <chrono>
-
 namespace Zipkin {
 
 typedef std::chrono::system_clock Duration;
