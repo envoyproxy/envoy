@@ -5,7 +5,7 @@
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-                           SystemTimeSource& tsource)
+                           MonotonicTimeSource& tsource)
     : time_source_(tsource), miss_timeout_(config.wdMissTimeout()),
       megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
       multi_kill_timeout_(config.wdMultiKillTimeout()),

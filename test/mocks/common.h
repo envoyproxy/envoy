@@ -35,3 +35,11 @@ public:
 
   MOCK_METHOD0(currentSystemTime, SystemTime());
 };
+
+class MockMonotonicTimeSource : public MonotonicTimeSource {
+public:
+  MockMonotonicTimeSource();
+  ~MockMonotonicTimeSource();
+
+  MOCK_METHOD0(currentSystemTime, MonotonicTime());
+};

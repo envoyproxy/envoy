@@ -45,6 +45,17 @@ public:
 };
 
 /**
+ * Production implementation of MonotonicTimeSource that returns the current time.
+ */
+class ProdMonotonicTimeSource : public MonotonicTimeSource {
+public:
+  // MonotonicTimeSource
+  MonotonicTime currentSystemTime() override { return std::chrono::steady_clock::now(); }
+
+  static ProdMonotonicTimeSource instance_;
+};
+
+/**
  * Utility class for date/time helpers.
  */
 class DateUtil {
@@ -53,6 +64,11 @@ public:
    * @return whether a time_point contains a valid, not default constructed time.
    */
   static bool timePointValid(SystemTime time_point);
+
+  /**
+   * @return whether a time_point contains a valid, not default constructed time.
+   */
+  static bool timePointValid(MonotonicTime time_point);
 };
 
 /**

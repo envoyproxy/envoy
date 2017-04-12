@@ -176,7 +176,7 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string&
                                       reply_documents_byte_size);
   stat_store_.deliverTimingToSinks(
       fmt::format("{}.reply_time_ms", prefix),
-      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() -
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
                                                             active_query.start_time_));
 }
 

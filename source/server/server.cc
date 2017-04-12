@@ -258,7 +258,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_.reset(
-      new Server::GuardDogImpl(*admin_scope_, *config_, ProdSystemTimeSource::instance_));
+      new Server::GuardDogImpl(*admin_scope_, *config_, ProdMonotonicTimeSource::instance_));
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that

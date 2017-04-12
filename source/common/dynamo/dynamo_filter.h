@@ -57,7 +57,7 @@ private:
   std::string operation_{};
   RequestParser::TableDescriptor table_descriptor_{"", true};
   std::string error_type_{};
-  SystemTime start_decode_;
+  MonotonicTime start_decode_;
   Http::HeaderMap* response_headers_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
