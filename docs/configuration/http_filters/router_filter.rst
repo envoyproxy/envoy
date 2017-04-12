@@ -206,6 +206,8 @@ upstream.base_retry_backoff_ms
   Base exponential retry back off time. See :ref:`here <arch_overview_http_routing_retry>` for more
   information. Defaults to 25ms.
 
+.. _config_http_filters_router_runtime_maintenance_mode:
+
 upstream.maintenance_mode.<cluster name>
   % of requests that will result in an immediate 503 response. This overrides any routing behavior
   for requests that would have been destined for <cluster name>. This can be used for load
