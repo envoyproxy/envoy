@@ -213,6 +213,10 @@ TEST_F(RouterTest, MaintenanceMode) {
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_maintenance_mode")
+          .value());
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(
       1U,
