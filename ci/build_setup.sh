@@ -17,7 +17,7 @@ then
   export BUILD_DIR=/build
   # Make sure that "docker run" has a -v bind mount for /build, since cmake
   # users will only have a bind mount for /source.
-  if [[ ! -a "${BUILD_DIR}" ]]
+  if [[ ! -d "${BUILD_DIR}" ]]
   then
     echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}?"
     exit 1
@@ -62,7 +62,7 @@ then
   # This is the hash on https://github.com/htuch/envoy-consumer.git we pin to.
   (cd "${ENVOY_CONSUMER_SRCDIR}" && git checkout 94e11fa753a1e787c82cccaec642eda5e5b61ed8)
 
-  # Also setup some space for building Envoy standadlone.
+  # Also setup some space for building Envoy standalone.
   export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
   mkdir -p "${ENVOY_BUILD_DIR}"
   cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE "${ENVOY_BUILD_DIR}"
