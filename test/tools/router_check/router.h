@@ -35,14 +35,14 @@ public:
    * @param config_json specifies the json config file to be loaded
    * @param schema is the json schema to validate against
    * @return Json::ObjectPtr pointer to router config json object. Return
-   * nullptr if load fails.
+   *         nullptr if load fails.
    */
   Json::ObjectPtr loadJson(const std::string& config_json, const std::string& schema);
 
   /**
    * @param router_config_json specifies the router config json file
    * @return bool if json file loaded successfully and ConfigImpl object created
-   * successfully
+   *         successfully
    */
   bool initializeFromConfig(const std::string& router_config_json);
 

@@ -8,7 +8,6 @@ Json::ObjectPtr RouterCheckTool::loadJson(const std::string& config_json,
     Json::ObjectPtr loader = Json::Factory::LoadFromFile(config_json);
     loader->validateSchema(schema);
     return loader;
-
   } catch (const EnvoyException& ex) {
     std::cerr << "config schema JSON load failed: " << config_json << std::endl;
     std::cerr << ex.what() << std::endl;
@@ -17,7 +16,8 @@ Json::ObjectPtr RouterCheckTool::loadJson(const std::string& config_json,
 }
 
 bool RouterCheckTool::initializeFromConfig(const std::string& router_config_json) {
-
+  // TODO(hennna): Allow users to load a full config and extract the route
+  // configuration from it.
   Json::ObjectPtr loader = loadJson(router_config_json, Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
   if (loader != nullptr) {
@@ -127,6 +127,7 @@ void ToolConfig::parseFromJson(const Json::ObjectPtr& check_config) {
 
 bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
+
   if (tool_config.route_->routeEntry() != nullptr) {
     actual = tool_config.route_->routeEntry()->clusterName();
   }

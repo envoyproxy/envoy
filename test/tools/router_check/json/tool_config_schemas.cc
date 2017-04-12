@@ -13,8 +13,8 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
           "input": {
             "type": "object",
             "properties": {
-              ":authority": {"type": "string", "required": true},
-              ":path": {"type": "string"},
+              ":authority": {"type": "string", "minLength": 1},
+              ":path": {"type": "string", "minLength": 1},
               ":method": {"type": "string", "enum": ["GET", "PUT", "POST"]},
               "random_value": {"type": "integer"},
               "ssl": {"type": "boolean"},

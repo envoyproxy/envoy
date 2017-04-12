@@ -97,8 +97,7 @@ test_name
   *(required, string)* The name of a test object.
 
 input
-  *(required, object)* Input values sent to the router that determine the returned route. The :authority
-  and :path input fields are required.
+  *(required, object)* Input values sent to the router that determine the returned route.
 
   :authority
     *(required, string)* The url authority. This value along with the path parameter define
@@ -125,11 +124,16 @@ input
     a client issuing a request via http or https. By default ssl is false which corresponds to
     x-forwarded-proto set to http.
 
-
   additional_headers
     *(optional, array)*  Additional headers to be added as input for route determination. The ":authority",
     ":path", ":method", "x-forwarded-proto", and "x-envoy-internal" fields are specified by the other config
     options and should not be set here.
+
+    field
+      *(required, string)* The name of the header field to add.
+
+    value
+      *(required, string)* The value of the header field to add.
 
 _validate
   *(required, object)* The _validate object specifies the returned route parameters to match. At least one
@@ -158,3 +162,9 @@ _validate
     *(optional, array)*  Match the listed header fields. Examples header fields include the ":path", "cookie",
     and "date" fields. The header fields are checked after all other test cases. Thus, the header fields checked
     will be those of the redirected or rewriten routes when applicable.
+
+    field
+      *(required, string)* The name of the header field to match.
+
+    value
+      *(required, string)* The value of the header field to match.
