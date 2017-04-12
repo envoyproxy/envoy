@@ -182,6 +182,7 @@ public:
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   GAUGE  (upstream_rq_pending_active)                                                              \
   COUNTER(upstream_rq_cancelled)                                                                   \
+  COUNTER(upstream_rq_maintenance_mode)                                                            \
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_rx_reset)                                                                    \
