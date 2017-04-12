@@ -10,33 +10,33 @@ namespace Zipkin {
 
 void Util::mergeJsons(std::string& target, const std::string& source,
                       const std::string& field_name) {
-  rapidjson::Document targetDoc, sourceDoc;
-  targetDoc.Parse(target.c_str());
-  sourceDoc.Parse(source.c_str());
+  rapidjson::Document target_doc, source_doc;
+  target_doc.Parse(target.c_str());
+  source_doc.Parse(source.c_str());
 
-  targetDoc.AddMember(rapidjson::StringRef(field_name.c_str()), sourceDoc,
-                      targetDoc.GetAllocator());
+  target_doc.AddMember(rapidjson::StringRef(field_name.c_str()), source_doc,
+                       target_doc.GetAllocator());
 
   rapidjson::StringBuffer sb;
   rapidjson::Writer<rapidjson::StringBuffer> w(sb);
-  targetDoc.Accept(w);
+  target_doc.Accept(w);
   target = sb.GetString();
 }
 
 void Util::addArrayToJson(std::string& target, const std::vector<const std::string*>& json_array,
                           const std::string& field_name) {
-  std::string stringifiedJsonArray = "[";
+  std::string stringified_json_array = "[";
 
   if (json_array.size() > 0) {
-    stringifiedJsonArray += *(json_array[0]);
+    stringified_json_array += *(json_array[0]);
     for (auto it = json_array.begin() + 1; it != json_array.end(); it++) {
-      stringifiedJsonArray += ",";
-      stringifiedJsonArray += **it;
+      stringified_json_array += ",";
+      stringified_json_array += **it;
     }
   }
-  stringifiedJsonArray += "]";
+  stringified_json_array += "]";
 
-  mergeJsons(target, stringifiedJsonArray, field_name);
+  mergeJsons(target, stringified_json_array, field_name);
 }
 
 uint64_t Util::timeSinceEpochMicro() {

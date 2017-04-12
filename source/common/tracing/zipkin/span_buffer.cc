@@ -23,17 +23,17 @@ void SpanBuffer::flush() {
 }
 
 std::string SpanBuffer::toStringifiedJsonArray() {
-  std::string stringifiedJsonArray = "[";
+  std::string stringified_json_array = "[";
 
   if (pendingSpans()) {
-    stringifiedJsonArray += span_buffer_[0]->toJson();
+    stringified_json_array += span_buffer_[0]->toJson();
     for (uint64_t i = 1; i < next_position_; i++) {
-      stringifiedJsonArray += ",";
-      stringifiedJsonArray += span_buffer_[i]->toJson();
+      stringified_json_array += ",";
+      stringified_json_array += span_buffer_[i]->toJson();
     }
   }
-  stringifiedJsonArray += "]";
+  stringified_json_array += "]";
 
-  return stringifiedJsonArray;
+  return stringified_json_array;
 }
 } // Zipkin

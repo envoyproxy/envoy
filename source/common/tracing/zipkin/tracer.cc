@@ -10,7 +10,7 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   std::string ip;
   uint16_t port;
   Endpoint ep;
-  uint64_t timestampMicro;
+  uint64_t timestamp_micro;
 
   // Build the endpoint
   getIPAndPort(address_, ip, port);
@@ -24,15 +24,15 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
 
   // Create an all-new span, with no parent id
   span.setName(span_name);
-  uint64_t randonNumber = Util::generateRandom64();
-  span.setId(randonNumber);
-  span.setTraceId(randonNumber);
+  uint64_t randon_number = Util::generateRandom64();
+  span.setId(randon_number);
+  span.setTraceId(randon_number);
   span.setStartTime(start_time);
 
   // Set the timestamp globally for the span and also for the CS annotation
-  timestampMicro = Util::timeSinceEpochMicro();
-  cs.setTimestamp(timestampMicro);
-  span.setTimestamp(timestampMicro);
+  timestamp_micro = Util::timeSinceEpochMicro();
+  cs.setTimestamp(timestamp_micro);
+  span.setTimestamp(timestamp_micro);
 
   // Add CS annotation to the span
   span.addAnnotation(std::move(cs));
@@ -49,18 +49,18 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
   std::string ip;
   uint16_t port;
   Endpoint ep;
-  uint64_t timestampMicro;
+  uint64_t timestamp_micro;
 
   // TODO We currently ignore the start_time to set the span/annotation timestamps
   // Is start_time really needed?
-  timestampMicro = Util::timeSinceEpochMicro();
+  timestamp_micro = Util::timeSinceEpochMicro();
 
   if ((previous_context.isSetAnnotation().sr) && (!previous_context.isSetAnnotation().cs)) {
     // We need to create a new span that is a child of the previous span; no shared context
 
     // Create a new span id
-    uint64_t randonNumber = Util::generateRandom64();
-    span.setId(randonNumber);
+    uint64_t randon_number = Util::generateRandom64();
+    span.setId(randon_number);
 
     span.setName(span_name);
 
@@ -71,7 +71,7 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
     annotation.setValue(ZipkinCoreConstants::CLIENT_SEND);
 
     // Set the timestamp globally for the span
-    span.setTimestamp(timestampMicro);
+    span.setTimestamp(timestamp_micro);
   } else if ((previous_context.isSetAnnotation().cs) && (!previous_context.isSetAnnotation().sr)) {
     // We need to create a new span that will share context with the previous span
 
@@ -98,7 +98,7 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
 
   // Add the newly-created annotation to the span
   annotation.setEndpoint(std::move(ep));
-  annotation.setTimestamp(timestampMicro);
+  annotation.setTimestamp(timestamp_micro);
   span.addAnnotation(std::move(annotation));
 
   // Keep the same trace id
