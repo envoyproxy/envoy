@@ -1127,11 +1127,15 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       },
       "hosts" : {
         "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
         "items" : {
           "type" : "object",
           "properties" : {
             "url" : {"type" : "string"}
-          }
+          },
+          "required" : ["url"],
+          "additionalProperties" : false
         }
       },
       "service_name" : {"type" : "string"},
@@ -1249,7 +1253,8 @@ const std::string Json::Schema::SDS_SCHEMA(R"EOF(
             }
           }
         },
-        "required" : ["ip_address", "port"]
+        "required" : ["ip_address", "port"],
+        "additionalProperties" : false
       }
     },
     "type" : "object",
@@ -1257,7 +1262,9 @@ const std::string Json::Schema::SDS_SCHEMA(R"EOF(
       "hosts" : {
         "type" : "array",
         "items" : {"$ref" : "#/definitions/host"}
-      }
+      },
+      "required" : ["hosts"],
+      "additionalProperties" : false
     }
   }
   )EOF");
