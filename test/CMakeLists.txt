@@ -112,7 +112,6 @@ add_executable(envoy-test
   common/upstream/ring_hash_lb_test.cc
   common/upstream/sds_test.cc
   common/upstream/upstream_impl_test.cc
-  example_configs_test.cc
   generated/helloworld.pb.cc
   integration/fake_upstream.cc
   integration/http2_integration_test.cc

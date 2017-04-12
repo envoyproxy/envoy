@@ -43,8 +43,9 @@ public:
   Server::TestOptionsImpl options_;
 };
 
-void runConfigTest() {
-  DIR* dir = opendir(TestEnvironment::runfilesDirectory().c_str());
+uint32_t runConfigTest() {
+  uint32_t num_tested = 0;
+  DIR* dir = opendir(TestEnvironment::temporaryDirectory().c_str());
   if (!dir) {
     throw std::runtime_error("Generated configs directory not found");
   }
@@ -55,15 +56,17 @@ void runConfigTest() {
     }
 
     std::string file_name =
-        fmt::format("{}/{}", TestEnvironment::runfilesDirectory(), std::string(entry->d_name));
+        fmt::format("{}/{}", TestEnvironment::temporaryDirectory(), std::string(entry->d_name));
     Logger::Registry::getLog(Logger::Id::testing).info("testing config: {}", file_name);
     ConfigTest config(file_name);
+    num_tested++;
   }
 
   closedir(dir);
+  return num_tested;
 }
 
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec({TestEnvironment::runfilesPath("test/example_configs_test_setup.sh")});
-  runConfigTest();
+  EXPECT_EQ(8UL, runConfigTest());
 }

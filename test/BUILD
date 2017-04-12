@@ -8,7 +8,10 @@ envoy_cc_test(
         "example_configs_test.cc",
         "example_configs_test.h",
     ],
-    data = ["//configs:example_configs"] + ["example_configs_test_setup.sh"],
+    data = [
+        "example_configs_test_setup.sh",
+        "//configs:example_configs",
+    ],
     deps = [
         "//source/server:configuration_lib",
         "//test/integration:integration_lib",
