@@ -1253,8 +1253,7 @@ const std::string Json::Schema::SDS_SCHEMA(R"EOF(
             }
           }
         },
-        "required" : ["ip_address", "port"],
-        "additionalProperties" : false
+        "required" : ["ip_address", "port"]
       }
     },
     "type" : "object",
