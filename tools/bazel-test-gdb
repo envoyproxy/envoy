@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Run a single Bazel test target under gdb. Usage:
+#
+# tools/bazel-test-gdb //test/foo:bar --some_other --bazel_args
+
+if [[ ! "$1" =~ //.*:.* ]]
+then
+  echo "First argument to $0 must be a //test/foo:bar label identifying a single test to run"
+  echo "$1 does not mach this pattern"
+  exit 1
+fi
+
+GDB_RUNNER=$(mktemp -t "bazel-test-gdb.XXXXXXX")
+function cleanup() {
+  rm -f "${GDB_RUNNER}"
+}
+trap cleanup EXIT
+
+bazel test "$@" --strategy=TestRunner=standalone --cache_test_results=no \
+  --test_output=summary --run_under="$PWD/tools/gen_gdb_wrapper_script.py ${GDB_RUNNER}"
+chmod u+x "${GDB_RUNNER}"
+"${GDB_RUNNER}"
