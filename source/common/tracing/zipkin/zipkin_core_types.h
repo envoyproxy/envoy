@@ -246,9 +246,9 @@ public:
 
   const std::string& toJson() override;
 
-  void setTracer(TracerPtr tracer) { tracer_ = tracer; }
+  void setTracer(TracerRawPtr tracer) { tracer_ = tracer; }
 
-  TracerPtr tracer() const { return tracer_; }
+  TracerRawPtr tracer() const { return tracer_; }
 
   void finish();
 
@@ -267,7 +267,7 @@ private:
 
   int64_t start_time_;
 
-  TracerPtr tracer_;
+  TracerRawPtr tracer_;
 
   _Span__isset isset_;
 };

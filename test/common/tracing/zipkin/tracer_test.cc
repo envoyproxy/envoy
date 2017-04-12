@@ -37,7 +37,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_FALSE(endpoint.isSetIpv6());
 
   // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerPtr>(&tracer), root_span.tracer());
+  EXPECT_EQ(dynamic_cast<TracerRawPtr>(&tracer), root_span.tracer());
 
   // Duration is not set at span-creation time
   EXPECT_FALSE(root_span.isSet().duration);
@@ -80,7 +80,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_FALSE(endpoint.isSetIpv6());
 
   // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerPtr>(&tracer), server_side_shared_context_span.tracer());
+  EXPECT_EQ(dynamic_cast<TracerRawPtr>(&tracer), server_side_shared_context_span.tracer());
 
   // Duration is not set at span-creation time
   EXPECT_FALSE(server_side_shared_context_span.isSet().duration);
@@ -122,7 +122,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_FALSE(endpoint.isSetIpv6());
 
   // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerPtr>(&tracer), child_span.tracer());
+  EXPECT_EQ(dynamic_cast<TracerRawPtr>(&tracer), child_span.tracer());
 
   // Duration is not set at span-creation time
   EXPECT_FALSE(child_span.isSet().duration);

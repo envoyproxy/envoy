@@ -19,6 +19,10 @@ public:
   virtual void reportSpan(Span&& span) = 0;
 };
 
+typedef std::shared_ptr<Reporter> ReporterSharedPtr;
+
+typedef std::unique_ptr<Reporter> ReporterUniquePtr;
+
 class Tracer : public TracerInterface {
 public:
   Tracer(const std::string& service_name, const std::string& address)
@@ -41,9 +45,9 @@ public:
    */
   void reportSpan(Span&& span) override;
 
-  std::shared_ptr<Reporter> reporter() { return reporter_; }
+  ReporterSharedPtr reporter() { return reporter_; }
 
-  void setReporter(std::unique_ptr<Reporter> reporter);
+  void setReporter(ReporterUniquePtr reporter);
 
 private:
   void getIPAndPort(const std::string& address, std::string& ip, uint16_t& port);
@@ -51,6 +55,6 @@ private:
   std::string service_name_;
   std::string address_;
 
-  std::shared_ptr<Reporter> reporter_;
+  ReporterSharedPtr reporter_;
 };
 } // Zipkin

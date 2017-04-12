@@ -118,8 +118,8 @@ void Tracer::reportSpan(Span&& span) {
   }
 }
 
-void Tracer::setReporter(std::unique_ptr<Reporter> reporter) {
-  reporter_ = std::shared_ptr<Reporter>(std::move(reporter));
+void Tracer::setReporter(ReporterUniquePtr reporter) {
+  reporter_ = ReporterSharedPtr(std::move(reporter));
 }
 
 void Tracer::getIPAndPort(const std::string& address, std::string& ip, uint16_t& port) {

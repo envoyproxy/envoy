@@ -4,7 +4,7 @@
 
 namespace Zipkin {
 
-typedef std::shared_ptr<Span> SpanPtr;
+typedef std::shared_ptr<Span> SpanSharedPtr;
 
 class SpanBuffer {
 public:
@@ -26,7 +26,7 @@ public:
 
 private:
   // We use a pre-allocated vector to improve performance
-  std::vector<SpanPtr> span_buffer_;
+  std::vector<SpanSharedPtr> span_buffer_;
   uint64_t size_;
   uint64_t next_position_;
 };

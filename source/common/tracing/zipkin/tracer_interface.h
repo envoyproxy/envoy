@@ -11,6 +11,6 @@ public:
   virtual void reportSpan(Span&& span) = 0;
 };
 
-typedef TracerInterface* TracerPtr;
+typedef TracerInterface* TracerRawPtr;
 
 } // Zipkin
