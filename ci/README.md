@@ -43,6 +43,7 @@ The `do_ci.sh` targets are:
 * `asan` &mdash; build and run tests with [AddressSanitizer](https://github.com/google/sanitizers/wiki/AddressSanitizer).
 * `coverage` &mdash; build and run tests, generating coverage information in `<SOURCE_DIR>/build_coverage/coverage.html`.
 * `debug` &mdash; build debug binary and run tests.
+* `bazel.coverage` &mdash; build and run tests with Bazel, generating coverage information in `<SOURCE_DIR>/generated/coverage/coverage.html`.
 * `bazel.debug` &mdash; build debug binary and run tests with Bazel.
 * `fix_format`&mdash; run `clang-format` 3.6 on entire source tree.
 * `normal` &mdash; build unstripped optimized binary and run tests .
