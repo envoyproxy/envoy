@@ -349,7 +349,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   Annotation ann;
   BinaryAnnotation bann;
   std::vector<Zipkin::Annotation> annotations;
-  std::vector<Zipkin::BinaryAnnotation> bAnnotations;
+  std::vector<Zipkin::BinaryAnnotation> binary_annotations;
 
   endpoint.setServiceName("my_service_name");
   std::string ip = "192.168.1.2";
@@ -368,8 +368,8 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   bann.setValue("my_component_name");
   bann.setEndpoint(endpoint);
 
-  bAnnotations.push_back(bann);
-  span.setBinaryAnnotations(bAnnotations);
+  binary_annotations.push_back(bann);
+  span.setBinaryAnnotations(binary_annotations);
   EXPECT_EQ(1ULL, span.binaryAnnotations().size());
 
   EXPECT_EQ(
