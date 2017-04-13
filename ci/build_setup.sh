@@ -46,8 +46,10 @@ then
   export BAZEL="bazel"
   export BAZEL_COVERAGE="bazel-coverage"
   # Not sandboxing, since non-privileged Docker can't do nested namespaces.
+  BAZEL_OPTIONS="--package_path %workspace%:/source"
+  export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
   export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
-    --verbose_failures --package_path %workspace%:/source"
+    --verbose_failures ${BAZEL_OPTIONS}"
   [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
   ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
   ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
