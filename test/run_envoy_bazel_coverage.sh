@@ -10,7 +10,7 @@ set -e
 [[ -z "${GCOVR}" ]] && GCOVR=gcovr
 
 # Make sure //test/coverage is up-to-date.
-(cd "${REAL_SRCDIR}"; BAZEL_BIN="${BAZEL_COVERAGE}" test/coverage/gen_build.sh)
+(BAZEL_BIN="${BAZEL_COVERAGE}" "${REAL_SRCDIR}"/test/coverage/gen_build.sh)
 
 # Run all tests under bazel coverage.
 "${BAZEL_COVERAGE}" coverage //test/coverage:coverage_tests ${BAZEL_BUILD_OPTIONS} \

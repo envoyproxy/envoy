@@ -63,9 +63,10 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
     // verify that all of the specified ciphers were understood by openssl
     ssize_t num_configured = std::count(cipher_suites.begin(), cipher_suites.end(), ':') + 1;
 #ifdef OPENSSL_IS_BORINGSSL
-    if (sk_SSL_CIPHER_num(ctx_->cipher_list->ciphers) != static_cast<size_t>(num_configured)) {
+    num_configured += std::count(cipher_suites.begin(), cipher_suites.end(), '|');
+    if (sk_SSL_CIPHER_num(ctx_->cipher_list->ciphers) < static_cast<size_t>(num_configured)) {
 #else
-    if (sk_SSL_CIPHER_num(ctx_->cipher_list) != num_configured) {
+    if (sk_SSL_CIPHER_num(ctx_->cipher_list) < num_configured) {
 #endif
       throw EnvoyException(
           fmt::format("Unknown cipher specified in cipher suites {}", config.cipherSuites()));
