@@ -26,30 +26,31 @@ TEST_F(SslContextImplTest, TestdNSNameMatching) {
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
-  FILE* fp = fopen("test/common/ssl/test_data/san_dns.crt", "r");
+  FILE* fp = fopen("test/common/ssl/test_data/san_dns_cert.pem", "r");
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
   EXPECT_NE(cert, nullptr);
-  std::vector<std::string> verify_subject_alt_name_list = {"foo.com", "test.com"};
+  std::vector<std::string> verify_subject_alt_name_list = {"server1.example.com",
+                                                           "server2.example.com"};
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
   X509_free(cert);
   fclose(fp);
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
-  FILE* fp = fopen("test/common/ssl/test_data/san_uri.crt", "r");
+  FILE* fp = fopen("test/common/ssl/test_data/san_uri_cert.pem", "r");
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
   EXPECT_NE(cert, nullptr);
-  std::vector<std::string> verify_subject_alt_name_list = {"istio:account.test.com",
-                                                           "istio:account2.test.com"};
+  std::vector<std::string> verify_subject_alt_name_list = {"istio:account1.foo.cluster.local",
+                                                           "istio:account2.bar.cluster.local"};
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
   X509_free(cert);
   fclose(fp);
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
-  FILE* fp = fopen("test/common/ssl/test_data/san_dns.crt", "r");
+  FILE* fp = fopen("test/common/ssl/test_data/san_dns_cert.pem", "r");
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
   EXPECT_NE(cert, nullptr);
@@ -119,7 +120,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "test/common/ssl/test_data/ca.crt"
+    "ca_cert_file": "test/common/ssl/test_data/ca_cert.pem"
   }
   )EOF";
 
@@ -137,7 +138,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   // serial number with
   // every build. For cert_chain output, we check only for the certificate path.
   std::string ca_cert_partial_output(
-      "Certificate Path: test/common/ssl/test_data/ca.crt, Serial Number: F0DE921A0515EB45, "
+      "Certificate Path: test/common/ssl/test_data/ca_cert.pem, Serial Number: B776A798802A1DCD, "
       "Days until Expiration: ");
   std::string cert_chain_partial_output(
       TestEnvironment::substitute("Certificate Path: {{ test_tmpdir }}/unittestcert.pem"));
