@@ -33,7 +33,7 @@ if __name__ == '__main__':
         GDB_RUNNER_SCRIPT.substitute(
             b64env=base64.b64encode(json.dumps(dict(os.environ))),
             working_dir=os.getcwd(),
-            test_path=sys.argv[2],))
+            test_path=test_path))
   # To make bazel consider the test a failure we exit non-zero.
   print 'Test was not run, instead a gdb wrapper script was produced in %s' % generated_path
   sys.exit(1)
