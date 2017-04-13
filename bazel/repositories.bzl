@@ -1,5 +1,22 @@
 load(":recipes.bzl", "RECIPES")
 
+# These should reflect //ci/prebuilt/BUILD declared targets.
+BIND_TARGETS = [
+    "ares",
+    "event",
+    "event_pthreads",
+    "googletest",
+    "http_parser",
+    "lightstep",
+    "nghttp2",
+    "protobuf",
+    "protoc",
+    "rapidjson",
+    "spdlog",
+    "ssl",
+    "tclap",
+]
+
 def _repository_impl(ctxt):
     # Setup the build directory with links to the relevant files.
     ctxt.symlink(Label("//bazel:recipes.bzl"), "recipes.bzl")
@@ -36,7 +53,7 @@ def _repository_impl(ctxt):
         if result.return_code != 0:
             fail("External dep build failed")
 
-def envoy_dependencies(path = "@envoy_deps//", local_protobuf_bzl = None):
+def envoy_dependencies(path = "@envoy_deps//", local_protobuf_bzl = None, skip_bind = []):
     # Used only for protobuf.bzl.
     if local_protobuf_bzl:
         native.new_local_repository(
@@ -74,77 +91,9 @@ def envoy_dependencies(path = "@envoy_deps//", local_protobuf_bzl = None):
         debug = debug_build,
     )
 
-    native.bind(
-        name = "ares",
-        actual = path + ":ares",
-    )
-
-    native.bind(
-        name = "cc_wkt_protos_genproto",
-        actual = path + ":cc_wkt_protos_genproto",
-    )
-
-    native.bind(
-        name = "cc_wkt_protos",
-        actual = path + ":cc_wkt_protos",
-    )
-
-    native.bind(
-        name = "event",
-        actual = path + ":event",
-    )
-
-    native.bind(
-        name = "event_pthreads",
-        actual = path + ":event_pthreads",
-    )
-
-    native.bind(
-        name = "googletest",
-        actual = path + ":googletest",
-    )
-
-    native.bind(
-        name = "http_parser",
-        actual = path + ":http_parser",
-    )
-
-    native.bind(
-        name = "lightstep",
-        actual = path + ":lightstep",
-    )
-
-    native.bind(
-        name = "nghttp2",
-        actual = path + ":nghttp2",
-    )
-
-    native.bind(
-        name = "protobuf",
-        actual = path + ":protobuf",
-    )
-
-    native.bind(
-        name = "protoc",
-        actual = path + ":protoc",
-    )
-
-    native.bind(
-        name = "rapidjson",
-        actual = path + ":rapidjson",
-    )
-
-    native.bind(
-        name = "spdlog",
-        actual = path + ":spdlog",
-    )
-
-    native.bind(
-        name = "ssl",
-        actual = path + ":ssl",
-    )
-
-    native.bind(
-        name = "tclap",
-        actual = path + ":tclap",
-    )
+    for t in BIND_TARGETS:
+        if t not in skip_bind:
+            native.bind(
+                name = t,
+                actual = path + ":" + t,
+            )

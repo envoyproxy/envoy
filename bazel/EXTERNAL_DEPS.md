@@ -6,7 +6,7 @@
 3. Add the build recipe to the list in [`bazel/recipes.bzl`](recipes.bzl).
 4. Add a build target X in [`ci/prebuilt/BUILD`](../ci/prebuilt/BUILD) to consume the headers and
    libraries.
-5. Add a bind target in [`ci/repositories.bzl`](repositories.bzl#L72) to allow the new dependency to be
+5. Add a bind target in [`ci/repositories.bzl`](repositories.bzl#L4) to allow the new dependency to be
    consumed by WORKSPACE.
 6. Reference your new external dependency in some `envoy_cc_library` via X in the `external_deps`
    attribute.
