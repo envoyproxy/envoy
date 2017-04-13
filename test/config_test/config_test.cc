@@ -13,6 +13,8 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+namespace ConfigTest {
+
 class ConfigTest {
 public:
   ConfigTest(const std::string& file_path) : options_(file_path) {
@@ -43,7 +45,7 @@ public:
   Server::TestOptionsImpl options_;
 };
 
-static uint32_t runConfigTest(const std::string& directory) {
+static uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
   DIR* dir = opendir(directory.c_str());
   if (!dir) {
@@ -56,7 +58,7 @@ static uint32_t runConfigTest(const std::string& directory) {
     Logger::Registry::getLog(Logger::Id::testing).info("iterating: {}", file_name);
     if (entry->d_type == DT_DIR && std::string(entry->d_name) != "." &&
         std::string(entry->d_name) != "..") {
-      num_tested = runConfigTest(file_name);
+      num_tested = run(file_name);
       continue;
     } else if (entry->d_type == DT_DIR) {
       continue;
@@ -71,4 +73,6 @@ static uint32_t runConfigTest(const std::string& directory) {
   return num_tested;
 }
 
-uint32_t runConfigTest() { return runConfigTest(TestEnvironment::temporaryDirectory().c_str()); }
+uint32_t run() { return run(TestEnvironment::temporaryDirectory() + "/config_test"); }
+
+} // ConfigTest
