@@ -102,7 +102,6 @@ void SpanContext::populateFromString(const std::string& span_context_str) {
       std::vector<std::string> annotation_value_strings =
           StringUtil::split(matched_annotations, FIELD_SEPARATOR_);
       for (const std::string& annotation_value : annotation_value_strings) {
-        //      while (annotation_value) {
         if (annotation_value == ZipkinCoreConstants::CLIENT_RECV) {
           annotation_values_.cr_ = true;
         } else if (annotation_value == ZipkinCoreConstants::CLIENT_SEND) {
