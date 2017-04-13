@@ -154,8 +154,8 @@ TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
         "address": "tcp://127.0.0.1:1234",
         "filters" : [],
         "ssl_context" : {
-          "cert_chain_file" : "test/common/ssl/test_data/approved_with_uri_san.crt",
-          "private_key_file" : "test/common/ssl/test_data/private_key_with_uri_san.pem",
+          "cert_chain_file" : "test/common/ssl/test_data/san_uri_cert.pem",
+          "private_key_file" : "test/common/ssl/test_data/san_uri_key.pem",
           "verify_subject_alt_name" : [
             "localhost",
             "127.0.0.1"

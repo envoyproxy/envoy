@@ -68,6 +68,8 @@ DetectorConfig::DetectorConfig(const Json::Object& json_config)
           static_cast<uint64_t>(json_config.getInteger("success_rate_minimum_hosts", 5))),
       success_rate_request_volume_(
           static_cast<uint64_t>(json_config.getInteger("success_rate_request_volume", 100))),
+      success_rate_stdev_factor_(
+          static_cast<uint64_t>(json_config.getInteger("success_rate_stdev_factor", 1900))),
       enforcing_consecutive_5xx_(
           static_cast<uint64_t>(json_config.getInteger("enforcing_consecutive_5xx", 100))),
       enforcing_success_rate_(
@@ -239,14 +241,9 @@ void DetectorImpl::onConsecutive5xxWorker(HostSharedPtr host) {
   ejectHost(host, EjectionType::Consecutive5xx);
 }
 
-// The canonical factor for outlier detection in normal distributions is 2. However, host
-// success rates are intuitively a distribution with negative skew, with most of the mass around
-// 100 and a left tail. Therefore, a more aggressive (lower) factor is needed to detect
-// outliers.
-const double Utility::SUCCESS_RATE_STDEV_FACTOR = 1.9;
-
 Utility::EjectionPair Utility::successRateEjectionThreshold(
-    double success_rate_sum, const std::vector<HostSuccessRatePair>& valid_success_rate_hosts) {
+    double success_rate_sum, const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
+    double success_rate_stdev_factor) {
   // This function is using mean and standard deviation as statistical measures for outlier
   // detection. First the mean is calculated by dividing the sum of success rate data over the
   // number of data points. Then variance is calculated by taking the mean of the
@@ -271,7 +268,7 @@ Utility::EjectionPair Utility::successRateEjectionThreshold(
   variance /= valid_success_rate_hosts.size();
   double stdev = std::sqrt(variance);
 
-  return {mean, (mean - (SUCCESS_RATE_STDEV_FACTOR * stdev))};
+  return {mean, (mean - (success_rate_stdev_factor * stdev))};
 }
 
 void DetectorImpl::processSuccessRateEjections() {
@@ -310,8 +307,12 @@ void DetectorImpl::processSuccessRateEjections() {
   }
 
   if (valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
-    Utility::EjectionPair ejection_pair =
-        Utility::successRateEjectionThreshold(success_rate_sum, valid_success_rate_hosts);
+    double success_rate_stdev_factor =
+        runtime_.snapshot().getInteger("outlier_detection.success_rate_stdev_factor",
+                                       config_.successRateStdevFactor()) /
+        1000.0;
+    Utility::EjectionPair ejection_pair = Utility::successRateEjectionThreshold(
+        success_rate_sum, valid_success_rate_hosts, success_rate_stdev_factor);
     success_rate_average_ = ejection_pair.success_rate_average_;
     success_rate_ejection_threshold_ = ejection_pair.ejection_threshold_;
     for (const auto& host_success_rate_pair : valid_success_rate_hosts) {

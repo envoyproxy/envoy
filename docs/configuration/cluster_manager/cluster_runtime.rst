@@ -30,7 +30,7 @@ Outlier detection
 
 See the outlier detection :ref:`architecture overview <arch_overview_outlier_detection>` for more
 information on outlier detection. The runtime parameters supported by outlier detection are the 
-same as the :ref:`static configuration parameters <config_cluster_manager_cluster_outlier_detection>`, namely
+same as the :ref:`static configuration parameters <config_cluster_manager_cluster_outlier_detection>`, namely:
 
 outlier_detection.consecutive_5xx
   :ref:`consecutive_5XX
@@ -70,6 +70,11 @@ outlier_detection.success_rate_minimum_hosts
 outlier_detection.success_rate_request_volume
   :ref:`success_rate_request_volume
   <config_cluster_manager_cluster_outlier_detection_success_rate_request_volume>`
+  setting in outlier detection
+
+outlier_detection.success_rate_stdev_factor
+  :ref:`success_rate_stdev_factor
+  <config_cluster_manager_cluster_outlier_detection_success_rate_stdev_factor>`
   setting in outlier detection
 
 Core
