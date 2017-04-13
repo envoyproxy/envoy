@@ -407,6 +407,8 @@ void HotRestartImpl::terminateParent() {
   parent_terminated_ = true;
 }
 
+void HotRestartImpl::shutdown() { socket_event_.reset(); }
+
 std::string HotRestartImpl::version() { return SharedMemory::version(); }
 
 } // Server
