@@ -8,6 +8,7 @@ matrix:
   fast_finish: true
 env:
   - TEST_TYPE=debug
+  - TEST_TYPE=bazel.coverage
   - TEST_TYPE=bazel.debug
   - TEST_TYPE=normal
   - TEST_TYPE=coverage
