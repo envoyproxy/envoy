@@ -3,14 +3,13 @@
 set -e
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
-[[ -z "${REAL_SRCDIR}" ]] && REAL_SRCDIR="${SRCDIR}"
 [[ -z "${GCOVR_DIR}" ]] && GCOVR_DIR="${SRCDIR}/bazel-envoy"
 [[ -z "${TESTLOGS_DIR}" ]] && TESTLOGS_DIR="${SRCDIR}/bazel-testlogs"
 [[ -z "${BAZEL_COVERAGE}" ]] && BAZEL_COVERAGE=bazel
 [[ -z "${GCOVR}" ]] && GCOVR=gcovr
 
 # Make sure //test/coverage is up-to-date.
-(cd "${REAL_SRCDIR}"; BAZEL_BIN="${BAZEL_COVERAGE}" test/coverage/gen_build.sh)
+(BAZEL_BIN="${BAZEL_COVERAGE}" "${SRCDIR}"/test/coverage/gen_build.sh)
 
 # Run all tests under bazel coverage.
 "${BAZEL_COVERAGE}" coverage //test/coverage:coverage_tests ${BAZEL_BUILD_OPTIONS} \
