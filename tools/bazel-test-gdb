@@ -4,12 +4,16 @@
 #
 # tools/bazel-test-gdb //test/foo:bar --some_other --bazel_args
 
-if [[ ! "$1" =~ //.*:.* ]]
+if [[ ! "$1" =~ (@[a-zA-Z0-9_-]+)?//.*:[a-zA-Z0-9_-]+ ]]
 then
-  echo "First argument to $0 must be a //test/foo:bar label identifying a single test to run"
+  echo "First argument to $0 must be a [@repo]//test/foo:bar label identifying a single test to run"
   echo "$1 does not mach this pattern"
   exit 1
 fi
+
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+[[ -z "${BAZEL}" ]] && BAZEL=bazel
+[[ -z "${GDB}" ]] && GDB=gdb
 
 GDB_RUNNER=$(mktemp -t "bazel-test-gdb.XXXXXXX")
 function cleanup() {
@@ -17,7 +21,7 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-bazel test "$@" --strategy=TestRunner=standalone --cache_test_results=no \
-  --test_output=summary --run_under="$PWD/tools/gen_gdb_wrapper_script.py ${GDB_RUNNER}"
+"${BAZEL}" test "$@" --strategy=TestRunner=standalone --cache_test_results=no \
+  --test_output=summary --run_under="${SCRIPT_DIR}/gen_gdb_wrapper_script.py ${GDB} ${GDB_RUNNER}"
 chmod u+x "${GDB_RUNNER}"
 "${GDB_RUNNER}"
