@@ -7,12 +7,12 @@ namespace Zipkin {
 class Span;
 
 /**
- * This interface must be observed by a Zipkin tracer
+ * This interface must be observed by a Zipkin tracer.
  */
 class TracerInterface {
 public:
   /**
-   * Destructor
+   * Destructor.
    */
   virtual ~TracerInterface() {}
 
@@ -23,7 +23,7 @@ public:
    *
    * This method is invoked by the Span object when its finish() method is called.
    *
-   * @param span The span that needs action
+   * @param span The span that needs action.
    */
   virtual void reportSpan(Span&& span) PURE;
 };

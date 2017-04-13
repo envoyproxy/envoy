@@ -16,7 +16,7 @@ namespace Zipkin {
 class Reporter {
 public:
   /**
-   * Destructor
+   * Destructor.
    */
   virtual ~Reporter() {}
 
@@ -24,7 +24,7 @@ public:
    * Method that a concrete Reporter class must implement to handle finished spans.
    * For example, a span-buffer management policy could be implemented.
    *
-   * @param span The span that needs action
+   * @param span The span that needs action.
    */
   virtual void reportSpan(Span&& span) PURE;
 };
@@ -44,7 +44,7 @@ typedef std::unique_ptr<Reporter> ReporterUniquePtr;
 class Tracer : public TracerInterface {
 public:
   /**
-   * Constructor
+   * Constructor.
    *
    * @param service_name The name of the service where the Tracer is running. This name is
    * used in all annotations' endpoints of the spans created by the Tracer.
@@ -59,32 +59,32 @@ public:
   /**
    * Creates a "root" Zipkin span.
    *
-   * @param span_name Name of the new span
-   * @param start_time The time indicating the beginning of the span
+   * @param span_name Name of the new span.
+   * @param start_time The time indicating the beginning of the span.
    */
   Span startSpan(const std::string& span_name, uint64_t start_time);
 
   /**
    * Depending on the given context, creates either a "child" or a "shared-context" Zipkin span.
    *
-   * @param span_name Name of the new span
-   * @param start_time The time indicating the beginning of the span
-   * @param previous_context The context of the span preceding the one to be created
+   * @param span_name Name of the new span.
+   * @param start_time The time indicating the beginning of the span.
+   * @param previous_context The context of the span preceding the one to be created.
    */
   Span startSpan(const std::string& span_name, uint64_t start_time, SpanContext& previous_context);
 
   /**
-   * TracerInterface::reportSpan
+   * TracerInterface::reportSpan.
    */
   void reportSpan(Span&& span) override;
 
   /**
-   * @return the Reporter associated with the Tracer object
+   * @return the Reporter associated with the Tracer object.
    */
   ReporterSharedPtr reporter() { return reporter_; }
 
   /**
-   * Associates a Reporter object with this Tracer
+   * Associates a Reporter object with this Tracer.
    */
   void setReporter(ReporterUniquePtr reporter);
 

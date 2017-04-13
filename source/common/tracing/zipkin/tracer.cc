@@ -5,24 +5,22 @@
 namespace Zipkin {
 
 Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
-  Span span;
-  Annotation cs;
+  // Build the endpoint
   std::string ip;
   uint16_t port;
-  Endpoint ep;
-  uint64_t timestamp_micro;
-
-  // Build the endpoint
   Util::getIPAndPort(address_, ip, port);
+  Endpoint ep;
   ep.setIpv4(ip);
   ep.setPort(port);
   ep.setServiceName(service_name_);
 
   // Build the CS annotation
+  Annotation cs;
   cs.setEndpoint(std::move(ep));
   cs.setValue(ZipkinCoreConstants::CLIENT_SEND);
 
   // Create an all-new span, with no parent id
+  Span span;
   span.setName(span_name);
   uint64_t randon_number = Util::generateRandom64();
   span.setId(randon_number);
@@ -30,6 +28,7 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   span.setStartTime(start_time);
 
   // Set the timestamp globally for the span and also for the CS annotation
+  uint64_t timestamp_micro;
   timestamp_micro = Util::timeSinceEpochMicro();
   cs.setTimestamp(timestamp_micro);
   span.setTimestamp(timestamp_micro);
@@ -46,9 +45,6 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
                        SpanContext& previous_context) {
   Span span;
   Annotation annotation;
-  std::string ip;
-  uint16_t port;
-  Endpoint ep;
   uint64_t timestamp_micro;
 
   // TODO(fabolive) We currently ignore the start_time to set the span/annotation timestamps
@@ -89,7 +85,10 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
   }
 
   // Build the endpoint
+  std::string ip;
+  uint16_t port;
   Util::getIPAndPort(address_, ip, port);
+  Endpoint ep;
   ep.setIpv4(ip);
   ep.setPort(port);
   ep.setServiceName(service_name_);
