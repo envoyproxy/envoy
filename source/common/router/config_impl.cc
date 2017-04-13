@@ -25,6 +25,8 @@ RetryPolicyImpl::RetryPolicyImpl(const Json::Object& config) {
     return;
   }
 
+  per_try_timeout_ = std::chrono::milliseconds(
+      config.getObject("retry_policy")->getInteger("per_try_timeout_ms", 0));
   num_retries_ = config.getObject("retry_policy")->getInteger("num_retries", 1);
   retry_on_ = RetryStateImpl::parseRetryOn(config.getObject("retry_policy")->getString("retry_on"));
 }

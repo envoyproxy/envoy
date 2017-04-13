@@ -75,14 +75,16 @@ using a ',' delimited list. The supported policies are:
 
 5xx
   Envoy will attempt a retry if the upstream server responds with any 5xx response code, or does not
-  respond at all (disconnect/reset/etc.). (Includes *connect-failure* and *refused-stream*)
+  respond at all (disconnect/reset/read timeout). (Includes *connect-failure* and *refused-stream*)
 
-  * **NOTE:** Envoy will not retry when a request exceeds
+  * **NOTE 1:** Envoy will not retry when a request exceeds
     :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` (resulting in a 504 error
     code). Use :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms` if you want
     to retry when individual attempts take too long.
     :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` is an outer time limit for a
     request, including any retries that take place.
+
+  * **NOTE 2:** Envoy currently does not support retrying requests on write timeouts.
 
 connect-failure
   Envoy will attempt a retry if a request is failed because of a connection failure to the upstream

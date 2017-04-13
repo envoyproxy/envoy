@@ -120,10 +120,12 @@ public:
   RetryPolicyImpl(const Json::Object& config);
 
   // Router::RetryPolicy
+  std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
 
 private:
+  std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
 };

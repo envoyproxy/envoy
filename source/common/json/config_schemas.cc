@@ -567,6 +567,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "retry_policy" : {
         "type" : "object",
         "properties" : {
+          "per_try_timeout_ms" : {"type" : "integer"},
           "num_retries" : {"type" : "integer"},
           "retry_on" : {"type" : "string"}
         },
