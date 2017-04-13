@@ -23,7 +23,7 @@ TEST(DateUtil, All) {
 
 TEST(ProdSystemTimeSourceTest, All) {
   ProdSystemTimeSource source;
-  source.currentSystemTime();
+  source.currentTime();
 }
 
 TEST(StringUtil, caseInsensitiveCompare) {

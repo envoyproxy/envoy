@@ -184,7 +184,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
     stats_.ejections_total_.inc();
     if (enforceEjection(type)) {
       stats_.ejections_active_.inc();
-      host_sinks_[host]->eject(time_source_.currentSystemTime());
+      host_sinks_[host]->eject(time_source_.currentTime());
       runCallbacks(host);
 
       if (event_logger_) {
@@ -325,7 +325,7 @@ void DetectorImpl::processSuccessRateEjections() {
 }
 
 void DetectorImpl::onIntervalTimer() {
-  MonotonicTime now = time_source_.currentSystemTime();
+  MonotonicTime now = time_source_.currentTime();
 
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
@@ -379,8 +379,8 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
     "\"cluster_success_rate_ejection_threshold\": \"{}\"" +
     "}}\n";
   // clang-format on
-  SystemTime now = time_source_.currentSystemTime();
-  MonotonicTime monotonic_now = monotonic_time_source_.currentSystemTime();
+  SystemTime now = time_source_.currentTime();
+  MonotonicTime monotonic_now = monotonic_time_source_.currentTime();
 
   switch (type) {
   case EjectionType::Consecutive5xx:
@@ -414,8 +414,8 @@ void EventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
     "\"num_ejections\": {}" +
     "}}\n";
   // clang-format on
-  SystemTime now = time_source_.currentSystemTime();
-  MonotonicTime monotonic_now = monotonic_time_source_.currentSystemTime();
+  SystemTime now = time_source_.currentTime();
+  MonotonicTime monotonic_now = monotonic_time_source_.currentTime();
   file_->write(fmt::format(
       json, AccessLogDateTimeFormatter::fromTime(now),
       secsSinceLastAction(host->outlierDetector().lastEjectionTime(), monotonic_now),

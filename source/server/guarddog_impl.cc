@@ -28,7 +28,7 @@ GuardDogImpl::~GuardDogImpl() { stop(); }
 
 void GuardDogImpl::threadRoutine() {
   do {
-    const auto now = time_source_.currentSystemTime();
+    const auto now = time_source_.currentTime();
     bool seen_one_multi_timeout(false);
     std::lock_guard<std::mutex> guard(wd_lock_);
     for (auto watched_dog : watched_dogs_) {

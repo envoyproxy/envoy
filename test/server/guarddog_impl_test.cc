@@ -25,7 +25,7 @@ class GuardDogDeathTest : public testing::Test {
 protected:
   GuardDogDeathTest()
       : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500) {
-    ON_CALL(time_source_, currentSystemTime())
+    ON_CALL(time_source_, currentTime())
         .WillByDefault(testing::Invoke([&]() {
           return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
         }));
@@ -125,7 +125,7 @@ TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
 class GuardDogMissTest : public testing::Test {
 protected:
   GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0) {
-    ON_CALL(time_source_, currentSystemTime())
+    ON_CALL(time_source_, currentTime())
         .WillByDefault(testing::Invoke([&]() {
           return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
         }));
@@ -147,12 +147,12 @@ TEST_F(GuardDogMissTest, MissTest) {
   auto unpet_dog = gd.createWatchDog(0);
   // At 300ms we shouldn't have hit the timeout yet:
   mock_time_ += 300;
-  // EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  // EXPECT_CALL(time_source_, currentTime()).WillRepeatedly(testing::Return(time_point_));
   gd.forceCheckForTest();
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_miss").value());
   // This should push it past the 500ms limit:
   mock_time_ += 250;
-  // EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  // EXPECT_CALL(time_source_, currentTime()).WillRepeatedly(testing::Return(time_point_));
   gd.forceCheckForTest();
   EXPECT_EQ(1UL, stats_store_.counter("server.watchdog_miss").value());
   gd.stopWatching(unpet_dog);
@@ -162,7 +162,7 @@ TEST_F(GuardDogMissTest, MissTest) {
 TEST_F(GuardDogMissTest, MegaMissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  ON_CALL(time_source_, currentSystemTime())
+  ON_CALL(time_source_, currentTime())
       .WillByDefault(testing::Invoke([&]() {
         return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
       }));

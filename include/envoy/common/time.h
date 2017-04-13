@@ -21,7 +21,7 @@ public:
   /**
    * @return the current system time.
    */
-  virtual SystemTime currentSystemTime() PURE;
+  virtual SystemTime currentTime() PURE;
 };
 
 /**
@@ -34,5 +34,5 @@ public:
   /**
    * @return the current monotonic time.
    */
-  virtual MonotonicTime currentSystemTime() PURE;
+  virtual MonotonicTime currentTime() PURE;
 };
