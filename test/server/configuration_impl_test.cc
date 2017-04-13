@@ -190,7 +190,9 @@ TEST(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
           "connect_timeout_ms": 1,
           "per_connection_buffer_limit_bytes": 8192,
           "lb_type": "round_robin",
-          "hosts": []
+          "hosts": [
+            { "url" : "tcp://127.0.0.1:9999" }
+          ]
         }
       ]
     }
