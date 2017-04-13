@@ -468,14 +468,18 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
+  // We do a longest wildcard suffix match against the host that's passed in.
+  // (e.g. foo-bar.baz.com should match *-bar.baz.com before matching *.baz.com)
+  // This is done by scanning the length => wildcards map looking for every
+  // wilcdard whose size is < length.
   for (const auto& iter : wildcard_virtual_host_suffixes_) {
-    const uint32_t i = iter.first;
+    const uint32_t wildcard_length = iter.first;
     const auto& wildcard_map = iter.second;
     // >= because *.foo.com shouldn't match .foo.com.
-    if (i >= host.size()) {
+    if (wildcard_length >= host.size()) {
       continue;
     }
-    const auto& match = wildcard_map.find(host.substr(host.size() - i));
+    const auto& match = wildcard_map.find(host.substr(host.size() - wildcard_length));
     if (match != wildcard_map.end()) {
       return match->second.get();
     }
