@@ -85,9 +85,6 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
     // Set the SR annotation value
     annotation.setValue(ZipkinCoreConstants::SERVER_RECV);
   } else {
-    // Unexpected condition
-
-    // TODO(fabolive) Log an error
     return span; // return an empty span
   }
 

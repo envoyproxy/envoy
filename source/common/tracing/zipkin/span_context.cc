@@ -10,17 +10,17 @@ SpanContext::SpanContext(const Span& span) {
   id_ = span.id();
   parent_id_ = span.parentId();
 
-  for (Annotation ann : span.annotations()) {
-    if (ann.value() == ZipkinCoreConstants::CLIENT_RECV) {
+  for (const Annotation& annotation : span.annotations()) {
+    if (annotation.value() == ZipkinCoreConstants::CLIENT_RECV) {
       annotation_values_.cr_ = true;
     }
-    if (ann.value() == ZipkinCoreConstants::CLIENT_SEND) {
+    if (annotation.value() == ZipkinCoreConstants::CLIENT_SEND) {
       annotation_values_.cs_ = true;
     }
-    if (ann.value() == ZipkinCoreConstants::SERVER_RECV) {
+    if (annotation.value() == ZipkinCoreConstants::SERVER_RECV) {
       annotation_values_.sr_ = true;
     }
-    if (ann.value() == ZipkinCoreConstants::SERVER_SEND) {
+    if (annotation.value() == ZipkinCoreConstants::SERVER_SEND) {
       annotation_values_.ss_ = true;
     }
   }
@@ -33,27 +33,27 @@ const std::string SpanContext::serializeToString() {
     return "0000000000000000;0000000000000000;0000000000000000";
   }
 
-  std::string s;
-  s = traceIdAsHexString() + FIELD_SEPARATOR_ + idAsHexString() + FIELD_SEPARATOR_ +
-      parentIdAsHexString();
+  std::string result;
+  result = traceIdAsHexString() + FIELD_SEPARATOR_ + idAsHexString() + FIELD_SEPARATOR_ +
+           parentIdAsHexString();
 
   if (annotation_values_.cr_) {
-    s += FIELD_SEPARATOR_ + ZipkinCoreConstants::CLIENT_RECV;
+    result += FIELD_SEPARATOR_ + ZipkinCoreConstants::CLIENT_RECV;
   }
   if (annotation_values_.cs_) {
-    s += FIELD_SEPARATOR_ + ZipkinCoreConstants::CLIENT_SEND;
+    result += FIELD_SEPARATOR_ + ZipkinCoreConstants::CLIENT_SEND;
   }
   if (annotation_values_.sr_) {
-    s += FIELD_SEPARATOR_ + ZipkinCoreConstants::SERVER_RECV;
+    result += FIELD_SEPARATOR_ + ZipkinCoreConstants::SERVER_RECV;
   }
   if (annotation_values_.ss_) {
-    s += FIELD_SEPARATOR_ + ZipkinCoreConstants::SERVER_SEND;
+    result += FIELD_SEPARATOR_ + ZipkinCoreConstants::SERVER_SEND;
   }
 
-  return s;
+  return result;
 }
 
-void SpanContext::populateFromString(std::string s) {
+void SpanContext::populateFromString(const std::string& s) {
   // ^([0-9,a-z]{16});([0-9,a-z]{16});([0-9,a-z]{16})((;(cs|sr|cr|ss))*)$
   std::string hex_digit_group = "([0-9,a-z]{16})";
   std::string reg_ex_str =

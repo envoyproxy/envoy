@@ -75,7 +75,7 @@ public:
    * @param s The string-encoding of a SpanContext in the same format produced by the
    * method serializeToString()
    */
-  void populateFromString(std::string s);
+  void populateFromString(const std::string& s);
 
   /**
    * @return the span id as an integer
