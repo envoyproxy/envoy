@@ -471,7 +471,7 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& 
   // We do a longest wildcard suffix match against the host that's passed in.
   // (e.g. foo-bar.baz.com should match *-bar.baz.com before matching *.baz.com)
   // This is done by scanning the length => wildcards map looking for every
-  // wilcdard whose size is < length.
+  // wildcard whose size is < length.
   for (const auto& iter : wildcard_virtual_host_suffixes_) {
     const uint32_t wildcard_length = iter.first;
     const auto& wildcard_map = iter.second;
