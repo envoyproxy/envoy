@@ -224,7 +224,7 @@ num_retries
   :ref:`config_http_filters_router_x-envoy-max-retries`.
 
 per_try_timeout_ms
-  *(optional, integer)* specifies the timeout per retry attempt. This parameter is optional.
+  *(optional, integer)* specifies a non-zero timeout per retry attempt. This parameter is optional.
   These are the same conditions documented for 
   :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`.
 
