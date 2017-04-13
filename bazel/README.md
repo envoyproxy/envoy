@@ -71,13 +71,42 @@ tools/bazel-test-gdb //test/common/http:async_client_impl_test
 
 # Additional Envoy build and test options
 
+In general, there are 3 [compilation
+modes](https://bazel.build/versions/master/docs/bazel-user-manual.html#flag--compilation_mode)
+that Bazel supports:
+
+* `fastbuild`: `-O0 -DDEBUG`, aimed at developer speed (default).
+* `opt`: `-O2`, for production builds and performance benchmarking.
+* `dbg`: `-O0 -ggdb3 -DDEBUG`, debug symbols.
+
+You can use the `-c <compilation_mode>` flag to control this, e.g.
+
+```
+bazel build -c opt //source/exe:envoy-static
+```
+
 To build and run tests with the compiler's address sanitizer (ASAN) enabled:
 
 ```
 bazel test -c dbg --config=asan //test/...
 ```
 
-The ASAN failure stack traces include numbers as a results of running ASAN with a `dbg` build above.
+The ASAN failure stack traces include line numbers as a results of running ASAN with a `dbg` build above.
+
+# Release builds
+
+Release builds should be built in `opt` mode, processed with `strip` and have a
+`.note.gnu.build-id` section with the Git SHA1 at which the build took place.
+They should also ignore any local `.bazelrc` for reproducibility. This can be
+achieved with:
+
+```
+bazel --bazelrc=/dev/null build -c opt //source/exe:envoy-static.stripped.stamped
+```
+
+One caveat to note is that the Git SHA1 is truncated to 16 bytes today as a
+result of the workaround in place for
+https://github.com/bazelbuild/bazel/issues/2805.
 
 # Adding or maintaining Envoy build rules
 

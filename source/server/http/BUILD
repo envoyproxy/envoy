@@ -7,7 +7,7 @@ envoy_cc_library(
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
     deps = [
-        "//:version_generated",
+        "//source/version_generated:version_generated",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:listen_socket_interface",
