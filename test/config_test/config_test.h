@@ -3,10 +3,10 @@
 namespace ConfigTest {
 
 /**
- * Load all configurations from a tar file and make sure they are valid. Config files are expected
- * to exist in $TEST_TMPDIR/config_test.
+ * Load all configurations from a tar file and make sure they are valid.
+ * @param path supplies the path to recurse through looking for config files.
  * @return uint32_t the number of configs tested.
  */
-uint32_t run();
+uint32_t run(const std::string& path);
 
 } // ConfigTest

@@ -3,7 +3,6 @@
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/test_common/environment.h"
 
 #include <dirent.h>
 
@@ -45,7 +44,7 @@ public:
   Server::TestOptionsImpl options_;
 };
 
-static uint32_t run(const std::string& directory) {
+uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
   DIR* dir = opendir(directory.c_str());
   if (!dir) {
@@ -72,7 +71,5 @@ static uint32_t run(const std::string& directory) {
   closedir(dir);
   return num_tested;
 }
-
-uint32_t run() { return run(TestEnvironment::temporaryDirectory() + "/config_test"); }
 
 } // ConfigTest
