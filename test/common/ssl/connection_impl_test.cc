@@ -135,7 +135,7 @@ TEST_F(SslConnectionImplTest, GetNoUriWithDnsSan) {
   testUtil(client_ctx_json, server_ctx_json, "", "");
 }
 
-TEST_F(SslConnectionImplTest, ClientAuthSanDNS) {
+TEST_F(SslConnectionImplTest, NoCert) {
   std::string client_ctx_json = R"EOF(
   {
     "cert_chain_file": "",
@@ -150,7 +150,6 @@ TEST_F(SslConnectionImplTest, ClientAuthSanDNS) {
   }
   )EOF";
 
-  // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
   testUtil(client_ctx_json, server_ctx_json, "", "");
 }
 
