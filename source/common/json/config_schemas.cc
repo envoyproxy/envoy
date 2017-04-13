@@ -571,7 +571,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
             "type" : "integer",
             "minimum" : 0,
             "exclusiveMinimum" : true
-	  },
+          },
           "num_retries" : {"type" : "integer"},
           "retry_on" : {"type" : "string"}
         },

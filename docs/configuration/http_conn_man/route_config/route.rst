@@ -225,8 +225,8 @@ num_retries
 
 per_try_timeout_ms
   *(optional, integer)* specifies a non-zero timeout per retry attempt. This parameter is optional.
-  These are the same conditions documented for 
-  :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`.
+  The same conditions documented for 
+  :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms` apply.
 
   **Note:** If left unspecified, Envoy will use the global
   `:ref: route timeout <config_http_conn_man_route_table_route_timeout>` for the request. 
