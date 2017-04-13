@@ -17,13 +17,13 @@ namespace Zipkin {
  * SS: "Server Send"
  * SR: "Server Receive"
  */
-typedef struct Annotation_isset_ {
-  Annotation_isset_() : cs_(false), cr_(false), ss_(false), sr_(false) {}
+typedef struct AnnotationIsSet {
+  AnnotationIsSet() : cs_(false), cr_(false), ss_(false), sr_(false) {}
   bool cs_ : 1;
   bool cr_ : 1;
   bool ss_ : 1;
   bool sr_ : 1;
-} Annotation_isset_;
+} AnnotationIsSet;
 
 /**
  * This class represents the context of a Zipkin span. It embodies the following
@@ -34,12 +34,12 @@ public:
   /**
    * Default constructor. Creates an empty context.
    */
-  SpanContext() : trace_id_(0), id_(0), parent_id_(0), is_populated_(false) {}
+  SpanContext() : trace_id_(0), id_(0), parent_id_(0), is_initialized_(false) {}
 
   /**
    * Constructor that creates a context object from the given Zipkin span object.
    *
-   * @param span The Zipkin span used to initialize a SpanContext object
+   * @param span The Zipkin span used to initialize a SpanContext object.
    */
   SpanContext(const Span& span);
 
@@ -72,10 +72,10 @@ public:
   /**
    * Initializes a SpanContext object based on the given string.
    *
-   * @param s The string-encoding of a SpanContext in the same format produced by the
-   * method serializeToString()
+   * @param span_context_str The string-encoding of a SpanContext in the same format produced by the
+   * method serializeToString().
    */
-  void populateFromString(const std::string& s);
+  void populateFromString(const std::string& span_context_str);
 
   /**
    * @return the span id as an integer
@@ -83,41 +83,61 @@ public:
   uint64_t id() const { return id_; }
 
   /**
-   * @return the span id as a 16-character hexadecimal string
+   * @return the span id as a 16-character hexadecimal string.
    */
   std::string idAsHexString() const { return Util::uint64ToBase16(id_); }
 
   /**
-   * @return the span's parent id as an integer
+   * @return the span's parent id as an integer.
    */
   uint64_t parent_id() const { return parent_id_; }
 
   /**
-   * @return the parent id as a 16-character hexadecimal string
+   * @return the parent id as a 16-character hexadecimal string.
    */
   std::string parentIdAsHexString() const { return Util::uint64ToBase16(parent_id_); }
 
   /**
-   * @return the trace id as an integer
+   * @return the trace id as an integer.
    */
   uint64_t trace_id() const { return trace_id_; }
 
   /**
-   * @return the trace id as a 16-character hexadecimal string
+   * @return the trace id as a 16-character hexadecimal string.
    */
   std::string traceIdAsHexString() const { return Util::uint64ToBase16(trace_id_); }
 
   /**
-   * @return a struct indicating which annotations are present in the span
+   * @return a struct indicating which annotations are present in the span.
    */
-  Annotation_isset_ isSetAnnotation() const { return annotation_values_; }
+  AnnotationIsSet isSetAnnotation() const { return annotation_values_; }
 
 private:
-  const static std::string FIELD_SEPARATOR_;
+  static const std::string FIELD_SEPARATOR_;
+  static const std::string UNITIALIZED_SPAN_CONTEXT_;
+  static const std::string HEX_DIGIT_GROUP_REGEX_STR_;
+
+  /**
+   * @return a string with a regular expression to match a valid string-serialized span context.
+   *
+   * Note that a function is needed because we cannot concatenate static strings from
+   * different compilation units at initialization time (the initialization order is not
+   * guaranteed). In this case, the compilation units are ZipkinCoreConstants and SpanContext.
+   */
+  static const std::string& SPAN_CONTEXT_REGEX_STR();
+
+  /**
+   * @return a regex to match a valid string-serialization of a span context.
+   *
+   * Note that a function is needed because the string used to build the regex
+   * cannot be initialized statically.
+   */
+  static const std::regex& SPAN_CONTEXT_REGEX();
+
   uint64_t trace_id_;
   uint64_t id_;
   uint64_t parent_id_;
-  Annotation_isset_ annotation_values_;
-  bool is_populated_;
+  AnnotationIsSet annotation_values_;
+  bool is_initialized_;
 };
 } // Zipkin
