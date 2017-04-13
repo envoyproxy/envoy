@@ -3,10 +3,12 @@
 #include "envoy/common/pure.h"
 
 /**
- * Less typing for common system time type.
+ * Less typing for common system time and steady time type.
+ *
+ * SystemTime should be used when getting a time to present to the user, e.g. for logging
+ * MonotonicTime should be used when tracking time for computing an interval
  */
 typedef std::chrono::time_point<std::chrono::system_clock> SystemTime;
-
 typedef std::chrono::time_point<std::chrono::steady_clock> MonotonicTime;
 
 /**
@@ -22,6 +24,9 @@ public:
   virtual SystemTime currentSystemTime() PURE;
 };
 
+/**
+ * Abstraction for getting the current monotonically increasing time. Useful for testing.
+ */
 class MonotonicTimeSource {
 public:
   virtual ~MonotonicTimeSource() {}

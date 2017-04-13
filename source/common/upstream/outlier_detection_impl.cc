@@ -16,20 +16,20 @@ DetectorSharedPtr DetectorImplFactory::createForCluster(Cluster& cluster,
                                                         EventLoggerSharedPtr event_logger) {
   if (cluster_config.hasObject("outlier_detection")) {
     return DetectorImpl::create(cluster, *cluster_config.getObject("outlier_detection"), dispatcher,
-                                runtime, ProdSystemTimeSource::instance_, event_logger);
+                                runtime, ProdMonotonicTimeSource::instance_, event_logger);
   } else {
     return nullptr;
   }
 }
 
-void DetectorHostSinkImpl::eject(SystemTime ejection_time) {
+void DetectorHostSinkImpl::eject(MonotonicTime ejection_time) {
   ASSERT(!host_.lock()->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   host_.lock()->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   num_ejections_++;
   last_ejection_time_.value(ejection_time);
 }
 
-void DetectorHostSinkImpl::uneject(SystemTime unejection_time) {
+void DetectorHostSinkImpl::uneject(MonotonicTime unejection_time) {
   last_unejection_time_.value(unejection_time);
 }
 
@@ -77,7 +77,7 @@ DetectorConfig::DetectorConfig(const Json::Object& json_config)
 
 DetectorImpl::DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                           SystemTimeSource& time_source, EventLoggerSharedPtr event_logger)
+                           MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger)
     : config_(json_config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
@@ -96,7 +96,7 @@ DetectorImpl::~DetectorImpl() {
 std::shared_ptr<DetectorImpl>
 DetectorImpl::create(const Cluster& cluster, const Json::Object& json_config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                     SystemTimeSource& time_source, EventLoggerSharedPtr event_logger) {
+                     MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
       new DetectorImpl(cluster, json_config, dispatcher, runtime, time_source, event_logger));
   detector->initialize(cluster);
@@ -141,7 +141,7 @@ void DetectorImpl::armIntervalTimer() {
 }
 
 void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostSinkImpl* sink,
-                                       SystemTime now) {
+                                       MonotonicTime now) {
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
     return;
   }
@@ -325,7 +325,7 @@ void DetectorImpl::processSuccessRateEjections() {
 }
 
 void DetectorImpl::onIntervalTimer() {
-  SystemTime now = time_source_.currentSystemTime();
+  MonotonicTime now = time_source_.currentSystemTime();
 
   for (auto host : host_sinks_) {
     checkHostForUneject(host.first, host.second, now);
@@ -380,21 +380,23 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
     "}}\n";
   // clang-format on
   SystemTime now = time_source_.currentSystemTime();
+  MonotonicTime monotonic_now = monotonic_time_source_.currentSystemTime();
 
   switch (type) {
   case EjectionType::Consecutive5xx:
-    file_->write(fmt::format(json_5xx, AccessLogDateTimeFormatter::fromTime(now),
-                             secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), now),
-                             host->cluster().name(), host->address()->asString(),
-                             typeToString(type), host->outlierDetector().numEjections(), enforced));
+    file_->write(fmt::format(
+        json_5xx, AccessLogDateTimeFormatter::fromTime(now),
+        secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), monotonic_now),
+        host->cluster().name(), host->address()->asString(), typeToString(type),
+        host->outlierDetector().numEjections(), enforced));
     break;
   case EjectionType::SuccessRate:
-    file_->write(fmt::format(json_success_rate, AccessLogDateTimeFormatter::fromTime(now),
-                             secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), now),
-                             host->cluster().name(), host->address()->asString(),
-                             typeToString(type), host->outlierDetector().numEjections(), enforced,
-                             host->outlierDetector().successRate(), detector.successRateAverage(),
-                             detector.successRateEjectionThreshold()));
+    file_->write(fmt::format(
+        json_success_rate, AccessLogDateTimeFormatter::fromTime(now),
+        secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), monotonic_now),
+        host->cluster().name(), host->address()->asString(), typeToString(type),
+        host->outlierDetector().numEjections(), enforced, host->outlierDetector().successRate(),
+        detector.successRateAverage(), detector.successRateEjectionThreshold()));
     break;
   }
 }
@@ -413,10 +415,11 @@ void EventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
     "}}\n";
   // clang-format on
   SystemTime now = time_source_.currentSystemTime();
-  file_->write(fmt::format(json, AccessLogDateTimeFormatter::fromTime(now),
-                           secsSinceLastAction(host->outlierDetector().lastEjectionTime(), now),
-                           host->cluster().name(), host->address()->asString(),
-                           host->outlierDetector().numEjections()));
+  MonotonicTime monotonic_now = monotonic_time_source_.currentSystemTime();
+  file_->write(fmt::format(
+      json, AccessLogDateTimeFormatter::fromTime(now),
+      secsSinceLastAction(host->outlierDetector().lastEjectionTime(), monotonic_now),
+      host->cluster().name(), host->address()->asString(), host->outlierDetector().numEjections()));
 }
 
 std::string EventLoggerImpl::typeToString(EjectionType type) {
@@ -430,8 +433,8 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
   NOT_REACHED;
 }
 
-int EventLoggerImpl::secsSinceLastAction(const Optional<SystemTime>& lastActionTime,
-                                         SystemTime now) {
+int EventLoggerImpl::secsSinceLastAction(const Optional<MonotonicTime>& lastActionTime,
+                                         MonotonicTime now) {
   if (lastActionTime.valid()) {
     return std::chrono::duration_cast<std::chrono::seconds>(now - lastActionTime.value()).count();
   }

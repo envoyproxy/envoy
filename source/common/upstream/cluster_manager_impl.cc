@@ -151,7 +151,8 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
         config.getObject("outlier_detection")->getString("event_log_path", "");
     if (!event_log_file_path.empty()) {
       outlier_event_logger_.reset(new Outlier::EventLoggerImpl(log_manager, event_log_file_path,
-                                                               ProdSystemTimeSource::instance_));
+                                                               ProdSystemTimeSource::instance_,
+                                                               ProdMonotonicTimeSource::instance_));
     }
   }
 
