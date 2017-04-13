@@ -3,7 +3,7 @@
 read -r -p "Do you have master checked out with most recent changes? [y/N] " response
 if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]
 then
-  TAG="$(git rev-parse master)"
+  export TAG="$(git rev-parse master)"
   docker-machine start default
   eval $(docker-machine env default)
   ./docker_build.sh
