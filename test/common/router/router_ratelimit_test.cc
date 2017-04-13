@@ -491,7 +491,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitKey) {
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, HeadeValueMatch) {
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatch) {
   std::string json = R"EOF(
   {
     "actions": [
@@ -518,7 +518,7 @@ TEST_F(RateLimitPolicyEntryTest, HeadeValueMatch) {
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, HeadeValueMatchNoMatch) {
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchNoMatch) {
   std::string json = R"EOF(
   {
     "actions": [
