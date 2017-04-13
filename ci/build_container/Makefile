@@ -6,6 +6,10 @@ all: $(addprefix $(THIRDPARTY_DEPS)/,$(shell ./print_recipe_deps.sh))
 
 RECIPES := build_recipes
 
+# Make sure we use a consistent compiler across all deps.
+CC ?= gcc
+CXX ?= g++
+
 # If $(BUILD_DISTINCT) is set in the make environment, the artifacts are built and installed in
 # distinct directories under $(THIRDPARTY_BUILD) and $(THIRDPARTY_SRC). They end up looking like
 # $(THIRDPARTY_BUILD)/protobuf.dep/include, $(THIRDPARTY_BUILD)/cotire.dep/include etc. instead of
@@ -31,6 +35,8 @@ build-recipe = cd $(THIRDPARTY_SRC) && \
     $(build-setup) && \
 	(((THIRDPARTY_SRC=$(THIRDPARTY_SRC)/$(DISTINCT_PATH) \
 	   THIRDPARTY_BUILD=$(THIRDPARTY_BUILD)/$(DISTINCT_PATH) \
+	   CC=$(CC) \
+	   CXX=$(CXX) \
 	   $(1) \
 	   bash $(realpath $<) 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
 	$(build-complete)
