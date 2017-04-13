@@ -7,7 +7,4 @@ local_repository(
 
 load("//bazel:repositories.bzl", "envoy_dependencies")
 
-envoy_dependencies(
-    path = "@envoy//ci/prebuilt",
-    local_protobuf_bzl = "/thirdparty/protobuf-3.2.0",
-)
+envoy_dependencies(path = "@envoy//ci/prebuilt")

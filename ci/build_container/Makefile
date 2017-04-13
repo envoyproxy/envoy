@@ -2,8 +2,6 @@
 # version number, etc.) to uniquely identify the revision of the upstream dependency.  This allows
 # make to pick up changes with a simple direct dependency on the build recipe.
 
-all: $(addprefix $(THIRDPARTY_DEPS)/,$(shell ./print_recipe_deps.sh))
-
 RECIPES := build_recipes
 
 # Make sure we use a consistent compiler across all deps.
@@ -38,7 +36,7 @@ build-recipe = cd $(THIRDPARTY_SRC) && \
 	   CC=$(CC) \
 	   CXX=$(CXX) \
 	   $(1) \
-	   bash $(realpath $<) 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
+	   time bash $(CURDIR)/recipe_wrapper.sh $(realpath $<) 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
 	$(build-complete)
 
 $(THIRDPARTY_DEPS)/%.dep: $(RECIPES)/%.sh

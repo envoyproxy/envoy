@@ -4,7 +4,8 @@ set -e
 
 # Setup basic requirements and install them.
 apt-get update
-apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc libtool automake lcov zip
+apt-get install -y wget software-properties-common make cmake git python python-pip \
+  clang-format-3.6 bc libtool automake lcov zip time
 apt-get install -y golang
 # For debugging.
 apt-get install -y gdb strace
@@ -44,4 +45,7 @@ export CXX=g++-4.9
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty
 export THIRDPARTY_BUILD=/thirdparty_build
-"$(dirname "$0")"/build_and_install_deps.sh
+DEPS=$(python <(cat target_recipes.bzl; \
+  echo "print ' '.join(\"${THIRDPARTY_DEPS}/%s.dep\" % r for r in set(TARGET_RECIPES.values()))"))
+echo "Building deps ${DEPS}"
+"$(dirname "$0")"/build_and_install_deps.sh ${DEPS}

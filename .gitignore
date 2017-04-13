@@ -4,7 +4,6 @@
 /generated
 /bazel-*
 /ci/bazel-*
-/ci/build_container/recipes.bzl
 /ci/prebuilt/thirdparty
 /ci/prebuilt/thirdparty_build
 /test/coverage/BUILD

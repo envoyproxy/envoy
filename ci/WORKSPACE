@@ -4,5 +4,12 @@ load("//bazel:repositories.bzl", "envoy_dependencies")
 
 envoy_dependencies(
     path = "//ci/prebuilt",
-    local_protobuf_bzl = "/thirdparty/protobuf-3.2.0",
+    skip_protobuf_bzl = True,
+)
+
+native.new_local_repository(
+    name = "protobuf_bzl",
+    path = "/thirdparty/protobuf-3.2.0",
+    # We only want protobuf.bzl, so don't support building out of this repo.
+    build_file_content = "",
 )
