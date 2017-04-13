@@ -85,7 +85,7 @@ public:
   /**
    * @return the span id as a 16-character hexadecimal string.
    */
-  std::string idAsHexString() const { return Util::uint64ToBase16(id_); }
+  std::string idAsHexString() const { return Util::uint64ToHex(id_); }
 
   /**
    * @return the span's parent id as an integer.
@@ -95,7 +95,7 @@ public:
   /**
    * @return the parent id as a 16-character hexadecimal string.
    */
-  std::string parentIdAsHexString() const { return Util::uint64ToBase16(parent_id_); }
+  std::string parentIdAsHexString() const { return Util::uint64ToHex(parent_id_); }
 
   /**
    * @return the trace id as an integer.
@@ -105,7 +105,7 @@ public:
   /**
    * @return the trace id as a 16-character hexadecimal string.
    */
-  std::string traceIdAsHexString() const { return Util::uint64ToBase16(trace_id_); }
+  std::string traceIdAsHexString() const { return Util::uint64ToHex(trace_id_); }
 
   /**
    * @return a struct indicating which annotations are present in the span.

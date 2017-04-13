@@ -9,7 +9,7 @@ TEST(ZipkinUtilTest, utilTests) {
   EXPECT_EQ(typeid(uint64_t).name(), typeid(Util::timeSinceEpochMicro()).name());
   EXPECT_EQ(typeid(uint64_t).name(), typeid(Util::timeSinceEpochNano()).name());
 
-  std::string base16_string = Util::uint64ToBase16(2722130815203937912ULL);
+  std::string base16_string = Util::uint64ToHex(2722130815203937912ULL);
   EXPECT_EQ(typeid(std::string).name(), typeid(base16_string).name());
   EXPECT_EQ("25c6f38dd0600e78", base16_string);
 

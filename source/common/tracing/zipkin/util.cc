@@ -1,5 +1,3 @@
-#include <iomanip>
-
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/document.h"
@@ -56,7 +54,7 @@ uint64_t Util::generateRandom64() {
   return rand_64();
 }
 
-std::string Util::uint64ToBase16(uint64_t value) {
+std::string Util::uint64ToHex(uint64_t value) {
   std::vector<uint8_t> data(8);
 
   data[7] = (value & 0x00000000000000FF);

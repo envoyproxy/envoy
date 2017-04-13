@@ -158,15 +158,15 @@ const std::string& Span::toJson() {
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
   writer.Key(ZipkinJsonFieldNames::SPAN_TRACE_ID.c_str());
-  writer.String(Util::uint64ToBase16(trace_id_).c_str());
+  writer.String(Util::uint64ToHex(trace_id_).c_str());
   writer.Key(ZipkinJsonFieldNames::SPAN_NAME.c_str());
   writer.String(name_.c_str());
   writer.Key(ZipkinJsonFieldNames::SPAN_ID.c_str());
-  writer.String(Util::uint64ToBase16(id_).c_str());
+  writer.String(Util::uint64ToHex(id_).c_str());
 
   if (isset_.parent_id_ && parent_id_) {
     writer.Key(ZipkinJsonFieldNames::SPAN_PARENT_ID.c_str());
-    writer.String(Util::uint64ToBase16(parent_id_).c_str());
+    writer.String(Util::uint64ToHex(parent_id_).c_str());
   }
 
   if (isset_.timestamp_) {

@@ -303,26 +303,26 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
             span.toJson());
 
   uint64_t id = Util::generateRandom64();
-  std::string id_hex = Util::uint64ToBase16(id);
+  std::string id_hex = Util::uint64ToHex(id);
   span.setId(id);
   EXPECT_EQ(id, span.id());
   EXPECT_EQ(id_hex, span.idAsHexString());
 
   id = Util::generateRandom64();
-  id_hex = Util::uint64ToBase16(id);
+  id_hex = Util::uint64ToHex(id);
   span.setParentId(id);
   EXPECT_EQ(id, span.parentId());
   EXPECT_EQ(id_hex, span.parentIdAsHexString());
   EXPECT_TRUE(span.isSet().parent_id_);
 
   id = Util::generateRandom64();
-  id_hex = Util::uint64ToBase16(id);
+  id_hex = Util::uint64ToHex(id);
   span.setTraceId(id);
   EXPECT_EQ(id, span.traceId());
   EXPECT_EQ(id_hex, span.traceIdAsHexString());
 
   id = Util::generateRandom64();
-  id_hex = Util::uint64ToBase16(id);
+  id_hex = Util::uint64ToHex(id);
   span.setTraceIdHigh(id);
   EXPECT_EQ(id, span.traceIdHigh());
   EXPECT_TRUE(span.isSet().trace_id_high_);
@@ -440,7 +440,7 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
   Span span;
 
   uint64_t id = Util::generateRandom64();
-  std::string id_hex = Util::uint64ToBase16(id);
+  std::string id_hex = Util::uint64ToHex(id);
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
@@ -475,7 +475,7 @@ TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
   Span span;
 
   uint64_t id = Util::generateRandom64();
-  std::string id_hex = Util::uint64ToBase16(id);
+  std::string id_hex = Util::uint64ToHex(id);
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
