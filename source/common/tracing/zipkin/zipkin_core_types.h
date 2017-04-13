@@ -14,7 +14,7 @@ namespace Zipkin {
 class ZipkinBase {
 public:
   /**
-   * Destructor
+   * Destructor.
    */
   virtual ~ZipkinBase() {}
 
@@ -35,12 +35,12 @@ protected:
 class Endpoint : public ZipkinBase {
 public:
   /**
-   * Copy constructor
+   * Copy constructor.
    */
   Endpoint(const Endpoint&);
 
   /**
-   * Assignment operator
+   * Assignment operator.
    */
   Endpoint& operator=(const Endpoint&);
 
@@ -52,30 +52,30 @@ public:
   /**
    * Constructor that initializes an endpoint with the given attributes.
    *
-   * @param ipv4 String representing the endpoint's ipv4 attribute
-   * @param port Integer representing the endpoint's port attribute
-   * @param service_name String representing the endpoint's
+   * @param ipv4 String representing the endpoint's ipv4 attribute.
+   * @param port Integer representing the endpoint's port attribute.
+   * @param service_name String representing the endpoint's.
    */
   Endpoint(const std::string& ipv4, uint16_t port, const std::string& service_name)
       : ipv4_(ipv4), port_(port), service_name_(service_name), isset_ipv6_(false) {}
 
   /**
-   * @return the endpoint's ipv4 as a string
+   * @return the endpoint's ipv4 as a string.
    */
   const std::string& ipv4() const { return ipv4_; }
 
   /**
-   * Sets the endpoint's ipv4 attribute
+   * Sets the endpoint's ipv4 attribute.
    */
   void setIpv4(const std::string& ipv4) { ipv4_ = ipv4; }
 
   /**
-   * @return the endpoint's ipv6 as a string
+   * @return the endpoint's ipv6 as a string.
    */
   const std::string& ipv6() const { return ipv6_; }
 
   /**
-   * Sets the endpoint's ipv6 attribute
+   * Sets the endpoint's ipv6 attribute.
    */
   void setIpv6(const std::string& ipv6) {
     ipv6_ = ipv6;
@@ -83,34 +83,34 @@ public:
   }
 
   /**
-   * @return true if the ipv6 attribute is set, or false otherwise
+   * @return true if the ipv6 attribute is set, or false otherwise.
    */
   bool isSetIpv6() const { return isset_ipv6_; }
 
   /**
-   * @return the endpoint's port attribute
+   * @return the endpoint's port attribute.
    */
   uint16_t port() const { return port_; }
 
   /**
-   * Sets the endpoint's port attribute
+   * Sets the endpoint's port attribute.
    */
   void setPort(uint16_t port) { port_ = port; }
 
   /**
-   * @return the endpoint's service name attribute
+   * @return the endpoint's service name attribute.
    */
   const std::string& serviceName() const { return service_name_; }
 
   /**
-   * Sets the endpoint's service name attribute
+   * Sets the endpoint's service name attribute.
    */
   void setServiceName(const std::string& service_name) { service_name_ = service_name; }
 
   /**
-   * Serializes the endpoint as a Zipkin-compliant JSON representation as a string
+   * Serializes the endpoint as a Zipkin-compliant JSON representation as a string.
    *
-   * @return a stringified JSON
+   * @return a stringified JSON.
    */
   const std::string& toJson() override;
 
@@ -130,38 +130,38 @@ private:
 class Annotation : public ZipkinBase {
 public:
   /**
-   * Copy constructor
+   * Copy constructor.
    */
   Annotation(const Annotation&);
 
   /**
-   * Assignment operator
+   * Assignment operator.
    */
   Annotation& operator=(const Annotation&);
 
   /**
-   * Default constructor. Creates an empty annotation
+   * Default constructor. Creates an empty annotation.
    */
   Annotation() : timestamp_(0), value_(), isset_endpoint_(false) {}
 
   /**
-   * Constructor that creates an annotation based on the given parameters
+   * Constructor that creates an annotation based on the given parameters.
    *
-   * @param timestamp A 64-bit integer containing the annotation timestasmp attribute
+   * @param timestamp A 64-bit integer containing the annotation timestasmp attribute.
    * @param value A string containing the annotation's value attribute. Valid values
    * appear on ZipkinCoreConstants. The most commonly used values are "cs", "cr", "ss" and "sr".
-   * @param endpoint The endpoint object representing the annotation's endpoint attribute
+   * @param endpoint The endpoint object representing the annotation's endpoint attribute.
    */
   Annotation(uint64_t timestamp, const std::string value, Endpoint& endpoint)
       : timestamp_(timestamp), value_(value), endpoint_(endpoint), isset_endpoint_(true) {}
 
   /**
-   * @return the annotation's endpoint attribute
+   * @return the annotation's endpoint attribute.
    */
   const Endpoint& endpoint() const { return endpoint_; }
 
   /**
-   * Sets the annotation's endpoint attribute (copy semantics)
+   * Sets the annotation's endpoint attribute (copy semantics).
    */
   void setEndpoint(const Endpoint& endpoint) {
     endpoint_ = endpoint;
@@ -169,7 +169,7 @@ public:
   }
 
   /**
-   * Sets the annotation's endpoint attribute (move semantics)
+   * Sets the annotation's endpoint attribute (move semantics).
    */
   void setEndpoint(const Endpoint&& endpoint) {
     endpoint_ = endpoint;
@@ -177,34 +177,34 @@ public:
   }
 
   /**
-   * @return the annotation's timestamp attribute
+   * @return the annotation's timestamp attribute.
    */
   uint64_t timestamp() const { return timestamp_; }
 
   /**
-   * Sets the annotation's timestamp attribute
+   * Sets the annotation's timestamp attribute.
    */
   void setTimestamp(uint64_t timestamp) { timestamp_ = timestamp; }
 
   /**
-   * return the annotation's value attribute
+   * return the annotation's value attribute.
    */
   const std::string& value() const { return value_; }
 
   /**
-   * Sets the annotation's value attribute
+   * Sets the annotation's value attribute.
    */
   void setValue(const std::string& value) { value_ = value; }
 
   /**
-   * @return true if the endpoint attribute is set, or false otherwise
+   * @return true if the endpoint attribute is set, or false otherwise.
    */
   bool isSetEndpoint() const { return isset_endpoint_; }
 
   /**
-   * Serializes the annotation as a Zipkin-compliant JSON representation as a string
+   * Serializes the annotation as a Zipkin-compliant JSON representation as a string.
    *
-   * @return a stringified JSON
+   * @return a stringified JSON.
    */
   const std::string& toJson() override;
 
@@ -217,7 +217,7 @@ private:
 };
 
 /**
- * Enum representing valid types of Zipkin binary annotations
+ * Enum representing valid types of Zipkin binary annotations.
  */
 enum AnnotationType { BOOL = 0, STRING = 1 };
 
@@ -229,46 +229,46 @@ enum AnnotationType { BOOL = 0, STRING = 1 };
 class BinaryAnnotation : public ZipkinBase {
 public:
   /**
-   * Copy constructor
+   * Copy constructor.
    */
   BinaryAnnotation(const BinaryAnnotation&);
 
   /**
-   * Assignment operator
+   * Assignment operator.
    */
   BinaryAnnotation& operator=(const BinaryAnnotation&);
 
   /**
-   * Default constructor. Creates an empty binary annotation
+   * Default constructor. Creates an empty binary annotation.
    */
   BinaryAnnotation() : key_(), value_(), annotation_type_(STRING), isset_endpoint_(false) {}
 
   /**
-   * Constructor that creates a binary annotation based on the given parameters
+   * Constructor that creates a binary annotation based on the given parameters.
    *
-   * @param key The key name of the annotation
-   * @param value The value associated with the key
+   * @param key The key name of the annotation.
+   * @param value The value associated with the key.
    */
   BinaryAnnotation(const std::string& key, const std::string& value)
       : key_(key), value_(value), annotation_type_(STRING), isset_endpoint_(false) {}
 
   /**
-   * @return the type of the binary annotation
+   * @return the type of the binary annotation.
    */
   AnnotationType annotationType() const { return annotation_type_; }
 
   /**
-   * Sets the binary's annotation type
+   * Sets the binary's annotation type.
    */
   void setAnnotationType(AnnotationType annotationType) { annotation_type_ = annotationType; }
 
   /**
-   * @return the annotation's endpoint attribute
+   * @return the annotation's endpoint attribute.
    */
   const Endpoint& endpoint() const { return endpoint_; }
 
   /**
-   * Sets the annotation's endpoint attribute (copy semantics)
+   * Sets the annotation's endpoint attribute (copy semantics).
    */
   void setEndpoint(const Endpoint& endpoint) {
     endpoint_ = endpoint;
@@ -276,7 +276,7 @@ public:
   }
 
   /**
-   * Sets the annotation's endpoint attribute (move semantics)
+   * Sets the annotation's endpoint attribute (move semantics).
    */
   void setEndpoint(const Endpoint&& endpoint) {
     endpoint_ = endpoint;
@@ -284,34 +284,34 @@ public:
   }
 
   /**
-   * @return true of the endpoint attribute has been set, or false otherwise
+   * @return true of the endpoint attribute has been set, or false otherwise.
    */
   bool isSetEndpoint() const { return isset_endpoint_; }
 
   /**
-   * @return the key attribute
+   * @return the key attribute.
    */
   const std::string& key() const { return key_; }
 
   /**
-   * Sets the key attribute
+   * Sets the key attribute.
    */
   void setKey(const std::string& key) { key_ = key; }
 
   /**
-   * @return the value attribute
+   * @return the value attribute.
    */
   const std::string& value() const { return value_; }
 
   /**
-   * Sets the value attribute
+   * Sets the value attribute.
    */
   void setValue(const std::string& value) { value_ = value; }
 
   /**
-   * Serializes the binary annotation as a Zipkin-compliant JSON representation as a string
+   * Serializes the binary annotation as a Zipkin-compliant JSON representation as a string.
    *
-   * @return a stringified JSON
+   * @return a stringified JSON.
    */
   const std::string& toJson() override;
 
@@ -329,8 +329,8 @@ private:
  * This struct identifies which of the optional attributes are set in a Span object.
  * Each member is a one-bit boolean indicating whether or not the corresponding attribute is set.
  */
-typedef struct Span_isset_ {
-  Span_isset_()
+typedef struct SpanIsSet {
+  SpanIsSet()
       : parent_id_(false), debug_(false), timestamp_(false), duration_(false),
         trace_id_high_(false) {}
   bool parent_id_ : 1;
@@ -338,7 +338,7 @@ typedef struct Span_isset_ {
   bool timestamp_ : 1;
   bool duration_ : 1;
   bool trace_id_high_ : 1;
-} Span_isset_;
+} SpanIsSet;
 
 /**
  * Represents a Zipkin span. This class is based on Zipkin's Thrift definition of a span.
@@ -346,12 +346,12 @@ typedef struct Span_isset_ {
 class Span : public ZipkinBase {
 public:
   /**
-   * Copy constructor
+   * Copy constructor.
    */
   Span(const Span&);
 
   /**
-   * Assignment operator
+   * Assignment operator.
    */
   Span& operator=(const Span&);
 
@@ -363,22 +363,22 @@ public:
         trace_id_high_(0), start_time_(0), tracer_(nullptr) {}
 
   /**
-   * Sets the span's trace id attribute
+   * Sets the span's trace id attribute.
    */
   void setTraceId(const uint64_t val) { trace_id_ = val; }
 
   /**
-   * Sets the span's name attribute
+   * Sets the span's name attribute.
    */
   void setName(const std::string& val) { name_ = val; }
 
   /**
-   * Sets the span's id
+   * Sets the span's id.
    */
   void setId(const uint64_t val) { id_ = val; }
 
   /**
-   * Sets the span's parent id
+   * Sets the span's parent id.
    */
   void setParentId(const uint64_t val) {
     parent_id_ = val;
@@ -386,47 +386,47 @@ public:
   }
 
   /**
-   * @return a vector with all annotations added to the span
+   * @return a vector with all annotations added to the span.
    */
   const std::vector<Annotation>& annotations() { return annotations_; }
 
   /**
-   * Sets the span's annotations all at once
+   * Sets the span's annotations all at once.
    */
   void setAannotations(const std::vector<Annotation>& val) { annotations_ = val; }
 
   /**
-   * Adds an annotation to the span (copy semantics)
+   * Adds an annotation to the span (copy semantics).
    */
   void addAnnotation(const Annotation& ann) { annotations_.push_back(ann); }
 
   /**
-   * Adds an annotation to the span (move semantics)
+   * Adds an annotation to the span (move semantics).
    */
   void addAnnotation(const Annotation&& ann) { annotations_.push_back(ann); }
 
   /**
-   * Sets the span's binary annotations all at once
+   * Sets the span's binary annotations all at once.
    */
   void setBinaryAnnotations(const std::vector<BinaryAnnotation>& val) { binary_annotations_ = val; }
 
   /**
-   * Adds a binary annotation to the span (copy semantics)
+   * Adds a binary annotation to the span (copy semantics).
    */
   void addBinaryAnnotation(const BinaryAnnotation& bann) { binary_annotations_.push_back(bann); }
 
   /**
-   * Adds a binary annotation to the span (move semantics)
+   * Adds a binary annotation to the span (move semantics).
    */
   void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
 
   /**
-   * Sets the span's debug attribute
+   * Sets the span's debug attribute.
    */
   void setDebug() { isset_.debug_ = true; }
 
   /**
-   * Sets the span's timestamp attribute
+   * Sets the span's timestamp attribute.
    */
   void setTimestamp(const int64_t val) {
     timestamp_ = val;
@@ -434,7 +434,7 @@ public:
   }
 
   /**
-   * Sets the span's duration attribute
+   * Sets the span's duration attribute.
    */
   void setDuration(const int64_t val) {
     duration_ = val;
@@ -442,8 +442,8 @@ public:
   }
 
   /**
-   * Sets the higher 64 bits of the span's 128-bit trace id
-   * Note that this is optional, since 64-bit trace ids are valid
+   * Sets the higher 64 bits of the span's 128-bit trace id.
+   * Note that this is optional, since 64-bit trace ids are valid.
    */
   void setTraceIdHigh(const uint64_t val) {
     trace_id_high_ = val;
@@ -451,86 +451,86 @@ public:
   }
 
   /**
-   * Sets the span start-time attribute
+   * Sets the span start-time attribute.
    */
   void setStartTime(const int64_t time) { start_time_ = time; }
 
   /**
-   * @return the span's annotations
+   * @return the span's annotations.
    */
   const std::vector<Annotation>& annotations() const { return annotations_; }
 
   /**
-   * @return the span's binary annotations
+   * @return the span's binary annotations.
    */
   const std::vector<BinaryAnnotation>& binaryAnnotations() const { return binary_annotations_; }
 
   /**
-   * @return the span's duration attribute
+   * @return the span's duration attribute.
    */
   int64_t duration() const { return duration_; }
 
   /**
-   * @return the span's id as an integer
+   * @return the span's id as an integer.
    */
   uint64_t id() const { return id_; }
 
   /**
-   * @return the span's id as a hexadecimal string
+   * @return the span's id as a hexadecimal string.
    */
   std::string idAsHexString() const { return Util::uint64ToHex(id_); }
 
   /**
-   * @return a struct indicating which of the span's optional attributes are set
+   * @return a struct indicating which of the span's optional attributes are set.
    */
-  const Span_isset_& isSet() const { return isset_; }
+  const SpanIsSet& isSet() const { return isset_; }
 
   /**
-   * @return the span's name
+   * @return the span's name.
    */
   const std::string& name() const { return name_; }
 
   /**
-   * @return the span's parent id as an integer
+   * @return the span's parent id as an integer.
    */
   uint64_t parentId() const { return parent_id_; }
 
   /**
-   * @return the span's parent id as a hexadecimal string
+   * @return the span's parent id as a hexadecimal string.
    */
   std::string parentIdAsHexString() const { return Util::uint64ToHex(parent_id_); }
 
   /**
-   * @return the span's timestamp
+   * @return the span's timestamp.
    */
   int64_t timestamp() const { return timestamp_; }
 
   /**
-   * @return the span's trace id as an integer
+   * @return the span's trace id as an integer.
    */
   uint64_t traceId() const { return trace_id_; }
 
   /**
-   * @return the span's trace id as a hexadecimal string
+   * @return the span's trace id as a hexadecimal string.
    */
   std::string traceIdAsHexString() const { return Util::uint64ToHex(trace_id_); }
 
   /**
-   * @return the higher 64 bits of a 128-bit trace id
+   * @return the higher 64 bits of a 128-bit trace id.
    */
   uint64_t traceIdHigh() const { return trace_id_high_; }
 
   /**
-   * @return the span's start time
+   * @return the span's start time.
    */
   int64_t startTime() const { return start_time_; }
 
   /**
     * Serializes the span as a Zipkin-compliant JSON representation as a string.
     * The resulting JSON string can be used as part of an HTTP POST call to
-    * send the span to Zipkin
+    * send the span to Zipkin.
     *
-    * @return a stringified JSON
+    * @return a stringified JSON.
     */
   const std::string& toJson() override;
 
@@ -539,12 +539,12 @@ public:
    * by the span's finish() method so that the tracer can decide what to do with the span
    * when it is finished.
    *
-   * @param tracer Represents the Tracer object to be associated with the span
+   * @param tracer Represents the Tracer object to be associated with the span.
    */
   void setTracer(TracerRawPtr tracer) { tracer_ = tracer; }
 
   /**
-   * @return the Tracer object associated with the span
+   * @return the Tracer object associated with the span.
    */
   TracerRawPtr tracer() const { return tracer_; }
 
@@ -553,16 +553,16 @@ public:
    *
    * (1) determine if it needs to add more annotations to the span (e.g., a span containing a CS
    * annotation will need to add a CR annotation) and add them;
-   * (2) compute and set the span's duration;
+   * (2) compute and set the span's duration; and
    * (3) invoke the tracer's reportSpan() method if a tracer has been associated with the span.
    */
   void finish();
 
   /**
-   * Adds a binary annotation to the span
+   * Adds a binary annotation to the span.
    *
-   * @param name The binary annotation's key
-   * @param value The binary annotation's value
+   * @param name The binary annotation's key.
+   * @param value The binary annotation's value.
    */
   void setTag(const std::string& name, const std::string& value);
 
@@ -581,6 +581,6 @@ private:
 
   TracerRawPtr tracer_;
 
-  Span_isset_ isset_;
+  SpanIsSet isset_;
 };
 } // Zipkin
