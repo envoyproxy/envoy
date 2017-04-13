@@ -2,13 +2,10 @@
 
 namespace Zipkin {
 
-void SpanBuffer::allocateBuffer(uint64_t size) {
-  span_buffer_.resize(size);
-  size_ = size;
-}
+void SpanBuffer::allocateBuffer(uint64_t size) { span_buffer_.resize(size); }
 
 bool SpanBuffer::addSpan(Span&& span) {
-  if (next_position_ == size_) {
+  if (next_position_ == span_buffer_.size()) {
     // Buffer full
     return false;
   }
@@ -17,7 +14,7 @@ bool SpanBuffer::addSpan(Span&& span) {
   return true;
 }
 
-void SpanBuffer::flush() {
+void SpanBuffer::clear() {
   next_position_ = 0;
   std::fill(span_buffer_.begin(), span_buffer_.end(), nullptr);
 }

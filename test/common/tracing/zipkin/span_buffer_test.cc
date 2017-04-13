@@ -26,7 +26,7 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
                                            "]";
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
 
-  buffer.flush();
+  buffer.clear();
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 
@@ -48,7 +48,7 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
   EXPECT_EQ(2ULL, buffer.pendingSpans());
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
 
-  buffer.flush();
+  buffer.clear();
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 }
@@ -71,7 +71,7 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
                                            "]";
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
 
-  buffer.flush();
+  buffer.clear();
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 
@@ -93,7 +93,7 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   EXPECT_EQ(2ULL, buffer.pendingSpans());
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
 
-  buffer.flush();
+  buffer.clear();
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 }
