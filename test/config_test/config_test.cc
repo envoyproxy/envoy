@@ -57,7 +57,7 @@ uint32_t run(const std::string& directory) {
     Logger::Registry::getLog(Logger::Id::testing).info("iterating: {}", file_name);
     if (entry->d_type == DT_DIR && std::string(entry->d_name) != "." &&
         std::string(entry->d_name) != "..") {
-      num_tested = run(file_name);
+      num_tested += run(file_name);
       continue;
     } else if (entry->d_type == DT_DIR) {
       continue;
