@@ -21,7 +21,7 @@ public:
   void initialize(Event::Dispatcher&, Server::Instance&) override {}
   void shutdownParentAdmin(ShutdownParentAdminInfo&) override {}
   void terminateParent() override {}
-  void shutdownAdmin() override {}
+  void shutdown() override {}
   std::string version() override { return "1"; }
 };
 

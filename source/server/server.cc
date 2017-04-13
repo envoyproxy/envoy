@@ -85,7 +85,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   }
 }
 
-InstanceImpl::~InstanceImpl() { restarter_.shutdownAdmin(); }
+InstanceImpl::~InstanceImpl() { restarter_.shutdown(); }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return config_->clusterManager(); }
 
