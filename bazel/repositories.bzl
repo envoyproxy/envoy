@@ -86,6 +86,9 @@ def envoy_dependencies(path = "@envoy_deps//", local_protobuf_bzl = None, skip_b
         attrs = {"debug": attr.bool(default=False)},
     )
 
+    # Ideally, we wouldn't have a single repository target for all dependencies, but instead one per
+    # dependency, as suggested in #747. However, it's much faster to build all deps under a single
+    # recursive make job and single make jobserver.
     envoy_repository(
         name = "envoy_deps",
         debug = debug_build,
