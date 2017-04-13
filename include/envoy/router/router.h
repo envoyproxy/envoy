@@ -37,6 +37,11 @@ public:
   virtual ~RetryPolicy() {}
 
   /**
+   * @return std::chrono::milliseconds timeout per retry attempt.
+   */
+  virtual std::chrono::milliseconds perTryTimeout() const PURE;
+
+  /**
    * @return uint32_t the number of retries to allow against the route.
    */
   virtual uint32_t numRetries() const PURE;

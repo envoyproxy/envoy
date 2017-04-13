@@ -210,7 +210,8 @@ HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
 
   {
     "retry_on": "...",
-    "num_retries": "..."
+    "num_retries": "...",
+    "per_try_timeout_ms" : "..."
   }
 
 retry_on
@@ -221,6 +222,17 @@ num_retries
   *(optional, integer)* specifies the allowed number of retries. This parameter is optional and
   defaults to 1. These are the same conditions documented for
   :ref:`config_http_filters_router_x-envoy-max-retries`.
+
+per_try_timeout_ms
+  *(optional, integer)* specifies a non-zero timeout per retry attempt. This parameter is optional.
+  The same conditions documented for 
+  :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms` apply.
+
+  **Note:** If left unspecified, Envoy will use the global
+  `:ref: route timeout <config_http_conn_man_route_table_route_timeout>` for the request. 
+  Consequently, when using a `:ref: 5xx <config_http_filters_router_x-envoy-retry-on>` based 
+  retry policy, a request that times out will not be retried as the total timeout budget 
+  would have been exhausted.
 
 .. _config_http_conn_man_route_table_route_shadow:
 

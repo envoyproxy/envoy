@@ -51,6 +51,7 @@ FilterUtility::TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
   // otherwise we use the default.
   TimeoutData timeout;
   timeout.global_timeout_ = route.timeout();
+  timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
   Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
   uint64_t header_timeout;
   if (header_timeout_entry) {

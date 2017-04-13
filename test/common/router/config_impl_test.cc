@@ -1073,6 +1073,7 @@ TEST(RouteMatcherTest, Retry) {
           "prefix": "/",
           "cluster": "www2",
           "retry_policy": {
+            "per_try_timeout_ms" : 1000,
             "num_retries": 3,
             "retry_on": "5xx,connect-failure"
           }
@@ -1090,6 +1091,10 @@ TEST(RouteMatcherTest, Retry) {
 
   EXPECT_FALSE(config.usesRuntime());
 
+  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                                              ->routeEntry()
+                                              ->retryPolicy()
+                                              .perTryTimeout());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1100,6 +1105,10 @@ TEST(RouteMatcherTest, Retry) {
                 ->retryPolicy()
                 .retryOn());
 
+  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                                              ->routeEntry()
+                                              ->retryPolicy()
+                                              .perTryTimeout());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1109,6 +1118,10 @@ TEST(RouteMatcherTest, Retry) {
                     ->retryPolicy()
                     .retryOn());
 
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                                                 ->routeEntry()
+                                                 ->retryPolicy()
+                                                 .perTryTimeout());
   EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
