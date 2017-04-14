@@ -23,8 +23,10 @@ We welcome contributions from the community. Here are some guidelines.
 
 * Currently we are targeting approximately quarterly official releases. We may change this based
   on customer demand.
-* In general, master is assumed to be beta quality at all times. Lyft runs master in production,
-  typically deploying every few days.
+* In general, master is assumed to be release candidate quality at all times for documented
+  features. For undocumented or clearly under development features, use caution or ask about
+  current status when running master. Lyft runs master in production, typically deploying every
+  few days.
 
 # PR review policy
 
