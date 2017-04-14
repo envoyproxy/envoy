@@ -1,7 +1,6 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
-#include "common/ssl/openssl.h"
 
 #include "test/test_common/environment.h"
 
@@ -10,7 +9,6 @@
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleMock(&argc, argv);
-  Ssl::OpenSsl::initialize();
   Event::Libevent::Global::initialize();
 
   // Set gtest properties
