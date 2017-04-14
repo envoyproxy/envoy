@@ -20,6 +20,7 @@ envoy_cc_library(
     name = "context_config_lib",
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
+    external_deps = ["ssl"],
     deps = [
         "//include/envoy/ssl:context_config_interface",
         "//source/common/json:json_loader_lib",

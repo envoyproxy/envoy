@@ -87,7 +87,10 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
     "consecutive_5xx" : 10,
     "max_ejection_percent" : 50,
     "enforcing_consecutive_5xx" : 10,
-    "enforcing_success_rate": 20
+    "enforcing_success_rate": 20,
+    "success_rate_minimum_hosts": 50,
+    "success_rate_request_volume": 200,
+    "success_rate_stdev_factor": 3000
   }
   )EOF";
 
@@ -102,6 +105,9 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
   EXPECT_EQ(50UL, detector->config().maxEjectionPercent());
   EXPECT_EQ(10UL, detector->config().enforcingConsecutive5xx());
   EXPECT_EQ(20UL, detector->config().enforcingSuccessRate());
+  EXPECT_EQ(50UL, detector->config().successRateMinimumHosts());
+  EXPECT_EQ(200UL, detector->config().successRateRequestVolume());
+  EXPECT_EQ(3000UL, detector->config().successRateStdevFactor());
 }
 
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
@@ -255,6 +261,8 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4]), _,
                        EjectionType::SuccessRate, true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.success_rate_stdev_factor", 1900))
+      .WillByDefault(Return(1900));
   interval_timer_->callback_();
   EXPECT_EQ(50, cluster_.hosts_[4]->outlierDetector().successRate());
   EXPECT_EQ(90, detector->successRateAverage());
@@ -567,7 +575,7 @@ TEST(OutlierUtility, SRThreshold) {
   };
   double sum = 450;
 
-  Utility::EjectionPair ejection_pair = Utility::successRateEjectionThreshold(sum, data);
+  Utility::EjectionPair ejection_pair = Utility::successRateEjectionThreshold(sum, data, 1.9);
   EXPECT_EQ(52.0, ejection_pair.ejection_threshold_);
   EXPECT_EQ(90.0, ejection_pair.success_rate_average_);
 }

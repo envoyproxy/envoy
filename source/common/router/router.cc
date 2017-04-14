@@ -51,6 +51,7 @@ FilterUtility::TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
   // otherwise we use the default.
   TimeoutData timeout;
   timeout.global_timeout_ = route.timeout();
+  timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
   Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
   uint64_t header_timeout;
   if (header_timeout_entry) {
@@ -190,6 +191,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     callbacks_->requestInfo().setResponseFlag(Http::AccessLog::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr);
     Http::Utility::sendLocalReply(*callbacks_, Http::Code::ServiceUnavailable, "maintenance mode");
+    cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
 

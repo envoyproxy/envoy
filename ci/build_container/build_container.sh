@@ -4,7 +4,8 @@ set -e
 
 # Setup basic requirements and install them.
 apt-get update
-apt-get install -y wget software-properties-common make cmake git python python-pip clang-format-3.6 bc libtool automake lcov zip
+apt-get install -y wget software-properties-common make cmake git python python-pip \
+  clang-format-3.6 bc libtool automake zip time
 apt-get install -y golang
 # For debugging.
 apt-get install -y gdb strace
@@ -44,10 +45,7 @@ export CXX=g++-4.9
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty
 export THIRDPARTY_BUILD=/thirdparty_build
-# TODO(htuch): Remove the first build of the libraries in non-distinct locations when cmake is gone.
-# Below we now build/install twice and this requires 2x the space in the Docker image as is to
-# support both Bazel and cmake, but it's not worth fixing up all the cmake stuff since it's going
-# soon.
-"$(dirname "$0")"/build_and_install_deps.sh
-rm -f /tmp/*.dep
-BUILD_DISTINCT=1 "$(dirname "$0")"/build_and_install_deps.sh
+DEPS=$(python <(cat target_recipes.bzl; \
+  echo "print ' '.join(\"${THIRDPARTY_DEPS}/%s.dep\" % r for r in set(TARGET_RECIPES.values()))"))
+echo "Building deps ${DEPS}"
+"$(dirname "$0")"/build_and_install_deps.sh ${DEPS}

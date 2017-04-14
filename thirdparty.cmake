@@ -31,7 +31,7 @@ set(ENVOY_TCLAP_INCLUDE_DIR "" CACHE FILEPATH "location of tclap includes")
 set(ENVOY_GPERFTOOLS_INCLUDE_DIR "" CACHE FILEPATH "location of gperftools includes")
 
 # https://boringssl.googlesource.com/boringssl/+/chromium-stable
-# Last tested with sha b87c80300647c2c0311c1489a104470e099f1531
+# Last tested with sha be873e9f48b2a07269300282b69bb17d496c69ee
 set(ENVOY_OPENSSL_INCLUDE_DIR "" CACHE FILEPATH "location of openssl includes")
 
 # https://github.com/c-ares/c-ares

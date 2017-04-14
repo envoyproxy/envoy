@@ -1,69 +1,15 @@
-bind(
-    name = "ares",
-    actual = "//ci/prebuilt:ares",
+workspace(name = "ci")
+
+load("//bazel:repositories.bzl", "envoy_dependencies")
+
+envoy_dependencies(
+    path = "//ci/prebuilt",
+    skip_protobuf_bzl = True,
 )
 
-bind(
-    name = "event",
-    actual = "//ci/prebuilt:event",
-)
-
-bind(
-    name = "event_pthreads",
-    actual = "//ci/prebuilt:event_pthreads",
-)
-
-bind(
-    name = "googletest",
-    actual = "//ci/prebuilt:googletest",
-)
-
-bind(
-    name = "http_parser",
-    actual = "//ci/prebuilt:http_parser",
-)
-
-bind(
-    name = "lightstep",
-    actual = "//ci/prebuilt:lightstep",
-)
-
-bind(
-    name = "nghttp2",
-    actual = "//ci/prebuilt:nghttp2",
-)
-
-bind(
-    name = "protobuf",
-    actual = "//ci/prebuilt:protobuf",
-)
-
-local_repository(
-    name = "protobuf_git",
+new_local_repository(
+    name = "protobuf_bzl",
     path = "/thirdparty/protobuf-3.2.0",
-)
-
-bind(
-    name = "protoc",
-    actual = "//ci/prebuilt:protoc",
-)
-
-bind(
-    name = "rapidjson",
-    actual = "//ci/prebuilt:rapidjson",
-)
-
-bind(
-    name = "spdlog",
-    actual = "//ci/prebuilt:spdlog",
-)
-
-bind(
-    name = "ssl",
-    actual = "//ci/prebuilt:ssl",
-)
-
-bind(
-    name = "tclap",
-    actual = "//ci/prebuilt:tclap",
+    # We only want protobuf.bzl, so don't support building out of this repo.
+    build_file_content = "",
 )

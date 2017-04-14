@@ -55,6 +55,26 @@ TEST(RouteMatcherTest, TestRoutes) {
       ]
     },
     {
+      "name": "wildcard",
+      "domains": ["*.foo.com", "*-bar.baz.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "wildcard"
+        }
+      ]
+    },
+    {
+      "name": "wildcard2",
+      "domains": ["*.baz.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "wildcard2"
+        }
+      ]
+    },
+    {
       "name": "default",
       "domains": ["*"],
       "routes": [
@@ -159,6 +179,21 @@ TEST(RouteMatcherTest, TestRoutes) {
             config.route(genHeaders("lyft.com", "/foo", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("root_www2",
             config.route(genHeaders("wwww.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
+
+  // Wildcards
+  EXPECT_EQ("wildcard",
+            config.route(genHeaders("www.foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ(
+      "wildcard",
+      config.route(genHeaders("foo-bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("wildcard2",
+            config.route(genHeaders("-bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("wildcard2",
+            config.route(genHeaders("bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("instant-server",
+            config.route(genHeaders(".foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("instant-server",
+            config.route(genHeaders("foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
 
   // Timeout testing.
   EXPECT_EQ(std::chrono::milliseconds(30000),
@@ -1038,6 +1073,7 @@ TEST(RouteMatcherTest, Retry) {
           "prefix": "/",
           "cluster": "www2",
           "retry_policy": {
+            "per_try_timeout_ms" : 1000,
             "num_retries": 3,
             "retry_on": "5xx,connect-failure"
           }
@@ -1055,6 +1091,10 @@ TEST(RouteMatcherTest, Retry) {
 
   EXPECT_FALSE(config.usesRuntime());
 
+  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                                              ->routeEntry()
+                                              ->retryPolicy()
+                                              .perTryTimeout());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1065,6 +1105,10 @@ TEST(RouteMatcherTest, Retry) {
                 ->retryPolicy()
                 .retryOn());
 
+  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                                              ->routeEntry()
+                                              ->retryPolicy()
+                                              .perTryTimeout());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1074,6 +1118,10 @@ TEST(RouteMatcherTest, Retry) {
                     ->retryPolicy()
                     .retryOn());
 
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                                                 ->routeEntry()
+                                                 ->retryPolicy()
+                                                 .perTryTimeout());
   EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()

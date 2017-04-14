@@ -567,6 +567,11 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "retry_policy" : {
         "type" : "object",
         "properties" : {
+          "per_try_timeout_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
           "num_retries" : {"type" : "integer"},
           "retry_on" : {"type" : "string"}
         },
@@ -1127,11 +1132,15 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       },
       "hosts" : {
         "type" : "array",
+        "minItems" : 1,
+        "uniqueItems" : true,
         "items" : {
           "type" : "object",
           "properties" : {
             "url" : {"type" : "string"}
-          }
+          },
+          "required" : ["url"],
+          "additionalProperties" : false
         }
       },
       "service_name" : {"type" : "string"},
@@ -1257,7 +1266,9 @@ const std::string Json::Schema::SDS_SCHEMA(R"EOF(
       "hosts" : {
         "type" : "array",
         "items" : {"$ref" : "#/definitions/host"}
-      }
+      },
+      "required" : ["hosts"],
+      "additionalProperties" : false
     }
   }
   )EOF");

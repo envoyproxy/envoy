@@ -2,22 +2,11 @@
 # version number, etc.) to uniquely identify the revision of the upstream dependency.  This allows
 # make to pick up changes with a simple direct dependency on the build recipe.
 
-all: $(THIRDPARTY_DEPS)/libevent.dep \
-	$(THIRDPARTY_DEPS)/boringssl.dep \
-	$(THIRDPARTY_DEPS)/gperftools.dep \
-	$(THIRDPARTY_DEPS)/nghttp2.dep \
-	$(THIRDPARTY_DEPS)/cares.dep \
-	$(THIRDPARTY_DEPS)/protobuf.dep \
-	$(THIRDPARTY_DEPS)/cotire.dep \
-	$(THIRDPARTY_DEPS)/spdlog.dep \
-	$(THIRDPARTY_DEPS)/http-parser.dep \
-	$(THIRDPARTY_DEPS)/tclap.dep \
-	$(THIRDPARTY_DEPS)/lightstep.dep \
-	$(THIRDPARTY_DEPS)/rapidjson.dep \
-	$(THIRDPARTY_DEPS)/googletest.dep \
-	$(THIRDPARTY_DEPS)/gcovr.dep
-
 RECIPES := build_recipes
+
+# Make sure we use a consistent compiler across all deps.
+CC ?= gcc
+CXX ?= g++
 
 # If $(BUILD_DISTINCT) is set in the make environment, the artifacts are built and installed in
 # distinct directories under $(THIRDPARTY_BUILD) and $(THIRDPARTY_SRC). They end up looking like
@@ -44,8 +33,10 @@ build-recipe = cd $(THIRDPARTY_SRC) && \
     $(build-setup) && \
 	(((THIRDPARTY_SRC=$(THIRDPARTY_SRC)/$(DISTINCT_PATH) \
 	   THIRDPARTY_BUILD=$(THIRDPARTY_BUILD)/$(DISTINCT_PATH) \
+	   CC=$(CC) \
+	   CXX=$(CXX) \
 	   $(1) \
-	   bash $(realpath $<) 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
+	   time bash $(CURDIR)/recipe_wrapper.sh $(realpath $<) 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
 	$(build-complete)
 
 $(THIRDPARTY_DEPS)/%.dep: $(RECIPES)/%.sh

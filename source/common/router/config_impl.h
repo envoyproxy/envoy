@@ -120,10 +120,12 @@ public:
   RetryPolicyImpl(const Json::Object& config);
 
   // Router::RetryPolicy
+  std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
 
 private:
+  std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
 };
@@ -367,8 +369,20 @@ public:
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
+  const VirtualHostImpl* findWildcardVirtualHost(const std::string& host) const;
 
   std::unordered_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
+  // std::greater as a minor optimization to iterate from more to less specific
+  //
+  // A note on using an unordered_map versus a vector of (string, VirtualHostSharedPtr) pairs:
+  //
+  // Based on local benchmarks, each vector entry costs around 20ns for recall and (string)
+  // comparison with a fixed cost of about 25ns. For unordered_map, the empty map costs about 65ns
+  // and climbs to about 110ns once there are any entries.
+  //
+  // The break-even is 4 entries.
+  std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<int64_t>>
+      wildcard_virtual_host_suffixes_;
   VirtualHostSharedPtr default_virtual_host_;
   bool uses_runtime_{};
 };

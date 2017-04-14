@@ -85,6 +85,9 @@ private:
 
   struct NullRetryPolicy : public Router::RetryPolicy {
     // Router::RetryPolicy
+    std::chrono::milliseconds perTryTimeout() const override {
+      return std::chrono::milliseconds(0);
+    }
     uint32_t numRetries() const override { return 0; }
     uint32_t retryOn() const override { return 0; }
   };

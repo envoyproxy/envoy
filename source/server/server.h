@@ -94,6 +94,8 @@ public:
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                const LocalInfo::LocalInfo& local_info);
 
+  ~InstanceImpl() override;
+
   void run();
 
   // Server::Instance
