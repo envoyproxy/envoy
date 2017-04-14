@@ -8,7 +8,7 @@ When possible, all PRs should be removed by at least one senior committer prior 
 # Committers
 
 * Roman Dzhabarov (RomanDzhabarov) (rdzhabarov@lyft.com)
-* Constance Caramanolis (ccaraman) (ccaramanolis@lyft.com )
+* Constance Caramanolis (ccaraman) (ccaramanolis@lyft.com)
 * Jose Nino (junr03) (jnino@lyft.com)
 * Daniel Hochman (danielhochman) (dhochman@lyft.com)
 * Michael Schore (goaway) (mschore@lyft.com)
