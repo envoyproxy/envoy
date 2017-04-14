@@ -17,13 +17,13 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
 
   buffer.addSpan(std::move(span));
   EXPECT_EQ(1ULL, buffer.pendingSpans());
-  std::string expected_json_array_string = ""
-                                           "[{\"traceId\":\"0000000000000000\","
-                                           "\"name\":\"\","
-                                           "\"id\":\"0000000000000000\","
-                                           "\"annotations\":[],"
-                                           "\"binaryAnnotations\":[]}"
-                                           "]";
+  std::string expected_json_array_string = "[{"
+                                           R"("traceId":"0000000000000000",)"
+                                           R"("name":"",)"
+                                           R"("id":"0000000000000000",)"
+                                           R"("annotations":[],)"
+                                           R"("binaryAnnotations":[])"
+                                           "}]";
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
 
   buffer.clear();
@@ -32,18 +32,21 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
 
   buffer.addSpan(std::move(span));
   buffer.addSpan(Span(span));
-  expected_json_array_string = ""
-                               "["
-                               "{\"traceId\":\"0000000000000000\","
-                               "\"name\":\"\","
-                               "\"id\":\"0000000000000000\","
-                               "\"annotations\":[],"
-                               "\"binaryAnnotations\":[]},"
-                               "{\"traceId\":\"0000000000000000\","
-                               "\"name\":\"\","
-                               "\"id\":\"0000000000000000\","
-                               "\"annotations\":[],"
-                               "\"binaryAnnotations\":[]}"
+  expected_json_array_string = "["
+                               "{"
+                               R"("traceId":"0000000000000000",)"
+                               R"("name":"",)"
+                               R"("id":"0000000000000000",)"
+                               R"("annotations":[],)"
+                               R"("binaryAnnotations":[])"
+                               "},"
+                               "{"
+                               R"("traceId":"0000000000000000",)"
+                               R"("name":"",)"
+                               R"("id":"0000000000000000",)"
+                               R"("annotations":[],)"
+                               R"("binaryAnnotations":[])"
+                               "}"
                                "]";
   EXPECT_EQ(2ULL, buffer.pendingSpans());
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
@@ -62,13 +65,13 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
 
   buffer.addSpan(std::move(span));
   EXPECT_EQ(1ULL, buffer.pendingSpans());
-  std::string expected_json_array_string = ""
-                                           "[{\"traceId\":\"0000000000000000\","
-                                           "\"name\":\"\","
-                                           "\"id\":\"0000000000000000\","
-                                           "\"annotations\":[],"
-                                           "\"binaryAnnotations\":[]}"
-                                           "]";
+  std::string expected_json_array_string = "[{"
+                                           R"("traceId":"0000000000000000",)"
+                                           R"("name":"",)"
+                                           R"("id":"0000000000000000",)"
+                                           R"("annotations":[],)"
+                                           R"("binaryAnnotations":[])"
+                                           "}]";
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
 
   buffer.clear();
@@ -77,19 +80,21 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
 
   buffer.addSpan(std::move(span));
   buffer.addSpan(Span(span));
-  expected_json_array_string = ""
-                               "["
-                               "{\"traceId\":\"0000000000000000\","
-                               "\"name\":\"\","
-                               "\"id\":\"0000000000000000\","
-                               "\"annotations\":[],"
-                               "\"binaryAnnotations\":[]},"
-                               "{\"traceId\":\"0000000000000000\","
-                               "\"name\":\"\","
-                               "\"id\":\"0000000000000000\","
-                               "\"annotations\":[],"
-                               "\"binaryAnnotations\":[]}"
-                               "]";
+  expected_json_array_string = "["
+                               "{"
+                               R"("traceId":"0000000000000000",)"
+                               R"("name":"",)"
+                               R"("id":"0000000000000000",)"
+                               R"("annotations":[],)"
+                               R"("binaryAnnotations":[])"
+                               "},"
+                               "{"
+                               R"("traceId":"0000000000000000",)"
+                               R"("name":"",)"
+                               R"("id":"0000000000000000",)"
+                               R"("annotations":[],)"
+                               R"("binaryAnnotations":[])"
+                               "}]";
   EXPECT_EQ(2ULL, buffer.pendingSpans());
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
 

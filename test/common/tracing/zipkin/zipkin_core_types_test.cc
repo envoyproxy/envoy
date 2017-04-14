@@ -12,7 +12,7 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   EXPECT_EQ(0, ep.port());
   EXPECT_EQ("", ep.serviceName());
   EXPECT_FALSE(ep.isSetIpv6());
-  EXPECT_EQ("{\"ipv4\":\"\",\"port\":0,\"serviceName\":\"\"}", ep.toJson());
+  EXPECT_EQ(R"({"ipv4":"","port":0,"serviceName":""})", ep.toJson());
 
   ep.setIpv4(std::string("127.0.0.1"));
   EXPECT_EQ("127.0.0.1", ep.ipv4());
@@ -27,8 +27,8 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   ep.setServiceName("my_service");
   EXPECT_EQ("my_service", ep.serviceName());
 
-  EXPECT_EQ("{\"ipv4\":\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\",\"ipv6\":\"2001:"
-            "0db8:85a3:0000:0000:8a2e:0370:7334\"}",
+  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service",)"
+            R"("ipv6":"2001:0db8:85a3:0000:0000:8a2e:0370:7334"})",
             ep.toJson());
 }
 
@@ -39,14 +39,14 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
   EXPECT_EQ(3306, ep.port());
   EXPECT_EQ("my_service", ep.serviceName());
   EXPECT_FALSE(ep.isSetIpv6());
-  EXPECT_EQ("{\"ipv4\":\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\"}", ep.toJson());
+  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})", ep.toJson());
 
   ep.setIpv6("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
   EXPECT_EQ("2001:0db8:85a3:0000:0000:8a2e:0370:7334", ep.ipv6());
   EXPECT_TRUE(ep.isSetIpv6());
 
-  EXPECT_EQ("{\"ipv4\":\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\",\"ipv6\":\"2001:"
-            "0db8:85a3:0000:0000:8a2e:0370:7334\"}",
+  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service",)"
+            R"("ipv6":"2001:0db8:85a3:0000:0000:8a2e:0370:7334"})",
             ep.toJson());
 }
 
@@ -58,7 +58,7 @@ TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
   EXPECT_EQ(3306, ep1.port());
   EXPECT_EQ("my_service", ep1.serviceName());
   EXPECT_FALSE(ep1.isSetIpv6());
-  EXPECT_EQ("{\"ipv4\":\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\"}", ep1.toJson());
+  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})", ep1.toJson());
 
   EXPECT_EQ(ep1.ipv4(), ep2.ipv4());
   EXPECT_EQ(ep1.port(), ep2.port());
@@ -75,7 +75,7 @@ TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
   EXPECT_EQ(3306, ep1.port());
   EXPECT_EQ("my_service", ep1.serviceName());
   EXPECT_FALSE(ep1.isSetIpv6());
-  EXPECT_EQ("{\"ipv4\":\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\"}", ep1.toJson());
+  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})", ep1.toJson());
 
   EXPECT_EQ(ep1.ipv4(), ep2.ipv4());
   EXPECT_EQ(ep1.port(), ep2.port());
@@ -98,8 +98,8 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   ann.setValue(ZipkinCoreConstants::CLIENT_SEND);
   EXPECT_EQ(ZipkinCoreConstants::CLIENT_SEND, ann.value());
 
-  std::string expected_json = "{\"timestamp\":" + std::to_string(timestamp) + ",\"value\":\"" +
-                              ZipkinCoreConstants::CLIENT_SEND + "\"}";
+  std::string expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
+                              ZipkinCoreConstants::CLIENT_SEND + R"("})";
   EXPECT_EQ(expected_json, ann.toJson());
 
   // Test the copy-semantics flavor of setEndpoint
@@ -111,13 +111,13 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ(3306, ann.endpoint().port());
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
   EXPECT_FALSE(ann.endpoint().isSetIpv6());
-  EXPECT_EQ("{\"ipv4\":\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\"}",
+  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})",
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
-  expected_json = "{\"timestamp\":" + std::to_string(timestamp) + ",\"value\":\"" +
+  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
                   ZipkinCoreConstants::CLIENT_SEND +
-                  "\",\"endpoint\":{\"ipv4\":"
-                  "\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\"}}";
+                  R"(","endpoint":{"ipv4":)"
+                  R"("127.0.0.1","port":3306,"serviceName":"my_service"}})";
   EXPECT_EQ(expected_json, ann.toJson());
 
   // Test the move-semantics flavor of setEndpoint
@@ -129,13 +129,13 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ(5555, ann.endpoint().port());
   EXPECT_EQ("my_service_2", ann.endpoint().serviceName());
   EXPECT_FALSE(ann.endpoint().isSetIpv6());
-  EXPECT_EQ("{\"ipv4\":\"192.168.1.1\",\"port\":5555,\"serviceName\":\"my_service_2\"}",
+  EXPECT_EQ(R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})",
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
-  expected_json = "{\"timestamp\":" + std::to_string(timestamp) + ",\"value\":\"" +
+  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
                   ZipkinCoreConstants::CLIENT_SEND +
-                  "\",\"endpoint\":{\"ipv4\":"
-                  "\"192.168.1.1\",\"port\":5555,\"serviceName\":\"my_service_2\"}}";
+                  R"(","endpoint":{"ipv4":"192.168.1.1",)"
+                  R"("port":5555,"serviceName":"my_service_2"}})";
   EXPECT_EQ(expected_json, ann.toJson());
 }
 
@@ -152,13 +152,13 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   EXPECT_EQ(3306, ann.endpoint().port());
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
   EXPECT_FALSE(ann.endpoint().isSetIpv6());
-  EXPECT_EQ("{\"ipv4\":\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\"}",
+  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})",
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
-  std::string expected_json = "{\"timestamp\":" + std::to_string(timestamp) + ",\"value\":\"" +
+  std::string expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
                               ZipkinCoreConstants::CLIENT_SEND +
-                              "\",\"endpoint\":{\"ipv4\":"
-                              "\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\"}}";
+                              R"(","endpoint":{"ipv4":"127.0.0.1",)"
+                              R"("port":3306,"serviceName":"my_service"}})";
   EXPECT_EQ(expected_json, ann.toJson());
 }
 
@@ -208,7 +208,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   ann.setValue("value");
   EXPECT_EQ("value", ann.value());
 
-  std::string expected_json = "{\"key\":\"key\",\"value\":\"value\"}";
+  std::string expected_json = R"({"key":"key","value":"value"})";
   EXPECT_EQ(expected_json, ann.toJson());
 
   // Test the copy-semantics flavor of setEndpoint
@@ -220,11 +220,14 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   EXPECT_EQ(3306, ann.endpoint().port());
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
   EXPECT_FALSE(ann.endpoint().isSetIpv6());
-  EXPECT_EQ("{\"ipv4\":\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\"}",
+  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})",
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
-  expected_json = "{\"key\":\"key\",\"value\":\"value\",\"endpoint\":{\"ipv4\":"
-                  "\"127.0.0.1\",\"port\":3306,\"serviceName\":\"my_service\"}}";
+  expected_json = "{"
+                  R"("key":"key","value":"value",)"
+                  R"("endpoint":)"
+                  R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"
+                  "}";
   EXPECT_EQ(expected_json, ann.toJson());
 
   // Test the move-semantics flavor of setEndpoint
@@ -236,11 +239,13 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   EXPECT_EQ(5555, ann.endpoint().port());
   EXPECT_EQ("my_service_2", ann.endpoint().serviceName());
   EXPECT_FALSE(ann.endpoint().isSetIpv6());
-  EXPECT_EQ("{\"ipv4\":\"192.168.1.1\",\"port\":5555,\"serviceName\":\"my_service_2\"}",
+  EXPECT_EQ(R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})",
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
-
-  expected_json = "{\"key\":\"key\",\"value\":\"value\",\"endpoint\":{\"ipv4\":"
-                  "\"192.168.1.1\",\"port\":5555,\"serviceName\":\"my_service_2\"}}";
+  expected_json = "{"
+                  R"("key":"key","value":"value",)"
+                  R"("endpoint":)"
+                  R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})"
+                  "}";
   EXPECT_EQ(expected_json, ann.toJson());
 }
 
@@ -251,7 +256,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, customConstructor) {
   EXPECT_EQ("value", ann.value());
   EXPECT_FALSE(ann.isSetEndpoint());
   EXPECT_EQ(AnnotationType::STRING, ann.annotationType());
-  std::string expected_json = "{\"key\":\"key\",\"value\":\"value\"}";
+  std::string expected_json = R"({"key":"key","value":"value"})";
   EXPECT_EQ(expected_json, ann.toJson());
 }
 
@@ -298,8 +303,8 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_FALSE(span.isSet().parent_id_);
   EXPECT_FALSE(span.isSet().timestamp_);
   EXPECT_FALSE(span.isSet().trace_id_high_);
-  EXPECT_EQ("{\"traceId\":\"0000000000000000\",\"name\":\"\",\"id\":\"0000000000000000\","
-            "\"annotations\":[],\"binaryAnnotations\":[]}",
+  EXPECT_EQ(R"({"traceId":"0000000000000000","name":"","id":"0000000000000000",)"
+            R"("annotations":[],"binaryAnnotations":[]})",
             span.toJson());
 
   uint64_t id = Util::generateRandom64();
@@ -373,16 +378,16 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(1ULL, span.binaryAnnotations().size());
 
   EXPECT_EQ(
-      "{\"traceId\":\"" + span.traceIdAsHexString() + "\",\"name\":\"span_name\",\"id\":\"" +
-          span.idAsHexString() + "\",\"parentId\":\"" + span.parentIdAsHexString() +
-          "\",\"timestamp\":" + std::to_string(span.timestamp()) + ",\"duration\":3000,"
-                                                                   "\"annotations\":["
-                                                                   "{\"timestamp\":" +
+      R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
+          span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
+          R"(","timestamp":)" + std::to_string(span.timestamp()) + R"(,"duration":3000,)"
+                                                                   R"("annotations":[)"
+                                                                   R"({"timestamp":)" +
           std::to_string(span.timestamp()) +
-          ",\"value\":\"cs\",\"endpoint\":"
-          "{\"ipv4\":\"192.168.1.2\",\"port\":3306,\"serviceName\":\"my_service_name\"}}],"
-          "\"binaryAnnotations\":[{\"key\":\"lc\",\"value\":\"my_component_name\",\"endpoint\":"
-          "{\"ipv4\":\"192.168.1.2\",\"port\":3306,\"serviceName\":\"my_service_name\"}}]}",
+          R"(,"value":"cs","endpoint":)"
+          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}],)"
+          R"("binaryAnnotations":[{"key":"lc","value":"my_component_name","endpoint":)"
+          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})",
       span.toJson());
 
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
@@ -407,32 +412,31 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(3ULL, span.annotations().size());
   EXPECT_EQ(3ULL, span.binaryAnnotations().size());
 
-  EXPECT_EQ("{\"traceId\":\"" + span.traceIdAsHexString() + "\",\"name\":\"span_name\",\"id\":\"" +
-                span.idAsHexString() + "\",\"parentId\":\"" + span.parentIdAsHexString() +
-                "\",\"timestamp\":" + std::to_string(span.timestamp()) + ",\"duration\":3000,"
-                                                                         "\"annotations\":["
-                                                                         "{\"timestamp\":" +
+  EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
+                span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
+                R"(","timestamp":)" + std::to_string(span.timestamp()) + R"(,"duration":3000,)"
+                                                                         R"("annotations":[)"
+                                                                         R"({"timestamp":)" +
                 std::to_string(timestamp) +
-                ",\"value\":\"cs\",\"endpoint\":"
-                "{\"ipv4\":\"192.168.1.2\",\"port\":3306,\"serviceName\":\"my_service_name\"}},"
-                "{\"timestamp\":" +
-                std::to_string(timestamp) + ",\"value\":\"ss\","
-                                            "\"endpoint\":{\"ipv4\":\"192.168.1.2\",\"port\":3306,"
-                                            "\"serviceName\":\"my_service_name\"}},"
-                                            "{\"timestamp\":" +
+                R"(,"value":"cs","endpoint":)"
+                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}},)"
+                R"({"timestamp":)" +
+                std::to_string(timestamp) + R"(,"value":"ss",)"
+                                            R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                                            R"("serviceName":"my_service_name"}},)"
+                                            R"({"timestamp":)" +
                 std::to_string(timestamp) +
-                ",\"value\":\"sr\","
-                "\"endpoint\":{\"ipv4\":\"192.168.1.2\",\"port\":3306,\"serviceName\":\"my_service_"
-                "name\"}}],"
-                "\"binaryAnnotations\":[{\"key\":\"lc\",\"value\":\"my_component_name\","
-                "\"endpoint\":{\"ipv4\":\"192.168.1.2\",\"port\":3306,\"serviceName\":\"my_service_"
-                "name\"}},"
-                "{\"key\":\"http.return_code\",\"value\":\"200\","
-                "\"endpoint\":{\"ipv4\":\"192.168.1.2\",\"port\":3306,\"serviceName\":\"my_service_"
-                "name\"}},"
-                "{\"key\":\"http.return_code\",\"value\":\"400\","
-                "\"endpoint\":{\"ipv4\":\"192.168.1.2\",\"port\":3306,\"serviceName\":\"my_service_"
-                "name\"}}]}",
+                R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                R"("serviceName":"my_service_name"}}],)"
+                R"("binaryAnnotations":[{"key":"lc","value":"my_component_name",)"
+                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                R"("serviceName":"my_service_name"}},)"
+                R"({"key":"http.return_code","value":"200",)"
+                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                R"("serviceName":"my_service_name"}},)"
+                R"({"key":"http.return_code","value":"400",)"
+                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                R"("serviceName":"my_service_name"}}]})",
             span.toJson());
 }
 
