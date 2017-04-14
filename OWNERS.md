@@ -1,6 +1,6 @@
 # Senior committers
 
-When possible, all PRs should be removed by at least one senior committer prior to merging.
+When possible, all PRs should be reviewed by at least one senior committer prior to merging.
 
 * Matt Klein (mattklein123) (mklein@lyft.com)
 * Harvey Tuch (htuch) (htuch@google.com) (pending)
