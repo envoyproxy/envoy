@@ -13,6 +13,7 @@ TLS context
     "verify_certificate_hash": "...",
     "verify_subject_alt_name": [],
     "cipher_suites": "...",
+    "ecdh_curves": "...",
     "sni": "..."
   }
 
@@ -67,6 +68,10 @@ cipher_suites
   AES256-SHA
 
 will be used.
+
+ecdh_curves
+  *(optional, string)* If specified, the TLS connection will only support the specified ECDH curves.
+  If not specified, the default curves (X25519, P-256) will be used.
 
 sni
   *(optional, string)* If specified, the string will be presented as the SNI during the TLS
