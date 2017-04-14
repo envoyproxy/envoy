@@ -88,7 +88,7 @@ envoy_cc_library(
     hdrs = ["options_impl.h"],
     external_deps = ["tclap"],
     deps = [
-        "//source/version_generated:version_generated",
+        "//source/version_generated",
         "//include/envoy/server:options_interface",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
@@ -104,7 +104,7 @@ envoy_cc_library(
         ":connection_handler_lib",
         ":test_hooks_lib",
         ":worker_lib",
-        "//source/version_generated:version_generated",
+        "//source/version_generated",
         "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
