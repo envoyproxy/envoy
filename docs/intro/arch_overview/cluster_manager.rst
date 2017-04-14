@@ -19,7 +19,7 @@ UDS), upstream protocol where applicable (HTTP/1.1, HTTP/2), etc.
 
 Clusters known to the cluster manager can be configured either statically, or fetched dynamically
 via the cluster discovery service (CDS) API. Dynamic cluster fetches allow more configuration to
-be stored in a central configuration server and thus requires less Envoy restarts and configuration
+be stored in a central configuration server and thus requires fewer Envoy restarts and configuration
 distribution.
 
 * Cluster manager :ref:`configuration <config_cluster_manager>`.
