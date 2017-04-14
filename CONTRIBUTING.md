@@ -9,47 +9,44 @@ We welcome contributions from the community. Here are some guidelines.
 
 # Coding style
 
-* The Envoy source code is formated using clang-format. Thus all white space, etc. 
-  issues are taken care of automatically. The Travis tests will automatically check
-  the code format and fail. There are make targets that can both check the format 
-  (check_format) as well as fix the code format for you (fix_format).
-* Beyond code formatting, for the most part Envoy uses the 
-  [Google C++ style guidelines](https://google.github.io/styleguide/cppguide.html). 
-  The following section covers the major areas where we deviate from the Google 
-  guidelines.
+* See [STYLE.md](STYLE.md)
 
-# Deviations from Google C++ Style guidelines
+# Breaking configuration change policy
 
-* Exceptions are allowed and encouraged where appropriate.
-* References are always preferred over pointers when the reference cannot be null. This
-  includes both const and non-const references.
-* Function names using camel case starting with a lower case letter (e.g., "doFoo()").
-* Struct/Class member variables have a '\_' postfix (e.g., "int foo\_;").
-* 100 columns is the line limit.
-* Global static non-pod variables are allowed because Envoy correctly joins all threads on exit.
-  However, care is needed during init and static accessor functions may be required.
-* OOM events (both memory and FDs) are considered fatal crashing errors.
-* Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
-* Smart pointers are type aliased:
-  * `typedef std::unique_ptr<Foo> FooPtr;`
-  * `typedef std::shared_ptr<Bar> BarSharedPtr;`
-  * `typedef std::shared_ptr<const Blah> BlahConstSharedPtr;`
-  * Regular pointers (e.g. `int* foo`) should not be type aliased.
-* API-level comments should follow normal Doxygen conventions. Use `@param` to describe
-  parameters, `@return <return-type>` for return values.
-* There are probably a few other things missing from this list. We will add them as they
-  are brought to our attention.
+* As of the 1.3.0 release, the Envoy configuration is locked and we will not make breaking changes
+  between releases.
+* We reserve the right to deprecate configuration, and at the beginning of the following release
+  cycle remove the deprecated configuration.
+* All deprecations/breaking changes will be clearly listed in the release notes.
+
+# Release cadence
+
+* Currently we are targeting approximately quarterly official releases. We may change this based
+  on customer demand.
+* In general, master is assumed to be beta quality at all times. Lyft runs master in production,
+  typically deploying every few days.
+
+# PR review policy
+
+* Typically we try to turn around reviews within one business day.
+* See [OWNERS.md](OWNERS.md) for ther current list of committers.
+* If possible, a senior committer should review every PR.
+* Anyone is welcome to review any PR that they want, whether they are a committer or not.
+* Committers **must** verify that the PR author has signed the CLA. Currently we do not have a
+  bot that verifies CLA compliance, and only Lyft employees can check the CLA tool to see if
+  someone has signed. Non-Lyft committers need to ask a Lyft employee to check unless they are sure
+  the author has signed.
 
 # Submitting a PR
 
 * Fork the repo and create your PR.
-* Tests will automatically run for you. 
+* Tests will automatically run for you.
 * When all of the tests are passing, tag @lyft/network-team and we will review it and
   merge once our CLA has been signed (see below).
 * Party time.
 
 # CLA
 
-* We require a CLA for code contributions, so before we can accept a pull request we need 
-  to have a signed CLA. Please visit our [CLA service](https://oss.lyft.com/cla) and follow 
+* We require a CLA for code contributions, so before we can accept a pull request we need
+  to have a signed CLA. Please visit our [CLA service](https://oss.lyft.com/cla) and follow
   the instructions to sign the CLA.
