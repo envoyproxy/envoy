@@ -312,7 +312,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
     }
     begin = end;
   }
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
