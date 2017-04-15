@@ -14,6 +14,7 @@ public:
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
   const std::string& altAlpnProtocols() const override { return alt_alpn_protocols_; }
   const std::string& cipherSuites() const override { return cipher_suites_; }
+  const std::string& ecdhCurves() const override { return ecdh_curves_; }
   const std::string& caCertFile() const override { return ca_cert_file_; }
   const std::string& certChainFile() const override { return cert_chain_file_; }
   const std::string& privateKeyFile() const override { return private_key_file_; }
@@ -25,10 +26,12 @@ public:
 
 private:
   static const std::string DEFAULT_CIPHER_SUITES;
+  static const std::string DEFAULT_ECDH_CURVES;
 
   std::string alpn_protocols_;
   std::string alt_alpn_protocols_;
   std::string cipher_suites_;
+  std::string ecdh_curves_;
   std::string ca_cert_file_;
   std::string cert_chain_file_;
   std::string private_key_file_;
