@@ -52,8 +52,17 @@ We welcome contributions from the community. Here are some guidelines.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
+* Your PR title should be descriptive, and generally start with a subsystem name followed by a
+  colon. Examples:
+** "docs: fix grammar error"
+** "http conn man: add new feature"
+* Your PR description should have details on what the PR does. If it fixes an existing issue it
+  should end with "Fixes #XXX".
 * When all of the tests are passing and all other conditions described herein are satisfied, tag
   @lyft/network-team and we will review it and merge once our CLA has been signed (see below).
+* Once you submit a PR, *please do not rebase it*. It's much easier to review if subsequent commits
+  are new commits and/or merges. We squash rebase the final merged commit so the number of commits
+  you have in the PR don't matter.
 * We expect that once a PR is opened, it will be actively worked on until it is merged or closed.
   We reserve the right to close PRs that are not making progress. This is generally defined as no
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
