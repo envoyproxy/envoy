@@ -54,8 +54,8 @@ We welcome contributions from the community. Here are some guidelines.
   to find some help but there are no guarantees.
 * Your PR title should be descriptive, and generally start with a subsystem name followed by a
   colon. Examples:
-** "docs: fix grammar error"
-** "http conn man: add new feature"
+  ** "docs: fix grammar error"
+  ** "http conn man: add new feature"
 * Your PR description should have details on what the PR does. If it fixes an existing issue it
   should end with "Fixes #XXX".
 * When all of the tests are passing and all other conditions described herein are satisfied, tag
