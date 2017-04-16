@@ -50,7 +50,7 @@ We welcome contributions from the community. Here are some guidelines.
   open it.
 * Any PR that changes user facing behavior **must** have associated documentation.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
-  If you are not a native English speaker (or a bad writer ;-)) please let us know and we will try
+  If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
 * When all of the tests are passing and all other conditions described herein are satisfied, tag
   @lyft/network-team and we will review it and merge once our CLA has been signed (see below).
