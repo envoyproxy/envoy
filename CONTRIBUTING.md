@@ -44,10 +44,11 @@ We welcome contributions from the community. Here are some guidelines.
 
 * Fork the repo and create your PR.
 * Tests will automatically run for you.
-* We will *not* merge any PR that is not passing tests.
-* PRs are expected to have 100% test coverage. This can be verified with a coverage build. If your
-  PR cannot have 100% coverage for some reason please clearly explain why when you open it.
-* Any PR that changes user facing behavior *must* have associated documentation.
+* We will **not** merge any PR that is not passing tests.
+* PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
+  build. If your PR cannot have 100% coverage for some reason please clearly explain why when you
+  open it.
+* Any PR that changes user facing behavior **must** have associated documentation.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a native English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
