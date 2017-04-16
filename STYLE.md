@@ -29,7 +29,7 @@
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
 
-# Google style guides for other languages:
+# Google style guides for other languages
 
 * [Python](https://google.github.io/styleguide/pyguide.html)
 * [Bash](https://google.github.io/styleguide/shell.xml)
