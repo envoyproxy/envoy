@@ -1,4 +1,4 @@
-# Coding style
+# C++ coding style
 
 * The Envoy source code is formated using clang-format. Thus all white space, etc.
   issues are taken care of automatically. The Travis tests will automatically check
@@ -9,7 +9,7 @@
   The following section covers the major areas where we deviate from the Google
   guidelines.
 
-# Deviations from Google C++ Style guidelines
+# Deviations from Google C++ style guidelines
 
 * Exceptions are allowed and encouraged where appropriate.
 * References are always preferred over pointers when the reference cannot be null. This
@@ -17,8 +17,6 @@
 * Function names using camel case starting with a lower case letter (e.g., "doFoo()").
 * Struct/Class member variables have a '\_' postfix (e.g., "int foo\_;").
 * 100 columns is the line limit.
-* Global static non-pod variables are allowed because Envoy correctly joins all threads on exit.
-  However, care is needed during init and static accessor functions may be required.
 * OOM events (both memory and FDs) are considered fatal crashing errors.
 * Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
 * Smart pointers are type aliased:
@@ -30,3 +28,9 @@
   parameters, `@return <return-type>` for return values.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
+
+# Google style guides for other languages:
+
+* [Python](https://google.github.io/styleguide/pyguide.html)
+* [Bash](https://google.github.io/styleguide/shell.xml)
+* [Bazel](https://github.com/bazelbuild/bazel/blob/master/site/versions/master/docs/skylark/build-style.md)

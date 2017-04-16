@@ -1,18 +1,46 @@
+See [CONTRIBUTING.md](CONTRIBUTING.md) for general contribution guidelines.
+
 # Senior committers
 
-When possible, all PRs should be reviewed by at least one senior committer prior to merging.
-
-* Matt Klein (mattklein123) (mklein@lyft.com)
-* Harvey Tuch (htuch) (htuch@google.com) (pending)
+* Matt Klein ([mattklein123](https://github.com/mattklein123)) (mklein@lyft.com)
+* Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com) (pending)
 
 # Committers
 
-* Roman Dzhabarov (RomanDzhabarov) (rdzhabarov@lyft.com)
-* Constance Caramanolis (ccaraman) (ccaramanolis@lyft.com)
-* Jose Nino (junr03) (jnino@lyft.com)
-* Daniel Hochman (danielhochman) (dhochman@lyft.com)
-* Michael Schore (goaway) (mschore@lyft.com)
+* Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
+* Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
+* Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
 
 # Emeritus committers
 
-* Bill Gallagher (wgallagher) (bgallagher@lyft.com)
+* Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
+
+# Process for becoming a committer
+
+## Your organization is not yet a committer
+
+* Express interest to the senior committers that your organization is interested in becoming a
+  committer. Becoming a committer generally means that you are going to be working close to full
+  time on Envoy for the foreseeable future. You should have domain expertise and be extremely
+  proficient in C++. Ultimately your goal is to become a senior committer that will represent your
+  organization.
+* We will expect you to start contributing increasingly complicated PRs, under the guidance
+  of the existing senior committers.
+* We may ask you to do some PRs from our backlog.
+* As you gain experience with the code base and our standards, we will ask you to do code reviews
+  for incoming PRs.
+* After a period of approximately 2-3 months of working together and making sure we see eye to eye,
+  the existing senior committers will confer and decide whether to grant commit status or not. We
+  make no guarantees on the length of time this will take, but 2-3 months of full time work is
+  the approximate goal.
+
+## Your organization is currently a committer
+
+* First decide whether your organization really needs more people with commit access. Valid reasons
+  are "blast radius", a large organization that is working on multiple unrelated projects, etc.
+* Contact the senior committer for your organization and express interest.
+* Start doing PRs and code reviews under the guidance of your senior committer.
+* After a period of 1-2 months the existing senior committers will discuss granting "standard"
+  commit access.
+* "standard" commit access can be upgraded to "senior" commit access after another 1-2 months of
+  work and another conference of the existing senior committers.
