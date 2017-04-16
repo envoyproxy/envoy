@@ -38,9 +38,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for general contribution guidelines.
 
 * First decide whether your organization really needs more people with commit access. Valid reasons
   are "blast radius", a large organization that is working on multiple unrelated projects, etc.
-* Contact the senior committer for your organization and express interest.
+* Contact a senior committer for your organization and express interest.
 * Start doing PRs and code reviews under the guidance of your senior committer.
 * After a period of 1-2 months the existing senior committers will discuss granting "standard"
   commit access.
-* "standard" commit access can be upgraded to "senior" commit access after another 1-2 months of
+* "Standard" commit access can be upgraded to "senior" commit access after another 1-2 months of
   work and another conference of the existing senior committers.
