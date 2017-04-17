@@ -11,7 +11,7 @@ if [[ "$1" == "bazel.debug" ]]; then
   echo "bazel debug build with tests..."
   cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} @envoy//source/exe:envoy-static
+  bazel build ${BAZEL_BUILD_OPTIONS} @envoy//source/exe:envoy-static.stamped
   echo "Testing..."
   bazel test ${BAZEL_BUILD_OPTIONS} --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test

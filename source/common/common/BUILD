@@ -99,6 +99,6 @@ envoy_cc_library(
     srcs = ["version.cc"],
     deps = [
         ":version_includes",
-        "//:version_generated",
+        "//source/version_generated",
     ],
 )

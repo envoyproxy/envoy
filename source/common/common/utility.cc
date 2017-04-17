@@ -20,8 +20,14 @@ std::string DateFormatter::now() {
 }
 
 ProdSystemTimeSource ProdSystemTimeSource::instance_;
+ProdMonotonicTimeSource ProdMonotonicTimeSource::instance_;
 
 bool DateUtil::timePointValid(SystemTime time_point) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
+             .count() != 0;
+}
+
+bool DateUtil::timePointValid(MonotonicTime time_point) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
              .count() != 0;
 }

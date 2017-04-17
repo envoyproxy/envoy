@@ -1,47 +1,49 @@
 load("@protobuf_bzl//:protobuf.bzl", "cc_proto_library")
 
-ENVOY_COPTS = [
-    # TODO(htuch): Remove this when Bazel bringup is done.
-    "-DBAZEL_BRINGUP",
-    "-Wall",
-    "-Wextra",
-    "-Werror",
-    "-Wnon-virtual-dtor",
-    "-Woverloaded-virtual",
-    "-Wold-style-cast",
-    "-std=c++0x",
-    "-includeprecompiled/precompiled.h",
-] + select({
-    # Bazel adds an implicit -DNDEBUG for opt.
-    "//bazel:opt_build": [],
-    "//bazel:fastbuild_build": [],
-    "//bazel:dbg_build": ["-ggdb3"],
-}) + select({
-    "//bazel:disable_tcmalloc": [],
-    "//conditions:default": ["-DTCMALLOC"],
-}) + select({
-    # Allow debug symbols to be added to opt/fastbuild as well.
-    "//bazel:debug_symbols": ["-ggdb3"],
-    "//conditions:default": [],
-})
+# Compute the final copts based on various options.
+def envoy_copts(repository):
+    return [
+        # TODO(htuch): Remove this when Bazel bringup is done.
+        "-DBAZEL_BRINGUP",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wnon-virtual-dtor",
+        "-Woverloaded-virtual",
+        "-Wold-style-cast",
+        "-std=c++0x",
+        "-includeprecompiled/precompiled.h",
+    ] + select({
+        # Bazel adds an implicit -DNDEBUG for opt.
+        repository + "//bazel:opt_build": [],
+        repository + "//bazel:fastbuild_build": [],
+        repository + "//bazel:dbg_build": ["-ggdb3"],
+    }) + select({
+        repository + "//bazel:disable_tcmalloc": [],
+        "//conditions:default": ["-DTCMALLOC"],
+    }) + select({
+        # Allow debug symbols to be added to opt/fastbuild as well.
+        repository + "//bazel:debug_symbols": ["-ggdb3"],
+        "//conditions:default": [],
+    })
 
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
     return "//external:%s" % dep
 
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.
-def tcmalloc_external_dep():
+def tcmalloc_external_dep(repository):
     return select({
-        "//bazel:disable_tcmalloc": None,
+        repository + "//bazel:disable_tcmalloc": None,
         "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
     })
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
 # https://github.com/bazelbuild/bazel/issues/2273.
-def tcmalloc_external_deps():
+def tcmalloc_external_deps(repository):
     return select({
-        "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:disable_tcmalloc": [],
         "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
     })
 
@@ -64,12 +66,12 @@ def envoy_cc_library(name,
                      repository = "",
                      deps = []):
     if tcmalloc_dep:
-        deps += tcmalloc_external_deps()
+        deps += tcmalloc_external_deps(repository)
     native.cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        copts = ENVOY_COPTS + copts,
+        copts = envoy_copts(repository) + copts,
         visibility = visibility,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//include/envoy/common:base_includes",
@@ -79,27 +81,66 @@ def envoy_cc_library(name,
         alwayslink = 1,
     )
 
+def _git_stamped_genrule(repository, name):
+    # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
+    # do binary rewriting to replace the linker produced MD5 hash with the
+    # version_generated.cc git SHA1 hash (truncated).
+    version_generated = repository + "//:version_generated.cc"
+    rewriter = repository + "//tools:git_sha_rewriter.py"
+    native.genrule(
+        name = name + "_stamped",
+        srcs = [
+            name,
+            version_generated,
+        ],
+        outs = [name + ".stamped"],
+        cmd = "cp $(location " + name + ") $@ && " +
+              "chmod u+w $@ && " +
+              "$(location " + rewriter + ") " +
+              "$(location " + version_generated + ") $@",
+        tools = [rewriter],
+    )
+
 # Envoy C++ binary targets should be specified with this function.
 def envoy_cc_binary(name,
                     srcs = [],
                     data = [],
+                    testonly = 0,
                     visibility = None,
                     repository = "",
+                    stamped = False,
                     deps = []):
+    # Implicit .stamped targets to obtain builds with the (truncated) git SHA1.
+    if stamped:
+        _git_stamped_genrule(repository, name)
+        _git_stamped_genrule(repository, name + ".stripped")
     native.cc_binary(
         name = name,
         srcs = srcs,
         data = data,
-        copts = ENVOY_COPTS,
+        copts = envoy_copts(repository),
         linkopts = [
             "-pthread",
             "-lrt",
+            # Force MD5 hash in build. This is part of the workaround for
+            # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
+            # does this by itself prior to
+            # https://github.com/bazelbuild/bazel/commit/724706ba4836c3366fc85b40ed50ccf92f4c3882.
+            # Ironically, forcing it here so that in future releases we will
+            # have the same behavior. When everyone is using an updated version
+            # of Bazel, we can use linkopts to set the git SHA1 directly in the
+            # --build-id and avoid doing the following.
+            '-Wl,--build-id=md5',
+            '-Wl,--hash-style=gnu',
             "-static-libstdc++",
             "-static-libgcc",
         ],
+        testonly = testonly,
         linkstatic = 1,
         visibility = visibility,
-        malloc = tcmalloc_external_dep(),
+        malloc = tcmalloc_external_dep(repository),
+        # See above comment on MD5 hash.
+        stamp = 0,
         deps = deps + [
             repository + "//source/precompiled:precompiled_includes",
         ],
@@ -128,10 +169,10 @@ def envoy_cc_test(name,
     )
     native.cc_test(
         name = name,
-        copts = ENVOY_COPTS,
+        copts = envoy_copts(repository),
         linkopts = ["-pthread"],
         linkstatic = 1,
-        malloc = tcmalloc_external_dep(),
+        malloc = tcmalloc_external_dep(repository),
         deps = [
             ":" + name + "_lib",
             repository + "//test:main"
@@ -155,7 +196,7 @@ def envoy_cc_test_library(name,
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = ENVOY_COPTS + ["-includetest/precompiled/precompiled_test.h"],
+        copts = envoy_copts(repository) + ["-includetest/precompiled/precompiled_test.h"],
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//source/precompiled:precompiled_includes",

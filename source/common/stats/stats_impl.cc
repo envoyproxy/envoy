@@ -6,7 +6,7 @@ namespace Stats {
 
 void TimerImpl::TimespanImpl::complete(const std::string& dynamic_name) {
   std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::system_clock::now() - start_);
+      std::chrono::steady_clock::now() - start_);
   parent_.parent_.deliverTimingToSinks(dynamic_name, ms);
 }
 

@@ -15,6 +15,7 @@ set -e
 # Run all tests under bazel coverage.
 "${BAZEL_COVERAGE}" coverage //test/coverage:coverage_tests ${BAZEL_BUILD_OPTIONS} \
   --cache_test_results=no --instrumentation_filter="" \
+  --test_output=all \
   --coverage_support=@bazel_tools//tools/coverage:coverage_support
 
 # Cleanup any artifacts from previous coverage runs.

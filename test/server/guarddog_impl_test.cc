@@ -25,9 +25,9 @@ class GuardDogDeathTest : public testing::Test {
 protected:
   GuardDogDeathTest()
       : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500) {
-    ON_CALL(time_source_, currentSystemTime())
+    ON_CALL(time_source_, currentTime())
         .WillByDefault(testing::Invoke([&]() {
-          return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
+          return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
         }));
   }
 
@@ -60,7 +60,7 @@ protected:
   NiceMock<Configuration::MockMain> config_kill_;
   NiceMock<Configuration::MockMain> config_multikill_;
   NiceMock<Stats::MockStore> fakestats_;
-  NiceMock<MockSystemTimeSource> time_source_;
+  NiceMock<MockMonotonicTimeSource> time_source_;
   std::atomic<unsigned int> mock_time_;
   std::unique_ptr<GuardDogImpl> guard_dog_;
   WatchDogSharedPtr unpet_dog_;
@@ -125,16 +125,16 @@ TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
 class GuardDogMissTest : public testing::Test {
 protected:
   GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0) {
-    ON_CALL(time_source_, currentSystemTime())
+    ON_CALL(time_source_, currentTime())
         .WillByDefault(testing::Invoke([&]() {
-          return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
+          return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
         }));
   }
 
   NiceMock<Configuration::MockMain> config_miss_;
   NiceMock<Configuration::MockMain> config_mega_;
   Stats::IsolatedStoreImpl stats_store_;
-  NiceMock<MockSystemTimeSource> time_source_;
+  NiceMock<MockMonotonicTimeSource> time_source_;
   std::atomic<unsigned int> mock_time_;
 };
 
@@ -147,12 +147,10 @@ TEST_F(GuardDogMissTest, MissTest) {
   auto unpet_dog = gd.createWatchDog(0);
   // At 300ms we shouldn't have hit the timeout yet:
   mock_time_ += 300;
-  // EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
   gd.forceCheckForTest();
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_miss").value());
   // This should push it past the 500ms limit:
   mock_time_ += 250;
-  // EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
   gd.forceCheckForTest();
   EXPECT_EQ(1UL, stats_store_.counter("server.watchdog_miss").value());
   gd.stopWatching(unpet_dog);
@@ -162,9 +160,9 @@ TEST_F(GuardDogMissTest, MissTest) {
 TEST_F(GuardDogMissTest, MegaMissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  ON_CALL(time_source_, currentSystemTime())
+  ON_CALL(time_source_, currentTime())
       .WillByDefault(testing::Invoke([&]() {
-        return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
+        return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
       }));
   GuardDogImpl gd(stats_store_, config_mega_, time_source_);
   auto unpet_dog = gd.createWatchDog(0);
@@ -185,14 +183,14 @@ TEST_F(GuardDogMissTest, MegaMissTest) {
 TEST(GuardDogBasicTest, StartStopTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(0, 0, 0, 0);
-  NiceMock<MockSystemTimeSource> time_source;
+  NiceMock<MockMonotonicTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
 }
 
 TEST(GuardDogBasicTest, LoopIntervalNoKillTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(40, 50, 0, 0);
-  NiceMock<MockSystemTimeSource> time_source;
+  NiceMock<MockMonotonicTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
   EXPECT_EQ(gd.loopIntervalForTest(), 40);
 }
@@ -200,7 +198,7 @@ TEST(GuardDogBasicTest, LoopIntervalNoKillTest) {
 TEST(GuardDogBasicTest, LoopIntervalTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
-  NiceMock<MockSystemTimeSource> time_source;
+  NiceMock<MockMonotonicTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
   EXPECT_EQ(gd.loopIntervalForTest(), 90);
 }
@@ -208,22 +206,22 @@ TEST(GuardDogBasicTest, LoopIntervalTest) {
 TEST(WatchDogBasicTest, ThreadIdTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
-  NiceMock<MockSystemTimeSource> time_source;
+  NiceMock<MockMonotonicTimeSource> time_source;
   GuardDogImpl gd(stats, config, time_source);
   auto watched_dog = gd.createWatchDog(123);
   EXPECT_EQ(watched_dog->threadId(), 123);
   gd.stopWatching(watched_dog);
 }
 
-// If this test fails it is because the std::chrono::system_clock::duration type has become
+// If this test fails it is because the std::chrono::steady_clock::duration type has become
 // nontrivial or we are compiling under a compiler and library combo that makes
-// std::chrono::system_clock::duration require a lock to be atomicly modified.
+// std::chrono::steady_clock::duration require a lock to be atomicly modified.
 //
 // The WatchDog/GuardDog relies on this being a lock free atomic for perf reasons so some workaround
 // will be required if this test starts failing.
 TEST(WatchDogTimeTest, AtomicIsAtomicTest) {
-  ProdSystemTimeSource time_source;
-  std::atomic<std::chrono::system_clock::duration> atomic_time;
+  ProdMonotonicTimeSource time_source;
+  std::atomic<std::chrono::steady_clock::duration> atomic_time;
   ASSERT_EQ(atomic_time.is_lock_free(), true);
 }
 
