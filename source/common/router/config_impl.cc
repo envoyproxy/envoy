@@ -524,7 +524,6 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
                                                          uint64_t random_value) const {
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto()->value() != "https") {
-
     return SSL_REDIRECT_ROUTE;
   } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
              headers.ForwardedProto()->value() != "https" && !headers.EnvoyInternalRequest()) {
