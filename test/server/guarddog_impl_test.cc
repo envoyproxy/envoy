@@ -147,12 +147,10 @@ TEST_F(GuardDogMissTest, MissTest) {
   auto unpet_dog = gd.createWatchDog(0);
   // At 300ms we shouldn't have hit the timeout yet:
   mock_time_ += 300;
-  // EXPECT_CALL(time_source_, currentTime()).WillRepeatedly(testing::Return(time_point_));
   gd.forceCheckForTest();
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_miss").value());
   // This should push it past the 500ms limit:
   mock_time_ += 250;
-  // EXPECT_CALL(time_source_, currentTime()).WillRepeatedly(testing::Return(time_point_));
   gd.forceCheckForTest();
   EXPECT_EQ(1UL, stats_store_.counter("server.watchdog_miss").value());
   gd.stopWatching(unpet_dog);
