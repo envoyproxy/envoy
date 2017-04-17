@@ -4,21 +4,21 @@ cc_library(
     name = "ares",
     srcs = ["thirdparty_build/lib/libcares.a"],
     hdrs = glob(["thirdparty_build/include/ares*.h"]),
-    strip_include_prefix = "thirdparty_build/include",
+    includes = ["thirdparty_build/include"],
 )
 
 cc_library(
     name = "crypto",
     srcs = ["thirdparty_build/lib/libcrypto.a"],
     hdrs = glob(["thirdparty_build/include/openssl/**/*.h"]),
-    strip_include_prefix = "thirdparty_build/include",
+    includes = ["thirdparty_build/include"],
 )
 
 cc_library(
     name = "event",
     srcs = ["thirdparty_build/lib/libevent.a"],
     hdrs = glob(["thirdparty_build/include/event2/**/*.h"]),
-    strip_include_prefix = "thirdparty_build/include",
+    includes = ["thirdparty_build/include"],
 )
 
 cc_library(
@@ -37,14 +37,14 @@ cc_library(
         "thirdparty_build/include/gmock/**/*.h",
         "thirdparty_build/include/gtest/**/*.h",
     ]),
-    strip_include_prefix = "thirdparty_build/include",
+    includes = ["thirdparty_build/include"],
 )
 
 cc_library(
     name = "http_parser",
     srcs = ["thirdparty_build/lib/libhttp_parser.a"],
     hdrs = glob(["thirdparty_build/include/http_parser.h"]),
-    strip_include_prefix = "thirdparty_build/include",
+    includes = ["thirdparty_build/include"],
 )
 
 cc_library(
@@ -57,7 +57,7 @@ cc_library(
         "thirdparty_build/include/collector.pb.h",
         "thirdparty_build/include/lightstep_carrier.pb.h",
     ],
-    strip_include_prefix = "thirdparty_build/include",
+    includes = ["thirdparty_build/include"],
     deps = [":protobuf"],
 )
 
@@ -65,14 +65,14 @@ cc_library(
     name = "nghttp2",
     srcs = ["thirdparty_build/lib/libnghttp2.a"],
     hdrs = glob(["thirdparty_build/include/nghttp2/**/*.h"]),
-    strip_include_prefix = "thirdparty_build/include",
+    includes = ["thirdparty_build/include"],
 )
 
 cc_library(
     name = "protobuf",
     srcs = glob(["thirdparty_build/lib/libproto*.a"]),
     hdrs = glob(["thirdparty_build/include/google/protobuf/**/*.h"]),
-    strip_include_prefix = "thirdparty_build/include",
+    includes = ["thirdparty_build/include"],
 )
 
 filegroup(
@@ -83,7 +83,7 @@ filegroup(
 cc_library(
     name = "rapidjson",
     hdrs = glob(["thirdparty/rapidjson-1.1.0/include/**/*.h"]),
-    strip_include_prefix = "thirdparty/rapidjson-1.1.0/include",
+    includes = ["thirdparty/rapidjson-1.1.0/include"],
 )
 
 cc_library(
@@ -92,7 +92,7 @@ cc_library(
         "thirdparty/spdlog-0.11.0/include/**/*.cc",
         "thirdparty/spdlog-0.11.0/include/**/*.h",
     ]),
-    strip_include_prefix = "thirdparty/spdlog-0.11.0/include",
+    includes = ["thirdparty/spdlog-0.11.0/include"],
 )
 
 cc_library(
@@ -104,5 +104,5 @@ cc_library(
 cc_library(
     name = "tclap",
     hdrs = glob(["thirdparty/tclap-1.2.1/include/**/*.h"]),
-    strip_include_prefix = "thirdparty/tclap-1.2.1/include",
+    includes = ["thirdparty/tclap-1.2.1/include"],
 )
