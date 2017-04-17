@@ -366,7 +366,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   ann.setEndpoint(endpoint);
 
   annotations.push_back(ann);
-  span.setAannotations(annotations);
+  span.setAnnotations(annotations);
   EXPECT_EQ(1ULL, span.annotations().size());
 
   bann.setKey(Zipkin::ZipkinCoreConstants::LOCAL_COMPONENT);

@@ -50,7 +50,7 @@ TEST(ZipkinSpanContextTest, populateFromString) {
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cs",
             span_context.serializeToString());
 
-  // Span context populated with trace id, id, parent id, and multiple annotations
+  // Span context populated with trace id, id, parent id, and two annotations
   span_context.populateFromString("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cs;cr");
   EXPECT_EQ(2722130815203937912ULL, span_context.trace_id());
   EXPECT_EQ("25c6f38dd0600e78", span_context.traceIdAsHexString());
@@ -63,6 +63,36 @@ TEST(ZipkinSpanContextTest, populateFromString) {
   EXPECT_FALSE(span_context.isSetAnnotation().sr_);
   EXPECT_FALSE(span_context.isSetAnnotation().ss_);
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cr;cs",
+            span_context.serializeToString());
+
+  // Span context populated with trace id, id, parent id, and three annotations
+  span_context.populateFromString("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cs;cr;ss");
+  EXPECT_EQ(2722130815203937912ULL, span_context.trace_id());
+  EXPECT_EQ("25c6f38dd0600e78", span_context.traceIdAsHexString());
+  EXPECT_EQ(6228615153417491119ULL, span_context.id());
+  EXPECT_EQ("56707c7b3e1092af", span_context.idAsHexString());
+  EXPECT_EQ(14164264937399213340ULL, span_context.parent_id());
+  EXPECT_EQ("c49193ea42335d1c", span_context.parentIdAsHexString());
+  EXPECT_TRUE(span_context.isSetAnnotation().cr_);
+  EXPECT_TRUE(span_context.isSetAnnotation().cs_);
+  EXPECT_FALSE(span_context.isSetAnnotation().sr_);
+  EXPECT_TRUE(span_context.isSetAnnotation().ss_);
+  EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cr;cs;ss",
+            span_context.serializeToString());
+
+  // Span context populated with trace id, id, parent id, and four annotations
+  span_context.populateFromString("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cs;cr;ss;sr");
+  EXPECT_EQ(2722130815203937912ULL, span_context.trace_id());
+  EXPECT_EQ("25c6f38dd0600e78", span_context.traceIdAsHexString());
+  EXPECT_EQ(6228615153417491119ULL, span_context.id());
+  EXPECT_EQ("56707c7b3e1092af", span_context.idAsHexString());
+  EXPECT_EQ(14164264937399213340ULL, span_context.parent_id());
+  EXPECT_EQ("c49193ea42335d1c", span_context.parentIdAsHexString());
+  EXPECT_TRUE(span_context.isSetAnnotation().cr_);
+  EXPECT_TRUE(span_context.isSetAnnotation().cs_);
+  EXPECT_TRUE(span_context.isSetAnnotation().sr_);
+  EXPECT_TRUE(span_context.isSetAnnotation().ss_);
+  EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cr;cs;sr;ss",
             span_context.serializeToString());
 
   // Span context populated with invalid string: it gets reset to its non-initialized state
@@ -119,10 +149,10 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_FALSE(span.isSet().trace_id_high_);
   span.setTraceIdHigh(9922130815203937912ULL);
   EXPECT_TRUE(span.isSet().trace_id_high_);
-  SpanContext span_context_5(span);
+  SpanContext span_context_high_id(span);
   // We currently drop the high bits. So, we expect the same context as above
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c",
-            span_context_5.serializeToString());
+            span_context_high_id.serializeToString());
 
   // Span context populated with trace id, id, parent id, and one annotation
   Annotation ann;
@@ -142,7 +172,7 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;sr",
             span_context_3.serializeToString());
 
-  // Span context populated with trace id, id, parent id, and multiple annotations
+  // Span context populated with trace id, id, parent id, and two annotations
   ann.setValue(ZipkinCoreConstants::SERVER_SEND);
   span.addAnnotation(ann);
   SpanContext span_context_4(span);
@@ -158,5 +188,48 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   EXPECT_TRUE(span_context_4.isSetAnnotation().ss_);
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;sr;ss",
             span_context_4.serializeToString());
+
+  // Span context populated with trace id, id, parent id, and three annotations
+  ann.setValue(ZipkinCoreConstants::CLIENT_SEND);
+  span.addAnnotation(ann);
+  SpanContext span_context_5(span);
+  EXPECT_EQ(2722130815203937912ULL, span_context_5.trace_id());
+  EXPECT_EQ("25c6f38dd0600e78", span_context_5.traceIdAsHexString());
+  EXPECT_EQ(6228615153417491119ULL, span_context_5.id());
+  EXPECT_EQ("56707c7b3e1092af", span_context_5.idAsHexString());
+  EXPECT_EQ(14164264937399213340ULL, span_context_5.parent_id());
+  EXPECT_EQ("c49193ea42335d1c", span_context_5.parentIdAsHexString());
+  EXPECT_FALSE(span_context_5.isSetAnnotation().cr_);
+  EXPECT_TRUE(span_context_5.isSetAnnotation().cs_);
+  EXPECT_TRUE(span_context_5.isSetAnnotation().sr_);
+  EXPECT_TRUE(span_context_5.isSetAnnotation().ss_);
+  EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cs;sr;ss",
+            span_context_5.serializeToString());
+
+  // Span context populated with trace id, id, parent id, and four annotations
+  std::vector<Annotation> annotations;
+  annotations.push_back(ann);
+  ann.setValue(ZipkinCoreConstants::SERVER_SEND);
+  annotations.push_back(ann);
+  ann.setValue(ZipkinCoreConstants::SERVER_RECV);
+  annotations.push_back(ann);
+  ann.setValue(ZipkinCoreConstants::CLIENT_RECV);
+  annotations.push_back(ann);
+  ann.setValue(ZipkinCoreConstants::CLIENT_SEND);
+  annotations.push_back(ann);
+  span.setAnnotations(annotations);
+  SpanContext span_context_6(span);
+  EXPECT_EQ(2722130815203937912ULL, span_context_6.trace_id());
+  EXPECT_EQ("25c6f38dd0600e78", span_context_6.traceIdAsHexString());
+  EXPECT_EQ(6228615153417491119ULL, span_context_6.id());
+  EXPECT_EQ("56707c7b3e1092af", span_context_6.idAsHexString());
+  EXPECT_EQ(14164264937399213340ULL, span_context_6.parent_id());
+  EXPECT_EQ("c49193ea42335d1c", span_context_6.parentIdAsHexString());
+  EXPECT_TRUE(span_context_6.isSetAnnotation().cr_);
+  EXPECT_TRUE(span_context_6.isSetAnnotation().cs_);
+  EXPECT_TRUE(span_context_6.isSetAnnotation().sr_);
+  EXPECT_TRUE(span_context_6.isSetAnnotation().ss_);
+  EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;cr;cs;sr;ss",
+            span_context_6.serializeToString());
 }
 } // Zipkin

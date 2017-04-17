@@ -393,7 +393,7 @@ public:
   /**
    * Sets the span's annotations all at once.
    */
-  void setAannotations(const std::vector<Annotation>& val) { annotations_ = val; }
+  void setAnnotations(const std::vector<Annotation>& val) { annotations_ = val; }
 
   /**
    * Adds an annotation to the span (copy semantics).
