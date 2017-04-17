@@ -12,9 +12,9 @@ ENVOY_COPTS = [
     "-std=c++0x",
     "-includeprecompiled/precompiled.h",
 ] + select({
-    "//bazel:opt_build": [],
-    "//bazel:fastbuild_build": ["-DDEBUG"],
-    "//bazel:dbg_build": ["-ggdb3", "-DDEBUG"],
+    "//bazel:opt_build": [], # Bazel adds an implicit -DNDEBUG.
+    "//bazel:fastbuild_build": [],
+    "//bazel:dbg_build": ["-ggdb3"],
 })
 
 # References to Envoy external dependencies should be wrapped with this function.
