@@ -7,7 +7,7 @@ maximize the chances of your PR being merged.
   email, etc. We will make sure no one else is already working on it and ask you to open a
   GitHub issue.
 * A "major feature" is defined as any change that is > 100 LOC altered (not including tests), or
-  changes any user facing behavior. We will use the GitHub issue to discuss the feature and come to
+  changes any user-facing behavior. We will use the GitHub issue to discuss the feature and come to
   agreement. This is to prevent your time being wasted, as well as ours. The GitHub review process
   for major features is also important so that [organizations with commit access](OWNERS.md) can
   come to agreement on design.
@@ -19,7 +19,7 @@ maximize the chances of your PR being merged.
 
 # Breaking change policy
 
-* As of the 1.3.0 release, the Envoy user facing configuration is locked and we will not make
+* As of the 1.3.0 release, the Envoy user-facing configuration is locked and we will not make
   breaking changes between official numbered releases. This includes JSON configuration, REST/gRPC
   APIs (SDS, CDS, RDS, etc.), and CLI switches. We will also try to not change behavioral semantics
   (e.g., HTTP header processing order), though this is harder to outright guarantee.
@@ -53,7 +53,7 @@ maximize the chances of your PR being merged.
 * PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
   build. If your PR cannot have 100% coverage for some reason please clearly explain why when you
   open it.
-* Any PR that changes user facing behavior **must** have associated documentation.
+* Any PR that changes user-facing behavior **must** have associated documentation.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
