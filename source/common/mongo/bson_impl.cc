@@ -177,7 +177,7 @@ int32_t FieldImpl::byteSize() const {
   }
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 void FieldImpl::encode(Buffer::Instance& output) const {
@@ -230,7 +230,7 @@ void FieldImpl::encode(Buffer::Instance& output) const {
     return BufferHelper::writeInt32(output, value_.int32_value_);
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 bool FieldImpl::operator==(const Field& rhs) const {
@@ -292,7 +292,7 @@ bool FieldImpl::operator==(const Field& rhs) const {
   }
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 std::string FieldImpl::toString() const {
@@ -338,7 +338,7 @@ std::string FieldImpl::toString() const {
   }
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 void DocumentImpl::fromBuffer(Buffer::Instance& data) {
