@@ -1,0 +1,45 @@
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["www.lyft.com"],
+      "require_ssl": "all",
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2"
+        }
+      ]
+    },
+    {
+      "name": "api",
+      "domains": ["api.lyft.com"],
+      "require_ssl": "external_only",
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2"
+        }
+      ]
+    },
+    {
+      "name": "redirect",
+      "domains": ["redirect.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/foo",
+          "host_redirect": "new.lyft.com"
+        },
+        {
+          "prefix": "/bar",
+          "path_redirect": "/new_bar"
+        },
+        {
+          "prefix": "/baz",
+          "host_redirect": "new.lyft.com",
+          "path_redirect": "/new_baz"
+        }
+      ]
+    }
+  ]
+}
