@@ -24,4 +24,8 @@ envoy_cc_library(
         "zipkin_json_field_names.h",
     ],
     external_deps = ["rapidjson"],
+    deps = [
+        "//include/envoy/runtime:runtime_interface",
+        "//source/common/common:utility_lib",
+    ],
 )
