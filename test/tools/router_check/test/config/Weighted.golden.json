@@ -1,0 +1,39 @@
+[
+  {
+    "test_name": "Test_1",
+    "input": {
+      ":authority": "www1.lyft.com",
+      ":path": "/foo",
+      "ssl": true,
+      "internal": true
+    },
+    "validate": {"path_redirect": ""}
+  },
+  {
+    "test_name": "Test_2",
+    "input": {
+      ":authority": "www1.lyft.com",
+      ":path": "/foo",
+      "random_value": 115
+    },
+    "validate": {"cluster_name": "cluster1"}
+  },
+  {
+    "test_name": "Test_3",
+    "input": {
+      ":authority": "www1.lyft.com",
+      ":path": "/foo",
+      "random_value": 445
+    },
+    "validate": {"cluster_name": "cluster2"}
+  },
+  {
+    "test_name": "Test_4",
+    "input": {
+      ":authority": "www1.lyft.com",
+      ":path": "/foo",
+      "random_value": 560
+    },
+    "validate": {"cluster_name": "cluster3"}
+  }
+]

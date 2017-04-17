@@ -13,3 +13,4 @@ Configuration reference
   http_conn_man/http_conn_man
   http_filters/http_filters
   cluster_manager/cluster_manager
+  tools/router_check
