@@ -108,10 +108,12 @@ def envoy_cc_binary(name,
                     testonly = 0,
                     visibility = None,
                     repository = "",
+                    stamped = False,
                     deps = []):
     # Implicit .stamped targets to obtain builds with the (truncated) git SHA1.
-    _git_stamped_genrule(repository, name)
-    _git_stamped_genrule(repository, name + ".stripped")
+    if stamped:
+        _git_stamped_genrule(repository, name)
+        _git_stamped_genrule(repository, name + ".stripped")
     native.cc_binary(
         name = name,
         srcs = srcs,

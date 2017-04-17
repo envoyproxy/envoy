@@ -9,6 +9,7 @@ alias(
 
 envoy_cc_binary(
     name = "envoy-static",
+    stamped = True,
     deps = ["envoy_main_lib"],
 )
 
