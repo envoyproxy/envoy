@@ -5,7 +5,7 @@
       ":authority": "some_cluster",
       ":path": "/foo"
     },
-    "_validate": {"cluster_name": "some_cluster"}
+    "validate": {"cluster_name": "some_cluster"}
   },
   {
     "test_name": "Test2",
@@ -13,7 +13,7 @@
       ":authority": "www.lyft.com",
       ":path": "/bar"
     },
-    "_validate": {"cluster_name": ""}
+    "validate": {"cluster_name": ""}
   },
   {
     "test_name": "Test3",
@@ -27,6 +27,6 @@
         }
       ]
     },
-    "_validate": {"cluster_name": "some_cluster"}
+    "validate": {"cluster_name": "some_cluster"}
   }
 ]

@@ -7,7 +7,7 @@
       "ssl": true,
       "internal": true
     },
-    "_validate": {"path_redirect": ""}
+    "validate": {"path_redirect": ""}
   },
   {
     "test_name": "Test_2",
@@ -16,7 +16,7 @@
       ":path": "/foo",
       "random_value": 115
     },
-    "_validate": {"cluster_name": "cluster1"}
+    "validate": {"cluster_name": "cluster1"}
   },
   {
     "test_name": "Test_3",
@@ -25,7 +25,7 @@
       ":path": "/foo",
       "random_value": 445
     },
-    "_validate": {"cluster_name": "cluster2"}
+    "validate": {"cluster_name": "cluster2"}
   },
   {
     "test_name": "Test_4",
@@ -34,6 +34,6 @@
       ":path": "/foo",
       "random_value": 560
     },
-    "_validate": {"cluster_name": "cluster3"}
+    "validate": {"cluster_name": "cluster3"}
   }
 ]

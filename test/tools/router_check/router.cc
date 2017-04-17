@@ -1,59 +1,67 @@
 #include "test/tools/router_check/router.h"
 
-Json::ObjectPtr RouterCheckTool::loadJson(const std::string& config_json,
-                                          const std::string& schema) {
+// static
+ToolConfig ToolConfig::create(const Json::ObjectPtr& check_config) {
+  Json::ObjectPtr input = check_config->getObject("input");
+  int random_value = input->getInteger("random_value", 0);
 
-  try {
-    // Json configuration
-    Json::ObjectPtr loader = Json::Factory::LoadFromFile(config_json);
-    loader->validateSchema(schema);
-    return loader;
-  } catch (const EnvoyException& ex) {
-    std::cerr << "config schema JSON load failed: " << config_json << std::endl;
-    std::cerr << ex.what() << std::endl;
-    return nullptr;
+  // Add header field values
+  std::unique_ptr<Http::TestHeaderMapImpl> headers(new Http::TestHeaderMapImpl());
+  headers->addViaCopy(":authority", input->getString(":authority", ""));
+  headers->addViaCopy(":path", input->getString(":path", ""));
+  headers->addViaCopy(":method", input->getString(":method", "GET"));
+  headers->addViaCopy("x-forwarded-proto", input->getBoolean("ssl", false) ? "https" : "http");
+
+  if (input->getBoolean("internal", false)) {
+    headers->addViaCopy("x-envoy-internal", "true");
   }
+
+  if (input->hasObject("additional_headers")) {
+    for (const Json::ObjectPtr& header_config : input->getObjectArray("additional_headers")) {
+      headers->addViaCopy(header_config->getString("field"), header_config->getString("value"));
+    }
+  }
+
+  return ToolConfig(std::move(headers), random_value);
 }
 
-bool RouterCheckTool::initializeFromConfig(const std::string& router_config_json) {
-  // TODO(hennna): Allow users to load a full config and extract the route
-  // configuration from it.
-  Json::ObjectPtr loader = loadJson(router_config_json, Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
+ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value)
+    : headers_(std::move(headers)), random_value_(random_value) {}
 
-  if (loader != nullptr) {
-    config_.reset(new Router::ConfigImpl(*loader, runtime_, cm_, false));
-    return true;
-  }
-  return false;
+// static
+RouterCheckTool RouterCheckTool::create(const std::string& router_config_json) {
+  // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
+  Json::ObjectPtr loader = Json::Factory::LoadFromFile(router_config_json);
+  loader->validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
+
+  std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
+  std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm(
+      new NiceMock<Upstream::MockClusterManager>());
+  std::unique_ptr<Router::ConfigImpl> config(new Router::ConfigImpl(*loader, *runtime, *cm, false));
+
+  return RouterCheckTool(std::move(runtime), std::move(cm), std::move(config));
 }
+
+RouterCheckTool::RouterCheckTool(std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime,
+                                 std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm,
+                                 std::unique_ptr<Router::ConfigImpl> config)
+    : runtime_(std::move(runtime)), cm_(std::move(cm)), config_(std::move(config)) {}
 
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  if (config_ == nullptr) {
-    return false;
-  }
-
-  // Load tool config json
-  Json::ObjectPtr loader = loadJson(expected_route_json, Json::ToolSchema::routerCheckSchema());
-
-  if (loader == nullptr) {
-    return false;
-  }
+  Json::ObjectPtr loader = Json::Factory::LoadFromFile(expected_route_json);
+  loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;
-  // Iterate through each test case
   for (const Json::ObjectPtr& check_config : loader->asObjectArray()) {
-    // Load parameters from json
-    ToolConfig tool_config;
-    tool_config.parseFromJson(check_config);
-    tool_config.route_ = config_->route(tool_config.headers_, tool_config.random_value_);
+    ToolConfig tool_config = ToolConfig::create(check_config);
+    tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
     std::string test_name = check_config->getString("test_name", "");
     if (details_) {
       std::cout << test_name << std::endl;
     }
-    Json::ObjectPtr validate = check_config->getObject("_validate");
+    Json::ObjectPtr validate = check_config->getObject("validate");
 
-    // Call appropriate function for each match case
     const std::unordered_map<std::string,
                              std::function<bool(ToolConfig&, const std::string&)>> checkers = {
         {"cluster_name", [this](ToolConfig& tool_config, const std::string& expected)
@@ -71,6 +79,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
                               -> bool { return compareRedirectPath(tool_config, expected); }},
     };
 
+    // Call appropriate function for each match case
     for (std::pair<std::string, std::function<bool(ToolConfig&, std::string)>> test : checkers) {
       if (validate->hasObject(test.first)) {
         std::string expected = validate->getString(test.first);
@@ -96,35 +105,6 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
   return no_failures;
 }
 
-void ToolConfig::parseFromJson(const Json::ObjectPtr& check_config) {
-  // Extract values from json object
-  Json::ObjectPtr input = check_config->getObject("input");
-
-  random_value_ = input->getInteger("random_value", 0);
-
-  // Add authority and path to header
-  headers_.addViaCopy(":authority", input->getString(":authority", ""));
-  headers_.addViaCopy(":path", input->getString(":path", ""));
-
-  // Add :method to header
-  headers_.addViaCopy(":method", input->getString(":method", "GET"));
-
-  // Add ssl header
-  headers_.addViaCopy("x-forwarded-proto", input->getBoolean("ssl", false) ? "https" : "http");
-
-  // Add internal route status to header
-  if (input->getBoolean("internal", false)) {
-    headers_.addViaCopy("x-envoy-internal", "true");
-  }
-
-  // Add additional headers
-  if (input->hasObject("additional_headers")) {
-    for (const Json::ObjectPtr& header_config : input->getObjectArray("additional_headers")) {
-      headers_.addViaCopy(header_config->getString("field"), header_config->getString("value"));
-    }
-  }
-}
-
 bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
 
@@ -138,8 +118,8 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
   std::string actual = "";
 
   if (tool_config.route_->routeEntry() != nullptr &&
-      tool_config.route_->routeEntry()->virtualCluster(tool_config.headers_) != nullptr) {
-    actual = tool_config.route_->routeEntry()->virtualCluster(tool_config.headers_)->name();
+      tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_) != nullptr) {
+    actual = tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_)->name();
   }
   return compareResults(actual, expected, "virtual_cluster_name");
 }
@@ -157,8 +137,8 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
   std::string actual = "";
 
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(tool_config.headers_);
-    actual = tool_config.headers_.get_(Http::Headers::get().Path);
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_);
+    actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
   return compareResults(actual, expected, "path_rewrite");
 }
@@ -167,8 +147,8 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
   std::string actual = "";
 
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(tool_config.headers_);
-    actual = tool_config.headers_.get_(Http::Headers::get().Host);
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_);
+    actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
   return compareResults(actual, expected, "host_rewrite");
 }
@@ -177,7 +157,7 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
   std::string actual = "";
 
   if (tool_config.route_->redirectEntry() != nullptr) {
-    actual = tool_config.route_->redirectEntry()->newPath(tool_config.headers_);
+    actual = tool_config.route_->redirectEntry()->newPath(*tool_config.headers_);
   }
 
   return compareResults(actual, expected, "path_redirect");
@@ -185,7 +165,7 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
 
 bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::string& field,
                                          const std::string& expected) {
-  std::string actual = tool_config.headers_.get_(field);
+  std::string actual = tool_config.headers_->get_(field);
 
   return compareResults(actual, expected, "check_header");
 }

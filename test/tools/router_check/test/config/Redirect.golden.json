@@ -7,7 +7,7 @@
       "internal": true,
       "ssl": true
     },
-    "_validate": {"path_redirect": ""}
+    "validate": {"path_redirect": ""}
   },
   {
     "test_name": "Test_2",
@@ -17,7 +17,7 @@
       "ssl": true,
       "internal": true
     },
-    "_validate": {"path_redirect": ""}
+    "validate": {"path_redirect": ""}
   },
   {
     "test_name": "Test_3",
@@ -27,7 +27,7 @@
       "ssl": false,
       "internal": false
     },
-    "_validate": {"path_redirect": "https://www.lyft.com/foo"}
+    "validate": {"path_redirect": "https://www.lyft.com/foo"}
   },
   {
     "test_name": "Test_4",
@@ -36,7 +36,7 @@
       ":path": "/foo",
       "internal": true
     },
-    "_validate": {"path_redirect": ""}
+    "validate": {"path_redirect": ""}
   },
   {
     "test_name": "Test_5",
@@ -44,7 +44,7 @@
       ":authority": "api.lyft.com",
       ":path": "/foo"
     },
-    "_validate": {"path_redirect": "https://api.lyft.com/foo"}
+    "validate": {"path_redirect": "https://api.lyft.com/foo"}
   },
   {
     "test_name": "Test_6",
@@ -54,7 +54,7 @@
       "ssl": false,
       "internal": false
     },
-    "_validate": {"path_redirect": "http://new.lyft.com/foo"}
+    "validate": {"path_redirect": "http://new.lyft.com/foo"}
   },
   {
     "test_name": "Test_7",
@@ -63,7 +63,7 @@
       ":path": "/bar",
       "ssl": true
     },
-    "_validate": {"path_redirect": "https://redirect.lyft.com/new_bar"}
+    "validate": {"path_redirect": "https://redirect.lyft.com/new_bar"}
   },
   {
     "test_name": "Test_8",
@@ -73,6 +73,6 @@
       "ssl": true,
       "internal": false
     },
-    "_validate": {"path_redirect": "https://new.lyft.com/new_baz"}
+    "validate": {"path_redirect": "https://new.lyft.com/new_baz"}
   }
 ]

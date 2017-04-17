@@ -5,7 +5,7 @@
       ":authority": "api.lyft.com",
       ":path": "/"
     },
-    "_validate": {
+    "validate": {
       "cluster_name": "instant-server",
       "virtual_cluster_name": "other",
       "virtual_host_name": "default",
@@ -19,7 +19,7 @@
       ":authority": "api.lyft.com",
       ":path": "/api/leads/me"
     },
-    "_validate": {"cluster_name": "ats"}
+    "validate": {"cluster_name": "ats"}
   },
   {
     "test_name": "Test3",
@@ -27,7 +27,7 @@
       ":authority": "api.lyft.com",
       ":path": "/api/locations?works=true"
     },
-    "_validate": {"cluster_name": "locations"}
+    "validate": {"cluster_name": "locations"}
   },
   {
     "test_name": "Test4",
@@ -35,7 +35,7 @@
       ":authority": "api.lyft.com",
       ":path": "/api/locations"
     },
-    "_validate": {"cluster_name": "locations"}
+    "validate": {"cluster_name": "locations"}
   },
   {
     "test_name": "Test5",
@@ -43,7 +43,7 @@
       ":authority": "lyft.com",
       ":path": "/foo"
     },
-    "_validate": {"cluster_name": "www2"}
+    "validate": {"cluster_name": "www2"}
   },
   {
     "test_name": "Test6",
@@ -51,7 +51,7 @@
       ":authority": "wwww.lyft.com",
       ":path": "/"
     },
-    "_validate": {"cluster_name": "root_www2"}
+    "validate": {"cluster_name": "root_www2"}
   },
   {
     "test_name": "Test7",
@@ -59,7 +59,7 @@
       ":authority": "www.lyft.com",
       ":path": "/new_endpoint/foo"
     },
-    "_validate":
+    "validate":
       {
 	"cluster_name": "www2",
 	"virtual_host_name": "www2"
@@ -71,7 +71,7 @@
       ":authority": "www.lyft.com",
       ":path": "/new_endpoint/foo"
     },
-    "_validate": {"path_rewrite": "/api/new_endpoint/foo"}
+    "validate": {"path_rewrite": "/api/new_endpoint/foo"}
   },
   {
     "test_name": "Test9",
@@ -79,7 +79,7 @@
       ":authority": "api.lyft.com",
       ":path": "/api/locations?works=true"
     },
-    "_validate": {"path_rewrite": "/rewrote?works=true"}
+    "validate": {"path_rewrite": "/rewrote?works=true"}
   },
   {
     "test_name": "Test10",
@@ -87,7 +87,7 @@
       ":authority": "api.lyft.com",
       ":path": "/foo"
     },
-    "_validate": {"path_rewrite": "/bar"}
+    "validate": {"path_rewrite": "/bar"}
   },
   {
     "test_name": "Test11",
@@ -95,7 +95,7 @@
       ":authority": "api.lyft.com",
       ":path": "/host/rewrite/me"
    },
-    "_validate": {"host_rewrite":"new_host"}
+    "validate": {"host_rewrite":"new_host"}
   },
   {
     "test_name": "Test12",
@@ -103,7 +103,7 @@
       ":authority": "api.lyft.com",
       ":path": "/API/locations?works=true"
     },
-    "_validate": {"path_rewrite": "/rewrote?works=true"}
+    "validate": {"path_rewrite": "/rewrote?works=true"}
   },
   {
     "test_name": "Test13",
@@ -111,7 +111,7 @@
       ":authority": "api.lyft.com",
       ":path": "/fooD"
     },
-    "_validate": {"path_rewrite": "/cAndy"}
+    "validate": {"path_rewrite": "/cAndy"}
   },
   {
     "test_name": "Test14",
@@ -119,7 +119,7 @@
       ":authority": "api.lyft.com",
       ":path": "/FOO"
     },
-    "_validate": {"path_rewrite": "/FOO"}
+    "validate": {"path_rewrite": "/FOO"}
   },
   {
     "test_name": "Test15",
@@ -127,7 +127,7 @@
       ":authority": "api.lyft.com",
       ":path": "/ApPles"
     },
-    "_validate": {"path_rewrite": "/ApPles"}
+    "validate": {"path_rewrite": "/ApPles"}
   },
   {
     "test_name": "Test16",
@@ -135,7 +135,7 @@
       ":authority": "api.lyft.com",
       ":path": "/oLDhost/rewrite/me"
     },
-    "_validate": {"host_rewrite": "api.lyft.com"}
+    "validate": {"host_rewrite": "api.lyft.com"}
   },
   {
     "test_name": "Test17",
@@ -143,7 +143,7 @@
       ":authority": "api.lyft.com",
       ":path": "/Tart"
     },
-    "_validate": {"path_rewrite": "/Tart"}
+    "validate": {"path_rewrite": "/Tart"}
   },
   {
     "test_name": "Test18",
@@ -151,7 +151,7 @@
       ":authority": "api.lyft.com",
       ":path": "/newhost/rewrite/me"
     },
-    "_validate": {"host_rewrite": "new_host"}
+    "validate": {"host_rewrite": "new_host"}
   },
   {
     "test_name": "Test19",
@@ -159,7 +159,7 @@
       ":authority": "api.lyft.com",
       ":path": "/rides"
     },
-    "_validate": {"virtual_cluster_name": "other"}
+    "validate": {"virtual_cluster_name": "other"}
   },
   {
     "test_name": "Test20",
@@ -168,7 +168,7 @@
       ":path": "/rides/blah",
       ":method": "POST"
      },
-    "_validate": {"virtual_cluster_name": "other"}
+    "validate": {"virtual_cluster_name": "other"}
   },
   {
     "test_name": "Test21",
@@ -177,7 +177,7 @@
       ":path": "/rides",
       ":method": "POST"
     },
-    "_validate": {"virtual_cluster_name": "ride_request"}
+    "validate": {"virtual_cluster_name": "ride_request"}
   },
   {
     "test_name": "Test22",
@@ -186,7 +186,7 @@
       ":path": "/rides/123",
       ":method": "PUT"
     },
-    "_validate": {"virtual_cluster_name": "update_ride"}
+    "validate": {"virtual_cluster_name": "update_ride"}
   },
   {
     "test_name": "Test23",
@@ -195,7 +195,7 @@
       ":path": "/users/123/chargeaccounts",
       ":method": "POST"
     },
-    "_validate": {"virtual_cluster_name": "cc_add"}
+    "validate": {"virtual_cluster_name": "cc_add"}
   },
   {
     "test_name": "Test24",
@@ -204,7 +204,7 @@
       ":path": "/users/123/chargeaccounts/hello123",
       ":method": "PUT"
     },
-    "_validate": {"virtual_cluster_name": "cc_add"}
+    "validate": {"virtual_cluster_name": "cc_add"}
   },
   {
     "test_name": "Test25",
@@ -213,7 +213,7 @@
       ":path": "/users/123/chargeaccounts/validate",
       ":method": "PUT"
     },
-    "_validate": {"virtual_cluster_name": "other"}
+    "validate": {"virtual_cluster_name": "other"}
   },
   {
     "test_name": "Test26",
@@ -222,7 +222,7 @@
       ":path": "/foo/bar",
       ":method": "PUT"
     },
-    "_validate": {"virtual_cluster_name": "other"}
+    "validate": {"virtual_cluster_name": "other"}
   },
   {
     "test_name": "Test27",
@@ -231,7 +231,7 @@
       ":path": "/users",
       ":method": "POST"
     },
-    "_validate": {"virtual_cluster_name": "create_user_login"}
+    "validate": {"virtual_cluster_name": "create_user_login"}
   },
   {
     "test_name": "Test28",
@@ -240,7 +240,7 @@
       ":path": "/users/123",
       ":method": "PUT"
     },
-    "_validate": {"virtual_cluster_name": "update_user"}
+    "validate": {"virtual_cluster_name": "update_user"}
   },
   {
     "test_name": "Test29",
@@ -249,7 +249,7 @@
       ":path": "/users/123/location",
       ":method": "POST"
     },
-    "_validate": {"virtual_cluster_name": "ulu"}
+    "validate": {"virtual_cluster_name": "ulu"}
   },
   {
     "test_name": "Test30",
@@ -258,7 +258,7 @@
       ":path": "/something/else",
       ":method": "GET"
     },
-    "_validate": {"virtual_cluster_name": "other"}
+    "validate": {"virtual_cluster_name": "other"}
   },
   {
     "test_name": "Header_Fields",
@@ -267,7 +267,7 @@
       ":path": "/host/rewrite/me",
       ":method": "GET"
     },
-    "_validate": {
+    "validate": {
       "host_rewrite": "new_host",
       "header_fields": [
         {

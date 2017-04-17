@@ -9,55 +9,59 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/precompiled/precompiled_test.h"
 #include "test/test_common/utility.h"
 #include "test/tools/router_check/json/tool_config_schemas.h"
 
 /**
- * Class that stores the configuration parameters of the router
- * check tool extracted from a json input file.
+ * Struct that stores the configuration parameters of the router check tool extracted from a json
+ * input file.
  */
 struct ToolConfig {
   ToolConfig() : random_value_(0){};
-  void parseFromJson(const Json::ObjectPtr& check_config);
 
-  int random_value_;
-  Http::TestHeaderMapImpl headers_;
+  /**
+   * @param check_config tool config json object pointer.
+   * @return ToolConfig a ToolConfig instance with member variables set by the tool config json
+   * file.
+   */
+  static ToolConfig create(const Json::ObjectPtr& check_config);
+
+  std::unique_ptr<Http::TestHeaderMapImpl> headers_;
   Router::RouteConstSharedPtr route_;
+  int random_value_;
+
+private:
+  ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value);
 };
 
 /**
- * Router check tool to check routes returned by a router
+ * A route table check tool that check whether route parameters returned by a router match
+ * what is expected.
  */
 class RouterCheckTool : Logger::Loggable<Logger::Id::testing> {
 public:
   /**
-   * @param config_json specifies the json config file to be loaded
-   * @param schema is the json schema to validate against
-   * @return Json::ObjectPtr pointer to router config json object. Return
-   *         nullptr if load fails.
-   */
-  Json::ObjectPtr loadJson(const std::string& config_json, const std::string& schema);
+   * @param router_config_json router config json file.
+   * @return RouterCheckTool a RouterCheckTool instance with member variables set by the router
+   * config json file.
+   * */
+  static RouterCheckTool create(const std::string& router_config_json);
 
   /**
-   * @param router_config_json specifies the router config json file
-   * @return bool if json file loaded successfully and ConfigImpl object created
-   *         successfully
-   */
-  bool initializeFromConfig(const std::string& router_config_json);
-
-  /**
-   * @param expected_route_json specifies the tool config json file
-   * @return bool if all routes match what is expected
+   * @param expected_route_json tool config json file.
+   * @return bool if all routes match what is expected.
    */
   bool compareEntriesInJson(const std::string& expected_route_json);
 
   /**
-   * Set whether to print out match case details
+   * Set whether to print out match case details.
    */
   void setShowDetails() { details_ = true; }
 
 private:
+  RouterCheckTool(std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime,
+                  std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm,
+                  std::unique_ptr<Router::ConfigImpl> config);
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected);
@@ -69,18 +73,17 @@ private:
   /**
    * Compare the expected and acutal route parameter values. Print out match details if details_
    * flag is set.
-   * @param actual holds the actual route returned by the router
-   * @param expected holds the expected parameter value of the route
-   * @return true if actual and expected match
+   * @param actual holds the actual route returned by the router.
+   * @param expected holds the expected parameter value of the route.
+   * @return bool if actual and expected match.
    */
   bool compareResults(const std::string& actual, const std::string& expected,
                       const std::string& test_type);
 
   bool details_{false};
 
-  // TODO(hennna): Switch away from mocks depending on whether envoy testing
-  // also switches away from mocks.
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Upstream::MockClusterManager> cm_;
+  // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
+  std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime_;
+  std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm_;
   std::unique_ptr<Router::ConfigImpl> config_;
 };

@@ -36,7 +36,7 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
               "required": [":authority", ":path"]
             }
           },
-          "_validate": {
+          "validate": {
             "type": "object",
             "properties": {
               "cluster_name": {"type": "string"},
@@ -64,7 +64,7 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
           }
         },
         "additionalProperties": false,
-        "required": ["test_name", "input", "_validate"]
+        "required": ["test_name", "input", "validate"]
       }
     }
   )EOF");

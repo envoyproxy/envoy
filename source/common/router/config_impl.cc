@@ -523,13 +523,11 @@ RouteMatcher::RouteMatcher(const Json::Object& json_config, const ConfigImpl& gl
 RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
                                                          uint64_t random_value) const {
   // First check for ssl redirect.
-  if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto() != nullptr &&
-      headers.ForwardedProto()->value() != "https") {
+  if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto()->value() != "https") {
 
     return SSL_REDIRECT_ROUTE;
   } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
-             headers.ForwardedProto() != nullptr && headers.ForwardedProto()->value() != "https" &&
-             !headers.EnvoyInternalRequest()) {
+             headers.ForwardedProto()->value() != "https" && !headers.EnvoyInternalRequest()) {
     return SSL_REDIRECT_ROUTE;
   }
 

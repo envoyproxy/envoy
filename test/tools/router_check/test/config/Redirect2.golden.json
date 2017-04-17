@@ -7,7 +7,7 @@
       "ssl": true,
       "internal": true
     },
-    "_validate": {
+    "validate": {
       "path_redirect": "",
       "cluster_name": "www2"
     }
@@ -20,7 +20,7 @@
       "ssl": false,
       "internal": false
     },
-    "_validate": {
+    "validate": {
       "path_redirect": "http://new.lyft.com/foo",
       "cluster_name": ""
     }
@@ -31,7 +31,7 @@
       ":authority": "redirect.lyft.com",
       ":path": "/foo"
     },
-    "_validate": {
+    "validate": {
       "path_redirect": "http://new.lyft.com/foo",
       "cluster_name": ""
     }
@@ -43,7 +43,7 @@
       ":path": "/foo",
       "ssl": false
     },
-    "_validate": {
+    "validate": {
       "path_redirect": "http://new.lyft.com/foo",
       "cluster_name": ""
     }
@@ -55,7 +55,7 @@
       "ssl": false,
       ":path": "/foo"
     },
-    "_validate": {
+    "validate": {
       "path_redirect": "http://new.lyft.com/foo",
       "cluster_name": ""
     }

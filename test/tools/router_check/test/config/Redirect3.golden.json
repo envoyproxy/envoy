@@ -7,7 +7,7 @@
       "ssl": true,
       "internal": true
     },
-    "_validate": {
+    "validate": {
       "path_redirect": "",
       "cluster_name": "www2"
     }
@@ -18,7 +18,7 @@
       ":authority": "redirect.lyft.com",
       ":path": "/foo"
     },
-    "_validate": {
+    "validate": {
       "cluster_name": "",
       "path_redirect": "http://new.lyft.com/foo"
     }

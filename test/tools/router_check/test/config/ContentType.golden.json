@@ -5,7 +5,7 @@
       ":authority": "www.lyft.com",
       ":path": "/"
     },
-    "_validate": {"cluster_name":"local_service"}
+    "validate": {"cluster_name":"local_service"}
   },
   {
     "test_name": "Test_2",
@@ -14,7 +14,7 @@
       ":path": "/",
       "additional_headers": [{"field": "content-type", "value": "application/grpc"}]
     },
-    "_validate": {"cluster_name": "local_service_grpc"}
+    "validate": {"cluster_name": "local_service_grpc"}
   },
   {
     "test_name": "Test_3",
@@ -23,6 +23,6 @@
       ":path": "/",
       "additional_headers": [{"field": "content-type", "value": "foo"}]
     },
-    "_validate": {"cluster_name": "local_service"}
+    "validate": {"cluster_name": "local_service"}
   }
 ]

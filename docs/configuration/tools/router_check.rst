@@ -40,7 +40,7 @@ expects a cluster name match of "instant-server".::
            ":authority":"api.lyft.com",
            ":path": "/api/locations"
          }
-       "_validate"
+       "validate"
          {
            "cluster_name": "instant-server"
          }
@@ -70,7 +70,7 @@ expects a cluster name match of "instant-server".::
             }
           ]
         }
-      "_validate": {
+      "validate": {
         "cluster_name": "...",
         "virtual_cluster_name": "...",
         "virtual_host_name": "...",
@@ -135,8 +135,8 @@ input
     value
       *(required, string)* The value of the header field to add.
 
-_validate
-  *(required, object)* The _validate object specifies the returned route parameters to match. At least one
+validate
+  *(required, object)* The validate object specifies the returned route parameters to match. At least one
   test parameter must be specificed. Use "" (empty string) to indicate that no return value is expected.
   For example, to test that no cluster match is expected use {"cluster_name": ""}.
 

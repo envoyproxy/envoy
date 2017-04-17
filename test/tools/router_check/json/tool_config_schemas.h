@@ -3,7 +3,6 @@
 namespace Json {
 
 class ToolSchema {
-
 public:
   /**
    * Obtain the router check json schema

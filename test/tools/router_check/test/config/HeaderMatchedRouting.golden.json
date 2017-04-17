@@ -5,7 +5,7 @@
       ":authority": "www.lyft.com",
       ":path": "/"
     },
-    "_validate": {"cluster_name": "local_service_without_headers"}
+    "validate": {"cluster_name": "local_service_without_headers"}
   },
   {
     "test_name": "Test_2",
@@ -19,7 +19,7 @@
         }
       ]
     },
-    "_validate": {"cluster_name": "local_service_with_headers"}
+    "validate": {"cluster_name": "local_service_with_headers"}
   },
   {
     "test_name": "Test_3",
@@ -37,7 +37,7 @@
         }
       ]
     },
-    "_validate": {"cluster_name": "local_service_with_multiple_headers"}
+    "validate": {"cluster_name": "local_service_with_multiple_headers"}
   },
   {
     "test_name": "Test_4",
@@ -51,7 +51,7 @@
         }
       ]
     },
-    "_validate": {"cluster_name": "local_service_without_headers"}
+    "validate": {"cluster_name": "local_service_without_headers"}
   },
   {
     "test_name": "Test_5",
@@ -65,7 +65,7 @@
         }
       ]
     },
-    "_validate": {"cluster_name": "local_service_with_empty_headers"}
+    "validate": {"cluster_name": "local_service_with_empty_headers"}
   },
   {
     "test_name": "Test_6",
@@ -79,7 +79,7 @@
         }
       ]
     },
-    "_validate": {"cluster_name": "local_service_with_header_pattern_set_regex"}
+    "validate": {"cluster_name": "local_service_with_header_pattern_set_regex"}
   },
   {
     "test_name": "Test_7",
@@ -93,6 +93,6 @@
         }
       ]
     },
-    "_validate": {"cluster_name": "local_service_without_headers"}
+    "validate": {"cluster_name": "local_service_without_headers"}
   }
 ]
