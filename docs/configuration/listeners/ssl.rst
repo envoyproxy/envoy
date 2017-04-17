@@ -15,7 +15,8 @@ TLS :ref:`architecture overview <arch_overview_ssl>`.
     "ca_cert_file": "...",
     "verify_certificate_hash": "...",
     "verify_subject_alt_name": [],
-    "cipher_suites": "..."
+    "cipher_suites": "...",
+    "ecdh_curves": "..."
   }
 
 cert_chain_file
@@ -75,3 +76,7 @@ cipher_suites
   AES256-SHA
 
 will be used.
+
+ecdh_curves
+  *(optional, string)* If specified, the TLS connection will only support the specified ECDH curves.
+  If not specified, the default curves (X25519, P-256) will be used.
