@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/tracing/zipkin/span_context.h"
 #include "common/tracing/zipkin/tracer_interface.h"
@@ -33,6 +34,8 @@ typedef std::shared_ptr<Reporter> ReporterSharedPtr;
 
 typedef std::unique_ptr<Reporter> ReporterUniquePtr;
 
+typedef std::shared_ptr<Runtime::RandomGenerator> RandomGeneratorSharedPtr;
+
 /**
  * This class implements the Zipkin tracer. It has methods to create the appropriate Zipkin span
  * type, i.e., root span, child span, or shared-context span.
@@ -52,7 +55,7 @@ public:
    * in all annotations' endpoints of the spans created by the Tracer.
    */
   Tracer(const std::string& service_name, const std::string& address)
-      : service_name_(service_name), address_(address) {}
+      : service_name_(service_name), address_(address), random_generator_(nullptr) {}
 
   virtual ~Tracer() {}
 
@@ -88,10 +91,25 @@ public:
    */
   void setReporter(ReporterUniquePtr reporter);
 
+  /**
+   * Provides a random-number generator to be used by the Tracer.
+   * If this method is not used, the Tracer will use a default random-number generator.
+   *
+   * @param random_generator Random-number generator to be used.
+   */
+  void setRandomGenerator(RandomGeneratorSharedPtr random_generator);
+
 private:
+  /**
+   * Uses the default random-number generator if one was not provided by the user
+   */
+  uint64_t generateRandomNumber();
+
   std::string service_name_;
   std::string address_;
 
   ReporterSharedPtr reporter_;
+
+  RandomGeneratorSharedPtr random_generator_;
 };
 } // Zipkin

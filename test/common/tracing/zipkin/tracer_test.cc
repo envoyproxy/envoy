@@ -1,3 +1,5 @@
+#include "common/runtime/runtime_impl.h"
+
 #include "common/tracing/zipkin/tracer.h"
 #include "common/tracing/zipkin/util.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
@@ -5,6 +7,26 @@
 #include "gtest/gtest.h"
 
 namespace Zipkin {
+
+class TestReporterImpl : public Reporter {
+public:
+  TestReporterImpl(int value) : value_(value) {}
+  void reportSpan(Span&& span) { reported_spans_.push_back(span); }
+  int getValue() { return value_; }
+  std::vector<Span>& reportedSpans() { return reported_spans_; }
+
+private:
+  int value_;
+  std::vector<Span> reported_spans_;
+};
+
+TEST(ZipkinTracerTest, reporterSetting) {
+  Tracer tracer("my_service_name", "127.0.0.1:9000");
+  ReporterUniquePtr reporter_ptr(new TestReporterImpl(135));
+  tracer.setReporter(std::move(reporter_ptr));
+  ReporterSharedPtr reporter_from_tracer = tracer.reporter();
+  EXPECT_EQ(135, std::static_pointer_cast<TestReporterImpl>(reporter_from_tracer)->getValue());
+}
 
 TEST(ZipkinTracerTest, spanCreation) {
   Tracer tracer("my_service_name", "127.0.0.1:9000");
@@ -130,6 +152,7 @@ TEST(ZipkinTracerTest, spanCreation) {
 
 TEST(ZipkinTracerTest, finishSpan) {
   Tracer tracer("my_service_name", "127.0.0.1:9000");
+  tracer.setRandomGenerator(RandomGeneratorSharedPtr(new Runtime::RandomGeneratorImpl()));
   int64_t timestamp = Util::timeSinceEpochMicro();
 
   // ==============
@@ -172,9 +195,19 @@ TEST(ZipkinTracerTest, finishSpan) {
   SpanContext context(span);
   Span server_side = tracer.startSpan("my_span", timestamp, context);
 
+  // Associate a reporter with the tracer
+  ReporterUniquePtr reporter_ptr(new TestReporterImpl(135));
+  tracer.setReporter(std::move(reporter_ptr));
+
   // Finishing a server-side span with an SR annotation must add an SS annotation
   server_side.finish();
   EXPECT_EQ(2ULL, server_side.annotations().size());
+
+  // Test if the reporter's reportSpan method was actually called upon finishing the span
+  ReporterSharedPtr reporter_from_tracer = tracer.reporter();
+  EXPECT_EQ(
+      1ULL,
+      std::static_pointer_cast<TestReporterImpl>(reporter_from_tracer)->reportedSpans().size());
 
   // Check the SR annotation added at span-creation time
   ann = server_side.annotations()[0];

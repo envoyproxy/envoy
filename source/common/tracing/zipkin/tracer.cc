@@ -22,9 +22,9 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   // Create an all-new span, with no parent id
   Span span;
   span.setName(span_name);
-  uint64_t randon_number = Util::generateRandom64();
-  span.setId(randon_number);
-  span.setTraceId(randon_number);
+  uint64_t random_number = generateRandomNumber();
+  span.setId(random_number);
+  span.setTraceId(random_number);
   span.setStartTime(start_time);
 
   // Set the timestamp globally for the span and also for the CS annotation
@@ -55,8 +55,8 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
     // We need to create a new span that is a child of the previous span; no shared context
 
     // Create a new span id
-    uint64_t randon_number = Util::generateRandom64();
-    span.setId(randon_number);
+    uint64_t random_number = generateRandomNumber();
+    span.setId(random_number);
 
     span.setName(span_name);
 
@@ -117,5 +117,13 @@ void Tracer::reportSpan(Span&& span) {
 
 void Tracer::setReporter(ReporterUniquePtr reporter) {
   reporter_ = ReporterSharedPtr(std::move(reporter));
+}
+
+void Tracer::setRandomGenerator(RandomGeneratorSharedPtr random_generator) {
+  random_generator_ = random_generator;
+}
+
+uint64_t Tracer::generateRandomNumber() {
+  return random_generator_ ? random_generator_->random() : Util::generateRandom64();
 }
 } // Zipkin
