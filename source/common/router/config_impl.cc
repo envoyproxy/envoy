@@ -25,6 +25,8 @@ RetryPolicyImpl::RetryPolicyImpl(const Json::Object& config) {
     return;
   }
 
+  per_try_timeout_ = std::chrono::milliseconds(
+      config.getObject("retry_policy")->getInteger("per_try_timeout_ms", 0));
   num_retries_ = config.getObject("retry_policy")->getInteger("num_retries", 1);
   retry_on_ = RetryStateImpl::parseRetryOn(config.getObject("retry_policy")->getString("retry_on"));
 }
@@ -139,6 +141,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
           {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
   }
+
+  // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
+  // or the route set `include_vh_rate_limits` to true.
+  include_vh_rate_limits_ =
+      (rate_limit_policy_.empty() || route.getBoolean("include_vh_rate_limits", false));
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
@@ -301,7 +308,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
     }
     begin = end;
   }
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
@@ -457,6 +464,26 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(const Json::Object& vi
   priority_ = ConfigUtility::parsePriority(virtual_cluster);
 }
 
+const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
+  // We do a longest wildcard suffix match against the host that's passed in.
+  // (e.g. foo-bar.baz.com should match *-bar.baz.com before matching *.baz.com)
+  // This is done by scanning the length => wildcards map looking for every
+  // wildcard whose size is < length.
+  for (const auto& iter : wildcard_virtual_host_suffixes_) {
+    const uint32_t wildcard_length = iter.first;
+    const auto& wildcard_map = iter.second;
+    // >= because *.foo.com shouldn't match .foo.com.
+    if (wildcard_length >= host.size()) {
+      continue;
+    }
+    const auto& match = wildcard_map.find(host.substr(host.size() - wildcard_length));
+    if (match != wildcard_map.end()) {
+      return match->second.get();
+    }
+  }
+  return nullptr;
+}
+
 RouteMatcher::RouteMatcher(const Json::Object& json_config, const ConfigImpl& global_route_config,
                            Runtime::Loader& runtime, Upstream::ClusterManager& cm,
                            bool validate_clusters) {
@@ -474,6 +501,8 @@ RouteMatcher::RouteMatcher(const Json::Object& json_config, const ConfigImpl& gl
           throw EnvoyException(fmt::format("Only a single single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
+      } else if (domain.size() > 0 && '*' == domain[0]) {
+        wildcard_virtual_host_suffixes_[domain.size() - 1].emplace(domain.substr(1), virtual_host);
       } else {
         if (virtual_hosts_.find(domain) != virtual_hosts_.end()) {
           throw EnvoyException(fmt::format(
@@ -513,14 +542,18 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
     return default_virtual_host_.get();
   }
 
-  auto iter = virtual_hosts_.find(headers.Host()->value().c_str());
+  const char* host = headers.Host()->value().c_str();
+  const auto& iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
-  } else if (default_virtual_host_) {
-    return default_virtual_host_.get();
   }
-
-  return nullptr;
+  if (!wildcard_virtual_host_suffixes_.empty()) {
+    const VirtualHostImpl* vhost = findWildcardVirtualHost(host);
+    if (vhost != nullptr) {
+      return vhost;
+    }
+  }
+  return default_virtual_host_.get();
 }
 
 RouteConstSharedPtr RouteMatcher::route(const Http::HeaderMap& headers,

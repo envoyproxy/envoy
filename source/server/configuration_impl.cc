@@ -11,6 +11,7 @@
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/tracing/http_tracer_impl.h"
+#include "common/tracing/lightstep_tracer_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 namespace Server {

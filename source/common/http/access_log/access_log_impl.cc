@@ -47,7 +47,7 @@ bool FilterImpl::compareAgainstValue(uint64_t lhs) {
     return lhs == value;
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {

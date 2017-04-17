@@ -63,6 +63,12 @@ the units tests in
 bazel test //test/common/http:async_client_impl_test
 ```
 
+# Running a single Bazel test under GDB
+
+```
+tools/bazel-test-gdb //test/common/http:async_client_impl_test
+```
+
 # Additional Envoy build and test options
 
 To build and run tests with the compiler's address sanitizer (ASAN) enabled:

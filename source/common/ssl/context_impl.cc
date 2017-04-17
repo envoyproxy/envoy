@@ -63,13 +63,18 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
     // verify that all of the specified ciphers were understood by openssl
     ssize_t num_configured = std::count(cipher_suites.begin(), cipher_suites.end(), ':') + 1;
 #ifdef OPENSSL_IS_BORINGSSL
-    if (sk_SSL_CIPHER_num(ctx_->cipher_list->ciphers) != static_cast<size_t>(num_configured)) {
+    num_configured += std::count(cipher_suites.begin(), cipher_suites.end(), '|');
+    if (sk_SSL_CIPHER_num(ctx_->cipher_list->ciphers) < static_cast<size_t>(num_configured)) {
 #else
-    if (sk_SSL_CIPHER_num(ctx_->cipher_list) != num_configured) {
+    if (sk_SSL_CIPHER_num(ctx_->cipher_list) < num_configured) {
 #endif
       throw EnvoyException(
           fmt::format("Unknown cipher specified in cipher suites {}", config.cipherSuites()));
     }
+  }
+
+  if (!SSL_CTX_set1_curves_list(ctx_.get(), config.ecdhCurves().c_str())) {
+    throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", config.ecdhCurves()));
   }
 
   if (!config.caCertFile().empty()) {
@@ -144,23 +149,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
 
   if (1 != rc) {
     throw EnvoyException(fmt::format("Failed to initialize DH params"));
-  }
-
-  // Initialize elliptic curve - this curve was chosen to match the one currently supported by ELB
-  EC_KEY* ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-  if (!ecdh) {
-    throw EnvoyException(fmt::format("Failed to initialize elliptic curve"));
-  }
-
-#ifdef OPENSSL_IS_BORINGSSL
-  rc = SSL_CTX_set_tmp_ecdh(ctx_.get(), ecdh);
-#else
-  rc = SSL_CTX_ctrl(ctx_.get(), SSL_CTRL_SET_TMP_ECDH, 0, reinterpret_cast<char*>(ecdh));
-#endif
-  EC_KEY_free(ecdh);
-
-  if (1 != rc) {
-    throw EnvoyException(fmt::format("Failed to initialize elliptic curve"));
   }
 
   SSL_CTX_set_session_id_context(ctx_.get(), &SERVER_SESSION_ID_CONTEXT,

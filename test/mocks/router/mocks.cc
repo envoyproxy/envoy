@@ -27,6 +27,7 @@ MockRateLimitPolicyEntry::~MockRateLimitPolicyEntry() {}
 
 MockRateLimitPolicy::MockRateLimitPolicy() {
   ON_CALL(*this, getApplicableRateLimit(_)).WillByDefault(ReturnRef(rate_limit_policy_entry_));
+  ON_CALL(*this, empty()).WillByDefault(Return(true));
 }
 
 MockRateLimitPolicy::~MockRateLimitPolicy() {}
@@ -53,6 +54,7 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
   ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
   ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
+  ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
 }
 
 MockRouteEntry::~MockRouteEntry() {}

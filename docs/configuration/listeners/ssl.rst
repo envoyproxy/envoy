@@ -15,7 +15,8 @@ TLS :ref:`architecture overview <arch_overview_ssl>`.
     "ca_cert_file": "...",
     "verify_certificate_hash": "...",
     "verify_subject_alt_name": [],
-    "cipher_suites": "..."
+    "cipher_suites": "...",
+    "ecdh_curves": "..."
   }
 
 cert_chain_file
@@ -53,5 +54,29 @@ verify_subject_alt_name
   that the server certificate's subject alt name matches one of the specified values.
 
 cipher_suites
-  *(optional, string)* If specified, the TLS listener will only support the specified cipher list.
-  If not specified, a default list will be used.
+  *(optional, string)* If specified, the TLS listener will only support the specified `cipher list
+  <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#Cipher-suite-configuration>`_.
+  If not specified, the default list:
+
+.. code-block:: none
+
+  [ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]
+  [ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]
+  ECDHE-ECDSA-AES128-SHA256
+  ECDHE-RSA-AES128-SHA256
+  AES128-GCM-SHA256
+  AES128-SHA256
+  AES128-SHA
+  ECDHE-ECDSA-AES256-GCM-SHA384
+  ECDHE-RSA-AES256-GCM-SHA384
+  ECDHE-ECDSA-AES256-SHA384
+  ECDHE-RSA-AES256-SHA384
+  AES256-GCM-SHA384
+  AES256-SHA256
+  AES256-SHA
+
+will be used.
+
+ecdh_curves
+  *(optional, string)* If specified, the TLS connection will only support the specified ECDH curves.
+  If not specified, the default curves (X25519, P-256) will be used.

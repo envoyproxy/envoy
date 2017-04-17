@@ -14,8 +14,7 @@ envoy_cc_test_library(
         "//source/common/common:version_lib",
         "//source/common/event:libevent_lib",
         "//source/common/ssl:openssl_lib",
-        "//source/server:options_lib",
-        "//test/integration:integration_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:printers_lib",
     ],
 )

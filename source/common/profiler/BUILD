@@ -6,4 +6,5 @@ envoy_cc_library(
     name = "profiler_lib",
     srcs = ["profiler.cc"],
     hdrs = ["profiler.h"],
+    tcmalloc_dep = 1,
 )

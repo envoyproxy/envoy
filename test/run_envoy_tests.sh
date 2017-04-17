@@ -28,7 +28,9 @@ echo "TEST_SRCDIR=$TEST_SRCDIR"
 
 mkdir -p $TEST_TMPDIR
 
-$SOURCE_DIR/test/certs/gen_test_certs.sh $TEST_SRCDIR/test/certs
+# This places the unittest SSL certificates into $TEST_TMPDIR where the unit
+# tests in test/common/ssl expect to consume them
+$SOURCE_DIR/test/common/ssl/gen_unittest_certs.sh
 
 # Some hacks for the config file template substitution. These go away in the Bazel build.
 CONFIG_IN_DIR="$SOURCE_DIR"/test/config/integration
@@ -43,10 +45,15 @@ do
 done
 
 # Some hacks for the runtime test filesystem. These go away in the Bazel build.
-TEST_RUNTIME_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/common/runtime/test_data
-mkdir -p "$TEST_RUNTIME_DIR"
-cp -r "$SOURCE_DIR"/test/common/runtime/test_data/* "$TEST_RUNTIME_DIR"
-"$SOURCE_DIR"/test/common/runtime/filesystem_setup.sh
+TEST_RUNTIME_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/common/runtime
+mkdir -p "$TEST_RUNTIME_DIR/test_data"
+cp -r "$SOURCE_DIR"/test/common/runtime/test_data/* "$TEST_RUNTIME_DIR"/test_data
+cp "$SOURCE_DIR"/test/common/runtime/filesystem_setup.sh "$TEST_RUNTIME_DIR"
+
+# Some hacks for the SSL cert generation. These go away in the Bazel build.
+TEST_SSL_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/common/ssl
+mkdir -p "$TEST_SSL_DIR"
+cp "$SOURCE_DIR"/test/common/ssl/gen_unittest_certs.sh "$TEST_SSL_DIR"
 
 if [ -n "$EXTRA_SETUP_SCRIPT" ]; then
   $EXTRA_SETUP_SCRIPT

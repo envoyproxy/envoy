@@ -17,7 +17,6 @@
 
 IntegrationTestServerPtr BaseIntegrationTest::test_server_;
 std::vector<std::unique_ptr<FakeUpstream>> BaseIntegrationTest::fake_upstreams_;
-spdlog::level::level_enum BaseIntegrationTest::default_log_level_;
 
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
@@ -212,8 +211,8 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(uint32_t events) {
 
 BaseIntegrationTest::BaseIntegrationTest()
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
-      dispatcher_(api_->allocateDispatcher()) {
-
+      dispatcher_(api_->allocateDispatcher()),
+      default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
@@ -274,7 +273,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitutePorts(json_path, port_map()));
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map()));
   registerTestServerPorts(port_names);
 }
 

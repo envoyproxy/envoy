@@ -75,7 +75,7 @@ using a ',' delimited list. The supported policies are:
 
 5xx
   Envoy will attempt a retry if the upstream server responds with any 5xx response code, or does not
-  respond at all (disconnect/reset/etc.). (Includes *connect-failure* and *refused-stream*)
+  respond at all (disconnect/reset/read timeout). (Includes *connect-failure* and *refused-stream*)
 
   * **NOTE:** Envoy will not retry when a request exceeds
     :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` (resulting in a 504 error
@@ -205,6 +205,8 @@ The router filter supports the following runtime settings:
 upstream.base_retry_backoff_ms
   Base exponential retry back off time. See :ref:`here <arch_overview_http_routing_retry>` for more
   information. Defaults to 25ms.
+
+.. _config_http_filters_router_runtime_maintenance_mode:
 
 upstream.maintenance_mode.<cluster name>
   % of requests that will result in an immediate 503 response. This overrides any routing behavior

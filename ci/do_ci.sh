@@ -4,35 +4,38 @@
 
 set -e
 
-if [[ "$1" == "bazel.debug" ]]; then
-  echo "debug bazel build with tests..."
-  cd ci
-  ln -sf /thirdparty prebuilt
-  ln -sf /thirdparty_build prebuilt
-  # Only CC is required to find g++, see
-  # https://www.bazel.build/blog/2016/03/31/autoconfiguration.html#implementation
-  export CC=gcc-4.9
-  export USER=bazel
-  export TEST_TMPDIR=/source/build
-  # Not sandboxing, since non-privileged Docker can't do nested namespaces.
-  BAZEL_OPTIONS="--strategy=CppCompile=standalone --strategy=CppLink=standalone \
-    --strategy=TestRunner=standalone --strategy=ProtoCompile=standalone \
-    --strategy=Genrule=standalone --verbose_failures --package_path %workspace%:.."
-  [[ "$BAZEL_INTERACTIVE" == "1" ]] && BAZEL_BATCH="" || BAZEL_BATCH="--batch"
-  [[ "$BAZEL_EXPUNGE" == "1" ]] && bazel clean --expunge
-  echo "Building..."
-  bazel $BAZEL_BATCH build $BAZEL_OPTIONS //source/exe:envoy-static
-  echo "Testing..."
-  bazel $BAZEL_BATCH test $BAZEL_OPTIONS --test_output=all \
-    --cache_test_results=no //test/...
-  exit 0
-fi
-
 . "$(dirname "$0")"/build_setup.sh
+echo "building using ${NUM_CPUS} CPUs"
 
-echo "building using $NUM_CPUS CPUs"
-
-if [[ "$1" == "fix_format" ]]; then
+if [[ "$1" == "bazel.debug" ]]; then
+  echo "bazel debug build with tests..."
+  cd "${ENVOY_CONSUMER_SRCDIR}"
+  echo "Building..."
+  bazel build ${BAZEL_BUILD_OPTIONS} @envoy//source/exe:envoy-static
+  echo "Testing..."
+  bazel test ${BAZEL_BUILD_OPTIONS} --test_output=all \
+    --cache_test_results=no @envoy//test/... //:echo2_integration_test
+  exit 0
+elif [[ "$1" == "bazel.coverage" ]]; then
+  echo "bazel coverage build with tests..."
+  export GCOVR="/thirdparty/gcovr-3.3/scripts/gcovr"
+  export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
+  export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
+  export BUILDIFIER_BIN="/usr/lib/go/bin/buildifier"
+  # There is a bug in gcovr 3.3, where it takes the -r path,
+  # in our case /source, and does a regex replacement of various
+  # source file paths during HTML generation. It attempts to strip
+  # out the prefix (e.g. /source), but because it doesn't do a match
+  # and only strip at the start of the string, it removes /source from
+  # the middle of the string, corrupting the path. The workaround is
+  # to point -r in the gcovr invocation in run_envoy_bazel_coverage.sh at
+  # some Bazel created symlinks to the source directory in its output
+  # directory. Wow.
+  cd "${ENVOY_BUILD_DIR}"
+  SRCDIR="${GCOVR_DIR}" REAL_SRCDIR="${ENVOY_SRCDIR}" \
+    "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
+  exit 0
+elif [[ "$1" == "fix_format" ]]; then
   echo "fix_format..."
   make fix_format
   exit 0
@@ -56,5 +59,5 @@ fi
 shift
 export EXTRA_TEST_ARGS="$@"
 
-[[ "$SKIP_CHECK_FORMAT" == "1" ]] || make check_format
-make -j$NUM_CPUS $TEST_TARGET
+[[ "${SKIP_CHECK_FORMAT}" == "1" ]] || make check_format
+make -j${NUM_CPUS} ${TEST_TARGET}

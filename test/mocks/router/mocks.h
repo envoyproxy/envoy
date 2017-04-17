@@ -18,9 +18,11 @@ public:
 class TestRetryPolicy : public RetryPolicy {
 public:
   // Router::RetryPolicy
+  std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
 
+  std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
 };
@@ -67,6 +69,7 @@ public:
   MOCK_CONST_METHOD1(
       getApplicableRateLimit,
       std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(uint64_t stage));
+  MOCK_CONST_METHOD0(empty, bool());
 
   std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };
@@ -147,6 +150,7 @@ public:
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
+  MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;

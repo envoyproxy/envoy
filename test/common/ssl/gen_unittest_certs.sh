@@ -4,7 +4,7 @@
 
 set -e
 
-TEST_CERT_DIR=$1
+TEST_CERT_DIR=$TEST_TMPDIR
 
 mkdir -p $TEST_CERT_DIR
 openssl genrsa -out $TEST_CERT_DIR/unittestkey.pem 1024

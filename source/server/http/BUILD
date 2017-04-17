@@ -63,5 +63,4 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/server/config/network:http_connection_manager_lib",
     ],
-    alwayslink = 1,
 )
