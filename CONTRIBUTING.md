@@ -1,4 +1,5 @@
-We welcome contributions from the community. Here are some guidelines.
+We welcome contributions from the community. Please read the following guidelines carefully to
+maximize the chances of your PR being merged.
 
 # Communication
 
@@ -26,6 +27,10 @@ We welcome contributions from the community. Here are some guidelines.
   cycle remove the deprecated configuration. This means that organizations deploying master should
   have some time to get ready for breaking changes, but we make no guarantees about the length of
   time.
+* The breaking change policy also applies to source level extensions (e.g., filters). Code that
+  conforms to the public interface documentation should continue to compile and work within the
+  deprecation window. We make no guarantees about code or deployments that rely on undocumented
+  behavior.
 * All deprecations/breaking changes will be clearly listed in the release notes.
 
 # Release cadence
@@ -88,6 +93,9 @@ We welcome contributions from the community. Here are some guidelines.
   someone has signed. Non-Lyft committers need to ask a Lyft employee to check unless they are sure
   the author has signed. (NOTE: Lyft plans on creating a CLA bot, but the timeline is unclear due
   to resourcing).
+* Please **clean up the commit message** before merging. By default, GitHub fills the squash merge
+  commit message with every individual commit from the PR. Generally, we want a commit message
+  that is roughly equal to the original PR title and description.
 
 # CLA
 
