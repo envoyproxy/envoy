@@ -81,6 +81,24 @@ def envoy_cc_library(name,
         alwayslink = 1,
     )
 
+def _git_stamped_genrule(name):
+    # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
+    # do binary rewriting to replace the linker produced MD5 hash with the
+    # version_generated.cc git SHA1 hash (truncated).
+    native.genrule(
+        name = name + "_stamped",
+        srcs = [
+            name,
+            "//source/version_generated:version_generated.cc",
+        ],
+        outs = [name + ".stamped"],
+        cmd = "cp $(location " + name + ") $@ && " +
+              "chmod u+w $@ && " +
+              "$(location //tools:git_sha_rewriter.py) " +
+              "$(location //source/version_generated:version_generated.cc) $@",
+        tools = ["//tools:git_sha_rewriter.py"],
+    )
+
 # Envoy C++ binary targets should be specified with this function.
 def envoy_cc_binary(name,
                     srcs = [],
@@ -88,6 +106,9 @@ def envoy_cc_binary(name,
                     visibility = None,
                     repository = "",
                     deps = []):
+    # Implicit .stamped targets to obtain builds with the (truncated) git SHA1.
+    _git_stamped_genrule(name)
+    _git_stamped_genrule(name + ".stripped")
     native.cc_binary(
         name = name,
         srcs = srcs,
@@ -96,12 +117,24 @@ def envoy_cc_binary(name,
         linkopts = [
             "-pthread",
             "-lrt",
+            # Force MD5 hash in build. This is part of the workaround for
+            # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
+            # does this by itself prior to
+            # https://github.com/bazelbuild/bazel/commit/724706ba4836c3366fc85b40ed50ccf92f4c3882.
+            # Ironically, forcing it here so that in future releases we will
+            # have the same behavior. When everyone is using an updated version
+            # of Bazel, we can use linkopts to set the git SHA1 directly in the
+            # --build-id and avoid doing the following.
+            '-Wl,--build-id=md5',
+            '-Wl,--hash-style=gnu',
             "-static-libstdc++",
             "-static-libgcc",
         ],
         linkstatic = 1,
         visibility = visibility,
         malloc = tcmalloc_external_dep(repository),
+        # See above comment on MD5 hash.
+        stamp = 0,
         deps = deps + [
             repository + "//source/precompiled:precompiled_includes",
         ],
