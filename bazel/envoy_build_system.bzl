@@ -12,9 +12,14 @@ ENVOY_COPTS = [
     "-std=c++0x",
     "-includeprecompiled/precompiled.h",
 ] + select({
-    "//bazel:opt_build": [], # Bazel adds an implicit -DNDEBUG.
+    # Bazel adds an implicit -DNDEBUG for opt.
+    "//bazel:opt_build": [],
     "//bazel:fastbuild_build": [],
     "//bazel:dbg_build": ["-ggdb3"],
+}) + select({
+    # Allow debug symbols to be added to opt/fastbuild as well.
+    "//bazel:debug_symbols": ["-ggdb3"],
+    "//conditions:default": [],
 })
 
 # References to Envoy external dependencies should be wrapped with this function.

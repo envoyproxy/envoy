@@ -16,3 +16,8 @@ config_setting(
     name = "dbg_build",
     values = {"compilation_mode": "dbg"},
 )
+
+config_setting(
+    name = "debug_symbols",
+    values = {"define": "debug_symbols=yes"},
+)
