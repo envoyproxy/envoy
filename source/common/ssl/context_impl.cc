@@ -73,6 +73,10 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
     }
   }
 
+  if (!SSL_CTX_set1_curves_list(ctx_.get(), config.ecdhCurves().c_str())) {
+    throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", config.ecdhCurves()));
+  }
+
   if (!config.caCertFile().empty()) {
     ca_cert_ = loadCert(config.caCertFile());
     ca_file_path_ = config.caCertFile();
@@ -145,23 +149,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
 
   if (1 != rc) {
     throw EnvoyException(fmt::format("Failed to initialize DH params"));
-  }
-
-  // Initialize elliptic curve - this curve was chosen to match the one currently supported by ELB
-  EC_KEY* ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-  if (!ecdh) {
-    throw EnvoyException(fmt::format("Failed to initialize elliptic curve"));
-  }
-
-#ifdef OPENSSL_IS_BORINGSSL
-  rc = SSL_CTX_set_tmp_ecdh(ctx_.get(), ecdh);
-#else
-  rc = SSL_CTX_ctrl(ctx_.get(), SSL_CTRL_SET_TMP_ECDH, 0, reinterpret_cast<char*>(ecdh));
-#endif
-  EC_KEY_free(ecdh);
-
-  if (1 != rc) {
-    throw EnvoyException(fmt::format("Failed to initialize elliptic curve"));
   }
 
   SSL_CTX_set_session_id_context(ctx_.get(), &SERVER_SESSION_ID_CONTEXT,

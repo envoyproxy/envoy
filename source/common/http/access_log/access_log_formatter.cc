@@ -107,7 +107,7 @@ const std::string& AccessLogFormatUtils::protocolToString(Protocol protocol) {
     return Http2String;
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 FormatterImpl::FormatterImpl(const std::string& format) {
