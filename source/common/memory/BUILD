@@ -6,4 +6,5 @@ envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats.cc"],
     hdrs = ["stats.h"],
+    tcmalloc_dep = 1,
 )

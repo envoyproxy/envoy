@@ -3,26 +3,47 @@ load("@protobuf_bzl//:protobuf.bzl", "cc_proto_library")
 ENVOY_COPTS = [
     # TODO(htuch): Remove this when Bazel bringup is done.
     "-DBAZEL_BRINGUP",
-    "-fno-omit-frame-pointer",
-    # TODO(htuch): Clang wants -ferror-limit, should support both. Commented out for now.
-    # "-fmax-errors=3",
     "-Wall",
-    # TODO(htuch): Figure out why protobuf-3.2.0 causes the CI build to fail
-    # with this but not the developer-local build.
-    #"-Wextra",
+    "-Wextra",
     "-Werror",
     "-Wnon-virtual-dtor",
     "-Woverloaded-virtual",
-    # TODO(htuch): Figure out how to use this in the presence of headers in
-    # openssl/tclap which use old style casts.
-    # "-Wold-style-cast",
+    "-Wold-style-cast",
     "-std=c++0x",
     "-includeprecompiled/precompiled.h",
-]
+] + select({
+    # Bazel adds an implicit -DNDEBUG for opt.
+    "//bazel:opt_build": [],
+    "//bazel:fastbuild_build": [],
+    "//bazel:dbg_build": ["-ggdb3"],
+}) + select({
+    "//bazel:disable_tcmalloc": [],
+    "//conditions:default": ["-DTCMALLOC"],
+}) + select({
+    # Allow debug symbols to be added to opt/fastbuild as well.
+    "//bazel:debug_symbols": ["-ggdb3"],
+    "//conditions:default": [],
+})
 
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
     return "//external:%s" % dep
+
+# Dependencies on tcmalloc_and_profiler should be wrapped with this function.
+def tcmalloc_external_dep():
+    return select({
+        "//bazel:disable_tcmalloc": None,
+        "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
+    })
+
+# As above, but wrapped in list form for adding to dep lists. This smell seems needed as
+# SelectorValue values have to match the attribute type. See
+# https://github.com/bazelbuild/bazel/issues/2273.
+def tcmalloc_external_deps():
+    return select({
+        "//bazel:disable_tcmalloc": [],
+        "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
+    })
 
 # Transform the package path (e.g. include/envoy/common) into a path for
 # exporting the package headers at (e.g. envoy/common). Source files can then
@@ -39,8 +60,11 @@ def envoy_cc_library(name,
                      copts = [],
                      visibility = None,
                      external_deps = [],
+                     tcmalloc_dep = None,
                      repository = "",
                      deps = []):
+    if tcmalloc_dep:
+        deps += tcmalloc_external_deps()
     native.cc_library(
         name = name,
         srcs = srcs,
@@ -101,9 +125,12 @@ def envoy_cc_binary(name,
             # --build-id and avoid doing the following.
             '-Wl,--build-id=md5',
             '-Wl,--hash-style=gnu',
+            "-static-libstdc++",
+            "-static-libgcc",
         ],
         linkstatic = 1,
         visibility = visibility,
+        malloc = tcmalloc_external_dep(),
         # See above comment on MD5 hash.
         stamp = 0,
         deps = deps + [
@@ -137,6 +164,7 @@ def envoy_cc_test(name,
         copts = ENVOY_COPTS,
         linkopts = ["-pthread"],
         linkstatic = 1,
+        malloc = tcmalloc_external_dep(),
         deps = [
             ":" + name + "_lib",
             repository + "//test:main"
