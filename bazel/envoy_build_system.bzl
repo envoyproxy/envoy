@@ -81,22 +81,24 @@ def envoy_cc_library(name,
         alwayslink = 1,
     )
 
-def _git_stamped_genrule(name):
+def _git_stamped_genrule(repository, name):
     # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
     # do binary rewriting to replace the linker produced MD5 hash with the
     # version_generated.cc git SHA1 hash (truncated).
+    version_generated = repository + "//:version_generated.cc"
+    rewriter = repository + "//tools:git_sha_rewriter.py"
     native.genrule(
         name = name + "_stamped",
         srcs = [
             name,
-            "//source/version_generated:version_generated.cc",
+            version_generated,
         ],
         outs = [name + ".stamped"],
         cmd = "cp $(location " + name + ") $@ && " +
               "chmod u+w $@ && " +
-              "$(location //tools:git_sha_rewriter.py) " +
-              "$(location //source/version_generated:version_generated.cc) $@",
-        tools = ["//tools:git_sha_rewriter.py"],
+              "$(location " + rewriter + ") " +
+              "$(location " + version_generated + ") $@",
+        tools = [rewriter],
     )
 
 # Envoy C++ binary targets should be specified with this function.
@@ -106,10 +108,12 @@ def envoy_cc_binary(name,
                     testonly = 0,
                     visibility = None,
                     repository = "",
+                    stamped = False,
                     deps = []):
     # Implicit .stamped targets to obtain builds with the (truncated) git SHA1.
-    _git_stamped_genrule(name)
-    _git_stamped_genrule(name + ".stripped")
+    if stamped:
+        _git_stamped_genrule(repository, name)
+        _git_stamped_genrule(repository, name + ".stripped")
     native.cc_binary(
         name = name,
         srcs = srcs,
