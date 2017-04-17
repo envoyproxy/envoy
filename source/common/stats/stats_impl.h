@@ -130,7 +130,7 @@ private:
    */
   class TimespanImpl : public Timespan {
   public:
-    TimespanImpl(TimerImpl& parent) : parent_(parent), start_(std::chrono::system_clock::now()) {}
+    TimespanImpl(TimerImpl& parent) : parent_(parent), start_(std::chrono::steady_clock::now()) {}
 
     // Stats::Timespan
     void complete() override { complete(parent_.name_); }
@@ -138,7 +138,7 @@ private:
 
   private:
     TimerImpl& parent_;
-    SystemTime start_;
+    MonotonicTime start_;
   };
 
   std::string name_;

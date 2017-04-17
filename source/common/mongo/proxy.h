@@ -104,7 +104,7 @@ public:
 private:
   struct ActiveQuery {
     ActiveQuery(ProxyFilter& parent, const QueryMessage& query)
-        : parent_(parent), query_info_(query), start_time_(std::chrono::system_clock::now()) {
+        : parent_(parent), query_info_(query), start_time_(std::chrono::steady_clock::now()) {
       parent_.stats_.op_query_active_.inc();
     }
 
@@ -112,7 +112,7 @@ private:
 
     ProxyFilter& parent_;
     QueryMessageInfo query_info_;
-    SystemTime start_time_;
+    MonotonicTime start_time_;
   };
 
   typedef std::unique_ptr<ActiveQuery> ActiveQueryPtr;
