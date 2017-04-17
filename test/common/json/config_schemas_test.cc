@@ -44,15 +44,24 @@ TEST_P(ConfigSchemasTest, CheckValidationExpectation) {
     schema = Schema::LISTENER_SCHEMA;
   } else if (schema_name == "HTTP_CONN_NETWORK_FILTER_SCHEMA") {
     schema = Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA;
+  } else if (schema_name == "ROUTE_CONFIGURATION_SCHEMA") {
+    schema = Schema::ROUTE_CONFIGURATION_SCHEMA;
+  } else if (schema_name == "ROUTE_ENTRY_CONFIGURATION_SCHEMA") {
+    schema = Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA;
+  } else if (schema_name == "CLUSTER_SCHEMA") {
+    schema = Schema::CLUSTER_SCHEMA;
+  } else if (schema_name == "TOP_LEVEL_CONFIG_SCHEMA") {
+    schema = Schema::TOP_LEVEL_CONFIG_SCHEMA;
   } else {
     FAIL() << fmt::format("Did not recognize schema name {}", schema_name);
   }
 
   // perform validation and verify result
+  // TODO(danielhochman): add support for EXPECT_THROW_WITH_MESSAGE
   if (json->getBoolean("throws", false)) {
     EXPECT_THROW(json->getObject("data")->validateSchema(schema), Exception);
   } else {
-    EXPECT_NO_THROW(json->getObject("data")->validateSchema(schema));
+    json->getObject("data")->validateSchema(schema);
   }
 }
 
