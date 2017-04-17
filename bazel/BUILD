@@ -21,3 +21,8 @@ config_setting(
     name = "debug_symbols",
     values = {"define": "debug_symbols=yes"},
 )
+
+config_setting(
+    name = "disable_tcmalloc",
+    values = {"define": "tcmalloc=disabled"},
+)

@@ -106,3 +106,10 @@ cc_library(
     hdrs = glob(["thirdparty/tclap-1.2.1/include/**/*.h"]),
     includes = ["thirdparty/tclap-1.2.1/include"],
 )
+
+cc_library(
+    name = "tcmalloc_and_profiler",
+    srcs = ["thirdparty_build/lib/libtcmalloc_and_profiler.a"],
+    hdrs = glob(["thirdparty_build/include/gperftools/**/*.h"]),
+    strip_include_prefix = "thirdparty_build/include",
+)
