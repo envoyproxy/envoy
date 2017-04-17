@@ -5,8 +5,8 @@
 /**
  * Less typing for common system time and steady time type.
  *
- * SystemTime should be used when getting a time to present to the user, e.g. for logging
- * MonotonicTime should be used when tracking time for computing an interval
+ * SystemTime should be used when getting a time to present to the user, e.g. for logging.
+ * MonotonicTime should be used when tracking time for computing an interval.
  */
 typedef std::chrono::time_point<std::chrono::system_clock> SystemTime;
 typedef std::chrono::time_point<std::chrono::steady_clock> MonotonicTime;
