@@ -19,7 +19,8 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
               "type" : "string"
             }
           },
-          "cipher_suites" : {"type" : "string"}
+          "cipher_suites" : {"type" : "string"},
+          "ecdh_curves" : {"type" : "string", "minLength" : 1}
         },
         "required": ["cert_chain_file", "private_key_file"],
         "additionalProperties": false
@@ -1099,6 +1100,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             }
           },
           "cipher_suites" : {"type" : "string"},
+          "ecdh_curves" : {"type" : "string", "minLength" : 1},
           "sni" : {"type" :"string"}
         },
         "additionalProperties" : false

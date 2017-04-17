@@ -38,7 +38,7 @@ bool operator==(const RespValue& lhs, const RespValue& rhs) {
   }
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 MockEncoder::MockEncoder() {

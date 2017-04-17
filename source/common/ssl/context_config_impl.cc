@@ -25,10 +25,13 @@ const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "AES256-SHA256:"
     "AES256-SHA";
 
+const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
+
 ContextConfigImpl::ContextConfigImpl(const Json::Object& config) {
   alpn_protocols_ = config.getString("alpn_protocols", "");
   alt_alpn_protocols_ = config.getString("alt_alpn_protocols", "");
   cipher_suites_ = config.getString("cipher_suites", DEFAULT_CIPHER_SUITES);
+  ecdh_curves_ = config.getString("ecdh_curves", DEFAULT_ECDH_CURVES);
   ca_cert_file_ = config.getString("ca_cert_file", "");
   if (config.hasObject("cert_chain_file")) {
     cert_chain_file_ = config.getString("cert_chain_file");

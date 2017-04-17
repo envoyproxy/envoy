@@ -29,6 +29,11 @@ public:
   virtual const std::string& cipherSuites() const PURE;
 
   /**
+   * The ':' delimited list of supported ECDH curves.
+   */
+  virtual const std::string& ecdhCurves() const PURE;
+
+  /**
    * @return The CA certificate file to use for peer validation.
    */
   virtual const std::string& caCertFile() const PURE;
