@@ -12,6 +12,8 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+namespace ConfigTest {
+
 class ConfigTest {
 public:
   ConfigTest(const std::string& file_path) : options_(file_path) {
@@ -42,23 +44,32 @@ public:
   Server::TestOptionsImpl options_;
 };
 
-void runConfigTest(const std::string& dir_path) {
-  DIR* dir = opendir(dir_path.c_str());
+uint32_t run(const std::string& directory) {
+  uint32_t num_tested = 0;
+  DIR* dir = opendir(directory.c_str());
   if (!dir) {
     throw std::runtime_error("Generated configs directory not found");
   }
+
   dirent* entry;
   while ((entry = readdir(dir)) != nullptr) {
-    if (entry->d_type != DT_REG) {
+    std::string file_name = fmt::format("{}/{}", directory, std::string(entry->d_name));
+    Logger::Registry::getLog(Logger::Id::testing).info("iterating: {}", file_name);
+    if (entry->d_type == DT_DIR && std::string(entry->d_name) != "." &&
+        std::string(entry->d_name) != "..") {
+      num_tested += run(file_name);
+      continue;
+    } else if (entry->d_type == DT_DIR) {
       continue;
     }
 
-    std::string file_name = fmt::format("{}/{}", dir_path, std::string(entry->d_name));
     Logger::Registry::getLog(Logger::Id::testing).info("testing config: {}", file_name);
     ConfigTest config(file_name);
+    num_tested++;
   }
 
   closedir(dir);
+  return num_tested;
 }
 
-TEST(ExampleConfigsTest, All) { runConfigTest("generated/configs"); }
+} // ConfigTest

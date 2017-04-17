@@ -4,7 +4,10 @@ load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
 
 envoy_cc_test(
     name = "http_tracer_impl_test",
-    srcs = ["http_tracer_impl_test.cc"],
+    srcs = [
+        "http_tracer_impl_test.cc",
+        "lightstep_tracer_impl_test.cc",
+    ],
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/http:header_map_lib",

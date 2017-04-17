@@ -37,6 +37,11 @@ public:
   virtual ~RetryPolicy() {}
 
   /**
+   * @return std::chrono::milliseconds timeout per retry attempt.
+   */
+  virtual std::chrono::milliseconds perTryTimeout() const PURE;
+
+  /**
    * @return uint32_t the number of retries to allow against the route.
    */
   virtual uint32_t numRetries() const PURE;
@@ -231,6 +236,11 @@ public:
    *         with the route
    */
   virtual const std::multimap<std::string, std::string>& opaqueConfig() const PURE;
+
+  /**
+   * @return bool true if the virtual host rate limits should be included.
+   */
+  virtual bool includeVirtualHostRateLimits() const PURE;
 };
 
 /**

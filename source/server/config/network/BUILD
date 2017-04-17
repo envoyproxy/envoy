@@ -12,7 +12,6 @@ envoy_cc_library(
         "//source/common/filter/auth:client_ssl_lib",
         "//source/server:configuration_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -23,7 +22,6 @@ envoy_cc_library(
         "//source/common/filter:echo_lib",
         "//source/server:configuration_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -49,7 +47,6 @@ envoy_cc_library(
         "//source/common/router:rds_lib",
         "//source/server:configuration_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -63,7 +60,6 @@ envoy_cc_library(
         "//source/common/mongo:proxy_lib",
         "//source/server:configuration_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -75,7 +71,6 @@ envoy_cc_library(
         "//source/common/filter:ratelimit_lib",
         "//source/server:configuration_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -89,7 +84,6 @@ envoy_cc_library(
         "//source/common/redis:proxy_filter_lib",
         "//source/server:configuration_lib",
     ],
-    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -102,5 +96,4 @@ envoy_cc_library(
         "//source/common/filter:tcp_proxy_lib",
         "//source/server:configuration_lib",
     ],
-    alwayslink = 1,
 )

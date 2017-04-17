@@ -12,11 +12,7 @@ filegroup(
 envoy_cc_test(
     name = "runtime_impl_test",
     srcs = ["runtime_impl_test.cc"],
-    data = glob(["test_data/**"]),
-    setup_cmds = [(
-        "filesystem_setup.sh",
-        [],
-    )],
+    data = glob(["test_data/**"]) + ["filesystem_setup.sh"],
     deps = [
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:stats_lib",

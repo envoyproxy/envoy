@@ -112,6 +112,7 @@ public:
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   void shutdownParentAdmin(ShutdownParentAdminInfo& info) override;
   void terminateParent() override;
+  void shutdown() override;
   std::string version() override;
 
   // RawStatDataAllocator

@@ -24,8 +24,12 @@ namespace Server {
 class GuardDogDeathTest : public testing::Test {
 protected:
   GuardDogDeathTest()
-      : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500),
-        time_point_(std::chrono::system_clock::now()) {}
+      : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500) {
+    ON_CALL(time_source_, currentSystemTime())
+        .WillByDefault(testing::Invoke([&]() {
+          return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
+        }));
+  }
 
   /**
    * This does everything but the final forceCheckForTest() that should cause
@@ -33,12 +37,10 @@ protected:
    */
   void SetupForDeath() {
     InSequence s;
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
     guard_dog_.reset(new GuardDogImpl(fakestats_, config_kill_, time_source_));
     unpet_dog_ = guard_dog_->createWatchDog(0);
     guard_dog_->forceCheckForTest();
-    time_point_ += std::chrono::milliseconds(500);
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+    mock_time_ += 500;
   }
 
   /**
@@ -47,21 +49,19 @@ protected:
    */
   void SetupForMultiDeath() {
     InSequence s;
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
     guard_dog_.reset(new GuardDogImpl(fakestats_, config_multikill_, time_source_));
     auto unpet_dog_ = guard_dog_->createWatchDog(0);
     guard_dog_->forceCheckForTest();
     auto second_dog_ = guard_dog_->createWatchDog(1);
     guard_dog_->forceCheckForTest();
-    time_point_ += std::chrono::milliseconds(501);
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+    mock_time_ += 501;
   }
 
   NiceMock<Configuration::MockMain> config_kill_;
   NiceMock<Configuration::MockMain> config_multikill_;
   NiceMock<Stats::MockStore> fakestats_;
-  MockSystemTimeSource time_source_;
-  std::chrono::system_clock::time_point time_point_;
+  NiceMock<MockSystemTimeSource> time_source_;
+  std::atomic<unsigned int> mock_time_;
   std::unique_ptr<GuardDogImpl> guard_dog_;
   WatchDogSharedPtr unpet_dog_;
   WatchDogSharedPtr second_dog_;
@@ -108,7 +108,6 @@ TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
   // This ensures that if only one thread surpasses the multiple kill threshold
   // there is no death.  The positive case is covered in MultiKillDeathTest.
   InSequence s;
-  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
   GuardDogImpl gd(fakestats_, config_multikill_, time_source_);
   auto unpet_dog = gd.createWatchDog(0);
   auto pet_dog = gd.createWatchDog(1);
@@ -117,8 +116,7 @@ TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
   // only one is nonresponsive, so there should be no kill (single kill
   // threshold of 1s is not reached).
   for (int i = 0; i < 6; i++) {
-    time_point_ += std::chrono::milliseconds(100);
-    EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+    mock_time_ += 100;
     pet_dog->touch();
     gd.forceCheckForTest();
   }
@@ -126,31 +124,35 @@ TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
 
 class GuardDogMissTest : public testing::Test {
 protected:
-  GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0) {}
+  GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0) {
+    ON_CALL(time_source_, currentSystemTime())
+        .WillByDefault(testing::Invoke([&]() {
+          return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
+        }));
+  }
 
   NiceMock<Configuration::MockMain> config_miss_;
   NiceMock<Configuration::MockMain> config_mega_;
   Stats::IsolatedStoreImpl stats_store_;
-  MockSystemTimeSource time_source_;
-  std::chrono::system_clock::time_point time_point_;
+  NiceMock<MockSystemTimeSource> time_source_;
+  std::atomic<unsigned int> mock_time_;
 };
 
 TEST_F(GuardDogMissTest, MissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
   GuardDogImpl gd(stats_store_, config_miss_, time_source_);
   // We'd better start at 0:
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_miss").value());
   auto unpet_dog = gd.createWatchDog(0);
   // At 300ms we shouldn't have hit the timeout yet:
-  time_point_ += std::chrono::milliseconds(300);
-  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  mock_time_ += 300;
+  // EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
   gd.forceCheckForTest();
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_miss").value());
   // This should push it past the 500ms limit:
-  time_point_ += std::chrono::milliseconds(250);
-  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  mock_time_ += 250;
+  // EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
   gd.forceCheckForTest();
   EXPECT_EQ(1UL, stats_store_.counter("server.watchdog_miss").value());
   gd.stopWatching(unpet_dog);
@@ -160,19 +162,20 @@ TEST_F(GuardDogMissTest, MissTest) {
 TEST_F(GuardDogMissTest, MegaMissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  ON_CALL(time_source_, currentSystemTime())
+      .WillByDefault(testing::Invoke([&]() {
+        return std::chrono::system_clock::time_point(std::chrono::milliseconds(mock_time_));
+      }));
   GuardDogImpl gd(stats_store_, config_mega_, time_source_);
   auto unpet_dog = gd.createWatchDog(0);
   // We'd better start at 0:
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_mega_miss").value());
   // This shouldn't be enough to increment the stat:
-  time_point_ += std::chrono::milliseconds(499);
-  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  mock_time_ += 499;
   gd.forceCheckForTest();
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_mega_miss").value());
   // Just 2ms more will make it greater than 500ms timeout:
-  time_point_ += std::chrono::milliseconds(2);
-  EXPECT_CALL(time_source_, currentSystemTime()).WillRepeatedly(testing::Return(time_point_));
+  mock_time_ += 2;
   gd.forceCheckForTest();
   EXPECT_EQ(1UL, stats_store_.counter("server.watchdog_mega_miss").value());
   gd.stopWatching(unpet_dog);

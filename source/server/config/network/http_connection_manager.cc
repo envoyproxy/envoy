@@ -185,7 +185,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     }
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {

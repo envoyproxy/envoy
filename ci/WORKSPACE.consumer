@@ -1,0 +1,10 @@
+workspace(name = "envoy")
+
+local_repository(
+    name = "envoy",
+    path = "/source",
+)
+
+load("//bazel:repositories.bzl", "envoy_dependencies")
+
+envoy_dependencies(path = "@envoy//ci/prebuilt")

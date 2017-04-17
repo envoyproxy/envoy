@@ -199,6 +199,16 @@ outlier_detection
     to include this host in success rate based outlier detection. If the volume is lower than this setting,
     outlier detection via success rate statistics is not performed for that host. Defaults to 100.
 
+  .. _config_cluster_manager_cluster_outlier_detection_success_rate_stdev_factor:
+
+  success_rate_stdev_factor
+    This factor is used to determine the ejection threshold for success rate outlier ejection.
+    The ejection threshold is the difference between the mean success rate, and the product of
+    this factor and the standard deviation of the mean success rate:
+    ``mean - (stdev * success_rate_stdev_factor)``. This factor is divided by a thousand to
+    get a ``double``. That is, if the desired factor is ``1.9``, the runtime value should be ``1900``.
+    Defaults to 1900.
+
   Each of the above configuration values can be overridden via
   :ref:`runtime values <config_cluster_manager_cluster_runtime_outlier_detection>`.
 

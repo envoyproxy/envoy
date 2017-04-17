@@ -1,5 +1,5 @@
 #!/bin/bash
-ENVOY_BUILD_SHA=b05ce8efcc0ba7957ad6724da83b1ae2abee4600
+ENVOY_BUILD_SHA=98a1276049a3cf4bebc6a0343217444a8675baf8
 
 # Script that lists all the steps take by the CI system when doing Envoy builds.
 set -e
@@ -15,7 +15,8 @@ then
   ./docs/publish.sh
   exit 0
 else
-  docker run -t -i -v $TRAVIS_BUILD_DIR:/source lyft/envoy-build:$ENVOY_BUILD_SHA /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
+  docker run -t -i -v /tmp/envoy-docker-build:/build -v $TRAVIS_BUILD_DIR:/source \
+    lyft/envoy-build:$ENVOY_BUILD_SHA /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
 fi
 
 # The following scripts are only relevant on a `normal` run.
