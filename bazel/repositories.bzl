@@ -14,8 +14,7 @@ def _repository_impl(ctxt):
 
     # Run the build script.
     environment = {}
-    if ctxt.attr.debug:
-        environment["DEBUG"] = "1"
+    print("Fetching external dependencies...")
     result = ctxt.execute(
         ["./repositories.sh"] + ctxt.attr.recipes,
         environment = environment,
@@ -28,12 +27,11 @@ def _repository_impl(ctxt):
         #
         # quiet = False,
     )
-    if result.return_code != 0 or ctxt.attr.debug:
-        print("External dep build exited with return code: %d" % result.return_code)
-        print(result.stdout)
-        print(result.stderr)
-        if result.return_code != 0:
-            fail("External dep build failed")
+    print("External dep build exited with return code: %d" % result.return_code)
+    print(result.stdout)
+    print(result.stderr)
+    if result.return_code != 0:
+        fail("External dep build failed")
 
 def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = []):
     # Used only for protobuf.bzl.
@@ -51,19 +49,16 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
             build_file_content = "",
         )
 
-    # Set this to True to make the build debug cycles faster.
-    debug_build = False
-
     envoy_repository = repository_rule(
         implementation = _repository_impl,
-        local = debug_build,
         environ = [
             "CC",
             "CXX",
             "LD_LIBRARY_PATH"
         ],
+        # Don't pretend we're in the sandbox, we do some evil stuff with envoy_dep_cache.
+        local = True,
         attrs = {
-            "debug": attr.bool(),
             "recipes": attr.string_list(),
         },
     )
@@ -78,7 +73,6 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
 
     envoy_repository(
         name = "envoy_deps",
-        debug = debug_build,
         recipes = recipes.to_list(),
     )
 
