@@ -1189,6 +1189,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "minimum" : 0,
             "exclusiveMinimum" : true
           },
+          "success_rate_stdev_factor" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
           "interval_ms" : {
             "type" : "integer",
             "minimum" : 0,
