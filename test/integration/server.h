@@ -19,12 +19,14 @@ namespace Server {
  */
 class TestOptionsImpl : public Options {
 public:
-  TestOptionsImpl(const std::string& config_path) : config_path_(config_path) {}
+  TestOptionsImpl(const std::string& config_path)
+      : config_path_(config_path), admin_address_path_("") {}
 
   // Server::Options
   uint64_t baseId() override { return 0; }
   uint32_t concurrency() override { return 1; }
   const std::string& configPath() override { return config_path_; }
+  const std::string& adminAddressPath() override { return admin_address_path_; }
   std::chrono::seconds drainTime() override { return std::chrono::seconds(0); }
   spdlog::level::level_enum logLevel() override { NOT_IMPLEMENTED; }
   std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(0); }
@@ -35,6 +37,7 @@ public:
 
 private:
   const std::string config_path_;
+  const std::string admin_address_path_;
 };
 
 class TestDrainManager : public DrainManager {

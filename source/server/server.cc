@@ -184,6 +184,14 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
                              initial_config.admin().profilePath(), initial_config.admin().address(),
                              *this));
+
+  if (options.adminAddressPath().length() > 0) {
+    std::ofstream admin_address_file(options.adminAddressPath());
+    ASSERT(admin_address_file.is_open());
+    admin_address_file << admin_->mutable_socket().localAddress()->asString();
+    admin_address_file.close();
+  }
+
   admin_scope_ = stats_store_.createScope("listener.admin.");
   handler_.addListener(*admin_, admin_->mutable_socket(), *admin_scope_,
                        Network::ListenerOptions::listenerOptionsWithBindToPort());

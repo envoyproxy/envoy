@@ -15,6 +15,8 @@ public:
    * Constructs a Json Object from a String.
    */
   static ObjectPtr LoadFromString(const std::string& json);
+
+  static const std::string listAsJsonString(const std::list<std::string>& items);
 };
 
 } // Json

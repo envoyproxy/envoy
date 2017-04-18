@@ -183,6 +183,11 @@ public:
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
+
+  /**
+   * @return int the total number of listeners
+   */
+  virtual int numListeners() PURE;
 };
 
 } // Server

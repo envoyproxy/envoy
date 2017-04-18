@@ -19,6 +19,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/json/json_loader.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
@@ -278,6 +279,17 @@ Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Buffer::Instance& 
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerListenerAddresses(const std::string&, Buffer::Instance& response) {
+  std::list<std::string> listeners;
+
+  for (int i = 0; i < server_.numListeners(); ++i) {
+    listeners.push_back(server_.getListenSocketByIndex(i)->localAddress()->asString());
+  }
+  response.add(fmt::format("{}", Json::Factory::listAsJsonString(listeners)));
+
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& response) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
@@ -337,7 +349,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/reset_counters", "reset all counters to zero", MAKE_HANDLER(handlerResetCounters)},
           {"/server_info", "print server version/status information",
            MAKE_HANDLER(handlerServerInfo)},
-          {"/stats", "print server stats", MAKE_HANDLER(handlerStats)}} {
+          {"/stats", "print server stats", MAKE_HANDLER(handlerStats)},
+          {"/listeners", "print listener addresses", MAKE_HANDLER(handlerListenerAddresses)}} {
 
   access_logs_.emplace_back(new Http::AccessLog::InstanceImpl(
       access_log_path, {}, Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),

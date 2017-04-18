@@ -8,8 +8,10 @@ using testing::SaveArg;
 
 namespace Server {
 
-MockOptions::MockOptions(const std::string& path) : path_(path) {
-  ON_CALL(*this, configPath()).WillByDefault(ReturnRef(path_));
+MockOptions::MockOptions(const std::string& config_path)
+    : config_path_(config_path), admin_address_path_("") {
+  ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
+  ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
 }
 MockOptions::~MockOptions() {}
 

@@ -119,6 +119,11 @@ TEST_F(IntegrationTest, Admin) {
                                                 Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/listeners", "",
+                                                Http::CodecClient::Type::HTTP1);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 // Successful call to startProfiler requires tcmalloc.

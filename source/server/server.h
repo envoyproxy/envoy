@@ -132,6 +132,7 @@ public:
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+  int numListeners() override { return config_->listeners().size(); }
 
 private:
   void flushStats();

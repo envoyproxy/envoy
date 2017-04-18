@@ -10,6 +10,10 @@ following are the command line options that Envoy supports.
 
   *(required)* The path to the :ref:`JSON configuration file <config>`.
 
+.. option:: -a <path string>, --admin-address-path <path string>
+
+  *(optional)* The output file path where the admin address will be written.
+
 .. option:: --base-id <integer>
 
   *(optional)* The base ID to use when allocating shared memory regions. Envoy uses shared memory
