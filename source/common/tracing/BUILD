@@ -7,10 +7,12 @@ envoy_cc_library(
     srcs = [
         "http_tracer_impl.cc",
         "lightstep_tracer_impl.cc",
+        "zipkin_tracer_impl.cc",
     ],
     hdrs = [
         "http_tracer_impl.h",
         "lightstep_tracer_impl.h",
+        "zipkin_tracer_impl.h",
     ],
     external_deps = ["lightstep"],
     deps = [
@@ -31,5 +33,6 @@ envoy_cc_library(
         "//source/common/http/access_log:access_log_formatter_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/runtime:uuid_util_lib",
+        "//source/zipkin:zipkin_lib",
     ],
 )

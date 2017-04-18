@@ -7,6 +7,7 @@ envoy_cc_test(
     srcs = [
         "http_tracer_impl_test.cc",
         "lightstep_tracer_impl_test.cc",
+        "zipkin_tracer_impl_test.cc",
     ],
     deps = [
         "//source/common/common:base64_lib",
