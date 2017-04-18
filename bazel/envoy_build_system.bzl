@@ -79,6 +79,7 @@ def envoy_cc_library(name,
         ],
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         alwayslink = 1,
+        linkstatic = 1,
     )
 
 def _git_stamped_genrule(repository, name):
@@ -204,6 +205,7 @@ def envoy_cc_test_library(name,
         ],
         tags = tags,
         alwayslink = 1,
+        linkstatic = 1,
     )
 
 # Envoy C++ mock targets should be specified with this function.
@@ -260,4 +262,5 @@ def envoy_proto_library(name, srcs = [], deps = []):
         hdrs = [_proto_header(s) for s in srcs if _proto_header(s)],
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         deps = [internal_name],
+        linkstatic = 1,
     )
