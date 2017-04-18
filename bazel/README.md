@@ -115,6 +115,18 @@ One caveat to note is that the Git SHA1 is truncated to 16 bytes today as a
 result of the workaround in place for
 https://github.com/bazelbuild/bazel/issues/2805.
 
+# Coverage builds
+
+To generate coverage results, make sure you have `gcov` 3.3 in your `PATH` (or
+set `GCOVR` to point at it). Then run:
+
+```
+test/run_envoy_bazel_coverage.sh
+```
+
+The summary results are printed to the standard output and the full coverage
+report is available in `generated/coverage/coverage.html`.
+
 # Adding or maintaining Envoy build rules
 
 See the [developer guide for writing Envoy Bazel rules](DEVELOPER.md).
