@@ -33,7 +33,7 @@ public:
     try {
       main_config.initialize(*config_json);
     } catch (const EnvoyException& ex) {
-      throw EnvoyException(fmt::format("'{}' config failed. Error: {}", file_path, ex.what()));
+      ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", file_path, ex.what());
     }
 
     server_.thread_local_.shutdownThread();
