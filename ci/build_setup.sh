@@ -44,7 +44,6 @@ then
   export USER=bazel
   export TEST_TMPDIR=/build/tmp
   export BAZEL="bazel"
-  export BAZEL_COVERAGE="bazel-coverage"
   # Not sandboxing, since non-privileged Docker can't do nested namespaces.
   BAZEL_OPTIONS="--package_path %workspace%:/source"
   export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
