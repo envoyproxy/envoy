@@ -6,7 +6,7 @@ import os
 import util
 
 def main():
-    test_dir = os.path.join(os.environ['TEST_TMPDIR'], 'config_schema_test')
+    test_dir = os.path.join(os.environ['TEST_TMPDIR'], 'config_schemas_test')
     os.mkdir(test_dir)
     writer = util.TestWriter(test_dir)
 

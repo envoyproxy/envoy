@@ -11,9 +11,9 @@ namespace Json {
 
 std::vector<std::string> generateTestInputs() {
   TestEnvironment::exec(
-      {TestEnvironment::runfilesPath("test/common/json/test_data/generate_test_data.py")});
+      {TestEnvironment::runfilesPath("test/common/json/config_schemas_test_data/generate_test_data.py")});
 
-  std::string test_path = TestEnvironment::temporaryDirectory() + "/config_schema_test";
+  std::string test_path = TestEnvironment::temporaryDirectory() + "/config_schemas_test";
   DIR* dir = opendir(test_path.c_str());
   if (!dir) {
     throw std::runtime_error("Generated config schema test directory not found");

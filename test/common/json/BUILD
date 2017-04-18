@@ -3,9 +3,9 @@ package(default_visibility = ["//visibility:public"])
 load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
 
 filegroup(
-    name = "schema_test_generator",
+    name = "config_schema_test_generator",
     srcs = glob([
-        "test_data/*.py",
+        "config_schemas_test_data/*.py",
     ]),
 )
 
@@ -13,7 +13,7 @@ envoy_cc_test(
     name = "config_schemas_test",
     srcs = ["config_schemas_test.cc"],
     data = [
-        "//test/common/json:schema_test_generator",
+        "//test/common/json:config_schema_test_generator",
     ],
     deps = [
         "//source/common/json:config_schemas_lib",
