@@ -1,4 +1,3 @@
-
 from util import get_blob
 from util import true, false
 

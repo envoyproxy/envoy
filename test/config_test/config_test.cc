@@ -46,7 +46,7 @@ public:
 uint32_t run(const std::string& directory) {
 
   uint32_t num_tested = 0;
-  for (std::string filename : TestUtility::listFiles(directory, true)) {
+  for (const std::string& filename : TestUtility::listFiles(directory, true)) {
     ConfigTest config(filename);
     num_tested++;
   }
