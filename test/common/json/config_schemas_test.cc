@@ -2,35 +2,18 @@
 #include "common/json/json_loader.h"
 
 #include "test/test_common/environment.h"
-
-#include <dirent.h>
+#include "test/test_common/utility.h"
 
 using testing::_;
 
 namespace Json {
 
 std::vector<std::string> generateTestInputs() {
-  TestEnvironment::exec(
-      {TestEnvironment::runfilesPath("test/common/json/config_schemas_test_data/generate_test_data.py")});
+  TestEnvironment::exec({TestEnvironment::runfilesPath(
+      "test/common/json/config_schemas_test_data/generate_test_data.py")});
 
   std::string test_path = TestEnvironment::temporaryDirectory() + "/config_schemas_test";
-  DIR* dir = opendir(test_path.c_str());
-  if (!dir) {
-    throw std::runtime_error("Generated config schema test directory not found");
-  }
-
-  dirent* entry;
-  std::vector<std::string> file_names;
-  while ((entry = readdir(dir)) != nullptr) {
-    std::string file_name = fmt::format("{}/{}", test_path, std::string(entry->d_name));
-    if (entry->d_type == DT_DIR) {
-      continue;
-    }
-    file_names.push_back(file_name);
-  }
-  closedir(dir);
-
-  return file_names;
+  return TestUtility::listFiles(test_path, false);
 }
 
 class ConfigSchemasTest : public ::testing::TestWithParam<std::string> {};

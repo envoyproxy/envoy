@@ -19,6 +19,7 @@ envoy_cc_test(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
