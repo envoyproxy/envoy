@@ -109,10 +109,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
     const std::string runtime_key_prefix =
         weighted_clusters_json->getString("runtime_key_prefix", EMPTY_STRING);
 
-    if (cluster_list.empty()) {
-      throw EnvoyException("weighted_clusters specification has empty list of clusters");
-    }
-
     for (const Json::ObjectPtr& cluster : cluster_list) {
       const std::string cluster_name = cluster->getString("name");
       std::unique_ptr<WeightedClusterEntry> cluster_entry(
@@ -404,10 +400,9 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
     ssl_requirements_ = SslRequirements::NONE;
   } else if (require_ssl == "all") {
     ssl_requirements_ = SslRequirements::ALL;
-  } else if (require_ssl == "external_only") {
-    ssl_requirements_ = SslRequirements::EXTERNAL_ONLY;
   } else {
-    throw EnvoyException(fmt::format("unknown 'require_ssl' type '{}'", require_ssl));
+    ASSERT(require_ssl == "external_only");
+    ssl_requirements_ = SslRequirements::EXTERNAL_ONLY;
   }
 
   if (virtual_host.hasObject("request_headers_to_add")) {

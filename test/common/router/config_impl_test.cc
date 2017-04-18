@@ -488,31 +488,6 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
               ContainerEq(config.responseHeadersToRemove()));
 }
 
-TEST(RouteMatcherTest, InvalidPriority) {
-  std::string json = R"EOF(
-{
-  "virtual_hosts": [
-    {
-      "name": "local_service",
-      "domains": ["*"],
-      "routes": [
-        {
-          "prefix": "/",
-          "cluster": "local_service_grpc",
-          "priority": "foo"
-        }
-      ]
-    }
-  ]
-}
-  )EOF";
-
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
-}
-
 TEST(RouteMatcherTest, Priority) {
   std::string json = R"EOF(
 {

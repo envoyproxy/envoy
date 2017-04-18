@@ -299,37 +299,5 @@ TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
   EXPECT_THROW(config.initialize(*loader), EnvoyException);
 }
 
-TEST(ConfigurationImplTest, UnsupportedDriverType) {
-  std::string json = R"EOF(
-  {
-    "listeners" : [
-      {
-        "address": "tcp://127.0.0.1:1234",
-        "filters": []
-      }
-    ],
-    "cluster_manager": {
-      "clusters": []
-    },
-    "tracing": {
-      "http": {
-        "driver": {
-          "type": "unknown",
-          "config": {
-            "access_token_file": "/etc/envoy/envoy.cfg"
-          }
-        }
-      }
-    }
-  }
-  )EOF";
-
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-
-  NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
-  EXPECT_THROW(config.initialize(*loader), EnvoyException);
-}
-
 } // Configuration
 } // Server

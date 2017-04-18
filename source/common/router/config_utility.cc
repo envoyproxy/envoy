@@ -1,3 +1,4 @@
+#include "common/common/assert.h"
 #include "common/router/config_utility.h"
 
 namespace Router {
@@ -6,10 +7,9 @@ Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& conf
   std::string priority_string = config.getString("priority", "default");
   if (priority_string == "default") {
     return Upstream::ResourcePriority::Default;
-  } else if (priority_string == "high") {
-    return Upstream::ResourcePriority::High;
   } else {
-    throw EnvoyException(fmt::format("invalid resource priority '{}'", priority_string));
+    ASSERT(priority_string == "high");
+    return Upstream::ResourcePriority::High;
   }
 }
 

@@ -447,26 +447,6 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   EXPECT_THROW(StaticClusterImpl(*config, runtime, stats, ssl_context_manager), EnvoyException);
 }
 
-TEST(StaticClusterImplTest, UnsupportedFeature) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
-  {
-    "name": "addressportconfig",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "features": "fake",
-    "hosts": [{"url": "tcp://192.168.1.1:22"},
-              {"url": "tcp://192.168.1.2:44"}]
-  }
-  )EOF";
-
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
-  EXPECT_THROW(StaticClusterImpl(*config, runtime, stats, ssl_context_manager), EnvoyException);
-}
-
 TEST(ClusterDefinitionTest, BadClusterConfig) {
   std::string json = R"EOF(
   {

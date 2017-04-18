@@ -182,11 +182,9 @@ bool ClusterInfoImpl::maintenanceMode() const {
 uint64_t ClusterInfoImpl::parseFeatures(const Json::Object& config) {
   uint64_t features = 0;
   for (const std::string& feature : StringUtil::split(config.getString("features", ""), ',')) {
-    if (feature == "http2") {
-      features |= Features::HTTP2;
-    } else {
-      throw EnvoyException(fmt::format("unknown cluster feature '{}'", feature));
-    }
+    ASSERT(feature == "http2");
+    UNREFERENCED_PARAMETER(feature);
+    features |= Features::HTTP2;
   }
 
   return features;
