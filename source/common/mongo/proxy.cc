@@ -98,6 +98,9 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
     }
 
     // Global stats.
+    if (active_query->query_info_.max_time() < 1) {
+      stats_.op_query_no_max_time_.inc();
+    }
     if (query_type == QueryMessageInfo::QueryType::ScatterGet) {
       stats_.op_query_scatter_get_.inc();
     } else if (query_type == QueryMessageInfo::QueryType::MultiGet) {
