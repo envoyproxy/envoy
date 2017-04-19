@@ -5,7 +5,7 @@ import os.path
 import sys
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
-                     "./bazel-")
+                     "./bazel-", "./test/precompiled/")
 SUFFIXES = (".cc", ".h", "BUILD")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG-FORMAT", "clang-format-3.6")
