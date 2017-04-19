@@ -37,7 +37,13 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   exit 0
 elif [[ "$1" == "fix_format" ]]; then
   echo "fix_format..."
-  make fix_format
+  cd "${ENVOY_SRCDIR}"
+  ./tools/check_format.py fix
+  exit 0
+elif [[ "$1" == "check_format" ]]; then
+  echo "check_format..."
+  cd "${ENVOY_SRCDIR}"
+  ./tools/check_format.py check
   exit 0
 elif [[ "$1" == "coverage" ]]; then
   echo "coverage build with tests..."

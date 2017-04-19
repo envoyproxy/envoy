@@ -1,11 +1,11 @@
 #pragma once
 
+#include "common/http/codec_client.h"
+#include "common/stats/stats_impl.h"
+
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/server.h"
-
-#include "common/http/codec_client.h"
-#include "common/stats/stats_impl.h"
 
 class ProxyProtoIntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:

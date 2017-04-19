@@ -1,4 +1,5 @@
 #include "common/common/utility.h"
+
 #include "server/options_impl.h"
 
 // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are

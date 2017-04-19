@@ -2,7 +2,6 @@
 
 #include "test/integration/integration.h"
 #include "test/integration/server.h"
-
 #include "test/mocks/runtime/mocks.h"
 
 using testing::NiceMock;

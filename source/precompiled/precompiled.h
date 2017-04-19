@@ -1,8 +1,15 @@
 #pragma once
 
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/tcp.h>
+#include <signal.h>
+#include <string.h>
+#include <sys/signalfd.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <array>
-#include <arpa/inet.h>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -12,15 +19,9 @@
 #include <list>
 #include <map>
 #include <memory>
-#include <netdb.h>
-#include <netinet/tcp.h>
 #include <random>
 #include <regex>
-#include <signal.h>
 #include <sstream>
-#include <string.h>
-#include <sys/signalfd.h>
-#include <unistd.h>
 #include <unordered_set>
 
 #pragma GCC diagnostic push

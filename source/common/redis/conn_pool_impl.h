@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/upstream/cluster_manager.h"
 #include "envoy/redis/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/json/json_validator.h"

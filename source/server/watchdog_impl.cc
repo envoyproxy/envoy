@@ -1,6 +1,8 @@
-#include "common/common/assert.h"
-#include "envoy/event/dispatcher.h"
 #include "server/watchdog_impl.h"
+
+#include "envoy/event/dispatcher.h"
+
+#include "common/common/assert.h"
 
 namespace Server {
 

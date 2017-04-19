@@ -3,10 +3,10 @@
 #include "common/event/libevent.h"
 #include "common/ssl/openssl.h"
 
+#include "test/test_common/environment.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "test/test_common/environment.h"
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleMock(&argc, argv);

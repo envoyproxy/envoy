@@ -1,11 +1,11 @@
 #pragma once
 
-#include "date_provider.h"
-
 #include "envoy/event/dispatcher.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/utility.h"
+
+#include "date_provider.h"
 
 namespace Http {
 

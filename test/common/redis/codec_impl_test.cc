@@ -1,7 +1,6 @@
-#include "common/redis/codec_impl.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/redis/codec_impl.h"
 
 #include "test/mocks/redis/mocks.h"
 #include "test/test_common/utility.h"
