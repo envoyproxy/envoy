@@ -32,8 +32,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # some Bazel created symlinks to the source directory in its output
   # directory. Wow.
   cd "${ENVOY_BUILD_DIR}"
-  SRCDIR="${GCOVR_DIR}" REAL_SRCDIR="${ENVOY_SRCDIR}" \
-    "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
+  SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
   exit 0
 elif [[ "$1" == "fix_format" ]]; then
   echo "fix_format..."
