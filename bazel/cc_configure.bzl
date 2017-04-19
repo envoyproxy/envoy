@@ -1,3 +1,13 @@
+# This file was imported from https://github.com/bazelbuild/bazel at d6fec93. We apply a number of
+# local modifications to deal with known issues in Bazel 0.4.5:
+#
+# * https://github.com/bazelbuild/bazel/issues/2840
+# * (and potentially) https://github.com/bazelbuild/bazel/issues/2805
+#
+# Specifically, for #2840 we replace gcc with g++ invocations and remove the mandatory -lstdc++
+# link. In the future, we can simplify our --build-id story resulting from #2805, but there's some
+# additional work necessary to plumb in the actual git hash.
+
 # Copyright 2016 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -232,7 +242,6 @@ def _crosstool_content(repository_ctx, cc, cpu_value, darwin):
           "-std=c++0x",
       ] + _cplus_include_paths(repository_ctx),
       "linker_flag": [
-          "-lstdc++",
           "-lm",  # Some systems expect -lm in addition to -lstdc++
           # Anticipated future default.
       ] + (
@@ -328,9 +337,8 @@ def _get_windows_msys_crosstool_content(repository_ctx):
       '   tool_path { name: "compat-ld" path: "%susr/bin/ld" }\n' % msys_root +
       '   tool_path { name: "cpp" path: "%susr/bin/cpp" }\n' % msys_root +
       '   tool_path { name: "dwp" path: "%susr/bin/dwp" }\n' % msys_root +
-      '   tool_path { name: "gcc" path: "%susr/bin/gcc" }\n' % msys_root +
+      '   tool_path { name: "gcc" path: "%susr/bin/g++" }\n' % msys_root +
       '   cxx_flag: "-std=gnu++0x"\n' +
-      '   linker_flag: "-lstdc++"\n' +
       '   cxx_builtin_include_directory: "%s"\n' % msys_root +
       '   cxx_builtin_include_directory: "/usr/"\n' +
       '   tool_path { name: "gcov" path: "%susr/bin/gcov" }\n' % msys_root +
@@ -387,18 +395,18 @@ def _get_system_root(repository_ctx):
 
 def _find_cc(repository_ctx):
   """Find the C++ compiler."""
-  cc_name = "gcc"
-  if "CC" in repository_ctx.os.environ:
-    cc_name = repository_ctx.os.environ["CC"].strip()
+  cc_name = "g++"
+  if "CXX" in repository_ctx.os.environ:
+    cc_name = repository_ctx.os.environ["CXX"].strip()
     if not cc_name:
-      cc_name = "gcc"
+      cc_name = "g++"
   if cc_name.startswith("/"):
     # Absolute path, maybe we should make this suported by our which function.
     return cc_name
   cc = repository_ctx.which(cc_name)
   if cc == None:
     fail(
-        "Cannot find gcc, either correct your path or set the CC" +
+        "Cannot find g++, either correct your path or set the CXX" +
         " environment variable")
   return cc
 
