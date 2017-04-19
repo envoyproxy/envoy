@@ -46,7 +46,7 @@ int32_t QueryMessageInfo::parseMaxTime(const QueryMessage& query) {
   if (field->type() == Bson::Field::Type::INT32) {
     return field->asInt32();
   } else if (field->type() == Bson::Field::Type::INT64) {
-    return static_cast<uint32_t>(field->asInt64());
+    return static_cast<int32_t>(field->asInt64());
   } else {
     return 0;
   }
