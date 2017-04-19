@@ -7,9 +7,12 @@ set -e
 [[ -z "${TESTLOGS_DIR}" ]] && TESTLOGS_DIR="${SRCDIR}/bazel-testlogs"
 [[ -z "${BAZEL_COVERAGE}" ]] && BAZEL_COVERAGE=bazel
 [[ -z "${GCOVR}" ]] && GCOVR=gcovr
+
+# This is the target that will be run to generate coverage data. It can be overriden by consumer
+# projects that want to run coverage on a different/combined target.
 [[ -z "${COVERAGE_TARGET}" ]] && COVERAGE_TARGET="//test/coverage:coverage_tests"
 
-# Make sure //test/coverage is up-to-date.
+# Make sure ${COVERAGE_TARGET} is up-to-date.
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 (BAZEL_BIN="${BAZEL_COVERAGE}" "${SCRIPT_DIR}"/coverage/gen_build.sh)
 

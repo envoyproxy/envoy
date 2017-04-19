@@ -10,8 +10,17 @@ set -e
 
 [ -z "${BAZEL_BIN}" ] && BAZEL_BIN=bazel
 [ -z "${BUILDIFIER_BIN}" ] && BUILDIFIER_BIN=buildifier
+
+# Path to the generated BUILD file for the coverage target.
 [ -z "${BUILD_PATH}" ] && BUILD_PATH="$(dirname "$0")"/BUILD
+
+# Extra repository information to include when generating coverage targets. This is useful for
+# consuming projects. E.g., "@envoy".
 [ -z "${REPOSITORY}" ] && REPOSITORY=""
+
+# This is an extra bazel path to query for additional targets. This is useful for consuming projects
+# that want to run coverage over the public envoy code as well as private extensions.
+# E.g., "//envoy-lyft/test/..."
 [ -z "${EXTRA_QUERY_PATHS}" ] && EXTRA_QUERY_PATHS=""
 
 TARGETS=$("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}//test/...)")
