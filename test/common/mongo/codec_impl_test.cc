@@ -10,14 +10,12 @@ namespace Mongo {
 
 class TestDecoderCallbacks : public DecoderCallbacks {
 public:
-  void decodeBase64(std::string&& message) override { decodeBase64_(message); }
   void decodeGetMore(GetMoreMessagePtr&& message) override { decodeGetMore_(message); }
   void decodeInsert(InsertMessagePtr&& message) override { decodeInsert_(message); }
   void decodeKillCursors(KillCursorsMessagePtr&& message) override { decodeKillCursors_(message); }
   void decodeQuery(QueryMessagePtr&& message) override { decodeQuery_(message); }
   void decodeReply(ReplyMessagePtr&& message) override { decodeReply_(message); }
 
-  MOCK_METHOD1(decodeBase64_, void(std::string& message));
   MOCK_METHOD1(decodeGetMore_, void(GetMoreMessagePtr& message));
   MOCK_METHOD1(decodeInsert_, void(InsertMessagePtr& message));
   MOCK_METHOD1(decodeKillCursors_, void(KillCursorsMessagePtr& message));

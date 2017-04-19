@@ -24,7 +24,6 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/mongo:codec_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:base64_lib",
         "//source/common/common:logger_lib",
     ],
 )

@@ -4,7 +4,6 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/base64.h"
 #include "common/mongo/bson_impl.h"
 
 namespace Mongo {
@@ -217,9 +216,6 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   if (data.length() < message_length) {
     return false;
   }
-
-  // Before draining, do a base64 convert of the entire op.
-  callbacks_.decodeBase64(Base64::encode(data, message_length));
 
   data.drain(sizeof(int32_t));
   int32_t request_id = Bson::BufferHelper::removeInt32(data);

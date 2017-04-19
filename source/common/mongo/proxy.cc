@@ -14,7 +14,7 @@ AccessLog::AccessLog(const std::string& file_name, ::AccessLog::AccessLogManager
   file_ = log_manager.createAccessLog(file_name);
 }
 
-void AccessLog::logMessage(const Message& message, const std::string&, bool full,
+void AccessLog::logMessage(const Message& message, bool full,
                            const Upstream::HostDescription* upstream_host) {
   static const std::string log_format =
       "{{\"time\": \"{}\", \"message\": \"{}\", \"upstream_host\": \"{}\"}}\n";
@@ -206,7 +206,7 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
 
 void ProxyFilter::logMessage(Message& message, bool full) {
   if (access_log_ && runtime_.snapshot().featureEnabled("mongo.logging_enabled", 100)) {
-    access_log_->logMessage(message, last_base64_op_, full, read_callbacks_->upstreamHost().get());
+    access_log_->logMessage(message, full, read_callbacks_->upstreamHost().get());
   }
 }
 
