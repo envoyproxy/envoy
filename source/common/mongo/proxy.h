@@ -30,6 +30,7 @@ namespace Mongo {
   COUNTER(op_query_no_cursor_timeout)                                                              \
   COUNTER(op_query_await_data)                                                                     \
   COUNTER(op_query_exhaust)                                                                        \
+  COUNTER(op_query_no_max_time)                                                                    \
   COUNTER(op_query_scatter_get)                                                                    \
   COUNTER(op_query_multi_get)                                                                      \
   GAUGE  (op_query_active)                                                                         \
