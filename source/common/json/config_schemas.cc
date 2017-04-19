@@ -254,7 +254,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "properties" : {"$ref" : "#/definitions/filters"}
       },
       "add_user_agent" : {"type" : "boolean"},
-      "tracing" : {"$ref" : "#/defintions/tracing"},
+      "tracing" : {"$ref" : "#/definitions/tracing"},
       "http_codec_options" : {
         "type" : "string",
         "enum" : ["no_compression"]
