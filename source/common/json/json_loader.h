@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include <string>
 
 #include "envoy/json/json_object.h"

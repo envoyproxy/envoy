@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <fstream>
 #include <functional>
 #include <list>
 #include <memory>
