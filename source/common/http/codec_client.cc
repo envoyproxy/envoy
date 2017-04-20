@@ -54,6 +54,7 @@ void CodecClient::onEvent(uint32_t events) {
   if (type_ == Type::HTTP1 && (events & Network::ConnectionEvent::RemoteClose) &&
       !active_requests_.empty()) {
     Buffer::OwnedImpl empty;
+    remote_close_ = true;
     onData(empty);
   }
 

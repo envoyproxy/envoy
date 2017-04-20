@@ -101,6 +101,8 @@ public:
     codec_callbacks_ = &callbacks;
   }
 
+  bool remoteClose() const { return remote_close_; }
+
 protected:
   /**
    * Create a codec client and connect to a remote host/port.
@@ -117,6 +119,9 @@ protected:
       codec_callbacks_->onGoAway();
     }
   }
+
+  // Network::ConnectionCallbacks
+  void onEvent(uint32_t events) override;
 
   const Type type_;
   ClientConnectionPtr codec_;
@@ -175,13 +180,11 @@ private:
   void onReset(ActiveRequest& request, StreamResetReason reason);
   void onData(Buffer::Instance& data);
 
-  // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override;
-
   std::list<ActiveRequestPtr> active_requests_;
   Http::ConnectionCallbacks* codec_callbacks_{};
   CodecClientCallbacks* codec_client_callbacks_{};
   bool connected_{};
+  bool remote_close_{};
 };
 
 typedef std::unique_ptr<CodecClient> CodecClientPtr;

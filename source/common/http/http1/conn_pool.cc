@@ -189,6 +189,9 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
     conn_log_debug("maximum requests per connection", *client.codec_client_);
     host_->cluster().stats().upstream_cx_max_requests_.inc();
     onDownstreamReset(client);
+  } else if (client.codec_client_->remoteClose()) {
+    conn_log_debug("remote close of client connection", *client.codec_client_);
+    onDownstreamReset(client);
   } else {
     processIdleClient(client);
   }
@@ -242,6 +245,7 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end
 }
 
 void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
+  std::cout << "ondecode " << std::endl;
   decode_complete_ = encode_complete_;
   parent_.parent_.onResponseComplete(parent_);
 }

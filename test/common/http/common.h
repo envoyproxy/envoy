@@ -9,7 +9,7 @@
 #include "test/mocks/common.h"
 
 /**
- * A fake CodecClient that 1) allows a mock codec to be passed in and 2) Allows or a destroy
+ * A fake CodecClient that 1) allows a mock codec to be passed in and 2) Allows for a destroy
  * callback.
  */
 class CodecClientForTest : public Http::CodecClient {
@@ -30,6 +30,8 @@ public:
   }
 
   void raiseGoAway() { onGoAway(); }
+
+  void raiseOnEvent(uint32_t events) { onEvent(events); }
 
   DestroyCb destroy_cb_;
 };
