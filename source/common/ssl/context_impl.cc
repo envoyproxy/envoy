@@ -59,25 +59,23 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
     : parent_(parent), ctx_(SSL_CTX_new(SSLv23_method())), scope_(scope),
       stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_);
-  // the list of ciphers that will be supported
-  if (!config.cipherSuites().empty()) {
-    const std::string& cipher_suites = config.cipherSuites();
 
-    if (!SSL_CTX_set_cipher_list(ctx_.get(), cipher_suites.c_str())) {
-      throw EnvoyException(fmt::format("Failed to initialize cipher suites {}", cipher_suites));
-    }
+  const std::string& cipher_suites = config.cipherSuites();
 
-    // verify that all of the specified ciphers were understood by openssl
-    ssize_t num_configured = std::count(cipher_suites.begin(), cipher_suites.end(), ':') + 1;
+  if (!SSL_CTX_set_cipher_list(ctx_.get(), cipher_suites.c_str())) {
+    throw EnvoyException(fmt::format("Failed to initialize cipher suites {}", cipher_suites));
+  }
+
+  // verify that all of the specified ciphers were understood by openssl
+  ssize_t num_configured = std::count(cipher_suites.begin(), cipher_suites.end(), ':') + 1;
 #ifdef OPENSSL_IS_BORINGSSL
-    num_configured += std::count(cipher_suites.begin(), cipher_suites.end(), '|');
-    if (sk_SSL_CIPHER_num(ctx_->cipher_list->ciphers) < static_cast<size_t>(num_configured)) {
+  num_configured += std::count(cipher_suites.begin(), cipher_suites.end(), '|');
+  if (sk_SSL_CIPHER_num(ctx_->cipher_list->ciphers) < static_cast<size_t>(num_configured)) {
 #else
-    if (sk_SSL_CIPHER_num(ctx_->cipher_list) < num_configured) {
+  if (sk_SSL_CIPHER_num(ctx_->cipher_list) < num_configured) {
 #endif
-      throw EnvoyException(
-          fmt::format("Unknown cipher specified in cipher suites {}", config.cipherSuites()));
-    }
+    throw EnvoyException(
+        fmt::format("Unknown cipher specified in cipher suites {}", config.cipherSuites()));
   }
 
   if (!SSL_CTX_set1_curves_list(ctx_.get(), config.ecdhCurves().c_str())) {
