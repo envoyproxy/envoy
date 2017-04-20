@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/http/filter.h"
 #include "envoy/stats/stats_macros.h"
 

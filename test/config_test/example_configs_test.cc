@@ -2,6 +2,8 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "gtest/gtest.h"
+
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});

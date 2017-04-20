@@ -1,5 +1,8 @@
 #include "test/mocks/access_log/mocks.h"
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
 using testing::_;
 using testing::Return;
 

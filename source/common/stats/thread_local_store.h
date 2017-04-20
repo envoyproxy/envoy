@@ -1,5 +1,14 @@
 #pragma once
 
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/stats/stats_impl.h"

@@ -2,6 +2,10 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "test/test_common/printers.h"
+
+#include "gtest/gtest.h"
+
 TEST_F(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
 

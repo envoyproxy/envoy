@@ -1,5 +1,13 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/common/optional.h"
 #include "envoy/network/connection.h"
 #include "envoy/ssl/context.h"

@@ -1,5 +1,7 @@
 #include "server/config/http/grpc_http1_bridge.h"
 
+#include <string>
+
 #include "common/grpc/http1_bridge_filter.h"
 
 namespace Server {

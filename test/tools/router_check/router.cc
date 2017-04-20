@@ -1,5 +1,12 @@
 #include "test/tools/router_check/router.h"
 
+#include <functional>
+#include <memory>
+#include <string>
+#include <unordered_map>
+
+#include "test/test_common/printers.h"
+
 // static
 ToolConfig ToolConfig::create(const Json::ObjectPtr& check_config) {
   Json::ObjectPtr input = check_config->getObject("input");

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/common/exception.h"
 #include "envoy/http/header_map.h"
 

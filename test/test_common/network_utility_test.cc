@@ -1,4 +1,8 @@
+#include <string>
+
 #include "test/test_common/network_utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Network {
 namespace Test {

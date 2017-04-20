@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include <mutex>
+
 #include "common/common/c_smart_ptr.h"
 
 #include "openssl/ssl.h"

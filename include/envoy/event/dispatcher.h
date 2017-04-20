@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"

@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <string>
+#include <vector>
+
 #include "envoy/mongo/codec.h"
 
 #include "common/common/logger.h"

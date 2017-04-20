@@ -1,5 +1,11 @@
 #include "common/common/hex.h"
 
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/common/exception.h"
 
 #include "common/common/utility.h"

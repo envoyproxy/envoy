@@ -1,5 +1,7 @@
 #include "common.h"
 
+#include <string>
+
 #include "envoy/http/header_map.h"
 
 void HttpTestUtility::addDefaultHeaders(Http::HeaderMap& headers) {

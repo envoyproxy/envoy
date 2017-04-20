@@ -1,5 +1,13 @@
 #pragma once
 
+#include <sys/socket.h>
+#include <sys/types.h>
+
+#include <array>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
 
 namespace Network {

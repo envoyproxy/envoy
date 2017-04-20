@@ -1,5 +1,12 @@
 #include "common/common/logger.h"
 
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <iostream>
+#include <string>
+#include <vector>
+
 #include "envoy/thread/thread.h"
 
 namespace Logger {

@@ -1,7 +1,11 @@
 #include "common/runtime/runtime_impl.h"
 
 #include <fcntl.h>
+#include <spdlog/spdlog.h>
 #include <unistd.h>
+
+#include <cstdint>
+#include <string>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/stats.h"

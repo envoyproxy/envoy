@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/server/instance.h"
 
 #include "server/config/network/http_connection_manager.h"

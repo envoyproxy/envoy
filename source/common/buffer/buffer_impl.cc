@@ -1,5 +1,8 @@
 #include "common/buffer/buffer_impl.h"
 
+#include <cstdint>
+#include <string>
+
 #include "common/common/assert.h"
 
 #include "event2/buffer.h"

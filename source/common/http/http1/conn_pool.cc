@@ -1,5 +1,8 @@
 #include "common/http/http1/conn_pool.h"
 
+#include <cstdint>
+#include <list>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/header_map.h"

@@ -1,5 +1,13 @@
 #include "common/upstream/outlier_detection_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 
 #include "common/common/assert.h"

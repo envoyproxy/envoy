@@ -1,5 +1,11 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/time.h"
 #include "envoy/mongo/codec.h"

@@ -1,5 +1,11 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <mutex>
+#include <vector>
+
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection_handler.h"

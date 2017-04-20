@@ -1,3 +1,5 @@
+#include <string>
+
 #include "envoy/network/connection.h"
 
 #include "common/filter/echo.h"

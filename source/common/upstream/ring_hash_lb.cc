@@ -1,5 +1,9 @@
 #include "common/upstream/ring_hash_lb.h"
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/common/assert.h"
 #include "common/upstream/load_balancer_impl.h"
 

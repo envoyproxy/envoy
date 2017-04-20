@@ -1,9 +1,17 @@
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <string>
+
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Http {
 

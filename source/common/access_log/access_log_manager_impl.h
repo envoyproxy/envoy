@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 

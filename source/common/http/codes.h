@@ -1,5 +1,9 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats.h"

@@ -1,7 +1,12 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/tracing/context.h"
+
+#include "gmock/gmock.h"
 
 namespace RateLimit {
 

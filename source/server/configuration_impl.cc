@@ -1,5 +1,13 @@
 #include "server/configuration_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"

@@ -1,5 +1,12 @@
 #pragma once
 
+#include <spdlog/spdlog.h>
+
+#include <atomic>
+#include <cstdint>
+#include <list>
+#include <memory>
+
 #include "envoy/api/api.h"
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"

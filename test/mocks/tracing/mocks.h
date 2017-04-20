@@ -1,7 +1,12 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "envoy/tracing/context.h"
 #include "envoy/tracing/http_tracer.h"
+
+#include "gmock/gmock.h"
 
 namespace Tracing {
 

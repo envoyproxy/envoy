@@ -1,10 +1,15 @@
 #pragma once
 
+#include <functional>
+#include <string>
+
 #include "envoy/ssl/connection.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats.h"
+
+#include "gmock/gmock.h"
 
 namespace Ssl {
 

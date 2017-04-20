@@ -1,5 +1,11 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 

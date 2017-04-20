@@ -1,5 +1,9 @@
 #include "common/grpc/http1_bridge_filter.h"
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/http/codes.h"
 
 #include "common/common/enum_to_int.h"

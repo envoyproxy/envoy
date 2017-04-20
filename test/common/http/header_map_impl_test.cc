@@ -1,6 +1,11 @@
+#include <string>
+
 #include "common/http/header_map_impl.h"
 
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Http {
 

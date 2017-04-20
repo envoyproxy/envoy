@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/tracing/context.h"

@@ -1,5 +1,12 @@
 #include "server/server.h"
 
+#include <signal.h>
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <functional>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"

@@ -25,7 +25,7 @@ testing purposes. The specific versions of the Envoy dependencies used in this b
 up-to-date with the latest security patches.
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. `bazel fetch //...` to fetch and build all external dependencies. This may take some time.
+2. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
 2. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Bazel with the CI Docker image

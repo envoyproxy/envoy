@@ -1,5 +1,10 @@
 #include "common/redis/proxy_filter.h"
 
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <string>
+
 #include "common/common/assert.h"
 #include "common/json/config_schemas.h"
 

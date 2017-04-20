@@ -1,5 +1,11 @@
 #include "server/http/admin.h"
 
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <string>
+#include <unordered_set>
+
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"

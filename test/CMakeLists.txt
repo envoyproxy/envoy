@@ -204,7 +204,3 @@ add_custom_target(
           ${ENVOY_TEST_EXTRA_SETUP_SCRIPT}
 )
 endif()
-
-set_target_properties(envoy-test PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT
-                      "precompiled/precompiled_test.h")
-cotire(envoy-test)

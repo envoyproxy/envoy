@@ -7,6 +7,9 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
 using testing::_;
 using testing::ByRef;
 using testing::Eq;

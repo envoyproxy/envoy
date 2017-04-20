@@ -1,5 +1,12 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/http/access_log.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
@@ -14,6 +21,9 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
 
 namespace Http {
 namespace AccessLog {

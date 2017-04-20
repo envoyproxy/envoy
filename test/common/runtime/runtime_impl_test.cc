@@ -1,3 +1,6 @@
+#include <memory>
+#include <string>
+
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/stats_impl.h"
 
@@ -6,6 +9,9 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::Return;

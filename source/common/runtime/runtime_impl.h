@@ -1,6 +1,13 @@
 #pragma once
 
 #include <dirent.h>
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <unordered_map>
 
 #include "envoy/common/exception.h"
 #include "envoy/common/optional.h"

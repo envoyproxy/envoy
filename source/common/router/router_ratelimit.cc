@@ -1,5 +1,10 @@
 #include "common/router/router_ratelimit.h"
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"

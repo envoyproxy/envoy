@@ -1,7 +1,11 @@
+#include <spdlog/spdlog.h>
+
 #include "envoy/http/header_map.h"
 
 #include "test/integration/integration_test.h"
 #include "test/integration/utility.h"
+
+#include "gtest/gtest.h"
 
 TEST_F(IntegrationTest, HealthCheck) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(

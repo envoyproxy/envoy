@@ -1,5 +1,15 @@
 #include "test/integration/integration.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
@@ -13,7 +23,10 @@
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 IntegrationTestServerPtr BaseIntegrationTest::test_server_;
 std::vector<std::unique_ptr<FakeUpstream>> BaseIntegrationTest::fake_upstreams_;

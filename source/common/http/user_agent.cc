@@ -1,5 +1,8 @@
 #include "common/http/user_agent.h"
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 

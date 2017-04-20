@@ -1,5 +1,9 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/init/init.h"

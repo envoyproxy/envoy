@@ -1,5 +1,9 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/grpc/rpc_channel.h"
 #include "envoy/upstream/cluster_manager.h"
 

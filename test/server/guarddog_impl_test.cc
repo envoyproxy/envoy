@@ -1,3 +1,7 @@
+#include <atomic>
+#include <chrono>
+#include <memory>
+
 #include "envoy/common/time.h"
 
 #include "common/common/utility.h"
@@ -8,6 +12,9 @@
 #include "test/mocks/common.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 using testing::NiceMock;

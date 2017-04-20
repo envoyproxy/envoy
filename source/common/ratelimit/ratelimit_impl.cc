@@ -1,5 +1,12 @@
 #include "common/ratelimit/ratelimit_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/tracing/context.h"
 
 #include "common/common/assert.h"

@@ -1,5 +1,10 @@
 #include "common/stats/stats_impl.h"
 
+#include <string.h>
+
+#include <chrono>
+#include <string>
+
 #include "common/common/utility.h"
 
 namespace Stats {

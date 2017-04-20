@@ -1,6 +1,13 @@
 #include "mocks.h"
 
+#include <cstdint>
+
 #include "common/common/assert.h"
+
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;

@@ -1,5 +1,10 @@
 #include "common/http/filter/ratelimit.h"
 
+#include <spdlog/spdlog.h>
+
+#include <string>
+#include <vector>
+
 #include "envoy/http/codes.h"
 
 #include "common/common/assert.h"

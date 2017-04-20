@@ -1,5 +1,10 @@
 #pragma once
 
+#include <atomic>
+#include <chrono>
+#include <memory>
+#include <string>
+
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 

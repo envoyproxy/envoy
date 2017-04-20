@@ -1,3 +1,6 @@
+#include <iostream>
+#include <string>
+
 #include "test/tools/router_check/router.h"
 
 int main(int argc, char* argv[]) {

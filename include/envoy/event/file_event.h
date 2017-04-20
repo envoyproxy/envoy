@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+
 #include "envoy/common/pure.h"
 
 namespace Event {

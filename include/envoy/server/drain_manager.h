@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/network/drain_decision.h"
 
 namespace Server {

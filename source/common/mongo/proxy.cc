@@ -1,5 +1,11 @@
 #include "common/mongo/proxy.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/exception.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"

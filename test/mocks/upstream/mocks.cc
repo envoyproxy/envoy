@@ -1,9 +1,15 @@
 #include "test/mocks/upstream/mocks.h"
 
+#include <chrono>
+#include <functional>
+
 #include "envoy/upstream/load_balancer.h"
 
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;

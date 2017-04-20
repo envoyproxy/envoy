@@ -1,6 +1,10 @@
+#include <string>
+
 #include "common/mongo/bson_impl.h"
 #include "common/mongo/codec_impl.h"
 #include "common/mongo/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Mongo {
 

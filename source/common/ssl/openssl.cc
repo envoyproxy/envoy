@@ -1,5 +1,8 @@
 #include "common/ssl/openssl.h"
 
+#include <memory>
+#include <mutex>
+
 #include "common/common/assert.h"
 
 #include "openssl/rand.h"

@@ -1,5 +1,7 @@
 #include "common/ssl/context_config_impl.h"
 
+#include <string>
+
 #include "openssl/ssl.h"
 
 namespace Ssl {

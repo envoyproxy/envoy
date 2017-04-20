@@ -1,5 +1,13 @@
 #include "common/mongo/codec_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <sstream>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 

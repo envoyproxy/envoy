@@ -1,8 +1,13 @@
 #pragma once
 
+#include <functional>
+#include <list>
+
 #include "envoy/init/init.h"
 
 #include "test/mocks/common.h"
+
+#include "gmock/gmock.h"
 
 namespace Init {
 

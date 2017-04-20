@@ -1,11 +1,18 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+
 #include "envoy/api/api.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
 
 #include "common/http/codec_client.h"
+
+#include "test/test_common/printers.h"
 
 /**
  * A buffering response decoder used for testing.

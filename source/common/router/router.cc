@@ -1,5 +1,9 @@
 #include "common/router/router.h"
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/conn_pool.h"

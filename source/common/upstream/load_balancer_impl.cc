@@ -1,5 +1,9 @@
 #include "common/upstream/load_balancer_impl.h"
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"

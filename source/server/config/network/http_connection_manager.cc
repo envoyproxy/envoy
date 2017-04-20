@@ -1,5 +1,12 @@
 #include "server/config/network/http_connection_manager.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
 #include "envoy/server/instance.h"
@@ -61,7 +68,8 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& config,
                                                          Server::Instance& server)
-    : server_(server), stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
+    : Json::Validator(config, Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA), server_(server),
+      stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, server.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, server.stats())),
@@ -69,8 +77,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
       date_provider_(server.dispatcher(), server.threadLocal()) {
-
-  config.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
       config, server.runtime(), server.clusterManager(), server.dispatcher(), server.random(),

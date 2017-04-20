@@ -44,3 +44,5 @@ private:
 };
 
 } // Http
+
+#include <vector>

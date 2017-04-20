@@ -1,5 +1,7 @@
 #include "common/mongo/utility.h"
 
+#include <string>
+
 #include "envoy/common/exception.h"
 
 #include "common/json/json_loader.h"

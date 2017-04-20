@@ -5,6 +5,8 @@
 
 #include "test/test_common/network_utility.h"
 
+#include "gtest/gtest.h"
+
 namespace Network {
 
 class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {

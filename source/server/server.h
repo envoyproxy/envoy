@@ -1,5 +1,12 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/common/optional.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"

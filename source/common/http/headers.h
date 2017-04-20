@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/http/header_map.h"
 
 namespace Http {

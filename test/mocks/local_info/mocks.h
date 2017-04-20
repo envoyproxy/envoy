@@ -1,6 +1,10 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/local_info/local_info.h"
+
+#include "gmock/gmock.h"
 
 namespace LocalInfo {
 

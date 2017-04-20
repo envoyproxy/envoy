@@ -2,6 +2,8 @@
 
 #include <sys/syscall.h>
 
+#include <functional>
+
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 

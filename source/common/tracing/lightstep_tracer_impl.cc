@@ -1,5 +1,12 @@
 #include "common/tracing/lightstep_tracer_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "common/common/base64.h"
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"

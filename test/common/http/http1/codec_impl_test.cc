@@ -1,3 +1,5 @@
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 
@@ -9,6 +11,10 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;

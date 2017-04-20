@@ -1,5 +1,10 @@
 #include "common/http/http1/codec_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"

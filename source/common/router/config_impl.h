@@ -1,5 +1,15 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <map>
+#include <memory>
+#include <regex>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "envoy/common/optional.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
