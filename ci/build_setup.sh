@@ -14,6 +14,14 @@ NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 
 if [[ "$1" == bazel* ]]
 then
+  # Create a fake home. Python site libs tries to do getpwuid(3) if we don't and the CI
+  # Docker image gets confused as it has no passwd entry when running non-root
+  # unless we do this.
+  FAKE_HOME=/tmp/fake_home
+  mkdir -p "${FAKE_HOME}"
+  export HOME="${FAKE_HOME}"
+  export PYTHONUSERBASE="${FAKE_HOME}"
+
   export BUILD_DIR=/build
   # Make sure that "docker run" has a -v bind mount for /build, since cmake
   # users will only have a bind mount for /source.
@@ -48,7 +56,8 @@ then
   BAZEL_OPTIONS="--package_path %workspace%:/source"
   export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
   export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
-    --verbose_failures ${BAZEL_OPTIONS}"
+    --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE"
+  export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE"
   [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
   ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
   ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt

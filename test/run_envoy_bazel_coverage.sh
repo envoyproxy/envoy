@@ -29,7 +29,7 @@ echo "Cleanup completed."
 # https://github.com/bazelbuild/bazel/issues/1118). This works today as we have
 # a single coverage test binary and do not require the "bazel coverage" support
 # for collecting multiple traces and glueing them together.
-"${BAZEL_COVERAGE}" test "${COVERAGE_TARGET}" ${BAZEL_BUILD_OPTIONS} \
+"${BAZEL_COVERAGE}" test "${COVERAGE_TARGET}" ${BAZEL_TEST_OPTIONS} \
   --cache_test_results=no --cxxopt="--coverage" --linkopt="--coverage" \
   --test_output=all --strategy=Genrule=standalone --spawn_strategy=standalone
 

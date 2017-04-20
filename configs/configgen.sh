@@ -9,14 +9,6 @@ BUILD_DIR=/tmp/configgen
 OUT_DIR="$1"
 shift
 
-# Create a fake home. virtualenv tries to do getpwuid(3) if we don't and the CI
-# Docker image gets confused as it has no passwd entry when running non-root
-# unless we do this.
-FAKE_HOME=/tmp/fake_home
-mkdir -p "${FAKE_HOME}"
-export HOME="${FAKE_HOME}"
-export PYTHONUSERBASE="${FAKE_HOME}"
-
 if [ ! -d "$BUILD_DIR"/venv ]; then
   virtualenv "$BUILD_DIR"/venv
   "$BUILD_DIR"/venv/bin/pip install -r "$SCRIPT_DIR"/requirements.txt
