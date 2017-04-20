@@ -31,8 +31,6 @@ public:
 
   void raiseGoAway() { onGoAway(); }
 
-  void raiseOnEvent(uint32_t events) { onEvent(events); }
-
   DestroyCb destroy_cb_;
 };
 

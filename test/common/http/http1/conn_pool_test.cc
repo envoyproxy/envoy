@@ -3,13 +3,11 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/codec_client.h"
-#include "common/http/http1/codec_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -56,7 +54,7 @@ public:
   struct TestCodecClient {
     Http::MockClientConnection* codec_;
     Network::MockClientConnection* connection_;
-    CodecClientForTest* codec_client_;
+    CodecClient* codec_client_;
     Event::MockTimer* connect_timer_;
   };
 
@@ -549,10 +547,8 @@ TEST_F(Http1ConnPoolImplTest, RemoteClosePendingResponses) {
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
-
   EXPECT_NE(nullptr, handle);
 
-  // Connect event will bind to request 1.
   NiceMock<Http::MockStreamEncoder> request_encoder;
   Http::StreamDecoder* inner_decoder;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
@@ -570,12 +566,9 @@ TEST_F(Http1ConnPoolImplTest, RemoteClosePendingResponses) {
         inner_decoder->decodeData(data, true);
       }));
 
-  // We should get a reset callback when the connection disconnects.
+  EXPECT_CALL(*conn_pool_.test_clients_[0].connection_,
+              close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  Http::MockStreamCallbacks stream_callbacks;
-  EXPECT_CALL(stream_callbacks, onResetStream(StreamResetReason::ConnectionTermination));
-  request_encoder.getStream().addCallbacks(stream_callbacks);
-
   conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }

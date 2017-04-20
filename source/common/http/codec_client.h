@@ -120,9 +120,6 @@ protected:
     }
   }
 
-  // Network::ConnectionCallbacks
-  void onEvent(uint32_t events) override;
-
   const Type type_;
   ClientConnectionPtr codec_;
   Network::ClientConnectionPtr connection_;
@@ -179,6 +176,9 @@ private:
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);
   void onData(Buffer::Instance& data);
+
+  // Network::ConnectionCallbacks
+  void onEvent(uint32_t events) override;
 
   std::list<ActiveRequestPtr> active_requests_;
   Http::ConnectionCallbacks* codec_callbacks_{};
