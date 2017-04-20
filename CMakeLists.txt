@@ -18,10 +18,6 @@ include_directories(SYSTEM ${ENVOY_PROTOBUF_INCLUDE_DIR})
 add_subdirectory(source)
 add_subdirectory(test)
 
-set(CLANG-FORMAT clang-format-3.6 CACHE FILEPATH "path to clang-format binary")
-set(BUILDIFIER /usr/lib/go/bin/buildifier CACHE FILEPATH "path to buildifier binary")
 set(CHECK_FORMAT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_format.py)
-add_custom_target(check_format
-                  ${CHECK_FORMAT_PATH} ${CMAKE_SOURCE_DIR} ${CLANG-FORMAT} ${BUILDIFIER} check)
-add_custom_target(fix_format
-                  ${CHECK_FORMAT_PATH} ${CMAKE_SOURCE_DIR} ${CLANG-FORMAT} ${BUILDIFIER} fix)
+add_custom_target(check_format ${CHECK_FORMAT_PATH} check ${CMAKE_SOURCE_DIR})
+add_custom_target(fix_format ${CHECK_FORMAT_PATH} fix ${CMAKE_SOURCE_DIR})

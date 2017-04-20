@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/network/address.h"
-
 #include <sys/un.h>
+
+#include "envoy/network/address.h"
 
 namespace Network {
 namespace Address {

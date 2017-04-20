@@ -1,5 +1,6 @@
-#include "common/common/assert.h"
 #include "common/router/config_utility.h"
+
+#include "common/common/assert.h"
 
 namespace Router {
 

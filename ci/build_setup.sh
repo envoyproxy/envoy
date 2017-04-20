@@ -12,6 +12,8 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 
 NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 
+export ENVOY_SRCDIR=/source
+
 if [[ "$1" == bazel* ]]
 then
   export BUILD_DIR=/build
@@ -22,7 +24,6 @@ then
     echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}?"
     exit 1
   fi
-  export ENVOY_SRCDIR=/source
   export ENVOY_CONSUMER_SRCDIR="${BUILD_DIR}/envoy-consumer"
 
   # Make sure that /source doesn't contain /build on the underlying host

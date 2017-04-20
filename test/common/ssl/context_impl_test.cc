@@ -1,7 +1,6 @@
-#include "common/ssl/context_impl.h"
-
 #include "common/json/json_loader.h"
 #include "common/ssl/context_config_impl.h"
+#include "common/ssl/context_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/common/ssl/ssl_certs_test.h"

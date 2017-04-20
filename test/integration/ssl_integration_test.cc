@@ -1,12 +1,12 @@
 #include "ssl_integration_test.h"
 
-#include "integration.h"
-#include "utility.h"
-
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
+
+#include "integration.h"
+#include "utility.h"
 
 using testing::Return;
 

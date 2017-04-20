@@ -1,14 +1,14 @@
 #include "exe/hot_restart.h"
 
+#include <sys/mman.h>
+#include <sys/prctl.h>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 
 #include "common/common/utility.h"
-
-#include <sys/mman.h>
-#include <sys/prctl.h>
 
 namespace Server {
 

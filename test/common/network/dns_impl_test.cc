@@ -1,3 +1,6 @@
+#include <arpa/nameser.h>
+#include <arpa/nameser_compat.h>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 
@@ -10,9 +13,6 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
-
-#include <arpa/nameser.h>
-#include <arpa/nameser_compat.h>
 
 #include "ares.h"
 #include "ares_dns.h"

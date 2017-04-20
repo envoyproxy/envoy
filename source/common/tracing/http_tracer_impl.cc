@@ -5,8 +5,8 @@
 #include "common/common/utility.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/codes.h"
-#include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/runtime/uuid_util.h"
 
