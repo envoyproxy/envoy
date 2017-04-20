@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 namespace Tracing {
 
 struct TransportContext {
@@ -10,4 +12,3 @@ struct TransportContext {
 static const TransportContext EMPTY_CONTEXT = {"", ""};
 
 } // Tracing
-#include <string>
