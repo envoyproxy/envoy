@@ -245,7 +245,6 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end
 }
 
 void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
-  std::cout << "ondecode " << std::endl;
   decode_complete_ = encode_complete_;
   parent_.parent_.onResponseComplete(parent_);
 }

@@ -545,11 +545,10 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
 TEST_F(Http1ConnPoolImplTest, RemoteClosePendingResponses) {
   InSequence s;
 
-  // Request 1 should kick off a new connection.
-  NiceMock<Http::MockStreamDecoder> outer_decoder1;
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
-  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder1, callbacks);
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
 
   EXPECT_NE(nullptr, handle);
 
@@ -560,20 +559,11 @@ TEST_F(Http1ConnPoolImplTest, RemoteClosePendingResponses) {
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
-  // TBD: do we need a pending request?
-  //  NiceMock<Http::MockStreamDecoder> outer_decoder2;
-  //  ConnPoolCallbacks callbacks2;
-  //  //EXPECT_CALL(callbacks2.pool_failure_, ready());
-  //  Http::ConnectionPool::Cancellable* handle2 = conn_pool_.newStream(outer_decoder2, callbacks2);
   EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
-  // check why this one isn't a nullptr?
-  // EXPECT_NE(nullptr, handle2);
   conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::Connected);
 
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
 
-  // Need to have another request pending.
-  // set expect_call callback2.pool_ready_, read()). Times(0);
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, dispatch(_))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
         // Simulate the onResponseComplete call to decodeData since dispatch is mocked out.
@@ -586,7 +576,6 @@ TEST_F(Http1ConnPoolImplTest, RemoteClosePendingResponses) {
   EXPECT_CALL(stream_callbacks, onResetStream(StreamResetReason::ConnectionTermination));
   request_encoder.getStream().addCallbacks(stream_callbacks);
 
-  // conn_pool_.test_clients_[0].codec_client_->raiseOnEvent(Network::ConnectionEvent::RemoteClose);
   conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }
