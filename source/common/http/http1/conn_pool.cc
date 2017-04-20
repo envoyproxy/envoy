@@ -182,15 +182,12 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   if (!client.stream_wrapper_->encode_complete_) {
     conn_log_debug("response before request complete", *client.codec_client_);
     onDownstreamReset(client);
-  } else if (client.stream_wrapper_->saw_close_header_) {
+  } else if (client.stream_wrapper_->saw_close_header_ || client.codec_client_->remoteClosed()) {
     conn_log_debug("saw upstream connection: close", *client.codec_client_);
     onDownstreamReset(client);
   } else if (client.remaining_requests_ > 0 && --client.remaining_requests_ == 0) {
     conn_log_debug("maximum requests per connection", *client.codec_client_);
     host_->cluster().stats().upstream_cx_max_requests_.inc();
-    onDownstreamReset(client);
-  } else if (client.codec_client_->remoteClose()) {
-    conn_log_debug("remote close of client connection", *client.codec_client_);
     onDownstreamReset(client);
   } else {
     processIdleClient(client);

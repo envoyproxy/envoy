@@ -101,7 +101,7 @@ public:
     codec_callbacks_ = &callbacks;
   }
 
-  bool remoteClose() const { return remote_close_; }
+  bool remoteClosed() const { return remote_closed_; }
 
 protected:
   /**
@@ -184,7 +184,7 @@ private:
   Http::ConnectionCallbacks* codec_callbacks_{};
   CodecClientCallbacks* codec_client_callbacks_{};
   bool connected_{};
-  bool remote_close_{};
+  bool remote_closed_{};
 };
 
 typedef std::unique_ptr<CodecClient> CodecClientPtr;
