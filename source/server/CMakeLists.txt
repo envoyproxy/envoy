@@ -30,10 +30,6 @@ include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
 include_directories(${ENVOY_LIBEVENT_INCLUDE_DIR})
 
-set_target_properties(envoy-server PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT
-                      "../precompiled/precompiled.h")
-cotire(envoy-server)
-
 # Needed due to generated proto headers. There is probably a way to have this only depend on the
 # generation of the header but I don't feel like figuring that out right now.
 add_dependencies(envoy-server envoy-common)
