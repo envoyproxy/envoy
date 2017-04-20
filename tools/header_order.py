@@ -25,6 +25,7 @@ def ReorderHeaders(path):
   includes_lines = []
   after_includes_lines = []
 
+  # Collect all the lines prior to the first #include in before_includes_lines.
   try:
     while True:
       line = all_lines.next()
@@ -35,6 +36,7 @@ def ReorderHeaders(path):
   except StopIteration:
     pass
 
+  # Collect all the #include and whitespace lines in includes_lines.
   try:
     while True:
       line = all_lines.next()
@@ -47,8 +49,12 @@ def ReorderHeaders(path):
   except StopIteration:
     pass
 
+  # Collect the remaining lines in after_includes_lines.
   after_includes_lines += list(all_lines)
 
+  # Filter for includes that finds the #include of the header file associated with the source file
+  # being processed. E.g. if 'path' is source/common/common/hex.cc, this filter matches
+  # "common/common/hex.h".
   def file_header_filter():
     return lambda f: f.endswith('.h"') and path.endswith(f[1:-3] + '.cc')
 
@@ -108,5 +114,5 @@ if __name__ == '__main__':
     with open(path, 'w') as f:
       f.write(reorderd_source)
     sys.exit(0)
-  print 'Usage: %s [--rewrite] <.h path>' % sys.argv[0]
+  print 'Usage: %s [--rewrite] <source file path>' % sys.argv[0]
   sys.exit(1)
