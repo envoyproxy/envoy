@@ -6,9 +6,9 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/http/async_client_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"

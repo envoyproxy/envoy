@@ -6,10 +6,10 @@
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
-#include "envoy/network/connection_handler.h"
 
 namespace Event {
 

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "test/mocks/upstream/cluster_info.h"
-
 #include "envoy/upstream/upstream.h"
 
 #include "common/stats/stats_impl.h"
+
+#include "test/mocks/upstream/cluster_info.h"
 
 namespace Upstream {
 namespace Outlier {

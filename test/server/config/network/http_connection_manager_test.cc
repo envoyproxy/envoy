@@ -1,6 +1,6 @@
-#include "server/config/network/http_connection_manager.h"
-
 #include "common/buffer/buffer_impl.h"
+
+#include "server/config/network/http_connection_manager.h"
 
 #include "test/mocks/network/mocks.h"
 

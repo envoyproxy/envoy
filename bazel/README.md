@@ -12,7 +12,7 @@ independently sourced, the following steps should be followed:
    to point Bazel at the Envoy dependencies. An example is provided in the CI Docker image
    [WORKSPACE](https://github.com/lyft/envoy/blob/master/ci/WORKSPACE) and corresponding
    [BUILD](https://github.com/lyft/envoy/blob/master/ci/prebuilt/BUILD) files.
-4. `bazel build --package_path %workspace%:<path to Envoy source tree> //source/exe:envoy-static` 
+4. `bazel build --package_path %workspace%:<path to Envoy source tree> //source/exe:envoy-static`
    from the directory containing your WORKSPACE.
 
 ## Quick start Bazel build for developers
@@ -22,10 +22,10 @@ As a developer convenience, a [WORKSPACE](https://github.com/lyft/envoy/blob/mas
 version](https://github.com/lyft/envoy/blob/master/bazel/repositories.bzl) of the various Envoy
 dependencies are provided. These are provided as is, they are only suitable for development and
 testing purposes. The specific versions of the Envoy dependencies used in this build may not be
-up-to-date with the latest security patches. In addition, Bazel build rules for deps have been
-improvised in some cases and this build is not checked by CI.
+up-to-date with the latest security patches.
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
+2. `bazel fetch //...` to fetch and build all external dependencies. This may take some time.
 2. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Bazel with the CI Docker image

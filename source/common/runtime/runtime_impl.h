@@ -1,5 +1,7 @@
 #pragma once
 
+#include <dirent.h>
+
 #include "envoy/common/exception.h"
 #include "envoy/common/optional.h"
 #include "envoy/runtime/runtime.h"
@@ -9,8 +11,6 @@
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
-
-#include <dirent.h>
 
 namespace Runtime {
 

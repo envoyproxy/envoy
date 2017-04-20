@@ -1,11 +1,11 @@
 #include "utility.h"
 
+#include <dirent.h>
+
 #include "envoy/buffer/buffer.h"
 
 #include "common/common/empty_string.h"
 #include "common/network/address_impl.h"
-
-#include <dirent.h>
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {

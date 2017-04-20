@@ -1,5 +1,7 @@
-#include "common/common/assert.h"
 #include "server/guarddog_impl.h"
+
+#include "common/common/assert.h"
+
 #include "server/watchdog_impl.h"
 
 namespace Server {

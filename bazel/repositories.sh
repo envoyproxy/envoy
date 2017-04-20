@@ -2,18 +2,19 @@
 
 set -e
 
-# When debugging the build, it's helpful to keep the artifacts in /tmp, since they don't get
-# repeatedly clobbered as build recipes are modified. This is controlled by debug_build in
-# bazel/respositories.bzl.
-if [[ "${DEBUG}" == "1" ]]
-then
-  BASEDIR=/tmp/bazel-envoy-deps
-  # Tell build_and_install_deps.sh to build sequentially when performance debugging.
-  # export BUILD_CONCURRENCY=0
-else
-  BASEDIR="${PWD}/build"
-fi
+# Tell build_and_install_deps.sh to build sequentially when performance debugging.
+# export BUILD_CONCURRENCY=0
 
+# Hash environment variables we care about to force rebuilds when they change.
+ENV_HASH=$(echo "${CC} ${CXX} ${LD_LIBRARY_PATH}" | md5sum - | cut -f 1 -d\ )
+
+# Don't build inside the directory Bazel believes the repository_rule output goes. Instead, do so in
+# a parallel directory. This allows the build artifacts to survive Bazel clobbering the repostory
+# directory when a small change to repositories.bzl or a build recipe happens. We then rely on make
+# dependency analysis to detect when stuff needs to be rebuilt.
+BASEDIR="${PWD}_cache_${ENV_HASH}"
+
+>&2 echo "External dependency cache directory ${BASEDIR}"
 mkdir -p  "${BASEDIR}"
 
 export THIRDPARTY_DEPS="${BASEDIR}"
@@ -27,16 +28,8 @@ do
 done
 
 set -o pipefail
-(time ./build_and_install_deps.sh ${DEPS}) 2>&1 | \
-  tee "${BASEDIR}"/build.log
+BUILD_LOG="${BASEDIR}"/build.log
+(time ./build_and_install_deps.sh ${DEPS}) 2>&1 | tee "${BUILD_LOG}"
 
-# Need to rsync in debug mode, since the symlinks are into /tmp and cause problems with later build
-# sandboxing.
-if [[ "${DEBUG}" == "1" ]]
-then
-  rsync -a "$(realpath "${THIRDPARTY_SRC}")"/ thirdparty
-  rsync -a "$(realpath "${THIRDPARTY_BUILD}")"/ thirdparty_build
-else
-  ln -sf "$(realpath "${THIRDPARTY_SRC}")" thirdparty
-  ln -sf "$(realpath "${THIRDPARTY_BUILD}")" thirdparty_build
-fi
+ln -sf "$(realpath "${THIRDPARTY_SRC}")" thirdparty
+ln -sf "$(realpath "${THIRDPARTY_BUILD}")" thirdparty_build
