@@ -7,6 +7,7 @@
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/json/json_loader.h"
+#include "common/json/json_validator.h"
 
 #include "server/configuration_impl.h"
 
@@ -65,7 +66,8 @@ public:
  */
 class HttpConnectionManagerConfig : Logger::Loggable<Logger::Id::config>,
                                     public Http::FilterChainFactory,
-                                    public Http::ConnectionManagerConfig {
+                                    public Http::ConnectionManagerConfig,
+                                    Json::Validator {
 public:
   HttpConnectionManagerConfig(const Json::Object& config, Server::Instance& server);
 
