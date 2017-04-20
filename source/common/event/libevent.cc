@@ -1,5 +1,7 @@
 #include "common/event/libevent.h"
 
+#include <signal.h>
+
 #include "common/common/assert.h"
 
 #include "event2/thread.h"

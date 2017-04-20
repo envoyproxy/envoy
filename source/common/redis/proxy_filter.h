@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/network/filter.h"
 #include "envoy/redis/codec.h"
 #include "envoy/redis/command_splitter.h"

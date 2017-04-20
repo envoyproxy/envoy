@@ -1,5 +1,11 @@
 #include "common/stats/statsd.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/cluster_manager.h"

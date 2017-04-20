@@ -1,8 +1,14 @@
+#include <cstdint>
+#include <list>
+#include <string>
+
 #include "envoy/common/exception.h"
 
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Network {
 

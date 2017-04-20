@@ -1,8 +1,16 @@
+#include <chrono>
+#include <memory>
+#include <string>
+#include <unordered_map>
+
 #include "common/stats/thread_local_store.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;

@@ -1,5 +1,8 @@
 #include "common/router/shadow_writer_impl.h"
 
+#include <chrono>
+#include <string>
+
 #include "common/common/assert.h"
 #include "common/http/headers.h"
 

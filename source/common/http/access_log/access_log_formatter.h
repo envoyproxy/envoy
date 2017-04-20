@@ -1,5 +1,9 @@
 #pragma once
 
+#include <functional>
+#include <string>
+#include <vector>
+
 #include "envoy/http/access_log.h"
 
 namespace Http {

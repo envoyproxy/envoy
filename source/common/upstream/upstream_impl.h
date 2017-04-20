@@ -1,5 +1,15 @@
 #pragma once
 
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"

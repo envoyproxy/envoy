@@ -1,5 +1,8 @@
 #include "common/runtime/uuid_util.h"
 
+#include <cstdint>
+#include <string>
+
 #include "common/common/utility.h"
 #include "common/runtime/runtime_impl.h"
 

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <memory>
+
 #include "envoy/event/timer.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/connection.h"

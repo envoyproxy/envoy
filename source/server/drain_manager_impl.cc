@@ -1,5 +1,8 @@
 #include "server/drain_manager_impl.h"
 
+#include <chrono>
+#include <cstdint>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"

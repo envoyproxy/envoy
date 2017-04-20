@@ -1,5 +1,7 @@
 #include "common/json/config_schemas.h"
 
+#include <string>
+
 const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",

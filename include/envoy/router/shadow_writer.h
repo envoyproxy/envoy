@@ -1,5 +1,9 @@
 #pragma once
 
+#include <chrono>
+#include <memory>
+#include <string>
+
 #include "envoy/http/message.h"
 
 namespace Router {

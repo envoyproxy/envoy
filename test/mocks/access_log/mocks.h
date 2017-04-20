@@ -1,8 +1,13 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "envoy/access_log/access_log.h"
 
 #include "test/mocks/filesystem/mocks.h"
+
+#include "gmock/gmock.h"
 
 namespace AccessLog {
 

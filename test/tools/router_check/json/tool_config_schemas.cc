@@ -1,5 +1,7 @@
 #include "test/tools/router_check/json/tool_config_schemas.h"
 
+#include <string>
+
 const std::string& Json::ToolSchema::routerCheckSchema() {
   static const std::string* router_check_schema = new std::string(R"EOF(
   {

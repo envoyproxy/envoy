@@ -1,5 +1,9 @@
 #include "common/http/header_map_impl.h"
 
+#include <cstdint>
+#include <list>
+#include <string>
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"

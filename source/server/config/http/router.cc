@@ -1,5 +1,7 @@
 #include "server/config/http/router.h"
 
+#include <string>
+
 #include "common/json/config_schemas.h"
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"

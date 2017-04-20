@@ -1,5 +1,9 @@
 #include "common/router/config_utility.h"
 
+#include <regex>
+#include <string>
+#include <vector>
+
 #include "common/common/assert.h"
 
 namespace Router {

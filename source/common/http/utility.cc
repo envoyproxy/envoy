@@ -1,5 +1,11 @@
 #include "common/http/utility.h"
 
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"

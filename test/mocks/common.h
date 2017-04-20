@@ -2,7 +2,7 @@
 
 #include "envoy/common/time.h"
 
-#include "test/precompiled/precompiled_test.h"
+#include "gmock/gmock.h"
 
 /**
  * This action allows us to save a reference parameter to a pointer target.

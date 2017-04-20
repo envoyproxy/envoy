@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "common/network/connection_impl.h"
 #include "common/ssl/context_impl.h"
 

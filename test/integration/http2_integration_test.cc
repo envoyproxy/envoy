@@ -1,11 +1,16 @@
 #include "test/integration/http2_integration_test.h"
 
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 TEST_F(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP2); }
 

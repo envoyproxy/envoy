@@ -1,7 +1,15 @@
 #include "exe/hot_restart.h"
 
+#include <signal.h>
+#include <spdlog/spdlog.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
+
+#include <cstdint>
+#include <string>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"

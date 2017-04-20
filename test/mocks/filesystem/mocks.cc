@@ -1,5 +1,7 @@
 #include "test/mocks/filesystem/mocks.h"
 
+#include <string>
+
 namespace Filesystem {
 
 MockOsSysCalls::MockOsSysCalls() { num_writes_ = num_open_ = 0; }

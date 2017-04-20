@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
@@ -10,6 +15,8 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
+
+#include "gmock/gmock.h"
 
 namespace Event {
 

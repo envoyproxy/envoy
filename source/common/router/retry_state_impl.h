@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/optional.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"

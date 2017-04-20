@@ -1,3 +1,5 @@
+#include <string>
+
 #include "common/http/conn_manager_utility.h"
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
@@ -8,7 +10,11 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;

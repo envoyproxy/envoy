@@ -1,5 +1,8 @@
 #include "common/network/listener_impl.h"
 
+#include <spdlog/spdlog.h>
+#include <sys/un.h>
+
 #include "envoy/common/exception.h"
 #include "envoy/network/connection_handler.h"
 

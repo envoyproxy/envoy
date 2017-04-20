@@ -1,6 +1,8 @@
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 
+#include "gtest/gtest.h"
+
 #ifdef BAZEL_BRINGUP
 #include "test/proto/helloworld.pb.h"
 #else

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"

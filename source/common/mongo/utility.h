@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/mongo/codec.h"
 
 namespace Mongo {

@@ -1,5 +1,8 @@
 #include "common/http/access_log/access_log_impl.h"
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"

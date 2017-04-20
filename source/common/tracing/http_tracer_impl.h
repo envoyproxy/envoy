@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"

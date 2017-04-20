@@ -1,3 +1,7 @@
+#include <cstdint>
+#include <memory>
+#include <vector>
+
 #include "common/http/http2/conn_pool.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -8,6 +12,10 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;

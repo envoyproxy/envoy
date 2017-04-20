@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/thread/thread.h"

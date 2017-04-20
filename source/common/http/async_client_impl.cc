@@ -1,5 +1,11 @@
 #include "common/http/async_client_impl.h"
 
+#include <chrono>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/http/utility.h"
 
 namespace Http {

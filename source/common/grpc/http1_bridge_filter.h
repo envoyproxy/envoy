@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 

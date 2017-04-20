@@ -1,5 +1,7 @@
 #include "server/config/network/mongo_proxy.h"
 
+#include <string>
+
 #include "envoy/network/connection.h"
 #include "envoy/server/instance.h"
 

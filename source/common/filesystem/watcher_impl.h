@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <string>
+#include <unordered_map>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 

@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"

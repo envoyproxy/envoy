@@ -1,6 +1,11 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/runtime/runtime.h"
+
+#include "gmock/gmock.h"
 
 namespace Runtime {
 

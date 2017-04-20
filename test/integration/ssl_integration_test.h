@@ -1,8 +1,14 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "test/integration/integration.h"
 #include "test/integration/server.h"
 #include "test/mocks/runtime/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 

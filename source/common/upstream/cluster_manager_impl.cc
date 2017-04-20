@@ -1,5 +1,14 @@
 #include "common/upstream/cluster_manager_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <string>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"

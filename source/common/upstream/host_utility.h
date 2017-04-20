@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/upstream/upstream.h"
 
 namespace Upstream {

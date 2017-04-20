@@ -1,5 +1,10 @@
 #pragma once
 
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 

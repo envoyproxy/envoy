@@ -3,6 +3,11 @@
 #include <fcntl.h>
 #include <sys/un.h>
 
+#include <array>
+#include <atomic>
+#include <cstdint>
+#include <string>
+
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
 

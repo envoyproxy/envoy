@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <memory>
+
 #include "envoy/common/optional.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"

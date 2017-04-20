@@ -6,7 +6,6 @@ envoy_cc_test_library(
     name = "main",
     srcs = ["main.cc"],
     external_deps = [
-        "googletest",
         "protobuf",
     ],
     deps = [

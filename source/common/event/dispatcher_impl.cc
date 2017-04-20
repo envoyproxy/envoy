@@ -1,5 +1,11 @@
 #include "common/event/dispatcher_impl.h"
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <mutex>
+#include <vector>
+
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 

@@ -1,3 +1,6 @@
+#include <memory>
+#include <string>
+
 #include "common/network/utility.h"
 #include "common/redis/conn_pool_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -6,6 +9,10 @@
 #include "test/mocks/redis/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Eq;

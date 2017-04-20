@@ -1,5 +1,10 @@
 #include "common/http/filter/fault_filter.h"
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"

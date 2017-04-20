@@ -1,5 +1,8 @@
 #pragma once
 
+#include <chrono>
+#include <memory>
+
 #include "envoy/common/optional.h"
 #include "envoy/http/message.h"
 

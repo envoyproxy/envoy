@@ -1,5 +1,10 @@
 #pragma once
 
+#include <array>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 

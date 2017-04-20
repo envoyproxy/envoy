@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
 
 namespace Filesystem {

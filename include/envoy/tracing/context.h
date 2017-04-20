@@ -10,3 +10,4 @@ struct TransportContext {
 static const TransportContext EMPTY_CONTEXT = {"", ""};
 
 } // Tracing
+#include <string>

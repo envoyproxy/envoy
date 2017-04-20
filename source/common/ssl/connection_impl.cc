@@ -1,5 +1,9 @@
 #include "common/ssl/connection_impl.h"
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"

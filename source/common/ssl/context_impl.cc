@@ -1,5 +1,12 @@
 #include "common/ssl/context_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 

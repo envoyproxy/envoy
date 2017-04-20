@@ -1,3 +1,7 @@
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/headers.h"
@@ -12,6 +16,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;

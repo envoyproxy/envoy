@@ -1,5 +1,11 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <string>
+
 #include "envoy/http/filter.h"
 #include "envoy/server/instance.h"
 

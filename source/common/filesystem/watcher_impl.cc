@@ -1,6 +1,10 @@
 #include "common/filesystem/watcher_impl.h"
 
+#include <spdlog/spdlog.h>
 #include <sys/inotify.h>
+
+#include <cstdint>
+#include <string>
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"

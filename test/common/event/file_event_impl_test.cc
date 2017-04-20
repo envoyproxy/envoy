@@ -1,8 +1,12 @@
+#include <cstdint>
+
 #include "envoy/event/file_event.h"
 
 #include "common/event/dispatcher_impl.h"
 
 #include "test/mocks/common.h"
+
+#include "gtest/gtest.h"
 
 namespace Event {
 

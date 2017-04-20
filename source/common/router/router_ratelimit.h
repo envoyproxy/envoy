@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 

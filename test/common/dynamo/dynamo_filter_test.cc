@@ -1,3 +1,6 @@
+#include <memory>
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/dynamo/dynamo_filter.h"
 #include "common/http/header_map_impl.h"
@@ -5,7 +8,11 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;

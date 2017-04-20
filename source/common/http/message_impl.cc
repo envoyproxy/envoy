@@ -1,5 +1,8 @@
 #include "common/http/message_impl.h"
 
+#include <cstdint>
+#include <string>
+
 namespace Http {
 
 std::string MessageImpl::bodyAsString() const {

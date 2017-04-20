@@ -1,5 +1,9 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 
 namespace Grpc {

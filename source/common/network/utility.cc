@@ -1,7 +1,17 @@
 #include "common/network/utility.h"
 
+#include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <linux/netfilter_ipv4.h>
+#include <netinet/ip.h>
+#include <spdlog/spdlog.h>
+#include <sys/socket.h>
+
+#include <cstdint>
+#include <list>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"

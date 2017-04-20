@@ -1,3 +1,5 @@
+#include <string>
+
 #include "server/config/network/client_ssl_auth.h"
 #include "server/config/network/http_connection_manager.h"
 #include "server/config/network/mongo_proxy.h"
@@ -6,6 +8,9 @@
 #include "server/config/network/tcp_proxy.h"
 
 #include "test/mocks/server/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;

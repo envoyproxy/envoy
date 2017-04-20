@@ -1,10 +1,15 @@
 #include "ssl_integration_test.h"
 
+#include <memory>
+#include <string>
+
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "integration.h"
 #include "utility.h"
 

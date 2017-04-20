@@ -1,5 +1,12 @@
 #include "test/test_common/network_utility.h"
 
+#include <netinet/ip.h>
+#include <spdlog/spdlog.h>
+#include <sys/socket.h>
+
+#include <cstdint>
+#include <string>
+
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"

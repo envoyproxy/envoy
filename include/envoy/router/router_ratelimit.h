@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/ratelimit/ratelimit.h"

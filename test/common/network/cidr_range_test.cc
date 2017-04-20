@@ -1,9 +1,15 @@
+#include <spdlog/spdlog.h>
 #include <sys/un.h>
+
+#include <iostream>
+#include <string>
 
 #include "envoy/common/exception.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/cidr_range.h"
+
+#include "gtest/gtest.h"
 
 // We are adding things into the std namespace.
 // Note that this is technically undefined behavior!

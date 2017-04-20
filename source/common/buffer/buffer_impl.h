@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 
 #include "common/event/libevent.h"
