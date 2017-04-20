@@ -13,7 +13,7 @@ if [[ "$1" == "bazel.debug" ]]; then
   echo "Building..."
   bazel build ${BAZEL_BUILD_OPTIONS} @envoy//source/exe:envoy-static.stamped
   echo "Testing..."
-  bazel test ${BAZEL_BUILD_OPTIONS} --test_output=all \
+  bazel test ${BAZEL_TEST_OPTIONS} --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
