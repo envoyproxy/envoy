@@ -141,7 +141,7 @@ Generic Key
 
 
 descriptor_value
-    *(required, string)* The value to use in the descriptor entry.
+  *(required, string)* The value to use in the descriptor entry.
 
 The following descriptor entry is appended to the descriptor:
 
@@ -157,15 +157,21 @@ Header Value Match
   {
     "type": "header_value_match",
     "descriptor_value" : "...",
+    "header_present" : "...",
     "headers" : []
   }
 
 
 descriptor_value
-    *(required, string)* The value to use in the descriptor entry.
+  *(required, string)* The value to use in the descriptor entry.
+
+header_present
+  *(optional, boolean)* Specifies if the action should be checking for the headers being present. If
+  set to true, the action will append a descriptor entry if the headers match. If set to
+  false, the action will append a descriptor entry if the headers do not match. 
 
 :ref:`headers<config_http_conn_man_route_table_route_headers>`
-    *(required, array)* Specifies a set of headers that the rate limit action should match on. The
+  *(required, array)* Specifies a set of headers that the rate limit action should match on. The
     action will check the request's headers against all the specified headers in the config. A match
     will happen if all the headers in the config are present in the request with the same values (or
     based on presence if the ``value`` field is not in the config).
