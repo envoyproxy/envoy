@@ -1,5 +1,11 @@
 #include "fake_upstream.h"
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 
 #include "common/api/api_impl.h"
@@ -10,6 +16,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder)

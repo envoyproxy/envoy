@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/upstream/host_description.h"
 

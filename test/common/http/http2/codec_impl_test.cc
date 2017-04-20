@@ -1,3 +1,6 @@
+#include <cstdint>
+#include <string>
+
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -6,7 +9,11 @@
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;

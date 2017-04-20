@@ -1,5 +1,11 @@
 #pragma once
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/server/options.h"
 
 /**

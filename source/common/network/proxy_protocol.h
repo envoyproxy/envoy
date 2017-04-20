@@ -1,5 +1,9 @@
 #pragma once
 
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/stats_macros.h"
 

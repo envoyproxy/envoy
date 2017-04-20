@@ -1,5 +1,10 @@
 #include "common/http/codes.h"
 
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <string>
+
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats.h"
 

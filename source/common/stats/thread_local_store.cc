@@ -1,5 +1,13 @@
 #include "common/stats/thread_local_store.h"
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_set>
+
 namespace Stats {
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(RawStatDataAllocator& alloc)

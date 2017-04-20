@@ -1,3 +1,7 @@
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/filter/tcp_proxy.h"
 #include "common/network/address_impl.h"
@@ -9,6 +13,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;

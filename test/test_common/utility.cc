@@ -1,11 +1,24 @@
 #include "utility.h"
 
 #include <dirent.h>
+#include <spdlog/spdlog.h>
+#include <unistd.h>
+
+#include <cstdint>
+#include <list>
+#include <mutex>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 #include "envoy/buffer/buffer.h"
 
 #include "common/common/empty_string.h"
 #include "common/network/address_impl.h"
+
+#include "test/test_common/printers.h"
+
+#include "gtest/gtest.h"
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {

@@ -1,5 +1,14 @@
+#include <array>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
+
+#include "test/test_common/printers.h"
+
+#include "gtest/gtest.h"
 
 #ifdef BAZEL_BRINGUP
 #include "test/proto/helloworld.pb.h"

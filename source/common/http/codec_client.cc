@@ -1,5 +1,7 @@
 #include "common/http/codec_client.h"
 
+#include <cstdint>
+
 #include "common/common/enum_to_int.h"
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"

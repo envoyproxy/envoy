@@ -1,5 +1,14 @@
 #pragma once
 
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <unordered_map>
+
 #include "envoy/common/time.h"
 #include "envoy/stats/stats.h"
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "server/configuration_impl.h"
 
 namespace Server {

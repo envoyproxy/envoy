@@ -1,9 +1,16 @@
 #include "mocks.h"
 
+#include <cstdint>
+
 #include "envoy/buffer/buffer.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;

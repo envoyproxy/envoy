@@ -1,5 +1,11 @@
 #include "common/filter/auth/client_ssl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/network/connection.h"
 
 #include "common/common/assert.h"

@@ -1,5 +1,9 @@
 #include "common/tracing/http_tracer_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <string>
+
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"

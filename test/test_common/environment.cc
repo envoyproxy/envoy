@@ -1,5 +1,16 @@
 #include "test/test_common/environment.h"
 
+#include <spdlog/spdlog.h>
+#include <sys/un.h>
+
+#include <fstream>
+#include <iostream>
+#include <regex>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "common/common/assert.h"
 
 #include "server/options_impl.h"

@@ -1,5 +1,14 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"

@@ -1,5 +1,13 @@
 #include "common/http/conn_manager_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <string>
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"

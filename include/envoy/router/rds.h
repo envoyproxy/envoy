@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/router/router.h"
 
 namespace Router {

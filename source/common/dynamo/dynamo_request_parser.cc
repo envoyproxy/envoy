@@ -1,5 +1,9 @@
 #include "common/dynamo/dynamo_request_parser.h"
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/common/utility.h"
 
 namespace Dynamo {

@@ -1,5 +1,11 @@
 #pragma once
 
+#include <atomic>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/network/connection.h"
 
 #include "common/buffer/buffer_impl.h"

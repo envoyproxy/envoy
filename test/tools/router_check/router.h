@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
@@ -9,6 +12,7 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 #include "test/tools/router_check/json/tool_config_schemas.h"
 

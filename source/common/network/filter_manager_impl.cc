@@ -1,5 +1,7 @@
 #include "common/network/filter_manager_impl.h"
 
+#include <list>
+
 #include "envoy/network/connection.h"
 
 #include "common/common/assert.h"

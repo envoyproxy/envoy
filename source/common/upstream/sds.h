@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/local_info/local_info.h"
 
 #include "common/http/rest_api_fetcher.h"

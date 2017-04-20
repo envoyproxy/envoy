@@ -1,8 +1,16 @@
+#include <spdlog/spdlog.h>
+
+#include <string>
+#include <vector>
+
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 

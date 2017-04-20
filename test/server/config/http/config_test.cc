@@ -1,3 +1,5 @@
+#include <string>
+
 #include "server/config/http/buffer.h"
 #include "server/config/http/dynamo.h"
 #include "server/config/http/fault.h"
@@ -7,6 +9,9 @@
 #include "server/http/health_check.h"
 
 #include "test/mocks/server/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;

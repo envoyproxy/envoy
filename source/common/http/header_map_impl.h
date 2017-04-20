@@ -1,5 +1,11 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/http/header_map.h"
 
 #include "common/common/non_copyable.h"

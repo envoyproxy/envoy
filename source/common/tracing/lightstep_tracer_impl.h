@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"

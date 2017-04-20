@@ -18,6 +18,8 @@ done
   cat << EOF
 #include "test/test_common/environment.h"
 
+#include "gtest/gtest.h"
+
 TEST(ShTest, ${TEST_NAME}) {
   TestEnvironment::exec({${EXEC_ARGS}});
 }

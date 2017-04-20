@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include "envoy/common/pure.h"
 
 /**

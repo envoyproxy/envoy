@@ -1,5 +1,12 @@
 #include "server/config/network/http_connection_manager.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
 #include "envoy/server/instance.h"

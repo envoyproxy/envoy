@@ -1,10 +1,1 @@
-package(default_visibility = ["//visibility:public"])
-
-load("//bazel:envoy_build_system.bzl", "envoy_external_dep_path")
-
-cc_library(
-    name = "precompiled_includes",
-    hdrs = ["precompiled.h"],
-    include_prefix = "precompiled",
-    deps = [envoy_external_dep_path("spdlog")],
-)
+# TODO(htuch): Nuke this directory when cmake is no more.

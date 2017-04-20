@@ -1,3 +1,6 @@
+#include <string>
+#include <vector>
+
 #include "common/json/json_loader.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
@@ -6,6 +9,8 @@
 #include "test/common/ssl/ssl_certs_test.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
+
+#include "gtest/gtest.h"
 
 namespace Ssl {
 

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
 
 namespace Ssl {

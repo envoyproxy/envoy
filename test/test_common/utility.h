@@ -1,9 +1,19 @@
 #pragma once
 
+#include <condition_variable>
+#include <list>
+#include <mutex>
+#include <string>
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
 
 #include "common/http/header_map_impl.h"
+
+#include "test/test_common/printers.h"
+
+#include "gtest/gtest.h"
 
 #define EXPECT_THROW_WITH_MESSAGE(statement, expected_exception, message)                          \
   try {                                                                                            \

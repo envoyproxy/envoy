@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/stats/stats_impl.h"
 
@@ -5,6 +7,9 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;

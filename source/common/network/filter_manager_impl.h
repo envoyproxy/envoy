@@ -1,5 +1,8 @@
 #pragma once
 
+#include <list>
+#include <memory>
+
 #include "envoy/network/filter.h"
 
 #include "common/common/linked_object.h"

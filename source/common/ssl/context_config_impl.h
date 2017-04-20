@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "envoy/ssl/context_config.h"
 
 #include "common/json/json_loader.h"

@@ -8,6 +8,8 @@
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
 
+#include "gtest/gtest.h"
+
 class UdsIntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:
   /**

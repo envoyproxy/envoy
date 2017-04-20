@@ -2,8 +2,16 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <spdlog/spdlog.h>
+#include <unistd.h>
 
+#include <chrono>
+#include <cstdint>
+#include <fstream>
 #include <iostream>
+#include <mutex>
+#include <sstream>
+#include <string>
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"

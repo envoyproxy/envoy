@@ -1,5 +1,7 @@
 #include "common/http/filter/buffer_filter.h"
 
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"

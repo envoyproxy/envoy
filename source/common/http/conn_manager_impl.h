@@ -1,5 +1,13 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/access_log.h"
 #include "envoy/http/codec.h"

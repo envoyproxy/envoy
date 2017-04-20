@@ -1,3 +1,8 @@
+#include <spdlog/spdlog.h>
+
+#include <iostream>
+#include <memory>
+
 #include "common/event/libevent.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"

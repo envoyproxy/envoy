@@ -1,5 +1,12 @@
 #pragma once
 
+#include <strings.h>
+
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/common/time.h"
 
 /**

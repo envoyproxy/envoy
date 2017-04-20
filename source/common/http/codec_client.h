@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <memory>
+
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"

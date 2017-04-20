@@ -1,5 +1,10 @@
 #pragma once
 
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/mongo/bson.h"
 
 /**

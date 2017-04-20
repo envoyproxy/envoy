@@ -1,5 +1,15 @@
 #include "common/upstream/upstream_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+#include <unordered_set>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"

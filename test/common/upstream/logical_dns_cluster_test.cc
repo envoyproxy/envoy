@@ -1,3 +1,8 @@
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/network/utility.h"
 #include "common/upstream/logical_dns_cluster.h"
 
@@ -7,6 +12,9 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;

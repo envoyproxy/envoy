@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
 
 namespace Buffer {

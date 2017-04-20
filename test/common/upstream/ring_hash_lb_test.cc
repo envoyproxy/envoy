@@ -1,9 +1,15 @@
+#include <cstdint>
+#include <string>
+
 #include "common/network/utility.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;

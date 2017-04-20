@@ -1,10 +1,19 @@
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/common/empty_string.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 

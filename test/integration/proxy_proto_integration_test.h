@@ -7,6 +7,8 @@
 #include "test/integration/integration.h"
 #include "test/integration/server.h"
 
+#include "gtest/gtest.h"
+
 class ProxyProtoIntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:
   /**

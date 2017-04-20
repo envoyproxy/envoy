@@ -1,6 +1,11 @@
+#include <string>
+#include <vector>
+
 #include "envoy/common/exception.h"
 
 #include "common/common/hex.h"
+
+#include "gtest/gtest.h"
 
 TEST(Hex, SimpleEncode) {
   std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x0a, 0x0b, 0x0c};

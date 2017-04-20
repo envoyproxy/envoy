@@ -1,5 +1,10 @@
 #pragma once
 
+#include <atomic>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/resource_manager.h"
 

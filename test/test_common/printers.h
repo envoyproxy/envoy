@@ -1,5 +1,10 @@
 #pragma once
 
+#include <iostream>
+#include <memory>
+
+#include "test/test_common/printers.h"
+
 namespace Http {
 /**
  * Pretty print const HeaderMapImpl&

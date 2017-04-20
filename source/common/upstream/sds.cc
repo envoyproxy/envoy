@@ -1,5 +1,9 @@
 #include "common/upstream/sds.h"
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/network/address_impl.h"

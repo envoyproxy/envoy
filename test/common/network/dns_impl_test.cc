@@ -1,5 +1,12 @@
+#include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <arpa/nameser_compat.h>
+
+#include <list>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
@@ -13,9 +20,11 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/printers.h"
 
 #include "ares.h"
 #include "ares_dns.h"
+#include "gtest/gtest.h"
 
 namespace Network {
 

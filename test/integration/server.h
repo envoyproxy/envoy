@@ -1,5 +1,14 @@
 #pragma once
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <string>
+
 #include "envoy/server/options.h"
 
 #include "common/common/assert.h"

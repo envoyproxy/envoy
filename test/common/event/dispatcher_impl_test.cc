@@ -1,6 +1,11 @@
+#include <functional>
+
 #include "common/event/dispatcher_impl.h"
 
 #include "test/mocks/common.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 

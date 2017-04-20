@@ -12,7 +12,6 @@ def envoy_copts(repository):
         "-Woverloaded-virtual",
         "-Wold-style-cast",
         "-std=c++0x",
-        "-includeprecompiled/precompiled.h",
     ] + select({
         # Bazel adds an implicit -DNDEBUG for opt.
         repository + "//bazel:opt_build": [],
@@ -75,7 +74,7 @@ def envoy_cc_library(name,
         visibility = visibility,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//include/envoy/common:base_includes",
-            repository + "//source/precompiled:precompiled_includes",
+            envoy_external_dep_path('spdlog'),
         ],
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         alwayslink = 1,
@@ -142,9 +141,7 @@ def envoy_cc_binary(name,
         malloc = tcmalloc_external_dep(repository),
         # See above comment on MD5 hash.
         stamp = 0,
-        deps = deps + [
-            repository + "//source/precompiled:precompiled_includes",
-        ],
+        deps = deps,
     )
 
 # Envoy C++ test targets should be specified with this function.
@@ -197,11 +194,11 @@ def envoy_cc_test_library(name,
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = envoy_copts(repository) + ["-includetest/precompiled/precompiled_test.h"],
+        copts = envoy_copts(repository),
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            repository + "//source/precompiled:precompiled_includes",
-            repository + "//test/precompiled:precompiled_includes",
+            envoy_external_dep_path('googletest'),
+            repository + "//test/test_common:printers_includes",
         ],
         tags = tags,
         alwayslink = 1,

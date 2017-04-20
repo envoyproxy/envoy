@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 /**
  * Hex encoder/decoder. Produces lowercase hex digits. Can consume either lowercase or uppercase
  * digits.

@@ -1,5 +1,12 @@
 #pragma once
 
+#include <string.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
 
 namespace Http {

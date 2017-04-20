@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "envoy/server/options.h"
 
 #include "common/json/json_loader.h"

@@ -1,3 +1,9 @@
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/filesystem/filesystem_impl.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
@@ -8,7 +14,11 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;

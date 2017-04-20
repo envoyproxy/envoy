@@ -1,9 +1,17 @@
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <string>
+
 #include "server/configuration_impl.h"
 
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;

@@ -1,4 +1,9 @@
+#include <string>
+#include <vector>
+
 #include "common/json/json_loader.h"
+
+#include "gtest/gtest.h"
 
 namespace Json {
 

@@ -1,8 +1,13 @@
 #pragma once
 
+#include <cstdint>
+#include <unordered_map>
+
 #include "envoy/thread_local/thread_local.h"
 
 #include "test/mocks/event/mocks.h"
+
+#include "gmock/gmock.h"
 
 namespace ThreadLocal {
 

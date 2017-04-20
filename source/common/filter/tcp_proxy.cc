@@ -1,5 +1,10 @@
 #include "common/filter/tcp_proxy.h"
 
+#include <spdlog/spdlog.h>
+
+#include <cstdint>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"

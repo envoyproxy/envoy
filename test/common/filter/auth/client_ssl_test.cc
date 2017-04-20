@@ -1,3 +1,7 @@
+#include <chrono>
+#include <memory>
+#include <string>
+
 #include "common/filesystem/filesystem_impl.h"
 #include "common/filter/auth/client_ssl.h"
 #include "common/http/message_impl.h"
@@ -8,7 +12,11 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;

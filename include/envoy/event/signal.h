@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+#include <memory>
+
 namespace Event {
 
 /**

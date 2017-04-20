@@ -1,6 +1,11 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/grpc/rpc_channel.h"
+
+#include "gmock/gmock.h"
 
 namespace Grpc {
 

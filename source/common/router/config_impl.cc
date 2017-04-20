@@ -1,5 +1,15 @@
 #include "common/router/config_impl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <regex>
+#include <string>
+#include <vector>
+
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"

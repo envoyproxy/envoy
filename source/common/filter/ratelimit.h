@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"

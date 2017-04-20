@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <vector>
+
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/watchdog.h"

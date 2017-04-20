@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/json/json_object.h"
 
 namespace Json {

@@ -1,5 +1,11 @@
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/mongo/bson_impl.h"
+
+#include "test/test_common/printers.h"
+
+#include "gtest/gtest.h"
 
 namespace Bson {
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
