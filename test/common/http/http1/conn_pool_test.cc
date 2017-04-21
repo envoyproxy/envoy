@@ -8,6 +8,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -540,7 +541,7 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-TEST_F(Http1ConnPoolImplTest, RemoteClosePendingResponses) {
+TEST_F(Http1ConnPoolImplTest, RemoteClose) {
   InSequence s;
 
   NiceMock<Http::MockStreamDecoder> outer_decoder;
@@ -558,9 +559,12 @@ TEST_F(Http1ConnPoolImplTest, RemoteClosePendingResponses) {
   EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
   conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::Connected);
 
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, false);
+  Buffer::OwnedImpl dummy_data("12345");
+  callbacks.outer_encoder_->encodeData(dummy_data, false);
 
-  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, dispatch(_))
+  Buffer::OwnedImpl empty_data;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, dispatch(BufferEqual(&empty_data)))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
         // Simulate the onResponseComplete call to decodeData since dispatch is mocked out.
         inner_decoder->decodeData(data, true);
