@@ -167,10 +167,10 @@ descriptor_value
 
 headers_present
   *(optional, boolean)* Specifies when the action should append a descriptor based on the
-  :ref:`headers<config_http_conn_man_route_table_route_headers>` matching or not. If set to true,
-  the action will append a descriptor entry when the request does match the headers.
-  If set to false, the action will append a descriptor entry when the request does not match the
-  headers. The default value is true.
+  :ref:`headers<config_http_conn_man_route_table_route_headers>` matching. If set to true,
+  the action will append a descriptor entry when the request matches the headers. If set to false,
+  the action will append a descriptor entry when the request does not match the headers. The default
+  value is true.
 
 :ref:`headers<config_http_conn_man_route_table_route_headers>`
   *(required, array)* Specifies a set of headers that the rate limit action should match on. The
@@ -178,9 +178,7 @@ headers_present
   will happen if all the headers in the config are present in the request with the same values (or
   based on presence if the ``value`` field is not in the config).
 
-The following descriptor entry is appended to the descriptor if the headers match and
-headers_present is true or the headers do not match and headers_present is false:
-
+The following descriptor entry is appended to the descriptor:
 .. code-block:: cpp
 
   ("header_match", "<descriptor_value>")
