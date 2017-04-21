@@ -157,7 +157,7 @@ Header Value Match
   {
     "type": "header_value_match",
     "descriptor_value" : "...",
-    "header_present" : "...",
+    "headers_present" : "...",
     "headers" : []
   }
 
@@ -165,19 +165,21 @@ Header Value Match
 descriptor_value
   *(required, string)* The value to use in the descriptor entry.
 
-header_present
-  *(optional, boolean)* Specifies if the action should be checking for the headers being present. If
-  set to true, the action will append a descriptor entry if the headers match. If set to
-  false, the action will append a descriptor entry if the headers do not match. 
+headers_present
+  *(optional, boolean)* Specifies when the action should append a descriptor based on the
+  :ref:`headers<config_http_conn_man_route_table_route_headers>` matching or not. If set to true,
+  the action will append a descriptor entry when the request does match the headers.
+  If set to false, the action will append a descriptor entry when the request does not match the
+  headers. The default value is true.
 
 :ref:`headers<config_http_conn_man_route_table_route_headers>`
   *(required, array)* Specifies a set of headers that the rate limit action should match on. The
-    action will check the request's headers against all the specified headers in the config. A match
-    will happen if all the headers in the config are present in the request with the same values (or
-    based on presence if the ``value`` field is not in the config).
+  action will check the request's headers against all the specified headers in the config. A match
+  will happen if all the headers in the config are present in the request with the same values (or
+  based on presence if the ``value`` field is not in the config).
 
-The following descriptor entry is appended to the descriptor if the request matches the headers
-specified in the action config:
+The following descriptor entry is appended to the descriptor if the headers match and
+headers_present is true or the headers do not match and headers_present is false:
 
 .. code-block:: cpp
 

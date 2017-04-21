@@ -97,7 +97,7 @@ public:
 
 private:
   const std::string descriptor_value_;
-  const bool header_present_;
+  const bool headers_present_;
   std::vector<Router::ConfigUtility::HeaderData> action_headers_;
 };
 

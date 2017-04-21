@@ -63,7 +63,7 @@ bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
 
 HeaderValueMatchAction::HeaderValueMatchAction(const Json::Object& action)
     : descriptor_value_(action.getString("descriptor_value")),
-      header_present_(action.getBoolean("header_present", true)) {
+      headers_present_(action.getBoolean("headers_present", true)) {
   std::vector<Json::ObjectPtr> config_headers = action.getObjectArray("headers");
   for (const Json::ObjectPtr& header_map : config_headers) {
     action_headers_.push_back(*header_map);
@@ -74,15 +74,12 @@ bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
                                                 ::RateLimit::Descriptor& descriptor,
                                                 const std::string&, const Http::HeaderMap& headers,
                                                 const std::string&) const {
-  bool headers_match = ConfigUtility::matchHeaders(headers, action_headers_);
-
-  if (headers_match && he)
-    if (ConfigUtility::matchHeaders(headers, action_headers_)) {
-      descriptor.entries_.push_back({"header_match", descriptor_value_});
-      return true;
-    } else {
-      return false;
-    }
+  if (headers_present_ == ConfigUtility::matchHeaders(headers, action_headers_)) {
+    descriptor.entries_.push_back({"header_match", descriptor_value_});
+    return true;
+  } else {
+    return false;
+  }
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
