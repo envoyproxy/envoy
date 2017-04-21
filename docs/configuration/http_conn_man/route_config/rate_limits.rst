@@ -166,11 +166,10 @@ descriptor_value
   *(required, string)* The value to use in the descriptor entry.
 
 expect_match
-  *(optional, boolean)* Specifies if the action should append a descriptor when it expects a match
-  to the :ref:`headers<config_http_conn_man_route_table_route_headers>`. If set to true,
-  the action will append a descriptor entry when the request matches the headers. If set to false,
-  the action will append a descriptor entry when the request does not match the headers. The default
-  value is true.
+  *(optional, boolean)* If set to true, the action will append a descriptor entry when the request
+  matches the :ref:`headers<config_http_conn_man_route_table_route_headers>`. If set to false,
+  the action will append a descriptor entry when the request does not match the
+  :ref:`headers<config_http_conn_man_route_table_route_headers>`. The default value is true.
 
 :ref:`headers<config_http_conn_man_route_table_route_headers>`
   *(required, array)* Specifies a set of headers that the rate limit action should match on. The

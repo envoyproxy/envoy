@@ -546,7 +546,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchNoMatch) {
   )EOF";
 
   SetUpTest(json);
-  Http::TestHeaderMapImpl header{{"x-header-name", "fake_value"}};
+  Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
   EXPECT_TRUE(descriptors_.empty());
@@ -573,7 +573,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchHeadersNotPresent) {
   )EOF";
 
   SetUpTest(json);
-  Http::TestHeaderMapImpl header{{"x-header-name", "fake_value"}};
+  Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
   EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
