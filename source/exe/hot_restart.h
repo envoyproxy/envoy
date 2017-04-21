@@ -106,6 +106,7 @@ class HotRestartImpl : public HotRestart,
                        Logger::Loggable<Logger::Id::main> {
 public:
   HotRestartImpl(Options& options);
+  ~HotRestartImpl();
 
   Thread::BasicLockable& logLock() { return log_lock_; }
   Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
@@ -198,6 +199,7 @@ private:
   std::array<uint8_t, 4096> rpc_buffer_;
   Server::Instance* server_{};
   bool parent_terminated_{};
+  bool clear_initialized_on_exit_{true};
 };
 
 } // Server
