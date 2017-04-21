@@ -721,6 +721,7 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
             "enum" : ["header_value_match"]
           },
           "descriptor_value" : {"type" : "string"},
+          "expect_match" : {"type" : "boolean"},
           "headers" : {
             "type" : "array",
             "minItems" : 1,

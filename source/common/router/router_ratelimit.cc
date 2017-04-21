@@ -63,7 +63,7 @@ bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
 
 HeaderValueMatchAction::HeaderValueMatchAction(const Json::Object& action)
     : descriptor_value_(action.getString("descriptor_value")),
-      headers_present_(action.getBoolean("headers_present", true)) {
+      expect_match_(action.getBoolean("expect_match", true)) {
   std::vector<Json::ObjectPtr> config_headers = action.getObjectArray("headers");
   for (const Json::ObjectPtr& header_map : config_headers) {
     action_headers_.push_back(*header_map);
@@ -74,7 +74,7 @@ bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
                                                 ::RateLimit::Descriptor& descriptor,
                                                 const std::string&, const Http::HeaderMap& headers,
                                                 const std::string&) const {
-  if (headers_present_ == ConfigUtility::matchHeaders(headers, action_headers_)) {
+  if (expect_match_ == ConfigUtility::matchHeaders(headers, action_headers_)) {
     descriptor.entries_.push_back({"header_match", descriptor_value_});
     return true;
   } else {

@@ -165,9 +165,9 @@ Header Value Match
 descriptor_value
   *(required, string)* The value to use in the descriptor entry.
 
-headers_present
-  *(optional, boolean)* Specifies when the action should append a descriptor based on the
-  :ref:`headers<config_http_conn_man_route_table_route_headers>` matching. If set to true,
+expect_match
+  *(optional, boolean)* Specifies if the action should append a descriptor when it expects a match
+  to the :ref:`headers<config_http_conn_man_route_table_route_headers>`. If set to true,
   the action will append a descriptor entry when the request matches the headers. If set to false,
   the action will append a descriptor entry when the request does not match the headers. The default
   value is true.

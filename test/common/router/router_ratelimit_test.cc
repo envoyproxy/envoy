@@ -559,7 +559,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchHeadersNotPresent) {
       {
         "type": "header_value_match",
         "descriptor_value": "fake_value",
-        "headers_present": false,
+        "expect_match": false,
         "headers": [
           {
             "name": "x-header-name",
@@ -587,7 +587,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchHeadersPresent) {
       {
         "type": "header_value_match",
         "descriptor_value": "fake_value",
-        "headers_present": false,
+        "expect_match": false,
         "headers": [
           {
             "name": "x-header-name",
