@@ -142,7 +142,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   // serial number with
   // every build. For cert_chain output, we check only for the certificate path.
   std::string ca_cert_partial_output(
-      "Certificate Path: test/common/ssl/test_data/ca_cert.pem, Serial Number: B776A798802A1DCD, "
+      "Certificate Path: test/common/ssl/test_data/ca_cert.pem, Serial Number: b776a798802a1dcd, "
       "Days until Expiration: ");
   std::string cert_chain_partial_output(
       TestEnvironment::substitute("Certificate Path: {{ test_tmpdir }}/unittestcert.pem"));
