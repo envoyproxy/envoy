@@ -541,7 +541,7 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-TEST_F(Http1ConnPoolImplTest, RemoteClose) {
+TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   InSequence s;
 
   NiceMock<Http::MockStreamDecoder> outer_decoder;
@@ -559,9 +559,11 @@ TEST_F(Http1ConnPoolImplTest, RemoteClose) {
   EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
   conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::Connected);
 
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, false);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+
+  inner_decoder->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, false);
   Buffer::OwnedImpl dummy_data("12345");
-  callbacks.outer_encoder_->encodeData(dummy_data, false);
+  inner_decoder->decodeData(dummy_data, false);
 
   Buffer::OwnedImpl empty_data;
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, dispatch(BufferEqual(&empty_data)))
