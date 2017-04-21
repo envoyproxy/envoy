@@ -157,7 +157,7 @@ Header Value Match
   {
     "type": "header_value_match",
     "descriptor_value" : "...",
-    "headers_present" : "...",
+    "expect_match" : "...",
     "headers" : []
   }
 
