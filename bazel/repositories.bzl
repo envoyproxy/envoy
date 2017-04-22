@@ -33,6 +33,31 @@ def _repository_impl(ctxt):
     if result.return_code != 0:
         fail("External dep build failed")
 
+def py_jinja2_dep():
+    BUILD = """
+py_library(
+    name = "jinja2",
+    srcs = glob(["jinja2/**/*.py"]),
+    visibility = ["//visibility:public"],
+)
+"""
+    native.new_git_repository(
+        name = "jinja2_git",
+        remote = "https://github.com/pallets/jinja.git",
+        tag = "2.9.6",
+        build_file_content = BUILD,
+    )
+
+# Python dependencies. If these become non-trivial, we might be better off using a virtualenv to
+# wrap them, but for now we can treat them as first-class Bazel.
+def python_deps(skip_targets):
+    if 'jinja2' not in skip_targets:
+        py_jinja2_dep()
+        native.bind(
+            name = "jinja2",
+            actual = "@jinja2_git//:jinja2",
+        )
+
 def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_targets = []):
     # Used only for protobuf.bzl.
     if not skip_protobuf_bzl:
@@ -82,3 +107,5 @@ def envoy_dependencies(path = "@envoy_deps//", skip_protobuf_bzl = False, skip_t
                 name = t,
                 actual = path + ":" + t,
             )
+
+    python_deps(skip_targets)
