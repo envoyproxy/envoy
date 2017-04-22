@@ -168,7 +168,7 @@ def envoy_cc_test(name,
     native.cc_test(
         name = name,
         copts = envoy_copts(repository),
-        linkopts = ["-pthread"],
+        linkopts = ["-pthread", "-latomic"],
         linkstatic = 1,
         malloc = tcmalloc_external_dep(repository),
         deps = [
