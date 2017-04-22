@@ -67,9 +67,7 @@ private:
   struct TlsLightStepTracer : ThreadLocal::ThreadLocalObject {
     TlsLightStepTracer(lightstep::Tracer tracer, LightStepDriver& driver);
 
-    void shutdown() override {
-      tracer_.reset();
-    }
+    void shutdown() override { tracer_.reset(); }
 
     std::unique_ptr<lightstep::Tracer> tracer_;
     LightStepDriver& driver_;
