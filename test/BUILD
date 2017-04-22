@@ -4,7 +4,10 @@ load("//bazel:envoy_build_system.bzl", "envoy_cc_test_library")
 
 envoy_cc_test_library(
     name = "main",
-    srcs = ["main.cc"],
+    srcs = [
+        "main.cc",
+        "test_runner.h",
+    ],
     external_deps = [
         "protobuf",
     ],

@@ -41,6 +41,24 @@
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
 
+# Hermetic tests
+
+Tests should be hermetic, i.e. have all dependencies explicitly captured and not depend on the local
+environment. In general, there should be no non-local network access. In addition:
+
+* Port numbers should not be hardcoded. Tests should bind to port zero and then discover the bound
+  port when needed. This avoids flakes due to conflicting ports and allows tests to be executed
+  concurrently by Bazel. See
+  [`test/integration/integration_test.h`](test/integration/integration_test.h) and
+  [`test/common/network/listener_impl_test.cc`](test/common/network/listener_impl_test.cc)
+  for examples of tests that do this.
+
+* Paths should be constructed using:
+  * The methods in [`TestEnvironment`](test/test_common/environment.h) for C++ tests.
+  * With `${TEST_TMPDIR}` (for writable temporary space) or `${TEST_RUNDIR}` for read-only access to
+    test inputs in shell tests.
+  * With `{{ test_tmpdir }}`, `{{ test_srcdir }}` and `{{ test_udsdir }}` for JSON templates.
+
 # Google style guides for other languages
 
 * [Python](https://google.github.io/styleguide/pyguide.html)

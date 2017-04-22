@@ -253,7 +253,7 @@
       "driver": {
         "type": "lightstep",
         "config": {
-          "access_token_file": "test/config/integration/lightstep_access_token",
+          "access_token_file": "{{ test_srcdir }}/test/config/integration/lightstep_access_token",
           "collector_cluster": "lightstep_saas"
         }
       }
@@ -261,7 +261,7 @@
   },
 
   "runtime": {
-    "symlink_root": "test/common/runtime/test_data/current",
+    "symlink_root": "{{ test_srcdir }}/test/common/runtime/test_data/current",
     "subdirectory": "envoy",
     "override_subdirectory": "envoy_override"
   },

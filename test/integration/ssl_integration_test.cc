@@ -58,12 +58,12 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   std::string json = R"EOF(
 {
-  "cert_chain_file": "test/config/integration/certs/upstreamcert.pem",
-  "private_key_file": "test/config/integration/certs/upstreamkey.pem"
+  "cert_chain_file": "{{ test_srcdir }}/test/config/integration/certs/upstreamcert.pem",
+  "private_key_file": "{{ test_srcdir }}/test/config/integration/certs/upstreamkey.pem"
 }
 )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
   ContextConfigImpl cfg(*loader);
   return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
 }
@@ -71,35 +71,35 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
 ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn, bool san) {
   std::string json_plain = R"EOF(
 {
-  "ca_cert_file": "test/config/integration/certs/cacert.pem",
-  "cert_chain_file": "test/config/integration/certs/clientcert.pem",
-  "private_key_file": "test/config/integration/certs/clientkey.pem"
+  "ca_cert_file": "{{ test_srcdir }}/test/config/integration/certs/cacert.pem",
+  "cert_chain_file": "{{ test_srcdir }}/test/config/integration/certs/clientcert.pem",
+  "private_key_file": "{{ test_srcdir }}/test/config/integration/certs/clientkey.pem"
 }
 )EOF";
 
   std::string json_alpn = R"EOF(
 {
-  "ca_cert_file": "test/config/integration/certs/cacert.pem",
-  "cert_chain_file": "test/config/integration/certs/clientcert.pem",
-  "private_key_file": "test/config/integration/certs/clientkey.pem",
+  "ca_cert_file": "{{ test_srcdir }}/test/config/integration/certs/cacert.pem",
+  "cert_chain_file": "{{ test_srcdir }}/test/config/integration/certs/clientcert.pem",
+  "private_key_file": "{{ test_srcdir }}/test/config/integration/certs/clientkey.pem",
   "alpn_protocols": "h2,http/1.1"
 }
 )EOF";
 
   std::string json_san = R"EOF(
 {
-  "ca_cert_file": "test/config/integration/certs/cacert.pem",
-  "cert_chain_file": "test/config/integration/certs/clientcert.pem",
-  "private_key_file": "test/config/integration/certs/clientkey.pem",
+  "ca_cert_file": "{{ test_srcdir }}/test/config/integration/certs/cacert.pem",
+  "cert_chain_file": "{{ test_srcdir }}/test/config/integration/certs/clientcert.pem",
+  "private_key_file": "{{ test_srcdir }}/test/config/integration/certs/clientkey.pem",
   "verify_subject_alt_name": [ "istio:account_a.namespace_foo.cluster.local" ]
 }
 )EOF";
 
   std::string json_alpn_san = R"EOF(
 {
-  "ca_cert_file": "test/config/integration/certs/cacert.pem",
-  "cert_chain_file": "test/config/integration/certs/clientcert.pem",
-  "private_key_file": "test/config/integration/certs/clientkey.pem",
+  "ca_cert_file": "{{ test_srcdir }}/test/config/integration/certs/cacert.pem",
+  "cert_chain_file": "{{ test_srcdir }}/test/config/integration/certs/clientcert.pem",
+  "private_key_file": "{{ test_srcdir }}/test/config/integration/certs/clientkey.pem",
   "alpn_protocols": "h2,http/1.1",
   "verify_subject_alt_name": [ "istio:account_a.namespace_foo.cluster.local" ]
 }
@@ -111,7 +111,7 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn, bool san)
   } else {
     target = san ? json_san : json_plain;
   }
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(target);
+  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(target);
   ContextConfigImpl cfg(*loader);
   return context_manager_->createSslClientContext(test_server_->store(), cfg);
 }

@@ -1,6 +1,9 @@
 package(default_visibility = ["//visibility:public"])
 
-exports_files(["gen_sh_test_runner.sh"])
+exports_files([
+    "gen_sh_test_runner.sh",
+    "sh_test_wrapper.sh",
+])
 
 config_setting(
     name = "opt_build",
