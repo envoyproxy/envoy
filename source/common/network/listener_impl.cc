@@ -1,6 +1,5 @@
 #include "common/network/listener_impl.h"
 
-#include <spdlog/spdlog.h>
 #include <sys/un.h>
 
 #include "envoy/common/exception.h"
@@ -15,6 +14,7 @@
 #include "common/ssl/connection_impl.h"
 
 #include "event2/listener.h"
+#include "spdlog/spdlog.h"
 
 namespace Network {
 

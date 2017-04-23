@@ -1,7 +1,5 @@
 #include "common/router/rds_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -10,6 +8,8 @@
 #include "common/common/assert.h"
 #include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Router {
 

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <list>
@@ -20,6 +18,8 @@
 #include "server/test_hooks.h"
 
 #include "test/test_common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 

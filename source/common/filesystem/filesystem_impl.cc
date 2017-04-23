@@ -2,7 +2,6 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#include <spdlog/spdlog.h>
 #include <unistd.h>
 
 #include <chrono>
@@ -20,6 +19,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/thread.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Filesystem {
 bool fileExists(const std::string& path) {

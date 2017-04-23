@@ -1,7 +1,5 @@
 #include "common/filter/tcp_proxy.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 
@@ -16,6 +14,8 @@
 #include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Filter {
 

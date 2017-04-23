@@ -1,7 +1,5 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
-
 #include <atomic>
 #include <cstdint>
 #include <list>
@@ -19,6 +17,8 @@
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
 #include "common/network/listen_socket_impl.h"
+
+#include "spdlog/spdlog.h"
 
 // clang-format off
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, TIMER)                                                  \

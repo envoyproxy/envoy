@@ -1,7 +1,5 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -10,6 +8,8 @@
 #include "envoy/thread/thread.h"
 
 #include "common/common/macros.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Logger {
 

@@ -1,7 +1,5 @@
 #include "common/tracing/http_tracer_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <string>
 
 #include "common/common/assert.h"
@@ -13,6 +11,8 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/runtime/uuid_util.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Tracing {
 

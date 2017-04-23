@@ -1,7 +1,5 @@
 #include "common/upstream/outlier_detection_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -13,6 +11,8 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Upstream {
 namespace Outlier {

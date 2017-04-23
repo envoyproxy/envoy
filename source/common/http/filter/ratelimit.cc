@@ -1,7 +1,5 @@
 #include "common/http/filter/ratelimit.h"
 
-#include <spdlog/spdlog.h>
-
 #include <string>
 #include <vector>
 
@@ -12,6 +10,8 @@
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
 #include "common/router/config_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 namespace RateLimit {
