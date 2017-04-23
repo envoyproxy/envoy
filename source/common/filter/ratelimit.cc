@@ -1,12 +1,12 @@
 #include "common/filter/ratelimit.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 
 #include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
+
+#include "spdlog/spdlog.h"
 
 namespace RateLimit {
 namespace TcpFilter {

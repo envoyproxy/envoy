@@ -1,7 +1,5 @@
 #include "common/tracing/lightstep_tracer_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -11,6 +9,8 @@
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"
 #include "common/tracing/http_tracer_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Tracing {
 
@@ -84,7 +84,7 @@ void LightStepRecorder::flushSpans() {
 
 LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(lightstep::Tracer tracer,
                                                         LightStepDriver& driver)
-    : tracer_(tracer), driver_(driver) {}
+    : tracer_(new lightstep::Tracer(tracer)), driver_(driver) {}
 
 LightStepDriver::LightStepDriver(const Json::Object& config,
                                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
@@ -118,7 +118,7 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
 
 SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
                                    const std::string& operation_name, SystemTime start_time) {
-  lightstep::Tracer& tracer = tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_;
+  lightstep::Tracer& tracer = *tls_.getTyped<TlsLightStepTracer>(tls_slot_).tracer_;
   LightStepSpanPtr active_span;
 
   if (request_headers.OtSpanContext()) {

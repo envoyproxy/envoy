@@ -1,7 +1,5 @@
 #include "common/http/http2/codec_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -18,6 +16,8 @@
 #include "common/http/exception.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 namespace Http2 {
@@ -166,7 +166,7 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ == -1);
-  stream_id_ = nghttp2_submit_request(parent_.session_, nullptr, &final_headers[0],
+  stream_id_ = nghttp2_submit_request(parent_.session_, nullptr, &final_headers.data()[0],
                                       final_headers.size(), provider, base());
   ASSERT(stream_id_ > 0);
 }
@@ -174,7 +174,7 @@ void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_n
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ != -1);
-  int rc = nghttp2_submit_response(parent_.session_, stream_id_, &final_headers[0],
+  int rc = nghttp2_submit_response(parent_.session_, stream_id_, &final_headers.data()[0],
                                    final_headers.size(), provider);
   ASSERT(rc == 0);
   UNREFERENCED_PARAMETER(rc);

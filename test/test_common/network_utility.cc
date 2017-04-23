@@ -1,7 +1,6 @@
 #include "test/test_common/network_utility.h"
 
 #include <netinet/ip.h>
-#include <spdlog/spdlog.h>
 #include <sys/socket.h>
 
 #include <cstdint>
@@ -13,6 +12,8 @@
 #include "common/runtime/runtime_impl.h"
 
 #include "test/test_common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Network {
 namespace Test {

@@ -1,7 +1,5 @@
 #include "common/http/codes.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 
@@ -12,6 +10,8 @@
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 

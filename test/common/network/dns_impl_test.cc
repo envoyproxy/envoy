@@ -216,6 +216,12 @@ public:
     ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
   }
 
+  void TearDown() override {
+    // Make sure we clean this up before dispatcher destruction.
+    listener_.reset();
+    server_.reset();
+  }
+
 protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
   virtual bool zero_timeout() const { return false; }

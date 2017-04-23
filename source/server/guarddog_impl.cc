@@ -1,13 +1,13 @@
 #include "server/guarddog_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <mutex>
 
 #include "common/common/assert.h"
 
 #include "server/watchdog_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 

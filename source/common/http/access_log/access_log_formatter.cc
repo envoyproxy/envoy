@@ -1,13 +1,13 @@
 #include "common/http/access_log/access_log_formatter.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 namespace AccessLog {

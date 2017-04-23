@@ -1,7 +1,6 @@
 #include "common/runtime/runtime_impl.h"
 
 #include <fcntl.h>
-#include <spdlog/spdlog.h>
 #include <unistd.h>
 
 #include <cstdint>
@@ -13,6 +12,8 @@
 
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Runtime {
 

@@ -1,7 +1,5 @@
 #include "common/dynamo/dynamo_filter.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -14,6 +12,8 @@
 #include "common/http/exception.h"
 #include "common/http/utility.h"
 #include "common/json/json_loader.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Dynamo {
 

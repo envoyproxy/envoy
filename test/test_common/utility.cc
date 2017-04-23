@@ -1,7 +1,6 @@
 #include "utility.h"
 
 #include <dirent.h>
-#include <spdlog/spdlog.h>
 #include <unistd.h>
 
 #include <cstdint>
@@ -19,6 +18,7 @@
 #include "test/test_common/printers.h"
 
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {

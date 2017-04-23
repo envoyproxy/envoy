@@ -1,7 +1,6 @@
 #include "server/server.h"
 
 #include <signal.h>
-#include <spdlog/spdlog.h>
 
 #include <cstdint>
 #include <functional>
@@ -28,6 +27,8 @@
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 
@@ -186,7 +187,6 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
-  drain_manager_->startParentShutdownSequence();
   original_start_time_ = info.original_start_time_;
   admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
                              initial_config.admin().profilePath(), initial_config.admin().address(),
@@ -296,6 +296,7 @@ void InstanceImpl::startWorkers(TestHooks& hooks) {
   // At this point we are ready to take traffic and all listening ports are up. Notify our parent
   // if applicable that they can stop listening and drain.
   restarter_.drainParentListeners();
+  drain_manager_->startParentShutdownSequence();
   hooks.onServerInitialized();
 }
 

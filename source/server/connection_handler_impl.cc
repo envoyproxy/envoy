@@ -1,13 +1,13 @@
 #include "server/connection_handler_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/listener_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 

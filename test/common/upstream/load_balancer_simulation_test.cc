@@ -1,5 +1,3 @@
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -14,6 +12,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 using testing::NiceMock;
 using testing::Return;

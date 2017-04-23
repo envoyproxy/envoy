@@ -1,7 +1,6 @@
 #pragma once
 
 #include <dirent.h>
-#include <spdlog/spdlog.h>
 
 #include <chrono>
 #include <cstdint>
@@ -18,6 +17,8 @@
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Runtime {
 

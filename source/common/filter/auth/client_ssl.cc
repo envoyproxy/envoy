@@ -1,7 +1,5 @@
 #include "common/filter/auth/client_ssl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -15,6 +13,8 @@
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/network/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Filter {
 namespace Auth {

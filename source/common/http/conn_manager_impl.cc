@@ -1,7 +1,5 @@
 #include "common/http/conn_manager_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <functional>
 #include <list>
@@ -29,6 +27,8 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 

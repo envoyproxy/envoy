@@ -1,13 +1,13 @@
 #include "common/redis/codec_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Redis {
 

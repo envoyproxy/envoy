@@ -1,7 +1,5 @@
 #include "common/http/utility.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -17,6 +15,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 
