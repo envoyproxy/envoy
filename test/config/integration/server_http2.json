@@ -202,14 +202,14 @@
         "type": "lightstep",
         "config": {
           "collector_cluster": "lightstep_saas",
-          "access_token_file": "{{ test_srcdir }}/test/config/integration/lightstep_access_token"
+          "access_token_file": "{{ test_rundir }}/test/config/integration/lightstep_access_token"
         }
       }
     }
   },
 
   "runtime": {
-    "symlink_root": "{{ test_srcdir }}/test/common/runtime/test_data/current",
+    "symlink_root": "{{ test_rundir }}/test/common/runtime/test_data/current",
     "subdirectory": "envoy",
     "override_subdirectory": "envoy_override"
   },

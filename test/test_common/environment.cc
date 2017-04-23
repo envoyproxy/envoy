@@ -74,7 +74,7 @@ std::string TestEnvironment::substitute(const std::string str) {
   const std::unordered_map<std::string, std::string> path_map = {
       {"test_tmpdir", TestEnvironment::temporaryDirectory()},
       {"test_udsdir", TestEnvironment::unixDomainSocketDirectory()},
-      {"test_srcdir", TestEnvironment::runfilesDirectory()},
+      {"test_rundir", TestEnvironment::runfilesDirectory()},
   };
   std::string out_json_string = str;
   for (auto it : path_map) {

@@ -162,8 +162,8 @@ TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
         "address": "tcp://127.0.0.1:1234",
         "filters" : [],
         "ssl_context" : {
-          "cert_chain_file" : "{{ test_srcdir }}/test/common/ssl/test_data/san_uri_cert.pem",
-          "private_key_file" : "{{ test_srcdir }}/test/common/ssl/test_data/san_uri_key.pem",
+          "cert_chain_file" : "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
+          "private_key_file" : "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem",
           "verify_subject_alt_name" : [
             "localhost",
             "127.0.0.1"

@@ -57,7 +57,7 @@ environment. In general, there should be no non-local network access. In additio
   * The methods in [`TestEnvironment`](test/test_common/environment.h) for C++ tests.
   * With `${TEST_TMPDIR}` (for writable temporary space) or `${TEST_RUNDIR}` for read-only access to
     test inputs in shell tests.
-  * With `{{ test_tmpdir }}`, `{{ test_srcdir }}` and `{{ test_udsdir }}` for JSON templates.
+  * With `{{ test_tmpdir }}`, `{{ test_rundir }}` and `{{ test_udsdir }}` for JSON templates.
 
 # Google style guides for other languages
 
