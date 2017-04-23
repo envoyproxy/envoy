@@ -1,7 +1,6 @@
 #include "server/server.h"
 
 #include <signal.h>
-#include <spdlog/spdlog.h>
 
 #include <cstdint>
 #include <functional>
@@ -28,6 +27,8 @@
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 

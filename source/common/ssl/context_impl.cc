@@ -1,7 +1,5 @@
 #include "common/ssl/context_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -14,6 +12,7 @@
 #include "common/common/hex.h"
 
 #include "openssl/x509v3.h"
+#include "spdlog/spdlog.h"
 
 namespace Ssl {
 

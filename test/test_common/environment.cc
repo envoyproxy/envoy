@@ -1,6 +1,5 @@
 #include "test/test_common/environment.h"
 
-#include <spdlog/spdlog.h>
 #include <sys/un.h>
 
 #include <fstream>
@@ -14,6 +13,8 @@
 #include "common/common/assert.h"
 
 #include "server/options_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace {
 

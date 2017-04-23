@@ -1,7 +1,6 @@
 #include "exe/hot_restart.h"
 
 #include <signal.h>
-#include <spdlog/spdlog.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
@@ -17,6 +16,8 @@
 #include "envoy/server/options.h"
 
 #include "common/common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 

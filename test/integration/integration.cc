@@ -1,7 +1,5 @@
 #include "test/integration/integration.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -27,6 +25,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 IntegrationTestServerPtr BaseIntegrationTest::test_server_;
 std::vector<std::unique_ptr<FakeUpstream>> BaseIntegrationTest::fake_upstreams_;

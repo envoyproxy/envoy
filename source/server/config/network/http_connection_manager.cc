@@ -1,7 +1,5 @@
 #include "server/config/network/http_connection_manager.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <memory>
 #include <string>
@@ -19,6 +17,8 @@
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/router/rds_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 namespace Configuration {

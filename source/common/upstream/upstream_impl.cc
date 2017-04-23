@@ -1,7 +1,5 @@
 #include "common/upstream/upstream_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <list>
@@ -28,6 +26,8 @@
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/sds.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Upstream {
 

@@ -1,4 +1,3 @@
-#include <spdlog/spdlog.h>
 #include <sys/un.h>
 
 #include <iostream>
@@ -10,6 +9,7 @@
 #include "common/network/cidr_range.h"
 
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 // We are adding things into the std namespace.
 // Note that this is technically undefined behavior!

@@ -1,5 +1,3 @@
-#include <spdlog/spdlog.h>
-
 #include <iostream>
 #include <memory>
 
@@ -16,6 +14,7 @@
 #include "server/test_hooks.h"
 
 #include "ares.h"
+#include "spdlog/spdlog.h"
 
 namespace Server {
 

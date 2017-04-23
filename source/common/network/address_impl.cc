@@ -2,7 +2,6 @@
 
 #include <arpa/inet.h>
 #include <netinet/ip.h>
-#include <spdlog/spdlog.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
@@ -14,6 +13,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Network {
 namespace Address {

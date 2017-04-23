@@ -1,5 +1,3 @@
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 
@@ -12,6 +10,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 using testing::_;
 using testing::Invoke;

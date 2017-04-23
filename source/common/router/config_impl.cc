@@ -1,7 +1,5 @@
 #include "common/router/config_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <map>
@@ -23,6 +21,8 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/router/retry_state_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Router {
 

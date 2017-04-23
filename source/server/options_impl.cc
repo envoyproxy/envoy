@@ -1,7 +1,5 @@
 #include "server/options_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <iostream>
@@ -10,6 +8,7 @@
 #include "common/common/macros.h"
 #include "common/common/version.h"
 
+#include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
 OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_version,
