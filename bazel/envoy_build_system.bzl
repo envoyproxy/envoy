@@ -207,6 +207,16 @@ def envoy_cc_test_library(name,
         linkstatic = 1,
     )
 
+# Envoy Python test binaries should be specified with this function.
+def envoy_py_test_binary(name,
+                         external_deps = [],
+                         **kargs):
+    # TODO(htuch): Add support for external_deps, e.g. jinja2 for config_test.
+    native.py_binary(
+        name = name,
+        **kargs
+    )
+
 # Envoy C++ mock targets should be specified with this function.
 def envoy_cc_mock(name, **kargs):
     envoy_cc_test_library(name = name, **kargs)
