@@ -39,6 +39,7 @@ py_library(
     name = "jinja2",
     srcs = glob(["jinja2/**/*.py"]),
     visibility = ["//visibility:public"],
+    deps = ["@markupsafe_git//:markupsafe"],
 )
 """
     native.new_git_repository(
@@ -48,9 +49,30 @@ py_library(
         build_file_content = BUILD,
     )
 
+def py_markupsafe_dep():
+    BUILD = """
+py_library(
+    name = "markupsafe",
+    srcs = glob(["markupsafe/**/*.py"]),
+    visibility = ["//visibility:public"],
+)
+"""
+    native.new_git_repository(
+        name = "markupsafe_git",
+        remote = "https://github.com/pallets/markupsafe.git",
+        tag = "1.0",
+        build_file_content = BUILD,
+    )
+
 # Python dependencies. If these become non-trivial, we might be better off using a virtualenv to
 # wrap them, but for now we can treat them as first-class Bazel.
 def python_deps(skip_targets):
+    if 'markupsafe' not in skip_targets:
+        py_markupsafe_dep()
+        native.bind(
+            name = "markupsafe",
+            actual = "@markupsafe_git//:markupsafe",
+        )
     if 'jinja2' not in skip_targets:
         py_jinja2_dep()
         native.bind(
