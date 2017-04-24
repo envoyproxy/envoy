@@ -1,4 +1,9 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_package",
+)
+
+envoy_package()
 
 genrule(
     name = "envoy_version",
