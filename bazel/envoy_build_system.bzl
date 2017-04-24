@@ -1,5 +1,8 @@
 load("@protobuf_bzl//:protobuf.bzl", "cc_proto_library")
 
+def envoy_package():
+    native.package(default_visibility = ["//visibility:public"])
+
 # Compute the final copts based on various options.
 def envoy_copts(repository):
     return [
