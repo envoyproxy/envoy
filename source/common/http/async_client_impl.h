@@ -216,6 +216,7 @@ public:
   virtual void cancel() override;
 
 private:
+  void initialize();
   void onComplete();
 
   // AsyncClient::StreamCallbacks

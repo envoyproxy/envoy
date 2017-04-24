@@ -39,6 +39,7 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
                                             const Optional<std::chrono::milliseconds>& timeout) {
   AsyncRequestImpl* async_request =
       new AsyncRequestImpl(std::move(request), *this, callbacks, timeout);
+  async_request->initialize();
   std::unique_ptr<AsyncStreamImpl> new_request{async_request};
 
   // The request may get immediately failed. If so, we will return nullptr.
@@ -157,8 +158,9 @@ void AsyncStreamImpl::resetStream() {
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
                                    const Optional<std::chrono::milliseconds>& timeout)
-    : AsyncStreamImpl(parent, *this, timeout), request_(std::move(request)), callbacks_(callbacks) {
+    : AsyncStreamImpl(parent, *this, timeout), request_(std::move(request)), callbacks_(callbacks) {}
 
+void AsyncRequestImpl::initialize() {
   sendHeaders(request_->headers(), !request_->body());
   if (!remoteClosed() && request_->body()) {
     sendData(*request_->body(), true);
