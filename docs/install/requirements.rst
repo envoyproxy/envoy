@@ -21,6 +21,7 @@ Envoy has the following requirements:
 * `lightstep-tracer-cpp <https://github.com/lightstep/lightstep-tracer-cpp/>`_ (last tested with 0.36)
 * `rapidjson <https://github.com/miloyip/rapidjson/>`_ (last tested with 1.1.0)
 * `c-ares <https://github.com/c-ares/c-ares>`_ (last tested with 1.12.0)
+* `backward <https://github.com/bombela/backward-cpp>`_ (last tested with 1.3)
 
 In order to compile and run the tests the following is required:
 

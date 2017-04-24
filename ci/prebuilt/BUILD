@@ -8,6 +8,12 @@ cc_library(
 )
 
 cc_library(
+    name = "backward",
+    hdrs = ["thirdparty_build/include/backward.hpp"],
+    includes = ["thirdparty_build/include"],
+)
+
+cc_library(
     name = "crypto",
     srcs = ["thirdparty_build/lib/libcrypto.a"],
     hdrs = glob(["thirdparty_build/include/openssl/**/*.h"]),
