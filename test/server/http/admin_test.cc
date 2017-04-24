@@ -5,6 +5,7 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -21,6 +22,7 @@ public:
   // TODO(mattklein123): Switch to mocks and do not bind to a real port.
   AdminFilterTest()
       : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
+               TestEnvironment::temporaryPath("admin.address"),
                Network::Utility::resolveUrl("tcp://127.0.0.1:9002"), server_),
         filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
@@ -53,12 +55,26 @@ TEST_F(AdminFilterTest, Trailers) {
   filter_.decodeTrailers(request_headers_);
 }
 
+class AdminInstanceTest : public testing::Test {
+public:
+  AdminInstanceTest()
+      : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
+        cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
+        admin_("/dev/null", cpu_profile_path_, address_out_path_,
+               Network::Test::getSomeLoopbackAddress(Network::Address::IpVersion::v4), server_) {}
+
+  std::string address_out_path_;
+  std::string cpu_profile_path_;
+  NiceMock<MockInstance> server_;
+  AdminImpl admin_;
+};
+
 // Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
 // a real profiler linked in (successful call to startProfiler). startProfiler
 // requies tcmalloc.
 #ifdef TCMALLOC
 
-TEST_F(AdminFilterTest, AdminProfiler) {
+TEST_F(AdminInstanceTest, AdminProfiler) {
   Buffer::OwnedImpl data;
   admin_.runCallback("/cpuprofiler?enable=y", data);
   EXPECT_TRUE(Profiler::Cpu::profilerEnabled());
@@ -68,13 +84,28 @@ TEST_F(AdminFilterTest, AdminProfiler) {
 
 #endif
 
-TEST_F(AdminFilterTest, AdminBadProfiler) {
+TEST_F(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
-  AdminImpl admin_bad_profile_path("/dev/null",
-                                   TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
-                                   Network::Utility::resolveUrl("tcp://127.0.0.1:9002"), server_);
+  AdminImpl admin_bad_profile_path(
+      "/dev/null", TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"), "",
+      Network::Test::getSomeLoopbackAddress(Network::Address::IpVersion::v4), server_);
   admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", data);
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
+TEST_F(AdminInstanceTest, WriteAddressToFile) {
+  std::ifstream address_file(address_out_path_);
+  std::string address_from_file;
+  std::getline(address_file, address_from_file);
+  EXPECT_STREQ(admin_.socket().localAddress()->asString().c_str(), address_from_file.c_str());
+}
+
+TEST_F(AdminInstanceTest, AdminBadAddressOutPath) {
+  std::string bad_path =
+      TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
+  AdminImpl admin_bad_address_out_path(
+      "/dev/null", cpu_profile_path_, bad_path,
+      Network::Test::getSomeLoopbackAddress(Network::Address::IpVersion::v4), server_);
+  EXPECT_FALSE(std::ifstream(bad_path));
+}
 } // namespace Server

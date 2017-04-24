@@ -9,6 +9,7 @@ namespace Json {
 
 class Factory {
 public:
+  // TODO(hennna): Cleanup function names - i.e. s/LoadFromFile/loadFromFile/.
   /*
    * Constructs a Json Object from a File.
    */

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <fstream>
 #include <list>
 #include <string>
 
@@ -29,7 +30,8 @@ class AdminImpl : public Admin,
                   Logger::Loggable<Logger::Id::admin> {
 public:
   AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
-            Network::Address::InstanceConstSharedPtr address, Server::Instance& server);
+            const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
+            Server::Instance& server);
 
   Http::Code runCallback(const std::string& path, Buffer::Instance& response);
   const Network::ListenSocket& socket() override { return *socket_; }

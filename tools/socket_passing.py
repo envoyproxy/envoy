@@ -12,64 +12,63 @@
 from collections import OrderedDict
 
 import argparse
+import httplib
 import json
 import os.path
-import httplib
 import sys
 import time
 
-def CheckNoChange(original_listeners, updated_listeners):
-  for updated, original in zip(updated_listeners, original_listeners):
-      if original['address'] != "tcp://" + updated:
-        return False
-  return True
+ADMIN_FILE_TIMEOUT_SECS = 20
 
-def ReplaceListenerAddresses(original_json, admin_address, no_port_change):
+def ReplaceListenerAddresses(original_json, admin_address, updated_json):
   # Get original listener addresses
   with open(original_json, 'r') as original_json_file:
+    # Import original config file in order to get a deterministic output. This
+    # allows us to diff the original config file and the updated config file
+    # output from this script to check for any changes.
     parsed_json = json.load(original_json_file, object_pairs_hook=OrderedDict)
   original_listeners = parsed_json['listeners']
 
-  admin_conn = httplib.HTTPConnection(admin_address)
-  admin_conn.request("GET", "/listeners")
-  admin_response = admin_conn.getresponse()
-
-  if not admin_response.status == 200:
-    admin_conn.close()
+  sys.stdout.write('Admin address is ' + admin_address + '\n')
+  try:
+    admin_conn = httplib.HTTPConnection(admin_address)
+    admin_conn.request('GET', '/listeners')
+    admin_response = admin_conn.getresponse()
+    if not admin_response.status == 200:
+      return False
+    discovered_listeners = json.loads(admin_response.read())
+  except:
+    sys.stderr.write('Cannot connect to admin.\n')
     return False
-
-  updated_listeners = json.loads(admin_response.read())
-  admin_conn.close()
-
-  if no_port_change:
-    return CheckNoChange(original_listeners, updated_listeners)
   else:
-    for updated, original in zip(updated_listeners, original_listeners):
-      original['address'] = "tcp://" + updated
-    with open(original_json, 'w') as outfile:
+    if not len(discovered) == len(original):
+      return False
+    for discovered, original in zip(discovered_listeners, original_listeners):
+      original['address'] = 'tcp://' + discovered
+    with open(updated_json, 'w') as outfile:
       json.dump(OrderedDict(parsed_json), outfile, indent=2)
+  finally:
+    admin_conn.close()
 
   return True
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Replace listener addressses in json file.')
   parser.add_argument('-o', '--original_json', type=str, required=True,
-                      help='Original json file')
+                      help='Path of the original config json file')
   parser.add_argument('-a', '--admin_address_path', type=str, required=True,
-                      help='Admin address path')
-  parser.add_argument('-n', '--no_port_change', action='store_true', default=False,
-                      help='Check that listener port addresses have not changed.');
+                      help='Path of the admin address file')
+  parser.add_argument('-u', '--updated_json', type=str, required=True,
+                      help='Path to output updated json config file')
   args = parser.parse_args()
-  original_json = args.original_json
   admin_address_path = args.admin_address_path
-  no_port_change = args.no_port_change
 
   # Read admin address from file
   counter = 0;
   while not os.path.exists(admin_address_path):
     time.sleep(1)
     counter += 1
-    if counter > 20:
+    if counter > ADMIN_FILE_TIMEOUT_SECS:
       break
 
   if not os.path.exists(admin_address_path):
@@ -78,6 +77,7 @@ if __name__ == '__main__':
   with open(admin_address_path, 'r') as admin_address_file:
     admin_address = admin_address_file.read()
 
-  result = ReplaceListenerAddresses(original_json, admin_address, no_port_change)
+  result = ReplaceListenerAddresses(args.original_json, admin_address, args.updated_json)
+
   if not result:
     sys.exit(1)

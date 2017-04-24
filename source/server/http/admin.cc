@@ -287,12 +287,12 @@ Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Buffer::Instance& 
 
 Http::Code AdminImpl::handlerListenerAddresses(const std::string&, Buffer::Instance& response) {
   std::list<std::string> listeners;
-
-  for (int i = 0; i < server_.numListeners(); ++i) {
-    listeners.push_back(server_.getListenSocketByIndex(i)->localAddress()->asString());
+  int listener_index = 0;
+  while (server_.getListenSocketByIndex(listener_index) != nullptr) {
+    listeners.push_back(server_.getListenSocketByIndex(listener_index)->localAddress()->asString());
+    ++listener_index;
   }
-  response.add(fmt::format("{}", Json::Factory::listAsJsonString(listeners)));
-
+  response.add(Json::Factory::listAsJsonString(listeners));
   return Http::Code::OK;
 }
 
@@ -334,6 +334,7 @@ AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
     : config_(new Router::NullConfigImpl()) {}
 
 AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
+                     const std::string& address_out_path,
                      Network::Address::InstanceConstSharedPtr address, Server::Instance& server)
     : server_(server), profile_path_(profile_path),
       socket_(new Network::TcpListenSocket(address, true)),
@@ -357,6 +358,15 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_HANDLER(handlerServerInfo)},
           {"/stats", "print server stats", MAKE_HANDLER(handlerStats)},
           {"/listeners", "print listener addresses", MAKE_HANDLER(handlerListenerAddresses)}} {
+
+  if (address_out_path.length() > 0) {
+    std::ofstream address_out_file(address_out_path);
+    if (!address_out_file) {
+      log().critical("cannot open admin address output file {} for writing.", address_out_path);
+    } else {
+      address_out_file << socket_->localAddress()->asString();
+    }
+  }
 
   access_logs_.emplace_back(new Http::AccessLog::InstanceImpl(
       access_log_path, {}, Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),

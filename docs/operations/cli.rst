@@ -12,7 +12,7 @@ following are the command line options that Envoy supports.
 
 .. option:: -a <path string>, --admin-address-path <path string>
 
-  *(optional)* The output file path where the admin address will be written.
+  *(optional)* The output file path where the admin address and port will be written.
 
 .. option:: --base-id <integer>
 

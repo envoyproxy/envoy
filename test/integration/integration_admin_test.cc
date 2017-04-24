@@ -2,6 +2,8 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/json/json_loader.h"
+
 #include "test/integration/integration_test.h"
 #include "test/integration/utility.h"
 
@@ -126,8 +128,17 @@ TEST_F(IntegrationTest, Admin) {
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/listeners", "",
                                                 Http::CodecClient::Type::HTTP1);
+  std::list<std::string> listener_addresses;
+  int listener_index = 0;
+  while (test_server_->server().getListenSocketByIndex(listener_index) != nullptr) {
+    listener_addresses.push_back(
+        test_server_->server().getListenSocketByIndex(listener_index)->localAddress()->asString());
+    ++listener_index;
+  }
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ(Json::Factory::listAsJsonString(listener_addresses).c_str(),
+               response->body().c_str());
 }
 
 // Successful call to startProfiler requires tcmalloc.

@@ -227,4 +227,20 @@ TEST(JsonLoaderTest, AsString) {
   });
 }
 
+TEST(JsonLoaderTest, ListAsString) {
+  std::list<std::string> list1 = {};
+  EXPECT_STREQ("[]", Json::Factory::listAsJsonString(list1).c_str());
+
+  std::list<std::string> list2 = {"one"};
+  EXPECT_STREQ("[\"one\"]", Json::Factory::listAsJsonString(list2).c_str());
+
+  std::list<std::string> list3 = {"one", "two", "three", "four"};
+  EXPECT_STREQ("[\"one\",\"two\",\"three\",\"four\"]",
+               Json::Factory::listAsJsonString(list3).c_str());
+
+  std::list<std::string> list4 = {"127.0.0.1:46465", "127.0.0.1:52211", "127.0.0.1:58941"};
+  EXPECT_STREQ("[\"127.0.0.1:46465\",\"127.0.0.1:52211\",\"127.0.0.1:58941\"]",
+               Json::Factory::listAsJsonString(list4).c_str());
+}
+
 } // Json

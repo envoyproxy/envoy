@@ -14,8 +14,8 @@ cat test/config/integration/server.json |
 
 # Now start the real server, hot restart it twice, and shut it all down as a basic hot restart
 # sanity test.
-ADMIN_ADDRESS_PATH_0="${TEST_TMPDIR}"/admin_address_file_0.pid
 echo "Starting epoch 0"
+ADMIN_ADDRESS_PATH_0="${TEST_TMPDIR}"/admin_0.address
 "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
     --restart-epoch 0 --base-id 1 --service-cluster cluster --service-node node \
     -a "${ADMIN_ADDRESS_PATH_0}" &
@@ -23,8 +23,10 @@ echo "Starting epoch 0"
 FIRST_SERVER_PID=$!
 sleep 3
 
-echo "Replacing listener addresses"
-"tools/socket_passing.py" "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}"
+echo "Updating original config json listener addresses"
+UPDATED_HOT_RESTART_JSON="${TEST_TMPDIR}"/hot_restart_updated.json
+tools/socket_passing.py "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
+  "-u" "${UPDATED_HOT_RESTART_JSON}"
 
 # Send SIGUSR1 signal to the first server, this should not kill it. Also send SIGHUP which should
 # get eaten.
@@ -33,9 +35,9 @@ kill -SIGUSR1 ${FIRST_SERVER_PID}
 kill -SIGHUP ${FIRST_SERVER_PID}
 sleep 3
 
-ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin_address_file_1.pid
 echo "Starting epoch 1"
-"${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
+ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin_1.address
+"${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
     --restart-epoch 1 --base-id 1 --service-cluster cluster --service-node node \
     -a "${ADMIN_ADDRESS_PATH_1}" &
 
@@ -44,11 +46,15 @@ SECOND_SERVER_PID=$!
 sleep 7
 
 echo "Checking that listener addresses have not changed"
-"tools/socket_passing.py" "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" "-n"
+HOT_RESTART_JSON_1="${TEST_TMPDIR}"/hot_restart_1.json
+tools/socket_passing.py "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
+  "-u" "${HOT_RESTART_JSON_1}"
+CONFIG_DIFF=$(diff -Z "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
+[[ "${CONFIG_DIFF}" == "" ]]
 
-ADMIN_ADDRESS_PATH_2="${TEST_TMPDIR}"/admin_address_file_2.pid
+ADMIN_ADDRESS_PATH_2="${TEST_TMPDIR}"/admin_2.address
 echo "Starting epoch 2"
-"${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
+"${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
     --restart-epoch 2 --base-id 1 --service-cluster cluster --service-node node \
     -a "${ADMIN_ADDRESS_PATH_2}" &
 
@@ -56,7 +62,11 @@ THIRD_SERVER_PID=$!
 sleep 3
 
 echo "Checking that listener addresses have not changed"
-"tools/socket_passing.py" "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" "-n"
+HOT_RESTART_JSON_2="${TEST_TMPDIR}"/hot_restart_2.json
+tools/socket_passing.py "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
+  "-u" "${HOT_RESTART_JSON_2}"
+CONFIG_DIFF=$(diff -Z "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_2}")
+[[ "${CONFIG_DIFF}" == "" ]]
 
 # First server should already be gone.
 echo "Waiting for epoch 0"
