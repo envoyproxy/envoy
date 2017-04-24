@@ -182,7 +182,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   if (!client.stream_wrapper_->encode_complete_) {
     conn_log_debug("response before request complete", *client.codec_client_);
     onDownstreamReset(client);
-  } else if (client.stream_wrapper_->saw_close_header_) {
+  } else if (client.stream_wrapper_->saw_close_header_ || client.codec_client_->remoteClosed()) {
     conn_log_debug("saw upstream connection: close", *client.codec_client_);
     onDownstreamReset(client);
   } else if (client.remaining_requests_ > 0 && --client.remaining_requests_ == 0) {

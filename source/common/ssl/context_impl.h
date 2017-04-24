@@ -9,9 +9,15 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/c_smart_ptr.h"
 #include "common/ssl/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
-#include "common/ssl/openssl.h"
+
+#include "openssl/ssl.h"
+
+#ifndef OPENSSL_IS_BORINGSSL
+#error Envoy requires BoringSSL
+#endif
 
 namespace Ssl {
 
@@ -32,6 +38,7 @@ struct SslStats {
 };
 
 typedef CSmartPtr<SSL, SSL_free> SslConPtr;
+typedef CSmartPtr<X509, X509_free> X509Ptr;
 
 class ContextImpl : public virtual Context {
 public:

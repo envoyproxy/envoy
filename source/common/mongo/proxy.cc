@@ -1,7 +1,5 @@
 #include "common/mongo/proxy.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -13,6 +11,8 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/mongo/codec_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Mongo {
 

@@ -21,39 +21,15 @@ fi
 : ${TEST_SRCDIR:=$TEST_BASE/runfiles}
 export TEST_TMPDIR TEST_SRCDIR
 export TEST_WORKSPACE=""
+export TEST_RUNDIR="${TEST_SRCDIR}"
 export TEST_UDSDIR="$TEST_TMPDIR"
 
 echo "TEST_TMPDIR=$TEST_TMPDIR"
 echo "TEST_SRCDIR=$TEST_SRCDIR"
 
 mkdir -p $TEST_TMPDIR
-
-# This places the unittest SSL certificates into $TEST_TMPDIR where the unit
-# tests in test/common/ssl expect to consume them
-$SOURCE_DIR/test/common/ssl/gen_unittest_certs.sh
-
-# Some hacks for the config file template substitution. These go away in the Bazel build.
-CONFIG_IN_DIR="$SOURCE_DIR"/test/config/integration
-CONFIG_RUNFILES_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/config/integration
-CONFIG_OUT_DIR="$TEST_TMPDIR"/test/config/integration
-mkdir -p "$CONFIG_RUNFILES_DIR"
-mkdir -p "$CONFIG_OUT_DIR"
-cp "$CONFIG_IN_DIR"/*.json "$CONFIG_RUNFILES_DIR"
-for f in $(cd "$SOURCE_DIR"; find test/config/integration -name "*.json")
-do
-  "$SOURCE_DIR"/test/test_common/environment_sub.sh "$f"
-done
-
-# Some hacks for the runtime test filesystem. These go away in the Bazel build.
-TEST_RUNTIME_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/common/runtime
-mkdir -p "$TEST_RUNTIME_DIR/test_data"
-cp -r "$SOURCE_DIR"/test/common/runtime/test_data/* "$TEST_RUNTIME_DIR"/test_data
-cp "$SOURCE_DIR"/test/common/runtime/filesystem_setup.sh "$TEST_RUNTIME_DIR"
-
-# Some hacks for the SSL cert generation. These go away in the Bazel build.
-TEST_SSL_DIR="$TEST_SRCDIR/$TEST_WORKSPACE"/test/common/ssl
-mkdir -p "$TEST_SSL_DIR"
-cp "$SOURCE_DIR"/test/common/ssl/gen_unittest_certs.sh "$TEST_SSL_DIR"
+mkdir -p $TEST_RUNDIR
+ln -sf "${SOURCE_DIR}/test" "${TEST_RUNDIR}"
 
 if [ -n "$EXTRA_SETUP_SCRIPT" ]; then
   $EXTRA_SETUP_SCRIPT

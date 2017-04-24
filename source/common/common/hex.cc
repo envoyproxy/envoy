@@ -1,7 +1,5 @@
 #include "common/common/hex.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -9,6 +7,8 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 std::string Hex::encode(const uint8_t* data, size_t length) {
   static const char* const digits = "0123456789abcdef";

@@ -1,7 +1,6 @@
 #include "common/grpc/common.h"
 
 #include <arpa/inet.h>
-#include <spdlog/spdlog.h>
 
 #include <cstdint>
 #include <string>
@@ -17,6 +16,7 @@
 
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
+#include "spdlog/spdlog.h"
 
 namespace Grpc {
 

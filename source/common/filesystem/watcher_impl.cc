@@ -1,6 +1,5 @@
 #include "common/filesystem/watcher_impl.h"
 
-#include <spdlog/spdlog.h>
 #include <sys/inotify.h>
 
 #include <cstdint>
@@ -12,6 +11,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Filesystem {
 

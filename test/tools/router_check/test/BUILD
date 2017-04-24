@@ -1,6 +1,8 @@
 package(default_visibility = ["//visibility:public"])
 
-sh_test(
+load("//bazel:envoy_build_system.bzl", "envoy_sh_test")
+
+envoy_sh_test(
     name = "router_tool_test",
     srcs = ["route_tests.sh"],
     data = [

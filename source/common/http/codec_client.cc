@@ -50,6 +50,10 @@ void CodecClient::onEvent(uint32_t events) {
     connected_ = true;
   }
 
+  if (events & Network::ConnectionEvent::RemoteClose) {
+    remote_closed_ = true;
+  }
+
   // HTTP/1 can signal end of response by disconnecting. We need to handle that case.
   if (type_ == Type::HTTP1 && (events & Network::ConnectionEvent::RemoteClose) &&
       !active_requests_.empty()) {

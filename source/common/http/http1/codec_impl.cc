@@ -1,7 +1,5 @@
 #include "common/http/http1/codec_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 
@@ -14,6 +12,8 @@
 #include "common/http/exception.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 namespace Http1 {

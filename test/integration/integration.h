@@ -1,7 +1,5 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <functional>
 #include <list>
@@ -17,6 +15,8 @@
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+
+#include "spdlog/spdlog.h"
 
 /**
  * Stream decoder wrapper used during integration testing.

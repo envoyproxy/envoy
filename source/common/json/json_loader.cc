@@ -1,11 +1,11 @@
 #include "common/json/json_loader.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <fstream>
 #include <string>
 #include <vector>
+
+#include "spdlog/spdlog.h"
 
 // Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"

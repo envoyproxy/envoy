@@ -23,7 +23,7 @@ public:
   AdminFilterTest()
       : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
                TestEnvironment::temporaryPath("admin.address"),
-               Network::Utility::resolveUrl("tcp://127.0.0.1:9002"), server_),
+               Network::Utility::resolveUrl("tcp://127.0.0.1:0"), server_),
         filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
@@ -86,6 +86,7 @@ TEST_F(AdminInstanceTest, AdminProfiler) {
 
 TEST_F(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
+<<<<<<< HEAD
   AdminImpl admin_bad_profile_path(
       "/dev/null", TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"), "",
       Network::Test::getSomeLoopbackAddress(Network::Address::IpVersion::v4), server_);

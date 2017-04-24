@@ -168,7 +168,9 @@ def envoy_cc_test(name,
     native.cc_test(
         name = name,
         copts = envoy_copts(repository),
-        linkopts = ["-pthread"],
+        # TODO(mattklein123): It's not great that we universally link against the following libs.
+        # In particular, -latomic is not needed on all platforms. Make this more granular.
+        linkopts = ["-pthread", "-latomic"],
         linkstatic = 1,
         malloc = tcmalloc_external_dep(repository),
         deps = [
@@ -231,8 +233,9 @@ def envoy_sh_test(name,
   )
   native.sh_test(
       name = name,
-      srcs = srcs,
+      srcs = ["//bazel:sh_test_wrapper.sh"],
       data = srcs + data,
+      args = ["$(location " + srcs[0] + ")"],
       **kargs
   )
 

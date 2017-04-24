@@ -1,7 +1,5 @@
 #include "server/configuration_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <list>
 #include <memory>
@@ -21,6 +19,8 @@
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/lightstep_tracer_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 namespace Configuration {

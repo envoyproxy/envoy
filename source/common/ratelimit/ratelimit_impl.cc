@@ -1,7 +1,5 @@
 #include "common/ratelimit/ratelimit_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -13,6 +11,8 @@
 #include "common/common/empty_string.h"
 #include "common/grpc/rpc_channel_impl.h"
 #include "common/http/headers.h"
+
+#include "spdlog/spdlog.h"
 
 namespace RateLimit {
 

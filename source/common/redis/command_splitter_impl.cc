@@ -1,13 +1,13 @@
 #include "common/redis/command_splitter_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "common/common/assert.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Redis {
 namespace CommandSplitter {

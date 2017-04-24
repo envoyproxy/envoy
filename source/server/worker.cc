@@ -72,5 +72,6 @@ void Worker::threadRoutine(Server::GuardDog& guard_dog) {
   handler_->closeConnections();
   tls_.shutdownThread();
   no_exit_timer_.reset();
+  watchdog.reset();
   handler_.reset();
 }

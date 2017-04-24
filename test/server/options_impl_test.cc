@@ -1,5 +1,3 @@
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <memory>
 #include <string>
@@ -10,6 +8,7 @@
 #include "server/options_impl.h"
 
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
 // separated by a single space: no fancy quoting or escaping.

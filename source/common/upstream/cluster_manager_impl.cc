@@ -1,7 +1,5 @@
 #include "common/upstream/cluster_manager_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -23,6 +21,8 @@
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/ring_hash_lb.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Upstream {
 

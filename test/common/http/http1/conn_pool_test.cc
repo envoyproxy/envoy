@@ -8,6 +8,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -537,6 +538,44 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   r1.completeResponse(false);
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
+  InSequence s;
+
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+  EXPECT_NE(nullptr, handle);
+
+  NiceMock<Http::MockStreamEncoder> request_encoder;
+  Http::StreamDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks.pool_ready_, ready());
+
+  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
+  conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::Connected);
+
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+
+  inner_decoder->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, false);
+  Buffer::OwnedImpl dummy_data("12345");
+  inner_decoder->decodeData(dummy_data, false);
+
+  Buffer::OwnedImpl empty_data;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, dispatch(BufferEqual(&empty_data)))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+        // Simulate the onResponseComplete call to decodeData since dispatch is mocked out.
+        inner_decoder->decodeData(data, true);
+      }));
+
+  EXPECT_CALL(*conn_pool_.test_clients_[0].connection_,
+              close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }
 

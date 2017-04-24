@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 namespace Http {
 
 class StreamCallbackHelper {
@@ -44,5 +46,3 @@ private:
 };
 
 } // Http
-
-#include <vector>

@@ -141,7 +141,7 @@ Generic Key
 
 
 descriptor_value
-    *(required, string)* The value to use in the descriptor entry.
+  *(required, string)* The value to use in the descriptor entry.
 
 The following descriptor entry is appended to the descriptor:
 
@@ -157,22 +157,27 @@ Header Value Match
   {
     "type": "header_value_match",
     "descriptor_value" : "...",
+    "expect_match" : "...",
     "headers" : []
   }
 
 
 descriptor_value
-    *(required, string)* The value to use in the descriptor entry.
+  *(required, string)* The value to use in the descriptor entry.
+
+expect_match
+  *(optional, boolean)* If set to true, the action will append a descriptor entry when the request
+  matches the :ref:`headers<config_http_conn_man_route_table_route_headers>`. If set to false,
+  the action will append a descriptor entry when the request does not match the
+  :ref:`headers<config_http_conn_man_route_table_route_headers>`. The default value is true.
 
 :ref:`headers<config_http_conn_man_route_table_route_headers>`
-    *(required, array)* Specifies a set of headers that the rate limit action should match on. The
-    action will check the request's headers against all the specified headers in the config. A match
-    will happen if all the headers in the config are present in the request with the same values (or
-    based on presence if the ``value`` field is not in the config).
+  *(required, array)* Specifies a set of headers that the rate limit action should match on. The
+  action will check the request's headers against all the specified headers in the config. A match
+  will happen if all the headers in the config are present in the request with the same values (or
+  based on presence if the ``value`` field is not in the config).
 
-The following descriptor entry is appended to the descriptor if the request matches the headers
-specified in the action config:
-
+The following descriptor entry is appended to the descriptor:
 .. code-block:: cpp
 
   ("header_match", "<descriptor_value>")

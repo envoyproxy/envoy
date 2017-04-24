@@ -1,7 +1,5 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <list>
@@ -32,6 +30,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 using testing::NiceMock;
 

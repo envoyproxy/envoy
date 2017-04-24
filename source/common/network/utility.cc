@@ -4,7 +4,6 @@
 #include <ifaddrs.h>
 #include <linux/netfilter_ipv4.h>
 #include <netinet/ip.h>
-#include <spdlog/spdlog.h>
 #include <sys/socket.h>
 
 #include <cstdint>
@@ -20,6 +19,8 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Network {
 

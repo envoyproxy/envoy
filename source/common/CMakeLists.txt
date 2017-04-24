@@ -104,7 +104,6 @@ add_library(
   ssl/context_config_impl.cc
   ssl/context_impl.cc
   ssl/context_manager_impl.cc
-  ssl/openssl.cc
   stats/stats_impl.cc
   stats/statsd.cc
   stats/thread_local_store.cc

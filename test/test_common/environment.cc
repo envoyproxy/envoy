@@ -1,6 +1,5 @@
 #include "test/test_common/environment.h"
 
-#include <spdlog/spdlog.h>
 #include <sys/un.h>
 
 #include <fstream>
@@ -14,6 +13,8 @@
 #include "common/common/assert.h"
 
 #include "server/options_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace {
 
@@ -70,20 +71,29 @@ const std::string TestEnvironment::unixDomainSocketDirectory() {
 }
 
 std::string TestEnvironment::substitute(const std::string str) {
-  const std::regex test_cert_regex("\\{\\{ test_tmpdir \\}\\}");
-  return std::regex_replace(str, test_cert_regex, TestEnvironment::temporaryDirectory());
+  const std::unordered_map<std::string, std::string> path_map = {
+      {"test_tmpdir", TestEnvironment::temporaryDirectory()},
+      {"test_udsdir", TestEnvironment::unixDomainSocketDirectory()},
+      {"test_rundir", TestEnvironment::runfilesDirectory()},
+  };
+  std::string out_json_string = str;
+  for (auto it : path_map) {
+    const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
+    out_json_string = std::regex_replace(out_json_string, port_regex, it.second);
+  }
+  return out_json_string;
 }
 
 std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
                                                      const PortMap& port_map) {
   // Load the entire file as a string, regex replace one at a time and write it back out. Proper
   // templating might be better one day, but this works for now.
-  const std::string tmp_json_path = TestEnvironment::runfilesPath(path);
+  const std::string json_path = TestEnvironment::runfilesPath(path);
   std::string out_json_string;
   {
-    std::ifstream file(tmp_json_path);
+    std::ifstream file(json_path);
     if (file.fail()) {
-      std::cerr << "failed to open: " << tmp_json_path << std::endl;
+      std::cerr << "failed to open: " << json_path << std::endl;
       RELEASE_ASSERT(false);
     }
 
@@ -97,16 +107,9 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
     out_json_string = std::regex_replace(out_json_string, port_regex, std::to_string(it.second));
   }
   // Substitute paths.
-  const std::unordered_map<std::string, std::string> path_map = {
-      {"test_tmpdir", TestEnvironment::temporaryDirectory()},
-      {"test_udsdir", TestEnvironment::unixDomainSocketDirectory()},
-      {"test_srcdir", TestEnvironment::runfilesDirectory()},
-  };
-  for (auto it : path_map) {
-    const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
-    out_json_string = std::regex_replace(out_json_string, port_regex, it.second);
-  }
-  const std::string out_json_path = tmp_json_path + ".with.ports.json";
+  out_json_string = substitute(out_json_string);
+  const std::string out_json_path = TestEnvironment::temporaryPath(path + ".with.ports.json");
+  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + out_json_path + ")").c_str()) == 0);
   {
     std::ofstream out_json_file(out_json_path);
     out_json_file << out_json_string;
@@ -120,6 +123,9 @@ Json::ObjectPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
 
 void TestEnvironment::exec(const std::vector<std::string>& args) {
   std::stringstream cmd;
+  // Symlinked args[0] can confuse Python when importing module relative, so we let Python know
+  // where it can find its module relative files.
+  cmd << "PYTHONPATH=$(dirname " << args[0] << ") ";
   for (auto& arg : args) {
     cmd << arg << " ";
   }

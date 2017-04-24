@@ -7,6 +7,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/environment.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -161,8 +162,8 @@ TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
         "address": "tcp://127.0.0.1:1234",
         "filters" : [],
         "ssl_context" : {
-          "cert_chain_file" : "test/common/ssl/test_data/san_uri_cert.pem",
-          "private_key_file" : "test/common/ssl/test_data/san_uri_key.pem",
+          "cert_chain_file" : "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
+          "private_key_file" : "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem",
           "verify_subject_alt_name" : [
             "localhost",
             "127.0.0.1"
@@ -176,7 +177,7 @@ TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);

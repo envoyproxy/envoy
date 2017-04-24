@@ -1,5 +1,3 @@
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 
@@ -12,6 +10,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 namespace Http {
 

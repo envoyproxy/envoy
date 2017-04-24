@@ -1,7 +1,5 @@
 #include "common/mongo/codec_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -14,6 +12,8 @@
 #include "common/common/assert.h"
 #include "common/common/base64.h"
 #include "common/mongo/bson_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Mongo {
 

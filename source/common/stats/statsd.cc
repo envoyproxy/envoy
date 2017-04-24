@@ -1,7 +1,5 @@
 #include "common/stats/statsd.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -14,6 +12,8 @@
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Stats {
 namespace Statsd {

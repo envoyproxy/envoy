@@ -1,7 +1,5 @@
 #include "server/http/admin.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <string>
 #include <unordered_set>
@@ -30,6 +28,8 @@
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 

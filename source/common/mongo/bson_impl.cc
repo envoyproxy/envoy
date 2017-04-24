@@ -1,13 +1,13 @@
 #include "common/mongo/bson_impl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cstdint>
 #include <sstream>
 #include <string>
 
 #include "common/common/assert.h"
 #include "common/common/hex.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Bson {
 
