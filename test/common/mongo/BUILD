@@ -16,6 +16,7 @@ envoy_cc_test(
     srcs = ["codec_impl_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/mongo:bson_lib",
         "//source/common/mongo:codec_lib",
     ],

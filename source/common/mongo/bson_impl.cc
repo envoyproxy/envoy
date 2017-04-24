@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/hex.h"
+#include "common/common/utility.h"
 
 namespace Bson {
 
@@ -303,7 +304,7 @@ std::string FieldImpl::toString() const {
 
   case Type::STRING:
   case Type::BINARY: {
-    return fmt::format("'{}'", value_.string_value_);
+    return fmt::format("\"{}\"", StringUtil::escape(value_.string_value_));
   }
 
   case Type::DOCUMENT:
@@ -312,11 +313,12 @@ std::string FieldImpl::toString() const {
   }
 
   case Type::OBJECT_ID: {
-    return Hex::encode(&value_.object_id_value_[0], value_.object_id_value_.size());
+    return fmt::format("\"{}\"",
+                       Hex::encode(&value_.object_id_value_[0], value_.object_id_value_.size()));
   }
 
   case Type::BOOLEAN: {
-    return std::to_string(value_.bool_value_);
+    return value_.bool_value_ ? "true" : "false";
   }
 
   case Type::NULL_VALUE: {
@@ -324,7 +326,8 @@ std::string FieldImpl::toString() const {
   }
 
   case Type::REGEX: {
-    return fmt::format("['{}', '{}']", value_.regex_value_.pattern_, value_.regex_value_.options_);
+    return fmt::format("[\"{}\", \"{}\"]", value_.regex_value_.pattern_,
+                       value_.regex_value_.options_);
   }
 
   case Type::INT32: {
@@ -509,7 +512,7 @@ std::string DocumentImpl::toString() const {
       out << ", ";
     }
 
-    out << fmt::format("'{}': {}", field->key(), field->toString());
+    out << fmt::format("\"{}\": {}", field->key(), field->toString());
     first = false;
   }
 

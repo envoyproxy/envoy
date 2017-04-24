@@ -134,6 +134,14 @@ public:
   static std::string subspan(const std::string& source, size_t start, size_t end);
 
   /**
+   * Escape strings for logging purposes. Returns a copy of the string with
+   * \n, \r, \t, and " (double quote) escaped
+   * @param source supplies the string to escape
+   * @return escaped string
+   */
+  static std::string escape(const std::string& source);
+
+  /**
    * @return true if @param source ends with @param end.
    */
   static bool endsWith(const std::string& source, const std::string& end);

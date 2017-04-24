@@ -17,7 +17,7 @@ AccessLog::AccessLog(const std::string& file_name, ::AccessLog::AccessLogManager
 void AccessLog::logMessage(const Message& message, bool full,
                            const Upstream::HostDescription* upstream_host) {
   static const std::string log_format =
-      "{{\"time\": \"{}\", \"message\": \"{}\", \"upstream_host\": \"{}\"}}\n";
+      "{{\"time\": \"{}\", \"message\": {}, \"upstream_host\": \"{}\"}}\n";
 
   SystemTime now = std::chrono::system_clock::now();
   std::string log_line =
