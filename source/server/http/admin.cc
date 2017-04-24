@@ -285,12 +285,11 @@ Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Buffer::Instance& 
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerAddresses(const std::string&, Buffer::Instance& response) {
+Http::Code AdminImpl::handlerListenerInfo(const std::string&, Buffer::Instance& response) {
   std::list<std::string> listeners;
   int listener_index = 0;
-  while (server_.getListenSocketByIndex(listener_index) != nullptr) {
-    listeners.push_back(server_.getListenSocketByIndex(listener_index)->localAddress()->asString());
-    ++listener_index;
+  while (auto listen_socket = server_.getListenSocketByIndex(listener_index++)) {
+    listeners.push_back(listen_socket->localAddress()->asString());
   }
   response.add(Json::Factory::listAsJsonString(listeners));
   return Http::Code::OK;
@@ -357,7 +356,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/server_info", "print server version/status information",
            MAKE_HANDLER(handlerServerInfo)},
           {"/stats", "print server stats", MAKE_HANDLER(handlerStats)},
-          {"/listeners", "print listener addresses", MAKE_HANDLER(handlerListenerAddresses)}} {
+          {"/listeners", "print listener addresses", MAKE_HANDLER(handlerListenerInfo)}} {
 
   if (address_out_path.length() > 0) {
     std::ofstream address_out_file(address_out_path);

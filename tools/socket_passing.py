@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 
 # This tool is a helper script that queries the admin address for all listener
-# addresses after envoy startup. The script can then be used to update an
-# exisiting json config file with updated listener addresses. This script is
-# currently called in the hot restart integration test to update listener
-# addresses bound to port 0 in the intial json config file. With the
-# -n or -no_port_change option, this script does not update an exisiting json
-# config file but checks that the listener addresses after envoy startup
-# match the listener addresses in the initial json config file.
+# addresses after envoy startup. (The admin adress is written out to a file by
+# setting the -a flag in the envoy binary.) The script then outputs a new json
+# config file with updated listener addresses. This script is currently called
+# in the hot restart integration test to update listener addresses bound to
+# port 0 in the intial json config file.
 
 from collections import OrderedDict
 
@@ -18,6 +16,8 @@ import os.path
 import sys
 import time
 
+# Seconds to wait for the admin address output file to appear. The script exits
+# if the file is not found.
 ADMIN_FILE_TIMEOUT_SECS = 20
 
 def ReplaceListenerAddresses(original_json, admin_address, updated_json):
@@ -37,8 +37,8 @@ def ReplaceListenerAddresses(original_json, admin_address, updated_json):
     if not admin_response.status == 200:
       return False
     discovered_listeners = json.loads(admin_response.read())
-  except:
-    sys.stderr.write('Cannot connect to admin.\n')
+  except Exception as e:
+    sys.stderr.write('Cannot connect to admin: %s\n' % e)
     return False
   else:
     if not len(discovered_listeners) == len(original_listeners):

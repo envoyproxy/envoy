@@ -127,17 +127,16 @@ TEST_F(IntegrationTest, Admin) {
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/listeners", "",
                                                 Http::CodecClient::Type::HTTP1);
-  std::list<std::string> listener_addresses;
-  int listener_index = 0;
-  while (test_server_->server().getListenSocketByIndex(listener_index) != nullptr) {
-    listener_addresses.push_back(
-        test_server_->server().getListenSocketByIndex(listener_index)->localAddress()->asString());
-    ++listener_index;
-  }
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_STREQ(Json::Factory::listAsJsonString(listener_addresses).c_str(),
-               response->body().c_str());
+
+  std::vector<Json::ObjectPtr> listener_info =
+      Json::Factory::LoadFromString(response->body())->asObjectArray();
+  for (std::size_t index = 0; index < listener_info.size(); index++) {
+    EXPECT_STREQ(
+        test_server_->server().getListenSocketByIndex(index)->localAddress()->asString().c_str(),
+        listener_info[index]->asString().c_str());
+  }
 }
 
 // Successful call to startProfiler requires tcmalloc.
