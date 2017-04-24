@@ -7,5 +7,5 @@ envoy_py_test_binary(
     srcs = [
         "generate_test_data.py",
         "util.py",
-    ],
+    ] + glob(["test_*.py"]),
 )
