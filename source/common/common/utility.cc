@@ -122,8 +122,7 @@ std::string StringUtil::escape(const std::string& source) {
 
   // Prevent unnecessary allocation by allocating 2x original size.
   ret.reserve(source.length() * 2);
-  for (size_t i = 0; i < source.length(); i++) {
-    auto c = source[i];
+  for (const auto& c : source) {
     switch (c) {
     case '\r':
       ret += "\\r";
