@@ -120,7 +120,7 @@ std::string StringUtil::subspan(const std::string& source, size_t start, size_t 
 std::string StringUtil::escape(const std::string& source) {
   std::string ret;
 
-  // prevent unnecessary allocation
+  // Prevent unnecessary allocation by allocating 2x original size.
   ret.reserve(source.length() * 2);
   for (size_t i = 0; i < source.length(); i++) {
     auto c = source[i];
