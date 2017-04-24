@@ -2,11 +2,8 @@
 
 set -e
 
-# We need to use /tmp for building the venv, since the sandboxed env does not allow execution in
-# the build output directory.
 CONFIGGEN="$1"
 shift
-BUILD_DIR=/tmp/configgen
 OUT_DIR="$1"
 shift
 
