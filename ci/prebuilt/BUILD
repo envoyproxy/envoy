@@ -9,7 +9,7 @@ cc_library(
 
 cc_library(
     name = "backward",
-    hdrs = glob(["thirdparty_build/include/*.hpp"]),
+    hdrs = ["thirdparty_build/include/backward.hpp"],
     includes = ["thirdparty_build/include"],
 )
 
