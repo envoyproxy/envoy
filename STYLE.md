@@ -35,6 +35,11 @@
   * `typedef std::shared_ptr<Bar> BarSharedPtr;`
   * `typedef std::shared_ptr<const Blah> BlahConstSharedPtr;`
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
+* The Google C++ style guide points out that [non-PoD static and global variables are forbidden](https://google.github.io/styleguide/cppguide.html#Static_and_Global_Variables).
+  This _includes_ types such as `std::string`. We encourage the use of the
+  advice in the [C++ FAQ on the static initialization
+  fiasco](https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use) for
+  how to best handle this.
 * API-level comments should follow normal Doxygen conventions. Use `@param` to describe
   parameters, `@return <return-type>` for return values.
 * Header guards should use `#pragma once`.
