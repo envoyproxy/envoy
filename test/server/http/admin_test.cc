@@ -86,7 +86,6 @@ TEST_F(AdminInstanceTest, AdminProfiler) {
 
 TEST_F(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
-<<<<<<< HEAD
   AdminImpl admin_bad_profile_path(
       "/dev/null", TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"), "",
       Network::Test::getSomeLoopbackAddress(Network::Address::IpVersion::v4), server_);
@@ -102,8 +101,7 @@ TEST_F(AdminInstanceTest, WriteAddressToFile) {
 }
 
 TEST_F(AdminInstanceTest, AdminBadAddressOutPath) {
-  std::string bad_path =
-      TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
+  std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path(
       "/dev/null", cpu_profile_path_, bad_path,
       Network::Test::getSomeLoopbackAddress(Network::Address::IpVersion::v4), server_);

@@ -41,7 +41,7 @@ def ReplaceListenerAddresses(original_json, admin_address, updated_json):
     sys.stderr.write('Cannot connect to admin.\n')
     return False
   else:
-    if not len(discovered) == len(original):
+    if not len(discovered_listeners) == len(original_listeners):
       return False
     for discovered, original in zip(discovered_listeners, original_listeners):
       original['address'] = 'tcp://' + discovered
