@@ -21,7 +21,7 @@ public:
   // TODO(mattklein123): Switch to mocks and do not bind to a real port.
   AdminFilterTest()
       : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
-               Network::Utility::resolveUrl("tcp://127.0.0.1:9002"), server_),
+               Network::Utility::resolveUrl("tcp://127.0.0.1:0"), server_),
         filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
@@ -72,7 +72,7 @@ TEST_F(AdminFilterTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
   AdminImpl admin_bad_profile_path("/dev/null",
                                    TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
-                                   Network::Utility::resolveUrl("tcp://127.0.0.1:9002"), server_);
+                                   Network::Utility::resolveUrl("tcp://127.0.0.1:0"), server_);
   admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", data);
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }

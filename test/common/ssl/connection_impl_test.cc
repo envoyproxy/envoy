@@ -85,8 +85,8 @@ class SslConnectionImplTest : public SslCertsTest {};
 TEST_F(SslConnectionImplTest, GetCertDigest) {
   std::string client_ctx_json = R"EOF(
   {
-    "cert_chain_file": "test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "test/common/ssl/test_data/no_san_key.pem"
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
   }
   )EOF";
 
@@ -94,7 +94,7 @@ TEST_F(SslConnectionImplTest, GetCertDigest) {
   {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "test/common/ssl/test_data/ca_cert.pem"
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
   }
   )EOF";
 
@@ -105,8 +105,8 @@ TEST_F(SslConnectionImplTest, GetCertDigest) {
 TEST_F(SslConnectionImplTest, GetUriWithUriSan) {
   std::string client_ctx_json = R"EOF(
   {
-    "cert_chain_file": "test/common/ssl/test_data/san_uri_cert.pem",
-    "private_key_file": "test/common/ssl/test_data/san_uri_key.pem"
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
   }
   )EOF";
 
@@ -114,7 +114,7 @@ TEST_F(SslConnectionImplTest, GetUriWithUriSan) {
   {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "test/common/ssl/test_data/ca_cert.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
     "verify_subject_alt_name": [ "istio:account1.foo.cluster.local" ]
   }
   )EOF";
@@ -125,8 +125,8 @@ TEST_F(SslConnectionImplTest, GetUriWithUriSan) {
 TEST_F(SslConnectionImplTest, GetNoUriWithDnsSan) {
   std::string client_ctx_json = R"EOF(
   {
-    "cert_chain_file": "test/common/ssl/test_data/san_dns_cert.pem",
-    "private_key_file": "test/common/ssl/test_data/san_dns_key.pem"
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"
   }
   )EOF";
 
@@ -134,7 +134,7 @@ TEST_F(SslConnectionImplTest, GetNoUriWithDnsSan) {
   {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "test/common/ssl/test_data/ca_cert.pem"
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
   }
   )EOF";
 
@@ -168,7 +168,7 @@ TEST_F(SslConnectionImplTest, ClientAuthBadVerification) {
   {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "test/common/ssl/test_data/ca_cert.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
     "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
   }
   )EOF";
@@ -188,8 +188,8 @@ TEST_F(SslConnectionImplTest, ClientAuthBadVerification) {
 
   std::string client_ctx_json = R"EOF(
   {
-    "cert_chain_file": "test/common/ssl/test_data/no_san_cert.pem",
-    "private_key_file": "test/common/ssl/test_data/no_san_key.pem"
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
   }
   )EOF";
 
@@ -225,7 +225,7 @@ TEST_F(SslConnectionImplTest, SslError) {
   {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "test/common/ssl/test_data/ca_cert.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
     "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
   }
   )EOF";
@@ -282,7 +282,7 @@ public:
     {
       "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
       "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-      "ca_cert_file": "test/common/ssl/test_data/ca_cert.pem"
+      "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
     }
     )EOF";
     Json::ObjectPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
@@ -300,8 +300,8 @@ public:
 
     std::string client_ctx_json = R"EOF(
     {
-      "cert_chain_file": "test/common/ssl/test_data/no_san_cert.pem",
-      "private_key_file": "test/common/ssl/test_data/no_san_key.pem"
+      "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+      "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
     }
     )EOF";
 

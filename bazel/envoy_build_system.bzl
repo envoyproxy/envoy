@@ -233,8 +233,9 @@ def envoy_sh_test(name,
   )
   native.sh_test(
       name = name,
-      srcs = srcs,
+      srcs = ["//bazel:sh_test_wrapper.sh"],
       data = srcs + data,
+      args = ["$(location " + srcs[0] + ")"],
       **kargs
   )
 
