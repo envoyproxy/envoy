@@ -17,10 +17,12 @@ namespace Json {
 
 std::vector<std::string> generateTestInputs() {
   TestEnvironment::exec({TestEnvironment::runfilesPath(
-      "test/common/json/config_schemas_test_data/generate_test_data.py")});
+      "test/common/json/config_schemas_test_data/generate_test_data")});
 
   std::string test_path = TestEnvironment::temporaryDirectory() + "/config_schemas_test";
-  return TestUtility::listFiles(test_path, false);
+  auto file_list = TestUtility::listFiles(test_path, false);
+  EXPECT_EQ(17, file_list.size());
+  return file_list;
 }
 
 class ConfigSchemasTest : public ::testing::TestWithParam<std::string> {};
