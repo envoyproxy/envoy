@@ -130,3 +130,34 @@ report is available in `generated/coverage/coverage.html`.
 # Adding or maintaining Envoy build rules
 
 See the [developer guide for writing Envoy Bazel rules](DEVELOPER.md).
+
+# Bazel performance on (virtual) machines with low resources
+
+If the (virtual) machine that is performing the build is low on memory or CPU
+resources, you can override Bazel's default job parallelism determination with
+`--jobs=N` to restrict the build to at most `N` simultaneous jobs, e.g.:
+
+```
+bazel build --jobs=2 //source/...
+```
+
+# Debugging the Bazel build
+
+When trying to understand what Bazel is doing, the `-s` and `--explain` options
+are useful. To have Bazel provide verbose output on which commands it is executing:
+
+```
+bazel build -s //source/...
+```
+
+To have Bazel emit to a text file the rationale for rebuilding a target:
+
+```
+bazel build --explain=file.txt //source/...
+```
+
+To get more verbose explanations:
+
+```
+bazel build --explain=file.txt --verbose_explanations //source/...
+```
