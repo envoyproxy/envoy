@@ -83,6 +83,15 @@ Bazel will by default cache successful test results. To force it to rerun tests:
 bazel test //test/common/http:async_client_impl_test --cache_test_results=no
 ```
 
+By default, Bazel runs all tests inside a sandbox, which disallows access to the
+filesystem. If you need to break out of the sandbox (for example to run under a
+local script or tool with `--run_under`, you can run the test with `--strategy=TestRunner=standalone`,
+e.g.:
+
+```
+bazel test //test/common/http:async_client_impl_test --strategy=TestRunner=standalone --run_under=/some/path/foobar.sh
+```
+
 # Running a single Bazel test under GDB
 
 ```
@@ -146,6 +155,12 @@ test/run_envoy_bazel_coverage.sh
 
 The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.
+
+# Cleaning the build and test artifacts
+
+`bazel clean` will nuke all the build/test artifacts from the Bazel cache for
+Envoy proper. To remove the artifacts for the external dependencies run
+`bazel clean --expunge`.
 
 # Adding or maintaining Envoy build rules
 
