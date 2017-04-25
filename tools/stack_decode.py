@@ -71,11 +71,11 @@ def output_stacktrace(thread_id, traceinfo):
   output_stdout, _ = addr2line.communicate(piped_input)
   output_lines = output_stdout.split("\n")
 
-  resolved_stack_frames = list(enumerate(output_lines, start=1))
+  resolved_stack_frames = enumerate(output_lines, start=1)
   print "%s Backtrace (most recent call first) from thread %s:" % (
       traceinfo.log_prefix, thread_id)
   for stack_frame in resolved_stack_frames:
-    print "  #%s %s" % (stack_frame[0], stack_frame[1])
+    print "  #%s %s" % stack_frame
 
 
 if __name__ == "__main__":
