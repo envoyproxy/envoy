@@ -10,7 +10,6 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/base64.h"
 #include "common/mongo/bson_impl.h"
 
 #include "spdlog/spdlog.h"
@@ -52,9 +51,10 @@ bool GetMoreMessageImpl::operator==(const GetMoreMessage& rhs) const {
 }
 
 std::string GetMoreMessageImpl::toString(bool) const {
-  return fmt::format("[GET_MORE id={} response_to={} collection='{}' return={} cursor={}]",
-                     request_id_, response_to_, full_collection_name_, number_to_return_,
-                     cursor_id_);
+  return fmt::format(
+      R"EOF({{"opcode": "OP_GET_MORE", "id": {}, "response_to": {}, "collection": "{}", "return": {}, )EOF"
+      R"EOF("cursor": {}}})EOF",
+      request_id_, response_to_, full_collection_name_, number_to_return_, cursor_id_);
 }
 
 void InsertMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
@@ -89,9 +89,11 @@ bool InsertMessageImpl::operator==(const InsertMessage& rhs) const {
 }
 
 std::string InsertMessageImpl::toString(bool full) const {
-  return fmt::format("[INSERT id={} response_to={} flags={:#x} collection='{}' documents={}]",
-                     request_id_, response_to_, flags_, full_collection_name_,
-                     full ? documentListToString(documents_) : std::to_string(documents_.size()));
+  return fmt::format(
+      R"EOF({{"opcode": "OP_INSERT", "id": {}, "response_to": {}, "flags": "{:#x}", "collection": "{}", )EOF"
+      R"EOF("documents": {}}})EOF",
+      request_id_, response_to_, flags_, full_collection_name_,
+      full ? documentListToString(documents_) : std::to_string(documents_.size()));
 }
 
 void KillCursorsMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
@@ -122,8 +124,10 @@ std::string KillCursorsMessageImpl::toString(bool) const {
   }
   cursors << "]";
 
-  return fmt::format("[KILL_CURSORS id={} response_to={} num_cursors={} cursors={}]", request_id_,
-                     response_to_, number_of_cursor_ids_, cursors.str());
+  return fmt::format(
+      R"EOF({{"opcode": "KILL_CURSORS", "id": {}, "response_to": "{:#x}", "num_cursors": "{}", )EOF"
+      R"EOF("cursors": {}}})EOF",
+      request_id_, response_to_, number_of_cursor_ids_, cursors.str());
 }
 
 void QueryMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
@@ -168,11 +172,12 @@ bool QueryMessageImpl::operator==(const QueryMessage& rhs) const {
 }
 
 std::string QueryMessageImpl::toString(bool full) const {
-  return fmt::format("[QUERY id={} response_to={} flags={:#x} collection='{}' skip={} return={} "
-                     "query={} fields={}]",
-                     request_id_, response_to_, flags_, full_collection_name_, number_to_skip_,
-                     number_to_return_, full ? query_->toString() : "{...}",
-                     return_fields_selector_ ? return_fields_selector_->toString() : "{}");
+  return fmt::format(
+      R"EOF({{"opcode": "OP_QUERY", "id": {}, "response_to": {}, "flags": "{:#x}", "collection": "{}", )EOF"
+      R"EOF("skip": {}, "return": {}, "query": {}, "fields": {}}})EOF",
+      request_id_, response_to_, flags_, full_collection_name_, number_to_skip_, number_to_return_,
+      full ? query_->toString() : "\"{...}\"",
+      return_fields_selector_ ? return_fields_selector_->toString() : "{}");
 }
 
 void ReplyMessageImpl::fromBuffer(uint32_t, Buffer::Instance& data) {
@@ -208,7 +213,8 @@ bool ReplyMessageImpl::operator==(const ReplyMessage& rhs) const {
 
 std::string ReplyMessageImpl::toString(bool full) const {
   return fmt::format(
-      "[REPLY id={} response_to={} flags={:#x} cursor={} from={} returned={} documents={}]",
+      R"EOF({{"opcode": "OP_REPLY", "id": {}, "response_to": {}, "flags": "{:#x}", "cursor": "{}", )EOF"
+      R"EOF("from": {}, "returned": {}, "documents": {}}})EOF",
       request_id_, response_to_, flags_, cursor_id_, starting_from_, number_returned_,
       full ? documentListToString(documents_) : std::to_string(documents_.size()));
 }
@@ -225,9 +231,6 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   if (data.length() < message_length) {
     return false;
   }
-
-  // Before draining, do a base64 convert of the entire op.
-  callbacks_.decodeBase64(Base64::encode(data, message_length));
 
   data.drain(sizeof(int32_t));
   int32_t request_id = Bson::BufferHelper::removeInt32(data);
