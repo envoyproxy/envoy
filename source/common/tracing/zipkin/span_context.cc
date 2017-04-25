@@ -21,17 +21,17 @@ const std::string SpanContext::HEX_DIGIT_GROUP_REGEX_STR_ = "([0-9,a-z]{16})";
 
 const std::string& SpanContext::SPAN_CONTEXT_REGEX_STR() {
   // ^([0-9,a-z]{16});([0-9,a-z]{16});([0-9,a-z]{16})((;(cs|sr|cr|ss))*)$
-  static std::string span_context_regex_str =
+  static const std::string* span_context_regex_str = new std::string(
       "^" + HEX_DIGIT_GROUP_REGEX_STR_ + FIELD_SEPARATOR_ + HEX_DIGIT_GROUP_REGEX_STR_ +
       FIELD_SEPARATOR_ + HEX_DIGIT_GROUP_REGEX_STR_ + "((" + FIELD_SEPARATOR_ + "(" +
       ZipkinCoreConstants::CLIENT_SEND + "|" + ZipkinCoreConstants::SERVER_RECV + "|" +
-      ZipkinCoreConstants::CLIENT_RECV + "|" + ZipkinCoreConstants::SERVER_SEND + "))*)$";
+      ZipkinCoreConstants::CLIENT_RECV + "|" + ZipkinCoreConstants::SERVER_SEND + "))*)$");
 
-  return span_context_regex_str;
+  return *span_context_regex_str;
 }
 
 const std::regex& SpanContext::SPAN_CONTEXT_REGEX() {
-  static std::regex span_context_regex(SPAN_CONTEXT_REGEX_STR());
+  static const std::regex span_context_regex(SPAN_CONTEXT_REGEX_STR());
 
   return span_context_regex;
 }

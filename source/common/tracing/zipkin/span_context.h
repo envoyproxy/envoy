@@ -17,13 +17,13 @@ namespace Zipkin {
  * SS: "Server Send"
  * SR: "Server Receive"
  */
-typedef struct AnnotationIsSet {
-  AnnotationIsSet() : cs_(false), cr_(false), ss_(false), sr_(false) {}
+struct AnnotationSet {
+  AnnotationSet() : cs_(false), cr_(false), ss_(false), sr_(false) {}
   bool cs_ : 1;
   bool cr_ : 1;
   bool ss_ : 1;
   bool sr_ : 1;
-} AnnotationIsSet;
+};
 
 /**
  * This class represents the context of a Zipkin span. It embodies the following
@@ -42,11 +42,6 @@ public:
    * @param span The Zipkin span used to initialize a SpanContext object.
    */
   SpanContext(const Span& span);
-
-  /**
-   * Destructor
-   */
-  virtual ~SpanContext() {}
 
   /**
    * Serializes the SpanContext object as a string. This encoding of a SpanContext is used
@@ -110,7 +105,7 @@ public:
   /**
    * @return a struct indicating which annotations are present in the span.
    */
-  AnnotationIsSet isSetAnnotation() const { return annotation_values_; }
+  AnnotationSet isSetAnnotation() const { return annotation_values_; }
 
 private:
   static const std::string FIELD_SEPARATOR_;
@@ -137,7 +132,7 @@ private:
   uint64_t trace_id_;
   uint64_t id_;
   uint64_t parent_id_;
-  AnnotationIsSet annotation_values_;
+  AnnotationSet annotation_values_;
   bool is_initialized_;
 };
 } // Zipkin
