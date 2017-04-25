@@ -1,3 +1,8 @@
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -10,7 +15,11 @@
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;

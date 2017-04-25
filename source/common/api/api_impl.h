@@ -1,5 +1,8 @@
 #pragma once
 
+#include <chrono>
+#include <string>
+
 #include "envoy/api/api.h"
 #include "envoy/filesystem/filesystem.h"
 

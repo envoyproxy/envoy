@@ -1,3 +1,6 @@
+#include <memory>
+#include <string>
+
 #include "envoy/upstream/upstream.h"
 
 #include "common/network/utility.h"
@@ -13,6 +16,9 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;

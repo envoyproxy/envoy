@@ -1,5 +1,8 @@
 #include "server/http/health_check.h"
 
+#include <chrono>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/header_map.h"

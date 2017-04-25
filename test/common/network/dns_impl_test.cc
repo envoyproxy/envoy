@@ -1,3 +1,13 @@
+#include <arpa/inet.h>
+#include <arpa/nameser.h>
+#include <arpa/nameser_compat.h>
+
+#include <list>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 
@@ -10,12 +20,11 @@
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
-
-#include <arpa/nameser.h>
-#include <arpa/nameser_compat.h>
+#include "test/test_common/printers.h"
 
 #include "ares.h"
 #include "ares_dns.h"
+#include "gtest/gtest.h"
 
 namespace Network {
 
@@ -205,6 +214,12 @@ public:
     peer_.reset(new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver_.get())));
     peer_->resetChannelTcpOnly(zero_timeout());
     ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
+  }
+
+  void TearDown() override {
+    // Make sure we clean this up before dispatcher destruction.
+    listener_.reset();
+    server_.reset();
   }
 
 protected:

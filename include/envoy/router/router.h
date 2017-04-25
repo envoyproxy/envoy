@@ -1,5 +1,13 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <map>
+#include <memory>
+#include <string>
+
 #include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
@@ -35,6 +43,11 @@ public:
   // clang-format on
 
   virtual ~RetryPolicy() {}
+
+  /**
+   * @return std::chrono::milliseconds timeout per retry attempt.
+   */
+  virtual std::chrono::milliseconds perTryTimeout() const PURE;
 
   /**
    * @return uint32_t the number of retries to allow against the route.

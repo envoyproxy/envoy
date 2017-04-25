@@ -1,5 +1,7 @@
 #include "server/worker.h"
 
+#include <chrono>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
@@ -70,5 +72,6 @@ void Worker::threadRoutine(Server::GuardDog& guard_dog) {
   handler_->closeConnections();
   tls_.shutdownThread();
   no_exit_timer_.reset();
+  watchdog.reset();
   handler_.reset();
 }

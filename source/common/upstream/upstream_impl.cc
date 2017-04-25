@@ -1,5 +1,13 @@
 #include "common/upstream/upstream_impl.h"
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+#include <unordered_set>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
@@ -18,6 +26,8 @@
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/sds.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Upstream {
 
@@ -182,11 +192,9 @@ bool ClusterInfoImpl::maintenanceMode() const {
 uint64_t ClusterInfoImpl::parseFeatures(const Json::Object& config) {
   uint64_t features = 0;
   for (const std::string& feature : StringUtil::split(config.getString("features", ""), ',')) {
-    if (feature == "http2") {
-      features |= Features::HTTP2;
-    } else {
-      throw EnvoyException(fmt::format("unknown cluster feature '{}'", feature));
-    }
+    ASSERT(feature == "http2");
+    UNREFERENCED_PARAMETER(feature);
+    features |= Features::HTTP2;
   }
 
   return features;

@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -223,7 +228,7 @@ private:
   RetryStatePtr retry_state_;
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
-  SystemTime downstream_request_complete_time_;
+  MonotonicTime downstream_request_complete_time_;
   std::unique_ptr<LoadBalancerContextImpl> lb_context_;
 
   bool downstream_response_started_ : 1;

@@ -1,5 +1,10 @@
 #include "server/config/network/http_connection_manager.h"
 
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/connection.h"
 #include "envoy/server/instance.h"
@@ -12,6 +17,8 @@
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/router/rds_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 namespace Configuration {
@@ -61,7 +68,8 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& config,
                                                          Server::Instance& server)
-    : server_(server), stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
+    : Json::Validator(config, Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA), server_(server),
+      stats_prefix_(fmt::format("http.{}.", config.getString("stat_prefix"))),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, server.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, server.stats())),
@@ -69,8 +77,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
       drain_timeout_(config.getInteger("drain_timeout_ms", 5000)),
       generate_request_id_(config.getBoolean("generate_request_id", true)),
       date_provider_(server.dispatcher(), server.threadLocal()) {
-
-  config.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(
       config, server.runtime(), server.clusterManager(), server.dispatcher(), server.random(),
@@ -129,10 +135,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     codec_type_ = CodecType::HTTP1;
   } else if (codec_type == "http2") {
     codec_type_ = CodecType::HTTP2;
-  } else if (codec_type == "auto") {
-    codec_type_ = CodecType::AUTO;
   } else {
-    throw EnvoyException(fmt::format("invalid connection manager codec '{}'", codec_type));
+    ASSERT(codec_type == "auto");
+    codec_type_ = CodecType::AUTO;
   }
 
   std::vector<Json::ObjectPtr> filters = config.getObjectArray("filters");
@@ -185,7 +190,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     }
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
@@ -199,10 +204,9 @@ HttpFilterType HttpConnectionManagerConfig::stringToType(const std::string& type
     return HttpFilterType::Decoder;
   } else if (type == "encoder") {
     return HttpFilterType::Encoder;
-  } else if (type == "both") {
-    return HttpFilterType::Both;
   } else {
-    throw EnvoyException(fmt::format("invalid http filter type '{}'", type));
+    ASSERT(type == "both");
+    return HttpFilterType::Both;
   }
 }
 

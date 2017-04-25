@@ -3,6 +3,9 @@
 #include "test/integration/integration_test.h"
 #include "test/integration/utility.h"
 
+#include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
+
 TEST_F(IntegrationTest, HealthCheck) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/healthcheck", "", Http::CodecClient::Type::HTTP1);

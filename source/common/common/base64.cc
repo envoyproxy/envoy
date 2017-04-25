@@ -1,5 +1,8 @@
 #include "common/common/base64.h"
 
+#include <cstdint>
+#include <string>
+
 #include "common/common/empty_string.h"
 
 static constexpr char CHAR_TABLE[] =

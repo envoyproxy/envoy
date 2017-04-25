@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 /**
  * Convert an int based enum to an int.
  */

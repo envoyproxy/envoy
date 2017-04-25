@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"

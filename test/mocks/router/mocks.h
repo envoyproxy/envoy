@@ -1,8 +1,18 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
+
+#include "gmock/gmock.h"
 
 namespace Router {
 
@@ -18,9 +28,11 @@ public:
 class TestRetryPolicy : public RetryPolicy {
 public:
   // Router::RetryPolicy
+  std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
 
+  std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
 };

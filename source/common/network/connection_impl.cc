@@ -1,5 +1,13 @@
 #include "common/network/connection_impl.h"
 
+#include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <atomic>
+#include <cstdint>
+
 #include "envoy/common/exception.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"

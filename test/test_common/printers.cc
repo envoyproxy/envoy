@@ -1,4 +1,7 @@
 #include "printers.h"
+#include "test/test_common/printers.h"
+
+#include <iostream>
 
 #include "envoy/redis/codec.h"
 

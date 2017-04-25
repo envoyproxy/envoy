@@ -1,9 +1,15 @@
 #include "common/upstream/cds_api_impl.h"
 
+#include <chrono>
+#include <string>
+#include <vector>
+
 #include "common/common/assert.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Upstream {
 

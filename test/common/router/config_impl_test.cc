@@ -1,3 +1,9 @@
+#include <chrono>
+#include <list>
+#include <map>
+#include <memory>
+#include <string>
+
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
@@ -5,7 +11,11 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -486,31 +496,6 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
   EXPECT_THAT(std::list<Http::LowerCaseString>({Http::LowerCaseString("x-envoy-upstream-canary"),
                                                 Http::LowerCaseString("x-envoy-virtual-cluster")}),
               ContainerEq(config.responseHeadersToRemove()));
-}
-
-TEST(RouteMatcherTest, InvalidPriority) {
-  std::string json = R"EOF(
-{
-  "virtual_hosts": [
-    {
-      "name": "local_service",
-      "domains": ["*"],
-      "routes": [
-        {
-          "prefix": "/",
-          "cluster": "local_service_grpc",
-          "priority": "foo"
-        }
-      ]
-    }
-  ]
-}
-  )EOF";
-
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
 }
 
 TEST(RouteMatcherTest, Priority) {
@@ -1073,6 +1058,7 @@ TEST(RouteMatcherTest, Retry) {
           "prefix": "/",
           "cluster": "www2",
           "retry_policy": {
+            "per_try_timeout_ms" : 1000,
             "num_retries": 3,
             "retry_on": "5xx,connect-failure"
           }
@@ -1090,6 +1076,10 @@ TEST(RouteMatcherTest, Retry) {
 
   EXPECT_FALSE(config.usesRuntime());
 
+  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                                              ->routeEntry()
+                                              ->retryPolicy()
+                                              .perTryTimeout());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1100,6 +1090,10 @@ TEST(RouteMatcherTest, Retry) {
                 ->retryPolicy()
                 .retryOn());
 
+  EXPECT_EQ(std::chrono::milliseconds(0), config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                                              ->routeEntry()
+                                              ->retryPolicy()
+                                              .perTryTimeout());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -1109,6 +1103,10 @@ TEST(RouteMatcherTest, Retry) {
                     ->retryPolicy()
                     .retryOn());
 
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                                                 ->routeEntry()
+                                                 ->retryPolicy()
+                                                 .perTryTimeout());
   EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()

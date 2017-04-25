@@ -1,5 +1,10 @@
 #include "common/http/filter/fault_filter.h"
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -21,47 +26,27 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
 
   json_config.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
 
-  const Json::ObjectPtr abort = json_config.getObject("abort", true);
-  const Json::ObjectPtr delay = json_config.getObject("delay", true);
+  const Json::ObjectPtr config_abort = json_config.getObject("abort", true);
+  const Json::ObjectPtr config_delay = json_config.getObject("delay", true);
 
-  if (abort->empty() && delay->empty()) {
+  if (config_abort->empty() && config_delay->empty()) {
     throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
   }
 
-  if (!abort->empty()) {
-    abort_percent_ = static_cast<uint64_t>(abort->getInteger("abort_percent", 0));
-
-    if (abort_percent_ > 0) {
-      if (abort_percent_ > 100) {
-        throw EnvoyException("abort percentage cannot be greater than 100");
-      }
-    }
+  if (!config_abort->empty()) {
+    abort_percent_ = static_cast<uint64_t>(config_abort->getInteger("abort_percent", 0));
 
     // TODO(mattklein123): Throw error if invalid return code is provided
-    if (abort->hasObject("http_status")) {
-      http_status_ = static_cast<uint64_t>(abort->getInteger("http_status"));
-    } else {
-      throw EnvoyException("missing http_status in abort config");
-    }
+    http_status_ = static_cast<uint64_t>(config_abort->getInteger("http_status"));
   }
 
-  if (!delay->empty()) {
-    const std::string type = delay->getString("type", "empty");
-    if (type == "fixed") {
-      fixed_delay_percent_ = static_cast<uint64_t>(delay->getInteger("fixed_delay_percent", 0));
-      fixed_duration_ms_ = static_cast<uint64_t>(delay->getInteger("fixed_duration_ms", 0));
-
-      if (fixed_delay_percent_ > 0) {
-        if (fixed_delay_percent_ > 100) {
-          throw EnvoyException("delay percentage cannot be greater than 100");
-        }
-      }
-      if (0 == fixed_duration_ms_) {
-        throw EnvoyException("delay duration must be greater than 0");
-      }
-    } else {
-      throw EnvoyException("delay type is either empty or invalid");
-    }
+  if (!config_delay->empty()) {
+    const std::string type = config_delay->getString("type");
+    ASSERT(type == "fixed");
+    UNREFERENCED_PARAMETER(type);
+    fixed_delay_percent_ =
+        static_cast<uint64_t>(config_delay->getInteger("fixed_delay_percent", 0));
+    fixed_duration_ms_ = static_cast<uint64_t>(config_delay->getInteger("fixed_duration_ms", 0));
   }
 
   if (json_config.hasObject("headers")) {

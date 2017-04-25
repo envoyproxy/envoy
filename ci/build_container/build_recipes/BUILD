@@ -1,3 +1,8 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_package",
+)
+
+envoy_package()
 
 exports_files(glob(["*.sh"]))

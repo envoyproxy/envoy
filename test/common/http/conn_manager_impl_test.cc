@@ -1,3 +1,9 @@
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/access_log.h"
@@ -21,6 +27,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;

@@ -1,5 +1,11 @@
 #include "common/network/proxy_protocol.h"
 
+#include <unistd.h>
+
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"

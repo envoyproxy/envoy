@@ -1,5 +1,9 @@
 #pragma once
 
+#include <regex>
+#include <string>
+#include <vector>
+
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/resource_manager.h"
 

@@ -1,5 +1,12 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/common/optional.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/ssl/context.h"

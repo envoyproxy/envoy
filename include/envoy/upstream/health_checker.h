@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+#include <memory>
+
 #include "envoy/upstream/upstream.h"
 
 namespace Upstream {

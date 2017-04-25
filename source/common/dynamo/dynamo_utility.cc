@@ -1,6 +1,10 @@
 #include "common/dynamo/dynamo_utility.h"
 
+#include <string>
+
 #include "common/stats/stats_impl.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Dynamo {
 

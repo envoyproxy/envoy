@@ -3,6 +3,7 @@
 # ci/build_container/build_recipes.
 TARGET_RECIPES = {
     "ares": "cares",
+    "backward": "backward",
     # TODO(htuch): Remove when cmake goes.
     "cotire": "cotire",
     "event": "libevent",
@@ -11,7 +12,7 @@ TARGET_RECIPES = {
     # that is external to Bazel.
     "gcovr": "gcovr",
     "googletest": "googletest",
-    "gperftools": "gperftools",
+    "tcmalloc_and_profiler": "gperftools",
     "http_parser": "http-parser",
     "lightstep": "lightstep",
     "nghttp2": "nghttp2",

@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/grpc/rpc_channel.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/tracing/context.h"

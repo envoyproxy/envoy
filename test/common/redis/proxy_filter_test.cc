@@ -1,9 +1,16 @@
+#include <memory>
+#include <string>
+
 #include "common/redis/proxy_filter.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/redis/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ByRef;

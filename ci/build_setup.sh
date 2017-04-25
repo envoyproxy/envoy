@@ -12,8 +12,18 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 
 NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 
+export ENVOY_SRCDIR=/source
+
 if [[ "$1" == bazel* ]]
 then
+  # Create a fake home. Python site libs tries to do getpwuid(3) if we don't and the CI
+  # Docker image gets confused as it has no passwd entry when running non-root
+  # unless we do this.
+  FAKE_HOME=/tmp/fake_home
+  mkdir -p "${FAKE_HOME}"
+  export HOME="${FAKE_HOME}"
+  export PYTHONUSERBASE="${FAKE_HOME}"
+
   export BUILD_DIR=/build
   # Make sure that "docker run" has a -v bind mount for /build, since cmake
   # users will only have a bind mount for /source.
@@ -22,7 +32,6 @@ then
     echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}?"
     exit 1
   fi
-  export ENVOY_SRCDIR=/source
   export ENVOY_CONSUMER_SRCDIR="${BUILD_DIR}/envoy-consumer"
 
   # Make sure that /source doesn't contain /build on the underlying host
@@ -44,12 +53,12 @@ then
   export USER=bazel
   export TEST_TMPDIR=/build/tmp
   export BAZEL="bazel"
-  export BAZEL_COVERAGE="bazel-coverage"
   # Not sandboxing, since non-privileged Docker can't do nested namespaces.
   BAZEL_OPTIONS="--package_path %workspace%:/source"
   export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
   export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
-    --verbose_failures ${BAZEL_OPTIONS}"
+    --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE"
+  export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE"
   [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
   ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
   ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt

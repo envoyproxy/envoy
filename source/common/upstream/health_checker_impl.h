@@ -1,5 +1,13 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"

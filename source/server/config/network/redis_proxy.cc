@@ -1,5 +1,8 @@
 #include "server/config/network/redis_proxy.h"
 
+#include <memory>
+#include <string>
+
 #include "common/redis/codec_impl.h"
 #include "common/redis/command_splitter_impl.h"
 #include "common/redis/conn_pool_impl.h"

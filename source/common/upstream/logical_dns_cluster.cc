@@ -1,5 +1,10 @@
 #include "common/upstream/logical_dns_cluster.h"
 
+#include <chrono>
+#include <list>
+#include <string>
+#include <vector>
+
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 

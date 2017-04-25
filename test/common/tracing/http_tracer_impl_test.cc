@@ -1,6 +1,10 @@
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "common/common/base64.h"
-#include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
@@ -14,7 +18,11 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -29,7 +37,7 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
   // Sampling, global on.
   {
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.random_sampling", 0, _, 10000))
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
         .WillOnce(Return(true));
     EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
@@ -45,7 +53,8 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
   // Sampling must not be done on client traced.
   {
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.random_sampling", 0, _, 10000)).Times(0);
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+        .Times(0);
     EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(true));
 
@@ -60,7 +69,7 @@ TEST(HttpTracerUtilityTest, mutateHeaders) {
   // Sampling, global off.
   {
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.random_sampling", 0, _, 10000))
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
         .WillOnce(Return(true));
     EXPECT_CALL(runtime.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
         .WillOnce(Return(false));

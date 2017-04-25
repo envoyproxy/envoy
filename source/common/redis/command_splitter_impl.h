@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "envoy/redis/command_splitter.h"
 #include "envoy/redis/conn_pool.h"
 

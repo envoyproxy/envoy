@@ -1,9 +1,11 @@
 #include "envoy/common/exception.h"
 
-#include "common/network/utility.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/utility.h"
 
 #include "test/test_common/network_utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Network {
 

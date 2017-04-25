@@ -1,5 +1,14 @@
 #pragma once
 
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
@@ -20,12 +29,12 @@ public:
   uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
-  const Optional<SystemTime>& lastEjectionTime() override { return time_; }
-  const Optional<SystemTime>& lastUnejectionTime() override { return time_; }
+  const Optional<MonotonicTime>& lastEjectionTime() override { return time_; }
+  const Optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
   double successRate() const override { return -1; }
 
 private:
-  const Optional<SystemTime> time_;
+  const Optional<MonotonicTime> time_;
 };
 
 /**
@@ -98,8 +107,8 @@ public:
     updateCurrentSuccessRateBucket();
   }
 
-  void eject(SystemTime ejection_time);
-  void uneject(SystemTime ejection_time);
+  void eject(MonotonicTime ejection_time);
+  void uneject(MonotonicTime ejection_time);
   void updateCurrentSuccessRateBucket();
   SuccessRateAccumulator& successRateAccumulator() { return success_rate_accumulator_; }
   void successRate(double new_success_rate) { success_rate_ = new_success_rate; }
@@ -108,16 +117,16 @@ public:
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
   void putResponseTime(std::chrono::milliseconds) override {}
-  const Optional<SystemTime>& lastEjectionTime() override { return last_ejection_time_; }
-  const Optional<SystemTime>& lastUnejectionTime() override { return last_unejection_time_; }
+  const Optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
+  const Optional<MonotonicTime>& lastUnejectionTime() override { return last_unejection_time_; }
   double successRate() const override { return success_rate_; }
 
 private:
   std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
   std::atomic<uint32_t> consecutive_5xx_{0};
-  Optional<SystemTime> last_ejection_time_;
-  Optional<SystemTime> last_unejection_time_;
+  Optional<MonotonicTime> last_ejection_time_;
+  Optional<MonotonicTime> last_unejection_time_;
   uint32_t num_ejections_{};
   SuccessRateAccumulator success_rate_accumulator_;
   std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
@@ -181,7 +190,7 @@ class DetectorImpl : public Detector, public std::enable_shared_from_this<Detect
 public:
   static std::shared_ptr<DetectorImpl>
   create(const Cluster& cluster, const Json::Object& json_config, Event::Dispatcher& dispatcher,
-         Runtime::Loader& runtime, SystemTimeSource& time_source,
+         Runtime::Loader& runtime, MonotonicTimeSource& time_source,
          EventLoggerSharedPtr event_logger);
   ~DetectorImpl();
 
@@ -197,11 +206,11 @@ public:
 private:
   DetectorImpl(const Cluster& cluster, const Json::Object& json_config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-               SystemTimeSource& time_source, EventLoggerSharedPtr event_logger);
+               MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger);
 
   void addHostSink(HostSharedPtr host);
   void armIntervalTimer();
-  void checkHostForUneject(HostSharedPtr host, DetectorHostSinkImpl* sink, SystemTime now);
+  void checkHostForUneject(HostSharedPtr host, DetectorHostSinkImpl* sink, MonotonicTime now);
   void ejectHost(HostSharedPtr host, EjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(const Cluster& cluster);
@@ -214,7 +223,7 @@ private:
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
-  SystemTimeSource& time_source_;
+  MonotonicTimeSource& time_source_;
   DetectionStats stats_;
   Event::TimerPtr interval_timer_;
   std::list<ChangeStateCb> callbacks_;
@@ -227,8 +236,9 @@ private:
 class EventLoggerImpl : public EventLogger {
 public:
   EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
-                  SystemTimeSource& time_source)
-      : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
+                  SystemTimeSource& time_source, MonotonicTimeSource& monotonic_time_source)
+      : file_(log_manager.createAccessLog(file_name)), time_source_(time_source),
+        monotonic_time_source_(monotonic_time_source) {}
 
   // Upstream::Outlier::EventLogger
   void logEject(HostDescriptionConstSharedPtr host, Detector& detector, EjectionType type,
@@ -237,10 +247,11 @@ public:
 
 private:
   std::string typeToString(EjectionType type);
-  int secsSinceLastAction(const Optional<SystemTime>& lastActionTime, SystemTime now);
+  int secsSinceLastAction(const Optional<MonotonicTime>& lastActionTime, MonotonicTime now);
 
   Filesystem::FileSharedPtr file_;
   SystemTimeSource& time_source_;
+  MonotonicTimeSource& monotonic_time_source_;
 };
 
 /**

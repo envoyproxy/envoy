@@ -11,14 +11,14 @@ if [[ "$1" == "bazel.debug" ]]; then
   echo "bazel debug build with tests..."
   cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} @envoy//source/exe:envoy-static
+  bazel build ${BAZEL_BUILD_OPTIONS} @envoy//source/exe:envoy-static.stamped
   echo "Testing..."
-  bazel test ${BAZEL_BUILD_OPTIONS} --test_output=all \
+  bazel test ${BAZEL_TEST_OPTIONS} --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   echo "bazel coverage build with tests..."
-  export GCOVR="/thirdparty/gcovr.dep/gcovr-3.3/scripts/gcovr"
+  export GCOVR="/thirdparty/gcovr-3.3/scripts/gcovr"
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
   export BUILDIFIER_BIN="/usr/lib/go/bin/buildifier"
@@ -32,12 +32,17 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # some Bazel created symlinks to the source directory in its output
   # directory. Wow.
   cd "${ENVOY_BUILD_DIR}"
-  SRCDIR="${GCOVR_DIR}" REAL_SRCDIR="${ENVOY_SRCDIR}" \
-    "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
+  SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
   exit 0
 elif [[ "$1" == "fix_format" ]]; then
   echo "fix_format..."
-  make fix_format
+  cd "${ENVOY_SRCDIR}"
+  ./tools/check_format.py fix
+  exit 0
+elif [[ "$1" == "check_format" ]]; then
+  echo "check_format..."
+  cd "${ENVOY_SRCDIR}"
+  ./tools/check_format.py check
   exit 0
 elif [[ "$1" == "coverage" ]]; then
   echo "coverage build with tests..."

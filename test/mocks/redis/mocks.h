@@ -1,9 +1,17 @@
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <string>
+
 #include "envoy/redis/command_splitter.h"
 #include "envoy/redis/conn_pool.h"
 
 #include "common/redis/codec_impl.h"
+
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
 
 namespace Redis {
 

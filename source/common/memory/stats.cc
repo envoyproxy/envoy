@@ -1,5 +1,7 @@
 #include "common/memory/stats.h"
 
+#include <cstdint>
+
 #ifdef TCMALLOC
 
 #include "gperftools/malloc_extension.h"

@@ -1,6 +1,10 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+envoy_package()
 
 envoy_cc_library(
     name = "bson_lib",
@@ -12,6 +16,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 
@@ -24,7 +29,6 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/mongo:codec_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:base64_lib",
         "//source/common/common:logger_lib",
     ],
 )

@@ -4,6 +4,8 @@
 
 #include "test/mocks/upstream/mocks.h"
 
+#include "gtest/gtest.h"
+
 namespace Upstream {
 
 TEST(HostUtilityTest, All) {

@@ -1,5 +1,9 @@
 #include "common/thread_local/thread_local_impl.h"
 
+#include <atomic>
+#include <cstdint>
+#include <list>
+
 #include "envoy/event/dispatcher.h"
 
 #include "common/common/assert.h"

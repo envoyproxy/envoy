@@ -1,8 +1,11 @@
 #include "common/http/http1/conn_pool.h"
 
-#include "envoy/http/header_map.h"
+#include <cstdint>
+#include <list>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/header_map.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
@@ -179,7 +182,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   if (!client.stream_wrapper_->encode_complete_) {
     conn_log_debug("response before request complete", *client.codec_client_);
     onDownstreamReset(client);
-  } else if (client.stream_wrapper_->saw_close_header_) {
+  } else if (client.stream_wrapper_->saw_close_header_ || client.codec_client_->remoteClosed()) {
     conn_log_debug("saw upstream connection: close", *client.codec_client_);
     onDownstreamReset(client);
   } else if (client.remaining_requests_ > 0 && --client.remaining_requests_ == 0) {

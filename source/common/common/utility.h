@@ -1,5 +1,12 @@
 #pragma once
 
+#include <strings.h>
+
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/common/time.h"
 
 /**
@@ -39,9 +46,20 @@ public:
 class ProdSystemTimeSource : public SystemTimeSource {
 public:
   // SystemTimeSource
-  SystemTime currentSystemTime() override { return std::chrono::system_clock::now(); }
+  SystemTime currentTime() override { return std::chrono::system_clock::now(); }
 
   static ProdSystemTimeSource instance_;
+};
+
+/**
+ * Production implementation of MonotonicTimeSource that returns the current time.
+ */
+class ProdMonotonicTimeSource : public MonotonicTimeSource {
+public:
+  // MonotonicTimeSource
+  MonotonicTime currentTime() override { return std::chrono::steady_clock::now(); }
+
+  static ProdMonotonicTimeSource instance_;
 };
 
 /**
@@ -53,6 +71,11 @@ public:
    * @return whether a time_point contains a valid, not default constructed time.
    */
   static bool timePointValid(SystemTime time_point);
+
+  /**
+   * @return whether a time_point contains a valid, not default constructed time.
+   */
+  static bool timePointValid(MonotonicTime time_point);
 };
 
 /**
@@ -116,6 +139,14 @@ public:
    * length.
    */
   static std::string subspan(const std::string& source, size_t start, size_t end);
+
+  /**
+   * Escape strings for logging purposes. Returns a copy of the string with
+   * \n, \r, \t, and " (double quote) escaped.
+   * @param source supplies the string to escape.
+   * @return escaped string.
+   */
+  static std::string escape(const std::string& source);
 
   /**
    * @return true if @param source ends with @param end.

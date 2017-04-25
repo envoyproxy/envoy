@@ -2,7 +2,7 @@ set -e
 
 git clone https://boringssl.googlesource.com/boringssl
 cd boringssl
-git reset --hard be873e9f48b2a07269300282b69bb17d496c69ee
+git reset --hard be2ee342d3781ddb954f91f8a7e660c6f59e87e5
 cmake .
 make
 cp -r include/* $THIRDPARTY_BUILD/include

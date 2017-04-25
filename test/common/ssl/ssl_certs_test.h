@@ -2,6 +2,8 @@
 
 #include "test/test_common/environment.h"
 
+#include "gtest/gtest.h"
+
 class SslCertsTest : public testing::Test {
 public:
   static void SetUpTestCase() {

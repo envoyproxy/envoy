@@ -1,5 +1,8 @@
 #pragma once
 
+#include <chrono>
+#include <memory>
+
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/thread_local/thread_local.h"

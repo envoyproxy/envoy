@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "envoy/common/pure.h"
 
 namespace Ssl {
@@ -27,6 +30,11 @@ public:
    * The ':' delimited list of supported cipher suites
    */
   virtual const std::string& cipherSuites() const PURE;
+
+  /**
+   * The ':' delimited list of supported ECDH curves.
+   */
+  virtual const std::string& ecdhCurves() const PURE;
 
   /**
    * @return The CA certificate file to use for peer validation.

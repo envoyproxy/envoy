@@ -1,6 +1,10 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+    "envoy_package",
+)
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
+envoy_package()
 
 envoy_cc_test(
     name = "bson_impl_test",
@@ -16,6 +20,7 @@ envoy_cc_test(
     srcs = ["codec_impl_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/mongo:bson_lib",
         "//source/common/mongo:codec_lib",
     ],

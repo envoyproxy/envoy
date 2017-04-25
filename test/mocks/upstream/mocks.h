@@ -1,6 +1,10 @@
 #pragma once
 
-#include "cluster_info.h"
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "envoy/http/async_client.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -12,6 +16,10 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+
+#include "cluster_info.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 

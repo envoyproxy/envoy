@@ -1,6 +1,11 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+    "envoy_cc_test_library",
+    "envoy_package",
+)
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_library")
+envoy_package()
 
 envoy_cc_test(
     name = "example_configs_test",
@@ -14,6 +19,7 @@ envoy_cc_test(
     deps = [
         ":config_test_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

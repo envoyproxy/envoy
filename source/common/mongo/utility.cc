@@ -1,5 +1,7 @@
 #include "common/mongo/utility.h"
 
+#include <string>
+
 #include "envoy/common/exception.h"
 
 #include "common/json/json_loader.h"
@@ -24,6 +26,7 @@ QueryMessageInfo::QueryMessageInfo(const QueryMessage& query) : request_id_{quer
   // Standard query.
   collection_ = parseCollection(query.fullCollectionName());
   callsite_ = parseCallingFunction(query);
+  max_time_ = parseMaxTime(query);
   type_ = parseType(query);
 }
 
@@ -34,6 +37,21 @@ std::string QueryMessageInfo::parseCollection(const std::string& full_collection
   }
 
   return full_collection_name.substr(collection_index + 1);
+}
+
+int32_t QueryMessageInfo::parseMaxTime(const QueryMessage& query) {
+  const Bson::Field* field = query.query()->find("$maxTimeMS");
+  if (!field) {
+    return 0;
+  }
+
+  if (field->type() == Bson::Field::Type::INT32) {
+    return field->asInt32();
+  } else if (field->type() == Bson::Field::Type::INT64) {
+    return static_cast<int32_t>(field->asInt64());
+  } else {
+    return 0;
+  }
 }
 
 const Bson::Document* QueryMessageInfo::parseCommand(const QueryMessage& query) {

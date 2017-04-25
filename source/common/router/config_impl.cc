@@ -1,5 +1,13 @@
 #include "common/router/config_impl.h"
 
+#include <chrono>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <regex>
+#include <string>
+#include <vector>
+
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -14,6 +22,8 @@
 #include "common/json/json_loader.h"
 #include "common/router/retry_state_impl.h"
 
+#include "spdlog/spdlog.h"
+
 namespace Router {
 
 std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
@@ -25,6 +35,8 @@ RetryPolicyImpl::RetryPolicyImpl(const Json::Object& config) {
     return;
   }
 
+  per_try_timeout_ = std::chrono::milliseconds(
+      config.getObject("retry_policy")->getInteger("per_try_timeout_ms", 0));
   num_retries_ = config.getObject("retry_policy")->getInteger("num_retries", 1);
   retry_on_ = RetryStateImpl::parseRetryOn(config.getObject("retry_policy")->getString("retry_on"));
 }
@@ -106,10 +118,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
         weighted_clusters_json->getObjectArray("clusters");
     const std::string runtime_key_prefix =
         weighted_clusters_json->getString("runtime_key_prefix", EMPTY_STRING);
-
-    if (cluster_list.empty()) {
-      throw EnvoyException("weighted_clusters specification has empty list of clusters");
-    }
 
     for (const Json::ObjectPtr& cluster : cluster_list) {
       const std::string cluster_name = cluster->getString("name");
@@ -310,7 +318,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
     }
     begin = end;
   }
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
@@ -402,10 +410,9 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
     ssl_requirements_ = SslRequirements::NONE;
   } else if (require_ssl == "all") {
     ssl_requirements_ = SslRequirements::ALL;
-  } else if (require_ssl == "external_only") {
-    ssl_requirements_ = SslRequirements::EXTERNAL_ONLY;
   } else {
-    throw EnvoyException(fmt::format("unknown 'require_ssl' type '{}'", require_ssl));
+    ASSERT(require_ssl == "external_only");
+    ssl_requirements_ = SslRequirements::EXTERNAL_ONLY;
   }
 
   if (virtual_host.hasObject("request_headers_to_add")) {

@@ -1,6 +1,10 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+    "envoy_package",
+)
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
+envoy_package()
 
 envoy_cc_test(
     name = "codec_impl_test",
@@ -32,6 +36,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",

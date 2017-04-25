@@ -1,5 +1,12 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/http/codec_client.h"
 #include "common/network/filter_impl.h"
 #include "common/stats/stats_impl.h"
@@ -7,6 +14,9 @@
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/printers.h"
+
+#include "spdlog/spdlog.h"
 
 /**
  * Stream decoder wrapper used during integration testing.

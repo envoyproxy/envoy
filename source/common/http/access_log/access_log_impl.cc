@@ -1,5 +1,8 @@
 #include "common/http/access_log/access_log_impl.h"
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
@@ -8,8 +11,8 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/http/access_log/access_log_formatter.h"
-#include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/json/json_loader.h"
 #include "common/runtime/uuid_util.h"
@@ -23,10 +26,9 @@ FilterImpl::FilterImpl(Json::Object& json, Runtime::Loader& runtime)
   std::string op = json.getString("op");
   if (op == ">=") {
     op_ = FilterOperation::GreaterEqual;
-  } else if (op == "=") {
-    op_ = FilterOperation::Equal;
   } else {
-    throw EnvoyException(fmt::format("invalid access log filter op '{}'", op));
+    ASSERT(op == "=");
+    op_ = FilterOperation::Equal;
   }
 
   if (json.hasObject("runtime_key")) {
@@ -48,7 +50,7 @@ bool FilterImpl::compareAgainstValue(uint64_t lhs) {
     return lhs == value;
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {
@@ -65,10 +67,9 @@ FilterPtr FilterImpl::fromJson(Json::Object& json, Runtime::Loader& runtime) {
     return FilterPtr{new AndFilter(json, runtime)};
   } else if (type == "not_healthcheck") {
     return FilterPtr{new NotHealthCheckFilter()};
-  } else if (type == "traceable_request") {
-    return FilterPtr{new TraceableRequestFilter()};
   } else {
-    throw EnvoyException(fmt::format("invalid access log filter type '{}'", type));
+    ASSERT(type == "traceable_request");
+    return FilterPtr{new TraceableRequestFilter()};
   }
 }
 
@@ -107,18 +108,8 @@ bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header
 }
 
 OperatorFilter::OperatorFilter(const Json::Object& json, Runtime::Loader& runtime) {
-  if (json.hasObject("filters")) {
-    std::vector<Json::ObjectPtr> filters = json.getObjectArray("filters");
-    if (filters.size() < 2) {
-      throw EnvoyException(fmt::format("Filter list must have at least 2 filters, {} filters given",
-                                       filters.size()));
-    }
-
-    for (Json::ObjectPtr& filter : filters) {
-      filters_.emplace_back(FilterImpl::fromJson(*filter, runtime));
-    }
-  } else {
-    throw EnvoyException(fmt::format("Filter list cannot be empty in OperatorFilter"));
+  for (Json::ObjectPtr& filter : json.getObjectArray("filters")) {
+    filters_.emplace_back(FilterImpl::fromJson(*filter, runtime));
   }
 }
 

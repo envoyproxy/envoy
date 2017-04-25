@@ -1,9 +1,14 @@
 #include "test/integration/integration_test.h"
 
+#include <string>
+
 #include "common/http/header_map_impl.h"
 
 #include "test/integration/utility.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 TEST_F(IntegrationTest, Echo) {
   Buffer::OwnedImpl buffer("hello");

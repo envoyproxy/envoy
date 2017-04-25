@@ -1,5 +1,8 @@
 #include "common/grpc/rpc_channel_impl.h"
 
+#include <cstdint>
+#include <string>
+
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"

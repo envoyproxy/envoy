@@ -1,4 +1,11 @@
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/common/utility.h"
+
+#include "gtest/gtest.h"
 
 TEST(StringUtil, atoul) {
   uint64_t out;
@@ -23,7 +30,7 @@ TEST(DateUtil, All) {
 
 TEST(ProdSystemTimeSourceTest, All) {
   ProdSystemTimeSource source;
-  source.currentSystemTime();
+  source.currentTime();
 }
 
 TEST(StringUtil, caseInsensitiveCompare) {
@@ -132,4 +139,11 @@ TEST(StringUtil, startsWith) {
   EXPECT_FALSE(StringUtil::startsWith("test", "testtest"));
   EXPECT_FALSE(StringUtil::startsWith("test", "TESTTEST", false));
   EXPECT_FALSE(StringUtil::startsWith("", "test"));
+}
+
+TEST(StringUtil, escape) {
+  EXPECT_EQ(StringUtil::escape("hello world"), "hello world");
+  EXPECT_EQ(StringUtil::escape("hello\nworld\n"), "hello\\nworld\\n");
+  EXPECT_EQ(StringUtil::escape("\t\nworld\r\n"), "\\t\\nworld\\r\\n");
+  EXPECT_EQ(StringUtil::escape("{\"linux\": \"penguin\"}"), "{\\\"linux\\\": \\\"penguin\\\"}");
 }

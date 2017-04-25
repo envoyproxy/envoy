@@ -1,28 +1,53 @@
 load("@protobuf_bzl//:protobuf.bzl", "cc_proto_library")
 
-ENVOY_COPTS = [
-    # TODO(htuch): Remove this when Bazel bringup is done.
-    "-DBAZEL_BRINGUP",
-    "-fno-omit-frame-pointer",
-    # TODO(htuch): Clang wants -ferror-limit, should support both. Commented out for now.
-    # "-fmax-errors=3",
-    "-Wall",
-    # TODO(htuch): Figure out why protobuf-3.2.0 causes the CI build to fail
-    # with this but not the developer-local build.
-    #"-Wextra",
-    "-Werror",
-    "-Wnon-virtual-dtor",
-    "-Woverloaded-virtual",
-    # TODO(htuch): Figure out how to use this in the presence of headers in
-    # openssl/tclap which use old style casts.
-    # "-Wold-style-cast",
-    "-std=c++0x",
-    "-includeprecompiled/precompiled.h",
-]
+def envoy_package():
+    native.package(default_visibility = ["//visibility:public"])
+
+# Compute the final copts based on various options.
+def envoy_copts(repository):
+    return [
+        # TODO(htuch): Remove this when Bazel bringup is done.
+        "-DBAZEL_BRINGUP",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wnon-virtual-dtor",
+        "-Woverloaded-virtual",
+        "-Wold-style-cast",
+        "-std=c++0x",
+    ] + select({
+        # Bazel adds an implicit -DNDEBUG for opt.
+        repository + "//bazel:opt_build": [],
+        repository + "//bazel:fastbuild_build": [],
+        repository + "//bazel:dbg_build": ["-ggdb3"],
+    }) + select({
+        repository + "//bazel:disable_tcmalloc": [],
+        "//conditions:default": ["-DTCMALLOC"],
+    }) + select({
+        # Allow debug symbols to be added to opt/fastbuild as well.
+        repository + "//bazel:debug_symbols": ["-ggdb3"],
+        "//conditions:default": [],
+    })
 
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
     return "//external:%s" % dep
+
+# Dependencies on tcmalloc_and_profiler should be wrapped with this function.
+def tcmalloc_external_dep(repository):
+    return select({
+        repository + "//bazel:disable_tcmalloc": None,
+        "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
+    })
+
+# As above, but wrapped in list form for adding to dep lists. This smell seems needed as
+# SelectorValue values have to match the attribute type. See
+# https://github.com/bazelbuild/bazel/issues/2273.
+def tcmalloc_external_deps(repository):
+    return select({
+        repository + "//bazel:disable_tcmalloc": [],
+        "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
+    })
 
 # Transform the package path (e.g. include/envoy/common) into a path for
 # exporting the package headers at (e.g. envoy/common). Source files can then
@@ -39,43 +64,87 @@ def envoy_cc_library(name,
                      copts = [],
                      visibility = None,
                      external_deps = [],
+                     tcmalloc_dep = None,
                      repository = "",
                      deps = []):
+    if tcmalloc_dep:
+        deps += tcmalloc_external_deps(repository)
     native.cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        copts = ENVOY_COPTS + copts,
+        copts = envoy_copts(repository) + copts,
         visibility = visibility,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//include/envoy/common:base_includes",
-            repository + "//source/precompiled:precompiled_includes",
+            envoy_external_dep_path('spdlog'),
         ],
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         alwayslink = 1,
+        linkstatic = 1,
+    )
+
+def _git_stamped_genrule(repository, name):
+    # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
+    # do binary rewriting to replace the linker produced MD5 hash with the
+    # version_generated.cc git SHA1 hash (truncated).
+    version_generated = repository + "//:version_generated.cc"
+    rewriter = repository + "//tools:git_sha_rewriter.py"
+    native.genrule(
+        name = name + "_stamped",
+        srcs = [
+            name,
+            version_generated,
+        ],
+        outs = [name + ".stamped"],
+        cmd = "cp $(location " + name + ") $@ && " +
+              "chmod u+w $@ && " +
+              "$(location " + rewriter + ") " +
+              "$(location " + version_generated + ") $@",
+        tools = [rewriter],
     )
 
 # Envoy C++ binary targets should be specified with this function.
 def envoy_cc_binary(name,
                     srcs = [],
                     data = [],
+                    testonly = 0,
                     visibility = None,
                     repository = "",
+                    stamped = False,
                     deps = []):
+    # Implicit .stamped targets to obtain builds with the (truncated) git SHA1.
+    if stamped:
+        _git_stamped_genrule(repository, name)
+        _git_stamped_genrule(repository, name + ".stripped")
     native.cc_binary(
         name = name,
         srcs = srcs,
         data = data,
-        copts = ENVOY_COPTS,
+        copts = envoy_copts(repository),
         linkopts = [
             "-pthread",
             "-lrt",
+            # Force MD5 hash in build. This is part of the workaround for
+            # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
+            # does this by itself prior to
+            # https://github.com/bazelbuild/bazel/commit/724706ba4836c3366fc85b40ed50ccf92f4c3882.
+            # Ironically, forcing it here so that in future releases we will
+            # have the same behavior. When everyone is using an updated version
+            # of Bazel, we can use linkopts to set the git SHA1 directly in the
+            # --build-id and avoid doing the following.
+            '-Wl,--build-id=md5',
+            '-Wl,--hash-style=gnu',
+            "-static-libstdc++",
+            "-static-libgcc",
         ],
+        testonly = testonly,
         linkstatic = 1,
         visibility = visibility,
-        deps = deps + [
-            repository + "//source/precompiled:precompiled_includes",
-        ],
+        malloc = tcmalloc_external_dep(repository),
+        # See above comment on MD5 hash.
+        stamp = 0,
+        deps = deps,
     )
 
 # Envoy C++ test targets should be specified with this function.
@@ -101,9 +170,12 @@ def envoy_cc_test(name,
     )
     native.cc_test(
         name = name,
-        copts = ENVOY_COPTS,
-        linkopts = ["-pthread"],
+        copts = envoy_copts(repository),
+        # TODO(mattklein123): It's not great that we universally link against the following libs.
+        # In particular, -latomic is not needed on all platforms. Make this more granular.
+        linkopts = ["-pthread", "-latomic"],
         linkstatic = 1,
+        malloc = tcmalloc_external_dep(repository),
         deps = [
             ":" + name + "_lib",
             repository + "//test:main"
@@ -127,14 +199,26 @@ def envoy_cc_test_library(name,
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = ENVOY_COPTS + ["-includetest/precompiled/precompiled_test.h"],
+        copts = envoy_copts(repository),
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            repository + "//source/precompiled:precompiled_includes",
-            repository + "//test/precompiled:precompiled_includes",
+            envoy_external_dep_path('googletest'),
+            repository + "//test/test_common:printers_includes",
         ],
         tags = tags,
         alwayslink = 1,
+        linkstatic = 1,
+    )
+
+# Envoy Python test binaries should be specified with this function.
+def envoy_py_test_binary(name,
+                         external_deps = [],
+                         deps = [],
+                         **kargs):
+    native.py_binary(
+        name = name,
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
+        **kargs
     )
 
 # Envoy C++ mock targets should be specified with this function.
@@ -163,8 +247,9 @@ def envoy_sh_test(name,
   )
   native.sh_test(
       name = name,
-      srcs = srcs,
+      srcs = ["//bazel:sh_test_wrapper.sh"],
       data = srcs + data,
+      args = ["$(location " + srcs[0] + ")"],
       **kargs
   )
 
@@ -191,4 +276,5 @@ def envoy_proto_library(name, srcs = [], deps = []):
         hdrs = [_proto_header(s) for s in srcs if _proto_header(s)],
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         deps = [internal_name],
+        linkstatic = 1,
     )

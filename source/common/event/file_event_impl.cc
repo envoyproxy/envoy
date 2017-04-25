@@ -1,5 +1,7 @@
 #include "common/event/file_event_impl.h"
 
+#include <cstdint>
+
 #include "common/common/assert.h"
 #include "common/event/dispatcher_impl.h"
 

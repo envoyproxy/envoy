@@ -1,11 +1,22 @@
 #include "common/network/cidr_range.h"
 
+#include <arpa/inet.h>
+#include <netinet/ip.h>
+#include <sys/socket.h>
+
+#include <array>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Network {
 namespace Address {

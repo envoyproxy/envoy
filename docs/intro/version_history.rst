@@ -27,7 +27,7 @@ Version history
   iptables based transparent proxy support).
 * TCP proxy filter :ref:`route table support <config_network_filters_tcp_proxy>`.
 * Configurable :ref:`stats flush interval <config_overview_stats_flush_interval_ms>`.
-* Various :ref:`third party library upgrades <install_requirements>`, including using boringssl as
+* Various :ref:`third party library upgrades <install_requirements>`, including using BoringSSL as
   the default SSL provider.
 * No longer maintain closed HTTP/2 streams for priority calculations. Leads to substantial memory
   savings for large meshes.

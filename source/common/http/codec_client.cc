@@ -1,5 +1,7 @@
 #include "common/http/codec_client.h"
 
+#include <cstdint>
+
 #include "common/common/enum_to_int.h"
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
@@ -46,6 +48,10 @@ void CodecClient::onEvent(uint32_t events) {
   if (events & Network::ConnectionEvent::Connected) {
     conn_log_debug("connected", *connection_);
     connected_ = true;
+  }
+
+  if (events & Network::ConnectionEvent::RemoteClose) {
+    remote_closed_ = true;
   }
 
   // HTTP/1 can signal end of response by disconnecting. We need to handle that case.

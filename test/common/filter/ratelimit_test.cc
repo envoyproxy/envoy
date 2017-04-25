@@ -1,3 +1,7 @@
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/filter/ratelimit.h"
 #include "common/stats/stats_impl.h"
@@ -6,6 +10,10 @@
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;

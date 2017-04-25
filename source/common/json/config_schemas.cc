@@ -1,5 +1,7 @@
 #include "common/json/config_schemas.h"
 
+#include <string>
+
 const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -19,7 +21,8 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
               "type" : "string"
             }
           },
-          "cipher_suites" : {"type" : "string"}
+          "cipher_suites" : {"type" : "string", "minLength" : 1},
+          "ecdh_curves" : {"type" : "string", "minLength" : 1}
         },
         "required": ["cert_chain_file", "private_key_file"],
         "additionalProperties": false
@@ -253,7 +256,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "properties" : {"$ref" : "#/definitions/filters"}
       },
       "add_user_agent" : {"type" : "boolean"},
-      "tracing" : {"$ref" : "#/defintions/tracing"},
+      "tracing" : {"$ref" : "#/definitions/tracing"},
       "http_codec_options" : {
         "type" : "string",
         "enum" : ["no_compression"]
@@ -389,7 +392,8 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
                     }
                   },
                   "source_ports": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "destination_ip_list" : {
                     "type": "array",
@@ -398,7 +402,8 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
                     }
                   },
                   "destination_ports": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": ["cluster"],
@@ -523,6 +528,7 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
     "definitions" : {
       "weighted_clusters" : {
         "type" : "object",
+        "minItems": 1,
         "properties" : {
           "clusters" : {
             "type" : "array",
@@ -567,6 +573,11 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "retry_policy" : {
         "type" : "object",
         "properties" : {
+          "per_try_timeout_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
           "num_retries" : {"type" : "integer"},
           "retry_on" : {"type" : "string"}
         },
@@ -710,6 +721,7 @@ const std::string Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA(R"EOF(
             "enum" : ["header_value_match"]
           },
           "descriptor_value" : {"type" : "string"},
+          "expect_match" : {"type" : "boolean"},
           "headers" : {
             "type" : "array",
             "minItems" : 1,
@@ -1093,7 +1105,8 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
               "type" : "string"
             }
           },
-          "cipher_suites" : {"type" : "string"},
+          "cipher_suites" : {"type" : "string", "minLength" : 1},
+          "ecdh_curves" : {"type" : "string", "minLength" : 1},
           "sni" : {"type" :"string"}
         },
         "additionalProperties" : false
@@ -1178,6 +1191,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
             "exclusiveMinimum" : true
           },
           "success_rate_request_volume" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "success_rate_stdev_factor" : {
             "type" : "integer",
             "minimum" : 0,
             "exclusiveMinimum" : true

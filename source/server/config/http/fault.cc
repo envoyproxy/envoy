@@ -1,5 +1,7 @@
 #include "server/config/http/fault.h"
 
+#include <string>
+
 #include "common/http/filter/fault_filter.h"
 #include "common/json/config_schemas.h"
 

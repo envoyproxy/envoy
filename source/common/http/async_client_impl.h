@@ -1,5 +1,14 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
@@ -85,6 +94,9 @@ private:
 
   struct NullRetryPolicy : public Router::RetryPolicy {
     // Router::RetryPolicy
+    std::chrono::milliseconds perTryTimeout() const override {
+      return std::chrono::milliseconds(0);
+    }
     uint32_t numRetries() const override { return 0; }
     uint32_t retryOn() const override { return 0; }
   };

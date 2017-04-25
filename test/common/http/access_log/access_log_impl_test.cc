@@ -1,3 +1,8 @@
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -16,7 +21,11 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -333,39 +342,6 @@ TEST_F(AccessLogImplTest, requestTracing) {
   }
 }
 
-TEST(AccessLogImplTestCtor, OperatorIsNotSupported) {
-  std::vector<std::string> unsupported_operators = {"<", "<=", ">"};
-
-  Runtime::MockLoader runtime;
-  ::AccessLog::MockAccessLogManager log_manager;
-
-  for (const auto& oper : unsupported_operators) {
-    std::string json =
-        "{ \"path\": \"/dev/null\", \"filter\": {\"type\": \"status_code\", \"op\": \"" + oper +
-        "\", \"value\" : 500}}";
-
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-    EXPECT_THROW(InstanceImpl::fromJson(*loader, runtime, log_manager),
-
-                 EnvoyException);
-  }
-}
-
-TEST(AccessLogImplTestCtor, FilterTypeNotSupported) {
-  Runtime::MockLoader runtime;
-  ::AccessLog::MockAccessLogManager log_manager;
-
-  std::string json = R"EOF(
-    {
-      "path": "/dev/null",
-      "filter": {"type": "unknown"}
-    }
-  )EOF";
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-
-  EXPECT_THROW(InstanceImpl::fromJson(*loader, runtime, log_manager), EnvoyException);
-}
-
 TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
   Runtime::MockLoader runtime;
   ::AccessLog::MockAccessLogManager log_manager;
@@ -388,59 +364,6 @@ TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
         "path": "/dev/null",
         "filter": {"type": "logical_and"}
       }
-    )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-
-    EXPECT_THROW(InstanceImpl::fromJson(*loader, runtime, log_manager), EnvoyException);
-  }
-}
-
-TEST(AccessLogImplTestCtor, lessThanTwoInFilterList) {
-  Runtime::MockLoader runtime;
-  ::AccessLog::MockAccessLogManager log_manager;
-
-  {
-    std::string json = R"EOF(
-    {
-      "path": "/dev/null",
-      "filter": {"type": "logical_or", "filters" : []}
-    }
-    )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-
-    EXPECT_THROW(InstanceImpl::fromJson(*loader, runtime, log_manager), EnvoyException);
-  }
-
-  {
-    std::string json = R"EOF(
-    {
-      "path": "/dev/null",
-      "filter": {"type": "logical_and", "filters" : []}
-    }
-    )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-
-    EXPECT_THROW(InstanceImpl::fromJson(*loader, runtime, log_manager), EnvoyException);
-  }
-
-  {
-    std::string json = R"EOF(
-    {
-      "path": "/dev/null",
-      "filter": {"type": "logical_or", "filters" : [ {"type": "not_healthcheck"} ]}
-    }
-    )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
-
-    EXPECT_THROW(InstanceImpl::fromJson(*loader, runtime, log_manager), EnvoyException);
-  }
-
-  {
-    std::string json = R"EOF(
-    {
-      "path": "/dev/null",
-      "filter": {"type": "logical_and", "filters" : [ {"type": "not_healthcheck"} ]}
-    }
     )EOF";
     Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
 

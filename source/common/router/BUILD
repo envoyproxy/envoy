@@ -1,6 +1,10 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+envoy_package()
 
 envoy_cc_library(
     name = "config_lib",
@@ -33,6 +37,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/json:json_object_interface",
         "//include/envoy/upstream:resource_manager_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/http:headers_lib",
         "//source/common/json:config_schemas_lib",

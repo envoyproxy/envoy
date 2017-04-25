@@ -1,9 +1,24 @@
 #include "utility.h"
 
+#include <dirent.h>
+#include <unistd.h>
+
+#include <cstdint>
+#include <list>
+#include <mutex>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 
 #include "common/common/empty_string.h"
 #include "common/network/address_impl.h"
+
+#include "test/test_common/printers.h"
+
+#include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {
@@ -52,6 +67,32 @@ TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
     ret.emplace_back(new Network::Address::Ipv4Instance(address));
   }
   return ret;
+}
+
+std::vector<std::string> TestUtility::listFiles(const std::string& path, bool recursive) {
+  DIR* dir = opendir(path.c_str());
+  if (!dir) {
+    throw std::runtime_error(fmt::format("Directory not found '{}'", path));
+  }
+
+  std::vector<std::string> file_names;
+  dirent* entry;
+  while ((entry = readdir(dir)) != nullptr) {
+    std::string file_name = fmt::format("{}/{}", path, std::string(entry->d_name));
+    if (recursive && entry->d_type == DT_DIR && std::string(entry->d_name) != "." &&
+        std::string(entry->d_name) != "..") {
+      std::vector<std::string> more_file_names = listFiles(file_name, recursive);
+      file_names.insert(file_names.end(), more_file_names.begin(), more_file_names.end());
+      continue;
+    } else if (entry->d_type == DT_DIR) {
+      continue;
+    }
+
+    file_names.push_back(file_name);
+  }
+
+  closedir(dir);
+  return file_names;
 }
 
 void ConditionalInitializer::setReady() {

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -63,9 +67,9 @@ private:
   struct TlsLightStepTracer : ThreadLocal::ThreadLocalObject {
     TlsLightStepTracer(lightstep::Tracer tracer, LightStepDriver& driver);
 
-    void shutdown() override {}
+    void shutdown() override { tracer_.reset(); }
 
-    lightstep::Tracer tracer_;
+    std::unique_ptr<lightstep::Tracer> tracer_;
     LightStepDriver& driver_;
   };
 

@@ -1,8 +1,17 @@
+#include <cstdint>
+#include <list>
+#include <string>
+#include <vector>
+
 #include "common/redis/command_splitter_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/redis/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ByRef;

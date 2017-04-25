@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/network/listener.h"
 #include "envoy/network/connection_handler.h"
+#include "envoy/network/listener.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"

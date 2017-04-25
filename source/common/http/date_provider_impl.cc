@@ -1,5 +1,8 @@
 #include "common/http/date_provider_impl.h"
 
+#include <chrono>
+#include <string>
+
 namespace Http {
 
 DateFormatter DateProviderImplBase::date_formatter_("%a, %d %b %Y %H:%M:%S GMT");

@@ -3,3 +3,6 @@
 build:asan --copt -fsanitize=address
 build:asan --linkopt -fsanitize=address
 build:asan --linkopt -ldl
+build:asan --define tcmalloc=disabled
+build:asan --build_tag_filters=-no_asan
+build:asan --test_tag_filters=-no_asan

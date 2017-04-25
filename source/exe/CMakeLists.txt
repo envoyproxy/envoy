@@ -22,10 +22,6 @@ include_directories(SYSTEM ${ENVOY_OPENSSL_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_LIGHTSTEP_TRACER_INCLUDE_DIR})
 include_directories(SYSTEM ${ENVOY_CARES_INCLUDE_DIR})
 
-set_target_properties(envoy PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT
-                      "../precompiled/precompiled.h")
-cotire(envoy)
-
 if (ENVOY_STRIP)
   add_custom_command(TARGET envoy POST_BUILD
     COMMAND objcopy --only-keep-debug $<TARGET_FILE:envoy> $<TARGET_FILE:envoy>.dbg

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <chrono>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"

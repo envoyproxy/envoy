@@ -1,9 +1,11 @@
 #include "common/common/thread.h"
 
+#include <sys/syscall.h>
+
+#include <functional>
+
 #include "common/common/assert.h"
 #include "common/common/macros.h"
-
-#include <sys/syscall.h>
 
 namespace Thread {
 

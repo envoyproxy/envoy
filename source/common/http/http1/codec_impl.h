@@ -1,5 +1,11 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 

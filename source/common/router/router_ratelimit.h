@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 
@@ -92,6 +97,7 @@ public:
 
 private:
   const std::string descriptor_value_;
+  const bool expect_match_;
   std::vector<Router::ConfigUtility::HeaderData> action_headers_;
 };
 

@@ -1,3 +1,9 @@
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <string>
+#include <vector>
+
 #include "envoy/api/api.h"
 #include "envoy/http/codec.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -13,6 +19,9 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -438,26 +447,6 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
     "connect_timeout_ms": 250,
     "type": "static",
     "lb_type": "fakelbtype",
-    "hosts": [{"url": "tcp://192.168.1.1:22"},
-              {"url": "tcp://192.168.1.2:44"}]
-  }
-  )EOF";
-
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
-  EXPECT_THROW(StaticClusterImpl(*config, runtime, stats, ssl_context_manager), EnvoyException);
-}
-
-TEST(StaticClusterImplTest, UnsupportedFeature) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  NiceMock<Runtime::MockLoader> runtime;
-  std::string json = R"EOF(
-  {
-    "name": "addressportconfig",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "features": "fake",
     "hosts": [{"url": "tcp://192.168.1.1:22"},
               {"url": "tcp://192.168.1.2:44"}]
   }

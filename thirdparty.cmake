@@ -31,7 +31,6 @@ set(ENVOY_TCLAP_INCLUDE_DIR "/usr/local/google/home/fengli/fengli79/tclap-code/i
 set(ENVOY_GPERFTOOLS_INCLUDE_DIR "/usr/local/google/home/fengli/fengli79/gperftools/src" CACHE FILEPATH "location of gperftools includes")
 
 # https://boringssl.googlesource.com/boringssl/+/chromium-stable
-# Last tested with sha be873e9f48b2a07269300282b69bb17d496c69ee
 set(ENVOY_OPENSSL_INCLUDE_DIR "/usr/local/google/home/fengli/fengli79/boringssl/include" CACHE FILEPATH "location of openssl includes")
 
 # https://github.com/c-ares/c-ares

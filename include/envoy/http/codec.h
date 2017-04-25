@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <memory>
+
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -97,6 +101,8 @@ public:
     codec_callbacks_ = &callbacks;
   }
 
+  bool remoteClosed() const { return remote_closed_; }
+
 protected:
   /**
    * Create a codec client and connect to a remote host/port.
@@ -178,6 +184,7 @@ private:
   Http::ConnectionCallbacks* codec_callbacks_{};
   CodecClientCallbacks* codec_client_callbacks_{};
   bool connected_{};
+  bool remote_closed_{};
 };
 
 typedef std::unique_ptr<CodecClient> CodecClientPtr;

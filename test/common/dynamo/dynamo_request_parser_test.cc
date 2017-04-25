@@ -1,8 +1,14 @@
-#include "common/dynamo/dynamo_request_parser.h"
-#include "common/json/json_loader.h"
-#include "common/http/header_map_impl.h"
+#include <string>
+#include <vector>
 
+#include "common/dynamo/dynamo_request_parser.h"
+#include "common/http/header_map_impl.h"
+#include "common/json/json_loader.h"
+
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Dynamo {
 

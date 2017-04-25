@@ -1,7 +1,13 @@
 #include "common/http/access_log/access_log_formatter.h"
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 namespace AccessLog {
@@ -107,7 +113,7 @@ const std::string& AccessLogFormatUtils::protocolToString(Protocol protocol) {
     return Http2String;
   }
 
-  NOT_IMPLEMENTED;
+  NOT_REACHED;
 }
 
 FormatterImpl::FormatterImpl(const std::string& format) {

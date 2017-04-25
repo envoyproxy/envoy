@@ -1,13 +1,16 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+envoy_package()
 
 envoy_cc_library(
     name = "admin_lib",
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
     deps = [
-        "//:version_generated",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:listen_socket_interface",
@@ -39,6 +42,7 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/server/config/network:http_connection_manager_lib",
+        "//source/version_generated",
     ],
 )
 

@@ -1,5 +1,8 @@
 #include "common/http/http1/codec_impl.h"
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
@@ -9,6 +12,8 @@
 #include "common/http/exception.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 namespace Http1 {

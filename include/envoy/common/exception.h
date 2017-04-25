@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stdexcept>
+#include <string>
+
 /**
  * Base class for all envoy exceptions.
  */

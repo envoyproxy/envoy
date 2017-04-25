@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 

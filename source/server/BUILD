@@ -1,6 +1,10 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+envoy_package()
 
 envoy_cc_library(
     name = "configuration_lib",
@@ -14,6 +18,7 @@ envoy_cc_library(
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/ssl:context_manager_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/json:config_schemas_lib",
@@ -88,10 +93,10 @@ envoy_cc_library(
     hdrs = ["options_impl.h"],
     external_deps = ["tclap"],
     deps = [
-        "//:version_generated",
         "//include/envoy/server:options_interface",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
+        "//source/version_generated",
     ],
 )
 
@@ -104,7 +109,6 @@ envoy_cc_library(
         ":connection_handler_lib",
         ":test_hooks_lib",
         ":worker_lib",
-        "//:version_generated",
         "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
@@ -130,6 +134,7 @@ envoy_cc_library(
         "//source/common/stats:statsd_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/server/http:admin_lib",
+        "//source/version_generated",
     ],
 )
 

@@ -1,6 +1,10 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+envoy_package()
 
 envoy_cc_library(
     name = "assert_lib",
@@ -99,6 +103,6 @@ envoy_cc_library(
     srcs = ["version.cc"],
     deps = [
         ":version_includes",
-        "//:version_generated",
+        "//source/version_generated",
     ],
 )

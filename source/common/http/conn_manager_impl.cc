@@ -1,5 +1,11 @@
 #include "common/http/conn_manager_impl.h"
 
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <string>
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -21,6 +27,8 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 

@@ -1,8 +1,15 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/thread/thread.h"
 
 #include "common/common/macros.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Logger {
 

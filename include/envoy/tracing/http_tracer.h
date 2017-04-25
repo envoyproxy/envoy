@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/common/pure.h"
 #include "envoy/http/access_log.h"
 #include "envoy/http/header_map.h"

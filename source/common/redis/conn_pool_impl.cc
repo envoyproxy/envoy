@@ -1,5 +1,10 @@
 #include "common/redis/conn_pool_impl.h"
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/common/assert.h"
 #include "common/json/config_schemas.h"
 

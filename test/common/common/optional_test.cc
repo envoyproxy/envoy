@@ -1,5 +1,7 @@
 #include "envoy/common/optional.h"
 
+#include "gtest/gtest.h"
+
 TEST(Optional, All) {
   Optional<int> optional;
   EXPECT_FALSE(optional.valid());

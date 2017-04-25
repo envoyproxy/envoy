@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/exception.h"
 #include "envoy/common/optional.h"
 #include "envoy/http/header_map.h"

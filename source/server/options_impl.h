@@ -1,6 +1,12 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/server/options.h"
+
+#include "spdlog/spdlog.h"
 
 /**
  * Implementation of Server::Options.

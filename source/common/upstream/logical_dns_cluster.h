@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <string>
+
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"

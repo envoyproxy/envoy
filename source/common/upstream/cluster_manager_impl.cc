@@ -1,19 +1,28 @@
 #include "common/upstream/cluster_manager_impl.h"
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <list>
+#include <string>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/http/async_client_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/ring_hash_lb.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Upstream {
 
@@ -151,7 +160,8 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
         config.getObject("outlier_detection")->getString("event_log_path", "");
     if (!event_log_file_path.empty()) {
       outlier_event_logger_.reset(new Outlier::EventLoggerImpl(log_manager, event_log_file_path,
-                                                               ProdSystemTimeSource::instance_));
+                                                               ProdSystemTimeSource::instance_,
+                                                               ProdMonotonicTimeSource::instance_));
     }
   }
 

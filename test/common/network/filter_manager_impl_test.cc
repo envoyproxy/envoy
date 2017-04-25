@@ -1,6 +1,9 @@
+#include <string>
+#include <vector>
+
 #include "common/buffer/buffer_impl.h"
-#include "common/filter/tcp_proxy.h"
 #include "common/filter/ratelimit.h"
+#include "common/filter/tcp_proxy.h"
 #include "common/network/filter_manager_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -12,6 +15,10 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;

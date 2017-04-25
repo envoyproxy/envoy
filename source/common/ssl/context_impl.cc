@@ -1,5 +1,10 @@
 #include "common/ssl/context_impl.h"
 
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 
@@ -7,6 +12,7 @@
 #include "common/common/hex.h"
 
 #include "openssl/x509v3.h"
+#include "spdlog/spdlog.h"
 
 namespace Ssl {
 
@@ -49,27 +55,17 @@ DH* get_dh2048() {
 const unsigned char ContextImpl::SERVER_SESSION_ID_CONTEXT = 1;
 
 ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config)
-    : parent_(parent), ctx_(SSL_CTX_new(SSLv23_method())), scope_(scope),
+    : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
       stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_);
-  // the list of ciphers that will be supported
-  if (!config.cipherSuites().empty()) {
-    const std::string& cipher_suites = config.cipherSuites();
 
-    if (!SSL_CTX_set_cipher_list(ctx_.get(), cipher_suites.c_str())) {
-      throw EnvoyException(fmt::format("Failed to initialize cipher suites {}", cipher_suites));
-    }
+  if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
+    throw EnvoyException(
+        fmt::format("Failed to initialize cipher suites {}", config.cipherSuites()));
+  }
 
-    // verify that all of the specified ciphers were understood by openssl
-    ssize_t num_configured = std::count(cipher_suites.begin(), cipher_suites.end(), ':') + 1;
-#ifdef OPENSSL_IS_BORINGSSL
-    if (sk_SSL_CIPHER_num(ctx_->cipher_list->ciphers) != static_cast<size_t>(num_configured)) {
-#else
-    if (sk_SSL_CIPHER_num(ctx_->cipher_list) != num_configured) {
-#endif
-      throw EnvoyException(
-          fmt::format("Unknown cipher specified in cipher suites {}", config.cipherSuites()));
-    }
+  if (!SSL_CTX_set1_curves_list(ctx_.get(), config.ecdhCurves().c_str())) {
+    throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", config.ecdhCurves()));
   }
 
   if (!config.caCertFile().empty()) {
@@ -115,52 +111,19 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, Contex
     verify_certificate_hash_ = Hex::decode(hash);
   }
 
-  SSL_CTX_set_options(ctx_.get(), SSL_OP_NO_SSLv2);
   SSL_CTX_set_options(ctx_.get(), SSL_OP_NO_SSLv3);
-
-  // releases buffers when they're no longer needed - saves ~34k per idle connection
-  SSL_CTX_set_mode(ctx_.get(), SSL_MODE_RELEASE_BUFFERS);
-
-  // disable SSL compression
-  SSL_CTX_set_options(ctx_.get(), SSL_OP_NO_COMPRESSION);
 
   // use the server's cipher list preferences
   SSL_CTX_set_options(ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
 
-  SSL_CTX_set_options(ctx_.get(), SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
-
   // Initialize DH params - 2048 bits was chosen based on recommendations from:
   // https://www.openssl.org/blog/blog/2015/05/20/logjam-freak-upcoming-changes/
   DH* dh = get_dh2048();
-#ifdef OPENSSL_IS_BORINGSSL
   long rc = SSL_CTX_set_tmp_dh(ctx_.get(), dh);
-#else
-  long rc = SSL_CTX_ctrl(ctx_.get(), SSL_CTRL_SET_TMP_DH, 0, reinterpret_cast<char*>(dh));
-#endif
   DH_free(dh);
-
-  // As of openssl 1.0.2f this is on by default and cannot be disabled. Set it here anyway.
-  SSL_CTX_set_options(ctx_.get(), SSL_OP_SINGLE_DH_USE);
 
   if (1 != rc) {
     throw EnvoyException(fmt::format("Failed to initialize DH params"));
-  }
-
-  // Initialize elliptic curve - this curve was chosen to match the one currently supported by ELB
-  EC_KEY* ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-  if (!ecdh) {
-    throw EnvoyException(fmt::format("Failed to initialize elliptic curve"));
-  }
-
-#ifdef OPENSSL_IS_BORINGSSL
-  rc = SSL_CTX_set_tmp_ecdh(ctx_.get(), ecdh);
-#else
-  rc = SSL_CTX_ctrl(ctx_.get(), SSL_CTRL_SET_TMP_ECDH, 0, reinterpret_cast<char*>(ecdh));
-#endif
-  EC_KEY_free(ecdh);
-
-  if (1 != rc) {
-    throw EnvoyException(fmt::format("Failed to initialize elliptic curve"));
   }
 
   SSL_CTX_set_session_id_context(ctx_.get(), &SERVER_SESSION_ID_CONTEXT,
@@ -368,9 +331,6 @@ std::string ContextImpl::getSerialNumber(X509* cert) {
   if (char_serial_number != nullptr) {
     std::string serial_number(char_serial_number);
     OPENSSL_free(char_serial_number);
-#ifdef OPENSSL_IS_BORINGSSL
-    std::transform(serial_number.begin(), serial_number.end(), serial_number.begin(), ::toupper);
-#endif
     return serial_number;
   }
   return "";
@@ -402,12 +362,7 @@ SslConPtr ClientContextImpl::newSsl() const {
   SslConPtr ssl_con = SslConPtr(ContextImpl::newSsl());
 
   if (!server_name_indication_.empty()) {
-#ifdef OPENSSL_IS_BORINGSSL
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());
-#else
-    int rc = SSL_ctrl(ssl_con.get(), SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name,
-                      const_cast<char*>(server_name_indication_.c_str()));
-#endif
     RELEASE_ASSERT(rc);
     UNREFERENCED_PARAMETER(rc);
   }

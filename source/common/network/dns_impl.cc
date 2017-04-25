@@ -1,5 +1,15 @@
 #include "common/network/dns_impl.h"
 
+#include <netdb.h>
+#include <netinet/ip.h>
+#include <sys/socket.h>
+
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"

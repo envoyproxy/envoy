@@ -1,10 +1,16 @@
+#include <cstdint>
+#include <string>
+
 #include "server/configuration_impl.h"
 
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/utility.h"
 
-#include <dirent.h>
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 using testing::_;
 using testing::Invoke;
@@ -33,7 +39,7 @@ public:
     try {
       main_config.initialize(*config_json);
     } catch (const EnvoyException& ex) {
-      throw EnvoyException(fmt::format("'{}' config failed. Error: {}", file_path, ex.what()));
+      ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", file_path, ex.what());
     }
 
     server_.thread_local_.shutdownThread();
@@ -45,30 +51,13 @@ public:
 };
 
 uint32_t run(const std::string& directory) {
+
   uint32_t num_tested = 0;
-  DIR* dir = opendir(directory.c_str());
-  if (!dir) {
-    throw std::runtime_error("Generated configs directory not found");
-  }
-
-  dirent* entry;
-  while ((entry = readdir(dir)) != nullptr) {
-    std::string file_name = fmt::format("{}/{}", directory, std::string(entry->d_name));
-    Logger::Registry::getLog(Logger::Id::testing).info("iterating: {}", file_name);
-    if (entry->d_type == DT_DIR && std::string(entry->d_name) != "." &&
-        std::string(entry->d_name) != "..") {
-      num_tested += run(file_name);
-      continue;
-    } else if (entry->d_type == DT_DIR) {
-      continue;
-    }
-
-    Logger::Registry::getLog(Logger::Id::testing).info("testing config: {}", file_name);
-    ConfigTest config(file_name);
+  for (const std::string& filename : TestUtility::listFiles(directory, true)) {
+    ConfigTest config(filename);
     num_tested++;
   }
 
-  closedir(dir);
   return num_tested;
 }
 

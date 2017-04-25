@@ -1,5 +1,7 @@
 #include "server/config/http/dynamo.h"
 
+#include <string>
+
 #include "common/dynamo/dynamo_filter.h"
 
 namespace Server {
