@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_py_test_binary",
     "envoy_package",
+    "envoy_py_test_binary",
 )
 
 envoy_package()
