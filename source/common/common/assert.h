@@ -1,6 +1,5 @@
 #pragma once
 
-#include "common/common/backward.h"
 #include "common/common/logger.h"
 
 /**
@@ -10,7 +9,6 @@
 #define RELEASE_ASSERT(X)                                                                          \
   {                                                                                                \
     if (!(X)) {                                                                                    \
-      BACKTRACE_PROD_LOG();                                                                        \
       Logger::Registry::getLog(Logger::Id::assert)                                                 \
           .critical("assert failure: {}: {}:{}", #X, __FILE__, __LINE__);                          \
       abort();                                                                                     \
@@ -27,7 +25,6 @@
  * Indicate a panic situation and exit.
  */
 #define PANIC(X)                                                                                   \
-  BACKTRACE_PROD_LOG();                                                                            \
   Logger::Registry::getLog(Logger::Id::assert)                                                     \
       .critical("panic: {}: {}:{}", X, __FILE__, __LINE__);                                        \
   abort();

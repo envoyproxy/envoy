@@ -17,16 +17,12 @@ def envoy_copts(repository):
         "-std=c++0x",
     ] + select({
         # Bazel adds an implicit -DNDEBUG for opt.
-        repository + "//bazel:opt_build": [],
+        repository + "//bazel:opt_build": ["-ggdb3"],
         repository + "//bazel:fastbuild_build": [],
         repository + "//bazel:dbg_build": ["-ggdb3"],
     }) + select({
         repository + "//bazel:disable_tcmalloc": [],
         "//conditions:default": ["-DTCMALLOC"],
-    }) + select({
-        # Allow debug symbols to be added to opt/fastbuild as well.
-        repository + "//bazel:debug_symbols": ["-ggdb3"],
-        "//conditions:default": [],
     })
 
 # References to Envoy external dependencies should be wrapped with this function.

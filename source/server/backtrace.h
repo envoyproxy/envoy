@@ -44,7 +44,7 @@
  * you to run tests containing backtrace commands added for debugging and see
  * the output like this:
  *
- *     bazel test -c dbg //test/common/common:backwards_test
+ *     bazel test -c dbg //test/server:backtrace_test
  *      --run_under=`pwd`/tools/stack_decode.py
  *      --strategy=TestRunner=standalone --cache_test_results=no
  *      --test_output=all

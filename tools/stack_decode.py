@@ -17,63 +17,72 @@ import re
 import subprocess
 import sys
 
+Backtrace = collections.namedtuple("Backtrace",
+                                   "log_prefix obj_file, address_list")
+
+
 # Process the log output looking for stacktrace snippets, print them out once
 # the entire stack trace has been read.  End when EOF received.
 def decode_stacktrace_log(input_source):
   traces = {}
-  trace_begin_re = re.compile('^(.+)\[backtrace\] Backtrace obj<(.+)> thr<(\d+)')
-  stackaddr_re = re.compile('\[backtrace\] thr<(\d+)> #(\d+) (0x[0-9a-fA-F]+)$')
-  trace_end_re = re.compile('\[backtrace\] end backtrace thread (\d+)')
+  trace_begin_re = re.compile(
+      "^(.+)\[backtrace\] Backtrace obj<(.+)> thr<(\d+)")
+  stackaddr_re = re.compile("\[backtrace\] thr<(\d+)> #\d+ (0x[0-9a-fA-F]+)$")
+  trace_end_re = re.compile("\[backtrace\] end backtrace thread (\d+)")
 
-  # build a dictionary indexed by thread_id:
-  #   value is a namedtuple (log_prefix, obj_file, [list of addresses])
-  Backtrace = collections.namedtuple('Backtrace', 'log_prefix obj_file, address_list')
+  # build a dictionary indexed by thread_id, value is a Backtrace namedtuple
   try:
     while True:
       line = input_source.readline()
-      if line == '':
-        return # EOF
+      if line == "":
+        return  # EOF
       begin_trace_match = trace_begin_re.search(line)
       if begin_trace_match:
         log_prefix, objfile, thread_id = begin_trace_match.groups()
-        traces[thread_id] = Backtrace(log_prefix = log_prefix,
-                                      obj_file = objfile,
-                                      address_list = [])
+        traces[thread_id] = Backtrace(
+            log_prefix=log_prefix, obj_file=objfile, address_list=[])
         continue
       stackaddr_match = stackaddr_re.search(line)
       if stackaddr_match:
-        thread_id, frame_idx, address = stackaddr_match.groups()
-        traces[thread_id].address_list.append((frame_idx, address))
+        thread_id, address = stackaddr_match.groups()
+        traces[thread_id].address_list.append(address)
         continue
       trace_end_match = trace_end_re.search(line)
       if trace_end_match:
         thread_id = trace_end_match.groups()[0]
         output_stacktrace(thread_id, traces[thread_id])
       else:
-        print line, # Pass through print all other log lines
+        # Pass through print all other log lines:
+        print line,
   except KeyboardInterrupt:
     return
+
 
 # Output one stacktrace after passing it through addr2line with appropriate
 # options
 def output_stacktrace(thread_id, traceinfo):
-  log_prefix, object_file, stack = traceinfo
   piped_input = ""
-  for stack_frame in stack:
-    piped_input += (stack_frame[1] + '\n')
-  addr2line = subprocess.Popen(['addr2line', '-Cpisfe', object_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+  for stack_addr in traceinfo.address_list:
+    piped_input += (stack_addr + "\n")
+  addr2line = subprocess.Popen(
+      ["addr2line", "-Cpisfe", traceinfo.obj_file],
+      stdin=subprocess.PIPE,
+      stdout=subprocess.PIPE)
   output_stdout, _ = addr2line.communicate(piped_input)
-  output_lines = output_stdout.split('\n')
+  output_lines = output_stdout.split("\n")
 
   resolved_stack_frames = list(enumerate(output_lines, start=1))
-  print "%s Backtrace (most recent call first) from thread %s:" % (log_prefix, thread_id)
+  print "%s Backtrace (most recent call first) from thread %s:" % (
+      traceinfo.log_prefix, thread_id)
   for stack_frame in resolved_stack_frames:
     print "  #%s %s" % (stack_frame[0], stack_frame[1])
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
   if len(sys.argv) > 1:
     print sys.argv[1:]
-    rununder = subprocess.Popen(sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    rununder = subprocess.Popen(
+        sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     decode_stacktrace_log(rununder.stderr)
   else:
     decode_stacktrace_log(sys.stdin)

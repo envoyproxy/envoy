@@ -80,7 +80,7 @@ sandboxing must be disabled by specifying standalone execution. Example
 command line:
 
 ```
-bazel test -c dbg //test/common/common:backwards_test
+bazel test -c dbg //test/server:backtrace_test
 --run_under=`pwd`/tools/stack_decode.py --strategy=TestRunner=standalone
 --cache_test_results=no --test_output=all
 ```
@@ -101,22 +101,14 @@ modes](https://bazel.build/versions/master/docs/bazel-user-manual.html#flag--com
 that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).
-* `opt`: `-O2 -DNDEBUG`, for production builds and performance benchmarking.
-* `dbg`: `-O0 -ggdb3`, debug symbols.
+* `opt`: `-O2 -DNDEBUG -ggdb3`, for production builds and performance benchmarking.
+* `dbg`: `-O0 -ggdb3`, no optimization and debug symbols.
 
 You can use the `-c <compilation_mode>` flag to control this, e.g.
 
 ```
 bazel build -c opt //source/exe:envoy-static
 ```
-
-Debug symbols can also be explicitly added to any build type with `--define
-debug_symbols=yes`, e.g.
-
-```
-bazel build -c opt --define debug_symbols=yes //source/exe:envoy-static
-```
-
 To build and run tests with the compiler's address sanitizer (ASAN) enabled:
 
 ```
