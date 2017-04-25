@@ -67,7 +67,7 @@ bazel test //test/common/http:async_client_impl_test
 
 Envoy can produce backtraces on demand or from assertions and other activity.
 The stack traces written in the log or to stderr contain addresses rather than
-resolved symbols.  The `tools/stack_Decode.py` script exists to process the output
+resolved symbols.  The `tools/stack_decode.py` script exists to process the output
 and do symbol resolution to make the stack traces useful.  Any log lines not
 relevant to the backtrace capability are passed through the script unchanged
 (it acts like a filter).
