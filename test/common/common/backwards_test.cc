@@ -10,3 +10,9 @@ TEST(Backward, Basic) {
   tracer.Capture();
   tracer.Log();
 }
+
+TEST(Backward, InvalidUsageTest) {
+  // Ensure we do not crash if logging is attempted when there was no trace captured
+  BackwardsTrace tracer(true);
+  tracer.Log();
+}

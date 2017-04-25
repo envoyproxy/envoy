@@ -63,6 +63,31 @@ the units tests in
 bazel test //test/common/http:async_client_impl_test
 ```
 
+# Stack trace symbol resolution
+
+Envoy can produce backtraces on demand or from assertions and other activity.
+The stack traces written in the log or to stderr contain addresses rather than
+resolved symbols.  The `tools/stack_Decode.py` script exists to process the output
+and do symbol resolution to make the stack traces useful.  Any log lines not
+relevant to the backtrace capability are passed through the script unchanged
+(it acts like a filter).
+
+The script runs in one of two modes. If passed no arguments it anticipates
+Envoy (or test) output on stdin. You can postprocess a log or pipe the output of
+an Envoy process. If passed some arguments it runs the arguments as a child
+process. This enables you to run a test with backtrace post processing. Bazel
+sandboxing must be disabled by specifying standalone execution. Example
+command line:
+
+```
+bazel test -c dbg //test/common/common:backwards_test
+--run_under=`pwd`/tools/stack_decode.py --strategy=TestRunner=standalone
+--cache_test_results=no --test_output=all
+```
+
+You will need to use either a `dbg` build type or the `--define
+debug_symbols=yes` option to get symbol information in the binaries.
+
 # Running a single Bazel test under GDB
 
 ```

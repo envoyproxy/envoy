@@ -93,9 +93,8 @@ public:
 #endif
     backward::TraceResolver resolver;
     resolver.load_stacktrace(stack_trace_);
-    // Our own call to Capture() should generate at least 3 stack frames, so we
-    // must have more than that.
-    if (stack_trace_.size() < 3) {
+    // If there's nothing in the captured trace we cannot do anything.
+    if (stack_trace_.size() < 1) {
       LogAtLevel("Back trace attempt failed");
       return;
     }
@@ -112,7 +111,7 @@ public:
 
     // Why start at 2? To hide the function call to backward that began the
     // trace.
-    for (unsigned int i = 2; i < stack_trace_.size(); ++i) {
+    for (unsigned int i = 0; i < stack_trace_.size(); ++i) {
       LogAtLevel("thr<{}> #{} {}", thread_id, stack_trace_[i].idx, stack_trace_[i].addr);
     }
     LogAtLevel("end backtrace thread {}", stack_trace_.thread_id());
