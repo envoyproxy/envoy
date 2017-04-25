@@ -18,7 +18,7 @@ import subprocess
 import sys
 
 Backtrace = collections.namedtuple("Backtrace",
-                                   "log_prefix obj_file, address_list")
+                                   "log_prefix obj_file address_list")
 
 
 # Process the log output looking for stacktrace snippets, print them out once
@@ -72,8 +72,8 @@ def output_stacktrace(thread_id, traceinfo):
   output_lines = output_stdout.split("\n")
 
   resolved_stack_frames = enumerate(output_lines, start=1)
-  sys.stdout.write("%s Backtrace (most recent call first) from thread %s:\n" % (
-      traceinfo.log_prefix, thread_id))
+  sys.stdout.write("%s Backtrace (most recent call first) from thread %s:\n" %
+                   (traceinfo.log_prefix, thread_id))
   for stack_frame in resolved_stack_frames:
     sys.stdout.write("  #%s %s\n" % stack_frame)
 
