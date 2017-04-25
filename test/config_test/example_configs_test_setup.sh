@@ -4,4 +4,4 @@ set -e
 
 DIR="$TEST_TMPDIR"/test/config_test
 mkdir -p "$DIR"
-tar -xvf configs/example_configs.tar -C "$DIR"
+tar -xvf "$TEST_RUNDIR"/configs/example_configs.tar -C "$DIR"

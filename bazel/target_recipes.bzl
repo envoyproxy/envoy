@@ -3,6 +3,7 @@
 # ci/build_container/build_recipes.
 TARGET_RECIPES = {
     "ares": "cares",
+    "backward": "backward",
     # TODO(htuch): Remove when cmake goes.
     "cotire": "cotire",
     "event": "libevent",

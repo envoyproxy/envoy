@@ -1,5 +1,8 @@
 load("@protobuf_bzl//:protobuf.bzl", "cc_proto_library")
 
+def envoy_package():
+    native.package(default_visibility = ["//visibility:public"])
+
 # Compute the final copts based on various options.
 def envoy_copts(repository):
     return [
@@ -210,10 +213,11 @@ def envoy_cc_test_library(name,
 # Envoy Python test binaries should be specified with this function.
 def envoy_py_test_binary(name,
                          external_deps = [],
+                         deps = [],
                          **kargs):
-    # TODO(htuch): Add support for external_deps, e.g. jinja2 for config_test.
     native.py_binary(
         name = name,
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
         **kargs
     )
 

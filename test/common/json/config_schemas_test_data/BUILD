@@ -1,6 +1,10 @@
-package(default_visibility = ["//visibility:public"])
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_package",
+    "envoy_py_test_binary",
+)
 
-load("//bazel:envoy_build_system.bzl", "envoy_py_test_binary")
+envoy_package()
 
 envoy_py_test_binary(
     name = "generate_test_data",
