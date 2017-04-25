@@ -63,6 +63,26 @@ the units tests in
 bazel test //test/common/http:async_client_impl_test
 ```
 
+To observe more verbose test output:
+
+```
+bazel test --test_output=streamed //test/common/http:async_client_impl_test
+```
+
+It's also possible to pass into an Envoy test additional command-line args via `--test_arg`. For
+example, for extremely verbose test debugging:
+
+```
+bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="-l trace"
+```
+
+Bazel will by default cache successful test results. To force it to rerun tests:
+
+
+```
+bazel test //test/common/http:async_client_impl_test --cache_test_results=no
+```
+
 # Running a single Bazel test under GDB
 
 ```
