@@ -11,7 +11,7 @@ travis lint .travis.yml --skip-completion-check
 if [ $TEST_TYPE == "docs" ]
 then
   echo "docs build..."
-  make docs
+  ./docs/build.sh
   ./docs/publish.sh
   exit 0
 else
