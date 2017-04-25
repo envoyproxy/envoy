@@ -11,7 +11,7 @@ travis lint .travis.yml --skip-completion-check
 ENVOY_BUILD_DIR=/tmp/envoy-docker-build
 
 # Do a build matrix with different types of builds docs, coverage, bazel.release, etc.
-if [ $TEST_TYPE == "docs" ]
+if [ "$TEST_TYPE" == "docs" ]
 then
   echo "docs build..."
   ./docs/build.sh
@@ -22,7 +22,8 @@ else
     lyft/envoy-build:$ENVOY_BUILD_SHA /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
 fi
 
-if [ $TEST_TYPE == "bazel.release" ]
+if [ "$TEST_TYPE" == "bazel.release" ]
+then
   mkdir -p "$ENVOY_BUILD_DIR"/build_release
   cp -f "$ENVOY_BUILD_DIR"/envoy/source/exe/envoy "$ENVOY_BUILD_DIR"/build_release
   # This script builds a lyft/envoy image and pushes that image on merge to master.
