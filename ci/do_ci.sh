@@ -12,6 +12,13 @@ if [[ "$1" == "bazel.release" ]]; then
   cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building..."
   bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt @envoy//source/exe:envoy-static.stripped.stamped
+  # Copy the envoy-static binary somewhere that we can access outside of the
+  # container.
+  DELIVER_DIR="${ENVOY_BUILD_DIR}"/source/exe
+  mkdir -p "${DELIVER_DIR}"
+  cp -f \
+    "${ENVOY_CONSUMER_SRCDIR}"/bazel-genfiles/external/envoy/source/exe/envoy-static.stripped.stamped \
+    "${DELIVER_DIR}"/envoy
   echo "Testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
