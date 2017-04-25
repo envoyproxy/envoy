@@ -83,10 +83,10 @@ Bazel will by default cache successful test results. To force it to rerun tests:
 bazel test //test/common/http:async_client_impl_test --cache_test_results=no
 ```
 
-By default, Bazel runs all tests inside a sandbox, which disallows access to the
-filesystem. If you need to break out of the sandbox (for example to run under a
-local script or tool with `--run_under`, you can run the test with `--strategy=TestRunner=standalone`,
-e.g.:
+Bazel will by default run all tests inside a sandbox, which disallows access to the
+local filesystem. If you need to break out of the sandbox (for example to run under a
+local script or tool with [`--run_under`](https://bazel.build/versions/master/docs/bazel-user-manual.html#flag--run_under)),
+you can run the test with `--strategy=TestRunner=standalone`, e.g.:
 
 ```
 bazel test //test/common/http:async_client_impl_test --strategy=TestRunner=standalone --run_under=/some/path/foobar.sh
