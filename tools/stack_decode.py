@@ -53,7 +53,7 @@ def decode_stacktrace_log(input_source):
         output_stacktrace(thread_id, traces[thread_id])
       else:
         # Pass through print all other log lines:
-        print line,
+        sys.stdout.write(line)
   except KeyboardInterrupt:
     return
 
@@ -72,15 +72,14 @@ def output_stacktrace(thread_id, traceinfo):
   output_lines = output_stdout.split("\n")
 
   resolved_stack_frames = enumerate(output_lines, start=1)
-  print "%s Backtrace (most recent call first) from thread %s:" % (
-      traceinfo.log_prefix, thread_id)
+  sys.stdout.write("%s Backtrace (most recent call first) from thread %s:\n" % (
+      traceinfo.log_prefix, thread_id))
   for stack_frame in resolved_stack_frames:
-    print "  #%s %s" % stack_frame
+    sys.stdout.write("  #%s %s\n" % stack_frame)
 
 
 if __name__ == "__main__":
   if len(sys.argv) > 1:
-    print sys.argv[1:]
     rununder = subprocess.Popen(
         sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     decode_stacktrace_log(rununder.stderr)
