@@ -151,7 +151,6 @@ class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() {}
 
-  virtual void decodeBase64(std::string&& message) PURE;
   virtual void decodeGetMore(GetMoreMessagePtr&& message) PURE;
   virtual void decodeInsert(InsertMessagePtr&& message) PURE;
   virtual void decodeKillCursors(KillCursorsMessagePtr&& message) PURE;
