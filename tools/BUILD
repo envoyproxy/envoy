@@ -1,11 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_py_test_binary",
     "envoy_package",
 )
 
 envoy_package()
-
-load("//bazel:envoy_build_system.bzl", "envoy_py_test_binary")
 
 exports_files([
     "gen_git_sha.sh",

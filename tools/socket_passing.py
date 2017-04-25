@@ -17,10 +17,10 @@ import sys
 import time
 
 # Seconds to wait for the admin address output file to appear. The script exits
-# if the file is not found.
+# with failure if the file is not found.
 ADMIN_FILE_TIMEOUT_SECS = 20
 
-def ReplaceListenerAddresses(original_json, admin_address, updated_json):
+def GenerateNewConfig(original_json, admin_address, updated_json):
   # Get original listener addresses
   with open(original_json, 'r') as original_json_file:
     # Import original config file in order to get a deterministic output. This
@@ -41,12 +41,12 @@ def ReplaceListenerAddresses(original_json, admin_address, updated_json):
     sys.stderr.write('Cannot connect to admin: %s\n' % e)
     return False
   else:
-    if not len(discovered_listeners) == len(original_listeners):
+    if len(discovered_listeners) != len(original_listeners):
       return False
     for discovered, original in zip(discovered_listeners, original_listeners):
       original['address'] = 'tcp://' + discovered
     with open(updated_json, 'w') as outfile:
-      json.dump(OrderedDict(parsed_json), outfile, indent=2)
+      json.dump(OrderedDict(parsed_json), outfile, indent=2, separators=(',',':'))
   finally:
     admin_conn.close()
 
@@ -77,7 +77,7 @@ if __name__ == '__main__':
   with open(admin_address_path, 'r') as admin_address_file:
     admin_address = admin_address_file.read()
 
-  result = ReplaceListenerAddresses(args.original_json, admin_address, args.updated_json)
+  success = GenerateNewConfig(args.original_json, admin_address, args.updated_json)
 
-  if not result:
+  if not success:
     sys.exit(1)

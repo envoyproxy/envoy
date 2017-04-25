@@ -1,6 +1,7 @@
 #include "server/http/admin.h"
 
 #include <cstdint>
+#include <fstream>
 #include <string>
 #include <unordered_set>
 

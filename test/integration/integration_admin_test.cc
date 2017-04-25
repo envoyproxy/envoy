@@ -133,9 +133,8 @@ TEST_F(IntegrationTest, Admin) {
   std::vector<Json::ObjectPtr> listener_info =
       Json::Factory::LoadFromString(response->body())->asObjectArray();
   for (std::size_t index = 0; index < listener_info.size(); index++) {
-    EXPECT_STREQ(
-        test_server_->server().getListenSocketByIndex(index)->localAddress()->asString().c_str(),
-        listener_info[index]->asString().c_str());
+    EXPECT_EQ(test_server_->server().getListenSocketByIndex(index)->localAddress()->asString(),
+              listener_info[index]->asString());
   }
 }
 

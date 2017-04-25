@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "common/http/message_impl.h"
 #include "common/profiler/profiler.h"
 
@@ -97,7 +99,7 @@ TEST_F(AdminInstanceTest, WriteAddressToFile) {
   std::ifstream address_file(address_out_path_);
   std::string address_from_file;
   std::getline(address_file, address_from_file);
-  EXPECT_STREQ(admin_.socket().localAddress()->asString().c_str(), address_from_file.c_str());
+  EXPECT_EQ(admin_.socket().localAddress()->asString(), address_from_file);
 }
 
 TEST_F(AdminInstanceTest, AdminBadAddressOutPath) {
