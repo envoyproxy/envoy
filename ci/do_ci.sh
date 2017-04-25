@@ -11,9 +11,9 @@ if [[ "$1" == "bazel.release" ]]; then
   echo "bazel release build with tests..."
   cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c opt @envoy//source/exe:envoy-static.stripped.stamped
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt @envoy//source/exe:envoy-static.stripped.stamped
   echo "Testing..."
-  bazel test ${BAZEL_TEST_OPTIONS} -c opt --test_output=all \
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
   exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
@@ -21,7 +21,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
   cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building and testing..."
   # TODO(htuch): This should switch to using clang when available.
-  bazel test ${BAZEL_TEST_OPTIONS} -c dbg --config=asan --test_output=all \
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=asan --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
   exit 0
 elif [[ "$1" == "bazel.fastbuild" ]]; then
