@@ -340,6 +340,8 @@ typedef struct SpanIsSet {
   bool trace_id_high_ : 1;
 } SpanIsSet;
 
+typedef std::unique_ptr<Span> SpanPtr;
+
 /**
  * Represents a Zipkin span. This class is based on Zipkin's Thrift definition of a span.
  */
