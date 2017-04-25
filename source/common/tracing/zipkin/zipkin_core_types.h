@@ -543,12 +543,12 @@ public:
    *
    * @param tracer Represents the Tracer object to be associated with the span.
    */
-  void setTracer(TracerRawPtr tracer) { tracer_ = tracer; }
+  void setTracer(TracerInterface* tracer) { tracer_ = tracer; }
 
   /**
    * @return the Tracer object associated with the span.
    */
-  TracerRawPtr tracer() const { return tracer_; }
+  TracerInterface* tracer() const { return tracer_; }
 
   /**
    * Marks a successful end of the span. This method will:
@@ -578,11 +578,8 @@ private:
   int64_t timestamp_;
   int64_t duration_;
   uint64_t trace_id_high_;
-
   int64_t start_time_;
-
-  TracerRawPtr tracer_;
-
+  TracerInterface* tracer_;
   SpanIsSet isset_;
 };
 } // Zipkin

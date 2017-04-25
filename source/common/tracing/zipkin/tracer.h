@@ -30,11 +30,7 @@ public:
   virtual void reportSpan(Span&& span) PURE;
 };
 
-typedef std::shared_ptr<Reporter> ReporterSharedPtr;
-
-typedef std::unique_ptr<Reporter> ReporterUniquePtr;
-
-typedef std::shared_ptr<Runtime::RandomGenerator> RandomGeneratorSharedPtr;
+typedef std::unique_ptr<Reporter> ReporterPtr;
 
 /**
  * This class implements the Zipkin tracer. It has methods to create the appropriate Zipkin span
@@ -57,15 +53,13 @@ public:
   Tracer(const std::string& service_name, const std::string& address)
       : service_name_(service_name), address_(address), random_generator_(nullptr) {}
 
-  virtual ~Tracer() {}
-
   /**
    * Creates a "root" Zipkin span.
    *
    * @param span_name Name of the new span.
    * @param start_time The time indicating the beginning of the span.
    */
-  Span startSpan(const std::string& span_name, uint64_t start_time);
+  SpanPtr startSpan(const std::string& span_name, uint64_t start_time);
 
   /**
    * Depending on the given context, creates either a "child" or a "shared-context" Zipkin span.
@@ -74,7 +68,8 @@ public:
    * @param start_time The time indicating the beginning of the span.
    * @param previous_context The context of the span preceding the one to be created.
    */
-  Span startSpan(const std::string& span_name, uint64_t start_time, SpanContext& previous_context);
+  SpanPtr startSpan(const std::string& span_name, uint64_t start_time,
+                    SpanContext& previous_context);
 
   /**
    * TracerInterface::reportSpan.
@@ -82,14 +77,9 @@ public:
   void reportSpan(Span&& span) override;
 
   /**
-   * @return the Reporter associated with the Tracer object.
-   */
-  ReporterSharedPtr reporter() { return reporter_; }
-
-  /**
    * Associates a Reporter object with this Tracer.
    */
-  void setReporter(ReporterUniquePtr reporter);
+  void setReporter(ReporterPtr reporter);
 
   /**
    * Provides a random-number generator to be used by the Tracer.
@@ -97,7 +87,7 @@ public:
    *
    * @param random_generator Random-number generator to be used.
    */
-  void setRandomGenerator(RandomGeneratorSharedPtr random_generator);
+  void setRandomGenerator(Runtime::RandomGeneratorPtr random_generator);
 
 private:
   /**
@@ -105,11 +95,9 @@ private:
    */
   uint64_t generateRandomNumber();
 
-  std::string service_name_;
-  std::string address_;
-
-  ReporterSharedPtr reporter_;
-
-  RandomGeneratorSharedPtr random_generator_;
+  const std::string service_name_;
+  const std::string address_;
+  ReporterPtr reporter_;
+  Runtime::RandomGeneratorPtr random_generator_;
 };
 } // Zipkin

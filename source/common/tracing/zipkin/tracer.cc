@@ -4,7 +4,7 @@
 
 namespace Zipkin {
 
-Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
+SpanPtr Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   // Build the endpoint
   std::string ip;
   uint16_t port;
@@ -20,30 +20,30 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   cs.setValue(ZipkinCoreConstants::CLIENT_SEND);
 
   // Create an all-new span, with no parent id
-  Span span;
-  span.setName(span_name);
+  SpanPtr span_ptr(new Span());
+  span_ptr->setName(span_name);
   uint64_t random_number = generateRandomNumber();
-  span.setId(random_number);
-  span.setTraceId(random_number);
-  span.setStartTime(start_time);
+  span_ptr->setId(random_number);
+  span_ptr->setTraceId(random_number);
+  span_ptr->setStartTime(start_time);
 
   // Set the timestamp globally for the span and also for the CS annotation
   uint64_t timestamp_micro;
   timestamp_micro = Util::timeSinceEpochMicro();
   cs.setTimestamp(timestamp_micro);
-  span.setTimestamp(timestamp_micro);
+  span_ptr->setTimestamp(timestamp_micro);
 
   // Add CS annotation to the span
-  span.addAnnotation(std::move(cs));
+  span_ptr->addAnnotation(std::move(cs));
 
-  span.setTracer(this);
+  span_ptr->setTracer(this);
 
-  return span;
+  return span_ptr;
 }
 
-Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
-                       SpanContext& previous_context) {
-  Span span;
+SpanPtr Tracer::startSpan(const std::string& span_name, uint64_t start_time,
+                          SpanContext& previous_context) {
+  SpanPtr span_ptr(new Span());
   Annotation annotation;
   uint64_t timestamp_micro;
 
@@ -56,32 +56,32 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
 
     // Create a new span id
     uint64_t random_number = generateRandomNumber();
-    span.setId(random_number);
+    span_ptr->setId(random_number);
 
-    span.setName(span_name);
+    span_ptr->setName(span_name);
 
     // Set the parent id to the id of the previous span
-    span.setParentId(previous_context.id());
+    span_ptr->setParentId(previous_context.id());
 
     // Set the CS annotation value
     annotation.setValue(ZipkinCoreConstants::CLIENT_SEND);
 
     // Set the timestamp globally for the span
-    span.setTimestamp(timestamp_micro);
+    span_ptr->setTimestamp(timestamp_micro);
   } else if ((previous_context.isSetAnnotation().cs_) &&
              (!previous_context.isSetAnnotation().sr_)) {
     // We need to create a new span that will share context with the previous span
 
     // Initialize the shared context for the new span
-    span.setId(previous_context.id());
+    span_ptr->setId(previous_context.id());
     if (previous_context.parent_id()) {
-      span.setParentId(previous_context.parent_id());
+      span_ptr->setParentId(previous_context.parent_id());
     }
 
     // Set the SR annotation value
     annotation.setValue(ZipkinCoreConstants::SERVER_RECV);
   } else {
-    return span; // return an empty span
+    return span_ptr; // return an empty span
   }
 
   // Build the endpoint
@@ -96,31 +96,28 @@ Span Tracer::startSpan(const std::string& span_name, uint64_t start_time,
   // Add the newly-created annotation to the span
   annotation.setEndpoint(std::move(ep));
   annotation.setTimestamp(timestamp_micro);
-  span.addAnnotation(std::move(annotation));
+  span_ptr->addAnnotation(std::move(annotation));
 
   // Keep the same trace id
-  span.setTraceId(previous_context.trace_id());
+  span_ptr->setTraceId(previous_context.trace_id());
 
-  span.setStartTime(start_time);
+  span_ptr->setStartTime(start_time);
 
-  span.setTracer(this);
+  span_ptr->setTracer(this);
 
-  return span;
+  return span_ptr;
 }
 
 void Tracer::reportSpan(Span&& span) {
-  auto r = reporter();
-  if (r) {
-    r->reportSpan(std::move(span));
+  if (reporter_) {
+    reporter_->reportSpan(std::move(span));
   }
 }
 
-void Tracer::setReporter(ReporterUniquePtr reporter) {
-  reporter_ = ReporterSharedPtr(std::move(reporter));
-}
+void Tracer::setReporter(ReporterPtr reporter) { reporter_ = std::move(reporter); }
 
-void Tracer::setRandomGenerator(RandomGeneratorSharedPtr random_generator) {
-  random_generator_ = random_generator;
+void Tracer::setRandomGenerator(Runtime::RandomGeneratorPtr random_generator) {
+  random_generator_ = std::move(random_generator);
 }
 
 uint64_t Tracer::generateRandomNumber() {

@@ -27,6 +27,8 @@ public:
   virtual std::string uuid() PURE;
 };
 
+typedef std::unique_ptr<RandomGenerator> RandomGeneratorPtr;
+
 /**
  * A snapshot of runtime data.
  */
