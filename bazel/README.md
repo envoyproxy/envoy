@@ -63,6 +63,34 @@ the units tests in
 bazel test //test/common/http:async_client_impl_test
 ```
 
+To observe more verbose test output:
+
+```
+bazel test --test_output=streamed //test/common/http:async_client_impl_test
+```
+
+It's also possible to pass into an Envoy test additional command-line args via `--test_arg`. For
+example, for extremely verbose test debugging:
+
+```
+bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="-l trace"
+```
+
+Bazel will by default cache successful test results. To force it to rerun tests:
+
+
+```
+bazel test //test/common/http:async_client_impl_test --cache_test_results=no
+```
+
+Bazel will by default run all tests inside a sandbox, which disallows access to the
+local filesystem. If you need to break out of the sandbox (for example to run under a
+local script or tool with [`--run_under`](https://bazel.build/versions/master/docs/bazel-user-manual.html#flag--run_under)),
+you can run the test with `--strategy=TestRunner=standalone`, e.g.:
+
+```
+bazel test //test/common/http:async_client_impl_test --strategy=TestRunner=standalone --run_under=/some/path/foobar.sh
+```
 # Stack trace symbol resolution
 
 Envoy can produce backtraces on demand or from assertions and other activity.
@@ -144,6 +172,43 @@ test/run_envoy_bazel_coverage.sh
 The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.
 
+# Cleaning the build and test artifacts
+
+`bazel clean` will nuke all the build/test artifacts from the Bazel cache for
+Envoy proper. To remove the artifacts for the external dependencies run
+`bazel clean --expunge`.
+
 # Adding or maintaining Envoy build rules
 
 See the [developer guide for writing Envoy Bazel rules](DEVELOPER.md).
+
+# Bazel performance on (virtual) machines with low resources
+
+If the (virtual) machine that is performing the build is low on memory or CPU
+resources, you can override Bazel's default job parallelism determination with
+`--jobs=N` to restrict the build to at most `N` simultaneous jobs, e.g.:
+
+```
+bazel build --jobs=2 //source/...
+```
+
+# Debugging the Bazel build
+
+When trying to understand what Bazel is doing, the `-s` and `--explain` options
+are useful. To have Bazel provide verbose output on which commands it is executing:
+
+```
+bazel build -s //source/...
+```
+
+To have Bazel emit to a text file the rationale for rebuilding a target:
+
+```
+bazel build --explain=file.txt //source/...
+```
+
+To get more verbose explanations:
+
+```
+bazel build --explain=file.txt --verbose_explanations //source/...
+```

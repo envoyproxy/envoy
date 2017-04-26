@@ -62,7 +62,7 @@ class AccessLog {
 public:
   AccessLog(const std::string& file_name, ::AccessLog::AccessLogManager& log_manager);
 
-  void logMessage(const Message& message, const std::string& base64, bool full,
+  void logMessage(const Message& message, bool full,
                   const Upstream::HostDescription* upstream_host);
 
 private:
@@ -98,7 +98,6 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data) override;
 
   // Mongo::DecoderCallback
-  void decodeBase64(std::string&& message) override { last_base64_op_ = std::move(message); }
   void decodeGetMore(GetMoreMessagePtr&& message) override;
   void decodeInsert(InsertMessagePtr&& message) override;
   void decodeKillCursors(KillCursorsMessagePtr&& message) override;
@@ -146,7 +145,6 @@ private:
   bool sniffing_{true};
   std::list<ActiveQueryPtr> active_query_list_;
   AccessLogSharedPtr access_log_;
-  std::string last_base64_op_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
