@@ -9,6 +9,7 @@
 #include "envoy/redis/conn_pool.h"
 
 #include "common/common/logger.h"
+#include "common/common/to_lower_table.h"
 
 namespace Redis {
 namespace CommandSplitter {
@@ -139,6 +140,7 @@ private:
   MGETCommandHandler mget_handler_;
   std::unordered_map<std::string, HandlerData> command_map_;
   InstanceStats stats_;
+  ToLowerTable to_lower_table_;
 };
 
 } // CommandSplitter

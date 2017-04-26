@@ -32,3 +32,9 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     deps = ["//source/common/common:utility_lib"],
 )
+
+envoy_cc_test(
+    name = "to_lower_table_test",
+    srcs = ["to_lower_table_test.cc"],
+    deps = ["//source/common/common:to_lower_table_lib"],
+)

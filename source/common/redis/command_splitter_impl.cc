@@ -145,7 +145,7 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
       mget_handler_(*conn_pool_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))} {
   // TODO(mattklein123) PERF: Make this a trie (like in header_map_impl).
-  // TODO(mattklein123): Make not case sensitive (like in header_map_impl).
+  addHandler(scope, stat_prefix, "expireby", all_to_one_handler_);
   addHandler(scope, stat_prefix, "incr", all_to_one_handler_);
   addHandler(scope, stat_prefix, "incrby", all_to_one_handler_);
   addHandler(scope, stat_prefix, "mget", mget_handler_);
@@ -164,7 +164,9 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
     }
   }
 
-  auto handler = command_map_.find(request.asArray()[0].asString());
+  std::string to_lower_string(request.asArray()[0].asString());
+  to_lower_table_.toLowerCase(to_lower_string);
+  auto handler = command_map_.find(to_lower_string);
   if (handler == command_map_.end()) {
     stats_.unsupported_command_.inc();
     callbacks.onResponse(Utility::makeError(
@@ -184,9 +186,12 @@ void InstanceImpl::onInvalidRequest(SplitCallbacks& callbacks) {
 
 void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefix,
                               const std::string& name, CommandHandler& handler) {
+  std::string to_lower_name(name);
+  to_lower_table_.toLowerCase(to_lower_name);
   command_map_.emplace(
-      name,
-      HandlerData{scope.counter(fmt::format("{}command.{}.total", stat_prefix, name)), handler});
+      to_lower_name,
+      HandlerData{scope.counter(fmt::format("{}command.{}.total", stat_prefix, to_lower_name)),
+                  handler});
 }
 
 } // CommandSplitter
