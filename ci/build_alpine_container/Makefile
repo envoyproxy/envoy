@@ -14,7 +14,7 @@ binary:
 	mkdir -p /tmp/envoy-alpine-build
 	docker run -t -i --name build-envoy-alpine-ct -v ${ROOT_DIR}/../../:/source -v /tmp/envoy-alpine-build:/build lyft/envoy-build:latest /bin/bash -c \
 		"set -x && cd /source && /source/ci/do_ci.sh bazel.release && \
-		cp /build/envoy/source/exe/envoy-static.stamped /tmp/envoy && \
+		cp /build/envoy/source/exe/envoy /tmp/envoy && \
 		cd /tmp/ && strip envoy && \
 		mv /tmp/envoy /source/ci/build_alpine_container/bin/stripped/ && \
 		cp /source/build_normal/source/exe/envoy /source/ci/build_alpine_container/bin/debug/ && \
