@@ -103,8 +103,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
+    linkstamp = "version_linkstamp.cc",
     deps = [
         ":version_includes",
-        "//source/version_generated",
     ],
 )

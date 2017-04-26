@@ -11,6 +11,10 @@ if [[ "$1" == "bazel.debug" ]]; then
   echo "bazel debug build with tests..."
   cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building..."
+  mkdir -p tools
+  ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc tools/
+  mkdir -p bazel
+  ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status bazel/
   bazel build ${BAZEL_BUILD_OPTIONS} @envoy//source/exe:envoy-static.stamped
   echo "Testing..."
   bazel test ${BAZEL_TEST_OPTIONS} --test_output=all \
