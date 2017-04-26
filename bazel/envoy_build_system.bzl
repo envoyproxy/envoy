@@ -267,6 +267,7 @@ def envoy_proto_library(name, srcs = [], deps = []):
         default_runtime = "//external:protobuf",
         protoc = "//external:protoc",
         deps = deps,
+        linkstatic = 1,
     )
     # We can't use include_prefix directly in cc_proto_library, since it
     # confuses protoc. Instead, we create a shim cc_library that performs the
