@@ -7,6 +7,12 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "backtrace_test",
+    srcs = ["backtrace_test.cc"],
+    deps = ["//source/server:backtrace_lib"],
+)
+
+envoy_cc_test(
     name = "configuration_impl_test",
     srcs = ["configuration_impl_test.cc"],
     data = ["//test/common/ssl/test_data:certs"],
