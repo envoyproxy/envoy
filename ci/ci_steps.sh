@@ -9,6 +9,7 @@ travis lint .travis.yml --skip-completion-check
 
 # Where the Envoy build takes place.
 ENVOY_BUILD_DIR=/tmp/envoy-docker-build
+mkdir -p "$ENVOY_BUILD_DIR"/build_release
 
 # Do a build matrix with different types of builds docs, coverage, bazel.release, etc.
 if [ "$TEST_TYPE" == "docs" ]
@@ -24,7 +25,6 @@ fi
 
 if [ "$TEST_TYPE" == "bazel.release" ]
 then
-  mkdir -p "$ENVOY_BUILD_DIR"/build_release
   cp -f "$ENVOY_BUILD_DIR"/envoy/source/exe/envoy "$ENVOY_BUILD_DIR"/build_release
   # This script builds a lyft/envoy image and pushes that image on merge to master.
   ./ci/docker_push.sh
