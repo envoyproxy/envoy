@@ -1,7 +1,8 @@
 PHONY: all
 
-ENVOY_TAG?="latest"
-ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+ENVOY_TAG ?= "latest"
+ENVOY_BUILD_DIR ?= "/tmp/envoy-docker-build"
+ROOT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 all: binary container test
 
@@ -11,7 +12,7 @@ binary:
 	mkdir -p ./bin/stripped
 	mkdir -p ./bin/debug
 	mkdir -p ./bin/configs
-	docker run -t -i --name build-envoy-alpine-ct -v ${ROOT_DIR}/../../:/source -v /tmp/envoy-alpine-build:/build lyft/envoy-build:latest /bin/bash -c \
+	docker run -t -i --name build-envoy-alpine-ct -v ${ROOT_DIR}/../../:/source -v $(ENVOY_BUILD_DIR):/build lyft/envoy-build:latest /bin/bash -c \
 		"set -x && cd /source &&
 		cp /build/envoy/source/exe/envoy /tmp/envoy && \
 		cd /tmp/ && strip envoy && \

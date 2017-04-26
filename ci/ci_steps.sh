@@ -8,7 +8,7 @@ set -e
 travis lint .travis.yml --skip-completion-check
 
 # Where the Envoy build takes place.
-ENVOY_BUILD_DIR=/tmp/envoy-docker-build
+export ENVOY_BUILD_DIR=/tmp/envoy-docker-build
 
 # Do a build matrix with different types of builds docs, coverage, bazel.release, etc.
 if [ "$TEST_TYPE" == "docs" ]
