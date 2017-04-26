@@ -4,8 +4,6 @@
 TARGET_RECIPES = {
     "ares": "cares",
     "backward": "backward",
-    # TODO(htuch): Remove when cmake goes.
-    "cotire": "cotire",
     "event": "libevent",
     "event_pthreads": "libevent",
     # TODO(htuch): This shouldn't be a build recipe, it's a tooling dependency
