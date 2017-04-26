@@ -7,6 +7,13 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "backtrace_lib",
+    hdrs = ["backtrace.h"],
+    external_deps = ["backward"],
+    deps = ["//source/common/common:logger_lib"],
+)
+
+envoy_cc_library(
     name = "configuration_lib",
     srcs = ["configuration_impl.cc"],
     hdrs = ["configuration_impl.h"],
