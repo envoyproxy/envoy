@@ -17,7 +17,7 @@ binary:
 		cp /build/envoy/source/exe/envoy /tmp/envoy && \
 		cd /tmp/ && strip envoy && \
 		mv /tmp/envoy /source/ci/build_alpine_container/bin/stripped/ && \
-		cp /source/build_normal/source/exe/envoy /source/ci/build_alpine_container/bin/debug/ && \
+		cp /build/envoy/source/exe/envoy /source/ci/build_alpine_container/bin/debug/ && \
 		cp /source/configs/google_com_proxy.json /source/ci/build_alpine_container/bin/configs/"
 	docker rm -f build-envoy-alpine-ct
 	# Fail build if a core file gets generated during the build.
