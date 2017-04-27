@@ -108,3 +108,9 @@ envoy_cc_library(
         "//source/version_generated",
     ],
 )
+
+envoy_cc_library(
+    name = "to_lower_table_lib",
+    srcs = ["to_lower_table.cc"],
+    hdrs = ["to_lower_table.h"],
+)
