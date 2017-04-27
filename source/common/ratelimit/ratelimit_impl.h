@@ -10,8 +10,8 @@
 #include "envoy/tracing/context.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/ratelimit/ratelimit.pb.h"
 #include "common/json/json_loader.h"
+#include "common/ratelimit/ratelimit.pb.h"
 
 namespace RateLimit {
 

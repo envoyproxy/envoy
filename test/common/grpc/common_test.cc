@@ -1,10 +1,10 @@
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 
-#include "gtest/gtest.h"
-
-#include "test/proto/helloworld.pb.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/proto/helloworld.pb.h"
+
+#include "gtest/gtest.h"
 
 namespace Grpc {
 

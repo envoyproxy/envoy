@@ -6,15 +6,14 @@
 #include "common/grpc/rpc_channel_impl.h"
 #include "common/http/message_impl.h"
 
+#include "test/mocks/grpc/mocks.h"
+#include "test/mocks/upstream/mocks.h"
+#include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "test/proto/helloworld.pb.h"
-#include "test/mocks/grpc/mocks.h"
-#include "test/mocks/upstream/mocks.h"
-#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::Invoke;

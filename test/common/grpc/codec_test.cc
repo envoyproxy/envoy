@@ -6,11 +6,10 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
 
+#include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
 
 #include "gtest/gtest.h"
-
-#include "test/proto/helloworld.pb.h"
 
 namespace Grpc {
 
