@@ -96,6 +96,7 @@ TEST(JsonLoaderTest, Basic) {
 
     ObjectPtr config = Factory::LoadFromString(json);
     EXPECT_EQ(2U, config->getObjectArray("descriptors")[0]->asObjectArray().size());
+
     EXPECT_EQ(1U, config->getObjectArray("descriptors")[1]->asObjectArray().size());
   }
 
@@ -228,33 +229,41 @@ TEST(JsonLoaderTest, AsString) {
 }
 
 TEST(JsonLoaderTest, ListAsString) {
-  std::list<std::string> list1 = {};
-  std::vector<Json::ObjectPtr> output1 =
-      Json::Factory::LoadFromString(Json::Factory::listAsJsonString(list1))->asObjectArray();
-  EXPECT_TRUE(output1.empty());
+  {
+    std::list<std::string> list = {};
+    Json::ObjectPtr json = Json::Factory::LoadFromString(Json::Factory::listAsJsonString(list));
+    std::vector<Json::ObjectPtr> output = json->asObjectArray();
+    EXPECT_TRUE(output.empty());
+  }
 
-  std::list<std::string> list2 = {"one"};
-  std::vector<Json::ObjectPtr> output2 =
-      Json::Factory::LoadFromString(Json::Factory::listAsJsonString(list2))->asObjectArray();
-  EXPECT_EQ(1, output2.size());
-  EXPECT_EQ("one", output2[0]->asString());
+  {
+    std::list<std::string> list = {"one"};
+    Json::ObjectPtr json = Json::Factory::LoadFromString(Json::Factory::listAsJsonString(list));
+    std::vector<Json::ObjectPtr> output = json->asObjectArray();
+    EXPECT_EQ(1, output.size());
+    EXPECT_EQ("one", output[0]->asString());
+  }
 
-  std::list<std::string> list3 = {"one", "two", "three", "four"};
-  std::vector<Json::ObjectPtr> output3 =
-      Json::Factory::LoadFromString(Json::Factory::listAsJsonString(list3))->asObjectArray();
-  EXPECT_EQ(4, output3.size());
-  EXPECT_EQ("one", output3[0]->asString());
-  EXPECT_EQ("two", output3[1]->asString());
-  EXPECT_EQ("three", output3[2]->asString());
-  EXPECT_EQ("four", output3[3]->asString());
+  {
+    std::list<std::string> list = {"one", "two", "three", "four"};
+    Json::ObjectPtr json = Json::Factory::LoadFromString(Json::Factory::listAsJsonString(list));
+    std::vector<Json::ObjectPtr> output = json->asObjectArray();
+    EXPECT_EQ(4, output.size());
+    EXPECT_EQ("one", output[0]->asString());
+    EXPECT_EQ("two", output[1]->asString());
+    EXPECT_EQ("three", output[2]->asString());
+    EXPECT_EQ("four", output[3]->asString());
+  }
 
-  std::list<std::string> list4 = {"127.0.0.1:46465", "127.0.0.1:52211", "127.0.0.1:58941"};
-  std::vector<Json::ObjectPtr> output4 =
-      Json::Factory::LoadFromString(Json::Factory::listAsJsonString(list4))->asObjectArray();
-  EXPECT_EQ(3, output4.size());
-  EXPECT_EQ("127.0.0.1:46465", output4[0]->asString());
-  EXPECT_EQ("127.0.0.1:52211", output4[1]->asString());
-  EXPECT_EQ("127.0.0.1:58941", output4[2]->asString());
+  {
+    std::list<std::string> list = {"127.0.0.1:46465", "127.0.0.1:52211", "127.0.0.1:58941"};
+    Json::ObjectPtr json = Json::Factory::LoadFromString(Json::Factory::listAsJsonString(list));
+    std::vector<Json::ObjectPtr> output = json->asObjectArray();
+    EXPECT_EQ(3, output.size());
+    EXPECT_EQ("127.0.0.1:46465", output[0]->asString());
+    EXPECT_EQ("127.0.0.1:52211", output[1]->asString());
+    EXPECT_EQ("127.0.0.1:58941", output[2]->asString());
+  }
 }
 
 } // Json
