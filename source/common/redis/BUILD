@@ -27,6 +27,7 @@ envoy_cc_library(
         "//include/envoy/redis:conn_pool_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:to_lower_table_lib",
     ],
 )
 
