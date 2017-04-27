@@ -18,7 +18,7 @@ do
 done
 if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$want_push" == "true" ]
 then
-    docker login -e $DOCKER_EMAIL -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+    docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
     docker push lyft/envoy:latest
     docker tag lyft/envoy:latest lyft/envoy:$TRAVIS_COMMIT
     docker push lyft/envoy:$TRAVIS_COMMIT
