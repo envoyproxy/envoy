@@ -8,13 +8,13 @@ set -e
 echo "building using ${NUM_CPUS} CPUs"
 
 function bazel_release_binary_build() {
-  cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building..."
-  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt @envoy//source/exe:envoy-static.stripped.stamped
+  cd "${ENVOY_BUILD_DIR}"
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static.stripped.stamped
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container for building Docker images.
   cp -f \
-    "${ENVOY_CONSUMER_SRCDIR}"/bazel-genfiles/external/envoy/source/exe/envoy-static.stripped.stamped \
+    "${ENVOY_BUILD_DIR}"/bazel-genfiles/source/exe/envoy-static.stripped.stamped \
     "${ENVOY_DELIVERY_DIR}"/envoy
 }
 
@@ -22,8 +22,7 @@ if [[ "$1" == "bazel.release" ]]; then
   echo "bazel release build with tests..."
   bazel_release_binary_build
   echo "Testing..."
-  bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt --test_output=all \
-    --cache_test_results=no @envoy//test/... //:echo2_integration_test
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/...
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
   echo "bazel release build..."
@@ -34,8 +33,8 @@ elif [[ "$1" == "bazel.asan" ]]; then
   cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building and testing..."
   # TODO(htuch): This should switch to using clang when available.
-  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=asan --test_output=all \
-    --cache_test_results=no @envoy//test/... //:echo2_integration_test
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=asan @envoy//test/... \
+    //:echo2_integration_test
   exit 0
 elif [[ "$1" == "bazel.dev" ]]; then
   # This doesn't go into CI but is available for developer convenience.
