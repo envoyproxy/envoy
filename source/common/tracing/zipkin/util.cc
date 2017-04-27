@@ -10,6 +10,7 @@
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+
 // TODO(fabolive): Need to add interfaces to the JSON namespace
 
 namespace Zipkin {
@@ -50,16 +51,5 @@ uint64_t Util::generateRandom64() {
                       ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   std::mt19937_64 rand_64(seed);
   return rand_64();
-}
-
-void Util::getIPAndPort(const std::string& address, std::string& ip, uint16_t& port) {
-  std::regex re("^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})(:(\\d+))?$");
-  std::smatch match;
-  if (std::regex_search(address, match, re)) {
-    ip = match.str(1);
-    if (match.str(3).size() > 0) {
-      port = std::stoi(match.str(3));
-    }
-  }
 }
 } // Zipkin

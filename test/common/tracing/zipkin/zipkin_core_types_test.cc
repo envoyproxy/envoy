@@ -1,4 +1,5 @@
 #include "common/common/utility.h"
+#include "common/network/address_impl.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
 #include "common/tracing/zipkin/zipkin_core_types.h"
 
@@ -9,79 +10,67 @@ namespace Zipkin {
 TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   Endpoint ep;
 
-  EXPECT_EQ("", ep.ipv4());
-  EXPECT_EQ(0, ep.port());
   EXPECT_EQ("", ep.serviceName());
-  EXPECT_FALSE(ep.isSetIpv6());
   EXPECT_EQ(R"({"ipv4":"","port":0,"serviceName":""})", ep.toJson());
 
-  ep.setIpv4(std::string("127.0.0.1"));
-  EXPECT_EQ("127.0.0.1", ep.ipv4());
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddress("127.0.0.1");
+  ep.setAddress(addr);
+  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":0,"serviceName":""})", ep.toJson());
 
-  ep.setIpv6("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
-  EXPECT_EQ("2001:0db8:85a3:0000:0000:8a2e:0370:7334", ep.ipv6());
-  EXPECT_TRUE(ep.isSetIpv6());
-
-  ep.setPort(3306);
-  EXPECT_EQ(3306, ep.port());
+  addr = Network::Address::parseInternetAddressAndPort(
+      "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
+  ep.setAddress(addr);
+  EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":""})", ep.toJson());
 
   ep.setServiceName("my_service");
   EXPECT_EQ("my_service", ep.serviceName());
 
-  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service",)"
-            R"("ipv6":"2001:0db8:85a3:0000:0000:8a2e:0370:7334"})",
-            ep.toJson());
+  EXPECT_EQ(
+      R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
+      ep.toJson());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
-  Endpoint ep(std::string("127.0.0.1"), 3306, std::string("my_service"));
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+  Endpoint ep(std::string("my_service"), addr);
 
-  EXPECT_EQ("127.0.0.1", ep.ipv4());
-  EXPECT_EQ(3306, ep.port());
   EXPECT_EQ("my_service", ep.serviceName());
-  EXPECT_FALSE(ep.isSetIpv6());
   EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})", ep.toJson());
 
-  ep.setIpv6("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
-  EXPECT_EQ("2001:0db8:85a3:0000:0000:8a2e:0370:7334", ep.ipv6());
-  EXPECT_TRUE(ep.isSetIpv6());
+  addr = Network::Address::parseInternetAddressAndPort(
+      "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
+  ep.setAddress(addr);
 
-  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service",)"
-            R"("ipv6":"2001:0db8:85a3:0000:0000:8a2e:0370:7334"})",
-            ep.toJson());
+  EXPECT_EQ(
+      R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
+      ep.toJson());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
-  Endpoint ep1(std::string("127.0.0.1"), 3306, std::string("my_service"));
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+  Endpoint ep1(std::string("my_service"), addr);
   Endpoint ep2(ep1);
 
-  EXPECT_EQ("127.0.0.1", ep1.ipv4());
-  EXPECT_EQ(3306, ep1.port());
   EXPECT_EQ("my_service", ep1.serviceName());
-  EXPECT_FALSE(ep1.isSetIpv6());
   EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})", ep1.toJson());
 
-  EXPECT_EQ(ep1.ipv4(), ep2.ipv4());
-  EXPECT_EQ(ep1.port(), ep2.port());
   EXPECT_EQ(ep1.serviceName(), ep2.serviceName());
-  EXPECT_FALSE(ep2.isSetIpv6());
   EXPECT_EQ(ep1.toJson(), ep2.toJson());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
-  Endpoint ep1(std::string("127.0.0.1"), 3306, std::string("my_service"));
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+  Endpoint ep1(std::string("my_service"), addr);
   Endpoint ep2 = ep1;
 
-  EXPECT_EQ("127.0.0.1", ep1.ipv4());
-  EXPECT_EQ(3306, ep1.port());
   EXPECT_EQ("my_service", ep1.serviceName());
-  EXPECT_FALSE(ep1.isSetIpv6());
   EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})", ep1.toJson());
 
-  EXPECT_EQ(ep1.ipv4(), ep2.ipv4());
-  EXPECT_EQ(ep1.port(), ep2.port());
   EXPECT_EQ(ep1.serviceName(), ep2.serviceName());
-  EXPECT_FALSE(ep2.isSetIpv6());
   EXPECT_EQ(ep1.toJson(), ep2.toJson());
 }
 
@@ -106,14 +95,12 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ(expected_json, ann.toJson());
 
   // Test the copy-semantics flavor of setEndpoint
-
-  Endpoint ep(std::string("127.0.0.1"), 3306, std::string("my_service"));
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+  Endpoint ep(std::string("my_service"), addr);
   ann.setEndpoint(ep);
   EXPECT_TRUE(ann.isSetEndpoint());
-  EXPECT_EQ("127.0.0.1", ann.endpoint().ipv4());
-  EXPECT_EQ(3306, ann.endpoint().port());
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
-  EXPECT_FALSE(ann.endpoint().isSetIpv6());
   EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})",
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
@@ -124,14 +111,11 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ(expected_json, ann.toJson());
 
   // Test the move-semantics flavor of setEndpoint
-
-  Endpoint ep2(std::string("192.168.1.1"), 5555, std::string("my_service_2"));
+  addr = Network::Address::parseInternetAddressAndPort("192.168.1.1:5555");
+  Endpoint ep2(std::string("my_service_2"), addr);
   ann.setEndpoint(std::move(ep2));
   EXPECT_TRUE(ann.isSetEndpoint());
-  EXPECT_EQ("192.168.1.1", ann.endpoint().ipv4());
-  EXPECT_EQ(5555, ann.endpoint().port());
   EXPECT_EQ("my_service_2", ann.endpoint().serviceName());
-  EXPECT_FALSE(ann.endpoint().isSetIpv6());
   EXPECT_EQ(R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})",
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
@@ -143,7 +127,9 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
-  Endpoint ep(std::string("127.0.0.1"), 3306, std::string("my_service"));
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+  Endpoint ep(std::string("my_service"), addr);
   uint64_t timestamp =
       std::chrono::duration_cast<std::chrono::microseconds>(
           ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
@@ -153,10 +139,7 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   EXPECT_EQ(ZipkinCoreConstants::CLIENT_SEND, ann.value());
   EXPECT_TRUE(ann.isSetEndpoint());
 
-  EXPECT_EQ("127.0.0.1", ann.endpoint().ipv4());
-  EXPECT_EQ(3306, ann.endpoint().port());
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
-  EXPECT_FALSE(ann.endpoint().isSetIpv6());
   EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})",
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
@@ -168,7 +151,9 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
-  Endpoint ep(std::string("127.0.0.1"), 3306, std::string("my_service"));
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+  Endpoint ep(std::string("my_service"), addr);
   uint64_t timestamp =
       std::chrono::duration_cast<std::chrono::microseconds>(
           ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
@@ -179,14 +164,13 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   EXPECT_EQ(ann.timestamp(), ann2.timestamp());
   EXPECT_EQ(ann.isSetEndpoint(), ann2.isSetEndpoint());
   EXPECT_EQ(ann.toJson(), ann2.toJson());
-
-  EXPECT_EQ(ann.endpoint().ipv4(), ann2.endpoint().ipv4());
-  EXPECT_EQ(ann.endpoint().port(), ann2.endpoint().port());
   EXPECT_EQ(ann.endpoint().serviceName(), ann2.endpoint().serviceName());
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
-  Endpoint ep(std::string("127.0.0.1"), 3306, std::string("my_service"));
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+  Endpoint ep(std::string("my_service"), addr);
   uint64_t timestamp =
       std::chrono::duration_cast<std::chrono::microseconds>(
           ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
@@ -197,9 +181,6 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   EXPECT_EQ(ann.timestamp(), ann2.timestamp());
   EXPECT_EQ(ann.isSetEndpoint(), ann2.isSetEndpoint());
   EXPECT_EQ(ann.toJson(), ann2.toJson());
-
-  EXPECT_EQ(ann.endpoint().ipv4(), ann2.endpoint().ipv4());
-  EXPECT_EQ(ann.endpoint().port(), ann2.endpoint().port());
   EXPECT_EQ(ann.endpoint().serviceName(), ann2.endpoint().serviceName());
 }
 
@@ -222,13 +203,12 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
 
   // Test the copy-semantics flavor of setEndpoint
 
-  Endpoint ep(std::string("127.0.0.1"), 3306, std::string("my_service"));
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+  Endpoint ep(std::string("my_service"), addr);
   ann.setEndpoint(ep);
   EXPECT_TRUE(ann.isSetEndpoint());
-  EXPECT_EQ("127.0.0.1", ann.endpoint().ipv4());
-  EXPECT_EQ(3306, ann.endpoint().port());
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
-  EXPECT_FALSE(ann.endpoint().isSetIpv6());
   EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})",
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
@@ -240,14 +220,11 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   EXPECT_EQ(expected_json, ann.toJson());
 
   // Test the move-semantics flavor of setEndpoint
-
-  Endpoint ep2(std::string("192.168.1.1"), 5555, std::string("my_service_2"));
+  addr = Network::Address::parseInternetAddressAndPort("192.168.1.1:5555");
+  Endpoint ep2(std::string("my_service_2"), addr);
   ann.setEndpoint(std::move(ep2));
   EXPECT_TRUE(ann.isSetEndpoint());
-  EXPECT_EQ("192.168.1.1", ann.endpoint().ipv4());
-  EXPECT_EQ(5555, ann.endpoint().port());
   EXPECT_EQ("my_service_2", ann.endpoint().serviceName());
-  EXPECT_FALSE(ann.endpoint().isSetIpv6());
   EXPECT_EQ(R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})",
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
   expected_json = "{"
@@ -370,9 +347,9 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   std::vector<Zipkin::BinaryAnnotation> binary_annotations;
 
   endpoint.setServiceName("my_service_name");
-  std::string ip = "192.168.1.2";
-  endpoint.setIpv4(ip);
-  endpoint.setPort(3306);
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("192.168.1.2:3306");
+  endpoint.setAddress(addr);
 
   ann.setValue(Zipkin::ZipkinCoreConstants::CLIENT_SEND);
   ann.setTimestamp(timestamp);

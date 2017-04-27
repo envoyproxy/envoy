@@ -1,4 +1,5 @@
 #include "common/common/utility.h"
+#include "common/network/address_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/zipkin/tracer.h"
 #include "common/tracing/zipkin/util.h"
@@ -21,7 +22,9 @@ private:
 };
 
 TEST(ZipkinTracerTest, spanCreation) {
-  Tracer tracer("my_service_name", "127.0.0.1:9000");
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
+  Tracer tracer("my_service_name", addr);
   MonotonicTime start_time = ProdMonotonicTimeSource::instance_.currentTime();
 
   // ==============
@@ -47,10 +50,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   Endpoint endpoint = ann.endpoint();
-  EXPECT_EQ("127.0.0.1", endpoint.ipv4());
-  EXPECT_EQ(9000, endpoint.port());
   EXPECT_EQ("my_service_name", endpoint.serviceName());
-  EXPECT_FALSE(endpoint.isSetIpv6());
 
   // The tracer must have been properly set
   EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), root_span->tracer());
@@ -93,10 +93,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
-  EXPECT_EQ("127.0.0.1", endpoint.ipv4());
-  EXPECT_EQ(9000, endpoint.port());
   EXPECT_EQ("my_service_name", endpoint.serviceName());
-  EXPECT_FALSE(endpoint.isSetIpv6());
 
   // The tracer must have been properly set
   EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), server_side_shared_context_span->tracer());
@@ -137,10 +134,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
-  EXPECT_EQ("127.0.0.1", endpoint.ipv4());
-  EXPECT_EQ(9000, endpoint.port());
   EXPECT_EQ("my_service_name", endpoint.serviceName());
-  EXPECT_FALSE(endpoint.isSetIpv6());
 
   // The tracer must have been properly set
   EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), child_span->tracer());
@@ -150,7 +144,9 @@ TEST(ZipkinTracerTest, spanCreation) {
 }
 
 TEST(ZipkinTracerTest, finishSpan) {
-  Tracer tracer("my_service_name", "127.0.0.1:9000");
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
+  Tracer tracer("my_service_name", addr);
   tracer.setRandomGenerator(Runtime::RandomGeneratorPtr(new Runtime::RandomGeneratorImpl()));
   MonotonicTime start_time = ProdMonotonicTimeSource::instance_.currentTime();
 
@@ -171,10 +167,7 @@ TEST(ZipkinTracerTest, finishSpan) {
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   Endpoint endpoint = ann.endpoint();
-  EXPECT_EQ("127.0.0.1", endpoint.ipv4());
-  EXPECT_EQ(9000, endpoint.port());
   EXPECT_EQ("my_service_name", endpoint.serviceName());
-  EXPECT_FALSE(endpoint.isSetIpv6());
 
   // Check the CR annotation added when ending the span
   ann = span->annotations()[1];
@@ -182,10 +175,7 @@ TEST(ZipkinTracerTest, finishSpan) {
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
-  EXPECT_EQ("127.0.0.1", endpoint.ipv4());
-  EXPECT_EQ(9000, endpoint.port());
   EXPECT_EQ("my_service_name", endpoint.serviceName());
-  EXPECT_FALSE(endpoint.isSetIpv6());
 
   // ==============
   // Test finishing a span containing an SR annotation
@@ -212,10 +202,7 @@ TEST(ZipkinTracerTest, finishSpan) {
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
-  EXPECT_EQ("127.0.0.1", endpoint.ipv4());
-  EXPECT_EQ(9000, endpoint.port());
   EXPECT_EQ("my_service_name", endpoint.serviceName());
-  EXPECT_FALSE(endpoint.isSetIpv6());
 
   // Check the SS annotation added when ending the span
   ann = server_side->annotations()[1];
@@ -223,9 +210,6 @@ TEST(ZipkinTracerTest, finishSpan) {
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
-  EXPECT_EQ("127.0.0.1", endpoint.ipv4());
-  EXPECT_EQ(9000, endpoint.port());
   EXPECT_EQ("my_service_name", endpoint.serviceName());
-  EXPECT_FALSE(endpoint.isSetIpv6());
 }
 } // Zipkin

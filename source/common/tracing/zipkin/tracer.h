@@ -48,10 +48,10 @@ public:
    *
    * @param service_name The name of the service where the Tracer is running. This name is
    * used in all annotations' endpoints of the spans created by the Tracer.
-   * @param address A string in the format <IP address>:<port>. The IP address and port are used
+   * @param address Pointer to a network-address object. The IP address and port are used
    * in all annotations' endpoints of the spans created by the Tracer.
    */
-  Tracer(const std::string& service_name, const std::string& address)
+  Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address)
       : service_name_(service_name), address_(address), random_generator_(nullptr) {}
 
   /**
@@ -97,7 +97,7 @@ private:
   uint64_t generateRandomNumber();
 
   const std::string service_name_;
-  const std::string address_;
+  Network::Address::InstanceConstSharedPtr address_;
   ReporterPtr reporter_;
   Runtime::RandomGeneratorPtr random_generator_;
 };

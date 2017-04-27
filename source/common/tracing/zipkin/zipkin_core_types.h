@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 
 #include "common/common/hex.h"
 #include "common/tracing/zipkin/tracer_interface.h"
@@ -50,55 +51,26 @@ public:
   /**
    * Default constructor. Creates an empty Endpoint.
    */
-  Endpoint() : ipv4_(), port_(0), service_name_(), isset_ipv6_(false) {}
+  Endpoint() : service_name_(), address_(nullptr) {}
 
   /**
    * Constructor that initializes an endpoint with the given attributes.
    *
-   * @param ipv4 String representing the endpoint's ipv4 attribute.
-   * @param port Integer representing the endpoint's port attribute.
-   * @param service_name String representing the endpoint's.
+   * @param service_name String representing the endpoint's service name
+   * @param address Pointer to an object representing the endpoint's network address
    */
-  Endpoint(const std::string& ipv4, uint16_t port, const std::string& service_name)
-      : ipv4_(ipv4), port_(port), service_name_(service_name), isset_ipv6_(false) {}
+  Endpoint(const std::string& service_name, Network::Address::InstanceConstSharedPtr address)
+      : service_name_(service_name), address_(address) {}
 
   /**
-   * @return the endpoint's ipv4 as a string.
+   * @return the endpoint's address.
    */
-  const std::string& ipv4() const { return ipv4_; }
+  Network::Address::InstanceConstSharedPtr address() const { return address_; }
 
   /**
-   * Sets the endpoint's ipv4 attribute.
+   * Sets the endpoint's address
    */
-  void setIpv4(const std::string& ipv4) { ipv4_ = ipv4; }
-
-  /**
-   * @return the endpoint's ipv6 as a string.
-   */
-  const std::string& ipv6() const { return ipv6_; }
-
-  /**
-   * Sets the endpoint's ipv6 attribute.
-   */
-  void setIpv6(const std::string& ipv6) {
-    ipv6_ = ipv6;
-    isset_ipv6_ = true;
-  }
-
-  /**
-   * @return true if the ipv6 attribute is set, or false otherwise.
-   */
-  bool isSetIpv6() const { return isset_ipv6_; }
-
-  /**
-   * @return the endpoint's port attribute.
-   */
-  uint16_t port() const { return port_; }
-
-  /**
-   * Sets the endpoint's port attribute.
-   */
-  void setPort(uint16_t port) { port_ = port; }
+  void setAddress(Network::Address::InstanceConstSharedPtr address) { address_ = address; }
 
   /**
    * @return the endpoint's service name attribute.
@@ -118,12 +90,8 @@ public:
   const std::string& toJson() override;
 
 private:
-  std::string ipv4_;
-  uint16_t port_;
   std::string service_name_;
-  std::string ipv6_;
-
-  bool isset_ipv6_;
+  Network::Address::InstanceConstSharedPtr address_;
 };
 
 /**

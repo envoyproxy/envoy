@@ -43,14 +43,5 @@ public:
    * Returns a randomly-generated 64-bit integer number.
    */
   static uint64_t generateRandom64();
-
-  /**
-   *  Extracts the IP address and port from a string of the form "<IP>:<port>".
-   *
-   *  @param address String of the form "<IP>:<port>".
-   *  @param ip It will be assigned the IP part of the address string.
-   *  @param port It will be assigned the port part of the address string.
-   */
-  static void getIPAndPort(const std::string& address, std::string& ip, uint16_t& port);
 };
 } // Zipkin

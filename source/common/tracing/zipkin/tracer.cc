@@ -10,13 +10,7 @@ namespace Zipkin {
 
 SpanPtr Tracer::startSpan(const std::string& span_name, MonotonicTime start_time) {
   // Build the endpoint
-  std::string ip;
-  uint16_t port;
-  Util::getIPAndPort(address_, ip, port);
-  Endpoint ep;
-  ep.setIpv4(ip);
-  ep.setPort(port);
-  ep.setServiceName(service_name_);
+  Endpoint ep(service_name_, address_);
 
   // Build the CS annotation
   Annotation cs;
@@ -91,13 +85,7 @@ SpanPtr Tracer::startSpan(const std::string& span_name, MonotonicTime start_time
   }
 
   // Build the endpoint
-  std::string ip;
-  uint16_t port;
-  Util::getIPAndPort(address_, ip, port);
-  Endpoint ep;
-  ep.setIpv4(ip);
-  ep.setPort(port);
-  ep.setServiceName(service_name_);
+  Endpoint ep(service_name_, address_);
 
   // Add the newly-created annotation to the span
   annotation.setEndpoint(std::move(ep));

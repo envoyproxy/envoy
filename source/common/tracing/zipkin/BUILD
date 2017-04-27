@@ -27,6 +27,8 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
     ],
 )

@@ -8,25 +8,19 @@
 
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+
 // TODO(fabolive): Need to add interfaces to the JSON namespace
 
 namespace Zipkin {
 
 Endpoint::Endpoint(const Endpoint& ep) {
-  ipv4_ = ep.ipv4();
-  port_ = ep.port();
   service_name_ = ep.serviceName();
-  ipv6_ = ep.ipv6();
-  isset_ipv6_ = ep.isSetIpv6();
+  address_ = ep.address();
 }
 
 Endpoint& Endpoint::operator=(const Endpoint& ep) {
-  ipv4_ = ep.ipv4();
-  port_ = ep.port();
   service_name_ = ep.serviceName();
-  ipv6_ = ep.ipv6();
-  isset_ipv6_ = ep.isSetIpv6();
-
+  address_ = ep.address();
   return *this;
 }
 
@@ -34,16 +28,25 @@ const std::string& Endpoint::toJson() {
   rapidjson::StringBuffer s;
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
-  writer.Key(ZipkinJsonFieldNames::ENDPOINT_IPV4.c_str());
-  writer.String(ipv4_.c_str());
-  writer.Key(ZipkinJsonFieldNames::ENDPOINT_PORT.c_str());
-  writer.Uint(port_);
+  if (!address_) {
+    writer.Key(ZipkinJsonFieldNames::ENDPOINT_IPV4.c_str());
+    writer.String("");
+    writer.Key(ZipkinJsonFieldNames::ENDPOINT_PORT.c_str());
+    writer.Uint(0);
+  } else {
+    if (address_->ip()->version() == Network::Address::IpVersion::v4) {
+      // IPv4
+      writer.Key(ZipkinJsonFieldNames::ENDPOINT_IPV4.c_str());
+    } else {
+      // IPv6
+      writer.Key(ZipkinJsonFieldNames::ENDPOINT_IPV6.c_str());
+    }
+    writer.String(address_->ip()->addressAsString().c_str());
+    writer.Key(ZipkinJsonFieldNames::ENDPOINT_PORT.c_str());
+    writer.Uint(address_->ip()->port());
+  }
   writer.Key(ZipkinJsonFieldNames::ENDPOINT_SERVICE_NAME.c_str());
   writer.String(service_name_.c_str());
-  if (isset_ipv6_) {
-    writer.Key(ZipkinJsonFieldNames::ENDPOINT_IPV6.c_str());
-    writer.String(ipv6_.c_str());
-  }
   writer.EndObject();
   json_string_ = s.GetString();
 
