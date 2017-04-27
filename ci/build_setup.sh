@@ -80,14 +80,16 @@ cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE "${ENVOY_BUILD_DIR}"
 export ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
 mkdir -p "${ENVOY_DELIVERY_DIR}"
 
+# This is where we build for bazel.release* and bazel.dev.
+export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
+
 # Hack due to https://github.com/lyft/envoy/issues/838 and the need to have
-# .git, tools and bazel.rc available for build linkstamping.
-ln -sf "${ENVOY_SRCDIR}"/.git "${ENVOY_BUILD_DIR}"/
+# tools and bazel.rc available for build linkstamping.
 mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/tools
-mkdir -p "${ENVOY_BUILD_DIR}"/tools
+mkdir -p "${ENVOY_CI_DIR}"/tools
 ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CONSUMER_SRCDIR}"/tools/
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_BUILD_DIR}"/tools/
+ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
 mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/bazel
-mkdir -p "${ENVOY_BUILD_DIR}"/bazel
+mkdir -p "${ENVOY_CI_DIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CONSUMER_SRCDIR}"/bazel/
-ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_BUILD_DIR}"/bazel/
+ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
