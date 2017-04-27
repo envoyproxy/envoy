@@ -1,3 +1,13 @@
+# Developer-local docs build
+
+```bash
+./docs/build.sh
+```
+
+The output can be found in `generated/docs`.
+
+# How the Envoy website and docs are updated
+
 The Envoy website, and docs are automatically built, and pushed on every commit 
 to master. This process is handled by Travis CI with the 
 [`publish.sh`](https://github.com/lyft/envoy/blob/master/docs/publish.sh) script. 

@@ -7,18 +7,47 @@ set -e
 . "$(dirname "$0")"/build_setup.sh
 echo "building using ${NUM_CPUS} CPUs"
 
-if [[ "$1" == "bazel.debug" ]]; then
-  echo "bazel debug build with tests..."
+if [[ "$1" == "bazel.release" ]]; then
+  echo "bazel release build with tests..."
   cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building..."
   mkdir -p tools
   ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc tools/
   mkdir -p bazel
   ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status bazel/
-  bazel build ${BAZEL_BUILD_OPTIONS} @envoy//source/exe:envoy-static.stamped
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt @envoy//source/exe:envoy-static.stripped.stamped
+  # Copy the envoy-static binary somewhere that we can access outside of the
+  # container.
+  DELIVER_DIR="${ENVOY_BUILD_DIR}"/source/exe
+  mkdir -p "${DELIVER_DIR}"
+  cp -f \
+    "${ENVOY_CONSUMER_SRCDIR}"/bazel-genfiles/external/envoy/source/exe/envoy-static.stripped.stamped \
+    "${DELIVER_DIR}"/envoy
   echo "Testing..."
-  bazel test ${BAZEL_TEST_OPTIONS} --test_output=all \
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
+  exit 0
+elif [[ "$1" == "bazel.asan" ]]; then
+  echo "bazel ASAN debug build with tests..."
+  cd "${ENVOY_CONSUMER_SRCDIR}"
+  echo "Building and testing..."
+  # TODO(htuch): This should switch to using clang when available.
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=asan --test_output=all \
+    --cache_test_results=no @envoy//test/... //:echo2_integration_test
+  exit 0
+elif [[ "$1" == "bazel.fastbuild" ]]; then
+  # This doesn't go into CI but is available for developer convenience.
+  echo "bazel fastbuild of envoy-static..."
+  cd "${ENVOY_BUILD_DIR}"
+  echo "Building..."
+  bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild //source/exe:envoy-static
+  exit 0
+elif [[ "$1" == "bazel.fastbuild.test" ]]; then
+  # This doesn't go into CI but is available for developer convenience.
+  echo "bazel test with fastbuild..."
+  cd "${ENVOY_BUILD_DIR}"
+  echo "Building and testing..."
+  bazel test ${BAZEL_BUILD_OPTIONS} -c fastbuild //test/...
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   echo "bazel coverage build with tests..."
@@ -36,6 +65,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # some Bazel created symlinks to the source directory in its output
   # directory. Wow.
   cd "${ENVOY_BUILD_DIR}"
+  export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg"
   SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
   exit 0
 elif [[ "$1" == "fix_format" ]]; then
@@ -48,25 +78,7 @@ elif [[ "$1" == "check_format" ]]; then
   cd "${ENVOY_SRCDIR}"
   ./tools/check_format.py check
   exit 0
-elif [[ "$1" == "coverage" ]]; then
-  echo "coverage build with tests..."
-  TEST_TARGET="envoy.check-coverage"
-elif [[ "$1" == "asan" ]]; then
-  echo "asan build with tests..."
-  TEST_TARGET="envoy.check"
-elif [[ "$1" == "debug" ]]; then
-  echo "debug build with tests..."
-  TEST_TARGET="envoy.check"
-elif [[ "$1" == "server_only" ]]; then
-  echo "normal build server only..."
-  TEST_TARGET="envoy"
 else
-  echo "normal build with tests..."
-  TEST_TARGET="envoy.check"
+  echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
+  exit 1
 fi
-
-shift
-export EXTRA_TEST_ARGS="$@"
-
-[[ "${SKIP_CHECK_FORMAT}" == "1" ]] || make check_format
-make -j${NUM_CPUS} ${TEST_TARGET}
