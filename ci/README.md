@@ -23,13 +23,13 @@ master commit at which the binary was compiled, and `latest` corresponds to a bi
 An example basic invocation to build the Envoy static binary (using the Bazel `fastbuild` type) is:
 
 ```bash
-./ci/run_envoy_docker.sh bazel.fastbuild
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.fastbuild'
 ```
 
 The output artifacts can be found in `/build/envoy/bazel-bin/source/exe/envoy-static` in the
 container.
 
-The `do_ci.sh` targets are:
+The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=asan`.
 * `bazel.fastbuild` &mdash; build Envoy static binary under `-c fastbuild`.
