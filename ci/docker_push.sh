@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Do not ever set -x here, it is a security hazard as it will place the credentials below in the
+# Travis logs.
 set -e
 
 # this is needed to verify the example images
