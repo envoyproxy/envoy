@@ -178,7 +178,7 @@ TEST_P(RedisAllParamsToOneServerCommandHandlerTest, NoUpstream) {
 
 INSTANTIATE_TEST_CASE_P(RedisAllParamsToOneServerCommandHandlerTest,
                         RedisAllParamsToOneServerCommandHandlerTest,
-                        testing::Values("incr", "INCR", "inCrBY", "EXPIREBY"));
+                        testing::Values("incr", "INCR", "inCrBY", "EXPIRE"));
 
 class RedisMGETCommandHandlerTest : public RedisCommandSplitterImplTest {
 public:

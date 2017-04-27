@@ -140,7 +140,7 @@ private:
   MGETCommandHandler mget_handler_;
   std::unordered_map<std::string, HandlerData> command_map_;
   InstanceStats stats_;
-  ToLowerTable to_lower_table_;
+  const ToLowerTable to_lower_table_;
 };
 
 } // CommandSplitter
