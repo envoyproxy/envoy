@@ -178,7 +178,9 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-SslConPtr ContextImpl::newSsl() const { return SslConPtr(SSL_new(ctx_.get())); }
+bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
+  return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
+}
 
 bool ContextImpl::verifyPeer(SSL* ssl) const {
   bool verified = true;
@@ -188,7 +190,7 @@ bool ContextImpl::verifyPeer(SSL* ssl) const {
   const char* cipher = SSL_get_cipher_name(ssl);
   scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
 
-  X509Ptr cert = X509Ptr(SSL_get_peer_certificate(ssl));
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
 
   if (!cert.get()) {
     stats_.no_certificate_.inc();
@@ -336,13 +338,13 @@ std::string ContextImpl::getSerialNumber(X509* cert) {
   return "";
 }
 
-X509Ptr ContextImpl::loadCert(const std::string& cert_file) {
+bssl::UniquePtr<X509> ContextImpl::loadCert(const std::string& cert_file) {
   X509* cert = nullptr;
   std::unique_ptr<FILE, decltype(&fclose)> fp(fopen(cert_file.c_str(), "r"), &fclose);
   if (!fp.get() || !PEM_read_X509(fp.get(), &cert, nullptr, nullptr)) {
     throw EnvoyException(fmt::format("Failed to load certificate '{}'", cert_file.c_str()));
   }
-  return X509Ptr(cert);
+  return bssl::UniquePtr<X509>(cert);
 };
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
@@ -358,8 +360,8 @@ ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& s
   server_name_indication_ = config.serverNameIndication();
 }
 
-SslConPtr ClientContextImpl::newSsl() const {
-  SslConPtr ssl_con = SslConPtr(ContextImpl::newSsl());
+bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
+  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl());
 
   if (!server_name_indication_.empty()) {
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());

@@ -36,14 +36,11 @@ struct SslStats {
   ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_TIMER_STRUCT)
 };
 
-typedef bssl::UniquePtr<SSL> SslConPtr;
-typedef bssl::UniquePtr<X509> X509Ptr;
-
 class ContextImpl : public virtual Context {
 public:
   ~ContextImpl() { parent_.releaseContext(this); }
 
-  virtual SslConPtr newSsl() const;
+  virtual bssl::UniquePtr<SSL> newSsl() const;
 
   /**
    * Performs all configured cert verifications on the connection
@@ -85,8 +82,6 @@ protected:
    */
   static const unsigned char SERVER_SESSION_ID_CONTEXT;
 
-  typedef bssl::UniquePtr<SSL_CTX> SslCtxPtr;
-
   /**
    * Verifies certificate hash for pinning. The hash is the SHA-256 has of the DER encoding of the
    * certificate.
@@ -102,20 +97,20 @@ protected:
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
   static SslStats generateStats(Stats::Scope& scope);
   int32_t getDaysUntilExpiration(const X509* cert);
-  X509Ptr loadCert(const std::string& cert_file);
+  bssl::UniquePtr<X509> loadCert(const std::string& cert_file);
   static std::string getSerialNumber(X509* cert);
   std::string getCaFileName() { return ca_file_path_; };
   std::string getCertChainFileName() { return cert_chain_file_path_; };
 
   ContextManagerImpl& parent_;
-  SslCtxPtr ctx_;
+  bssl::UniquePtr<SSL_CTX> ctx_;
   std::vector<std::string> verify_subject_alt_name_list_;
   std::vector<uint8_t> verify_certificate_hash_;
   Stats::Scope& scope_;
   SslStats stats_;
   std::vector<uint8_t> parsed_alpn_protocols_;
-  X509Ptr ca_cert_;
-  X509Ptr cert_chain_;
+  bssl::UniquePtr<X509> ca_cert_;
+  bssl::UniquePtr<X509> cert_chain_;
   std::string ca_file_path_;
   std::string cert_chain_file_path_;
 };
@@ -124,7 +119,7 @@ class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
   ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, ContextConfig& config);
 
-  SslConPtr newSsl() const override;
+  bssl::UniquePtr<SSL> newSsl() const override;
 
 private:
   std::string server_name_indication_;
