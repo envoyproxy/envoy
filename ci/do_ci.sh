@@ -11,10 +11,6 @@ if [[ "$1" == "bazel.release" ]]; then
   echo "bazel release build with tests..."
   cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building..."
-  mkdir -p tools
-  ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc tools/
-  mkdir -p bazel
-  ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status bazel/
   bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt @envoy//source/exe:envoy-static.stripped.stamped
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
