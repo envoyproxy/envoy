@@ -18,17 +18,6 @@
 * Function names using camel case starting with a lower case letter (e.g., "doFoo()").
 * Struct/Class member variables have a '\_' postfix (e.g., "int foo\_;").
 * 100 columns is the line limit.
-* OOM events (both memory and FDs) are considered fatal crashing errors.
-* All error code returns should be checked. It's acceptable to turn failures into crash semantics
-  via `RELEASE_ASSERT(condition)` or `PANIC(message)` if there is no other sensible behavior, e.g.
-  in OOM (memory/FD) scenarios. Crash semantics are preferred over complex error recovery logic when
-  the condition is extremely unlikely or is a fundamental programming error that should be caught by
-  a test, and the testing overhead to verify the recovery logic is high. Only
-  `RELEASE_ASSERT(condition)` should be used to validate conditions that might be imposed by
-  the external environment. `ASSERT(condition)` should be used to document (and check in debug-only
-  builds) program invariants. Use `ASSERT` liberally, but do not use it for things that will crash
-  in an obvious way in a subsequent line. E.g., do not do
-  `ASSERT(foo != nullptr); foo->doSomething();`.
 * Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
 * Smart pointers are type aliased:
   * `typedef std::unique_ptr<Foo> FooPtr;`
@@ -45,6 +34,36 @@
 * Header guards should use `#pragma once`.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
+
+# Error handling
+
+A few general notes on our error handling philosophy:
+
+* All error code returns should be checked.
+* At a very high level, our philosophy is that errors that are *likely* to happen should be
+  gracefully handled. Examples of likely errors include any type of network error, bad data
+  returned by an API call, bad data read from runtime files, etc. Errors that are *unlikely* to
+  happen should lead to process death, under the assumption that the additional burden of defensive
+  coding and testing is not an effective use of time for an error that should not happen given
+  proper system setup. Examples of these types of errors include not being able to open the shared
+  memory region, an invalid initial JSON config read from disk, system calls that should not fail
+  assuming correct parameters (which should be validated via tests), etc.
+* OOM events (both memory and FDs) are considered fatal crashing errors. This rule is again based
+  on the philosophy that the engineering costs of properly handling these cases is not worth it.
+  Time is better spent designing proper system controls that shed load if resource usage becomes
+  too high, etc.
+* Although we strongly recommend that any type of startup error leads to a fatal error, since this
+  is almost always a result of faulty configuration which should be caught during a canary process,
+  there may be cases in which we want some classes of startup errors to be non-fatal. For example,
+  if a misconfigured option is not necessary for server operation. Although this is discouraged, we
+  will discuss these on a case by case basis case basis during code review.
+* Per above it's acceptable to turn failures into crash semantics
+  via `RELEASE_ASSERT(condition)` or `PANIC(message)` if there is no other sensible behavior, e.g.
+  in OOM (memory/FD) scenarios. Only `RELEASE_ASSERT(condition)` should be used to validate
+  conditions that might be imposed by the external environment. `ASSERT(condition)` should be used
+  to document (and check in debug-only builds) program invariants. Use `ASSERT` liberally, but do
+  not use it for things that will crash in an obvious way in a subsequent line. E.g., do not do
+  `ASSERT(foo != nullptr); foo->doSomething();`.
 
 # Hermetic tests
 
