@@ -200,7 +200,7 @@ Network::ConnectionImpl::IoResult ConnectionImpl::doWriteToSocket() {
 void ConnectionImpl::onConnected() { ASSERT(!handshake_complete_); }
 
 std::string ConnectionImpl::sha256PeerCertificateDigest() {
-  X509Ptr cert = X509Ptr(SSL_get_peer_certificate(ssl_.get()));
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
   }
@@ -213,7 +213,7 @@ std::string ConnectionImpl::sha256PeerCertificateDigest() {
 }
 
 std::string ConnectionImpl::uriSanPeerCertificate() {
-  X509Ptr cert = X509Ptr(SSL_get_peer_certificate(ssl_.get()));
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
   }
