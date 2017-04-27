@@ -85,7 +85,7 @@ void RdsRouteConfigProviderImpl::createRequest(Http::Message& request) {
 
 void RdsRouteConfigProviderImpl::parseResponse(const Http::Message& response) {
   log_debug("rds: parsing response");
-  Json::ObjectPtr response_json = Json::Factory::LoadFromString(response.bodyAsString());
+  Json::ObjectPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
   uint64_t new_hash = response_json->hash();
   if (new_hash != last_config_hash_ || !initialized_) {
     response_json->validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
