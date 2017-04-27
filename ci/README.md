@@ -44,6 +44,7 @@ For a release version of the Envoy binary you can run:
 The artifacts can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
+The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=asan`.
 * `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild`.
