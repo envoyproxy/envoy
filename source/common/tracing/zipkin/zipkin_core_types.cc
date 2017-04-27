@@ -8,6 +8,7 @@
 
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+// TODO(fabolive): Need to add interfaces to the JSON namespace
 
 namespace Zipkin {
 
