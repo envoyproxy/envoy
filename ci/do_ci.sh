@@ -7,8 +7,7 @@ set -e
 . "$(dirname "$0")"/build_setup.sh
 echo "building using ${NUM_CPUS} CPUs"
 
-if [[ "$1" == "bazel.release" ]]; then
-  echo "bazel release build with tests..."
+function bazel_release_binary_build() {
   cd "${ENVOY_CONSUMER_SRCDIR}"
   echo "Building..."
   bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt @envoy//source/exe:envoy-static.stripped.stamped
@@ -17,9 +16,18 @@ if [[ "$1" == "bazel.release" ]]; then
   cp -f \
     "${ENVOY_CONSUMER_SRCDIR}"/bazel-genfiles/external/envoy/source/exe/envoy-static.stripped.stamped \
     "${ENVOY_DELIVERY_DIR}"/envoy
+}
+
+if [[ "$1" == "bazel.release" ]]; then
+  echo "bazel release build with tests..."
+  bazel_release_binary_build
   echo "Testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
+  exit 0
+elif [[ "$1" == "bazel.release.server_only" ]]; then
+  echo "bazel release build..."
+  bazel_release_binary_build
   exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
   echo "bazel ASAN debug build with tests..."
@@ -29,7 +37,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=asan --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
   exit 0
-elif [[ "$1" == "bazel.dev" ]]; then
+elif [[ "$1" == "bazel.dev.server_only" ]]; then
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild of envoy-static..."
   cd "${ENVOY_BUILD_DIR}"
