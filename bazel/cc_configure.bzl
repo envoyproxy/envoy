@@ -228,7 +228,7 @@ def _crosstool_content(repository_ctx, cc, cpu_value, darwin):
       "builtin_sysroot": "",
       "compiler": _get_env_var(repository_ctx, "BAZEL_COMPILER", "compiler", False),
       "host_system_name": _get_env_var(repository_ctx, "BAZEL_HOST_SYSTEM", "local", False),
-      "needsPic": True,
+      "needsPic": False,
       "supports_gold_linker": supports_gold_linker,
       "supports_incremental_linker": False,
       "supports_fission": False,

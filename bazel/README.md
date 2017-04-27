@@ -178,6 +178,9 @@ report is available in `generated/coverage/coverage.html`.
 Envoy proper. To remove the artifacts for the external dependencies run
 `bazel clean --expunge`.
 
+If something goes really wrong and none of the above work to resolve a stale build issue, you can
+always remove your Bazel cache completely. It is likely located in `~/.cache/bazel`.
+
 # Adding or maintaining Envoy build rules
 
 See the [developer guide for writing Envoy Bazel rules](DEVELOPER.md).
