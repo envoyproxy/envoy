@@ -29,7 +29,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=asan --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
   exit 0
-elif [[ "$1" == "bazel.fastbuild" ]]; then
+elif [[ "$1" == "bazel.dev" ]]; then
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild of envoy-static..."
   cd "${ENVOY_BUILD_DIR}"
@@ -41,7 +41,7 @@ elif [[ "$1" == "bazel.fastbuild" ]]; then
     "${ENVOY_BUILD_DIR}"/bazel-bin/source/exe/envoy-static \
     "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
   exit 0
-elif [[ "$1" == "bazel.fastbuild.test" ]]; then
+elif [[ "$1" == "bazel.dev.test" ]]; then
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel test with fastbuild..."
   cd "${ENVOY_BUILD_DIR}"

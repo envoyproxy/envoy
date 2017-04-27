@@ -20,10 +20,10 @@ master commit at which the binary was compiled, and `latest` corresponds to a bi
 
 # Building and running tests as a developer
 
-An example basic invocation to build the Envoy static binary (using the Bazel `fastbuild` type) is:
+An example basic invocation to build a developer version of the Envoy static binary (using the Bazel `fastbuild` type) is:
 
 ```bash
-./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.fastbuild'
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
 The Envoy binary can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-fastbuild` on the Docker host. You
@@ -32,7 +32,7 @@ generate the binary in `~/build/envoy/source/exe/envoy-fastbuild` you can run:
 
 
 ```bash
-ENVOY_DOCKER_BUILD_DIR=~/build ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.fastbuild'
+ENVOY_DOCKER_BUILD_DIR=~/build ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
 For a release Envoy binary you can run:
@@ -46,8 +46,8 @@ The artifacts can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (
 
 
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=asan`.
-* `bazel.fastbuild` &mdash; build Envoy static binary under `-c fastbuild`.
-* `bazel.fastbuild.test` &mdash; build and run tests under `-c fastbuild`.
+* `bazel.dev` &mdash; build Envoy static binary under `-c fastbuild`.
+* `bazel.dev.test` &mdash; build and run tests under `-c fastbuild`.
 * `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt`.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg`, generating coverage information in `<SOURCE_DIR>/generated/coverage/coverage.html`.
 * `check_format`&mdash; run `clang-format` 3.6 and `buildifier` on entire source tree.
