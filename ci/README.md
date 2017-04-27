@@ -35,7 +35,7 @@ generate the binary in `~/build/envoy/source/exe/envoy-fastbuild` you can run:
 ENVOY_DOCKER_BUILD_DIR=~/build ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev.server_only'
 ```
 
-For a release Envoy binary you can run:
+For a release version of the Envoy binary you can run:
 
 ```bash
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release.server_only'
