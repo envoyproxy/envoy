@@ -22,7 +22,7 @@ SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runt
       local_info_(local_info), service_name_(config.getString("service_name")) {}
 
 void SdsClusterImpl::parseResponse(const Http::Message& response) {
-  Json::ObjectPtr json = Json::Factory::LoadFromString(response.bodyAsString());
+  Json::ObjectPtr json = Json::Factory::loadFromString(response.bodyAsString());
   json->validateSchema(Json::Schema::SDS_SCHEMA);
   std::vector<HostSharedPtr> new_hosts;
   for (const Json::ObjectPtr& host : json->getObjectArray("hosts")) {

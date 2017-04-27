@@ -219,7 +219,7 @@ private:
   rapidjson::Document root_;
 };
 
-ObjectPtr Factory::LoadFromFile(const std::string& file_path) {
+ObjectPtr Factory::loadFromFile(const std::string& file_path) {
   rapidjson::Document document;
   std::ifstream file_stream(file_path);
   rapidjson::IStreamWrapper stream_wrapper(file_stream);
@@ -230,7 +230,7 @@ ObjectPtr Factory::LoadFromFile(const std::string& file_path) {
   return ObjectPtr{new ObjectImplRoot(std::move(document))};
 }
 
-ObjectPtr Factory::LoadFromString(const std::string& json) {
+ObjectPtr Factory::loadFromString(const std::string& json) {
   rapidjson::Document document;
   if (document.Parse<0>(json.c_str()).HasParseError()) {
     throw Exception(fmt::format("Error(offset {}): {}\n", document.GetErrorOffset(),

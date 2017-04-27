@@ -38,7 +38,7 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 // static
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_json) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
-  Json::ObjectPtr loader = Json::Factory::LoadFromFile(router_config_json);
+  Json::ObjectPtr loader = Json::Factory::loadFromFile(router_config_json);
   loader->validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
   std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
@@ -55,7 +55,7 @@ RouterCheckTool::RouterCheckTool(std::unique_ptr<NiceMock<Runtime::MockLoader>> 
     : runtime_(std::move(runtime)), cm_(std::move(cm)), config_(std::move(config)) {}
 
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectPtr loader = Json::Factory::LoadFromFile(expected_route_json);
+  Json::ObjectPtr loader = Json::Factory::loadFromFile(expected_route_json);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;

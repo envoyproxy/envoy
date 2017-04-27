@@ -28,7 +28,7 @@ public:
     ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
         .WillByDefault(Return("access_token"));
 
-    Json::ObjectPtr config_json = Json::Factory::LoadFromFile(file_path);
+    Json::ObjectPtr config_json = Json::Factory::loadFromFile(file_path);
     Server::Configuration::InitialImpl initial_config(*config_json);
     Server::Configuration::MainImpl main_config(server_);
 
