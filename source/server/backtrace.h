@@ -83,6 +83,23 @@ public:
   }
 
   /**
+   * Capture a stack trace from a particular address.
+   *
+   * This can be used to capture a useful stack trace from a fatal signal
+   * handler.
+   *
+   * @param address The stack trace will begin from this address.
+   */
+  void CaptureFrom(void* address) {
+#ifdef NDEBUG
+    if (!log_in_prod_) {
+      return;
+    }
+#endif
+    stack_trace_.load_from(address, MAX_STACK_DEPTH);
+  }
+
+  /**
    * Log the stack trace.
    */
   void Log() {
@@ -100,11 +117,9 @@ public:
     }
 
     const auto thread_id = stack_trace_.thread_id();
-    // Trick to figure out our own object file name for script to use:
     backward::ResolvedTrace trace = resolver.resolve(stack_trace_[0]);
     auto obj_name = trace.object_filename;
-    if (obj_name.empty()) {
-      obj_name = "path/to/envoy-executable";
+    for (unsigned int i = 0; i < stack_trace_.size(); ++i) {
     }
 
     LogAtLevel("Backtrace obj<{}> thr<{}> (use tools/stack_decode.py):", obj_name, thread_id);
@@ -112,9 +127,18 @@ public:
     // Why start at 2? To hide the function call to backward that began the
     // trace.
     for (unsigned int i = 0; i < stack_trace_.size(); ++i) {
+      backward::ResolvedTrace trace = resolver.resolve(stack_trace_[i]);
+      if (trace.object_filename != obj_name) {
+        obj_name = trace.object_filename;
+        LogAtLevel("thr<{}> obj<{}>", thread_id, obj_name);
+      }
       LogAtLevel("thr<{}> #{} {}", thread_id, stack_trace_[i].idx, stack_trace_[i].addr);
     }
     LogAtLevel("end backtrace thread {}", stack_trace_.thread_id());
+  }
+
+  void LogFault(const char* signame, const void* addr) {
+    LogAtLevel("Caught {}, suspect faulting address {}", signame, addr);
   }
 
 private:

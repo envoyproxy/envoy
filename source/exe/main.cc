@@ -7,6 +7,7 @@
 #include "common/stats/thread_local_store.h"
 
 #include "exe/hot_restart.h"
+#include "exe/signal_action.h"
 
 #include "server/drain_manager_impl.h"
 #include "server/options_impl.h"
@@ -34,6 +35,7 @@ public:
 } // Server
 
 int main(int argc, char** argv) {
+  SignalAction handle_sigs;
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   OptionsImpl options(argc, argv, Server::SharedMemory::version(), spdlog::level::warn);
