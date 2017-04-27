@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/common/hex.h"
 #include "common/tracing/zipkin/tracer_interface.h"
 #include "common/tracing/zipkin/util.h"
 
@@ -483,7 +484,7 @@ public:
   /**
    * @return the span's id as a hexadecimal string.
    */
-  std::string idAsHexString() const { return Util::uint64ToHex(id_); }
+  std::string idAsHexString() const { return Hex::uint64ToHex(id_); }
 
   /**
    * @return a struct indicating which of the span's optional attributes are set.
@@ -503,7 +504,7 @@ public:
   /**
    * @return the span's parent id as a hexadecimal string.
    */
-  std::string parentIdAsHexString() const { return Util::uint64ToHex(parent_id_); }
+  std::string parentIdAsHexString() const { return Hex::uint64ToHex(parent_id_); }
 
   /**
    * @return the span's timestamp (clock time for user presentation: microseconds since epoch).
@@ -518,7 +519,7 @@ public:
   /**
    * @return the span's trace id as a hexadecimal string.
    */
-  std::string traceIdAsHexString() const { return Util::uint64ToHex(trace_id_); }
+  std::string traceIdAsHexString() const { return Hex::uint64ToHex(trace_id_); }
 
   /**
    * @return the higher 64 bits of a 128-bit trace id.

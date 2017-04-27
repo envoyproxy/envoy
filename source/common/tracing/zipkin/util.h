@@ -45,13 +45,6 @@ public:
   static uint64_t generateRandom64();
 
   /**
-   * Converts the given 64-bit integer into a hexadecimal string.
-   *
-   * @param value The integer to be converted.
-   */
-  static std::string uint64ToHex(uint64_t value);
-
-  /**
    *  Extracts the IP address and port from a string of the form "<IP>:<port>".
    *
    *  @param address String of the form "<IP>:<port>".
