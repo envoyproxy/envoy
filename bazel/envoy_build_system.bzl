@@ -6,8 +6,6 @@ def envoy_package():
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
     return [
-        # TODO(htuch): Remove this when Bazel bringup is done.
-        "-DBAZEL_BRINGUP",
         "-Wall",
         "-Wextra",
         "-Werror",

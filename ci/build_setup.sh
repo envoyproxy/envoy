@@ -22,8 +22,6 @@ export HOME="${FAKE_HOME}"
 export PYTHONUSERBASE="${FAKE_HOME}"
 
 export BUILD_DIR=/build
-# Make sure that "docker run" has a -v bind mount for /build, since cmake
-# users will only have a bind mount for /source.
 if [[ ! -d "${BUILD_DIR}" ]]
 then
   echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}?"

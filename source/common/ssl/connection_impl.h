@@ -37,7 +37,7 @@ private:
   void onConnected() override;
 
   ContextImpl& ctx_;
-  SslConPtr ssl_;
+  bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
 };
 
