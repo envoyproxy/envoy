@@ -8,6 +8,7 @@ export CC=gcc-4.9
 export CXX=g++-4.9
 export HEAPCHECK=normal
 export PPROF_PATH=/thirdparty_build/bin/pprof
+export GIT_BUILD_SHA=`git rev-parse HEAD`
 
 NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 

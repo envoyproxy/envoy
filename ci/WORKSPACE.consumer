@@ -21,3 +21,6 @@ new_local_repository(
 )
 
 cc_configure()
+
+load("@envoy//bazel:git_version.bzl", "git_version")
+git_version()

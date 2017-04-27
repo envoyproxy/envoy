@@ -8,6 +8,6 @@ envoy_package()
 
 envoy_cc_library(
     name = "version_generated",
-    srcs = ["//:version_generated.cc"],
+    srcs = ["@git_version//:version_generated.cc"],
     deps = ["//source/common/common:version_includes"],
 )
