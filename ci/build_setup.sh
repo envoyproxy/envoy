@@ -78,3 +78,7 @@ ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CONSUMER_SRCDIR}"/tools/bazel.r
 export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
 mkdir -p "${ENVOY_BUILD_DIR}"
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE "${ENVOY_BUILD_DIR}"
+
+# This is where we copy build deliverables to.
+export ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
+mkdir -p "${ENVOY_DELIVERY_DIR}"

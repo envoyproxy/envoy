@@ -13,12 +13,10 @@ if [[ "$1" == "bazel.release" ]]; then
   echo "Building..."
   bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt @envoy//source/exe:envoy-static.stripped.stamped
   # Copy the envoy-static binary somewhere that we can access outside of the
-  # container.
-  DELIVER_DIR="${ENVOY_BUILD_DIR}"/source/exe
-  mkdir -p "${DELIVER_DIR}"
+  # container for building Docker images.
   cp -f \
     "${ENVOY_CONSUMER_SRCDIR}"/bazel-genfiles/external/envoy/source/exe/envoy-static.stripped.stamped \
-    "${DELIVER_DIR}"/envoy
+    "${ENVOY_DELIVERY_DIR}"/envoy
   echo "Testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
@@ -37,6 +35,11 @@ elif [[ "$1" == "bazel.fastbuild" ]]; then
   cd "${ENVOY_BUILD_DIR}"
   echo "Building..."
   bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild //source/exe:envoy-static
+  # Copy the envoy-static binary somewhere that we can access outside of the
+  # container for developers.
+  cp -f \
+    "${ENVOY_BUILD_DIR}"/bazel-bin/source/exe/envoy-static \
+    "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
   exit 0
 elif [[ "$1" == "bazel.fastbuild.test" ]]; then
   # This doesn't go into CI but is available for developer convenience.

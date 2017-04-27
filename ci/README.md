@@ -26,10 +26,24 @@ An example basic invocation to build the Envoy static binary (using the Bazel `f
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.fastbuild'
 ```
 
-The output artifacts can be found in `/build/envoy/bazel-bin/source/exe/envoy-static` in the
-container.
+The Envoy binary can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-fastbuild` on the Docker host. You
+can control this by setting `ENVOY_DOCKER_BUILD_DIR` in the environment, e.g. to
+generate the binary in `~/build/envoy/source/exe/envoy-fastbuild` you can run:
 
-The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
+
+```bash
+ENVOY_DOCKER_BUILD_DIR=~/build ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.fastbuild'
+```
+
+For a release Envoy binary you can run:
+
+```bash
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release'
+```
+
+The artifacts can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
+`$ENVOY_DOCKER_BUILD_DIR` points).
+
 
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=asan`.
 * `bazel.fastbuild` &mdash; build Envoy static binary under `-c fastbuild`.
