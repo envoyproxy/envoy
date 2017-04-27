@@ -22,6 +22,7 @@ envoy_cc_mock(
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/upstream:cluster_manager_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",

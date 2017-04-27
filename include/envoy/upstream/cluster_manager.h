@@ -6,9 +6,12 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/json/json_object.h"
+#include "envoy/local_info/local_info.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
@@ -103,6 +106,8 @@ public:
   virtual void shutdown() PURE;
 };
 
+typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
+
 /**
  * Global configuration for any SDS clusters.
  */
@@ -138,6 +143,17 @@ typedef std::unique_ptr<CdsApi> CdsApiPtr;
 class ClusterManagerFactory {
 public:
   virtual ~ClusterManagerFactory() {}
+
+  /**
+   * Allocate a cluster manager from configuration JSON.
+   */
+  virtual ClusterManagerPtr clusterManagerFromJson(const Json::Object& config,
+                                                   Stats::Store& stats, ThreadLocal::Instance& tls,
+                                                   Runtime::Loader& runtime,
+                                                   Runtime::RandomGenerator& random,
+                                                   const LocalInfo::LocalInfo& local_info,
+                                                   AccessLog::AccessLogManager& log_manager) PURE;
+
 
   /**
    * Allocate an HTTP connection pool.

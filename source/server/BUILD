@@ -141,6 +141,7 @@ envoy_cc_library(
         "//source/common/ssl:context_lib",
         "//source/common/stats:statsd_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//source/common/upstream:cluster_manager_lib",
         "//source/server/http:admin_lib",
     ],
 )

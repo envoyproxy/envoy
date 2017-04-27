@@ -546,6 +546,14 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   return container.pools_[enumToInt(priority)].get();
 }
 
+ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromJson(
+    const Json::Object& config, Stats::Store& stats, ThreadLocal::Instance& tls,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
+  return ClusterManagerPtr{new ClusterManagerImpl(config, *this, stats, tls, runtime, random,
+                                                  local_info, log_manager)};
+}
+
 Http::ConnectionPool::InstancePtr
 ProdClusterManagerFactory::allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                                             ResourcePriority priority) {
