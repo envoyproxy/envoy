@@ -178,7 +178,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-SslConPtr ContextImpl::newSsl() const { return SSL_new(ctx_.get()); }
+SslConPtr ContextImpl::newSsl() const { return SslConPtr(SSL_new(ctx_.get())); }
 
 bool ContextImpl::verifyPeer(SSL* ssl) const {
   bool verified = true;
@@ -342,7 +342,7 @@ X509Ptr ContextImpl::loadCert(const std::string& cert_file) {
   if (!fp.get() || !PEM_read_X509(fp.get(), &cert, nullptr, nullptr)) {
     throw EnvoyException(fmt::format("Failed to load certificate '{}'", cert_file.c_str()));
   }
-  return X509Ptr{cert};
+  return X509Ptr(cert);
 };
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,

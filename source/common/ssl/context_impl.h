@@ -9,7 +9,6 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/c_smart_ptr.h"
 #include "common/ssl/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -37,8 +36,8 @@ struct SslStats {
   ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_TIMER_STRUCT)
 };
 
-typedef CSmartPtr<SSL, SSL_free> SslConPtr;
-typedef CSmartPtr<X509, X509_free> X509Ptr;
+typedef bssl::UniquePtr<SSL> SslConPtr;
+typedef bssl::UniquePtr<X509> X509Ptr;
 
 class ContextImpl : public virtual Context {
 public:
@@ -86,7 +85,7 @@ protected:
    */
   static const unsigned char SERVER_SESSION_ID_CONTEXT;
 
-  typedef CSmartPtr<SSL_CTX, SSL_CTX_free> SslCtxPtr;
+  typedef bssl::UniquePtr<SSL_CTX> SslCtxPtr;
 
   /**
    * Verifies certificate hash for pinning. The hash is the SHA-256 has of the DER encoding of the
