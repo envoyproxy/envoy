@@ -23,7 +23,7 @@ master commit at which the binary was compiled, and `latest` corresponds to a bi
 An example basic invocation to build a developer version of the Envoy static binary (using the Bazel `fastbuild` type) is:
 
 ```bash
-./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev.server_only'
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
 The Envoy binary can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-fastbuild` on the Docker host. You
@@ -46,8 +46,7 @@ The artifacts can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (
 
 
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=asan`.
-* `bazel.dev.server_only` &mdash; build Envoy static binary under `-c fastbuild`.
-* `bazel.dev.test` &mdash; build and run tests under `-c fastbuild`.
+* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild`.
 * `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt`.
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt`.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg`, generating coverage information in `<SOURCE_DIR>/generated/coverage/coverage.html`.

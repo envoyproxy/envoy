@@ -37,24 +37,19 @@ elif [[ "$1" == "bazel.asan" ]]; then
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=asan --test_output=all \
     --cache_test_results=no @envoy//test/... //:echo2_integration_test
   exit 0
-elif [[ "$1" == "bazel.dev.server_only" ]]; then
+elif [[ "$1" == "bazel.dev" ]]; then
   # This doesn't go into CI but is available for developer convenience.
-  echo "bazel fastbuild of envoy-static..."
+  echo "bazel fastbuild build with tests..."
   cd "${ENVOY_BUILD_DIR}"
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild //source/exe:envoy-static
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c fastbuild //source/exe:envoy-static
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container for developers.
   cp -f \
     "${ENVOY_BUILD_DIR}"/bazel-bin/source/exe/envoy-static \
     "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
-  exit 0
-elif [[ "$1" == "bazel.dev.test" ]]; then
-  # This doesn't go into CI but is available for developer convenience.
-  echo "bazel test with fastbuild..."
-  cd "${ENVOY_BUILD_DIR}"
   echo "Building and testing..."
-  bazel test ${BAZEL_BUILD_OPTIONS} -c fastbuild //test/...
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   echo "bazel coverage build with tests..."
