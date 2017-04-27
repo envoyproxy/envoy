@@ -1,5 +1,7 @@
 #pragma once
 
+#include <regex>
+
 #include "common/tracing/zipkin/util.h"
 #include "common/tracing/zipkin/zipkin_core_types.h"
 

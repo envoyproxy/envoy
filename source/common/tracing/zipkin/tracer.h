@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/tracing/zipkin/span_context.h"
@@ -59,7 +60,7 @@ public:
    * @param span_name Name of the new span.
    * @param start_time The time indicating the beginning of the span.
    */
-  SpanPtr startSpan(const std::string& span_name, uint64_t start_time);
+  SpanPtr startSpan(const std::string& span_name, MonotonicTime start_time);
 
   /**
    * Depending on the given context, creates either a "child" or a "shared-context" Zipkin span.
@@ -68,7 +69,7 @@ public:
    * @param start_time The time indicating the beginning of the span.
    * @param previous_context The context of the span preceding the one to be created.
    */
-  SpanPtr startSpan(const std::string& span_name, uint64_t start_time,
+  SpanPtr startSpan(const std::string& span_name, MonotonicTime start_time,
                     SpanContext& previous_context);
 
   /**

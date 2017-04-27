@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 namespace Zipkin {
 
 /**
@@ -31,19 +34,6 @@ public:
    */
   static void addArrayToJson(std::string& target, const std::vector<const std::string*>& json_array,
                              const std::string& field_name);
-  // ====
-  // Time manipulation
-  // ====
-
-  /**
-   * Returns the time since epoch in microseconds.
-   */
-  static uint64_t timeSinceEpochMicro();
-
-  /**
-   * Returns the time since epoch in nanoseconds.
-   */
-  static uint64_t timeSinceEpochNano();
 
   // ====
   // Miscellaneous

@@ -1,5 +1,6 @@
-#include "common/tracing/zipkin/zipkin_core_types.h"
+#include "common/common/utility.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
+#include "common/tracing/zipkin/zipkin_core_types.h"
 
 #include "gtest/gtest.h"
 
@@ -91,7 +92,9 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ("", ann.value());
   EXPECT_FALSE(ann.isSetEndpoint());
 
-  uint64_t timestamp = Util::timeSinceEpochMicro();
+  uint64_t timestamp =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   ann.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, ann.timestamp());
 
@@ -141,7 +144,9 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
 
 TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   Endpoint ep(std::string("127.0.0.1"), 3306, std::string("my_service"));
-  uint64_t timestamp = Util::timeSinceEpochMicro();
+  uint64_t timestamp =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   Annotation ann(timestamp, ZipkinCoreConstants::CLIENT_SEND, ep);
 
   EXPECT_EQ(timestamp, ann.timestamp());
@@ -164,7 +169,9 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
 
 TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   Endpoint ep(std::string("127.0.0.1"), 3306, std::string("my_service"));
-  uint64_t timestamp = Util::timeSinceEpochMicro();
+  uint64_t timestamp =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   Annotation ann(timestamp, ZipkinCoreConstants::CLIENT_SEND, ep);
   Annotation ann2(ann);
 
@@ -180,7 +187,9 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
 
 TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   Endpoint ep(std::string("127.0.0.1"), 3306, std::string("my_service"));
-  uint64_t timestamp = Util::timeSinceEpochMicro();
+  uint64_t timestamp =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   Annotation ann(timestamp, ZipkinCoreConstants::CLIENT_SEND, ep);
   Annotation ann2 = ann;
 
@@ -332,13 +341,17 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(id, span.traceIdHigh());
   EXPECT_TRUE(span.isSet().trace_id_high_);
 
-  int64_t timestamp = Util::timeSinceEpochMicro();
+  int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   span.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, span.timestamp());
   EXPECT_TRUE(span.isSet().timestamp_);
 
-  span.setStartTime(timestamp);
-  EXPECT_EQ(timestamp, span.startTime());
+  int64_t start_time =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch()).count();
+  span.setStartTime(start_time);
+  EXPECT_EQ(start_time, span.startTime());
 
   span.setDuration(3000LL);
   EXPECT_EQ(3000LL, span.duration());
@@ -448,7 +461,8 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
-  int64_t timestamp = Util::timeSinceEpochMicro();
+  int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
   span.setName("span_name");
@@ -483,7 +497,8 @@ TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
-  int64_t timestamp = Util::timeSinceEpochMicro();
+  int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
   span.setName("span_name");

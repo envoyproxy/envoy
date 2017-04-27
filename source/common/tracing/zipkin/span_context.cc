@@ -1,7 +1,7 @@
-#include "common/common/utility.h"
-
-#include "common/tracing/zipkin/zipkin_core_constants.h"
 #include "common/tracing/zipkin/span_context.h"
+
+#include "common/common/utility.h"
+#include "common/tracing/zipkin/zipkin_core_constants.h"
 
 namespace Zipkin {
 

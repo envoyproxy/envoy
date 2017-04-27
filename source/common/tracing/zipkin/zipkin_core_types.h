@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/pure.h"
 
 #include "common/tracing/zipkin/tracer_interface.h"
@@ -177,7 +179,8 @@ public:
   }
 
   /**
-   * @return the annotation's timestamp attribute.
+   * @return the annotation's timestamp attribute
+   * (clock time for user presentation: microseconds since epoch).
    */
   uint64_t timestamp() const { return timestamp_; }
 
@@ -362,7 +365,7 @@ public:
    */
   Span()
       : trace_id_(0), name_(), id_(0), parent_id_(0), timestamp_(0), duration_(0),
-        trace_id_high_(0), start_time_(0), tracer_(nullptr) {}
+        trace_id_high_(0), monotonic_start_time_(0), tracer_(nullptr) {}
 
   /**
    * Sets the span's trace id attribute.
@@ -453,9 +456,9 @@ public:
   }
 
   /**
-   * Sets the span start-time attribute.
+   * Sets the span start-time attribute (monotonic, used to calculate duration).
    */
-  void setStartTime(const int64_t time) { start_time_ = time; }
+  void setStartTime(const int64_t time) { monotonic_start_time_ = time; }
 
   /**
    * @return the span's annotations.
@@ -503,7 +506,7 @@ public:
   std::string parentIdAsHexString() const { return Util::uint64ToHex(parent_id_); }
 
   /**
-   * @return the span's timestamp.
+   * @return the span's timestamp (clock time for user presentation: microseconds since epoch).
    */
   int64_t timestamp() const { return timestamp_; }
 
@@ -523,9 +526,9 @@ public:
   uint64_t traceIdHigh() const { return trace_id_high_; }
 
   /**
-   * @return the span's start time.
+   * @return the span's start time (monotonic, used to calculate duration).
    */
-  int64_t startTime() const { return start_time_; }
+  int64_t startTime() const { return monotonic_start_time_; }
 
   /**
     * Serializes the span as a Zipkin-compliant JSON representation as a string.
@@ -578,7 +581,7 @@ private:
   int64_t timestamp_;
   int64_t duration_;
   uint64_t trace_id_high_;
-  int64_t start_time_;
+  int64_t monotonic_start_time_;
   TracerInterface* tracer_;
   SpanIsSet isset_;
 };

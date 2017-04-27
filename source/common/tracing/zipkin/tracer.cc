@@ -1,10 +1,14 @@
+#include "common/tracing/zipkin/tracer.h"
+
+#include <chrono>
+
+#include "common/common/utility.h"
 #include "common/tracing/zipkin/util.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
-#include "common/tracing/zipkin/tracer.h"
 
 namespace Zipkin {
 
-SpanPtr Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
+SpanPtr Tracer::startSpan(const std::string& span_name, MonotonicTime start_time) {
   // Build the endpoint
   std::string ip;
   uint16_t port;
@@ -25,11 +29,14 @@ SpanPtr Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   uint64_t random_number = generateRandomNumber();
   span_ptr->setId(random_number);
   span_ptr->setTraceId(random_number);
-  span_ptr->setStartTime(start_time);
+  int64_t start_time_micro =
+      std::chrono::duration_cast<std::chrono::microseconds>(start_time.time_since_epoch()).count();
+  span_ptr->setStartTime(start_time_micro);
 
   // Set the timestamp globally for the span and also for the CS annotation
-  uint64_t timestamp_micro;
-  timestamp_micro = Util::timeSinceEpochMicro();
+  uint64_t timestamp_micro =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   cs.setTimestamp(timestamp_micro);
   span_ptr->setTimestamp(timestamp_micro);
 
@@ -41,15 +48,14 @@ SpanPtr Tracer::startSpan(const std::string& span_name, uint64_t start_time) {
   return span_ptr;
 }
 
-SpanPtr Tracer::startSpan(const std::string& span_name, uint64_t start_time,
+SpanPtr Tracer::startSpan(const std::string& span_name, MonotonicTime start_time,
                           SpanContext& previous_context) {
   SpanPtr span_ptr(new Span());
   Annotation annotation;
   uint64_t timestamp_micro;
 
-  // TODO(fabolive) We currently ignore the start_time to set the span/annotation timestamps
-  // Is start_time really needed?
-  timestamp_micro = Util::timeSinceEpochMicro();
+  timestamp_micro = std::chrono::duration_cast<std::chrono::microseconds>(
+                        ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
 
   if ((previous_context.isSetAnnotation().sr_) && (!previous_context.isSetAnnotation().cs_)) {
     // We need to create a new span that is a child of the previous span; no shared context
@@ -101,7 +107,9 @@ SpanPtr Tracer::startSpan(const std::string& span_name, uint64_t start_time,
   // Keep the same trace id
   span_ptr->setTraceId(previous_context.trace_id());
 
-  span_ptr->setStartTime(start_time);
+  int64_t start_time_micro =
+      std::chrono::duration_cast<std::chrono::microseconds>(start_time.time_since_epoch()).count();
+  span_ptr->setStartTime(start_time_micro);
 
   span_ptr->setTracer(this);
 

@@ -1,9 +1,15 @@
-#include "rapidjson/writer.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/document.h"
+#include "common/tracing/zipkin/util.h"
+
+#include <chrono>
+#include <random>
+#include <regex>
 
 #include "common/common/hex.h"
-#include "common/tracing/zipkin/util.h"
+#include "common/common/utility.h"
+
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 namespace Zipkin {
 
@@ -38,18 +44,9 @@ void Util::addArrayToJson(std::string& target, const std::vector<const std::stri
   mergeJsons(target, stringified_json_array, field_name);
 }
 
-uint64_t Util::timeSinceEpochMicro() {
-  return std::chrono::duration_cast<std::chrono::microseconds>(
-             std::chrono::system_clock::now().time_since_epoch()).count();
-}
-
-uint64_t Util::timeSinceEpochNano() {
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(
-             std::chrono::system_clock::now().time_since_epoch()).count();
-}
-
 uint64_t Util::generateRandom64() {
-  uint64_t seed = timeSinceEpochNano();
+  uint64_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                      ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   std::mt19937_64 rand_64(seed);
   return rand_64();
 }

@@ -1,5 +1,5 @@
+#include "common/common/utility.h"
 #include "common/runtime/runtime_impl.h"
-
 #include "common/tracing/zipkin/tracer.h"
 #include "common/tracing/zipkin/util.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
@@ -22,16 +22,18 @@ private:
 
 TEST(ZipkinTracerTest, spanCreation) {
   Tracer tracer("my_service_name", "127.0.0.1:9000");
-  int64_t timestamp = Util::timeSinceEpochMicro();
+  MonotonicTime start_time = ProdMonotonicTimeSource::instance_.currentTime();
 
   // ==============
   // Test the creation of a root span --> CS
   // ==============
 
-  SpanPtr root_span = tracer.startSpan("my_span", timestamp);
+  SpanPtr root_span = tracer.startSpan("my_span", start_time);
 
   EXPECT_EQ("my_span", root_span->name());
-  EXPECT_EQ(timestamp, root_span->startTime());
+  EXPECT_EQ(
+      std::chrono::duration_cast<std::chrono::microseconds>(start_time.time_since_epoch()).count(),
+      root_span->startTime());
 
   EXPECT_NE(0ULL, root_span->traceId());            // trace id must be set
   EXPECT_EQ(root_span->traceId(), root_span->id()); // span id and trace id must be the same
@@ -62,9 +64,11 @@ TEST(ZipkinTracerTest, spanCreation) {
 
   SpanContext root_span_context(*root_span);
   SpanPtr server_side_shared_context_span =
-      tracer.startSpan("my_span", timestamp, root_span_context);
+      tracer.startSpan("my_span", start_time, root_span_context);
 
-  EXPECT_EQ(timestamp, server_side_shared_context_span->startTime());
+  EXPECT_EQ(
+      std::chrono::duration_cast<std::chrono::microseconds>(start_time.time_since_epoch()).count(),
+      server_side_shared_context_span->startTime());
 
   // span name should NOT be set (it was set in the CS side)
   EXPECT_EQ("", server_side_shared_context_span->name());
@@ -105,10 +109,12 @@ TEST(ZipkinTracerTest, spanCreation) {
   // ==============
 
   SpanContext server_side_context(*server_side_shared_context_span);
-  SpanPtr child_span = tracer.startSpan("my_child_span", timestamp, server_side_context);
+  SpanPtr child_span = tracer.startSpan("my_child_span", start_time, server_side_context);
 
   EXPECT_EQ("my_child_span", child_span->name());
-  EXPECT_EQ(timestamp, child_span->startTime());
+  EXPECT_EQ(
+      std::chrono::duration_cast<std::chrono::microseconds>(start_time.time_since_epoch()).count(),
+      child_span->startTime());
 
   // trace id must be retained
   EXPECT_NE(0ULL, child_span->traceId());
@@ -146,14 +152,14 @@ TEST(ZipkinTracerTest, spanCreation) {
 TEST(ZipkinTracerTest, finishSpan) {
   Tracer tracer("my_service_name", "127.0.0.1:9000");
   tracer.setRandomGenerator(Runtime::RandomGeneratorPtr(new Runtime::RandomGeneratorImpl()));
-  int64_t timestamp = Util::timeSinceEpochMicro();
+  MonotonicTime start_time = ProdMonotonicTimeSource::instance_.currentTime();
 
   // ==============
   // Test finishing a span containing a CS annotation
   // ==============
 
   // Creates a root-span with a CS annotation
-  SpanPtr span = tracer.startSpan("my_span", timestamp);
+  SpanPtr span = tracer.startSpan("my_span", start_time);
 
   // Finishing a root span with a CS annotation must add a CR annotation
   span->finish();
@@ -186,7 +192,7 @@ TEST(ZipkinTracerTest, finishSpan) {
   // ==============
 
   SpanContext context(*span);
-  SpanPtr server_side = tracer.startSpan("my_span", timestamp, context);
+  SpanPtr server_side = tracer.startSpan("my_span", start_time, context);
 
   // Associate a reporter with the tracer
   TestReporterImpl* reporter_object = new TestReporterImpl(135);

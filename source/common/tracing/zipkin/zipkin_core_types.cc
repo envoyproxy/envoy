@@ -1,11 +1,13 @@
-#include "rapidjson/writer.h"
-#include "rapidjson/stringbuffer.h"
+#include "common/tracing/zipkin/zipkin_core_types.h"
 
+#include "common/common/utility.h"
 #include "common/tracing/zipkin/span_context.h"
 #include "common/tracing/zipkin/util.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
 #include "common/tracing/zipkin/zipkin_json_field_names.h"
-#include "common/tracing/zipkin/zipkin_core_types.h"
+
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 namespace Zipkin {
 
@@ -132,7 +134,7 @@ Span::Span(const Span& span) {
   duration_ = span.duration();
   trace_id_high_ = span.traceIdHigh();
   isset_ = span.isSet();
-  start_time_ = span.startTime();
+  monotonic_start_time_ = span.startTime();
   tracer_ = span.tracer();
 }
 
@@ -147,7 +149,7 @@ Span& Span::operator=(const Span& span) {
   duration_ = span.duration();
   trace_id_high_ = span.traceIdHigh();
   isset_ = span.isSet();
-  start_time_ = span.startTime();
+  monotonic_start_time_ = span.startTime();
   tracer_ = span.tracer();
 
   return *this;
@@ -208,18 +210,24 @@ void Span::finish() {
     // Need to set the SS annotation
     Annotation ss;
     ss.setEndpoint(annotations_[0].endpoint());
-    ss.setTimestamp(Util::timeSinceEpochMicro());
+    ss.setTimestamp(std::chrono::duration_cast<std::chrono::microseconds>(
+                        ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count());
     ss.setValue(ZipkinCoreConstants::SERVER_SEND);
     annotations_.push_back(std::move(ss));
   } else if ((context.isSetAnnotation().cs_) && (!context.isSetAnnotation().cr_)) {
     // Need to set the CR annotation
     Annotation cr;
-    uint64_t stop_time = Util::timeSinceEpochMicro();
+    uint64_t stop_timestamp =
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
     cr.setEndpoint(annotations_[0].endpoint());
-    cr.setTimestamp(stop_time);
+    cr.setTimestamp(stop_timestamp);
     cr.setValue(ZipkinCoreConstants::CLIENT_RECV);
     annotations_.push_back(std::move(cr));
-    setDuration(stop_time - timestamp_);
+    int64_t monotonic_stop_time =
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch()).count();
+    setDuration(monotonic_stop_time - monotonic_start_time_);
   }
 
   auto t = tracer();
