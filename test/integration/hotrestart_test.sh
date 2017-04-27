@@ -19,7 +19,7 @@ echo "Starting epoch 0"
 ADMIN_ADDRESS_PATH_0="${TEST_TMPDIR}"/admin_0.address
 "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
     --restart-epoch 0 --base-id 1 --service-cluster cluster --service-node node \
-    -a "${ADMIN_ADDRESS_PATH_0}" &
+    --admin-address-path "${ADMIN_ADDRESS_PATH_0}" &
 
 FIRST_SERVER_PID=$!
 sleep 3
@@ -40,7 +40,7 @@ echo "Starting epoch 1"
 ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin_1.address
 "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
     --restart-epoch 1 --base-id 1 --service-cluster cluster --service-node node \
-    -a "${ADMIN_ADDRESS_PATH_1}" &
+    --admin-address-path "${ADMIN_ADDRESS_PATH_1}" &
 
 SECOND_SERVER_PID=$!
 # Wait for stat flushing
@@ -57,7 +57,7 @@ ADMIN_ADDRESS_PATH_2="${TEST_TMPDIR}"/admin_2.address
 echo "Starting epoch 2"
 "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
     --restart-epoch 2 --base-id 1 --service-cluster cluster --service-node node \
-    -a "${ADMIN_ADDRESS_PATH_2}" &
+    --admin-address-path "${ADMIN_ADDRESS_PATH_2}" &
 
 THIRD_SERVER_PID=$!
 sleep 3

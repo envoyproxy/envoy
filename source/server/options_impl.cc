@@ -29,7 +29,7 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const std::string& hot_restart_v
                                         std::thread::hardware_concurrency(), "uint32_t", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file", false,
                                            "", "string", cmd);
-  TCLAP::ValueArg<std::string> admin_address_path("a", "admin-address-path", "Admin address path",
+  TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
   TCLAP::ValueArg<std::string> log_level("l", "log-level", log_levels_string, false,
                                          spdlog::level::level_names[default_log_level], "string",

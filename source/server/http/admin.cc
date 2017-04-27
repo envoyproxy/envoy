@@ -359,7 +359,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/stats", "print server stats", MAKE_HANDLER(handlerStats)},
           {"/listeners", "print listener addresses", MAKE_HANDLER(handlerListenerInfo)}} {
 
-  if (address_out_path.length() > 0) {
+  if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
     if (!address_out_file) {
       log().critical("cannot open admin address output file {} for writing.", address_out_path);

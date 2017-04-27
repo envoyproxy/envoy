@@ -28,8 +28,7 @@ namespace Server {
  */
 class TestOptionsImpl : public Options {
 public:
-  TestOptionsImpl(const std::string& config_path)
-      : config_path_(config_path), admin_address_path_("") {}
+  TestOptionsImpl(const std::string& config_path) : config_path_(config_path) {}
 
   // Server::Options
   uint64_t baseId() override { return 0; }

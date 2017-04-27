@@ -28,7 +28,7 @@ TEST(OptionsImplDeathTest, HotRestartVersion) {
 
 TEST(OptionsImplTest, All) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
-      "envoy --concurrency 2 -c hello -a path --restart-epoch 1 -l info "
+      "envoy --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 -l info "
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 --drain-time-s 60 --parent-shutdown-time-s 90");
   EXPECT_EQ(2U, options->concurrency());
@@ -48,4 +48,5 @@ TEST(OptionsImplTest, DefaultParams) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
+  EXPECT_EQ("", options->adminAddressPath());
 }
