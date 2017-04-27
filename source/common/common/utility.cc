@@ -125,6 +125,34 @@ std::string StringUtil::subspan(const std::string& source, size_t start, size_t 
   return source.substr(start, end - start);
 }
 
+std::string StringUtil::escape(const std::string& source) {
+  std::string ret;
+
+  // Prevent unnecessary allocation by allocating 2x original size.
+  ret.reserve(source.length() * 2);
+  for (char c : source) {
+    switch (c) {
+    case '\r':
+      ret += "\\r";
+      break;
+    case '\n':
+      ret += "\\n";
+      break;
+    case '\t':
+      ret += "\\t";
+      break;
+    case '"':
+      ret += "\\\"";
+      break;
+    default:
+      ret += c;
+      break;
+    }
+  }
+
+  return ret;
+}
+
 std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   static DateFormatter date_format("%Y-%m-%dT%H:%M:%S");
 

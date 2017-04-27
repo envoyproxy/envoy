@@ -4,7 +4,7 @@ def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
 # Compute the final copts based on various options.
-def envoy_copts(repository):
+def envoy_copts(repository, test = False):
     return [
         # TODO(htuch): Remove this when Bazel bringup is done.
         "-DBAZEL_BRINGUP",
@@ -17,16 +17,12 @@ def envoy_copts(repository):
         "-std=c++0x",
     ] + select({
         # Bazel adds an implicit -DNDEBUG for opt.
-        repository + "//bazel:opt_build": [],
+        repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
         repository + "//bazel:fastbuild_build": [],
         repository + "//bazel:dbg_build": ["-ggdb3"],
     }) + select({
         repository + "//bazel:disable_tcmalloc": [],
         "//conditions:default": ["-DTCMALLOC"],
-    }) + select({
-        # Allow debug symbols to be added to opt/fastbuild as well.
-        repository + "//bazel:debug_symbols": ["-ggdb3"],
-        "//conditions:default": [],
     })
 
 # References to Envoy external dependencies should be wrapped with this function.
@@ -170,7 +166,7 @@ def envoy_cc_test(name,
     )
     native.cc_test(
         name = name,
-        copts = envoy_copts(repository),
+        copts = envoy_copts(repository, test = True),
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic is not needed on all platforms. Make this more granular.
         linkopts = ["-pthread", "-latomic"],
@@ -199,7 +195,7 @@ def envoy_cc_test_library(name,
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = envoy_copts(repository),
+        copts = envoy_copts(repository, test = True),
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             envoy_external_dep_path('googletest'),
@@ -267,6 +263,7 @@ def envoy_proto_library(name, srcs = [], deps = []):
         default_runtime = "//external:protobuf",
         protoc = "//external:protoc",
         deps = deps,
+        linkstatic = 1,
     )
     # We can't use include_prefix directly in cc_proto_library, since it
     # confuses protoc. Instead, we create a shim cc_library that performs the

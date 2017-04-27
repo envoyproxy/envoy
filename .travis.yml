@@ -7,11 +7,10 @@ install:
 matrix:
   fast_finish: true
 env:
-  - TEST_TYPE=debug
+  - TEST_TYPE=bazel.release
+  - TEST_TYPE=bazel.asan
   - TEST_TYPE=bazel.coverage
-  - TEST_TYPE=bazel.debug
-  - TEST_TYPE=normal
-  - TEST_TYPE=asan
+  - TEST_TYPE=check_format
   - TEST_TYPE=docs
 script: ./ci/ci_steps.sh
 

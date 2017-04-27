@@ -63,6 +63,59 @@ the units tests in
 bazel test //test/common/http:async_client_impl_test
 ```
 
+To observe more verbose test output:
+
+```
+bazel test --test_output=streamed //test/common/http:async_client_impl_test
+```
+
+It's also possible to pass into an Envoy test additional command-line args via `--test_arg`. For
+example, for extremely verbose test debugging:
+
+```
+bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="-l trace"
+```
+
+Bazel will by default cache successful test results. To force it to rerun tests:
+
+
+```
+bazel test //test/common/http:async_client_impl_test --cache_test_results=no
+```
+
+Bazel will by default run all tests inside a sandbox, which disallows access to the
+local filesystem. If you need to break out of the sandbox (for example to run under a
+local script or tool with [`--run_under`](https://bazel.build/versions/master/docs/bazel-user-manual.html#flag--run_under)),
+you can run the test with `--strategy=TestRunner=standalone`, e.g.:
+
+```
+bazel test //test/common/http:async_client_impl_test --strategy=TestRunner=standalone --run_under=/some/path/foobar.sh
+```
+# Stack trace symbol resolution
+
+Envoy can produce backtraces on demand or from assertions and other activity.
+The stack traces written in the log or to stderr contain addresses rather than
+resolved symbols.  The `tools/stack_decode.py` script exists to process the output
+and do symbol resolution to make the stack traces useful.  Any log lines not
+relevant to the backtrace capability are passed through the script unchanged
+(it acts like a filter).
+
+The script runs in one of two modes. If passed no arguments it anticipates
+Envoy (or test) output on stdin. You can postprocess a log or pipe the output of
+an Envoy process. If passed some arguments it runs the arguments as a child
+process. This enables you to run a test with backtrace post processing. Bazel
+sandboxing must be disabled by specifying standalone execution. Example
+command line:
+
+```
+bazel test -c dbg //test/server:backtrace_test
+--run_under=`pwd`/tools/stack_decode.py --strategy=TestRunner=standalone
+--cache_test_results=no --test_output=all
+```
+
+You will need to use either a `dbg` build type or the `--define
+debug_symbols=yes` option to get symbol information in the binaries.
+
 # Running a single Bazel test under GDB
 
 ```
@@ -76,22 +129,14 @@ modes](https://bazel.build/versions/master/docs/bazel-user-manual.html#flag--com
 that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).
-* `opt`: `-O2 -DNDEBUG`, for production builds and performance benchmarking.
-* `dbg`: `-O0 -ggdb3`, debug symbols.
+* `opt`: `-O2 -DNDEBUG -ggdb3`, for production builds and performance benchmarking.
+* `dbg`: `-O0 -ggdb3`, no optimization and debug symbols.
 
 You can use the `-c <compilation_mode>` flag to control this, e.g.
 
 ```
 bazel build -c opt //source/exe:envoy-static
 ```
-
-Debug symbols can also be explicitly added to any build type with `--define
-debug_symbols=yes`, e.g.
-
-```
-bazel build -c opt --define debug_symbols=yes //source/exe:envoy-static
-```
-
 To build and run tests with the compiler's address sanitizer (ASAN) enabled:
 
 ```
@@ -127,6 +172,46 @@ test/run_envoy_bazel_coverage.sh
 The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.
 
+# Cleaning the build and test artifacts
+
+`bazel clean` will nuke all the build/test artifacts from the Bazel cache for
+Envoy proper. To remove the artifacts for the external dependencies run
+`bazel clean --expunge`.
+
+If something goes really wrong and none of the above work to resolve a stale build issue, you can
+always remove your Bazel cache completely. It is likely located in `~/.cache/bazel`.
+
 # Adding or maintaining Envoy build rules
 
 See the [developer guide for writing Envoy Bazel rules](DEVELOPER.md).
+
+# Bazel performance on (virtual) machines with low resources
+
+If the (virtual) machine that is performing the build is low on memory or CPU
+resources, you can override Bazel's default job parallelism determination with
+`--jobs=N` to restrict the build to at most `N` simultaneous jobs, e.g.:
+
+```
+bazel build --jobs=2 //source/...
+```
+
+# Debugging the Bazel build
+
+When trying to understand what Bazel is doing, the `-s` and `--explain` options
+are useful. To have Bazel provide verbose output on which commands it is executing:
+
+```
+bazel build -s //source/...
+```
+
+To have Bazel emit to a text file the rationale for rebuilding a target:
+
+```
+bazel build --explain=file.txt //source/...
+```
+
+To get more verbose explanations:
+
+```
+bazel build --explain=file.txt --verbose_explanations //source/...
+```
