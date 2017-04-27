@@ -49,7 +49,7 @@ class RewriterException(Exception):
   pass
 
 
-# Extract MD5 hash hex string from version_generated.cc.
+# Extract git SHA1 hash from "envoy --version" stdout.
 def ExtractGitSha(path):
   version_output = sp.check_output([path, '--version']).strip()
   sr = re.search('version: (\w+)/', version_output)

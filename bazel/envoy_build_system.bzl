@@ -135,7 +135,8 @@ def envoy_cc_binary(name,
         linkstatic = 1,
         visibility = visibility,
         malloc = tcmalloc_external_dep(repository),
-        # See above comment on MD5 hash.
+        # See above comment on MD5 hash, this is another "force MD5 stamps" to make sure our
+        # rewriting is robust.
         stamp = 1,
         deps = deps,
     )
