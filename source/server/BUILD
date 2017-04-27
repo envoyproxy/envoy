@@ -103,7 +103,6 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
-        "//source/version_generated",
     ],
 )
 
@@ -141,7 +140,6 @@ envoy_cc_library(
         "//source/common/stats:statsd_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/server/http:admin_lib",
-        "//source/version_generated",
     ],
 )
 

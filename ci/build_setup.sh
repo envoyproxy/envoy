@@ -68,7 +68,10 @@ fi
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.consumer "${ENVOY_CONSUMER_SRCDIR}"/WORKSPACE
 mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/tools
 # Hack due to https://github.com/lyft/envoy/issues/838.
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CONSUMER_SRCDIR}"/tools/bazel.rc
+ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CONSUMER_SRCDIR}"/tools/
+mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/bazel
+ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CONSUMER_SRCDIR}"/bazel/
+
 # This is the hash on https://github.com/htuch/envoy-consumer.git we pin to.
 (cd "${ENVOY_CONSUMER_SRCDIR}" && git checkout 94e11fa753a1e787c82cccaec642eda5e5b61ed8)
 

@@ -42,7 +42,6 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/server/config/network:http_connection_manager_lib",
-        "//source/version_generated",
     ],
 )
 

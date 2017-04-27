@@ -60,6 +60,7 @@ def envoy_cc_library(name,
                      external_deps = [],
                      tcmalloc_dep = None,
                      repository = "",
+                     linkstamp = None,
                      deps = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
@@ -76,25 +77,21 @@ def envoy_cc_library(name,
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         alwayslink = 1,
         linkstatic = 1,
+        linkstamp = linkstamp,
     )
 
 def _git_stamped_genrule(repository, name):
     # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
     # do binary rewriting to replace the linker produced MD5 hash with the
     # version_generated.cc git SHA1 hash (truncated).
-    version_generated = repository + "//:version_generated.cc"
     rewriter = repository + "//tools:git_sha_rewriter.py"
     native.genrule(
         name = name + "_stamped",
-        srcs = [
-            name,
-            version_generated,
-        ],
+        srcs = [name],
         outs = [name + ".stamped"],
         cmd = "cp $(location " + name + ") $@ && " +
               "chmod u+w $@ && " +
-              "$(location " + rewriter + ") " +
-              "$(location " + version_generated + ") $@",
+              "$(location " + rewriter + ") $@",
         tools = [rewriter],
     )
 
@@ -136,8 +133,9 @@ def envoy_cc_binary(name,
         linkstatic = 1,
         visibility = visibility,
         malloc = tcmalloc_external_dep(repository),
-        # See above comment on MD5 hash.
-        stamp = 0,
+        # See above comment on MD5 hash, this is another "force MD5 stamps" to make sure our
+        # rewriting is robust.
+        stamp = 1,
         deps = deps,
     )
 

@@ -72,7 +72,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   failHealthcheck(false);
 
   uint64_t version_int;
-  if (!StringUtil::atoul(VersionInfo::GIT_SHA.substr(0, 6).c_str(), version_int, 16)) {
+  if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
     throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
   }
   server_stats_.version_.set(version_int);

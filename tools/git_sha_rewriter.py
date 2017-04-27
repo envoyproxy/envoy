@@ -41,6 +41,7 @@ EXPECTED_BUILD_ID_NOTE_PREFIX = [
 ]
 # We're expecting an MD5 hash, 16 bytes.
 MD5_HASH_LEN = 16
+SHA1_HASH_LEN = 20
 EXPECTED_BUILD_ID_NOTE_LENGTH = len(EXPECTED_BUILD_ID_NOTE_PREFIX) + MD5_HASH_LEN
 
 
@@ -48,14 +49,16 @@ class RewriterException(Exception):
   pass
 
 
-# Extract MD5 hash hex string from version_generated.cc.
+# Extract git SHA1 hash from "envoy --version" stdout.
 def ExtractGitSha(path):
-  with open(path, 'r') as f:
-    contents = f.read()
-    sr = re.search('GIT_SHA\("(\w+)"', contents, flags=re.MULTILINE)
-    if not sr:
-      raise RewriterException('Bad version_generated.cc: %s' % contents)
-    return sr.group(1)
+  version_output = sp.check_output([path, '--version']).strip()
+  sr = re.search('version: (\w+)/', version_output)
+  if not sr:
+    raise RewriterException('Bad envoy --version: %s' % version_output)
+  sha1_hash = sr.group(1)
+  if len(sha1_hash) != 2 * SHA1_HASH_LEN:
+    raise RewriterException('Bad SHA1 hash in %s: %s' % (path, sha1_hash))
+  return sha1_hash
 
 
 # Scrape the offset of .note.gnu.build-id via readelf from the binary. Also
@@ -101,11 +104,10 @@ def RewriteBinary(path, offset, git5_sha1):
 
 
 if __name__ == '__main__':
-  if len(sys.argv) != 3:
-    print('Usage: %s <path to version_generated.cc <Envoy binary path> ' %
-          sys.argv[0])
+  if len(sys.argv) != 2:
+    print 'Usage: %s <Envoy binary path> ' % sys.argv[0]
     sys.exit(1)
-  version_generated = ExtractGitSha(sys.argv[1])
-  envoy_bin_path = sys.argv[2]
+  envoy_bin_path = sys.argv[1]
+  version_generated = ExtractGitSha(envoy_bin_path)
   build_id_note_offset = ExtractBuildIdNoteOffset(envoy_bin_path)
   RewriteBinary(envoy_bin_path, build_id_note_offset, version_generated)
