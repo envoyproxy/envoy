@@ -50,7 +50,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'envoy'
-copyright = u'2016, Lyft'
+copyright = u'2016-2017, Lyft'
 author = u'Lyft'
 
 # The version info for the project you're documenting, acts as replacement for
