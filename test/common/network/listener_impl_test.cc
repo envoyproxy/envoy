@@ -5,6 +5,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
 #include "gmock/gmock.h"
@@ -82,7 +83,7 @@ protected:
   const Address::InstanceConstSharedPtr alt_address_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
-                        testing::Values(Address::IpVersion::v4, Address::IpVersion::v6));
+                        testing::ValuesIn(TestEnvironment::getIpTestParameters()));
 
 TEST_P(ListenerImplTest, NormalRedirect) {
   Stats::IsolatedStoreImpl stats_store;

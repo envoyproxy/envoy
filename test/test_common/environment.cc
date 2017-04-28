@@ -8,7 +8,6 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 #include "common/common/assert.h"
 
@@ -47,6 +46,30 @@ char** argv_;
 void TestEnvironment::initializeOptions(int argc, char** argv) {
   argc_ = argc;
   argv_ = argv;
+}
+
+bool TestEnvironment::isTestIpVersionOnly(const Network::Address::IpVersion& type) {
+  const char* option = ::getenv("IP_TEST_TYPE");
+  if (option == nullptr) {
+    return false;
+  }
+  if ((type == Network::Address::IpVersion::v4 && strcmp(option, "v4only") == 0) ||
+      (type == Network::Address::IpVersion::v6 && strcmp(option, "v6only") == 0)) {
+    return true;
+  }
+  return false;
+}
+
+std::vector<Network::Address::IpVersion> TestEnvironment::getIpTestParameters() {
+  std::vector<Network::Address::IpVersion> parameters;
+  if (TestEnvironment::isTestIpVersionOnly(Network::Address::IpVersion::v6) == false) {
+    parameters.push_back(Network::Address::IpVersion::v4);
+  }
+
+  if (TestEnvironment::isTestIpVersionOnly(Network::Address::IpVersion::v4) == false) {
+    parameters.push_back(Network::Address::IpVersion::v6);
+  }
+  return parameters;
 }
 
 Server::Options& TestEnvironment::getOptions() {

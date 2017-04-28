@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/network/address.h"
 #include "envoy/server/options.h"
 
 #include "common/json/json_loader.h"
@@ -19,6 +20,17 @@ public:
    * @param argv array of command-line args.
    */
   static void initializeOptions(int argc, char** argv);
+
+  /**
+   * @return bool if testing only with IP type addresses only.
+   */
+  static bool isTestIpVersionOnly(const Network::Address::IpVersion& type);
+
+  /**
+   * @return std::vector<Network::Address::IpVersion> vector of ip address
+   * types to test.
+   */
+  static std::vector<Network::Address::IpVersion> getIpTestParameters();
 
   /**
    * Obtain command-line options reference.

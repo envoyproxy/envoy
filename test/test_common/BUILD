@@ -20,6 +20,7 @@ envoy_cc_test_library(
         "//include/envoy/server:options_interface",
         "//source/common/common:assert_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:utility_lib",
         "//source/server:options_lib",
     ],
 )
