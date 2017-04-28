@@ -52,9 +52,6 @@ elif [[ "$1" == "bazel.dev" ]]; then
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   echo "bazel coverage build with tests..."
-  # Nuke any circular symlinks in source directory.
-  rm -f "${ENVOY_SRCDIR}"/bazel-*
-  rm -f "${ENVOY_CI_DIR}"/bazel-*
   export GCOVR="/thirdparty/gcovr-3.3/scripts/gcovr"
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"

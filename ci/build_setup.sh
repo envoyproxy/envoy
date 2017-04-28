@@ -93,3 +93,13 @@ mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/bazel
 mkdir -p "${ENVOY_CI_DIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CONSUMER_SRCDIR}"/bazel/
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
+
+function cleanup() {
+  # Remove build artifacts. This doesn't mess with incremental builds as these
+  # are just symlinks.
+  rm -f "${ENVOY_SRCDIR}"/bazel-*
+  rm -f "${ENVOY_CI_DIR}"/bazel-*
+  rm -rf "${ENVOY_CI_DIR}"/bazel
+  rm -rf "${ENVOY_CI_DIR}"/tools
+}
+trap cleanup EXIT
