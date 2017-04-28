@@ -50,9 +50,7 @@ public:
    *
    * The trace will begin with the call to capture().
    */
-  void capture() {
-    stack_trace_.load_here(MAX_STACK_DEPTH);
-  }
+  void capture() { stack_trace_.load_here(MAX_STACK_DEPTH); }
 
   /**
    * Capture a stack trace from a particular address.
@@ -62,9 +60,7 @@ public:
    *
    * @param address The stack trace will begin from this address.
    */
-  void captureFrom(void* address) {
-    stack_trace_.load_from(address, MAX_STACK_DEPTH);
-  }
+  void captureFrom(void* address) { stack_trace_.load_from(address, MAX_STACK_DEPTH); }
 
   /**
    * Log the stack trace.

@@ -70,9 +70,7 @@ void SignalAction::mapAndProtectStackMemory() {
   RELEASE_ASSERT(mprotect(altstack_ + guard_size_ + altstack_size_, guard_size_, PROT_NONE) == 0);
 }
 
-void SignalAction::unmapStackMemory() {
-  munmap(altstack_, mapSizeWithGuards());
-}
+void SignalAction::unmapStackMemory() { munmap(altstack_, mapSizeWithGuards()); }
 
 void SignalAction::doGoodAccessForTest() {
   volatile char* altaltstack = altstack_;
