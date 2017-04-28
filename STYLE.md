@@ -41,22 +41,35 @@ A few general notes on our error handling philosophy:
 
 * All error code returns should be checked.
 * At a very high level, our philosophy is that errors that are *likely* to happen should be
-  gracefully handled. Examples of likely errors include any type of network error, bad data
-  returned by an API call, bad data read from runtime files, etc. Errors that are *unlikely* to
-  happen should lead to process death, under the assumption that the additional burden of defensive
-  coding and testing is not an effective use of time for an error that should not happen given
-  proper system setup. Examples of these types of errors include not being able to open the shared
+  gracefully handled. Examples of likely errors include any type of network error, disk IO error,
+  bad data returned by an API call, bad data read from runtime files, etc. Errors that are
+  *unlikely* to happen should lead to process death, under the assumption that the additional burden
+  of defensive coding and testing is not an effective use of time for an error that should not happen
+  given proper system setup. Examples of these types of errors include not being able to open the shared
   memory region, an invalid initial JSON config read from disk, system calls that should not fail
-  assuming correct parameters (which should be validated via tests), etc.
+  assuming correct parameters (which should be validated via tests), etc. Examples of system calls
+  that should not fail when passed valid parameters include most usages of `setsockopt()`,
+  `getsockopt()`, the kernel returning a valid sockaddr after a successful call to `accept()`,
+  `pthread_create()`, `pthread_join()`, etc.
 * OOM events (both memory and FDs) are considered fatal crashing errors. This rule is again based
   on the philosophy that the engineering costs of properly handling these cases is not worth it.
   Time is better spent designing proper system controls that shed load if resource usage becomes
   too high, etc.
+* The "less is more" error handling philosophy described in the previous two points is primarily
+  based on the fact that restarts are designed to be fast, reliable and cheap.
 * Although we strongly recommend that any type of startup error leads to a fatal error, since this
   is almost always a result of faulty configuration which should be caught during a canary process,
   there may be cases in which we want some classes of startup errors to be non-fatal. For example,
   if a misconfigured option is not necessary for server operation. Although this is discouraged, we
-  will discuss these on a case by case basis case basis during code review.
+  will discuss these on a case by case basis case basis during code review (an example of this
+  case is the --admin-address-path option). **If degraded mode error handling is implemented, we require
+  that there is complete test coverage for the degraded case.** Additionally, the user should be
+  aware of the degraded state minimally via an error log of level warn or greater, and optimally
+  via the increment of a stat.
+* There error handling philosophy described herein is based on the assumption that Envoy is deployed
+  using industry best practices (primarily canary). Major and obvious errors should always be
+  caught in canary. If a low rate error leads to periodic crash cycling when deployed to
+  production, the error rate should allow for rollback without large customer impact.
 * Per above it's acceptable to turn failures into crash semantics
   via `RELEASE_ASSERT(condition)` or `PANIC(message)` if there is no other sensible behavior, e.g.
   in OOM (memory/FD) scenarios. Only `RELEASE_ASSERT(condition)` should be used to validate
