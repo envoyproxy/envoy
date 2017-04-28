@@ -39,14 +39,21 @@
  */
 class SignalAction {
 public:
-  SignalAction() : altstack_(nullptr) { MapAndProtectStackMemory(); InstallSigHandlers(); }
+  SignalAction() : altstack_(nullptr) {
+    MapAndProtectStackMemory();
+    InstallSigHandlers();
+  }
   SignalAction(const SignalAction&) = delete;
-  ~SignalAction() { RemoveSigHandlers(); UnmapStackMemory(); }
+  ~SignalAction() {
+    RemoveSigHandlers();
+    UnmapStackMemory();
+  }
   /**
    * Helpers for testing guarded stack memory
    */
   void DoGoodAccessForTest();
   void TryEvilAccessForTest(bool end);
+
 private:
   /**
    * Use this many bytes for the alternate signal handling stack.
@@ -54,7 +61,7 @@ private:
    * This should be a multiple of 4096.
    * Additionally, two guard pages will be allocated to bookend the usable area.
    */
-  static const size_t ALTSTACK_SIZE = 4096*4;
+  static const size_t ALTSTACK_SIZE = 4096 * 4;
   /**
    * Allocate this many bytes on each side of the area used for alt stack.
    *
@@ -70,7 +77,7 @@ private:
   /**
    * Return the memory size we actually map including two guard pages.
    */
-  static constexpr size_t MapSizeWithGuards() { return ALTSTACK_SIZE+GUARD_SIZE*2; }
+  static constexpr size_t MapSizeWithGuards() { return ALTSTACK_SIZE + GUARD_SIZE * 2; }
   /**
    * The actual signal handler function with prototype matching signal.h
    */
