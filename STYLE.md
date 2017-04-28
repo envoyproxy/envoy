@@ -64,7 +64,7 @@ A few general notes on our error handling philosophy:
   there may be cases in which we want some classes of startup errors to be non-fatal. For example,
   if a misconfigured option is not necessary for server operation. Although this is discouraged, we
   will discuss these on a case by case basis case basis during code review (an example of this
-  is the --admin-address-path option). **If degraded mode error handling is implemented, we require
+  is the `--admin-address-path` option). **If degraded mode error handling is implemented, we require
   that there is complete test coverage for the degraded case.** Additionally, the user should be
   aware of the degraded state minimally via an error log of level warn or greater and via the
   increment of a stat.
@@ -83,13 +83,13 @@ A few general notes on our error handling philosophy:
   to document (and check in debug-only builds) program invariants. Use `ASSERT` liberally, but do
   not use it for things that will crash in an obvious way in a subsequent line. E.g., do not do
   `ASSERT(foo != nullptr); foo->doSomething();`. Note that there is a gray line between external
-  environment and program invariants. For example, memory corruption due to a security issue (a bug,
-  deliberate buffer overflow etc.) might manifest as a violation of program invariants or as a 
-  detectable condition in the external environment (e.g. some library returning a highly unexpected
-  error code or buffer contents). Unfortunately no rule can cleanly cover when to use
-  `RELEASE_ASSERT` vs. `ASSERT`. In general we view `ASSERT` as the common case and `RELEASE_ASSERT`
-  as the uncommon case, but experience and judgment may dictate a particular approach depending
-  on the situation.
+  environment failures and program invariant violations. For example, memory corruption due to a
+  security issue (a bug, deliberate buffer overflow etc.) might manifest as a violation of program
+  invariants or as a detectable condition in the external environment (e.g. some library returning a
+  highly unexpected error code or buffer contents). Unfortunately no rule can cleanly cover when to
+  use `RELEASE_ASSERT` vs. `ASSERT`. In general we view `ASSERT` as the common case and
+  `RELEASE_ASSERT` as the uncommon case, but experience and judgment may dictate a particular approach
+  depending on the situation.
 
 # Hermetic tests
 
