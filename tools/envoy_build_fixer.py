@@ -8,11 +8,12 @@ LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n'
 
 def FixBuild(path):
   with open(path, 'r') as f:
-    contents = f.read()
+    outlines = [LICENSE_STRING]
+    for line in f:
+      if not line.startswith('licenses'):
+        outlines.append(line)
 
-  if not contents.startswith(LICENSE_STRING):
-    return LICENSE_STRING + contents
-  return contents
+  return ''.join(outlines)
 
 if __name__ == '__main__':
   if len(sys.argv) == 2:
