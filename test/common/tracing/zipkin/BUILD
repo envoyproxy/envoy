@@ -13,7 +13,7 @@ envoy_cc_test(
         "span_context_test.cc",
         "tracer_test.cc",
         "util_test.cc",
-        "zipkin_core_types_test.cc"
+        "zipkin_core_types_test.cc",
     ],
     deps = [
         "//include/envoy/common:optional",
@@ -21,8 +21,8 @@ envoy_cc_test(
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
-        "//source/common/runtime:runtime_lib",
         "//source/common/network:address_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/common/tracing/zipkin:zipkin_lib",
     ],
 )
