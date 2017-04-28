@@ -25,6 +25,7 @@ envoy_cc_library(
     ],
     external_deps = ["rapidjson"],
     deps = [
+        "//include/envoy/common:optional",
         "//include/envoy/common:time_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:hex_lib",
