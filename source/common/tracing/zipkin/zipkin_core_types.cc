@@ -24,7 +24,7 @@ Endpoint& Endpoint::operator=(const Endpoint& ep) {
   return *this;
 }
 
-const std::string& Endpoint::toJson() {
+const std::string Endpoint::toJson() {
   rapidjson::StringBuffer s;
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
@@ -48,9 +48,9 @@ const std::string& Endpoint::toJson() {
   writer.Key(ZipkinJsonFieldNames::ENDPOINT_SERVICE_NAME.c_str());
   writer.String(service_name_.c_str());
   writer.EndObject();
-  json_string_ = s.GetString();
+  std::string json_string = s.GetString();
 
-  return json_string_;
+  return json_string;
 }
 
 Annotation::Annotation(const Annotation& ann) {
@@ -71,7 +71,7 @@ Annotation& Annotation::operator=(const Annotation& ann) {
   return *this;
 }
 
-const std::string& Annotation::toJson() {
+const std::string Annotation::toJson() {
   rapidjson::StringBuffer s;
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
@@ -81,14 +81,14 @@ const std::string& Annotation::toJson() {
   writer.String(value_.c_str());
   writer.EndObject();
 
-  json_string_ = s.GetString();
+  std::string json_string = s.GetString();
 
   if (endpoint_.valid()) {
-    Util::mergeJsons(json_string_, static_cast<Endpoint>(endpoint_.value()).toJson(),
+    Util::mergeJsons(json_string, static_cast<Endpoint>(endpoint_.value()).toJson(),
                      ZipkinJsonFieldNames::ANNOTATION_ENDPOINT.c_str());
   }
 
-  return json_string_;
+  return json_string;
 }
 
 BinaryAnnotation::BinaryAnnotation(const BinaryAnnotation& ann) {
@@ -111,7 +111,7 @@ BinaryAnnotation& BinaryAnnotation::operator=(const BinaryAnnotation& ann) {
   return *this;
 }
 
-const std::string& BinaryAnnotation::toJson() {
+const std::string BinaryAnnotation::toJson() {
   rapidjson::StringBuffer s;
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
@@ -121,14 +121,14 @@ const std::string& BinaryAnnotation::toJson() {
   writer.String(value_.c_str());
   writer.EndObject();
 
-  json_string_ = s.GetString();
+  std::string json_string = s.GetString();
 
   if (endpoint_.valid()) {
-    Util::mergeJsons(json_string_, static_cast<Endpoint>(endpoint_.value()).toJson(),
+    Util::mergeJsons(json_string, static_cast<Endpoint>(endpoint_.value()).toJson(),
                      ZipkinJsonFieldNames::BINARY_ANNOTATION_ENDPOINT.c_str());
   }
 
-  return json_string_;
+  return json_string;
 }
 
 const std::string Span::EMPTY_HEX_STRING_ = "0000000000000000";
@@ -181,7 +181,7 @@ Span& Span::operator=(const Span& span) {
   return *this;
 }
 
-const std::string& Span::toJson() {
+const std::string Span::toJson() {
   rapidjson::StringBuffer s;
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
@@ -209,24 +209,24 @@ const std::string& Span::toJson() {
 
   writer.EndObject();
 
-  json_string_ = s.GetString();
+  std::string json_string = s.GetString();
 
-  std::vector<const std::string*> annotation_json_vector;
+  std::vector<std::string> annotation_json_vector;
 
   for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
-    annotation_json_vector.push_back(&(it->toJson()));
+    annotation_json_vector.push_back(it->toJson());
   }
-  Util::addArrayToJson(json_string_, annotation_json_vector,
+  Util::addArrayToJson(json_string, annotation_json_vector,
                        ZipkinJsonFieldNames::SPAN_ANNOTATIONS.c_str());
 
-  std::vector<const std::string*> binary_annotation_json_vector;
+  std::vector<std::string> binary_annotation_json_vector;
   for (auto it = binary_annotations_.begin(); it != binary_annotations_.end(); it++) {
-    binary_annotation_json_vector.push_back(&(it->toJson()));
+    binary_annotation_json_vector.push_back(it->toJson());
   }
-  Util::addArrayToJson(json_string_, binary_annotation_json_vector,
+  Util::addArrayToJson(json_string, binary_annotation_json_vector,
                        ZipkinJsonFieldNames::SPAN_BINARY_ANNOTATIONS.c_str());
 
-  return json_string_;
+  return json_string;
 }
 
 void Span::finish() {

@@ -1,5 +1,6 @@
 #include "common/common/hex.h"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -45,7 +46,7 @@ std::vector<uint8_t> Hex::decode(const std::string& hex_string) {
 }
 
 std::string Hex::uint64ToHex(uint64_t value) {
-  std::vector<uint8_t> data(8);
+  std::array<uint8_t, 8> data;
 
   data[7] = (value & 0x00000000000000FF);
   data[6] = (value & 0x000000000000FF00) >> 8;

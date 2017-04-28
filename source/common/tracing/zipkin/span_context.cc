@@ -5,25 +5,34 @@
 
 namespace Zipkin {
 
-// String that separates the span-context fields in its string-serialized form.
-const std::string SpanContext::FIELD_SEPARATOR_ = ";";
-
-// String value corresponding to an empty span context.
-const std::string SpanContext::UNITIALIZED_SPAN_CONTEXT_ = "0000000000000000" + FIELD_SEPARATOR_ +
-                                                           "0000000000000000" + FIELD_SEPARATOR_ +
-                                                           "0000000000000000";
-
-// String with regular expression to match a 16-digit hexadecimal number.
-const std::string SpanContext::HEX_DIGIT_GROUP_REGEX_STR_ = "([0-9,a-z]{16})";
-
 // The static functions below are needed due to C++ inability to safely concatenate static strings
 // belonging to different compilation units (the initialization order is not guaranteed).
+
+const std::string& SpanContext::FIELD_SEPARATOR() {
+  static const std::string* field_separator = new std::string(";");
+
+  return *field_separator;
+}
+
+const std::string& SpanContext::UNITIALIZED_SPAN_CONTEXT() {
+  static const std::string* unitialized_span_context =
+      new std::string("0000000000000000" + FIELD_SEPARATOR() + "0000000000000000" +
+                      FIELD_SEPARATOR() + "0000000000000000");
+
+  return *unitialized_span_context;
+}
+
+const std::string& SpanContext::HEX_DIGIT_GROUP_REGEX_STR() {
+  static const std::string* hex_digit_group_regex_str = new std::string("([0-9,a-z]{16})");
+
+  return *hex_digit_group_regex_str;
+}
 
 const std::string& SpanContext::SPAN_CONTEXT_REGEX_STR() {
   // ^([0-9,a-z]{16});([0-9,a-z]{16});([0-9,a-z]{16})((;(cs|sr|cr|ss))*)$
   static const std::string* span_context_regex_str = new std::string(
-      "^" + HEX_DIGIT_GROUP_REGEX_STR_ + FIELD_SEPARATOR_ + HEX_DIGIT_GROUP_REGEX_STR_ +
-      FIELD_SEPARATOR_ + HEX_DIGIT_GROUP_REGEX_STR_ + "((" + FIELD_SEPARATOR_ + "(" +
+      "^" + HEX_DIGIT_GROUP_REGEX_STR() + FIELD_SEPARATOR() + HEX_DIGIT_GROUP_REGEX_STR() +
+      FIELD_SEPARATOR() + HEX_DIGIT_GROUP_REGEX_STR() + "((" + FIELD_SEPARATOR() + "(" +
       ZipkinCoreConstants::CLIENT_SEND + "|" + ZipkinCoreConstants::SERVER_RECV + "|" +
       ZipkinCoreConstants::CLIENT_RECV + "|" + ZipkinCoreConstants::SERVER_SEND + "))*)$");
 
@@ -61,24 +70,24 @@ SpanContext::SpanContext(const Span& span) {
 
 const std::string SpanContext::serializeToString() {
   if (!is_initialized_) {
-    return UNITIALIZED_SPAN_CONTEXT_;
+    return UNITIALIZED_SPAN_CONTEXT();
   }
 
   std::string result;
-  result = traceIdAsHexString() + FIELD_SEPARATOR_ + idAsHexString() + FIELD_SEPARATOR_ +
+  result = traceIdAsHexString() + FIELD_SEPARATOR() + idAsHexString() + FIELD_SEPARATOR() +
            parentIdAsHexString();
 
   if (annotation_values_.cr_) {
-    result += FIELD_SEPARATOR_ + ZipkinCoreConstants::CLIENT_RECV;
+    result += FIELD_SEPARATOR() + ZipkinCoreConstants::CLIENT_RECV;
   }
   if (annotation_values_.cs_) {
-    result += FIELD_SEPARATOR_ + ZipkinCoreConstants::CLIENT_SEND;
+    result += FIELD_SEPARATOR() + ZipkinCoreConstants::CLIENT_SEND;
   }
   if (annotation_values_.sr_) {
-    result += FIELD_SEPARATOR_ + ZipkinCoreConstants::SERVER_RECV;
+    result += FIELD_SEPARATOR() + ZipkinCoreConstants::SERVER_RECV;
   }
   if (annotation_values_.ss_) {
-    result += FIELD_SEPARATOR_ + ZipkinCoreConstants::SERVER_SEND;
+    result += FIELD_SEPARATOR() + ZipkinCoreConstants::SERVER_SEND;
   }
 
   return result;
@@ -100,7 +109,7 @@ void SpanContext::populateFromString(const std::string& span_context_str) {
     std::string matched_annotations = match.str(4);
     if (matched_annotations.size() > 0) {
       std::vector<std::string> annotation_value_strings =
-          StringUtil::split(matched_annotations, FIELD_SEPARATOR_);
+          StringUtil::split(matched_annotations, FIELD_SEPARATOR());
       for (const std::string& annotation_value : annotation_value_strings) {
         if (annotation_value == ZipkinCoreConstants::CLIENT_RECV) {
           annotation_values_.cr_ = true;

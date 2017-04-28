@@ -110,9 +110,20 @@ public:
   AnnotationSet isSetAnnotation() const { return annotation_values_; }
 
 private:
-  static const std::string FIELD_SEPARATOR_;
-  static const std::string UNITIALIZED_SPAN_CONTEXT_;
-  static const std::string HEX_DIGIT_GROUP_REGEX_STR_;
+  /**
+   * @return String that separates the span-context fields in its string-serialized form.
+   */
+  static const std::string& FIELD_SEPARATOR();
+
+  /**
+   * @return String value corresponding to an empty span context.
+   */
+  static const std::string& UNITIALIZED_SPAN_CONTEXT();
+
+  /**
+   * @return String with regular expression to match a 16-digit hexadecimal number.
+   */
+  static const std::string& HEX_DIGIT_GROUP_REGEX_STR();
 
   /**
    * @return a string with a regular expression to match a valid string-serialized span context.

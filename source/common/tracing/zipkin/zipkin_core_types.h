@@ -27,10 +27,7 @@ public:
    * All classes defining Zipkin abstractions need to implement this method to convert
    * the corresponding abstraction to a Zipkin-compliant JSON.
    */
-  virtual const std::string& toJson() PURE;
-
-protected:
-  std::string json_string_;
+  virtual const std::string toJson() PURE;
 };
 
 /**
@@ -88,7 +85,7 @@ public:
    *
    * @return a stringified JSON.
    */
-  const std::string& toJson() override;
+  const std::string toJson() override;
 
 private:
   std::string service_name_;
@@ -173,7 +170,7 @@ public:
    *
    * @return a stringified JSON.
    */
-  const std::string& toJson() override;
+  const std::string toJson() override;
 
 private:
   uint64_t timestamp_;
@@ -272,7 +269,7 @@ public:
    *
    * @return a stringified JSON.
    */
-  const std::string& toJson() override;
+  const std::string toJson() override;
 
 private:
   std::string key_;
@@ -484,7 +481,7 @@ public:
     *
     * @return a stringified JSON.
     */
-  const std::string& toJson() override;
+  const std::string toJson() override;
 
   /**
    * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked

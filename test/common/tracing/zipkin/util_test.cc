@@ -22,7 +22,7 @@ TEST(ZipkinUtilTest, utilTests) {
 
   // Test adding an array to a JSON
 
-  std::vector<const std::string*> json_array;
+  std::vector<std::string> json_array;
   Util::addArrayToJson(merged_json, json_array, "array_field");
   expected_json = "{\"sub_json\":{\"field1\":\"val1\"},\"second_merge\":{\"sub_json\":{\"field1\":"
                   "\"val1\"}},\"array_field\":[]}";
@@ -30,8 +30,8 @@ TEST(ZipkinUtilTest, utilTests) {
 
   std::string str1 = "{\"a1\":10}";
   std::string str2 = "{\"a2\":\"10\"}";
-  json_array.push_back(&str1);
-  json_array.push_back(&str2);
+  json_array.push_back(str1);
+  json_array.push_back(str2);
   Util::addArrayToJson(merged_json, json_array, "second_array");
   expected_json = "{\"sub_json\":{\"field1\":\"val1\"},\"second_merge\":{\"sub_json\":{\"field1\":"
                   "\"val1\"}},\"array_field\":[],\"second_array\":[{\"a1\":10},{\"a2\":\"10\"}]}";

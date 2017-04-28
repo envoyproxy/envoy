@@ -28,11 +28,11 @@ public:
    * Merges a stringified JSON and a vector of stringified JSONs.
    *
    * @param target It will contain the resulting stringified JSON.
-   * @param json_array Vector of string pointers, where each element references a stringified JSON.
+   * @param json_array Vector of strings, where each element is a stringified JSON.
    * @param field_name The key name (added to target's JSON) whose value will be a stringified.
    * JSON array derived from json_array.
    */
-  static void addArrayToJson(std::string& target, const std::vector<const std::string*>& json_array,
+  static void addArrayToJson(std::string& target, const std::vector<std::string>& json_array,
                              const std::string& field_name);
 
   // ====
