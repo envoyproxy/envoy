@@ -23,12 +23,10 @@ if [[ "$1" == "bazel.release" ]]; then
   bazel_release_binary_build
   echo "Testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/...
-  rm -f bazel-*
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
   echo "bazel release build..."
   bazel_release_binary_build
-  rm -f bazel-*
   exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
   echo "bazel ASAN debug build with tests..."
@@ -51,10 +49,12 @@ elif [[ "$1" == "bazel.dev" ]]; then
     "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
   echo "Building and testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
-  rm -f bazel-*
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   echo "bazel coverage build with tests..."
+  # Nuke any circular symlinks in source directory.
+  rm -f "${ENVOY_SRCDIR}"/bazel-*
+  rm -f "${ENVOY_CI_DIR}"/bazel-*
   export GCOVR="/thirdparty/gcovr-3.3/scripts/gcovr"
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
