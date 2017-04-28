@@ -7,7 +7,7 @@
 
 constexpr int SignalAction::FATAL_SIGS[];
 
-void SignalAction::SigHandler(int sig, siginfo_t* info, void* context) {
+void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
   void* error_pc = 0;
 
   const ucontext_t* ucontext = reinterpret_cast<const ucontext_t*>(context);
@@ -15,90 +15,68 @@ void SignalAction::SigHandler(int sig, siginfo_t* info, void* context) {
 #ifdef REG_RIP
     // x86_64
     error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext.gregs[REG_RIP]);
-#elif defined(REG_EIP)
-// x86 Classic - not tested
-// error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext.gregs[REG_EIP]);
-#warning "Please enable and test x86_32 pc retrieval code in signal_action.cc"
-#elif defined(__arm__)
-// ARM - not tested
-// error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext.arm_pc);
-#warning "Please enable and test ARM pc retrieval code in signal_action.cc"
-#elif defined(__ppc__)
-// PPC - not tested
-// error_pc = reinterpret_cast<void*>(ucontext->uc_mcontext.regs->nip);
-#warning "Please enable and test PPC pc retrieval code in signal_action.cc"
 #else
-#warning "Cannot determine PC location in machine context for your architecture"
+#warning "Please enable and test PC retrieval code for your arch in signal_action.cc"
+// x86 Classic: reinterpret_cast<void*>(ucontext->uc_mcontext.gregs[REG_EIP]);
+// ARM: reinterpret_cast<void*>(ucontext->uc_mcontext.arm_pc);
+// PPC: reinterpret_cast<void*>(ucontext->uc_mcontext.regs->nip);
 #endif
   }
 
   BackwardsTrace tracer(true);
-  tracer.LogFault(strsignal(sig), info->si_addr);
+  tracer.logFault(strsignal(sig), info->si_addr);
   if (error_pc != 0) {
-    tracer.CaptureFrom(error_pc);
+    tracer.captureFrom(error_pc);
   } else {
-    tracer.Capture();
+    tracer.capture();
   }
-  tracer.Log();
+  tracer.log();
 
   signal(sig, SIG_DFL);
   raise(sig);
 }
 
-void SignalAction::InstallSigHandlers() {
+void SignalAction::installSigHandlers() {
   stack_t stack;
   stack.ss_sp = altstack_ + GUARD_SIZE; // Guard page at one end ...
   stack.ss_size = ALTSTACK_SIZE;        // ... guard page at the other
   stack.ss_flags = 0;
 
-  if (sigaltstack(&stack, nullptr) < 0) {
-    std::cerr << "Failed to set up alternate signal stack: " << strerror(errno) << std::endl;
-    RELEASE_ASSERT(false);
-  }
+  RELEASE_ASSERT(sigaltstack(&stack, nullptr) == 0);
 
   for (const auto& sig : FATAL_SIGS) {
     struct sigaction saction;
     std::memset(&saction, 0, sizeof(saction));
     sigemptyset(&saction.sa_mask);
     saction.sa_flags = (SA_SIGINFO | SA_ONSTACK | SA_RESETHAND | SA_NODEFER);
-    saction.sa_sigaction = SigHandler;
-    if (sigaction(sig, &saction, nullptr) < 0) {
-      std::cerr << "Failed to set up signal action for signal " << sig << ": " << strerror(errno)
-                << std::endl;
-      RELEASE_ASSERT(false);
-    }
+    saction.sa_sigaction = sigHandler;
+    RELEASE_ASSERT(sigaction(sig, &saction, nullptr) == 0);
   }
 }
 
-void SignalAction::RemoveSigHandlers() const {
+void SignalAction::removeSigHandlers() const {
   for (const auto& sig : FATAL_SIGS) {
     signal(sig, SIG_DFL);
   }
 }
 
-void SignalAction::MapAndProtectStackMemory() {
+void SignalAction::mapAndProtectStackMemory() {
   // Per docs MAP_STACK doesn't actually do anything today but provides a
   // library hint that might be used in the future.
-  altstack_ = static_cast<char*>(mmap(nullptr, MapSizeWithGuards(), PROT_READ | PROT_WRITE,
+  altstack_ = static_cast<char*>(mmap(nullptr, mapSizeWithGuards(), PROT_READ | PROT_WRITE,
                                       MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
   RELEASE_ASSERT(altstack_);
-  if (mprotect(altstack_, GUARD_SIZE, PROT_NONE) < 0) {
-    std::cerr << "Failed to protect signal stack memory: " << strerror(errno) << std::endl;
-    RELEASE_ASSERT(false);
-  }
-  if (mprotect(altstack_ + GUARD_SIZE + ALTSTACK_SIZE, GUARD_SIZE, PROT_NONE) < 0) {
-    std::cerr << "Failed to protect signal stack memory: " << strerror(errno) << std::endl;
-    RELEASE_ASSERT(false);
-  }
+  RELEASE_ASSERT(mprotect(altstack_, GUARD_SIZE, PROT_NONE) == 0);
+  RELEASE_ASSERT(mprotect(altstack_ + GUARD_SIZE + ALTSTACK_SIZE, GUARD_SIZE, PROT_NONE) == 0);
 }
 
-void SignalAction::UnmapStackMemory() {
+void SignalAction::unmapStackMemory() {
   if (altstack_ != nullptr) {
-    munmap(altstack_, MapSizeWithGuards());
+    munmap(altstack_, mapSizeWithGuards());
   }
 }
 
-void SignalAction::DoGoodAccessForTest() {
+void SignalAction::doGoodAccessForTest() {
   for (size_t i = 0; i < ALTSTACK_SIZE; ++i) {
     *(altstack_ + GUARD_SIZE + i) = 42;
   }
@@ -107,7 +85,7 @@ void SignalAction::DoGoodAccessForTest() {
   }
 }
 
-void SignalAction::TryEvilAccessForTest(bool end) {
+void SignalAction::tryEvilAccessForTest(bool end) {
   if (end) {
     // One byte past the valid region
     // http://oeis.org/A001969

@@ -2,6 +2,7 @@
 
 #include <signal.h>
 
+#include "common/common/non_copyable.h"
 #include "server/backtrace.h"
 
 /**
@@ -37,22 +38,22 @@
  * scope, eg, in main(). This enables fatal signal handling for almost all code
  * executed.
  */
-class SignalAction {
+class SignalAction : NonCopyable {
 public:
   SignalAction() : altstack_(nullptr) {
-    MapAndProtectStackMemory();
-    InstallSigHandlers();
+    mapAndProtectStackMemory();
+    installSigHandlers();
   }
   SignalAction(const SignalAction&) = delete;
   ~SignalAction() {
-    RemoveSigHandlers();
-    UnmapStackMemory();
+    removeSigHandlers();
+    unmapStackMemory();
   }
   /**
    * Helpers for testing guarded stack memory
    */
-  void DoGoodAccessForTest();
-  void TryEvilAccessForTest(bool end);
+  void doGoodAccessForTest();
+  void tryEvilAccessForTest(bool end);
 
 private:
   /**
@@ -77,15 +78,15 @@ private:
   /**
    * Return the memory size we actually map including two guard pages.
    */
-  static constexpr size_t MapSizeWithGuards() { return ALTSTACK_SIZE + GUARD_SIZE * 2; }
+  static constexpr size_t mapSizeWithGuards() { return ALTSTACK_SIZE + GUARD_SIZE * 2; }
   /**
    * The actual signal handler function with prototype matching signal.h
    */
-  static void SigHandler(int sig, siginfo_t* info, void* context);
+  static void sigHandler(int sig, siginfo_t* info, void* context);
   /**
    * Install all signal handlers and setup signal handling stack.
    */
-  void InstallSigHandlers();
+  void installSigHandlers();
   /**
    * Remove all signal handlers.
    *
@@ -94,17 +95,17 @@ private:
    * Signal handlers will be reset to the default, NOT back to any signal
    * handler existing before InstallSigHandlers().
    */
-  void RemoveSigHandlers() const;
+  void removeSigHandlers() const;
   /**
    * Use mmap to map anonymous memory for the alternative stack.
    *
    * GUARD_SIZE on either end of the memory will be marked PROT_NONE, protected
    * from all access.
    */
-  void MapAndProtectStackMemory();
+  void mapAndProtectStackMemory();
   /**
    * Unmap alternative stack memory.
    */
-  void UnmapStackMemory();
+  void unmapStackMemory();
   char* altstack_;
 };

@@ -78,6 +78,7 @@ envoy_cc_library(
     hdrs = ["signal_action.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/common:non_copyable",
         "//source/server:backtrace_lib",
     ],
 )

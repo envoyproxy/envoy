@@ -7,15 +7,15 @@
 #define BACKTRACE_LOG()                                                                            \
   do {                                                                                             \
     BackwardsTrace t;                                                                              \
-    t.Capture();                                                                                   \
-    t.Log();                                                                                       \
+    t.capture();                                                                                   \
+    t.log();                                                                                       \
   } while (0)
 
 #define BACKTRACE_PROD_LOG()                                                                       \
   do {                                                                                             \
     BackwardsTrace t(true);                                                                        \
-    t.Capture();                                                                                   \
-    t.Log();                                                                                       \
+    t.capture();                                                                                   \
+    t.log();                                                                                       \
   } while (0)
 
 /**
@@ -71,9 +71,9 @@ public:
   /**
    * Capture a stack trace.
    *
-   * The trace will begin with the call to Capture().
+   * The trace will begin with the call to capture().
    */
-  void Capture() {
+  void capture() {
 #ifdef NDEBUG
     if (!log_in_prod_) {
       return;
@@ -90,7 +90,7 @@ public:
    *
    * @param address The stack trace will begin from this address.
    */
-  void CaptureFrom(void* address) {
+  void captureFrom(void* address) {
 #ifdef NDEBUG
     if (!log_in_prod_) {
       return;
@@ -102,7 +102,7 @@ public:
   /**
    * Log the stack trace.
    */
-  void Log() {
+  void log() {
 #ifdef NDEBUG
     if (!log_in_prod_) {
       return;
@@ -139,7 +139,7 @@ public:
     LogAtLevel("end backtrace thread {}", stack_trace_.thread_id());
   }
 
-  void LogFault(const char* signame, const void* addr) {
+  void logFault(const char* signame, const void* addr) {
     LogAtLevel("Caught {}, suspect faulting address {}", signame, addr);
   }
 
