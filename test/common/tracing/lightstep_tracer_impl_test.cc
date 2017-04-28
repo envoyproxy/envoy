@@ -59,7 +59,7 @@ public:
     std::string valid_config = R"EOF(
       {"collector_cluster": "fake_cluster"}
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
 
     setup(*loader, true);
   }
@@ -86,14 +86,14 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     std::string invalid_config = R"EOF(
       {"fake" : "fake"}
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(invalid_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(invalid_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
 
   {
     std::string empty_config = "{}";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(empty_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(empty_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
@@ -105,7 +105,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     std::string valid_config = R"EOF(
       {"collector_cluster": "fake_cluster"}
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
@@ -118,7 +118,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     std::string valid_config = R"EOF(
       {"collector_cluster": "fake_cluster"}
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
@@ -131,7 +131,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     std::string valid_config = R"EOF(
       {"collector_cluster": "fake_cluster"}
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
 
     setup(*loader, true);
   }

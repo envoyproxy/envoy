@@ -118,7 +118,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
 }
 
 Json::ObjectPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
-  return Json::Factory::LoadFromString(substitute(json));
+  return Json::Factory::loadFromString(substitute(json));
 }
 
 void TestEnvironment::exec(const std::vector<std::string>& args) {
