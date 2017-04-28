@@ -10,6 +10,8 @@ SUFFIXES = (".cc", ".h", "BUILD")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG-FORMAT", "clang-format-3.6")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER", "/usr/lib/go/bin/buildifier")
+ENVOY_BUILD_FIXER_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
 
@@ -24,6 +26,9 @@ def printError(error):
 
 def checkFilePath(file_path):
   if os.path.basename(file_path) == "BUILD":
+    if os.system("%s %s | diff -q %s - > /dev/null" %
+                 (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
+      printError("envoy_build_fixer check failed for file: %s" % (file_path))
     if os.system("cat %s | %s -mode=fix | diff -q %s - > /dev/null" %
                  (file_path, BUILDIFIER_PATH, file_path)) != 0:
       printError("buildifier check failed for file: %s" % (file_path))
@@ -40,6 +45,8 @@ def checkFilePath(file_path):
 
 def fixFilePath(file_path):
   if os.path.basename(file_path) == "BUILD":
+    if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
+      printError("envoy_build_fixer rewrite failed for file: %s" % (file_path))
     if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
       printError("buildifier rewrite failed for file: %s" % (file_path))
     return
