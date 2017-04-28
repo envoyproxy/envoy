@@ -117,20 +117,22 @@ public:
     }
 
     const auto thread_id = stack_trace_.thread_id();
-    backward::ResolvedTrace trace = resolver.resolve(stack_trace_[0]);
-    auto obj_name = trace.object_filename;
-    for (unsigned int i = 0; i < stack_trace_.size(); ++i) {
-    }
+    backward::ResolvedTrace first_frame_trace = resolver.resolve(stack_trace_[0]);
+    auto obj_name = first_frame_trace.object_filename;
 
     LogAtLevel("Backtrace obj<{}> thr<{}> (use tools/stack_decode.py):", obj_name, thread_id);
 
     // Why start at 2? To hide the function call to backward that began the
     // trace.
     for (unsigned int i = 0; i < stack_trace_.size(); ++i) {
-      backward::ResolvedTrace trace = resolver.resolve(stack_trace_[i]);
-      if (trace.object_filename != obj_name) {
-        obj_name = trace.object_filename;
-        LogAtLevel("thr<{}> obj<{}>", thread_id, obj_name);
+      // Backtrace gets tagged by ASAN when we try the object name resolution for the last
+      // frame on stack, so skip the last one. It has no useful info anyway.
+      if (i + 1 != stack_trace_.size()) {
+        backward::ResolvedTrace trace = resolver.resolve(stack_trace_[i]);
+        if (trace.object_filename != obj_name) {
+          obj_name = trace.object_filename;
+          LogAtLevel("thr<{}> obj<{}>", thread_id, obj_name);
+        }
       }
       LogAtLevel("thr<{}> #{} {}", thread_id, stack_trace_[i].idx, stack_trace_[i].addr);
     }

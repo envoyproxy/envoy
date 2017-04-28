@@ -93,11 +93,11 @@ bazel test //test/common/http:async_client_impl_test --strategy=TestRunner=stand
 ```
 # Stack trace symbol resolution
 
-Envoy can produce backtraces on demand or from assertions and other activity.
-The stack traces written in the log or to stderr contain addresses rather than
-resolved symbols.  The `tools/stack_decode.py` script exists to process the output
-and do symbol resolution to make the stack traces useful.  Any log lines not
-relevant to the backtrace capability are passed through the script unchanged
+Envoy can produce backtraces on demand and from assertions and other fatal
+actions like segfaults.  The stack traces written in the log or to stderr contain
+addresses rather than resolved symbols.  The `tools/stack_decode.py` script exists
+to process the output and do symbol resolution to make the stack traces useful.  Any
+log lines not relevant to the backtrace capability are passed through the script unchanged
 (it acts like a filter).
 
 The script runs in one of two modes. If passed no arguments it anticipates
@@ -115,6 +115,13 @@ bazel test -c dbg //test/server:backtrace_test
 
 You will need to use either a `dbg` build type or the `--define
 debug_symbols=yes` option to get symbol information in the binaries.
+
+By default main.cc will install signal handlers to print backtraces at the
+location where a fatal signal occurred.  The signal handler will re-raise the
+fatal signal with the default handler so a core file will still be dumped after
+the stack trace is logged.  To inhibit this behavior use
+`--define=signal_trace=disabled` on the Bazel command line. No signal handlers will
+be installed.
 
 # Running a single Bazel test under GDB
 
