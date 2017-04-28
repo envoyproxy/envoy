@@ -18,13 +18,6 @@
 
 namespace {
 
-std::string getCheckedEnvVar(const std::string& var) {
-  // Bazel style temp dirs. Should be set by test runner or Bazel.
-  const char* path = ::getenv(var.c_str());
-  RELEASE_ASSERT(path != nullptr);
-  return std::string(path);
-}
-
 std::string getOrCreateUnixDomainSocketDirectory() {
   const char* path = ::getenv("TEST_UDSDIR");
   if (path != nullptr) {
@@ -44,6 +37,13 @@ char** argv_;
 
 } // namespace
 
+std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
+  // Bazel style temp dirs. Should be set by test runner or Bazel.
+  const char* path = ::getenv(var.c_str());
+  RELEASE_ASSERT(path != nullptr);
+  return std::string(path);
+}
+
 void TestEnvironment::initializeOptions(int argc, char** argv) {
   argc_ = argc;
   argv_ = argv;
@@ -60,8 +60,7 @@ const std::string& TestEnvironment::temporaryDirectory() {
 }
 
 const std::string& TestEnvironment::runfilesDirectory() {
-  static const std::string* runfiles_directory =
-      new std::string(getCheckedEnvVar("TEST_SRCDIR") + "/" + getCheckedEnvVar("TEST_WORKSPACE"));
+  static const std::string* runfiles_directory = new std::string(getCheckedEnvVar("TEST_RUNDIR"));
   return *runfiles_directory;
 }
 
