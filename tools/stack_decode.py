@@ -86,9 +86,6 @@ def output_stacktrace(thread_id, traceinfo):
   for address_list in traceinfo.obj_list:
     piped_input = ""
     obj_name = address_list.obj_file
-    # end of stack sentinel
-    if obj_name == "[0xffffffffffffffff]":
-      break
     for stack_addr in address_list.addresses:
       piped_input += (stack_addr + "\n")
     output_lines += run_addr2line(obj_name, piped_input)

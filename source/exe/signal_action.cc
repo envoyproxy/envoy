@@ -23,14 +23,14 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
 #endif
   }
 
-  BackwardsTrace tracer(true);
+  BackwardsTrace tracer;
   tracer.logFault(strsignal(sig), info->si_addr);
   if (error_pc != 0) {
     tracer.captureFrom(error_pc);
   } else {
     tracer.capture();
   }
-  tracer.log();
+  tracer.logTrace();
 
   signal(sig, SIG_DFL);
   raise(sig);
@@ -38,8 +38,8 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
 
 void SignalAction::installSigHandlers() {
   stack_t stack;
-  stack.ss_sp = altstack_ + GUARD_SIZE; // Guard page at one end ...
-  stack.ss_size = ALTSTACK_SIZE;        // ... guard page at the other
+  stack.ss_sp = altstack_ + guard_size_; // Guard page at one end ...
+  stack.ss_size = altstack_size_;        // ... guard page at the other
   stack.ss_flags = 0;
 
   RELEASE_ASSERT(sigaltstack(&stack, nullptr) == 0);
@@ -66,32 +66,32 @@ void SignalAction::mapAndProtectStackMemory() {
   altstack_ = static_cast<char*>(mmap(nullptr, mapSizeWithGuards(), PROT_READ | PROT_WRITE,
                                       MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
   RELEASE_ASSERT(altstack_);
-  RELEASE_ASSERT(mprotect(altstack_, GUARD_SIZE, PROT_NONE) == 0);
-  RELEASE_ASSERT(mprotect(altstack_ + GUARD_SIZE + ALTSTACK_SIZE, GUARD_SIZE, PROT_NONE) == 0);
+  RELEASE_ASSERT(mprotect(altstack_, guard_size_, PROT_NONE) == 0);
+  RELEASE_ASSERT(mprotect(altstack_ + guard_size_ + altstack_size_, guard_size_, PROT_NONE) == 0);
 }
 
 void SignalAction::unmapStackMemory() {
-  if (altstack_ != nullptr) {
-    munmap(altstack_, mapSizeWithGuards());
-  }
+  munmap(altstack_, mapSizeWithGuards());
 }
 
 void SignalAction::doGoodAccessForTest() {
-  for (size_t i = 0; i < ALTSTACK_SIZE; ++i) {
-    *(altstack_ + GUARD_SIZE + i) = 42;
+  volatile char* altaltstack = altstack_;
+  for (size_t i = 0; i < altstack_size_; ++i) {
+    *(altaltstack + guard_size_ + i) = 42;
   }
-  for (size_t i = 0; i < ALTSTACK_SIZE; ++i) {
-    ASSERT(*(altstack_ + GUARD_SIZE + i) == 42);
+  for (size_t i = 0; i < altstack_size_; ++i) {
+    ASSERT(*(altaltstack + guard_size_ + i) == 42);
   }
 }
 
 void SignalAction::tryEvilAccessForTest(bool end) {
+  volatile char* altaltstack = altstack_;
   if (end) {
     // One byte past the valid region
     // http://oeis.org/A001969
-    *(altstack_ + GUARD_SIZE + ALTSTACK_SIZE) = 43;
+    *(altaltstack + guard_size_ + altstack_size_) = 43;
   } else {
     // One byte before the valid region
-    *(altstack_ + GUARD_SIZE - 1) = 43;
+    *(altaltstack + guard_size_ - 1) = 43;
   }
 }

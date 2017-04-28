@@ -71,8 +71,8 @@ TEST(Signals, AbortDeathTest) {
 
 TEST(Signals, IllegalStackAccessDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH(actions.TryEvilAccessForTest(false), "");
-  EXPECT_DEATH(actions.TryEvilAccessForTest(true), "");
+  EXPECT_DEATH(actions.tryEvilAccessForTest(false), "");
+  EXPECT_DEATH(actions.tryEvilAccessForTest(true), "");
 }
 
 TEST(Signals, LegalTest) {
@@ -92,5 +92,5 @@ TEST(Signals, RaiseNonFatalTest) {
 
 TEST(Signals, LegalStackAccessTest) {
   SignalAction actions;
-  actions.DoGoodAccessForTest();
+  actions.doGoodAccessForTest();
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <signal.h>
+#include <unistd.h>
 
 #include "common/common/non_copyable.h"
 #include "server/backtrace.h"
@@ -40,7 +41,9 @@
  */
 class SignalAction : NonCopyable {
 public:
-  SignalAction() : altstack_(nullptr) {
+  SignalAction() : guard_size_(sysconf(_SC_PAGE_SIZE)),
+                   altstack_size_(guard_size_*4),
+                   altstack_(nullptr) {
     mapAndProtectStackMemory();
     installSigHandlers();
   }
@@ -57,18 +60,22 @@ public:
 
 private:
   /**
-   * Use this many bytes for the alternate signal handling stack.
-   *
-   * This should be a multiple of 4096.
-   * Additionally, two guard pages will be allocated to bookend the usable area.
-   */
-  static const size_t ALTSTACK_SIZE = 4096 * 4;
-  /**
    * Allocate this many bytes on each side of the area used for alt stack.
+   *
+   * Set to system page size.
    *
    * The memory will be protected from read and write.
    */
-  static const size_t GUARD_SIZE = 4096;
+  const size_t guard_size_;
+  /**
+   * Use this many bytes for the alternate signal handling stack.
+   *
+   * Initialized as a multiple of page size (although sigaltstack will
+   * do alignment as needed).
+   *
+   * Additionally, two guard pages will be allocated to bookend the usable area.
+   */
+  const size_t altstack_size_;
   /**
    * This constant array defines the signals we will insert handlers for.
    *
@@ -78,7 +85,7 @@ private:
   /**
    * Return the memory size we actually map including two guard pages.
    */
-  static constexpr size_t mapSizeWithGuards() { return ALTSTACK_SIZE + GUARD_SIZE * 2; }
+  size_t mapSizeWithGuards() const { return altstack_size_ + guard_size_ * 2; }
   /**
    * The actual signal handler function with prototype matching signal.h
    */
