@@ -307,5 +307,65 @@ TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
   EXPECT_THROW(config.initialize(*loader), EnvoyException);
 }
 
+TEST(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
+  std::string json = R"EOF(
+  {
+    "listeners" : [
+      {
+        "address": "tcp://127.0.0.1:1234",
+        "filters": []
+      }
+    ],
+    "cluster_manager": {
+      "clusters": []
+    }
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  server.local_info_.cluster_name_ = "";
+  MainImpl config(server);
+  config.initialize(*loader);
+
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
+}
+
+TEST(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguration) {
+  std::string json = R"EOF(
+  {
+    "listeners" : [
+      {
+        "address": "tcp://127.0.0.1:1234",
+        "filters": []
+      }
+    ],
+    "cluster_manager": {
+      "clusters": []
+    },
+    "tracing": {
+      "not_http": {
+        "driver": {
+          "type": "lightstep",
+          "config": {
+            "access_token_file": "/etc/envoy/envoy.cfg"
+          }
+        }
+      }
+    }
+  }
+  )EOF";
+
+  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+
+  NiceMock<Server::MockInstance> server;
+  server.local_info_.cluster_name_ = "";
+  MainImpl config(server);
+  config.initialize(*loader);
+
+  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
+}
+
 } // Configuration
 } // Server
