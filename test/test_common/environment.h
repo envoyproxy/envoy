@@ -39,6 +39,12 @@ public:
   static Server::Options& getOptions();
 
   /**
+   * Obtain the value of an environment variable, die if not available.
+   * @return std::string with the value of the environment variable.
+   */
+  static std::string getCheckedEnvVar(const std::string& var);
+
+  /**
    * Obtain a private writable temporary directory.
    * @return const std::string& with the path to the temporary directory.
    */

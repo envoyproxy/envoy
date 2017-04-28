@@ -4,7 +4,9 @@
 // The main entry point (and the rest of this file) should have no logic in it,
 // this allows overriding by site specific versions of main.cc.
 int main(int argc, char** argv) {
-  ::setenv("TEST_RUNDIR", TestEnvironment::runfilesDirectory().c_str(), 1);
+  ::setenv("TEST_RUNDIR", (TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
+                           TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE")).c_str(),
+           1);
   // Select whether to test only for IPv4, IPv6, or both. The default is to
   // test for both. Options are {"v4only", "v6only", "all"}. Set IP_TEST_TYPE
   // to "v4only" if the system currently does not support IPv6 network
