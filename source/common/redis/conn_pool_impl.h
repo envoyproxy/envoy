@@ -119,8 +119,7 @@ public:
 private:
   struct ThreadLocalPool;
 
-  struct ThreadLocalActiveClient : public Network::ConnectionCallbacks,
-                                   public Event::DeferredDeletable {
+  struct ThreadLocalActiveClient : public Network::ConnectionCallbacks {
     ThreadLocalActiveClient(ThreadLocalPool& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
