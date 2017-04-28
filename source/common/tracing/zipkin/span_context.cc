@@ -39,7 +39,7 @@ const std::regex& SpanContext::SPAN_CONTEXT_REGEX() {
 SpanContext::SpanContext(const Span& span) {
   trace_id_ = span.traceId();
   id_ = span.id();
-  parent_id_ = span.parentId();
+  parent_id_ = span.isSetParentId() ? span.parentId() : 0;
 
   for (const Annotation& annotation : span.annotations()) {
     if (annotation.value() == ZipkinCoreConstants::CLIENT_RECV) {
@@ -93,9 +93,9 @@ void SpanContext::populateFromString(const std::string& span_context_str) {
 
   if (std::regex_search(span_context_str, match, SPAN_CONTEXT_REGEX())) {
     // This is a valid string encoding of the context
-    trace_id_ = stoull(match.str(1), nullptr, 16);
-    id_ = stoull(match.str(2), nullptr, 16);
-    parent_id_ = stoull(match.str(3), nullptr, 16);
+    trace_id_ = std::stoull(match.str(1), nullptr, 16);
+    id_ = std::stoull(match.str(2), nullptr, 16);
+    parent_id_ = std::stoull(match.str(3), nullptr, 16);
 
     std::string matched_annotations = match.str(4);
     if (matched_annotations.size() > 0) {

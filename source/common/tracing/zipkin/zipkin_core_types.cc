@@ -56,15 +56,17 @@ const std::string& Endpoint::toJson() {
 Annotation::Annotation(const Annotation& ann) {
   timestamp_ = ann.timestamp();
   value_ = ann.value();
-  endpoint_ = ann.endpoint();
-  isset_endpoint_ = ann.isSetEndpoint();
+  if (ann.isSetEndpoint()) {
+    endpoint_ = ann.endpoint();
+  }
 }
 
 Annotation& Annotation::operator=(const Annotation& ann) {
   timestamp_ = ann.timestamp();
   value_ = ann.value();
-  endpoint_ = ann.endpoint();
-  isset_endpoint_ = ann.isSetEndpoint();
+  if (ann.isSetEndpoint()) {
+    endpoint_ = ann.endpoint();
+  }
 
   return *this;
 }
@@ -81,8 +83,8 @@ const std::string& Annotation::toJson() {
 
   json_string_ = s.GetString();
 
-  if (isset_endpoint_) {
-    Util::mergeJsons(json_string_, endpoint_.toJson(),
+  if (endpoint_.valid()) {
+    Util::mergeJsons(json_string_, static_cast<Endpoint>(endpoint_.value()).toJson(),
                      ZipkinJsonFieldNames::ANNOTATION_ENDPOINT.c_str());
   }
 
@@ -93,16 +95,18 @@ BinaryAnnotation::BinaryAnnotation(const BinaryAnnotation& ann) {
   key_ = ann.key();
   value_ = ann.value();
   annotation_type_ = ann.annotationType();
-  endpoint_ = ann.endpoint();
-  isset_endpoint_ = ann.isSetEndpoint();
+  if (ann.isSetEndpoint()) {
+    endpoint_ = ann.endpoint();
+  }
 }
 
 BinaryAnnotation& BinaryAnnotation::operator=(const BinaryAnnotation& ann) {
   key_ = ann.key();
   value_ = ann.value();
   annotation_type_ = ann.annotationType();
-  endpoint_ = ann.endpoint();
-  isset_endpoint_ = ann.isSetEndpoint();
+  if (ann.isSetEndpoint()) {
+    endpoint_ = ann.endpoint();
+  }
 
   return *this;
 }
@@ -119,25 +123,35 @@ const std::string& BinaryAnnotation::toJson() {
 
   json_string_ = s.GetString();
 
-  if (isset_endpoint_) {
-    Util::mergeJsons(json_string_, endpoint_.toJson(),
+  if (endpoint_.valid()) {
+    Util::mergeJsons(json_string_, static_cast<Endpoint>(endpoint_.value()).toJson(),
                      ZipkinJsonFieldNames::BINARY_ANNOTATION_ENDPOINT.c_str());
   }
 
   return json_string_;
 }
 
+const std::string Span::EMPTY_HEX_STRING_ = "0000000000000000";
+
 Span::Span(const Span& span) {
   trace_id_ = span.traceId();
   name_ = span.name();
   id_ = span.id();
-  parent_id_ = span.parentId();
+  if (span.isSetParentId()) {
+    parent_id_ = span.parentId();
+  }
+  debug_ = span.debug();
   annotations_ = span.annotations();
   binary_annotations_ = span.binaryAnnotations();
-  timestamp_ = span.timestamp();
-  duration_ = span.duration();
-  trace_id_high_ = span.traceIdHigh();
-  isset_ = span.isSet();
+  if (span.isSetTimestamp()) {
+    timestamp_ = span.timestamp();
+  }
+  if (span.isSetDuration()) {
+    duration_ = span.duration();
+  }
+  if (span.isSetTraceIdHigh()) {
+    trace_id_high_ = span.traceIdHigh();
+  }
   monotonic_start_time_ = span.startTime();
   tracer_ = span.tracer();
 }
@@ -146,13 +160,21 @@ Span& Span::operator=(const Span& span) {
   trace_id_ = span.traceId();
   name_ = span.name();
   id_ = span.id();
-  parent_id_ = span.parentId();
+  if (span.isSetParentId()) {
+    parent_id_ = span.parentId();
+  }
+  debug_ = span.debug();
   annotations_ = span.annotations();
   binary_annotations_ = span.binaryAnnotations();
-  timestamp_ = span.timestamp();
-  duration_ = span.duration();
-  trace_id_high_ = span.traceIdHigh();
-  isset_ = span.isSet();
+  if (span.isSetTimestamp()) {
+    timestamp_ = span.timestamp();
+  }
+  if (span.isSetDuration()) {
+    duration_ = span.duration();
+  }
+  if (span.isSetTraceIdHigh()) {
+    trace_id_high_ = span.traceIdHigh();
+  }
   monotonic_start_time_ = span.startTime();
   tracer_ = span.tracer();
 
@@ -170,19 +192,19 @@ const std::string& Span::toJson() {
   writer.Key(ZipkinJsonFieldNames::SPAN_ID.c_str());
   writer.String(Hex::uint64ToHex(id_).c_str());
 
-  if (isset_.parent_id_ && parent_id_) {
+  if (parent_id_.valid() && parent_id_.value()) {
     writer.Key(ZipkinJsonFieldNames::SPAN_PARENT_ID.c_str());
-    writer.String(Hex::uint64ToHex(parent_id_).c_str());
+    writer.String(Hex::uint64ToHex(parent_id_.value()).c_str());
   }
 
-  if (isset_.timestamp_) {
+  if (timestamp_.valid()) {
     writer.Key(ZipkinJsonFieldNames::SPAN_TIMESTAMP.c_str());
-    writer.Int64(timestamp_);
+    writer.Int64(timestamp_.value());
   }
 
-  if (isset_.duration_) {
+  if (duration_.valid()) {
     writer.Key(ZipkinJsonFieldNames::SPAN_DURATION.c_str());
-    writer.Int64(duration_);
+    writer.Int64(duration_.value());
   }
 
   writer.EndObject();

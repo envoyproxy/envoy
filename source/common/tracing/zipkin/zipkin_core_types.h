@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
@@ -113,7 +114,7 @@ public:
   /**
    * Default constructor. Creates an empty annotation.
    */
-  Annotation() : timestamp_(0), value_(), isset_endpoint_(false) {}
+  Annotation() : timestamp_(0), value_() {}
 
   /**
    * Constructor that creates an annotation based on the given parameters.
@@ -124,28 +125,22 @@ public:
    * @param endpoint The endpoint object representing the annotation's endpoint attribute.
    */
   Annotation(uint64_t timestamp, const std::string value, Endpoint& endpoint)
-      : timestamp_(timestamp), value_(value), endpoint_(endpoint), isset_endpoint_(true) {}
+      : timestamp_(timestamp), value_(value), endpoint_(endpoint) {}
 
   /**
    * @return the annotation's endpoint attribute.
    */
-  const Endpoint& endpoint() const { return endpoint_; }
+  const Endpoint& endpoint() const { return endpoint_.value(); }
 
   /**
    * Sets the annotation's endpoint attribute (copy semantics).
    */
-  void setEndpoint(const Endpoint& endpoint) {
-    endpoint_ = endpoint;
-    isset_endpoint_ = true;
-  }
+  void setEndpoint(const Endpoint& endpoint) { endpoint_.value(endpoint); }
 
   /**
    * Sets the annotation's endpoint attribute (move semantics).
    */
-  void setEndpoint(const Endpoint&& endpoint) {
-    endpoint_ = endpoint;
-    isset_endpoint_ = true;
-  }
+  void setEndpoint(const Endpoint&& endpoint) { endpoint_.value(endpoint); }
 
   /**
    * @return the annotation's timestamp attribute
@@ -171,7 +166,7 @@ public:
   /**
    * @return true if the endpoint attribute is set, or false otherwise.
    */
-  bool isSetEndpoint() const { return isset_endpoint_; }
+  bool isSetEndpoint() const { return endpoint_.valid(); }
 
   /**
    * Serializes the annotation as a Zipkin-compliant JSON representation as a string.
@@ -183,9 +178,7 @@ public:
 private:
   uint64_t timestamp_;
   std::string value_;
-  Endpoint endpoint_;
-
-  bool isset_endpoint_;
+  Optional<Endpoint> endpoint_;
 };
 
 /**
@@ -213,7 +206,7 @@ public:
   /**
    * Default constructor. Creates an empty binary annotation.
    */
-  BinaryAnnotation() : key_(), value_(), annotation_type_(STRING), isset_endpoint_(false) {}
+  BinaryAnnotation() : key_(), value_(), annotation_type_(STRING) {}
 
   /**
    * Constructor that creates a binary annotation based on the given parameters.
@@ -222,7 +215,7 @@ public:
    * @param value The value associated with the key.
    */
   BinaryAnnotation(const std::string& key, const std::string& value)
-      : key_(key), value_(value), annotation_type_(STRING), isset_endpoint_(false) {}
+      : key_(key), value_(value), annotation_type_(STRING) {}
 
   /**
    * @return the type of the binary annotation.
@@ -237,28 +230,22 @@ public:
   /**
    * @return the annotation's endpoint attribute.
    */
-  const Endpoint& endpoint() const { return endpoint_; }
+  const Endpoint& endpoint() const { return endpoint_.value(); }
 
   /**
    * Sets the annotation's endpoint attribute (copy semantics).
    */
-  void setEndpoint(const Endpoint& endpoint) {
-    endpoint_ = endpoint;
-    isset_endpoint_ = true;
-  }
+  void setEndpoint(const Endpoint& endpoint) { endpoint_.value(endpoint); }
 
   /**
    * Sets the annotation's endpoint attribute (move semantics).
    */
-  void setEndpoint(const Endpoint&& endpoint) {
-    endpoint_ = endpoint;
-    isset_endpoint_ = true;
-  }
+  void setEndpoint(const Endpoint&& endpoint) { endpoint_.value(endpoint); }
 
   /**
    * @return true of the endpoint attribute has been set, or false otherwise.
    */
-  bool isSetEndpoint() const { return isset_endpoint_; }
+  bool isSetEndpoint() const { return endpoint_.valid(); }
 
   /**
    * @return the key attribute.
@@ -290,27 +277,9 @@ public:
 private:
   std::string key_;
   std::string value_;
-  Endpoint endpoint_;
-
+  Optional<Endpoint> endpoint_;
   AnnotationType annotation_type_;
-
-  bool isset_endpoint_;
 };
-
-/**
- * This struct identifies which of the optional attributes are set in a Span object.
- * Each member is a one-bit boolean indicating whether or not the corresponding attribute is set.
- */
-typedef struct SpanIsSet {
-  SpanIsSet()
-      : parent_id_(false), debug_(false), timestamp_(false), duration_(false),
-        trace_id_high_(false) {}
-  bool parent_id_ : 1;
-  bool debug_ : 1;
-  bool timestamp_ : 1;
-  bool duration_ : 1;
-  bool trace_id_high_ : 1;
-} SpanIsSet;
 
 typedef std::unique_ptr<Span> SpanPtr;
 
@@ -333,8 +302,7 @@ public:
    * Default constructor. Creates an empty span.
    */
   Span()
-      : trace_id_(0), name_(), id_(0), parent_id_(0), timestamp_(0), duration_(0),
-        trace_id_high_(0), monotonic_start_time_(0), tracer_(nullptr) {}
+      : trace_id_(0), name_(), id_(0), debug_(false), monotonic_start_time_(0), tracer_(nullptr) {}
 
   /**
    * Sets the span's trace id attribute.
@@ -354,10 +322,12 @@ public:
   /**
    * Sets the span's parent id.
    */
-  void setParentId(const uint64_t val) {
-    parent_id_ = val;
-    isset_.parent_id_ = true;
-  }
+  void setParentId(const uint64_t val) { parent_id_.value(val); }
+
+  /**
+   * @return Whether or not the parent_id attribute is set.
+   */
+  bool isSetParentId() const { return parent_id_.valid(); }
 
   /**
    * @return a vector with all annotations added to the span.
@@ -397,32 +367,38 @@ public:
   /**
    * Sets the span's debug attribute.
    */
-  void setDebug() { isset_.debug_ = true; }
+  void setDebug() { debug_ = true; }
 
   /**
    * Sets the span's timestamp attribute.
    */
-  void setTimestamp(const int64_t val) {
-    timestamp_ = val;
-    isset_.timestamp_ = true;
-  }
+  void setTimestamp(const int64_t val) { timestamp_.value(val); }
+
+  /**
+   * @return Whether or not the timestamp attribute is set.
+   */
+  bool isSetTimestamp() const { return timestamp_.valid(); }
 
   /**
    * Sets the span's duration attribute.
    */
-  void setDuration(const int64_t val) {
-    duration_ = val;
-    isset_.duration_ = true;
-  }
+  void setDuration(const int64_t val) { duration_.value(val); }
+
+  /**
+   * @return Whether or not the duration attribute is set.
+   */
+  bool isSetDuration() const { return duration_.valid(); }
 
   /**
    * Sets the higher 64 bits of the span's 128-bit trace id.
    * Note that this is optional, since 64-bit trace ids are valid.
    */
-  void setTraceIdHigh(const uint64_t val) {
-    trace_id_high_ = val;
-    isset_.trace_id_high_ = true;
-  }
+  void setTraceIdHigh(const uint64_t val) { trace_id_high_.value(val); }
+
+  /**
+   * @return whether or not the trace_id_high attribute is set.
+   */
+  bool isSetTraceIdHigh() const { return trace_id_high_.valid(); }
 
   /**
    * Sets the span start-time attribute (monotonic, used to calculate duration).
@@ -442,7 +418,7 @@ public:
   /**
    * @return the span's duration attribute.
    */
-  int64_t duration() const { return duration_; }
+  int64_t duration() const { return duration_.value(); }
 
   /**
    * @return the span's id as an integer.
@@ -452,12 +428,7 @@ public:
   /**
    * @return the span's id as a hexadecimal string.
    */
-  std::string idAsHexString() const { return Hex::uint64ToHex(id_); }
-
-  /**
-   * @return a struct indicating which of the span's optional attributes are set.
-   */
-  const SpanIsSet& isSet() const { return isset_; }
+  const std::string idAsHexString() const { return Hex::uint64ToHex(id_); }
 
   /**
    * @return the span's name.
@@ -467,17 +438,24 @@ public:
   /**
    * @return the span's parent id as an integer.
    */
-  uint64_t parentId() const { return parent_id_; }
+  uint64_t parentId() const { return parent_id_.value(); }
 
   /**
    * @return the span's parent id as a hexadecimal string.
    */
-  std::string parentIdAsHexString() const { return Hex::uint64ToHex(parent_id_); }
+  const std::string parentIdAsHexString() const {
+    return parent_id_.valid() ? Hex::uint64ToHex(parent_id_.value()) : EMPTY_HEX_STRING_;
+  }
+
+  /**
+   * @return whether or not the debug attribute is set
+   */
+  bool debug() const { return debug_; }
 
   /**
    * @return the span's timestamp (clock time for user presentation: microseconds since epoch).
    */
-  int64_t timestamp() const { return timestamp_; }
+  int64_t timestamp() const { return timestamp_.value(); }
 
   /**
    * @return the span's trace id as an integer.
@@ -487,12 +465,12 @@ public:
   /**
    * @return the span's trace id as a hexadecimal string.
    */
-  std::string traceIdAsHexString() const { return Hex::uint64ToHex(trace_id_); }
+  const std::string traceIdAsHexString() const { return Hex::uint64ToHex(trace_id_); }
 
   /**
    * @return the higher 64 bits of a 128-bit trace id.
    */
-  uint64_t traceIdHigh() const { return trace_id_high_; }
+  uint64_t traceIdHigh() const { return trace_id_high_.value(); }
 
   /**
    * @return the span's start time (monotonic, used to calculate duration).
@@ -541,17 +519,18 @@ public:
   void setTag(const std::string& name, const std::string& value);
 
 private:
+  static const std::string EMPTY_HEX_STRING_;
   uint64_t trace_id_;
   std::string name_;
   uint64_t id_;
-  uint64_t parent_id_;
+  Optional<uint64_t> parent_id_;
+  bool debug_;
   std::vector<Annotation> annotations_;
   std::vector<BinaryAnnotation> binary_annotations_;
-  int64_t timestamp_;
-  int64_t duration_;
-  uint64_t trace_id_high_;
+  Optional<int64_t> timestamp_;
+  Optional<int64_t> duration_;
+  Optional<uint64_t> trace_id_high_;
   int64_t monotonic_start_time_;
   TracerInterface* tracer_;
-  SpanIsSet isset_;
 };
 } // Zipkin

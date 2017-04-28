@@ -146,9 +146,9 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
             span_context_2.serializeToString());
 
   // Test if we can handle 128-bit trace ids
-  EXPECT_FALSE(span.isSet().trace_id_high_);
+  EXPECT_FALSE(span.isSetTraceIdHigh());
   span.setTraceIdHigh(9922130815203937912ULL);
-  EXPECT_TRUE(span.isSet().trace_id_high_);
+  EXPECT_TRUE(span.isSetTraceIdHigh());
   SpanContext span_context_high_id(span);
   // We currently drop the high bits. So, we expect the same context as above
   EXPECT_EQ("25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c",
