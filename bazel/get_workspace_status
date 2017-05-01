@@ -1,6 +1,6 @@
-# This file was imported from https://github.com/bazelbuild/bazel at d6fec93.
-
 #!/bin/bash
+
+# This file was imported from https://github.com/bazelbuild/bazel at d6fec93.
 
 # This script will be run bazel when building process starts to
 # generate key-value information that represents the status of the

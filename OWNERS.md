@@ -3,7 +3,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for general contribution guidelines.
 # Senior committers
 
 * Matt Klein ([mattklein123](https://github.com/mattklein123)) (mklein@lyft.com)
-* Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com) (pending)
+* Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
 
 # Committers
 

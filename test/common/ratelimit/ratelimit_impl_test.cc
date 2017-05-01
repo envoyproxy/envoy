@@ -130,7 +130,7 @@ TEST(RateLimitGrpcFactoryTest, NoCluster) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   Upstream::MockClusterManager cm;
 
   EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
@@ -144,7 +144,7 @@ TEST(RateLimitGrpcFactoryTest, Create) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   Upstream::MockClusterManager cm;
 
   EXPECT_CALL(cm, get("foo")).Times(AtLeast(1));

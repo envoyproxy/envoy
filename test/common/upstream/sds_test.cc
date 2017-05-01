@@ -44,7 +44,7 @@ protected:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::LoadFromString(raw_config);
+    Json::ObjectPtr config = Json::Factory::loadFromString(raw_config);
 
     timer_ = new Event::MockTimer(&dispatcher_);
     local_info_.zone_name_ = "us-east-1a";

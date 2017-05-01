@@ -54,7 +54,8 @@ export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
   --jobs=${NUM_CPUS}"
-export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE"
+export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE \
+  --cache_test_results=no --test_output=all"
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
 ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
 ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
@@ -66,11 +67,6 @@ then
   git clone https://github.com/htuch/envoy-consumer.git "${ENVOY_CONSUMER_SRCDIR}"
 fi
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.consumer "${ENVOY_CONSUMER_SRCDIR}"/WORKSPACE
-mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/tools
-# Hack due to https://github.com/lyft/envoy/issues/838.
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CONSUMER_SRCDIR}"/tools/
-mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/bazel
-ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CONSUMER_SRCDIR}"/bazel/
 
 # This is the hash on https://github.com/htuch/envoy-consumer.git we pin to.
 (cd "${ENVOY_CONSUMER_SRCDIR}" && git checkout 94e11fa753a1e787c82cccaec642eda5e5b61ed8)
@@ -83,3 +79,27 @@ cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE "${ENVOY_BUILD_DIR}"
 # This is where we copy build deliverables to.
 export ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
 mkdir -p "${ENVOY_DELIVERY_DIR}"
+
+# This is where we build for bazel.release* and bazel.dev.
+export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
+
+# Hack due to https://github.com/lyft/envoy/issues/838 and the need to have
+# tools and bazel.rc available for build linkstamping.
+mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/tools
+mkdir -p "${ENVOY_CI_DIR}"/tools
+ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CONSUMER_SRCDIR}"/tools/
+ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
+mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/bazel
+mkdir -p "${ENVOY_CI_DIR}"/bazel
+ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CONSUMER_SRCDIR}"/bazel/
+ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
+
+function cleanup() {
+  # Remove build artifacts. This doesn't mess with incremental builds as these
+  # are just symlinks.
+  rm -f "${ENVOY_SRCDIR}"/bazel-*
+  rm -f "${ENVOY_CI_DIR}"/bazel-*
+  rm -rf "${ENVOY_CI_DIR}"/bazel
+  rm -rf "${ENVOY_CI_DIR}"/tools
+}
+trap cleanup EXIT

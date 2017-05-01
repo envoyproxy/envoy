@@ -222,3 +222,8 @@ To get more verbose explanations:
 ```
 bazel build --explain=file.txt --verbose_explanations //source/...
 ```
+
+# Resolving paths in bazel build output
+
+Sometimes it's useful to see real system paths in bazel error message output (vs. symbolic links).
+`tools/path_fix.sh` is provided to help with this. See the comments in that file.

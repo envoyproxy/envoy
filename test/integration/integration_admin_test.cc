@@ -130,7 +130,7 @@ TEST_F(IntegrationTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
-  Json::ObjectPtr json = Json::Factory::LoadFromString(response->body());
+  Json::ObjectPtr json = Json::Factory::loadFromString(response->body());
   std::vector<Json::ObjectPtr> listener_info = json->asObjectArray();
   for (std::size_t index = 0; index < listener_info.size(); index++) {
     EXPECT_EQ(test_server_->server().getListenSocketByIndex(index)->localAddress()->asString(),

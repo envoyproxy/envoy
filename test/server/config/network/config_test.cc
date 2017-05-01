@@ -29,7 +29,7 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   RedisProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb =
@@ -47,7 +47,7 @@ TEST(NetworkFilterConfigTest, MongoProxy) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   MongoProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb =
@@ -66,7 +66,7 @@ TEST(NetworkFilterConfigTest, BadMongoProxyConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   MongoProxyFilterConfigFactory factory;
   EXPECT_THROW(
@@ -102,7 +102,7 @@ TEST(NetworkFilterConfigTest, TcpProxy) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   TcpProxyConfigFactory factory;
   NetworkFilterFactoryCb cb =
@@ -124,7 +124,7 @@ TEST(NetworkFilterConfigTest, ClientSslAuth) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   ClientSslAuthConfigFactory factory;
   NetworkFilterFactoryCb cb = factory.tryCreateFilterFactory(
@@ -143,7 +143,7 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   RateLimitConfigFactory factory;
   NetworkFilterFactoryCb cb =
@@ -176,7 +176,7 @@ TEST(NetworkFilterConfigTest, BadHttpConnectionMangerConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
   EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
@@ -219,7 +219,7 @@ TEST(NetworkFilterConfigTest, BadAccessLogConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
   EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
@@ -264,7 +264,7 @@ TEST(NetworkFilterConfigTest, BadAccessLogType) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
   EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
@@ -319,7 +319,7 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
   EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",

@@ -85,7 +85,7 @@ TEST(StrictDnsClusterImplTest, ImmediateResolve) {
                              cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
                              return nullptr;
                            }));
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
   StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
                                dispatcher);
   cluster.setInitializedCb([&]() -> void { initialized.ready(); });
@@ -132,7 +132,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
   StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
                                dispatcher);
   EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
@@ -276,7 +276,7 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
   EXPECT_EQ("", cluster.hosts()[0]->hostname());
@@ -296,7 +296,7 @@ TEST(StaticClusterImplTest, RingHash) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
   EXPECT_EQ(1UL, cluster.healthyHosts().size());
   EXPECT_EQ(LoadBalancerType::RingHash, cluster.info()->lbType());
@@ -317,7 +317,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
 
   Outlier::MockDetector* detector = new Outlier::MockDetector();
@@ -358,7 +358,7 @@ TEST(StaticClusterImplTest, HealthyStat) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
@@ -416,7 +416,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   StaticClusterImpl cluster(*config, runtime, stats, ssl_context_manager);
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(1024U,
@@ -452,7 +452,7 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   EXPECT_THROW(StaticClusterImpl(*config, runtime, stats, ssl_context_manager), EnvoyException);
 }
 
@@ -468,7 +468,7 @@ TEST(ClusterDefinitionTest, BadClusterConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
 }
 

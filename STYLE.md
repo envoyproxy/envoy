@@ -18,17 +18,6 @@
 * Function names using camel case starting with a lower case letter (e.g., "doFoo()").
 * Struct/Class member variables have a '\_' postfix (e.g., "int foo\_;").
 * 100 columns is the line limit.
-* OOM events (both memory and FDs) are considered fatal crashing errors.
-* All error code returns should be checked. It's acceptable to turn failures into crash semantics
-  via `RELEASE_ASSERT(condition)` or `PANIC(message)` if there is no other sensible behavior, e.g.
-  in OOM (memory/FD) scenarios. Crash semantics are preferred over complex error recovery logic when
-  the condition is extremely unlikely or is a fundamental programming error that should be caught by
-  a test, and the testing overhead to verify the recovery logic is high. Only
-  `RELEASE_ASSERT(condition)` should be used to validate conditions that might be imposed by
-  the external environment. `ASSERT(condition)` should be used to document (and check in debug-only
-  builds) program invariants. Use `ASSERT` liberally, but do not use it for things that will crash
-  in an obvious way in a subsequent line. E.g., do not do
-  `ASSERT(foo != nullptr); foo->doSomething();`.
 * Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
 * Smart pointers are type aliased:
   * `typedef std::unique_ptr<Foo> FooPtr;`
@@ -45,6 +34,62 @@
 * Header guards should use `#pragma once`.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
+
+# Error handling
+
+A few general notes on our error handling philosophy:
+
+* All error code returns should be checked.
+* At a very high level, our philosophy is that errors that are *likely* to happen should be
+  gracefully handled. Examples of likely errors include any type of network error, disk IO error,
+  bad data returned by an API call, bad data read from runtime files, etc. Errors that are
+  *unlikely* to happen should lead to process death, under the assumption that the additional burden
+  of defensive coding and testing is not an effective use of time for an error that should not happen
+  given proper system setup. Examples of these types of errors include not being able to open the shared
+  memory region, an invalid initial JSON config read from disk, system calls that should not fail
+  assuming correct parameters (which should be validated via tests), etc. Examples of system calls
+  that should not fail when passed valid parameters include most usages of `setsockopt()`,
+  `getsockopt()`, the kernel returning a valid `sockaddr` after a successful call to `accept()`,
+  `pthread_create()`, `pthread_join()`, etc.
+* OOM events (both memory and FDs) are considered fatal crashing errors. An OOM error should never
+  silently be ignored and should crash the process either via the C++ allocation error exception, an
+  explicit `RELEASE_ASSERT` following a third party library call, or an obvious crash on a subsequent
+  line via null pointer dereference. This rule is again based on the philosophy that the engineering
+  costs of properly handling these cases is not worth it. Time is better spent designing proper system
+  controls that shed load if resource usage becomes too high, etc.
+* The "less is more" error handling philosophy described in the previous two points is primarily
+  based on the fact that restarts are designed to be fast, reliable and cheap.
+* Although we strongly recommend that any type of startup error leads to a fatal error, since this
+  is almost always a result of faulty configuration which should be caught during a canary process,
+  there may be cases in which we want some classes of startup errors to be non-fatal. For example,
+  if a misconfigured option is not necessary for server operation. Although this is discouraged, we
+  will discuss these on a case by case basis case basis during code review (an example of this
+  is the `--admin-address-path` option). **If degraded mode error handling is implemented, we require
+  that there is complete test coverage for the degraded case.** Additionally, the user should be
+  aware of the degraded state minimally via an error log of level warn or greater and via the
+  increment of a stat.
+* The error handling philosophy described herein is based on the assumption that Envoy is deployed
+  using industry best practices (primarily canary). Major and obvious errors should always be
+  caught in canary. If a low rate error leads to periodic crash cycling when deployed to
+  production, the error rate should allow for rollback without large customer impact.
+* Tip: If the thought of adding the extra test coverage, logging, and stats to handle an error and
+  continue seems ridiculous because *"this should never happen"*, it's a very good indication that
+  the appropriate behavior is to terminate the process and not handle the error. When in doubt,
+  please discuss.
+* Per above it's acceptable to turn failures into crash semantics
+  via `RELEASE_ASSERT(condition)` or `PANIC(message)` if there is no other sensible behavior, e.g.
+  in OOM (memory/FD) scenarios. Only `RELEASE_ASSERT(condition)` should be used to validate
+  conditions that might be imposed by the external environment. `ASSERT(condition)` should be used
+  to document (and check in debug-only builds) program invariants. Use `ASSERT` liberally, but do
+  not use it for things that will crash in an obvious way in a subsequent line. E.g., do not do
+  `ASSERT(foo != nullptr); foo->doSomething();`. Note that there is a gray line between external
+  environment failures and program invariant violations. For example, memory corruption due to a
+  security issue (a bug, deliberate buffer overflow etc.) might manifest as a violation of program
+  invariants or as a detectable condition in the external environment (e.g. some library returning a
+  highly unexpected error code or buffer contents). Unfortunately no rule can cleanly cover when to
+  use `RELEASE_ASSERT` vs. `ASSERT`. In general we view `ASSERT` as the common case and
+  `RELEASE_ASSERT` as the uncommon case, but experience and judgment may dictate a particular approach
+  depending on the situation.
 
 # Hermetic tests
 

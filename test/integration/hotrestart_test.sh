@@ -50,7 +50,7 @@ echo "Checking that listener addresses have not changed"
 HOT_RESTART_JSON_1="${TEST_TMPDIR}"/hot_restart_1.json
 "${TEST_RUNDIR}"/tools/socket_passing.py "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
   "-u" "${HOT_RESTART_JSON_1}"
-CONFIG_DIFF=$(diff -Z "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
+CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
 [[ -z "${CONFIG_DIFF}" ]]
 
 ADMIN_ADDRESS_PATH_2="${TEST_TMPDIR}"/admin_2.address
@@ -66,7 +66,7 @@ echo "Checking that listener addresses have not changed"
 HOT_RESTART_JSON_2="${TEST_TMPDIR}"/hot_restart_2.json
 "${TEST_RUNDIR}"/tools/socket_passing.py "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
   "-u" "${HOT_RESTART_JSON_2}"
-CONFIG_DIFF=$(diff -Z "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_2}")
+CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_2}")
 [[ -z "${CONFIG_DIFF}" ]]
 
 # First server should already be gone.
