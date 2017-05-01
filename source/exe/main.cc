@@ -38,7 +38,7 @@ public:
 namespace {
 
 int validateConfig(OptionsImpl& options, Server::ProdComponentFactory& component_factory,
-                          const LocalInfo::LocalInfoImpl& local_info) {
+                   const LocalInfo::LocalInfoImpl& local_info) {
   Server::ValidationHotRestart restarter;
   Logger::Registry::initialize(options.logLevel(), restarter.logLock());
   Stats::HeapRawStatDataAllocator alloc;
