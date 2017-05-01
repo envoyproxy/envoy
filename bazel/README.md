@@ -113,8 +113,8 @@ bazel test -c dbg //test/server:backtrace_test
 --cache_test_results=no --test_output=all
 ```
 
-You will need to use either a `dbg` build type or the `--define
-debug_symbols=yes` option to get symbol information in the binaries.
+You will need to use either a `dbg` build type or the `opt` build type to get symbol
+information in the binaries.
 
 By default main.cc will install signal handlers to print backtraces at the
 location where a fatal signal occurred.  The signal handler will re-raise the
@@ -126,8 +126,11 @@ be installed.
 # Running a single Bazel test under GDB
 
 ```
-tools/bazel-test-gdb //test/common/http:async_client_impl_test
+tools/bazel-test-gdb //test/common/http:async_client_impl_test -c dbg
 ```
+
+Without the `-c dbg` Bazel option at the end of the command line the test
+binaries will not include debugging symbols and GDB will not be very useful.
 
 # Additional Envoy build and test options
 
