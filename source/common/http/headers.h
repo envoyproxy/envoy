@@ -11,7 +11,7 @@ namespace Http {
 /**
  * Constant HTTP headers and values. All lower case.
  */
-class HeadersValues {
+class HeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
   const LowerCaseString Authorization{"authorization"};
@@ -102,6 +102,6 @@ public:
   } UserAgentValues;
 };
 
-typedef Singleton<HeadersValues> Headers;
+typedef ConstSingleton<HeaderValues> Headers;
 
 } // Http

@@ -1,16 +1,18 @@
 #pragma once
 
 /**
- * Singleton pattern.
+ * Immutable singleton pattern.
  */
-template <class T> class Singleton {
+template <class T> class ConstSingleton {
 public:
   /**
    * Obtain an instance of the singleton for class T.
-   * @return T& a reference to the singleton for class T.
+   * @return const T& a reference to the singleton for class T.
    */
-  static T& get() {
+  static const T& get() {
     static T* instance = new T();
     return *instance;
   }
 };
+
+// TODO(htuch): Add a mutable Singleton if there is a need for this.
