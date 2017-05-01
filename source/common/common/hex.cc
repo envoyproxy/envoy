@@ -48,6 +48,7 @@ std::vector<uint8_t> Hex::decode(const std::string& hex_string) {
 std::string Hex::uint64ToHex(uint64_t value) {
   std::array<uint8_t, 8> data;
 
+  // This is explicitly done for performance reasons
   data[7] = (value & 0x00000000000000FF);
   data[6] = (value & 0x000000000000FF00) >> 8;
   data[5] = (value & 0x0000000000FF0000) >> 16;

@@ -232,7 +232,7 @@ const std::string Span::toJson() {
 void Span::finish() {
   // Assumption: Span will have only one annotation when this method is called
   SpanContext context(*this);
-  if ((context.isSetAnnotation().sr_) && (!context.isSetAnnotation().ss_)) {
+  if ((context.annotationSet().sr_) && (!context.annotationSet().ss_)) {
     // Need to set the SS annotation
     Annotation ss;
     ss.setEndpoint(annotations_[0].endpoint());
@@ -240,7 +240,7 @@ void Span::finish() {
                         ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count());
     ss.setValue(ZipkinCoreConstants::SERVER_SEND);
     annotations_.push_back(std::move(ss));
-  } else if ((context.isSetAnnotation().cs_) && (!context.isSetAnnotation().cr_)) {
+  } else if ((context.annotationSet().cs_) && (!context.annotationSet().cr_)) {
     // Need to set the CR annotation
     Annotation cr;
     uint64_t stop_timestamp =

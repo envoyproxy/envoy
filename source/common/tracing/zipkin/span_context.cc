@@ -5,45 +5,68 @@
 
 namespace Zipkin {
 
-// The static functions below are needed due to C++ inability to safely concatenate static strings
-// belonging to different compilation units (the initialization order is not guaranteed).
+namespace {
+// The functions below are needed due to the "C++ static initialization order fiasco."
 
-const std::string& SpanContext::FIELD_SEPARATOR() {
+/**
+ * @return String that separates the span-context fields in its string-serialized form.
+ */
+static const std::string& fieldSeparator() {
   static const std::string* field_separator = new std::string(";");
 
   return *field_separator;
 }
 
-const std::string& SpanContext::UNITIALIZED_SPAN_CONTEXT() {
+/**
+ * @return String value corresponding to an empty span context.
+ */
+static const std::string& unitializedSpanContext() {
   static const std::string* unitialized_span_context =
-      new std::string("0000000000000000" + FIELD_SEPARATOR() + "0000000000000000" +
-                      FIELD_SEPARATOR() + "0000000000000000");
+      new std::string("0000000000000000" + fieldSeparator() + "0000000000000000" +
+                      fieldSeparator() + "0000000000000000");
 
   return *unitialized_span_context;
 }
 
-const std::string& SpanContext::HEX_DIGIT_GROUP_REGEX_STR() {
+/**
+ * @return String with regular expression to match a 16-digit hexadecimal number.
+ */
+static const std::string& hexDigitGroupRegexStr() {
   static const std::string* hex_digit_group_regex_str = new std::string("([0-9,a-z]{16})");
 
   return *hex_digit_group_regex_str;
 }
 
-const std::string& SpanContext::SPAN_CONTEXT_REGEX_STR() {
+/**
+ * @return a string with a regular expression to match a valid string-serialized span context.
+ *
+ * Note that a function is needed because we cannot concatenate static strings from
+ * different compilation units at initialization time (the initialization order is not
+ * guaranteed). In this case, the compilation units are ZipkinCoreConstants and SpanContext.
+ */
+static const std::string& spanContextRegexStr() {
   // ^([0-9,a-z]{16});([0-9,a-z]{16});([0-9,a-z]{16})((;(cs|sr|cr|ss))*)$
   static const std::string* span_context_regex_str = new std::string(
-      "^" + HEX_DIGIT_GROUP_REGEX_STR() + FIELD_SEPARATOR() + HEX_DIGIT_GROUP_REGEX_STR() +
-      FIELD_SEPARATOR() + HEX_DIGIT_GROUP_REGEX_STR() + "((" + FIELD_SEPARATOR() + "(" +
+      "^" + hexDigitGroupRegexStr() + fieldSeparator() + hexDigitGroupRegexStr() +
+      fieldSeparator() + hexDigitGroupRegexStr() + "((" + fieldSeparator() + "(" +
       ZipkinCoreConstants::CLIENT_SEND + "|" + ZipkinCoreConstants::SERVER_RECV + "|" +
       ZipkinCoreConstants::CLIENT_RECV + "|" + ZipkinCoreConstants::SERVER_SEND + "))*)$");
 
   return *span_context_regex_str;
 }
 
-const std::regex& SpanContext::SPAN_CONTEXT_REGEX() {
-  static const std::regex span_context_regex(SPAN_CONTEXT_REGEX_STR());
+/**
+ * @return a regex to match a valid string-serialization of a span context.
+ *
+ * Note that a function is needed because the string used to build the regex
+ * cannot be initialized statically.
+ */
+static const std::regex& spanContextRegex() {
+  static const std::regex* span_context_regex = new std::regex(spanContextRegexStr());
 
-  return span_context_regex;
+  return *span_context_regex;
 }
+} // namespace
 
 SpanContext::SpanContext(const Span& span) {
   trace_id_ = span.traceId();
@@ -53,14 +76,11 @@ SpanContext::SpanContext(const Span& span) {
   for (const Annotation& annotation : span.annotations()) {
     if (annotation.value() == ZipkinCoreConstants::CLIENT_RECV) {
       annotation_values_.cr_ = true;
-    }
-    if (annotation.value() == ZipkinCoreConstants::CLIENT_SEND) {
+    } else if (annotation.value() == ZipkinCoreConstants::CLIENT_SEND) {
       annotation_values_.cs_ = true;
-    }
-    if (annotation.value() == ZipkinCoreConstants::SERVER_RECV) {
+    } else if (annotation.value() == ZipkinCoreConstants::SERVER_RECV) {
       annotation_values_.sr_ = true;
-    }
-    if (annotation.value() == ZipkinCoreConstants::SERVER_SEND) {
+    } else if (annotation.value() == ZipkinCoreConstants::SERVER_SEND) {
       annotation_values_.ss_ = true;
     }
   }
@@ -70,24 +90,24 @@ SpanContext::SpanContext(const Span& span) {
 
 const std::string SpanContext::serializeToString() {
   if (!is_initialized_) {
-    return UNITIALIZED_SPAN_CONTEXT();
+    return unitializedSpanContext();
   }
 
   std::string result;
-  result = traceIdAsHexString() + FIELD_SEPARATOR() + idAsHexString() + FIELD_SEPARATOR() +
+  result = traceIdAsHexString() + fieldSeparator() + idAsHexString() + fieldSeparator() +
            parentIdAsHexString();
 
   if (annotation_values_.cr_) {
-    result += FIELD_SEPARATOR() + ZipkinCoreConstants::CLIENT_RECV;
+    result += fieldSeparator() + ZipkinCoreConstants::CLIENT_RECV;
   }
   if (annotation_values_.cs_) {
-    result += FIELD_SEPARATOR() + ZipkinCoreConstants::CLIENT_SEND;
+    result += fieldSeparator() + ZipkinCoreConstants::CLIENT_SEND;
   }
   if (annotation_values_.sr_) {
-    result += FIELD_SEPARATOR() + ZipkinCoreConstants::SERVER_RECV;
+    result += fieldSeparator() + ZipkinCoreConstants::SERVER_RECV;
   }
   if (annotation_values_.ss_) {
-    result += FIELD_SEPARATOR() + ZipkinCoreConstants::SERVER_SEND;
+    result += fieldSeparator() + ZipkinCoreConstants::SERVER_SEND;
   }
 
   return result;
@@ -100,7 +120,7 @@ void SpanContext::populateFromString(const std::string& span_context_str) {
   annotation_values_.cs_ = annotation_values_.cr_ = annotation_values_.ss_ =
       annotation_values_.sr_ = false;
 
-  if (std::regex_search(span_context_str, match, SPAN_CONTEXT_REGEX())) {
+  if (std::regex_search(span_context_str, match, spanContextRegex())) {
     // This is a valid string encoding of the context
     trace_id_ = std::stoull(match.str(1), nullptr, 16);
     id_ = std::stoull(match.str(2), nullptr, 16);
@@ -109,7 +129,7 @@ void SpanContext::populateFromString(const std::string& span_context_str) {
     std::string matched_annotations = match.str(4);
     if (matched_annotations.size() > 0) {
       std::vector<std::string> annotation_value_strings =
-          StringUtil::split(matched_annotations, FIELD_SEPARATOR());
+          StringUtil::split(matched_annotations, fieldSeparator());
       for (const std::string& annotation_value : annotation_value_strings) {
         if (annotation_value == ZipkinCoreConstants::CLIENT_RECV) {
           annotation_values_.cr_ = true;

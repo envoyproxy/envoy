@@ -51,7 +51,7 @@ SpanPtr Tracer::startSpan(const std::string& span_name, MonotonicTime start_time
   timestamp_micro = std::chrono::duration_cast<std::chrono::microseconds>(
                         ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
 
-  if ((previous_context.isSetAnnotation().sr_) && (!previous_context.isSetAnnotation().cs_)) {
+  if ((previous_context.annotationSet().sr_) && (!previous_context.annotationSet().cs_)) {
     // We need to create a new span that is a child of the previous span; no shared context
 
     // Create a new span id
@@ -68,8 +68,7 @@ SpanPtr Tracer::startSpan(const std::string& span_name, MonotonicTime start_time
 
     // Set the timestamp globally for the span
     span_ptr->setTimestamp(timestamp_micro);
-  } else if ((previous_context.isSetAnnotation().cs_) &&
-             (!previous_context.isSetAnnotation().sr_)) {
+  } else if ((previous_context.annotationSet().cs_) && (!previous_context.annotationSet().sr_)) {
     // We need to create a new span that will share context with the previous span
 
     // Initialize the shared context for the new span

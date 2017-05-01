@@ -21,7 +21,7 @@ public:
    *
    * @param size The desired buffer size.
    */
-  SpanBuffer(uint64_t size) { span_buffer_.reserve(size); }
+  SpanBuffer(uint64_t size) { allocateBuffer(size); }
 
   /**
    * Allocates space for an empty buffer or resizes a previously-allocated one.

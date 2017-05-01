@@ -107,41 +107,9 @@ public:
   /**
    * @return a struct indicating which annotations are present in the span.
    */
-  AnnotationSet isSetAnnotation() const { return annotation_values_; }
+  AnnotationSet annotationSet() const { return annotation_values_; }
 
 private:
-  /**
-   * @return String that separates the span-context fields in its string-serialized form.
-   */
-  static const std::string& FIELD_SEPARATOR();
-
-  /**
-   * @return String value corresponding to an empty span context.
-   */
-  static const std::string& UNITIALIZED_SPAN_CONTEXT();
-
-  /**
-   * @return String with regular expression to match a 16-digit hexadecimal number.
-   */
-  static const std::string& HEX_DIGIT_GROUP_REGEX_STR();
-
-  /**
-   * @return a string with a regular expression to match a valid string-serialized span context.
-   *
-   * Note that a function is needed because we cannot concatenate static strings from
-   * different compilation units at initialization time (the initialization order is not
-   * guaranteed). In this case, the compilation units are ZipkinCoreConstants and SpanContext.
-   */
-  static const std::string& SPAN_CONTEXT_REGEX_STR();
-
-  /**
-   * @return a regex to match a valid string-serialization of a span context.
-   *
-   * Note that a function is needed because the string used to build the regex
-   * cannot be initialized statically.
-   */
-  static const std::regex& SPAN_CONTEXT_REGEX();
-
   uint64_t trace_id_;
   uint64_t id_;
   uint64_t parent_id_;
