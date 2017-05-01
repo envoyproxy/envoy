@@ -11,7 +11,7 @@
 namespace Server {
 
 /**
- * Whether to run Envoy in serving mode, or in config-validation mode at one of two levels (in which
+ * Whether to run Envoy in serving mode, or in config validation mode at one of two levels (in which
  * case we'll verify the configuration file is valid, print any errors, and exit without serving.)
  */
 enum class Mode {

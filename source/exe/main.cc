@@ -35,7 +35,9 @@ public:
 
 } // Server
 
-int validateConfigAndExit(OptionsImpl& options, Server::ProdComponentFactory& component_factory,
+namespace {
+
+int validateConfig(OptionsImpl& options, Server::ProdComponentFactory& component_factory,
                           const LocalInfo::LocalInfoImpl& local_info) {
   Server::ValidationHotRestart restarter;
   Logger::Registry::initialize(options.logLevel(), restarter.logLock());
@@ -44,10 +46,12 @@ int validateConfigAndExit(OptionsImpl& options, Server::ProdComponentFactory& co
 
   Server::ValidationInstance server(options, restarter, stats_store, restarter.accessLogLock(),
                                     component_factory, local_info);
-  std::cerr << "configuration '" << options.configPath() << "' OK" << std::endl;
+  std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
   server.shutdown();
   return 0;
 }
+
+} // namespace
 
 int main(int argc, char** argv) {
   Event::Libevent::Global::initialize();
@@ -57,7 +61,7 @@ int main(int argc, char** argv) {
                                       options.serviceClusterName(), options.serviceNodeName());
 
   if (options.mode() != Server::Mode::Serve) {
-    return validateConfigAndExit(options, component_factory, local_info);
+    return validateConfig(options, component_factory, local_info);
   }
 
   ares_library_init(ARES_LIB_INIT_ALL);
