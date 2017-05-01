@@ -54,7 +54,10 @@ envoy_cc_library(
     deps = [
         ":envoy_common_lib",
         ":hot_restart_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [":sigaction_lib"],
+    }),
 )
 
 envoy_cc_library(
@@ -70,5 +73,16 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "sigaction_lib",
+    srcs = ["signal_action.cc"],
+    hdrs = ["signal_action.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:non_copyable",
+        "//source/server:backtrace_lib",
     ],
 )
