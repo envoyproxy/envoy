@@ -83,7 +83,7 @@ protected:
   const Address::InstanceConstSharedPtr alt_address_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpTestParameters()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(ListenerImplTest, NormalRedirect) {
   Stats::IsolatedStoreImpl stats_store;

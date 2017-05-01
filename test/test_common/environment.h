@@ -22,15 +22,22 @@ public:
   static void initializeOptions(int argc, char** argv);
 
   /**
+   * Check whether testing with IP version type {v4 or v6} only is enabled via
+   * setting the environment variable ENVOY_IP_TEST_VERSIONS.
+   * @param Network::Address::IpVersion IP address version to check.
    * @return bool if testing only with IP type addresses only.
    */
-  static bool isTestIpVersionOnly(const Network::Address::IpVersion& type);
+  static bool shouldRunTestForIpVersion(const Network::Address::IpVersion& type);
 
   /**
-   * @return std::vector<Network::Address::IpVersion> vector of ip address
+   * Return a vector of IP address parameters to test. Tests can be run with
+   * only IPv4 addressing or only IPv6 addressing by setting the environmnet
+   * variable ENVOY_IP_TEST_VERSIONS to "v4only" or "v6only", respectively.
+   * The default test setting runs all tests with both IPv4 and IPv6 addresses.
+   * @return std::vector<Network::Address::IpVersion> vector of IP address
    * types to test.
    */
-  static std::vector<Network::Address::IpVersion> getIpTestParameters();
+  static std::vector<Network::Address::IpVersion> getIpVersionsForTest();
 
   /**
    * Obtain command-line options reference.

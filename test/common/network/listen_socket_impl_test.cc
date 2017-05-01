@@ -16,7 +16,7 @@ protected:
   const Address::IpVersion version_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenSocketImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpTestParameters()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(ListenSocketImplTest, BindSpecificPort) {
   // Pick a free port.

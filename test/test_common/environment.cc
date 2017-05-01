@@ -8,6 +8,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "common/common/assert.h"
 
@@ -48,25 +49,26 @@ void TestEnvironment::initializeOptions(int argc, char** argv) {
   argv_ = argv;
 }
 
-bool TestEnvironment::isTestIpVersionOnly(const Network::Address::IpVersion& type) {
-  const char* option = ::getenv("IP_TEST_TYPE");
-  if (option == nullptr) {
-    return false;
-  }
-  if ((type == Network::Address::IpVersion::v4 && strcmp(option, "v4only") == 0) ||
-      (type == Network::Address::IpVersion::v6 && strcmp(option, "v6only") == 0)) {
+bool TestEnvironment::shouldRunTestForIpVersion(const Network::Address::IpVersion& type) {
+  const char* value = ::getenv("ENVOY_IP_TEST_VERSIONS");
+  std::string option(value ? value : "");
+  if (option.empty()) {
     return true;
   }
-  return false;
+  if ((type == Network::Address::IpVersion::v4 && option == "v6only") ||
+      (type == Network::Address::IpVersion::v6 && option == "v4only")) {
+    return false;
+  }
+  return true;
 }
 
-std::vector<Network::Address::IpVersion> TestEnvironment::getIpTestParameters() {
+std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest() {
   std::vector<Network::Address::IpVersion> parameters;
-  if (TestEnvironment::isTestIpVersionOnly(Network::Address::IpVersion::v6) == false) {
+  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4) == true) {
     parameters.push_back(Network::Address::IpVersion::v4);
   }
 
-  if (TestEnvironment::isTestIpVersionOnly(Network::Address::IpVersion::v4) == false) {
+  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6) == true) {
     parameters.push_back(Network::Address::IpVersion::v6);
   }
   return parameters;
