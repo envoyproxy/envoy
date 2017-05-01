@@ -49,6 +49,31 @@ void TestEnvironment::initializeOptions(int argc, char** argv) {
   argv_ = argv;
 }
 
+bool TestEnvironment::shouldRunTestForIpVersion(const Network::Address::IpVersion& type) {
+  const char* value = ::getenv("ENVOY_IP_TEST_VERSIONS");
+  std::string option(value ? value : "");
+  if (option.empty()) {
+    return true;
+  }
+  if ((type == Network::Address::IpVersion::v4 && option == "v6only") ||
+      (type == Network::Address::IpVersion::v6 && option == "v4only")) {
+    return false;
+  }
+  return true;
+}
+
+std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest() {
+  std::vector<Network::Address::IpVersion> parameters;
+  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    parameters.push_back(Network::Address::IpVersion::v4);
+  }
+
+  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
+    parameters.push_back(Network::Address::IpVersion::v6);
+  }
+  return parameters;
+}
+
 Server::Options& TestEnvironment::getOptions() {
   static OptionsImpl* options = new OptionsImpl(argc_, argv_, "1", spdlog::level::err);
   return *options;

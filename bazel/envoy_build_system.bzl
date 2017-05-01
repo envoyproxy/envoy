@@ -21,6 +21,9 @@ def envoy_copts(repository, test = False):
     }) + select({
         repository + "//bazel:disable_tcmalloc": [],
         "//conditions:default": ["-DTCMALLOC"],
+    }) + select({
+        repository + "//bazel:disable_signal_trace": [],
+        "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
     })
 
 # References to Envoy external dependencies should be wrapped with this function.
