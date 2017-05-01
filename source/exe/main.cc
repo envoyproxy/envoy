@@ -7,7 +7,10 @@
 #include "common/stats/thread_local_store.h"
 
 #include "exe/hot_restart.h"
+
+#ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
+#endif
 
 #include "server/drain_manager_impl.h"
 #include "server/options_impl.h"

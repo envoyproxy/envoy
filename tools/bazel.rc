@@ -8,3 +8,4 @@ build:asan --linkopt -ldl
 build:asan --define tcmalloc=disabled
 build:asan --build_tag_filters=-no_asan
 build:asan --test_tag_filters=-no_asan
+build:asan --define signal_trace=disabled

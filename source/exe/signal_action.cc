@@ -54,7 +54,7 @@ void SignalAction::installSigHandlers() {
   }
 }
 
-void SignalAction::removeSigHandlers() const {
+void SignalAction::removeSigHandlers() {
   for (const auto& sig : FATAL_SIGS) {
     signal(sig, SIG_DFL);
   }

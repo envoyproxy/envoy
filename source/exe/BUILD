@@ -52,8 +52,10 @@ envoy_cc_library(
     deps = [
         ":envoy_common_lib",
         ":hot_restart_lib",
-        ":sigaction_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [":sigaction_lib"],
+    }),
 )
 
 envoy_cc_library(

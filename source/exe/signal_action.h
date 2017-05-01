@@ -47,7 +47,6 @@ public:
     mapAndProtectStackMemory();
     installSigHandlers();
   }
-  SignalAction(const SignalAction&) = delete;
   ~SignalAction() {
     removeSigHandlers();
     unmapStackMemory();
@@ -102,7 +101,7 @@ private:
    * Signal handlers will be reset to the default, NOT back to any signal
    * handler existing before InstallSigHandlers().
    */
-  void removeSigHandlers() const;
+  void removeSigHandlers();
   /**
    * Use mmap to map anonymous memory for the alternative stack.
    *
