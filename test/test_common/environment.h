@@ -31,7 +31,7 @@ public:
 
   /**
    * Return a vector of IP address parameters to test. Tests can be run with
-   * only IPv4 addressing or only IPv6 addressing by setting the environmnet
+   * only IPv4 addressing or only IPv6 addressing by setting the environment
    * variable ENVOY_IP_TEST_VERSIONS to "v4only" or "v6only", respectively.
    * The default test setting runs all tests with both IPv4 and IPv6 addresses.
    * @return std::vector<Network::Address::IpVersion> vector of IP address

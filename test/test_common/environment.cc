@@ -64,11 +64,11 @@ bool TestEnvironment::shouldRunTestForIpVersion(const Network::Address::IpVersio
 
 std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest() {
   std::vector<Network::Address::IpVersion> parameters;
-  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4) == true) {
+  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     parameters.push_back(Network::Address::IpVersion::v4);
   }
 
-  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6) == true) {
+  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
     parameters.push_back(Network::Address::IpVersion::v6);
   }
   return parameters;
