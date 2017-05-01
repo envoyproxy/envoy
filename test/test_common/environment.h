@@ -22,7 +22,7 @@ public:
   static void initializeOptions(int argc, char** argv);
 
   /**
-   * Check whether testing with IP version type {v4 or v6} only is enabled via
+   * Check whether testing with IP version type {v4 or v6} is enabled via
    * setting the environment variable ENVOY_IP_TEST_VERSIONS.
    * @param Network::Address::IpVersion IP address version to check.
    * @return bool if testing only with IP type addresses only.
