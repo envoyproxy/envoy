@@ -30,7 +30,8 @@
   fiasco](https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use) for
   how to best handle this.
 * API-level comments should follow normal Doxygen conventions. Use `@param` to describe
-  parameters, `@return <return-type>` for return values.
+  parameters, `@return <return-type>` for return values. Internal comments for
+  methods and member variables should be regular C++ `//` comments.
 * Header guards should use `#pragma once`.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
@@ -91,7 +92,7 @@ A few general notes on our error handling philosophy:
   `RELEASE_ASSERT` as the uncommon case, but experience and judgment may dictate a particular approach
   depending on the situation.
 
-# Hermetic tests
+# Hermetic and deterministic tests
 
 Tests should be hermetic, i.e. have all dependencies explicitly captured and not depend on the local
 environment. In general, there should be no non-local network access. In addition:
@@ -110,6 +111,11 @@ environment. In general, there should be no non-local network access. In additio
   * With `{{ test_tmpdir }}`, `{{ test_rundir }}` and `{{ test_udsdir }}` respectively for JSON templates.
     `{{ test_udsdir }}` is provided for pathname based Unix Domain Sockets, which must fit within a
     108 character limit on Linux, a property that might not hold for `{{ test_tmpdir }}`.
+
+Tests should be deterministic. They should not rely on randomness or details
+such as the current time. Instead, mocks such as
+`MockRandomGenerator`(test/mocks/runtime/mocks.h) and
+`Mock*TimeSource`(test/mocks/common.h) should be used.
 
 # Google style guides for other languages
 
