@@ -1,9 +1,11 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/tracing/zipkin/tracer.h"
 #include "common/tracing/zipkin/util.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
+
+#include "test/mocks/common.h"
+#include "test/mocks/runtime/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -25,7 +27,8 @@ TEST(ZipkinTracerTest, spanCreation) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
   Tracer tracer("my_service_name", addr);
-  MonotonicTime start_time = ProdMonotonicTimeSource::instance_.currentTime();
+  MockMonotonicTimeSource mock_start_time;
+  MonotonicTime start_time = mock_start_time.currentTime();
 
   // ==============
   // Test the creation of a root span --> CS
@@ -146,8 +149,9 @@ TEST(ZipkinTracerTest, finishSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
   Tracer tracer("my_service_name", addr);
-  tracer.setRandomGenerator(Runtime::RandomGeneratorPtr(new Runtime::RandomGeneratorImpl()));
-  MonotonicTime start_time = ProdMonotonicTimeSource::instance_.currentTime();
+  tracer.setRandomGenerator(Runtime::RandomGeneratorPtr(new Runtime::MockRandomGenerator()));
+  MockMonotonicTimeSource mock_start_time;
+  MonotonicTime start_time = mock_start_time.currentTime();
 
   // ==============
   // Test finishing a span containing a CS annotation
