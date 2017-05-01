@@ -167,7 +167,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "headers_lib",
     hdrs = ["headers.h"],
-    deps = ["//include/envoy/http:header_map_interface"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//source/common/common:singleton",
+    ],
 )
 
 envoy_cc_library(
