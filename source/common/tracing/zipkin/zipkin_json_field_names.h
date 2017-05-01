@@ -2,30 +2,35 @@
 
 #include <string>
 
+#include "common/common/singleton.h"
+
 namespace Zipkin {
 
-class ZipkinJsonFieldNames {
+class ZipkinJsonFieldNameValues {
 public:
-  static const std::string SPAN_TRACE_ID;
-  static const std::string SPAN_PARENT_ID;
-  static const std::string SPAN_NAME;
-  static const std::string SPAN_ID;
-  static const std::string SPAN_TIMESTAMP;
-  static const std::string SPAN_DURATION;
-  static const std::string SPAN_ANNOTATIONS;
-  static const std::string SPAN_BINARY_ANNOTATIONS;
+  const std::string SPAN_TRACE_ID = "traceId";
+  const std::string SPAN_PARENT_ID = "parentId";
+  const std::string SPAN_NAME = "name";
+  const std::string SPAN_ID = "id";
+  const std::string SPAN_TIMESTAMP = "timestamp";
+  const std::string SPAN_DURATION = "duration";
+  const std::string SPAN_ANNOTATIONS = "annotations";
+  const std::string SPAN_BINARY_ANNOTATIONS = "binaryAnnotations";
 
-  static const std::string ANNOTATION_ENDPOINT;
-  static const std::string ANNOTATION_TIMESTAMP;
-  static const std::string ANNOTATION_VALUE;
+  const std::string ANNOTATION_ENDPOINT = "endpoint";
+  const std::string ANNOTATION_TIMESTAMP = "timestamp";
+  const std::string ANNOTATION_VALUE = "value";
 
-  static const std::string BINARY_ANNOTATION_ENDPOINT;
-  static const std::string BINARY_ANNOTATION_KEY;
-  static const std::string BINARY_ANNOTATION_VALUE;
+  const std::string BINARY_ANNOTATION_ENDPOINT = "endpoint";
+  const std::string BINARY_ANNOTATION_KEY = "key";
+  const std::string BINARY_ANNOTATION_VALUE = "value";
 
-  static const std::string ENDPOINT_SERVICE_NAME;
-  static const std::string ENDPOINT_PORT;
-  static const std::string ENDPOINT_IPV4;
-  static const std::string ENDPOINT_IPV6;
+  const std::string ENDPOINT_SERVICE_NAME = "serviceName";
+  const std::string ENDPOINT_PORT = "port";
+  const std::string ENDPOINT_IPV4 = "ipv4";
+  const std::string ENDPOINT_IPV6 = "ipv6";
 };
+
+typedef ConstSingleton<ZipkinJsonFieldNameValues> ZipkinJsonFieldNames;
+
 } // Zipkin

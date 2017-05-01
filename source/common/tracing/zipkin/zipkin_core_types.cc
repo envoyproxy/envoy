@@ -29,23 +29,23 @@ const std::string Endpoint::toJson() {
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
   if (!address_) {
-    writer.Key(ZipkinJsonFieldNames::ENDPOINT_IPV4.c_str());
+    writer.Key(ZipkinJsonFieldNames::get().ENDPOINT_IPV4.c_str());
     writer.String("");
-    writer.Key(ZipkinJsonFieldNames::ENDPOINT_PORT.c_str());
+    writer.Key(ZipkinJsonFieldNames::get().ENDPOINT_PORT.c_str());
     writer.Uint(0);
   } else {
     if (address_->ip()->version() == Network::Address::IpVersion::v4) {
       // IPv4
-      writer.Key(ZipkinJsonFieldNames::ENDPOINT_IPV4.c_str());
+      writer.Key(ZipkinJsonFieldNames::get().ENDPOINT_IPV4.c_str());
     } else {
       // IPv6
-      writer.Key(ZipkinJsonFieldNames::ENDPOINT_IPV6.c_str());
+      writer.Key(ZipkinJsonFieldNames::get().ENDPOINT_IPV6.c_str());
     }
     writer.String(address_->ip()->addressAsString().c_str());
-    writer.Key(ZipkinJsonFieldNames::ENDPOINT_PORT.c_str());
+    writer.Key(ZipkinJsonFieldNames::get().ENDPOINT_PORT.c_str());
     writer.Uint(address_->ip()->port());
   }
-  writer.Key(ZipkinJsonFieldNames::ENDPOINT_SERVICE_NAME.c_str());
+  writer.Key(ZipkinJsonFieldNames::get().ENDPOINT_SERVICE_NAME.c_str());
   writer.String(service_name_.c_str());
   writer.EndObject();
   std::string json_string = s.GetString();
@@ -75,9 +75,9 @@ const std::string Annotation::toJson() {
   rapidjson::StringBuffer s;
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
-  writer.Key(ZipkinJsonFieldNames::ANNOTATION_TIMESTAMP.c_str());
+  writer.Key(ZipkinJsonFieldNames::get().ANNOTATION_TIMESTAMP.c_str());
   writer.Uint64(timestamp_);
-  writer.Key(ZipkinJsonFieldNames::ANNOTATION_VALUE.c_str());
+  writer.Key(ZipkinJsonFieldNames::get().ANNOTATION_VALUE.c_str());
   writer.String(value_.c_str());
   writer.EndObject();
 
@@ -85,7 +85,7 @@ const std::string Annotation::toJson() {
 
   if (endpoint_.valid()) {
     Util::mergeJsons(json_string, static_cast<Endpoint>(endpoint_.value()).toJson(),
-                     ZipkinJsonFieldNames::ANNOTATION_ENDPOINT.c_str());
+                     ZipkinJsonFieldNames::get().ANNOTATION_ENDPOINT.c_str());
   }
 
   return json_string;
@@ -115,9 +115,9 @@ const std::string BinaryAnnotation::toJson() {
   rapidjson::StringBuffer s;
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
-  writer.Key(ZipkinJsonFieldNames::BINARY_ANNOTATION_KEY.c_str());
+  writer.Key(ZipkinJsonFieldNames::get().BINARY_ANNOTATION_KEY.c_str());
   writer.String(key_.c_str());
-  writer.Key(ZipkinJsonFieldNames::BINARY_ANNOTATION_VALUE.c_str());
+  writer.Key(ZipkinJsonFieldNames::get().BINARY_ANNOTATION_VALUE.c_str());
   writer.String(value_.c_str());
   writer.EndObject();
 
@@ -125,7 +125,7 @@ const std::string BinaryAnnotation::toJson() {
 
   if (endpoint_.valid()) {
     Util::mergeJsons(json_string, static_cast<Endpoint>(endpoint_.value()).toJson(),
-                     ZipkinJsonFieldNames::BINARY_ANNOTATION_ENDPOINT.c_str());
+                     ZipkinJsonFieldNames::get().BINARY_ANNOTATION_ENDPOINT.c_str());
   }
 
   return json_string;
@@ -185,25 +185,25 @@ const std::string Span::toJson() {
   rapidjson::StringBuffer s;
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
-  writer.Key(ZipkinJsonFieldNames::SPAN_TRACE_ID.c_str());
+  writer.Key(ZipkinJsonFieldNames::get().SPAN_TRACE_ID.c_str());
   writer.String(Hex::uint64ToHex(trace_id_).c_str());
-  writer.Key(ZipkinJsonFieldNames::SPAN_NAME.c_str());
+  writer.Key(ZipkinJsonFieldNames::get().SPAN_NAME.c_str());
   writer.String(name_.c_str());
-  writer.Key(ZipkinJsonFieldNames::SPAN_ID.c_str());
+  writer.Key(ZipkinJsonFieldNames::get().SPAN_ID.c_str());
   writer.String(Hex::uint64ToHex(id_).c_str());
 
   if (parent_id_.valid() && parent_id_.value()) {
-    writer.Key(ZipkinJsonFieldNames::SPAN_PARENT_ID.c_str());
+    writer.Key(ZipkinJsonFieldNames::get().SPAN_PARENT_ID.c_str());
     writer.String(Hex::uint64ToHex(parent_id_.value()).c_str());
   }
 
   if (timestamp_.valid()) {
-    writer.Key(ZipkinJsonFieldNames::SPAN_TIMESTAMP.c_str());
+    writer.Key(ZipkinJsonFieldNames::get().SPAN_TIMESTAMP.c_str());
     writer.Int64(timestamp_.value());
   }
 
   if (duration_.valid()) {
-    writer.Key(ZipkinJsonFieldNames::SPAN_DURATION.c_str());
+    writer.Key(ZipkinJsonFieldNames::get().SPAN_DURATION.c_str());
     writer.Int64(duration_.value());
   }
 
@@ -217,14 +217,14 @@ const std::string Span::toJson() {
     annotation_json_vector.push_back(it->toJson());
   }
   Util::addArrayToJson(json_string, annotation_json_vector,
-                       ZipkinJsonFieldNames::SPAN_ANNOTATIONS.c_str());
+                       ZipkinJsonFieldNames::get().SPAN_ANNOTATIONS.c_str());
 
   std::vector<std::string> binary_annotation_json_vector;
   for (auto it = binary_annotations_.begin(); it != binary_annotations_.end(); it++) {
     binary_annotation_json_vector.push_back(it->toJson());
   }
   Util::addArrayToJson(json_string, binary_annotation_json_vector,
-                       ZipkinJsonFieldNames::SPAN_BINARY_ANNOTATIONS.c_str());
+                       ZipkinJsonFieldNames::get().SPAN_BINARY_ANNOTATIONS.c_str());
 
   return json_string;
 }
@@ -232,7 +232,7 @@ const std::string Span::toJson() {
 void Span::finish() {
   // Assumption: Span will have only one annotation when this method is called
   SpanContext context(*this);
-  if ((context.annotationSet().sr_) && (!context.annotationSet().ss_)) {
+  if (context.annotationSet().sr_ && !context.annotationSet().ss_) {
     // Need to set the SS annotation
     Annotation ss;
     ss.setEndpoint(annotations_[0].endpoint());
@@ -240,30 +240,29 @@ void Span::finish() {
                         ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count());
     ss.setValue(ZipkinCoreConstants::SERVER_SEND);
     annotations_.push_back(std::move(ss));
-  } else if ((context.annotationSet().cs_) && (!context.annotationSet().cr_)) {
+  } else if (context.annotationSet().cs_ && !context.annotationSet().cr_) {
     // Need to set the CR annotation
     Annotation cr;
-    uint64_t stop_timestamp =
+    const uint64_t stop_timestamp =
         std::chrono::duration_cast<std::chrono::microseconds>(
             ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
     cr.setEndpoint(annotations_[0].endpoint());
     cr.setTimestamp(stop_timestamp);
     cr.setValue(ZipkinCoreConstants::CLIENT_RECV);
     annotations_.push_back(std::move(cr));
-    int64_t monotonic_stop_time =
+    const int64_t monotonic_stop_time =
         std::chrono::duration_cast<std::chrono::microseconds>(
             ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch()).count();
     setDuration(monotonic_stop_time - monotonic_start_time_);
   }
 
-  auto t = tracer();
-  if (t) {
+  if (auto t = tracer()) {
     t->reportSpan(std::move(*this));
   }
 }
 
 void Span::setTag(const std::string& name, const std::string& value) {
-  if ((name.size() > 0) && (value.size() > 0)) {
+  if (name.size() > 0 && value.size() > 0) {
     addBinaryAnnotation(BinaryAnnotation(name, value));
   }
 }

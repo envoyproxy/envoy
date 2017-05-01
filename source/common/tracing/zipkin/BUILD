@@ -13,7 +13,6 @@ envoy_cc_library(
         "util.cc",
         "zipkin_core_constants.cc",
         "zipkin_core_types.cc",
-        "zipkin_json_field_names.cc",
     ],
     hdrs = [
         "span_buffer.h",
@@ -31,6 +30,7 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:hex_lib",
+        "//source/common/common:singleton",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
     ],
