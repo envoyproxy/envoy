@@ -14,9 +14,9 @@
 
 #include "server/options_impl.h"
 
-#include "spdlog/spdlog.h"
-
 #include "test/test_common/network_utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace {
 
