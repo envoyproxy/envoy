@@ -1,4 +1,4 @@
-language: cpp
+language: minimal
 sudo: required
 services:
   - docker
@@ -12,6 +12,7 @@ env:
   - TEST_TYPE=bazel.coverage
   - TEST_TYPE=check_format
   - TEST_TYPE=docs
+  - TEST_TYPE=build_image
 script: ./ci/ci_steps.sh
 
 branches:
