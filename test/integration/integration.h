@@ -179,7 +179,6 @@ public:
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  Stats::IsolatedStoreImpl stats_store_;
 
 protected:
   void testRouterRedirect(Http::CodecClient::Type type);

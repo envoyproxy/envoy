@@ -20,5 +20,6 @@ sh_test(
 envoy_cc_test(
     name = "signals_test",
     srcs = ["signals_test.cc"],
+    tags = ["backtrace"],
     deps = ["//source/exe:sigaction_lib"],
 )
