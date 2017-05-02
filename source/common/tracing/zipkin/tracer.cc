@@ -15,7 +15,7 @@ SpanPtr Tracer::startSpan(const std::string& span_name, MonotonicTime start_time
   // Build the CS annotation
   Annotation cs;
   cs.setEndpoint(std::move(ep));
-  cs.setValue(ZipkinCoreConstants::CLIENT_SEND);
+  cs.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
 
   // Create an all-new span, with no parent id
   SpanPtr span_ptr(new Span());
@@ -64,7 +64,7 @@ SpanPtr Tracer::startSpan(const std::string& span_name, MonotonicTime start_time
     span_ptr->setParentId(previous_context.id());
 
     // Set the CS annotation value
-    annotation.setValue(ZipkinCoreConstants::CLIENT_SEND);
+    annotation.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
 
     // Set the timestamp globally for the span
     span_ptr->setTimestamp(timestamp_micro);
@@ -78,7 +78,7 @@ SpanPtr Tracer::startSpan(const std::string& span_name, MonotonicTime start_time
     }
 
     // Set the SR annotation value
-    annotation.setValue(ZipkinCoreConstants::SERVER_RECV);
+    annotation.setValue(ZipkinCoreConstants::get().SERVER_RECV);
   } else {
     return span_ptr; // return an empty span
   }

@@ -49,7 +49,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   // A CS annotation must have been added
   EXPECT_EQ(1ULL, root_span->annotations().size());
   Annotation ann = root_span->annotations()[0];
-  EXPECT_EQ(ZipkinCoreConstants::CLIENT_SEND, ann.value());
+  EXPECT_EQ(ZipkinCoreConstants::get().CLIENT_SEND, ann.value());
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   Endpoint endpoint = ann.endpoint();
@@ -91,7 +91,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   // An SR annotation must have been added
   EXPECT_EQ(1ULL, server_side_shared_context_span->annotations().size());
   ann = server_side_shared_context_span->annotations()[0];
-  EXPECT_EQ(ZipkinCoreConstants::SERVER_RECV, ann.value());
+  EXPECT_EQ(ZipkinCoreConstants::get().SERVER_RECV, ann.value());
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
@@ -132,7 +132,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   // A CS annotation must have been added
   EXPECT_EQ(1ULL, child_span->annotations().size());
   ann = child_span->annotations()[0];
-  EXPECT_EQ(ZipkinCoreConstants::CLIENT_SEND, ann.value());
+  EXPECT_EQ(ZipkinCoreConstants::get().CLIENT_SEND, ann.value());
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
@@ -166,7 +166,7 @@ TEST(ZipkinTracerTest, finishSpan) {
 
   // Check the CS annotation added at span-creation time
   Annotation ann = span->annotations()[0];
-  EXPECT_EQ(ZipkinCoreConstants::CLIENT_SEND, ann.value());
+  EXPECT_EQ(ZipkinCoreConstants::get().CLIENT_SEND, ann.value());
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   Endpoint endpoint = ann.endpoint();
@@ -174,7 +174,7 @@ TEST(ZipkinTracerTest, finishSpan) {
 
   // Check the CR annotation added when ending the span
   ann = span->annotations()[1];
-  EXPECT_EQ(ZipkinCoreConstants::CLIENT_RECV, ann.value());
+  EXPECT_EQ(ZipkinCoreConstants::get().CLIENT_RECV, ann.value());
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
@@ -201,7 +201,7 @@ TEST(ZipkinTracerTest, finishSpan) {
 
   // Check the SR annotation added at span-creation time
   ann = server_side->annotations()[0];
-  EXPECT_EQ(ZipkinCoreConstants::SERVER_RECV, ann.value());
+  EXPECT_EQ(ZipkinCoreConstants::get().SERVER_RECV, ann.value());
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
@@ -209,7 +209,7 @@ TEST(ZipkinTracerTest, finishSpan) {
 
   // Check the SS annotation added when ending the span
   ann = server_side->annotations()[1];
-  EXPECT_EQ(ZipkinCoreConstants::SERVER_SEND, ann.value());
+  EXPECT_EQ(ZipkinCoreConstants::get().SERVER_SEND, ann.value());
   EXPECT_NE(0ULL, ann.timestamp()); // annotation's timestamp must be set
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();

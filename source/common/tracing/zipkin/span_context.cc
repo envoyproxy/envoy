@@ -49,8 +49,9 @@ static const std::string& spanContextRegexStr() {
   static const std::string* span_context_regex_str = new std::string(
       "^" + hexDigitGroupRegexStr() + fieldSeparator() + hexDigitGroupRegexStr() +
       fieldSeparator() + hexDigitGroupRegexStr() + "((" + fieldSeparator() + "(" +
-      ZipkinCoreConstants::CLIENT_SEND + "|" + ZipkinCoreConstants::SERVER_RECV + "|" +
-      ZipkinCoreConstants::CLIENT_RECV + "|" + ZipkinCoreConstants::SERVER_SEND + "))*)$");
+      ZipkinCoreConstants::get().CLIENT_SEND + "|" + ZipkinCoreConstants::get().SERVER_RECV + "|" +
+      ZipkinCoreConstants::get().CLIENT_RECV + "|" + ZipkinCoreConstants::get().SERVER_SEND +
+      "))*)$");
 
   return *span_context_regex_str;
 }
@@ -74,13 +75,13 @@ SpanContext::SpanContext(const Span& span) {
   parent_id_ = span.isSetParentId() ? span.parentId() : 0;
 
   for (const Annotation& annotation : span.annotations()) {
-    if (annotation.value() == ZipkinCoreConstants::CLIENT_RECV) {
+    if (annotation.value() == ZipkinCoreConstants::get().CLIENT_RECV) {
       annotation_values_.cr_ = true;
-    } else if (annotation.value() == ZipkinCoreConstants::CLIENT_SEND) {
+    } else if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
       annotation_values_.cs_ = true;
-    } else if (annotation.value() == ZipkinCoreConstants::SERVER_RECV) {
+    } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
       annotation_values_.sr_ = true;
-    } else if (annotation.value() == ZipkinCoreConstants::SERVER_SEND) {
+    } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_SEND) {
       annotation_values_.ss_ = true;
     }
   }
@@ -98,16 +99,16 @@ const std::string SpanContext::serializeToString() {
            parentIdAsHexString();
 
   if (annotation_values_.cr_) {
-    result += fieldSeparator() + ZipkinCoreConstants::CLIENT_RECV;
+    result += fieldSeparator() + ZipkinCoreConstants::get().CLIENT_RECV;
   }
   if (annotation_values_.cs_) {
-    result += fieldSeparator() + ZipkinCoreConstants::CLIENT_SEND;
+    result += fieldSeparator() + ZipkinCoreConstants::get().CLIENT_SEND;
   }
   if (annotation_values_.sr_) {
-    result += fieldSeparator() + ZipkinCoreConstants::SERVER_RECV;
+    result += fieldSeparator() + ZipkinCoreConstants::get().SERVER_RECV;
   }
   if (annotation_values_.ss_) {
-    result += fieldSeparator() + ZipkinCoreConstants::SERVER_SEND;
+    result += fieldSeparator() + ZipkinCoreConstants::get().SERVER_SEND;
   }
 
   return result;
@@ -131,13 +132,13 @@ void SpanContext::populateFromString(const std::string& span_context_str) {
       std::vector<std::string> annotation_value_strings =
           StringUtil::split(matched_annotations, fieldSeparator());
       for (const std::string& annotation_value : annotation_value_strings) {
-        if (annotation_value == ZipkinCoreConstants::CLIENT_RECV) {
+        if (annotation_value == ZipkinCoreConstants::get().CLIENT_RECV) {
           annotation_values_.cr_ = true;
-        } else if (annotation_value == ZipkinCoreConstants::CLIENT_SEND) {
+        } else if (annotation_value == ZipkinCoreConstants::get().CLIENT_SEND) {
           annotation_values_.cs_ = true;
-        } else if (annotation_value == ZipkinCoreConstants::SERVER_RECV) {
+        } else if (annotation_value == ZipkinCoreConstants::get().SERVER_RECV) {
           annotation_values_.sr_ = true;
-        } else if (annotation_value == ZipkinCoreConstants::SERVER_SEND) {
+        } else if (annotation_value == ZipkinCoreConstants::get().SERVER_SEND) {
           annotation_values_.ss_ = true;
         }
       }

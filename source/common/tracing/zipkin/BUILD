@@ -11,7 +11,6 @@ envoy_cc_library(
         "span_context.cc",
         "tracer.cc",
         "util.cc",
-        "zipkin_core_constants.cc",
         "zipkin_core_types.cc",
     ],
     hdrs = [

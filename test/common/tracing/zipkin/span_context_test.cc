@@ -156,7 +156,7 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
 
   // Span context populated with trace id, id, parent id, and one annotation
   Annotation ann;
-  ann.setValue(ZipkinCoreConstants::SERVER_RECV);
+  ann.setValue(ZipkinCoreConstants::get().SERVER_RECV);
   span.addAnnotation(ann);
   SpanContext span_context_3(span);
   EXPECT_EQ(2722130815203937912ULL, span_context_3.trace_id());
@@ -173,7 +173,7 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
             span_context_3.serializeToString());
 
   // Span context populated with trace id, id, parent id, and two annotations
-  ann.setValue(ZipkinCoreConstants::SERVER_SEND);
+  ann.setValue(ZipkinCoreConstants::get().SERVER_SEND);
   span.addAnnotation(ann);
   SpanContext span_context_4(span);
   EXPECT_EQ(2722130815203937912ULL, span_context_4.trace_id());
@@ -190,7 +190,7 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
             span_context_4.serializeToString());
 
   // Span context populated with trace id, id, parent id, and three annotations
-  ann.setValue(ZipkinCoreConstants::CLIENT_SEND);
+  ann.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
   span.addAnnotation(ann);
   SpanContext span_context_5(span);
   EXPECT_EQ(2722130815203937912ULL, span_context_5.trace_id());
@@ -209,13 +209,13 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
   // Span context populated with trace id, id, parent id, and four annotations
   std::vector<Annotation> annotations;
   annotations.push_back(ann);
-  ann.setValue(ZipkinCoreConstants::SERVER_SEND);
+  ann.setValue(ZipkinCoreConstants::get().SERVER_SEND);
   annotations.push_back(ann);
-  ann.setValue(ZipkinCoreConstants::SERVER_RECV);
+  ann.setValue(ZipkinCoreConstants::get().SERVER_RECV);
   annotations.push_back(ann);
-  ann.setValue(ZipkinCoreConstants::CLIENT_RECV);
+  ann.setValue(ZipkinCoreConstants::get().CLIENT_RECV);
   annotations.push_back(ann);
-  ann.setValue(ZipkinCoreConstants::CLIENT_SEND);
+  ann.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
   annotations.push_back(ann);
   span.setAnnotations(annotations);
   SpanContext span_context_6(span);

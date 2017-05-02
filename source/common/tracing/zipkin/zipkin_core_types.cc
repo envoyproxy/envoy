@@ -238,7 +238,7 @@ void Span::finish() {
     ss.setEndpoint(annotations_[0].endpoint());
     ss.setTimestamp(std::chrono::duration_cast<std::chrono::microseconds>(
                         ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count());
-    ss.setValue(ZipkinCoreConstants::SERVER_SEND);
+    ss.setValue(ZipkinCoreConstants::get().SERVER_SEND);
     annotations_.push_back(std::move(ss));
   } else if (context.annotationSet().cs_ && !context.annotationSet().cr_) {
     // Need to set the CR annotation
@@ -248,7 +248,7 @@ void Span::finish() {
             ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
     cr.setEndpoint(annotations_[0].endpoint());
     cr.setTimestamp(stop_timestamp);
-    cr.setValue(ZipkinCoreConstants::CLIENT_RECV);
+    cr.setValue(ZipkinCoreConstants::get().CLIENT_RECV);
     annotations_.push_back(std::move(cr));
     const int64_t monotonic_stop_time =
         std::chrono::duration_cast<std::chrono::microseconds>(

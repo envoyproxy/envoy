@@ -87,11 +87,11 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   ann.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, ann.timestamp());
 
-  ann.setValue(ZipkinCoreConstants::CLIENT_SEND);
-  EXPECT_EQ(ZipkinCoreConstants::CLIENT_SEND, ann.value());
+  ann.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
+  EXPECT_EQ(ZipkinCoreConstants::get().CLIENT_SEND, ann.value());
 
   std::string expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
-                              ZipkinCoreConstants::CLIENT_SEND + R"("})";
+                              ZipkinCoreConstants::get().CLIENT_SEND + R"("})";
   EXPECT_EQ(expected_json, ann.toJson());
 
   // Test the copy-semantics flavor of setEndpoint
@@ -105,7 +105,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
   expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
-                  ZipkinCoreConstants::CLIENT_SEND +
+                  ZipkinCoreConstants::get().CLIENT_SEND +
                   R"(","endpoint":{"ipv4":)"
                   R"("127.0.0.1","port":3306,"serviceName":"my_service"}})";
   EXPECT_EQ(expected_json, ann.toJson());
@@ -120,7 +120,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
   expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
-                  ZipkinCoreConstants::CLIENT_SEND +
+                  ZipkinCoreConstants::get().CLIENT_SEND +
                   R"(","endpoint":{"ipv4":"192.168.1.1",)"
                   R"("port":5555,"serviceName":"my_service_2"}})";
   EXPECT_EQ(expected_json, ann.toJson());
@@ -133,10 +133,10 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   uint64_t timestamp =
       std::chrono::duration_cast<std::chrono::microseconds>(
           ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
-  Annotation ann(timestamp, ZipkinCoreConstants::CLIENT_SEND, ep);
+  Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
 
   EXPECT_EQ(timestamp, ann.timestamp());
-  EXPECT_EQ(ZipkinCoreConstants::CLIENT_SEND, ann.value());
+  EXPECT_EQ(ZipkinCoreConstants::get().CLIENT_SEND, ann.value());
   EXPECT_TRUE(ann.isSetEndpoint());
 
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
@@ -144,7 +144,7 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
             (const_cast<Endpoint&>(ann.endpoint())).toJson());
 
   std::string expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
-                              ZipkinCoreConstants::CLIENT_SEND +
+                              ZipkinCoreConstants::get().CLIENT_SEND +
                               R"(","endpoint":{"ipv4":"127.0.0.1",)"
                               R"("port":3306,"serviceName":"my_service"}})";
   EXPECT_EQ(expected_json, ann.toJson());
@@ -157,7 +157,7 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   uint64_t timestamp =
       std::chrono::duration_cast<std::chrono::microseconds>(
           ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
-  Annotation ann(timestamp, ZipkinCoreConstants::CLIENT_SEND, ep);
+  Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
   Annotation ann2(ann);
 
   EXPECT_EQ(ann.value(), ann2.value());
@@ -174,7 +174,7 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   uint64_t timestamp =
       std::chrono::duration_cast<std::chrono::microseconds>(
           ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
-  Annotation ann(timestamp, ZipkinCoreConstants::CLIENT_SEND, ep);
+  Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
   Annotation ann2 = ann;
 
   EXPECT_EQ(ann.value(), ann2.value());
@@ -347,7 +347,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
       Network::Address::parseInternetAddressAndPort("192.168.1.2:3306");
   endpoint.setAddress(addr);
 
-  ann.setValue(Zipkin::ZipkinCoreConstants::CLIENT_SEND);
+  ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_SEND);
   ann.setTimestamp(timestamp);
   ann.setEndpoint(endpoint);
 
@@ -355,7 +355,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   span.setAnnotations(annotations);
   EXPECT_EQ(1ULL, span.annotations().size());
 
-  bann.setKey(Zipkin::ZipkinCoreConstants::LOCAL_COMPONENT);
+  bann.setKey(Zipkin::ZipkinCoreConstants::get().LOCAL_COMPONENT);
   bann.setValue("my_component_name");
   bann.setEndpoint(endpoint);
 
@@ -378,7 +378,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
 
-  ann.setValue(Zipkin::ZipkinCoreConstants::SERVER_SEND);
+  ann.setValue(Zipkin::ZipkinCoreConstants::get().SERVER_SEND);
   span.addAnnotation(ann);
   bann.setKey("http.return_code");
   bann.setValue("200");
@@ -389,7 +389,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 
   // Test the move-semantics flavor of addAnnotation and addBinaryAnnotation
 
-  ann.setValue(Zipkin::ZipkinCoreConstants::SERVER_RECV);
+  ann.setValue(Zipkin::ZipkinCoreConstants::get().SERVER_RECV);
   span.addAnnotation(std::move(ann));
   bann.setKey("http.return_code");
   bann.setValue("400");
