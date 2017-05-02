@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "backtrace_lib",
     hdrs = ["backtrace.h"],
     external_deps = ["backward"],
+    tags = ["backtrace"],
     deps = ["//source/common/common:logger_lib"],
 )
 
