@@ -30,8 +30,10 @@
   fiasco](https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use) for
   how to best handle this.
 * API-level comments should follow normal Doxygen conventions. Use `@param` to describe
-  parameters, `@return <return-type>` for return values. Internal comments for
-  methods and member variables should be regular C++ `//` comments.
+  parameters and `@return <return-type>` for return values. Internal comments for
+  methods and member variables may be regular C++ `//` comments or Doxygen at
+  developer discretion. Where possible, methods should have meaningful
+  documentation on expected input and state preconditions.
 * Header guards should use `#pragma once`.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
