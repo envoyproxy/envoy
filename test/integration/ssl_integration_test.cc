@@ -113,7 +113,8 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn, bool san)
   }
   Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(target);
   ContextConfigImpl cfg(*loader);
-  return context_manager_->createSslClientContext(test_server_->store(), cfg);
+  static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
+  return context_manager_->createSslClientContext(*client_stats_store, cfg);
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn, bool san) {
