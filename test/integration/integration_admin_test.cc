@@ -9,7 +9,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-INSTANTIATE_TEST_CASE_P(IntegrationTestIpVersions, IntegrationTest,
+INSTANTIATE_TEST_CASE_P(AdminIntegrationTestIpVersions, IntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(IntegrationTest, HealthCheck) {
