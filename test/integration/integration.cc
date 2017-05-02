@@ -283,10 +283,17 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
+                                           const Network::Address::IpVersion version,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map()));
+      TestEnvironment::temporaryFileSubstitute(json_path, version, port_map()));
   registerTestServerPorts(port_names);
+}
+
+// TODO(hennna): Depricate when IPv6 test support is finished.
+void BaseIntegrationTest::createTestServer(const std::string& json_path,
+                                           const std::vector<std::string>& port_names) {
+  BaseIntegrationTest::createTestServer(json_path, Network::Address::IpVersion::v4, port_names);
 }
 
 void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,

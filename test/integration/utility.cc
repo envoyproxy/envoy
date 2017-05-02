@@ -17,6 +17,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -81,16 +82,22 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   return response;
 }
 
-RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
+RawConnectionDriver::RawConnectionDriver(uint32_t port, Network::Address::IpVersion version,
+                                         Buffer::Instance& initial_data,
                                          ReadCallback data_callback) {
   api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
   dispatcher_ = api_->allocateDispatcher();
-  client_ = dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", port)));
+  client_ = dispatcher_->createClientConnection(Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressString(version), port)));
   client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
   client_->write(initial_data);
   client_->connect();
 }
+
+// TODO(hennna): Deprecate when IPv6 test support is finished.
+RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
+                                         ReadCallback data_callback)
+    : RawConnectionDriver(port, Network::Address::IpVersion::v4, initial_data, data_callback) {}
 
 RawConnectionDriver::~RawConnectionDriver() {}
 

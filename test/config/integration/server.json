@@ -1,7 +1,7 @@
 {
   "listeners": [
   {
-    "address": "tcp://127.0.0.1:0",
+    "address": "tcp://{{ ip_loopback_address }}:0",
     "use_original_dst": true,
     "filters": [
       { "type": "read", "name": "ratelimit",

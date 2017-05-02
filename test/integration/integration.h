@@ -171,7 +171,11 @@ public:
   static std::string substitutePorts(const std::string& json_path);
 
   static void registerTestServerPorts(const std::vector<std::string>& port_names);
+  // TODO(hennna): Deprecate when IPv6 test support is finished.
   static void createTestServer(const std::string& json_path,
+                               const std::vector<std::string>& port_names);
+  static void createTestServer(const std::string& json_path,
+                               const Network::Address::IpVersion version,
                                const std::vector<std::string>& port_names);
 
   static IntegrationTestServerPtr test_server_;

@@ -91,8 +91,7 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   // TODO(mattklein123): We still support the legacy tcp:// and unix:// names. We should
   // support/parse ip:// and pipe:// as better names.
   if (url.find(TCP_SCHEME) == 0) {
-    return Address::InstanceConstSharedPtr{
-        new Address::Ipv4Instance(hostFromTcpUrl(url), portFromTcpUrl(url))};
+    return Address::parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
   } else if (url.find(UNIX_SCHEME) == 0) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
