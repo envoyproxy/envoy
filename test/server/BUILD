@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "backtrace_test",
     srcs = ["backtrace_test.cc"],
+    tags = ["backtrace"],
     deps = ["//source/server:backtrace_lib"],
 )
 

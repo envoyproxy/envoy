@@ -80,6 +80,7 @@ envoy_cc_library(
     name = "sigaction_lib",
     srcs = ["signal_action.cc"],
     hdrs = ["signal_action.h"],
+    tags = ["backtrace"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:non_copyable",
