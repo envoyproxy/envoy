@@ -121,17 +121,17 @@ void FakeStream::waitForReset() {
   }
 }
 
-FakeHttpConnection::FakeHttpConnection(Network::Connection& connection, Stats::Store& store,
-                                       Type type)
-    : FakeConnectionBase(connection) {
+FakeHttpConnection::FakeHttpConnection(QueuedConnectionWrapperPtr connection_wrapper,
+                                       Stats::Store& store, Type type)
+    : FakeConnectionBase(std::move(connection_wrapper)) {
   if (type == Type::HTTP1) {
-    codec_.reset(new Http::Http1::ServerConnectionImpl(connection, *this));
+    codec_.reset(new Http::Http1::ServerConnectionImpl(connection_, *this));
   } else {
-    codec_.reset(new Http::Http2::ServerConnectionImpl(connection, *this, store, 0));
+    codec_.reset(new Http::Http2::ServerConnectionImpl(connection_, *this, store, 0));
     ASSERT(type == Type::HTTP2);
   }
 
-  connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+  connection_.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
 }
 
 void FakeConnectionBase::close() {
@@ -147,7 +147,18 @@ void FakeConnectionBase::close() {
 }
 
 void FakeConnectionBase::readDisable(bool disable) {
-  connection_.dispatcher().post([this, disable]() -> void { connection_.readDisable(disable); });
+  std::unique_lock<std::mutex> lock(lock_);
+  if (!disconnected_) {
+    connection_.dispatcher().post([this, disable]() -> void {
+      if (!disconnected_) {
+        connection_.readDisable(disable);
+      }
+    });
+  } else {
+    // Someone has tried to disable a connection which is in the disconnected
+    // state, so something bad has happened.
+    NOT_IMPLEMENTED;
+  }
 }
 
 Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {
@@ -227,7 +238,7 @@ FakeUpstream::~FakeUpstream() {
 bool FakeUpstream::createFilterChain(Network::Connection& connection) {
   std::unique_lock<std::mutex> lock(lock_);
   connection.readDisable(true);
-  new_connections_.push_back(&connection);
+  new_connections_.emplace_back(new QueuedConnectionWrapper(connection));
   new_connection_event_.notify_one();
   return true;
 }
@@ -259,9 +270,9 @@ FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& cli
 
   ASSERT(!new_connections_.empty());
   FakeHttpConnectionPtr connection(
-      new FakeHttpConnection(*new_connections_.front(), stats_store_, http_type_));
-  connection->readDisable(false);
+      new FakeHttpConnection(std::move(new_connections_.front()), stats_store_, http_type_));
   new_connections_.pop_front();
+  connection->readDisable(false);
   return connection;
 }
 
@@ -273,9 +284,9 @@ FakeRawConnectionPtr FakeUpstream::waitForRawConnection() {
   }
 
   ASSERT(!new_connections_.empty());
-  FakeRawConnectionPtr connection(new FakeRawConnection(*new_connections_.front()));
-  connection->readDisable(false);
+  FakeRawConnectionPtr connection(new FakeRawConnection(std::move(new_connections_.front())));
   new_connections_.pop_front();
+  connection->readDisable(false);
   return connection;
 }
 

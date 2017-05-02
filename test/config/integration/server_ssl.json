@@ -96,7 +96,7 @@
     "clusters": [
     {
       "name": "cluster_1",
-      "connect_timeout_ms": 250,
+      "connect_timeout_ms": 5000,
       "ssl_context": {
         "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem",
         "verify_subject_alt_name": [ "foo.lyft.com" ]
@@ -107,7 +107,7 @@
     },
     {
       "name": "cluster_2",
-      "connect_timeout_ms": 250,
+      "connect_timeout_ms": 5000,
       "ssl_context": {
         "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem",
         "verify_subject_alt_name": [ "foo.lyft.com" ]

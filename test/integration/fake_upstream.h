@@ -70,6 +70,35 @@ private:
 typedef std::unique_ptr<FakeStream> FakeStreamPtr;
 
 /**
+ * Wraps a raw Network::Connection in a safe way, such that the connection can
+ * be placed in a queue for an arbitrary amount of time. It handles disconnects
+ * that take place in the queued state by failing the test. Once a
+ * QueuedConnectionWrapper object is instantiated by FakeHttpConnection or
+ * FakeRawConnection, it no longer plays a role.
+ */
+class QueuedConnectionWrapper : public Network::ConnectionCallbacks {
+public:
+  QueuedConnectionWrapper(Network::Connection& connection)
+      : connection_(connection), parented_(false) {
+    connection_.addConnectionCallbacks(*this);
+  }
+  void set_parented() { parented_ = true; }
+  Network::Connection& connection() const { return connection_; }
+
+  // Network::ConnectionCallbacks
+  void onEvent(uint32_t events) {
+    RELEASE_ASSERT(parented_ || (!(events & Network::ConnectionEvent::RemoteClose) &&
+                                 !(events & Network::ConnectionEvent::LocalClose)));
+  }
+
+private:
+  Network::Connection& connection_;
+  bool parented_;
+};
+
+typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
+
+/**
  * Base class for both fake raw connections and fake HTTP connections.
  */
 class FakeConnectionBase : public Network::ConnectionCallbacks {
@@ -82,7 +111,10 @@ public:
   void onEvent(uint32_t events) override;
 
 protected:
-  FakeConnectionBase(Network::Connection& connection) : connection_(connection) {
+  FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)
+      : connection_(connection_wrapper->connection()),
+        connection_wrapper_(std::move(connection_wrapper)) {
+    connection_wrapper_->set_parented();
     connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
   }
 
@@ -90,6 +122,11 @@ protected:
   std::mutex lock_;
   std::condition_variable connection_event_;
   bool disconnected_{};
+
+private:
+  // We hold on to this as connection callbacks live for the entire life of the
+  // connection.
+  QueuedConnectionWrapperPtr connection_wrapper_;
 };
 
 /**
@@ -99,7 +136,7 @@ class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeCo
 public:
   enum class Type { HTTP1, HTTP2 };
 
-  FakeHttpConnection(Network::Connection& connection, Stats::Store& store, Type type);
+  FakeHttpConnection(QueuedConnectionWrapperPtr connection_wrapper, Stats::Store& store, Type type);
   Network::Connection& connection() { return connection_; }
   FakeStreamPtr waitForNewStream();
 
@@ -131,8 +168,9 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
  */
 class FakeRawConnection : Logger::Loggable<Logger::Id::testing>, public FakeConnectionBase {
 public:
-  FakeRawConnection(Network::Connection& connection) : FakeConnectionBase(connection) {
-    connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+  FakeRawConnection(QueuedConnectionWrapperPtr connection_wrapper)
+      : FakeConnectionBase(std::move(connection_wrapper)) {
+    connection_.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
   void waitForData(uint64_t num_bytes);
@@ -184,6 +222,6 @@ private:
   std::condition_variable new_connection_event_;
   Stats::IsolatedStoreImpl stats_store_;
   Server::ConnectionHandlerImpl handler_;
-  std::list<Network::Connection*> new_connections_;
+  std::list<QueuedConnectionWrapperPtr> new_connections_;
   FakeHttpConnection::Type http_type_;
 };
