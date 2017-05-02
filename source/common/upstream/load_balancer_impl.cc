@@ -44,11 +44,9 @@ void LoadBalancerBase::regenerateZoneRoutingStructures() {
   ASSERT(num_zones > 0);
 
   uint64_t local_percentage[num_zones];
-  memset(local_percentage, 0, sizeof(local_percentage));
   calculateZonePercentage(local_host_set_->healthyHostsPerZone(), local_percentage);
 
   uint64_t upstream_percentage[num_zones];
-  memset(upstream_percentage, 0, sizeof(upstream_percentage));
   calculateZonePercentage(host_set_.healthyHostsPerZone(), upstream_percentage);
 
   // If we have lower percent of hosts in the local cluster in the same zone,
@@ -145,11 +143,9 @@ void LoadBalancerBase::calculateZonePercentage(
     total_hosts += zone_hosts.size();
   }
 
-  if (total_hosts != 0) {
-    size_t i = 0;
-    for (const auto& zone_hosts : hosts_per_zone) {
-      ret[i++] = 10000ULL * zone_hosts.size() / total_hosts;
-    }
+  size_t i = 0;
+  for (const auto& zone_hosts : hosts_per_zone) {
+    ret[i++] = total_hosts > 0 ? 10000ULL * zone_hosts.size() / total_hosts : 0;
   }
 }
 
