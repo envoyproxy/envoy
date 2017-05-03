@@ -22,7 +22,7 @@ then
   # The script builds lyft/envoy-build and pushes that image when ci/build_container
   # has changed on a push to master.
   echo "lyft/envoy-build pushing..."
-  ./ci/docker_push_build.sh
+  ./ci/build_container/docker_push.sh
 else
   docker run -t -i -v "$ENVOY_BUILD_DIR":/build -v $TRAVIS_BUILD_DIR:/source \
     lyft/envoy-build:$ENVOY_BUILD_SHA /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"

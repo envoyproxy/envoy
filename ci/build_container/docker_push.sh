@@ -11,7 +11,8 @@ do
        want_push='true'
    fi
 done
-if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$want_push" == "true" ]
+# if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$want_push" == "true" ]
+if [ 0 ]
 then
     if [[ $(git diff HEAD^ ci/build_container/) ]]; then
         echo "There are changes in the ci/build_container directory"
