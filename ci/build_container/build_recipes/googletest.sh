@@ -1,7 +1,13 @@
+#!/bin/bash
+
 set -e
 
-wget -O googletest-1.8.0.tar.gz https://github.com/google/googletest/archive/release-1.8.0.tar.gz
-tar xf googletest-1.8.0.tar.gz
-cd googletest-release-1.8.0
+VERSION=release-1.8.0
+
+wget -O googletest-$VERSION.tar.gz https://github.com/google/googletest/archive/$VERSION.tar.gz
+tar xf googletest-$VERSION.tar.gz
+cd googletest-$VERSION
 cmake -DCMAKE_INSTALL_PREFIX:PATH=$THIRDPARTY_BUILD .
 make install
+cd ..
+rm -rf googletest-$VERSION*

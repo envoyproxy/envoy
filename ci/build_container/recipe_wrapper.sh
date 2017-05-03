@@ -1,3 +1,5 @@
+#!/bin/bash
+
 PS4='+ $(date "+%s.%N") '
 set -x
 

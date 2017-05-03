@@ -1,7 +1,13 @@
+#!/bin/bash
+
 set -e
 
-wget https://github.com/gperftools/gperftools/releases/download/gperftools-2.5/gperftools-2.5.tar.gz
-tar xf gperftools-2.5.tar.gz
-cd gperftools-2.5
+VERSION=2.5
+
+wget -O gperftools-$VERSION.tar.gz https://github.com/gperftools/gperftools/releases/download/gperftools-$VERSION/gperftools-$VERSION.tar.gz
+tar xf gperftools-$VERSION.tar.gz
+cd gperftools-$VERSION
 LDFLAGS="-lpthread" ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-frame-pointers
 make install
+cd ..
+rm -rf gperftools-$VERSION*

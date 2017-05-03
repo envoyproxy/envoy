@@ -1,6 +1,10 @@
+#!/bin/bash
+
 set -e
 
-wget -O gcovr-3.3.tar.gz https://github.com/gcovr/gcovr/archive/3.3.tar.gz
-tar xf gcovr-3.3.tar.gz
-rsync -av gcovr-3.3 $THIRDPARTY_SRC
-rm gcovr-3.3.tar.gz
+VERSION=3.3
+
+wget -O gcovr-$VERSION.tar.gz https://github.com/gcovr/gcovr/archive/$VERSION.tar.gz
+tar xf gcovr-$VERSION.tar.gz
+rsync -av gcovr-$VERSION $THIRDPARTY_SRC
+rm -rf gcovr-$VERSION*

@@ -1,5 +1,10 @@
+#!/bin/bash
+
 set -e
 
-wget -O rapidjson-1.1.0.tar.gz https://github.com/miloyip/rapidjson/archive/v1.1.0.tar.gz
-tar xf rapidjson-1.1.0.tar.gz
-rsync -av rapidjson-1.1.0 $THIRDPARTY_SRC
+VERSION=1.1.0
+
+wget -O rapidjson-$VERSION.tar.gz https://github.com/miloyip/rapidjson/archive/v$VERSION.tar.gz
+tar xf rapidjson-$VERSION.tar.gz
+rsync -av rapidjson-$VERSION $THIRDPARTY_SRC
+rm -rf rapidjson-$VERSION*
