@@ -92,9 +92,9 @@ public:
 
 private:
   /**
-   * Initialize tracers and corresponding sinks.
+   * Initialize tracer driver and corresponding sinks.
    */
-  void initializeTracers(const Json::Object& tracing_configuration);
+  void initializeTracerDriver(const Json::Object& tracing_configuration);
 
   /**
    * Maps JSON config to runtime config for a listener with network filter chain.

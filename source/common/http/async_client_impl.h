@@ -33,9 +33,10 @@ class AsyncRequestImpl;
 class AsyncClientImpl final : public AsyncClient {
 public:
   AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
-                  Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info,
-                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                  Runtime::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer);
+                  Tracing::HttpTracer& tracer, Event::Dispatcher& dispatcher,
+                  const LocalInfo::LocalInfo& local_info, Upstream::ClusterManager& cm,
+                  Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                  Router::ShadowWriterPtr&& shadow_writer);
   ~AsyncClientImpl();
 
   // Http::AsyncClient

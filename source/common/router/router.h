@@ -15,6 +15,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Router {
 
@@ -77,11 +78,11 @@ public:
 class FilterConfig {
 public:
   FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
-               Stats::Store& stats, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-               Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
-               bool emit_dynamic_stats)
+               Stats::Store& stats, Tracing::HttpTracer& tracer, Upstream::ClusterManager& cm,
+               Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+               ShadowWriterPtr&& shadow_writer, bool emit_dynamic_stats)
       : global_store_(stats), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
-        stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))},
+        stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(stats, stat_prefix))}, tracer_(tracer),
         emit_dynamic_stats_(emit_dynamic_stats), shadow_writer_(std::move(shadow_writer)) {}
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
@@ -92,6 +93,7 @@ public:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   FilterStats stats_;
+  Tracing::HttpTracer& tracer_;
   const bool emit_dynamic_stats_;
 
 private:

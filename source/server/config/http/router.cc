@@ -21,8 +21,8 @@ HttpFilterFactoryCb RouterFilterConfig::tryCreateFilterFactory(HttpFilterType ty
   json_config.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
 
   Router::FilterConfigSharedPtr config(new Router::FilterConfig(
-      stat_prefix, server.localInfo(), server.stats(), server.clusterManager(), server.runtime(),
-      server.random(),
+      stat_prefix, server.localInfo(), server.stats(), server.httpTracer(), server.clusterManager(),
+      server.runtime(), server.random(),
       Router::ShadowWriterPtr{new Router::ShadowWriterImpl(server.clusterManager())},
       json_config.getBoolean("dynamic_stats", true)));
 

@@ -14,6 +14,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -70,6 +71,7 @@ public:
   MOCK_METHOD0(createCds_, CdsApi*());
 
   Stats::IsolatedStoreImpl stats_;
+  NiceMock<Tracing::MockHttpTracer> tracer_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Network::MockDnsResolver> dns_resolver_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -82,9 +84,9 @@ public:
 class ClusterManagerImplTest : public testing::Test {
 public:
   void create(const Json::Object& config) {
-    cluster_manager_.reset(new ClusterManagerImpl(config, factory_, factory_.stats_, factory_.tls_,
-                                                  factory_.runtime_, factory_.random_,
-                                                  factory_.local_info_, log_manager_));
+    cluster_manager_.reset(new ClusterManagerImpl(
+        config, factory_, factory_.stats_, factory_.tracer_, factory_.tls_, factory_.runtime_,
+        factory_.random_, factory_.local_info_, log_manager_));
   }
 
   NiceMock<TestClusterManagerFactory> factory_;

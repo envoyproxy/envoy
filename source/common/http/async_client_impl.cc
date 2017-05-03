@@ -20,13 +20,13 @@ const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rat
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 
 AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
-                                 Event::Dispatcher& dispatcher,
+                                 Tracing::HttpTracer& tracer, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer)
-    : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
-                                 std::move(shadow_writer), true),
+    : cluster_(cluster), config_("http.async-client.", local_info, stats_store, tracer, cm, runtime,
+                                 random, std::move(shadow_writer), true),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {

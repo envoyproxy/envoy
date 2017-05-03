@@ -27,14 +27,14 @@ namespace Upstream {
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
   ProdClusterManagerFactory(Runtime::Loader& runtime, Stats::Store& stats,
-                            ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
-                            Network::DnsResolver& dns_resolver,
+                            Tracing::HttpTracer& tracer, ThreadLocal::Instance& tls,
+                            Runtime::RandomGenerator& random, Network::DnsResolver& dns_resolver,
                             Ssl::ContextManager& ssl_context_manager,
                             Event::Dispatcher& primary_dispatcher,
                             const LocalInfo::LocalInfo& local_info)
-      : runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
-        ssl_context_manager_(ssl_context_manager), primary_dispatcher_(primary_dispatcher),
-        local_info_(local_info) {}
+      : runtime_(runtime), stats_(stats), tracer_(tracer), tls_(tls), random_(random),
+        dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
+        primary_dispatcher_(primary_dispatcher), local_info_(local_info) {}
 
   // Upstream::ClusterManagerFactory
   Http::ConnectionPool::InstancePtr allocateConnPool(Event::Dispatcher& dispatcher,
@@ -48,6 +48,7 @@ public:
 private:
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
+  Tracing::HttpTracer& tracer_;
   ThreadLocal::Instance& tls_;
   Runtime::RandomGenerator& random_;
   Network::DnsResolver& dns_resolver_;
@@ -112,8 +113,9 @@ struct ClusterManagerStats {
 class ClusterManagerImpl : public ClusterManager {
 public:
   ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
-                     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                     Stats::Store& stats, Tracing::HttpTracer& tracer, ThreadLocal::Instance& tls,
+                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                     const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager);
 
   // Upstream::ClusterManager
@@ -218,6 +220,7 @@ private:
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
+  Tracing::HttpTracer& tracer_;
   ThreadLocal::Instance& tls_;
   Runtime::RandomGenerator& random_;
   uint32_t thread_local_slot_;

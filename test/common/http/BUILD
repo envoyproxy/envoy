@@ -25,6 +25,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
 )

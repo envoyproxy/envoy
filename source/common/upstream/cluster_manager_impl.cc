@@ -145,12 +145,13 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
 }
 
 ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManagerFactory& factory,
-                                       Stats::Store& stats, ThreadLocal::Instance& tls,
-                                       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                       Stats::Store& stats, Tracing::HttpTracer& tracer,
+                                       ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                                       Runtime::RandomGenerator& random,
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager)
-    : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls), random_(random),
-      thread_local_slot_(tls.allocateSlot()), local_info_(local_info),
+    : factory_(factory), runtime_(runtime), stats_(stats), tracer_(tracer), tls_(tls),
+      random_(random), thread_local_slot_(tls.allocateSlot()), local_info_(local_info),
       cm_stats_(generateStats(stats)) {
 
   config.validateSchema(Json::Schema::CLUSTER_MANAGER_SCHEMA);
@@ -480,9 +481,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::shutdown() {
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster)
     : parent_(parent), cluster_info_(cluster),
-      http_async_client_(*cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
-                         parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
-                         parent.parent_.random_,
+      http_async_client_(*cluster, parent.parent_.stats_, parent.parent_.tracer_,
+                         parent.thread_local_dispatcher_, parent.parent_.local_info_,
+                         parent.parent_, parent.parent_.runtime_, parent.parent_.random_,
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)}) {
 
   switch (cluster->lbType()) {

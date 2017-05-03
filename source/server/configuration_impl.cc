@@ -37,12 +37,15 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
 MainImpl::MainImpl(Server::Instance& server) : server_(server) {}
 
 void MainImpl::initialize(const Json::Object& json) {
+  Tracing::DriverPtr null_driver(new Tracing::NullDriver());
+  http_tracer_.reset(new Tracing::HttpTracerImpl(std::move(null_driver), server_.localInfo()));
+
   cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
-      server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
+      server_.runtime(), server_.stats(), *http_tracer_, server_.threadLocal(), server_.random(),
       server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
       server_.localInfo()));
   cluster_manager_.reset(new Upstream::ClusterManagerImpl(
-      *json.getObject("cluster_manager"), *cluster_manager_factory_, server_.stats(),
+      *json.getObject("cluster_manager"), *cluster_manager_factory_, server_.stats(), *http_tracer_,
       server_.threadLocal(), server_.runtime(), server_.random(), server_.localInfo(),
       server_.accessLogManager()));
 
@@ -74,7 +77,7 @@ void MainImpl::initialize(const Json::Object& json) {
   watchdog_multikill_timeout_ =
       std::chrono::milliseconds(json.getInteger("watchdog_multikill_timeout_ms", 0));
 
-  initializeTracers(json);
+  initializeTracerDriver(json);
 
   if (json.hasObject("rate_limit_service")) {
     Json::ObjectPtr rate_limit_service_config = json.getObject("rate_limit_service");
@@ -88,7 +91,7 @@ void MainImpl::initialize(const Json::Object& json) {
   }
 }
 
-void MainImpl::initializeTracers(const Json::Object& configuration) {
+void MainImpl::initializeTracerDriver(const Json::Object& configuration) {
   log().info("loading tracing configuration");
 
   if (!configuration.hasObject("tracing")) {
@@ -129,7 +132,7 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
       new Tracing::LightStepDriver(*lightstep_config, *cluster_manager_, server_.stats(),
                                    server_.threadLocal(), server_.runtime(), std::move(opts)));
 
-  http_tracer_.reset(new Tracing::HttpTracerImpl(std::move(lightstep_driver), server_.localInfo()));
+  http_tracer_->installDriver(std::move(lightstep_driver));
 }
 
 const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { return listeners_; }
