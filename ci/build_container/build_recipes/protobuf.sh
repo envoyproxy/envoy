@@ -10,5 +10,3 @@ rsync -av protobuf-$VERSION/* $THIRDPARTY_SRC/protobuf
 cd protobuf-$VERSION
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no
 make install
-cd ..
-rm -rf protobuf-$VERSION*

@@ -9,5 +9,3 @@ tar xf gperftools-$VERSION.tar.gz
 cd gperftools-$VERSION
 LDFLAGS="-lpthread" ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-frame-pointers
 make install
-cd ..
-rm -rf gperftools-$VERSION*

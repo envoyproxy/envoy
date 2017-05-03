@@ -9,5 +9,3 @@ tar xf libevent-$VERSION.tar.gz
 cd libevent-$VERSION
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --disable-libevent-regress --disable-openssl
 make install
-cd ..
-rm -rf libevent-$VERSION*

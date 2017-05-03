@@ -9,5 +9,3 @@ tar xf googletest-$VERSION.tar.gz
 cd googletest-$VERSION
 cmake -DCMAKE_INSTALL_PREFIX:PATH=$THIRDPARTY_BUILD .
 make install
-cd ..
-rm -rf googletest-$VERSION*

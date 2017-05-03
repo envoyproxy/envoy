@@ -12,5 +12,3 @@ make
 cp -r include/* $THIRDPARTY_BUILD/include
 cp ssl/libssl.a $THIRDPARTY_BUILD/lib
 cp crypto/libcrypto.a $THIRDPARTY_BUILD/lib
-cd ..
-rm -rf boringssl

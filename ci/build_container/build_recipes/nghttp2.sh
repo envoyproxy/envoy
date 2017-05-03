@@ -9,5 +9,3 @@ tar xf nghttp2-$VERSION.tar.gz
 cd nghttp2-$VERSION
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-lib-only
 make install
-cd ..
-rm -rf nghttp2-$VERSION*
