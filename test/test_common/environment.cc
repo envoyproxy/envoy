@@ -143,7 +143,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   // Substitute IP loopback addresses.
   const std::regex loopback_address_regex("\\{\\{ ip_loopback_address \\}\\}");
   out_json_string = std::regex_replace(out_json_string, loopback_address_regex,
-                                       Network::Test::getLoopbackAddressString(version));
+                                       Network::Test::getLoopbackAddressUrlString(version));
 
   // Substitute paths.
   out_json_string = substitute(out_json_string);

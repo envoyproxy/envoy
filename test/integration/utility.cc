@@ -88,7 +88,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Network::Address::IpVers
   api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
   dispatcher_ = api_->allocateDispatcher();
   client_ = dispatcher_->createClientConnection(Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressString(version), port)));
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
   client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
   client_->write(initial_data);
   client_->connect();
