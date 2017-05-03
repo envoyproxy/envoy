@@ -1,14 +1,7 @@
-## Steps to publish new image for Envoy 3rd party dependencies
+Envoy's CI has a build run called `build_image`. On a commit to master, `ci/build_container/docker_push.sh`
+checks if the commit has changed the `ci/build_container` directory. If there are changes, CI builds a new `lyft/envoy-build`
+image. The image is pushed to dockerhub under `latest` and under the commit sha.
 
-*Currently this can be done only by Envoy team*
-
-After you have made changes to `build_container.sh` and merge them to master:
-
-1.  Checkout master and pull latest changes.
-2.  From `~/envoy/ci/build_container` run `update_build_container.sh`. **Make sure to have
-    DOCKER_USERNAME and DOCKER_PASSWORD environment variables set**. This script will build
-    the envoy-build container with the current state of `build_container.sh`, tag the image, and push it to Dockerhub:
-    ```
-    ~/envoy/ci/build_container $ DOCKER_USERNAME=user DOCKER_PASSWORD=pass ./update_build_container.sh
-    ```
-3.  After you have done that, update `ci/ci_steps.sh` in a new PR to pull the new tagged version of `lyft/envoy-build` during CI runs by updating the `ENVOY_BUILD_SHA` variable. Any PRs that depend on this image change will have to merge master after the change to `ci/ci_steps.sh` has been merged to master.
+After the PR that changes `ci/build_container` has been merged, and the new image gets pushed,
+a second PR is needed to update `ci/ci_steps.sh`. In order to pull the new tagged version of
+the build image, change ENVOY_BUILD_SHA [here](https://github.com/lyft/envoy/blob/master/ci/ci_steps.sh#L2). Any PRs that depend on this image change will have to merge master after the change to ci/ci_steps.sh has been merged to master.
