@@ -52,7 +52,7 @@ elif [[ "$1" == "bazel.dev" ]]; then
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   echo "bazel coverage build with tests..."
-  export GCOVR="/thirdparty/gcovr/scripts/gcovr"
+  export GCOVR="/thirdparty/gcovr-3.3/scripts/gcovr"
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
   export BUILDIFIER_BIN="/usr/lib/go/bin/buildifier"
