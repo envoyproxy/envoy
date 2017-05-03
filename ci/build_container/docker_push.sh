@@ -13,8 +13,7 @@ do
        want_push='true'
    fi
 done
-# if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$want_push" == "true" ]
-if [ 0 ]
+if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$want_push" == "true" ]
 then
     if [[ $(git diff HEAD^ ci/build_container/) ]]; then
         echo "There are changes in the ci/build_container directory"
@@ -22,9 +21,9 @@ then
         cd ci/build_container
         ./docker_build.sh
         docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD
-        # docker push lyft/envoy-build:$TRAVIS_COMMIT
-        docker tag lyft/envoy-build:$TRAVIS_COMMIT lyft/envoy-build-test:latest
-        docker push lyft/envoy-build-test:latest
+        docker push lyft/envoy-build:$TRAVIS_COMMIT
+        docker tag lyft/envoy-build:$TRAVIS_COMMIT lyft/envoy-build:latest
+        docker push lyft/envoy-build:latest
     else
         echo "The ci/build_container directory has not changed"
     fi
