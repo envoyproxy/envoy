@@ -1,5 +1,8 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+
 #include "envoy/http/access_log.h"
 
 namespace Http {

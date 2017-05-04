@@ -1,5 +1,10 @@
 #pragma once
 
+#include <atomic>
+#include <cstdint>
+#include <list>
+#include <vector>
+
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"

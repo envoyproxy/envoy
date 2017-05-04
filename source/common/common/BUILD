@@ -1,11 +1,19 @@
-package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
 
 envoy_cc_library(
     name = "assert_lib",
     hdrs = ["assert.h"],
-    deps = [":logger_lib"],
+    deps = [
+        ":logger_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -67,6 +75,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "singleton",
+    hdrs = ["singleton.h"],
+)
+
+envoy_cc_library(
     name = "stl_helpers",
     hdrs = ["stl_helpers.h"],
 )
@@ -97,8 +110,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
+    linkstamp = "version_linkstamp.cc",
     deps = [
         ":version_includes",
-        "//:version_generated",
     ],
+)
+
+envoy_cc_library(
+    name = "to_lower_table_lib",
+    srcs = ["to_lower_table.cc"],
+    hdrs = ["to_lower_table.h"],
 )

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/http/header_map.h"
 
 #include "common/json/json_loader.h"

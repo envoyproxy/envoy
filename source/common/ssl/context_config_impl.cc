@@ -1,19 +1,16 @@
 #include "common/ssl/context_config_impl.h"
 
-#include "openssl/ssl.h"
+#include <string>
 
 namespace Ssl {
 
 const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
-#ifdef OPENSSL_IS_BORINGSSL
     "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
     "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
-#else
-    "ECDHE-ECDSA-AES128-GCM-SHA256:"
-    "ECDHE-RSA-AES128-GCM-SHA256:"
-#endif
     "ECDHE-ECDSA-AES128-SHA256:"
     "ECDHE-RSA-AES128-SHA256:"
+    "ECDHE-ECDSA-AES128-SHA:"
+    "ECDHE-RSA-AES128-SHA:"
     "AES128-GCM-SHA256:"
     "AES128-SHA256:"
     "AES128-SHA:"
@@ -21,6 +18,8 @@ const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "ECDHE-RSA-AES256-GCM-SHA384:"
     "ECDHE-ECDSA-AES256-SHA384:"
     "ECDHE-RSA-AES256-SHA384:"
+    "ECDHE-ECDSA-AES256-SHA:"
+    "ECDHE-RSA-AES256-SHA:"
     "AES256-GCM-SHA384:"
     "AES256-SHA256:"
     "AES256-SHA";

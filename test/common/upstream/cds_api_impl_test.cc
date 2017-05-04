@@ -1,10 +1,18 @@
+#include <chrono>
+#include <string>
+#include <vector>
+
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/upstream/cds_api_impl.h"
 
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -29,7 +37,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::LoadFromString(config_json);
+    Json::ObjectPtr config = Json::Factory::loadFromString(config_json);
     cds_ = CdsApiImpl::create(*config, cm_, dispatcher_, random_, local_info_, store_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
@@ -91,7 +99,7 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(config_json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(config_json);
   local_info_.cluster_name_ = "";
   local_info_.node_name_ = "";
   EXPECT_THROW(CdsApiImpl::create(*config, cm_, dispatcher_, random_, local_info_, store_),

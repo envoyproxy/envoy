@@ -1,6 +1,9 @@
+#include <string>
+#include <vector>
+
 #include "common/buffer/buffer_impl.h"
-#include "common/filter/tcp_proxy.h"
 #include "common/filter/ratelimit.h"
+#include "common/filter/tcp_proxy.h"
 #include "common/network/filter_manager_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -12,6 +15,10 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -109,7 +116,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   ON_CALL(runtime.snapshot_, featureEnabled("ratelimit.tcp_filter_enforcing", 100))
       .WillByDefault(Return(true));
 
-  Json::ObjectPtr rl_config_loader = Json::Factory::LoadFromString(rl_json);
+  Json::ObjectPtr rl_config_loader = Json::Factory::loadFromString(rl_json);
 
   RateLimit::TcpFilter::ConfigSharedPtr rl_config(
       new RateLimit::TcpFilter::Config(*rl_config_loader, stats_store, runtime));
@@ -130,7 +137,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
     }
     )EOF";
 
-  Json::ObjectPtr tcp_proxy_config_loader = Json::Factory::LoadFromString(tcp_proxy_json);
+  Json::ObjectPtr tcp_proxy_config_loader = Json::Factory::loadFromString(tcp_proxy_json);
   ::Filter::TcpProxyConfigSharedPtr tcp_proxy_config(
       new ::Filter::TcpProxyConfig(*tcp_proxy_config_loader, cm, stats_store));
   manager.addReadFilter(ReadFilterSharedPtr{new ::Filter::TcpProxy(tcp_proxy_config, cm)});

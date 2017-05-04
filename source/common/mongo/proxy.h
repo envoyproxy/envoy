@@ -1,5 +1,11 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/time.h"
 #include "envoy/mongo/codec.h"
@@ -30,6 +36,7 @@ namespace Mongo {
   COUNTER(op_query_no_cursor_timeout)                                                              \
   COUNTER(op_query_await_data)                                                                     \
   COUNTER(op_query_exhaust)                                                                        \
+  COUNTER(op_query_no_max_time)                                                                    \
   COUNTER(op_query_scatter_get)                                                                    \
   COUNTER(op_query_multi_get)                                                                      \
   GAUGE  (op_query_active)                                                                         \
@@ -55,7 +62,7 @@ class AccessLog {
 public:
   AccessLog(const std::string& file_name, ::AccessLog::AccessLogManager& log_manager);
 
-  void logMessage(const Message& message, const std::string& base64, bool full,
+  void logMessage(const Message& message, bool full,
                   const Upstream::HostDescription* upstream_host);
 
 private:
@@ -91,7 +98,6 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data) override;
 
   // Mongo::DecoderCallback
-  void decodeBase64(std::string&& message) override { last_base64_op_ = std::move(message); }
   void decodeGetMore(GetMoreMessagePtr&& message) override;
   void decodeInsert(InsertMessagePtr&& message) override;
   void decodeKillCursors(KillCursorsMessagePtr&& message) override;
@@ -104,7 +110,7 @@ public:
 private:
   struct ActiveQuery {
     ActiveQuery(ProxyFilter& parent, const QueryMessage& query)
-        : parent_(parent), query_info_(query), start_time_(std::chrono::system_clock::now()) {
+        : parent_(parent), query_info_(query), start_time_(std::chrono::steady_clock::now()) {
       parent_.stats_.op_query_active_.inc();
     }
 
@@ -112,7 +118,7 @@ private:
 
     ProxyFilter& parent_;
     QueryMessageInfo query_info_;
-    SystemTime start_time_;
+    MonotonicTime start_time_;
   };
 
   typedef std::unique_ptr<ActiveQuery> ActiveQueryPtr;
@@ -139,7 +145,6 @@ private:
   bool sniffing_{true};
   std::list<ActiveQueryPtr> active_query_list_;
   AccessLogSharedPtr access_log_;
-  std::string last_base64_op_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 

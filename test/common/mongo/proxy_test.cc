@@ -1,3 +1,8 @@
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "common/mongo/bson_impl.h"
 #include "common/mongo/codec_impl.h"
 #include "common/mongo/proxy.h"
@@ -8,6 +13,10 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -103,6 +112,7 @@ TEST_F(MongoProxyFilterTest, Stats) {
   EXPECT_EQ(1U, store_.counter("test.op_query_no_cursor_timeout").value());
   EXPECT_EQ(1U, store_.counter("test.op_query_await_data").value());
   EXPECT_EQ(1U, store_.counter("test.op_query_exhaust").value());
+  EXPECT_EQ(1U, store_.counter("test.op_query_no_max_time").value());
   EXPECT_EQ(1U, store_.counter("test.op_query_scatter_get").value());
 
   EXPECT_EQ(1U, store_.counter("test.collection.test.query.total").value());
@@ -234,6 +244,20 @@ TEST_F(MongoProxyFilterTest, MultiGet) {
 
   EXPECT_EQ(1U, store_.counter("test.op_query_multi_get").value());
   EXPECT_EQ(1U, store_.counter("test.collection.test.query.multi_get").value());
+}
+
+TEST_F(MongoProxyFilterTest, MaxTime) {
+  EXPECT_CALL(*filter_->decoder_, onData(_))
+      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
+        QueryMessagePtr message(new QueryMessageImpl(0, 0));
+        message->fullCollectionName("db.test");
+        message->flags(0b1110010);
+        message->query(Bson::DocumentImpl::create()->addInt32("$maxTimeMS", 100));
+        filter_->callbacks_->decodeQuery(std::move(message));
+      }));
+  filter_->onData(fake_data_);
+
+  EXPECT_EQ(0U, store_.counter("test.op_query_no_max_time").value());
 }
 
 TEST_F(MongoProxyFilterTest, DecodeError) {

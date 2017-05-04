@@ -1,5 +1,7 @@
 #include "common/upstream/host_utility.h"
 
+#include <string>
+
 namespace Upstream {
 
 std::string HostUtility::healthFlagsToString(const Host& host) {

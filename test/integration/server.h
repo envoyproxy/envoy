@@ -1,15 +1,25 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <string>
+
 #include "envoy/server/options.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/stats/stats_impl.h"
+
 #include "server/server.h"
 #include "server/test_hooks.h"
 
 #include "test/test_common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 
@@ -24,6 +34,7 @@ public:
   uint64_t baseId() override { return 0; }
   uint32_t concurrency() override { return 1; }
   const std::string& configPath() override { return config_path_; }
+  const std::string& adminAddressPath() override { return admin_address_path_; }
   std::chrono::seconds drainTime() override { return std::chrono::seconds(0); }
   spdlog::level::level_enum logLevel() override { NOT_IMPLEMENTED; }
   std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(0); }
@@ -34,6 +45,7 @@ public:
 
 private:
   const std::string config_path_;
+  const std::string admin_address_path_;
 };
 
 class TestDrainManager : public DrainManager {

@@ -2,6 +2,8 @@
 
 #include "common/event/dispatcher_impl.h"
 
+#include "gtest/gtest.h"
+
 TEST_F(UdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP1, 1024, 512, false);

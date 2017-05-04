@@ -1,5 +1,9 @@
 #include "common/grpc/codec.h"
 
+#include <array>
+#include <cstdint>
+#include <vector>
+
 #include "common/buffer/buffer_impl.h"
 
 namespace Grpc {

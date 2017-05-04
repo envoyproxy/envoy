@@ -1,8 +1,14 @@
 #pragma once
 
+#include <condition_variable>
+#include <cstdint>
+#include <string>
+
 #include "envoy/filesystem/filesystem.h"
 
 #include "common/common/thread.h"
+
+#include "gmock/gmock.h"
 
 namespace Filesystem {
 

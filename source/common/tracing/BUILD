@@ -1,16 +1,24 @@
-package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
 
 envoy_cc_library(
     name = "http_tracer_lib",
     srcs = [
         "http_tracer_impl.cc",
         "lightstep_tracer_impl.cc",
+        "zipkin_tracer_impl.cc",
     ],
     hdrs = [
         "http_tracer_impl.h",
         "lightstep_tracer_impl.h",
+        "zipkin_tracer_impl.h",
     ],
     external_deps = ["lightstep"],
     deps = [
@@ -31,6 +39,6 @@ envoy_cc_library(
         "//source/common/http/access_log:access_log_formatter_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/runtime:uuid_util_lib",
-        "//source/zipkin:zipkin_lib",
+        "//source/common/tracing/zipkin:zipkin_lib",
     ],
 )

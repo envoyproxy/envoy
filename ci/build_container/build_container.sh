@@ -12,6 +12,11 @@ apt-get install -y gdb strace
 add-apt-repository -y ppa:ubuntu-toolchain-r/test
 apt-get update
 apt-get install -y g++-4.9
+# clang head (currently 5.0)
+wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial main"
+apt-get update
+apt-get install -y clang-5.0
 # Bazel and related dependencies.
 apt-get install -y openjdk-8-jdk curl
 echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
@@ -19,17 +24,6 @@ curl https://bazel.build/bazel-release.pub.gpg | apt-key add -
 apt-get update
 apt-get install -y bazel
 rm -rf /var/lib/apt/lists/*
-
-# Build a version of Bazel suitable for C++ code coverage collection. See
-# https://github.com/bazelbuild/bazel/issues/1118 for why we need this. This is the envoy-coverage
-# branch on the cloned repository.
-git clone https://github.com/htuch/bazel.git /tmp/bazel-coverage
-pushd /tmp/bazel-coverage
-git checkout 63f0542560773e973c9963845d5bbc30be75441a
-bazel build --spawn_strategy=standalone --genrule_strategy=standalone //src:bazel
-cp bazel-bin/src/bazel /usr/bin/bazel-coverage
-popd
-rm -rf /root/.cache /tmp/bazel-coverage
 
 # virtualenv
 pip install virtualenv

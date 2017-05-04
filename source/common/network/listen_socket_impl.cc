@@ -1,10 +1,17 @@
 #include "common/network/listen_socket_impl.h"
 
+#include <sys/socket.h>
+#include <sys/types.h>
+
+#include <string>
+
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Network {
 

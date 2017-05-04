@@ -1,6 +1,12 @@
-package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+    "envoy_package",
+)
+
+envoy_package()
 
 envoy_cc_test(
     name = "admin_test",
@@ -11,6 +17,7 @@ envoy_cc_test(
         "//source/server/http:admin_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

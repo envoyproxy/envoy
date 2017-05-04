@@ -1,5 +1,14 @@
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/common/utility.h"
+
 #include "server/options_impl.h"
+
+#include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
 // separated by a single space: no fancy quoting or escaping.
@@ -19,11 +28,12 @@ TEST(OptionsImplDeathTest, HotRestartVersion) {
 
 TEST(OptionsImplTest, All) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
-      "envoy --concurrency 2 -c hello --restart-epoch 1 -l info "
+      "envoy --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 -l info "
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 --drain-time-s 60 --parent-shutdown-time-s 90");
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
+  EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(1U, options->restartEpoch());
   EXPECT_EQ(spdlog::level::info, options->logLevel());
   EXPECT_EQ("cluster", options->serviceClusterName());
@@ -38,4 +48,5 @@ TEST(OptionsImplTest, DefaultParams) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
+  EXPECT_EQ("", options->adminAddressPath());
 }

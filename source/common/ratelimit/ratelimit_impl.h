@@ -1,16 +1,17 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/grpc/rpc_channel.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/tracing/context.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#ifdef BAZEL_BRINGUP
-#include "common/ratelimit/ratelimit.pb.h"
-#else
-#include "common/generated/ratelimit.pb.h"
-#endif
 #include "common/json/json_loader.h"
+#include "common/ratelimit/ratelimit.pb.h"
 
 namespace RateLimit {
 

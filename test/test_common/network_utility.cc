@@ -1,10 +1,19 @@
 #include "test/test_common/network_utility.h"
 
+#include <netinet/ip.h>
+#include <sys/socket.h>
+
+#include <cstdint>
+#include <string>
+
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
+
 #include "test/test_common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Network {
 namespace Test {

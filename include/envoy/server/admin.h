@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/codes.h"

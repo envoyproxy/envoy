@@ -1,3 +1,7 @@
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/headers.h"
@@ -12,6 +16,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -38,6 +46,14 @@ public:
     EXPECT_CALL(callbacks_, onSuccess_(_))
         .WillOnce(Invoke([code](Message* response) -> void {
           EXPECT_EQ(code, Utility::getResponseStatus(response->headers()));
+        }));
+  }
+
+  void expectResponseHeaders(MockAsyncClientStreamCallbacks& callbacks, uint64_t code,
+                             bool end_stream) {
+    EXPECT_CALL(callbacks, onHeaders_(_, end_stream))
+        .WillOnce(Invoke([code](HeaderMap& headers, bool) -> void {
+          EXPECT_EQ(std::to_string(code), headers.Status()->value().c_str());
         }));
   }
 
@@ -76,8 +92,7 @@ TEST_F(AsyncClientImplTest, BasicStream) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
 
-  TestHeaderMapImpl expected_headers{{":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
-  EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
+  expectResponseHeaders(stream_callbacks_, 200, false);
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
 
   AsyncClient::Stream* stream =
@@ -226,8 +241,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
 
-  TestHeaderMapImpl expected_headers{{":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
-  EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
+  expectResponseHeaders(stream_callbacks_, 200, false);
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
 
   AsyncClient::Stream* stream =
@@ -253,8 +267,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
   EXPECT_CALL(stream_encoder2, encodeHeaders(HeaderMapEqualRef(&headers2), false));
   EXPECT_CALL(stream_encoder2, encodeData(BufferEqual(body2.get()), true));
 
-  TestHeaderMapImpl expected_headers2{{":status", "503"}, {"x-envoy-upstream-service-time", "0"}};
-  EXPECT_CALL(stream_callbacks2, onHeaders_(HeaderMapEqualRef(&expected_headers2), true));
+  expectResponseHeaders(stream_callbacks2, 503, true);
 
   AsyncClient::Stream* stream2 =
       client_.start(stream_callbacks2, Optional<std::chrono::milliseconds>());
@@ -353,8 +366,7 @@ TEST_F(AsyncClientImplTest, StreamAndRequest) {
   EXPECT_CALL(stream_encoder2, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder2, encodeData(BufferEqual(body.get()), true));
 
-  TestHeaderMapImpl expected_headers{{":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
-  EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
+  expectResponseHeaders(stream_callbacks_, 200, false);
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
 
   AsyncClient::Stream* stream =
@@ -392,10 +404,9 @@ TEST_F(AsyncClientImplTest, StreamWithTrailers) {
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
   EXPECT_CALL(stream_encoder_, encodeTrailers(HeaderMapEqualRef(&trailers)));
 
-  TestHeaderMapImpl expected_headers{{":status", "200"}, {"x-envoy-upstream-service-time", "0"}};
-  TestHeaderMapImpl expected_trailers{{"some", "trailer"}};
-  EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
+  expectResponseHeaders(stream_callbacks_, 200, false);
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
+  TestHeaderMapImpl expected_trailers{{"some", "trailer"}};
   EXPECT_CALL(stream_callbacks_, onTrailers_(HeaderMapEqualRef(&expected_trailers)));
 
   AsyncClient::Stream* stream =

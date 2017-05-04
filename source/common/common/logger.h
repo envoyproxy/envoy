@@ -1,8 +1,15 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/thread/thread.h"
 
 #include "common/common/macros.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Logger {
 
@@ -10,6 +17,7 @@ namespace Logger {
 #define ALL_LOGGER_IDS(FUNCTION) \
   FUNCTION(admin)                \
   FUNCTION(assert)               \
+  FUNCTION(backtrace)            \
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \

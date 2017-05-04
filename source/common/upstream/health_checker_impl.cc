@@ -1,5 +1,10 @@
 #include "common/upstream/health_checker_impl.h"
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"

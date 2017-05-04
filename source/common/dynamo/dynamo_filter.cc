@@ -1,5 +1,10 @@
 #include "common/dynamo/dynamo_filter.h"
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/dynamo/dynamo_request_parser.h"
 #include "common/dynamo/dynamo_utility.h"
@@ -8,11 +13,13 @@
 #include "common/http/utility.h"
 #include "common/json/json_loader.h"
 
+#include "spdlog/spdlog.h"
+
 namespace Dynamo {
 
 Http::FilterHeadersStatus DynamoFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (enabled_) {
-    start_decode_ = std::chrono::system_clock::now();
+    start_decode_ = std::chrono::steady_clock::now();
     operation_ = RequestParser::parseOperation(headers);
   }
 
@@ -44,7 +51,7 @@ void DynamoFilter::onDecodeComplete(const Buffer::Instance& data) {
   std::string body = buildBody(decoder_callbacks_->decodingBuffer().get(), data);
   if (!body.empty()) {
     try {
-      Json::ObjectPtr json_body = Json::Factory::LoadFromString(body);
+      Json::ObjectPtr json_body = Json::Factory::loadFromString(body);
       table_descriptor_ = RequestParser::parseTable(operation_, *json_body);
     } catch (const Json::Exception& jsonEx) {
       // Body parsing failed. This should not happen, just put a stat for that.
@@ -64,7 +71,7 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
   std::string body = buildBody(encoder_callbacks_->encodingBuffer().get(), data);
   if (!body.empty()) {
     try {
-      Json::ObjectPtr json_body = Json::Factory::LoadFromString(body);
+      Json::ObjectPtr json_body = Json::Factory::loadFromString(body);
       chargeTablePartitionIdStats(*json_body);
 
       if (Http::CodeUtility::is4xx(status)) {
@@ -158,7 +165,7 @@ void DynamoFilter::chargeBasicStats(uint64_t status) {
 void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::string& entity_type,
                                         uint64_t status) {
   std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::system_clock::now() - start_decode_);
+      std::chrono::steady_clock::now() - start_decode_);
 
   std::string group_string =
       Http::CodeUtility::groupStringForResponseCode(static_cast<Http::Code>(status));

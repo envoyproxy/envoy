@@ -1,9 +1,12 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/network/listener.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
 
 namespace Network {

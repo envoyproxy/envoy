@@ -1,5 +1,9 @@
+#include <string>
+
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
+
+#include "gtest/gtest.h"
 
 TEST(UUIDUtilsTest, mod) {
   uint16_t result;

@@ -1,5 +1,10 @@
+#include <string>
+
 #include "common/dynamo/dynamo_utility.h"
 #include "common/stats/stats_impl.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 

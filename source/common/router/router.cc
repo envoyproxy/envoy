@@ -1,5 +1,9 @@
 #include "common/router/router.h"
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/conn_pool.h"
@@ -326,7 +330,7 @@ void Filter::maybeDoShadowing() {
 
 void Filter::onRequestComplete() {
   downstream_end_stream_ = true;
-  downstream_request_complete_time_ = std::chrono::system_clock::now();
+  downstream_request_complete_time_ = std::chrono::steady_clock::now();
 
   // Possible that we got an immediate reset.
   if (upstream_request_) {
@@ -465,7 +469,7 @@ void Filter::onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   // premature response.
   if (DateUtil::timePointValid(downstream_request_complete_time_)) {
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now() - downstream_request_complete_time_);
+        std::chrono::steady_clock::now() - downstream_request_complete_time_);
     headers->insertEnvoyUpstreamServiceTime().value(ms.count());
   }
 
@@ -503,7 +507,7 @@ void Filter::onUpstreamComplete() {
   if (config_.emit_dynamic_stats_ && !callbacks_->requestInfo().healthCheck() &&
       DateUtil::timePointValid(downstream_request_complete_time_)) {
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now() - downstream_request_complete_time_);
+        std::chrono::steady_clock::now() - downstream_request_complete_time_);
 
     upstream_request_->upstream_host_->outlierDetector().putResponseTime(response_time);
 

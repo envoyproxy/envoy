@@ -1,14 +1,18 @@
 #include "common/tracing/http_tracer_impl.h"
 
+#include <string>
+
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/codes.h"
-#include "common/http/headers.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/runtime/uuid_util.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Tracing {
 
@@ -56,7 +60,7 @@ void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime:
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
-    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", 0, result, 10000)) {
+    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", 10000, result, 10000)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
     }
   }

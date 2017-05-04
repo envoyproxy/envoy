@@ -1,33 +1,19 @@
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/event/libevent.h"
-#include "common/ssl/openssl.h"
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
 #include "test/test_common/environment.h"
+#include "test/test_runner.h"
 
+// The main entry point (and the rest of this file) should have no logic in it,
+// this allows overriding by site specific versions of main.cc.
 int main(int argc, char** argv) {
-  ::testing::InitGoogleMock(&argc, argv);
-  Ssl::OpenSsl::initialize();
-  Event::Libevent::Global::initialize();
-
-  // Set gtest properties
-  // (https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#logging-additional-information),
-  // they are available in the test XML.
-  // TODO(htuch): Log these as well?
-  ::testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
-  ::testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
-
-  if (::setenv("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory().c_str(), 1) != 0) {
-    ::perror("Failed to set temporary UDS directory.");
-    ::exit(1);
-  }
-
-  TestEnvironment::initializeOptions(argc, argv);
-  Thread::MutexBasicLockable lock;
-  Logger::Registry::initialize(TestEnvironment::getOptions().logLevel(), lock);
-
-  return RUN_ALL_TESTS();
+  ::setenv("TEST_RUNDIR", (TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
+                           TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE")).c_str(),
+           1);
+  // Select whether to test only for IPv4, IPv6, or both. The default is to
+  // test for both. Options are {"v4only", "v6only", "all"}. Set
+  // ENVOY_IP_TEST_VERSIONS to "v4only" if the system currently does not support IPv6 network
+  // operations. Similary set ENVOY_IP_TEST_VERSIONS to "v6only" if IPv4 has already been
+  // phased out of network operations. Set to "all" (or don't set) if testing both
+  // v4 and v6 addresses is desired. This feature is in progress and will be rolled out to all tests
+  // in upcoming PRs.
+  ::setenv("ENVOY_IP_TEST_VERSIONS", "all", 0);
+  return TestRunner::RunTests(argc, argv);
 }

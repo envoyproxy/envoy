@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/stats/stats.h"
 
 /**

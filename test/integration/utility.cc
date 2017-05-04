@@ -1,5 +1,10 @@
 #include "utility.h"
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
@@ -12,7 +17,10 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);

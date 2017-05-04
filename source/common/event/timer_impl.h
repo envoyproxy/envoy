@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include "envoy/event/timer.h"
 
 #include "common/event/dispatcher_impl.h"

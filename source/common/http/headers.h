@@ -1,13 +1,17 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/http/header_map.h"
+
+#include "common/common/singleton.h"
 
 namespace Http {
 
 /**
  * Constant HTTP headers and values. All lower case.
  */
-class Headers {
+class HeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
   const LowerCaseString Authorization{"authorization"};
@@ -101,14 +105,8 @@ public:
   struct {
     const std::string EnvoyHealthChecker{"Envoy/HC"};
   } UserAgentValues;
-
-  static Headers& get() {
-    static Headers instance;
-    return instance;
-  }
-
-private:
-  Headers() {}
 };
+
+typedef ConstSingleton<HeaderValues> Headers;
 
 } // Http

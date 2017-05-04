@@ -1,5 +1,9 @@
 #pragma once
 
+#include <chrono>
+#include <memory>
+#include <string>
+
 #include "envoy/redis/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 

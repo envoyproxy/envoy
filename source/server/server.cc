@@ -1,5 +1,11 @@
 #include "server/server.h"
 
+#include <signal.h>
+
+#include <cstdint>
+#include <functional>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -21,6 +27,8 @@
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 
@@ -64,7 +72,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   failHealthcheck(false);
 
   uint64_t version_int;
-  if (!StringUtil::atoul(VersionInfo::GIT_SHA.substr(0, 6).c_str(), version_int, 16)) {
+  if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
     throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
   }
   server_stats_.version_.set(version_int);
@@ -171,7 +179,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
              restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  Json::ObjectPtr config_json = Json::Factory::LoadFromFile(options.configPath());
+  Json::ObjectPtr config_json = Json::Factory::loadFromFile(options.configPath());
   config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
   log().info("admin address: {}", initial_config.admin().address()->asString());
@@ -179,11 +187,11 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   HotRestart::ShutdownParentAdminInfo info;
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
-  drain_manager_->startParentShutdownSequence();
   original_start_time_ = info.original_start_time_;
   admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
-                             initial_config.admin().profilePath(), initial_config.admin().address(),
-                             *this));
+                             initial_config.admin().profilePath(), options.adminAddressPath(),
+                             initial_config.admin().address(), *this));
+
   admin_scope_ = stats_store_.createScope("listener.admin.");
   handler_.addListener(*admin_, admin_->mutable_socket(), *admin_scope_,
                        Network::ListenerOptions::listenerOptionsWithBindToPort());
@@ -260,7 +268,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_.reset(
-      new Server::GuardDogImpl(*admin_scope_, *config_, ProdSystemTimeSource::instance_));
+      new Server::GuardDogImpl(*admin_scope_, *config_, ProdMonotonicTimeSource::instance_));
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
@@ -289,6 +297,7 @@ void InstanceImpl::startWorkers(TestHooks& hooks) {
   // At this point we are ready to take traffic and all listening ports are up. Notify our parent
   // if applicable that they can stop listening and drain.
   restarter_.drainParentListeners();
+  drain_manager_->startParentShutdownSequence();
   hooks.onServerInitialized();
 }
 

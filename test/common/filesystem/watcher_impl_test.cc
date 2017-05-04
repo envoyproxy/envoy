@@ -1,8 +1,14 @@
+#include <cstdint>
+#include <fstream>
+
 #include "common/common/assert.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/filesystem/watcher_impl.h"
 
 #include "test/test_common/environment.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Filesystem {
 

@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstdint>
+#include <forward_list>
+#include <string>
+#include <vector>
+
 #include "envoy/redis/codec.h"
 
 #include "common/common/logger.h"

@@ -1,5 +1,9 @@
 #include "common/upstream/load_balancer_impl.h"
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
@@ -37,6 +41,7 @@ void LoadBalancerBase::regenerateZoneRoutingStructures() {
   }
 
   size_t num_zones = host_set_.healthyHostsPerZone().size();
+  ASSERT(num_zones > 0);
 
   uint64_t local_percentage[num_zones];
   calculateZonePercentage(local_host_set_->healthyHostsPerZone(), local_percentage);
@@ -138,11 +143,9 @@ void LoadBalancerBase::calculateZonePercentage(
     total_hosts += zone_hosts.size();
   }
 
-  if (total_hosts != 0) {
-    size_t i = 0;
-    for (const auto& zone_hosts : hosts_per_zone) {
-      ret[i++] = 10000ULL * zone_hosts.size() / total_hosts;
-    }
+  size_t i = 0;
+  for (const auto& zone_hosts : hosts_per_zone) {
+    ret[i++] = total_hosts > 0 ? 10000ULL * zone_hosts.size() / total_hosts : 0;
   }
 }
 

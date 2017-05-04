@@ -1,6 +1,13 @@
-package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_library")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+    "envoy_cc_test_library",
+    "envoy_package",
+)
+
+envoy_package()
 
 envoy_cc_test(
     name = "example_configs_test",
@@ -14,6 +21,7 @@ envoy_cc_test(
     deps = [
         ":config_test_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

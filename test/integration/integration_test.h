@@ -2,6 +2,8 @@
 
 #include "test/integration/integration.h"
 
+#include "gtest/gtest.h"
+
 class IntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:
   /**

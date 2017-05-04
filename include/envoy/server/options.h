@@ -1,6 +1,12 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/pure.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 
@@ -33,6 +39,11 @@ public:
    * @return const std::string& the path to the configuration file.
    */
   virtual const std::string& configPath() PURE;
+
+  /**
+   * @return const std::string& the admin address output file.
+   */
+  virtual const std::string& adminAddressPath() PURE;
 
   /**
    * @return spdlog::level::level_enum the default log level for the server.

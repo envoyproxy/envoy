@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
@@ -33,7 +35,7 @@ public:
    */
   virtual void touch() PURE;
   virtual int32_t threadId() const PURE;
-  virtual SystemTime lastTouchTime() const PURE;
+  virtual MonotonicTime lastTouchTime() const PURE;
 };
 
 typedef std::shared_ptr<WatchDog> WatchDogSharedPtr;

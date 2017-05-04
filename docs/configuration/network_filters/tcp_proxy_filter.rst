@@ -83,9 +83,9 @@ destination_ports
   *(optional, string)* An optional string containing a comma-separated list of port numbers or
   ranges. The criteria is satisfied if the destination port of the downstream connection
   is contained in at least one of the specified ranges.
-  If the parameter is not specified or the list is empty, the destination port is ignored.
-  The destination port address of the downstream connection might be different from the port
-  on which the proxy is listening if the connection has been redirected. Example:
+  If the parameter is not specified, the destination port is ignored. The destination port address
+  of the downstream connection might be different from the port on which the proxy is listening if
+  the connection has been redirected. Example:
 
  .. code-block:: json
 
@@ -110,8 +110,8 @@ source_ip_list
 source_ports
   *(optional, string)* An optional string containing a comma-separated list of port numbers or
   ranges. The criteria is satisfied if the source port of the downstream connection is contained
-  in at least one of the specified ranges. If the parameter is not specified or the list is empty,
-  the source port is ignored.  Example:
+  in at least one of the specified ranges. If the parameter is not specified, the source port is
+  ignored.  Example:
 
  .. code-block:: json
 

@@ -1,3 +1,7 @@
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/filter/tcp_proxy.h"
 #include "common/network/address_impl.h"
@@ -9,6 +13,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -25,7 +33,7 @@ TEST(TcpProxyConfigTest, NoRouteConfig) {
     }
     )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   EXPECT_THROW(TcpProxyConfig(*config, cluster_manager,
                               cluster_manager.thread_local_cluster_.cluster_.info_->stats_store_),
@@ -46,7 +54,7 @@ TEST(TcpProxyConfigTest, NoCluster) {
     }
     )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   EXPECT_CALL(cluster_manager, get("fake_cluster")).WillOnce(Return(nullptr));
   EXPECT_THROW(TcpProxyConfig(*config, cluster_manager,
@@ -68,7 +76,7 @@ TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
    }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   EXPECT_THROW(TcpProxyConfig(*json_config, cluster_manager,
                               cluster_manager.thread_local_cluster_.cluster_.info_->stats_store_),
@@ -118,7 +126,7 @@ TEST(TcpProxyConfigTest, Routes) {
     }
     )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json);
   NiceMock<Upstream::MockClusterManager> cm_;
 
   TcpProxyConfig config_obj(*json_config, cm_,
@@ -274,7 +282,7 @@ TEST(TcpProxyConfigTest, EmptyRouteConfig) {
     }
     )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json);
   NiceMock<Upstream::MockClusterManager> cm_;
 
   TcpProxyConfig config_obj(*json_config, cm_,
@@ -300,7 +308,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+    Json::ObjectPtr config = Json::Factory::loadFromString(json);
     config_.reset(
         new TcpProxyConfig(*config, cluster_manager_,
                            cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_));
@@ -471,7 +479,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+    Json::ObjectPtr config = Json::Factory::loadFromString(json);
     config_.reset(
         new TcpProxyConfig(*config, cluster_manager_,
                            cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_));

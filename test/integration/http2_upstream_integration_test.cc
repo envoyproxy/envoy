@@ -2,7 +2,10 @@
 
 #include "common/http/header_map_impl.h"
 
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 TEST_F(Http2UpstreamIntegrationTest, RouterNotFound) {
   testRouterNotFound(Http::CodecClient::Type::HTTP2);

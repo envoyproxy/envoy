@@ -1,5 +1,9 @@
 #include "common/filter/auth/client_ssl.h"
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/network/connection.h"
 
 #include "common/common/assert.h"
@@ -9,6 +13,8 @@
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/network/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Filter {
 namespace Auth {
@@ -55,7 +61,7 @@ GlobalStats Config::generateStats(Stats::Store& store, const std::string& prefix
 
 void Config::parseResponse(const Http::Message& message) {
   AllowedPrincipalsSharedPtr new_principals(new AllowedPrincipals());
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(message.bodyAsString());
+  Json::ObjectPtr loader = Json::Factory::loadFromString(message.bodyAsString());
   for (const Json::ObjectPtr& certificate : loader->getObjectArray("certificates")) {
     new_principals->add(certificate->getString("fingerprint_sha256"));
   }

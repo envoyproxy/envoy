@@ -1,8 +1,14 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
+
 #include "test/mocks/filesystem/mocks.h"
+
+#include "gmock/gmock.h"
 
 namespace Api {
 

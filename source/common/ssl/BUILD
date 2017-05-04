@@ -1,6 +1,12 @@
-package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
 
 envoy_cc_library(
     name = "connection_lib",
@@ -20,7 +26,6 @@ envoy_cc_library(
     name = "context_config_lib",
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
-    external_deps = ["ssl"],
     deps = [
         "//include/envoy/ssl:context_config_interface",
         "//source/common/json:json_loader_lib",
@@ -37,8 +42,8 @@ envoy_cc_library(
         "context_impl.h",
         "context_manager_impl.h",
     ],
+    external_deps = ["ssl"],
     deps = [
-        ":openssl_lib",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/ssl:context_config_interface",
         "//include/envoy/ssl:context_interface",
@@ -47,16 +52,5 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "openssl_lib",
-    srcs = ["openssl.cc"],
-    hdrs = ["openssl.h"],
-    external_deps = ["ssl"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/common:c_smart_ptr_lib",
     ],
 )

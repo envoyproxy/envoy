@@ -1,5 +1,12 @@
 #pragma once
 
+#include <condition_variable>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <string>
+
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -10,8 +17,10 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/stats_impl.h"
+
 #include "server/connection_handler_impl.h"
 
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 class FakeHttpConnection;

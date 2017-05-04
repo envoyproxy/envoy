@@ -1,5 +1,13 @@
 #pragma once
 
+#include <dirent.h>
+
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <unordered_map>
+
 #include "envoy/common/exception.h"
 #include "envoy/common/optional.h"
 #include "envoy/runtime/runtime.h"
@@ -10,7 +18,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 
-#include <dirent.h>
+#include "spdlog/spdlog.h"
 
 namespace Runtime {
 

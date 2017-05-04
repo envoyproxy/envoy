@@ -1,5 +1,9 @@
 #include "common/http/utility.h"
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -11,6 +15,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 

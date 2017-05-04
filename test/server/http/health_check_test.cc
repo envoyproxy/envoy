@@ -1,8 +1,16 @@
+#include <chrono>
+#include <memory>
+
 #include "common/buffer/buffer_impl.h"
+
 #include "server/http/health_check.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
@@ -195,7 +203,7 @@ TEST_F(HealthCheckFilterCachingTest, NotHcRequest) {
 
 TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSet) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
-  Json::ObjectPtr config = Json::Factory::LoadFromString(
+  Json::ObjectPtr config = Json::Factory::loadFromString(
       "{\"pass_through_mode\":false, \"cache_time_ms\":234, \"endpoint\":\"foo\"}");
   NiceMock<Server::MockInstance> serverMock;
 
@@ -208,7 +216,7 @@ TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSet) {
 TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSet) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
   Json::ObjectPtr config =
-      Json::Factory::LoadFromString("{\"pass_through_mode\":false, \"endpoint\":\"foo\"}");
+      Json::Factory::loadFromString("{\"pass_through_mode\":false, \"endpoint\":\"foo\"}");
   NiceMock<Server::MockInstance> serverMock;
 
   healthCheckFilterConfig.tryCreateFilterFactory(Server::Configuration::HttpFilterType::Both,

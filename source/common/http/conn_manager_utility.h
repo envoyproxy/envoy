@@ -1,5 +1,8 @@
 #pragma once
 
+#include <atomic>
+#include <cstdint>
+
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 

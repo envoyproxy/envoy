@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <vector>
+
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/watchdog.h"
@@ -29,7 +34,7 @@ public:
    * See the configuration documentation for details on the timeout settings.
    */
   GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-               SystemTimeSource& tsource);
+               MonotonicTimeSource& tsource);
   ~GuardDogImpl();
 
   /**
@@ -59,7 +64,7 @@ private:
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }
   bool multikillEnabled() const { return multi_kill_timeout_ > std::chrono::milliseconds(0); }
 
-  SystemTimeSource& time_source_;
+  MonotonicTimeSource& time_source_;
   const std::chrono::milliseconds miss_timeout_;
   const std::chrono::milliseconds megamiss_timeout_;
   const std::chrono::milliseconds kill_timeout_;

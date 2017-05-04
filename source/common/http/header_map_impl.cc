@@ -1,7 +1,12 @@
 #include "common/http/header_map_impl.h"
 
+#include <cstdint>
+#include <list>
+#include <string>
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/common/singleton.h"
 #include "common/common/utility.h"
 
 namespace Http {
@@ -193,8 +198,6 @@ void HeaderMapImpl::HeaderEntryImpl::value(const HeaderEntry& header) {
     return {&h.inline_headers_.name##_, &Headers::get().name};                                     \
   });
 
-const HeaderMapImpl::StaticLookupTable HeaderMapImpl::static_lookup_table_;
-
 HeaderMapImpl::StaticLookupTable::StaticLookupTable() {
   ALL_INLINE_HEADERS(INLINE_HEADER_STATIC_MAP_ENTRY)
 
@@ -275,7 +278,7 @@ bool HeaderMapImpl::operator==(const HeaderMapImpl& rhs) const {
 }
 
 void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
-  StaticLookupEntry::EntryCb cb = static_lookup_table_.find(key.c_str());
+  StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.c_str());
   if (cb) {
     // TODO(mattklein123): Currently, for all of the inline headers, we don't support appending. The
     // only inline header where we should be converting multiple headers into a comma delimited
@@ -346,7 +349,7 @@ void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {
 }
 
 void HeaderMapImpl::remove(const LowerCaseString& key) {
-  StaticLookupEntry::EntryCb cb = static_lookup_table_.find(key.get().c_str());
+  StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get().c_str());
   if (cb) {
     StaticLookupResponse static_lookup_response = cb(*this);
     removeInline(static_lookup_response.entry_);

@@ -1,3 +1,7 @@
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
@@ -7,7 +11,11 @@
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -22,7 +30,7 @@ TEST(BadRateLimitConfiguration, MissingActions) {
 }
 )EOF";
 
-  EXPECT_THROW(RateLimitPolicyImpl(*Json::Factory::LoadFromString(json)), EnvoyException);
+  EXPECT_THROW(RateLimitPolicyImpl(*Json::Factory::loadFromString(json)), EnvoyException);
 }
 
 TEST(BadRateLimitConfiguration, BadType) {
@@ -36,7 +44,7 @@ TEST(BadRateLimitConfiguration, BadType) {
   }
   )EOF";
 
-  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::LoadFromString(json)), EnvoyException);
+  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::loadFromString(json)), EnvoyException);
 }
 
 TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
@@ -50,7 +58,7 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
   }
   )EOF";
 
-  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::LoadFromString(json_one)), EnvoyException);
+  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::loadFromString(json_one)), EnvoyException);
 
   std::string json_two = R"EOF(
   {
@@ -63,7 +71,7 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
   }
   )EOF";
 
-  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::LoadFromString(json_two)), EnvoyException);
+  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::loadFromString(json_two)), EnvoyException);
 
   std::string json_three = R"EOF(
   {
@@ -76,7 +84,7 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
   }
   )EOF";
 
-  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::LoadFromString(json_three)),
+  EXPECT_THROW(RateLimitPolicyEntryImpl(*Json::Factory::loadFromString(json_three)),
                EnvoyException);
 }
 
@@ -88,7 +96,7 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
 class RateLimitConfiguration : public testing::Test {
 public:
   void SetUpTest(const std::string json) {
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(json);
     config_.reset(new ConfigImpl(*loader, runtime_, cm_, true));
   }
 
@@ -329,7 +337,7 @@ TEST_F(RateLimitConfiguration, Stages) {
 class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void SetUpTest(const std::string json) {
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(json);
     rate_limit_entry_.reset(new RateLimitPolicyEntryImpl(*loader));
     descriptors_.clear();
   }
@@ -538,7 +546,62 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchNoMatch) {
   )EOF";
 
   SetUpTest(json);
-  Http::TestHeaderMapImpl header{{"x-header-name", "fake_value"}};
+  Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchHeadersNotPresent) {
+  std::string json = R"EOF(
+  {
+    "actions": [
+      {
+        "type": "header_value_match",
+        "descriptor_value": "fake_value",
+        "expect_match": false,
+        "headers": [
+          {
+            "name": "x-header-name",
+            "value": "test_value",
+            "regex": false
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  SetUpTest(json);
+  Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
+  EXPECT_THAT(std::vector<::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchHeadersPresent) {
+  std::string json = R"EOF(
+  {
+    "actions": [
+      {
+        "type": "header_value_match",
+        "descriptor_value": "fake_value",
+        "expect_match": false,
+        "headers": [
+          {
+            "name": "x-header-name",
+            "value": "test_value",
+            "regex": false
+          }
+        ]
+      }
+    ]
+  }
+  )EOF";
+
+  SetUpTest(json);
+  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
   EXPECT_TRUE(descriptors_.empty());

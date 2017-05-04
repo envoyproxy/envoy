@@ -1,5 +1,10 @@
 #include "server/http/admin.h"
 
+#include <cstdint>
+#include <fstream>
+#include <string>
+#include <unordered_set>
+
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
@@ -19,10 +24,13 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/json/json_loader.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Server {
 
@@ -278,6 +286,16 @@ Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Buffer::Instance& 
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerListenerInfo(const std::string&, Buffer::Instance& response) {
+  std::list<std::string> listeners;
+  int listener_index = 0;
+  while (auto listen_socket = server_.getListenSocketByIndex(listener_index++)) {
+    listeners.push_back(listen_socket->localAddress()->asString());
+  }
+  response.add(Json::Factory::listAsJsonString(listeners));
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerCerts(const std::string&, Buffer::Instance& response) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
@@ -316,6 +334,7 @@ AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
     : config_(new Router::NullConfigImpl()) {}
 
 AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
+                     const std::string& address_out_path,
                      Network::Address::InstanceConstSharedPtr address, Server::Instance& server)
     : server_(server), profile_path_(profile_path),
       socket_(new Network::TcpListenSocket(address, true)),
@@ -337,7 +356,17 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/reset_counters", "reset all counters to zero", MAKE_HANDLER(handlerResetCounters)},
           {"/server_info", "print server version/status information",
            MAKE_HANDLER(handlerServerInfo)},
-          {"/stats", "print server stats", MAKE_HANDLER(handlerStats)}} {
+          {"/stats", "print server stats", MAKE_HANDLER(handlerStats)},
+          {"/listeners", "print listener addresses", MAKE_HANDLER(handlerListenerInfo)}} {
+
+  if (!address_out_path.empty()) {
+    std::ofstream address_out_file(address_out_path);
+    if (!address_out_file) {
+      log().critical("cannot open admin address output file {} for writing.", address_out_path);
+    } else {
+      address_out_file << socket_->localAddress()->asString();
+    }
+  }
 
   access_logs_.emplace_back(new Http::AccessLog::InstanceImpl(
       access_log_path, {}, Http::AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),

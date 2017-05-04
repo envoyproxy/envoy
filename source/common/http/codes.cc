@@ -1,5 +1,8 @@
 #include "common/http/codes.h"
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats.h"
 
@@ -7,6 +10,8 @@
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Http {
 

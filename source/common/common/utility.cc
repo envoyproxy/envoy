@@ -1,5 +1,13 @@
 #include "common/common/utility.h"
 
+#include <array>
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include "spdlog/spdlog.h"
+
 std::string DateFormatter::fromTime(const SystemTime& time) {
   return fromTimeT(std::chrono::system_clock::to_time_t(time));
 }
@@ -20,8 +28,14 @@ std::string DateFormatter::now() {
 }
 
 ProdSystemTimeSource ProdSystemTimeSource::instance_;
+ProdMonotonicTimeSource ProdMonotonicTimeSource::instance_;
 
 bool DateUtil::timePointValid(SystemTime time_point) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
+             .count() != 0;
+}
+
+bool DateUtil::timePointValid(MonotonicTime time_point) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
              .count() != 0;
 }
@@ -109,6 +123,34 @@ std::vector<std::string> StringUtil::split(const std::string& source, const std:
 
 std::string StringUtil::subspan(const std::string& source, size_t start, size_t end) {
   return source.substr(start, end - start);
+}
+
+std::string StringUtil::escape(const std::string& source) {
+  std::string ret;
+
+  // Prevent unnecessary allocation by allocating 2x original size.
+  ret.reserve(source.length() * 2);
+  for (char c : source) {
+    switch (c) {
+    case '\r':
+      ret += "\\r";
+      break;
+    case '\n':
+      ret += "\\n";
+      break;
+    case '\t':
+      ret += "\\t";
+      break;
+    case '"':
+      ret += "\\\"";
+      break;
+    default:
+      ret += c;
+      break;
+    }
+  }
+
+  return ret;
 }
 
 std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {

@@ -46,6 +46,7 @@ following statistics:
   op_query_no_cursor_timeout, Counter, Number of OP_QUERY with no cursor timeout flag set
   op_query_await_data, Counter, Number of OP_QUERY with await data flag set
   op_query_exhaust, Counter, Number of OP_QUERY with exhaust flag set
+  op_query_no_max_time, Counter, Number of queries without maxTimeMS set
   op_query_scatter_get, Counter, Number of scatter get queries
   op_query_multi_get, Counter, Number of multi get queries
   op_query_active, Gauge, Number of active queries

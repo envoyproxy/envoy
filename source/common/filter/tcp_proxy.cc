@@ -1,5 +1,8 @@
 #include "common/filter/tcp_proxy.h"
 
+#include <cstdint>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -12,6 +15,8 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
+#include "spdlog/spdlog.h"
+
 namespace Filter {
 
 TcpProxyConfig::Route::Route(const Json::Object& config) {
@@ -23,9 +28,6 @@ TcpProxyConfig::Route::Route(const Json::Object& config) {
 
   if (config.hasObject("source_ports")) {
     const std::string source_ports = config.getString("source_ports");
-    if (source_ports.empty()) {
-      throw EnvoyException("source_ports cannot be empty");
-    }
     Network::Utility::parsePortRangeList(source_ports, source_port_ranges_);
   }
 
@@ -35,9 +37,6 @@ TcpProxyConfig::Route::Route(const Json::Object& config) {
 
   if (config.hasObject("destination_ports")) {
     const std::string destination_ports = config.getString("destination_ports");
-    if (destination_ports.empty()) {
-      throw EnvoyException("destination_ports cannot be empty");
-    }
     Network::Utility::parsePortRangeList(destination_ports, destination_port_ranges_);
   }
 }

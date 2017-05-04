@@ -1,5 +1,9 @@
 #pragma once
 
+#include <functional>
+#include <list>
+#include <mutex>
+
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context_manager.h"
 

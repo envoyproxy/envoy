@@ -1,5 +1,9 @@
 #pragma once
 
+#include <chrono>
+#include <list>
+#include <string>
+
 #include "envoy/http/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/admin.h"
@@ -10,6 +14,7 @@
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/utility.h"
+
 #include "server/config/network/http_connection_manager.h"
 
 namespace Server {
@@ -24,7 +29,8 @@ class AdminImpl : public Admin,
                   Logger::Loggable<Logger::Id::admin> {
 public:
   AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
-            Network::Address::InstanceConstSharedPtr address, Server::Instance& server);
+            const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
+            Server::Instance& server);
 
   Http::Code runCallback(const std::string& path, Buffer::Instance& response);
   const Network::ListenSocket& socket() override { return *socket_; }
@@ -113,6 +119,7 @@ private:
   Http::Code handlerServerInfo(const std::string& url, Buffer::Instance& response);
   Http::Code handlerStats(const std::string& url, Buffer::Instance& response);
   Http::Code handlerQuitQuitQuit(const std::string& url, Buffer::Instance& response);
+  Http::Code handlerListenerInfo(const std::string& url, Buffer::Instance& response);
 
   Server::Instance& server_;
   std::list<Http::AccessLog::InstanceSharedPtr> access_logs_;

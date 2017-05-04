@@ -1,9 +1,15 @@
 #include "common/upstream/cds_api_impl.h"
 
+#include <chrono>
+#include <string>
+#include <vector>
+
 #include "common/common/assert.h"
 #include "common/http/headers.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Upstream {
 
@@ -40,7 +46,7 @@ void CdsApiImpl::createRequest(Http::Message& request) {
 
 void CdsApiImpl::parseResponse(const Http::Message& response) {
   log_debug("cds: parsing response");
-  Json::ObjectPtr response_json = Json::Factory::LoadFromString(response.bodyAsString());
+  Json::ObjectPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
   response_json->validateSchema(Json::Schema::CDS_SCHEMA);
   std::vector<Json::ObjectPtr> clusters = response_json->getObjectArray("clusters");
 

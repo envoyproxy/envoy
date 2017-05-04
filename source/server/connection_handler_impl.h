@@ -1,17 +1,24 @@
 #pragma once
 
+#include <atomic>
+#include <cstdint>
+#include <list>
+#include <memory>
+
 #include "envoy/api/api.h"
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
-#include "envoy/network/listener.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/listener.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
 #include "common/network/listen_socket_impl.h"
+
+#include "spdlog/spdlog.h"
 
 // clang-format off
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, TIMER)                                                  \

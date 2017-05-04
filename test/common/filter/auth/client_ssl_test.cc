@@ -1,3 +1,7 @@
+#include <chrono>
+#include <memory>
+#include <string>
+
 #include "common/filesystem/filesystem_impl.h"
 #include "common/filter/auth/client_ssl.h"
 #include "common/http/message_impl.h"
@@ -8,7 +12,12 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -43,7 +52,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(json);
     EXPECT_CALL(cm_, get("vpn"));
     setupRequest();
     config_ = Config::create(*loader, tls_, cm_, dispatcher_, stats_store_, random_);
@@ -90,7 +99,7 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
   EXPECT_THROW(Config::create(*loader, tls_, cm_, dispatcher_, stats_store_, random_),
                EnvoyException);
@@ -106,7 +115,7 @@ TEST_F(ClientSslAuthFilterTest, BadClientSslAuthConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   EXPECT_THROW(Config::create(*json_config, tls_, cm_, dispatcher_, stats_store_, random_),
                Json::Exception);
 }
@@ -148,8 +157,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/filter/auth/test_data/vpn_response_1.json")));
+  message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
+      TestEnvironment::runfilesPath("test/common/filter/auth/test_data/vpn_response_1.json"))));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(1U, stats_store_.gauge("auth.clientssl.vpn.total_principals").value());
 

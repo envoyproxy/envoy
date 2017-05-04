@@ -1,5 +1,11 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/http/header_map.h"
 
 #include "common/common/non_copyable.h"
@@ -99,8 +105,6 @@ protected:
 
     StaticLookupEntry root_;
   };
-
-  static const StaticLookupTable static_lookup_table_;
 
   struct AllInlineHeaders {
     ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_STRUCT)

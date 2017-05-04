@@ -1,6 +1,19 @@
-package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+    "envoy_package",
+)
+
+envoy_package()
+
+envoy_cc_test(
+    name = "backtrace_test",
+    srcs = ["backtrace_test.cc"],
+    tags = ["backtrace"],
+    deps = ["//source/server:backtrace_lib"],
+)
 
 envoy_cc_test(
     name = "configuration_impl_test",
@@ -12,6 +25,7 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
     ],
 )
 

@@ -1,5 +1,9 @@
-#include "common/http/headers.h"
+#include <chrono>
+#include <memory>
+#include <string>
+
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
@@ -14,6 +18,9 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -49,7 +56,7 @@ public:
        "collector_endpoint": "/api/v1/spans"
        }
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
 
     setup(*loader, true);
   }
@@ -74,14 +81,14 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     std::string invalid_config = R"EOF(
       {"fake" : "fake"}
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(invalid_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(invalid_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
 
   {
     std::string empty_config = "{}";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(empty_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(empty_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
@@ -96,7 +103,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
        "collector_endpoint": "/api/v1/spans"
        }
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
@@ -113,7 +120,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
        "collector_endpoint": "/api/v1/spans"
        }
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
@@ -129,7 +136,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
        "collector_endpoint": "/api/v1/spans"
        }
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::LoadFromString(valid_config);
+    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
 
     setup(*loader, true);
   }
@@ -161,24 +168,34 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
+  std::cout << "XXX Before 1st startSpan" << std::endl;
   SpanPtr first_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  std::cout << "XXX After 1st startSpan" << std::endl;
   first_span->finishSpan();
+  std::cout << "XXX After 1st finishSpan" << std::endl;
 
+  std::cout << "XXX Before 2nd startSpan" << std::endl;
   SpanPtr second_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  std::cout << "XXX After 2nd startSpan" << std::endl;
   second_span->finishSpan();
+  std::cout << "XXX After 2nd finishSpan" << std::endl;
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "202"}}}));
 
+  std::cout << "XXX Before onSucess" << std::endl;
   callback->onSuccess(std::move(msg));
 
   EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
 
+  std::cout << "XXX Before onFailure" << std::endl;
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
+  std::cout << "XXX After onFailure" << std::endl;
 
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_dropped").value());
+  std::cout << "XXX END" << std::endl;
 }
 
 TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {

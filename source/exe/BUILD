@@ -1,6 +1,13 @@
-package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cc_binary")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_binary",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
 
 alias(
     name = "envoy",
@@ -9,6 +16,7 @@ alias(
 
 envoy_cc_binary(
     name = "envoy-static",
+    stamped = True,
     deps = ["envoy_main_lib"],
 )
 
@@ -18,7 +26,6 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:utility_lib",
-        "//source/common/ssl:openssl_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server:drain_manager_lib",
         "//source/server:options_lib",
@@ -47,7 +54,10 @@ envoy_cc_library(
     deps = [
         ":envoy_common_lib",
         ":hot_restart_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [":sigaction_lib"],
+    }),
 )
 
 envoy_cc_library(
@@ -63,5 +73,17 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "sigaction_lib",
+    srcs = ["signal_action.cc"],
+    hdrs = ["signal_action.h"],
+    tags = ["backtrace"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:non_copyable",
+        "//source/server:backtrace_lib",
     ],
 )

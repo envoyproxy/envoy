@@ -1,3 +1,6 @@
+#include <chrono>
+#include <string>
+
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
@@ -6,7 +9,11 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -32,7 +39,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::LoadFromString(config_json);
+    Json::ObjectPtr config = Json::Factory::loadFromString(config_json);
 
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(init_manager_, registerTarget(_));
@@ -80,7 +87,7 @@ TEST_F(RdsImplTest, RdsAndStatic) {
     }
     )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(config_json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(config_json);
   EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, dispatcher_, random_,
                                                local_info_, store_, "foo.", tls_, init_manager_),
                EnvoyException);
@@ -96,7 +103,7 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
     }
     )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(config_json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(config_json);
   local_info_.cluster_name_ = "";
   local_info_.node_name_ = "";
   interval_timer_ = new Event::MockTimer(&dispatcher_);
@@ -115,7 +122,7 @@ TEST_F(RdsImplTest, UnknownCluster) {
     }
     )EOF";
 
-  Json::ObjectPtr config = Json::Factory::LoadFromString(config_json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(config_json);
   ON_CALL(cm_, get("foo_cluster")).WillByDefault(Return(nullptr));
   interval_timer_ = new Event::MockTimer(&dispatcher_);
   EXPECT_THROW(RouteConfigProviderUtil::create(*config, runtime_, cm_, dispatcher_, random_,

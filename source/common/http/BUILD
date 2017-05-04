@@ -1,6 +1,12 @@
-package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
 
 envoy_cc_library(
     name = "async_client_lib",
@@ -154,6 +160,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:non_copyable",
+        "//source/common/common:singleton",
         "//source/common/common:utility_lib",
     ],
 )
@@ -161,7 +168,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "headers_lib",
     hdrs = ["headers.h"],
-    deps = ["//include/envoy/http:header_map_interface"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//source/common/common:singleton",
+    ],
 )
 
 envoy_cc_library(

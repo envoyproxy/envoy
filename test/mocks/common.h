@@ -2,7 +2,7 @@
 
 #include "envoy/common/time.h"
 
-#include "test/precompiled/precompiled_test.h"
+#include "gmock/gmock.h"
 
 /**
  * This action allows us to save a reference parameter to a pointer target.
@@ -33,5 +33,13 @@ public:
   MockSystemTimeSource();
   ~MockSystemTimeSource();
 
-  MOCK_METHOD0(currentSystemTime, SystemTime());
+  MOCK_METHOD0(currentTime, SystemTime());
+};
+
+class MockMonotonicTimeSource : public MonotonicTimeSource {
+public:
+  MockMonotonicTimeSource();
+  ~MockMonotonicTimeSource();
+
+  MOCK_METHOD0(currentTime, MonotonicTime());
 };

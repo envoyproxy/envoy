@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/http/access_log.h"
 #include "envoy/runtime/runtime.h"

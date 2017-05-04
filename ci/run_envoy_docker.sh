@@ -2,8 +2,10 @@
 
 set -e
 
-BUILD_DIR=/tmp/envoy-docker-build
-mkdir -p "${BUILD_DIR}"
-docker pull lyft/envoy-build:latest
-docker run -t -i -u $(id -u):$(id -g) -v "${BUILD_DIR}":/build \
-  -v "$PWD":/source lyft/envoy-build:latest /bin/bash -c "cd source && $*"
+[[ -z "${IMAGE_ID}" ]] && IMAGE_ID="latest"
+[[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
+
+mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
+docker pull lyft/envoy-build:"${IMAGE_ID}"
+docker run -t -i -u $(id -u):$(id -g) -v "${ENVOY_DOCKER_BUILD_DIR}":/build \
+  -v "$PWD":/source lyft/envoy-build:"${IMAGE_ID}" /bin/bash -c "cd source && $*"

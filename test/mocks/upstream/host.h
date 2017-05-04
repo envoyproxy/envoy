@@ -1,10 +1,17 @@
 #pragma once
 
-#include "test/mocks/upstream/cluster_info.h"
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <string>
 
 #include "envoy/upstream/upstream.h"
 
 #include "common/stats/stats_impl.h"
+
+#include "test/mocks/upstream/cluster_info.h"
+
+#include "gmock/gmock.h"
 
 namespace Upstream {
 namespace Outlier {
@@ -17,8 +24,8 @@ public:
   MOCK_METHOD0(numEjections, uint32_t());
   MOCK_METHOD1(putHttpResponseCode, void(uint64_t code));
   MOCK_METHOD1(putResponseTime, void(std::chrono::milliseconds time));
-  MOCK_METHOD0(lastEjectionTime, const Optional<SystemTime>&());
-  MOCK_METHOD0(lastUnejectionTime, const Optional<SystemTime>&());
+  MOCK_METHOD0(lastEjectionTime, const Optional<MonotonicTime>&());
+  MOCK_METHOD0(lastUnejectionTime, const Optional<MonotonicTime>&());
   MOCK_CONST_METHOD0(successRate, double());
   MOCK_METHOD1(successRate, void(double new_success_rate));
 };

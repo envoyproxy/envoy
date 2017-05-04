@@ -1,15 +1,19 @@
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "common/grpc/common.h"
 #include "common/grpc/rpc_channel_impl.h"
 #include "common/http/message_impl.h"
 
-#ifdef BAZEL_BRINGUP
-#include "test/proto/helloworld.pb.h"
-#else
-#include "test/generated/helloworld.pb.h"
-#endif
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/proto/helloworld.pb.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;

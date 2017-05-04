@@ -1,5 +1,7 @@
 #include "common/profiler/profiler.h"
 
+#include <string>
+
 #ifdef TCMALLOC
 
 #include "gperftools/heap-profiler.h"

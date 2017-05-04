@@ -1,5 +1,7 @@
 #include "common/access_log/access_log_manager_impl.h"
 
+#include <string>
+
 namespace AccessLog {
 
 void AccessLogManagerImpl::reopen() {

@@ -1,9 +1,16 @@
+#include <cstdint>
+#include <string>
+
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 namespace Http {
 
@@ -84,18 +91,18 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 TEST(HttpUtility, parseCodecOptions) {
   {
-    Json::ObjectPtr json = Json::Factory::LoadFromString("{}");
+    Json::ObjectPtr json = Json::Factory::loadFromString("{}");
     EXPECT_EQ(0UL, Utility::parseCodecOptions(*json));
   }
 
   {
     Json::ObjectPtr json =
-        Json::Factory::LoadFromString("{\"http_codec_options\": \"no_compression\"}");
+        Json::Factory::loadFromString("{\"http_codec_options\": \"no_compression\"}");
     EXPECT_EQ(CodecOptions::NoCompression, Utility::parseCodecOptions(*json));
   }
 
   {
-    Json::ObjectPtr json = Json::Factory::LoadFromString("{\"http_codec_options\": \"foo\"}");
+    Json::ObjectPtr json = Json::Factory::loadFromString("{\"http_codec_options\": \"foo\"}");
     EXPECT_THROW(Utility::parseCodecOptions(*json), EnvoyException);
   }
 }

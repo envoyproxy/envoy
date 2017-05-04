@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 /**
  * This is a helper that wraps C style API objects that need to be deleted with a smart pointer.
  */

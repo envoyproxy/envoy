@@ -1,3 +1,9 @@
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/common/optional.h"
 #include "envoy/common/time.h"
 
@@ -10,6 +16,9 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -20,7 +29,7 @@ namespace Upstream {
 namespace Outlier {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
-  Json::ObjectPtr loader = Json::Factory::LoadFromString("{}");
+  Json::ObjectPtr loader = Json::Factory::loadFromString("{}");
   NiceMock<MockCluster> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -35,7 +44,7 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
   NiceMock<MockCluster> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -74,9 +83,9 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* interval_timer_ = new Event::MockTimer(&dispatcher_);
   CallbackChecker checker_;
-  MockSystemTimeSource time_source_;
+  MockMonotonicTimeSource time_source_;
   std::shared_ptr<MockEventLogger> event_logger_{new MockEventLogger()};
-  Json::ObjectPtr loader_ = Json::Factory::LoadFromString("{}");
+  Json::ObjectPtr loader_ = Json::Factory::loadFromString("{}");
 };
 
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
@@ -94,7 +103,7 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr custom_config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr custom_config = Json::Factory::loadFromString(json);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100)));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
       cluster_, *custom_config, dispatcher_, runtime_, time_source_, event_logger_));
@@ -121,8 +130,8 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
 
   loadRq(cluster_.hosts_[0], 4, 503);
 
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(0))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]), _,
@@ -170,8 +179,8 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   cluster_.hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(cluster_.hosts_[0], 4, 503);
 
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(0))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]), _,
@@ -182,15 +191,15 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
   // Interval that doesn't bring the host back in.
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(9999))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(9999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_FALSE(cluster_.hosts_[0]->outlierDetector().lastUnejectionTime().valid());
 
   // Interval that does bring the host back in.
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(30001))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(30001))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0])));
@@ -205,8 +214,8 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   cluster_.hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(cluster_.hosts_[0], 4, 503);
 
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(40000))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(40000))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]), _,
@@ -253,9 +262,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   loadRq(cluster_.hosts_, 200, 200);
   loadRq(cluster_.hosts_[4], 200, 503);
 
-  EXPECT_CALL(time_source_, currentSystemTime())
+  EXPECT_CALL(time_source_, currentTime())
       .Times(2)
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(10000))));
+      .WillRepeatedly(Return(MonotonicTime(std::chrono::milliseconds(10000))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4]), _,
@@ -271,16 +280,16 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
   // Interval that doesn't bring the host back in.
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(19999))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(19999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_TRUE(cluster_.hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
   // Interval that does bring the host back in.
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(50001))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(50001))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[4])));
@@ -293,8 +302,8 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRate) {
   loadRq(cluster_.hosts_, 25, 200);
   loadRq(cluster_.hosts_[4], 25, 503);
 
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(60001))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(60001))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
@@ -314,8 +323,8 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
 
   loadRq(cluster_.hosts_[0], 4, 503);
 
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(0))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]), _,
@@ -330,8 +339,8 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
 
   EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(9999))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(9999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
 }
@@ -353,8 +362,8 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
 
   loadRq(cluster_.hosts_[0], 4, 503);
 
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(0))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]), _,
@@ -457,8 +466,8 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   loadRq(cluster_.hosts_[0], 1, 503);
 
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(0))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]), _,
@@ -484,8 +493,8 @@ TEST_F(OutlierDetectorImplTest, Consecutive5xxAlreadyEjected) {
   // Cause a consecutive 5xx error.
   loadRq(cluster_.hosts_[0], 4, 503);
 
-  EXPECT_CALL(time_source_, currentSystemTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(0))));
+  EXPECT_CALL(time_source_, currentTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(0))));
   EXPECT_CALL(checker_, check(cluster_.hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(cluster_.hosts_[0]), _,
@@ -513,36 +522,39 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster));
   NiceMock<MockSystemTimeSource> time_source;
+  NiceMock<MockMonotonicTimeSource> monotonic_time_source;
   Optional<SystemTime> time;
+  Optional<MonotonicTime> monotonic_time;
   NiceMock<MockDetector> detector;
 
   EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
-  EventLoggerImpl event_logger(log_manager, "foo", time_source);
+  EventLoggerImpl event_logger(log_manager, "foo", time_source, monotonic_time_source);
 
   std::string log1;
-  EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(time));
+  EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"-1\", \"cluster\": "
                            "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
                            "\"eject\", \"type\": \"5xx\", \"num_ejections\": \"0\", "
                            "\"enforced\": \"true\"}\n")).WillOnce(SaveArg<0>(&log1));
   event_logger.logEject(host, detector, EjectionType::Consecutive5xx, true);
-  Json::Factory::LoadFromString(log1);
+  Json::Factory::loadFromString(log1);
 
   std::string log2;
-  EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(time));
+  EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"-1\", \"cluster\": \"fake_cluster\", "
                            "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
                            "\"num_ejections\": 0}\n")).WillOnce(SaveArg<0>(&log2));
   event_logger.logUneject(host);
-  Json::Factory::LoadFromString(log2);
+  Json::Factory::loadFromString(log2);
 
   // now test with time since last action.
-  time.value(time_source.currentSystemTime() - std::chrono::seconds(30));
+  time.value(time_source.currentTime() - std::chrono::seconds(30));
+  monotonic_time.value(monotonic_time_source.currentTime() - std::chrono::seconds(30));
 
   std::string log3;
-  EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(time));
+  EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
   EXPECT_CALL(host->outlier_detector_, successRate()).WillOnce(Return(-1));
   EXPECT_CALL(detector, successRateAverage()).WillOnce(Return(-1));
   EXPECT_CALL(detector, successRateEjectionThreshold()).WillOnce(Return(-1));
@@ -555,16 +567,16 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                            "\"-1\", \"cluster_success_rate_ejection_threshold\": \"-1\""
                            "}\n")).WillOnce(SaveArg<0>(&log3));
   event_logger.logEject(host, detector, EjectionType::SuccessRate, false);
-  Json::Factory::LoadFromString(log3);
+  Json::Factory::loadFromString(log3);
 
   std::string log4;
-  EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(time));
+  EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"30\", \"cluster\": \"fake_cluster\", "
                            "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
                            "\"num_ejections\": 0}\n")).WillOnce(SaveArg<0>(&log4));
   event_logger.logUneject(host);
-  Json::Factory::LoadFromString(log4);
+  Json::Factory::loadFromString(log4);
 }
 
 TEST(OutlierUtility, SRThreshold) {

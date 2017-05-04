@@ -1,3 +1,8 @@
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/network/utility.h"
 #include "common/upstream/logical_dns_cluster.h"
 
@@ -8,6 +13,9 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -17,7 +25,7 @@ namespace Upstream {
 class LogicalDnsClusterTest : public testing::Test {
 public:
   void setup(const std::string& json) {
-    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+    Json::ObjectPtr config = Json::Factory::loadFromString(json);
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     cluster_.reset(new LogicalDnsCluster(*config, runtime_, stats_store_, ssl_context_manager_,
                                          dns_resolver_, tls_, dispatcher_));

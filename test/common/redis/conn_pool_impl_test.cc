@@ -1,3 +1,6 @@
+#include <memory>
+#include <string>
+
 #include "common/network/utility.h"
 #include "common/redis/conn_pool_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -6,6 +9,10 @@
 #include "test/mocks/redis/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Eq;
@@ -45,7 +52,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+    Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
     config_.reset(new ConfigImpl(*json_config));
 
     upstream_connection_ = new NiceMock<Network::MockClientConnection>();
@@ -311,7 +318,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
 
   ClientFactoryImpl factory;
   Upstream::MockHost::MockCreateConnectionData conn_info;
@@ -333,7 +340,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+    Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
     conn_pool_.reset(new InstanceImpl(cluster_name_, cm_, *this, tls_, *json_config));
   }
 

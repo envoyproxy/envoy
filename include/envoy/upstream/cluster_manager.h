@@ -1,5 +1,11 @@
 #pragma once
 
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <string>
+#include <unordered_map>
+
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/json/json_object.h"

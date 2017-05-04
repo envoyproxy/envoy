@@ -1,9 +1,19 @@
 #pragma once
 
+#include <condition_variable>
+#include <list>
+#include <mutex>
+#include <string>
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
 
 #include "common/http/header_map_impl.h"
+
+#include "test/test_common/printers.h"
+
+#include "gtest/gtest.h"
 
 #define EXPECT_THROW_WITH_MESSAGE(statement, expected_exception, message)                          \
   try {                                                                                            \
@@ -36,6 +46,15 @@ public:
    */
   static std::list<Network::Address::InstanceConstSharedPtr>
   makeDnsResponse(const std::list<std::string>& addresses);
+
+  /**
+   * List files in a given directory path
+   *
+   * @param path directory path to list
+   * @param recursive whether or not to traverse subdirectories
+   * @return std::vector<std::string> filenames
+   */
+  static std::vector<std::string> listFiles(const std::string& path, bool recursive);
 };
 
 /**

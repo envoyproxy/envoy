@@ -1,5 +1,9 @@
 #include "server/config/http/buffer.h"
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "common/http/filter/buffer_filter.h"
 #include "common/json/config_schemas.h"
 

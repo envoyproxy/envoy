@@ -1,10 +1,19 @@
+#include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/common/utility.h"
 #include "common/http/access_log/access_log_formatter.h"
 #include "common/http/header_map_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;

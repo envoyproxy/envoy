@@ -3,6 +3,11 @@
 # Run a single Bazel test target under gdb. Usage:
 #
 # tools/bazel-test-gdb //test/foo:bar --some_other --bazel_args
+#
+# The default build type ("fastbuild") does not generate debugging symbols so
+# you almost certainly want to use "-c opt" or "-c dbg" Bazel arguments to
+# trigger generation of debug symbols.  By default the "opt" build type does not
+# include symbols for tests: see bazel/envoy_build_system.bzl for details.
 
 if [[ ! "$1" =~ (@[a-zA-Z0-9_-]+)?//.*:[a-zA-Z0-9_-]+ ]]
 then

@@ -10,8 +10,8 @@ CXX ?= g++
 
 # If $(BUILD_DISTINCT) is set in the make environment, the artifacts are built and installed in
 # distinct directories under $(THIRDPARTY_BUILD) and $(THIRDPARTY_SRC). They end up looking like
-# $(THIRDPARTY_BUILD)/protobuf.dep/include, $(THIRDPARTY_BUILD)/cotire.dep/include etc. instead of
-# all being under $(THIRDPARTY_BUILD)/include.
+# $(THIRDPARTY_BUILD)/protobuf.dep/include, etc. instead of all being under
+# $(THIRDPARTY_BUILD)/include.
 DISTINCT_PATH = $(if $(BUILD_DISTINCT),$(@F),)
 
 build-setup = rm -rf $@.build && \

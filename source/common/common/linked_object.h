@@ -1,5 +1,8 @@
 #pragma once
 
+#include <list>
+#include <memory>
+
 #include "common/common/assert.h"
 
 /**

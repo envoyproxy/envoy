@@ -1,5 +1,9 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"

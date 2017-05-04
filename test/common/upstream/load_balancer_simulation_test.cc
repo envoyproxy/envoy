@@ -1,3 +1,7 @@
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -5,6 +9,10 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "spdlog/spdlog.h"
 
 using testing::NiceMock;
 using testing::Return;

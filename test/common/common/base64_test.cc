@@ -1,6 +1,11 @@
-#include "common/buffer/buffer_impl.h"
+#include <string>
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/base64.h"
+
+#include "test/test_common/printers.h"
+
+#include "gtest/gtest.h"
 
 TEST(Base64Test, EmptyBufferEncode) {
   {

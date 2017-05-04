@@ -1,5 +1,9 @@
 #pragma once
 
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/mongo/bson.h"

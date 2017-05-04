@@ -1,9 +1,20 @@
 #include "common/network/address_impl.h"
 
+#include <arpa/inet.h>
+#include <netinet/ip.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+
+#include <array>
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Network {
 namespace Address {

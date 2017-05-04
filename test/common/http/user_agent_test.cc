@@ -2,7 +2,10 @@
 #include "common/http/user_agent.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Http {
 

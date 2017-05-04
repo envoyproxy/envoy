@@ -1,5 +1,9 @@
 #include "common/stats/statsd.h"
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -8,6 +12,8 @@
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+
+#include "spdlog/spdlog.h"
 
 namespace Stats {
 namespace Statsd {

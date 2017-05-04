@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/common/pure.h"
 
 namespace Init {

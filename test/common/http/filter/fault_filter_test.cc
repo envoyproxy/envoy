@@ -1,3 +1,8 @@
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -10,7 +15,11 @@
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
@@ -87,7 +96,7 @@ public:
     )EOF";
 
   void SetUpTest(const std::string json) {
-    Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+    Json::ObjectPtr config = Json::Factory::loadFromString(json);
     config_.reset(new FaultFilterConfig(*config, runtime_, "", stats_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
@@ -116,7 +125,7 @@ TEST(FaultFilterBadConfigTest, EmptyConfig) {
   )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -132,7 +141,7 @@ TEST(FaultFilterBadConfigTest, BadAbortPercent) {
   )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -147,7 +156,7 @@ TEST(FaultFilterBadConfigTest, MissingHTTPStatus) {
   )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -164,7 +173,7 @@ TEST(FaultFilterBadConfigTest, BadDelayType) {
   )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -181,7 +190,7 @@ TEST(FaultFilterBadConfigTest, BadDelayPercent) {
   )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -198,7 +207,7 @@ TEST(FaultFilterBadConfigTest, BadDelayDuration) {
    )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -214,7 +223,7 @@ TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
    )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }

@@ -1,3 +1,9 @@
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "common/filesystem/filesystem_impl.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
@@ -8,7 +14,12 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
@@ -33,7 +44,7 @@ protected:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::LoadFromString(raw_config);
+    Json::ObjectPtr config = Json::Factory::loadFromString(raw_config);
 
     timer_ = new Event::MockTimer(&dispatcher_);
     local_info_.zone_name_ = "us-east-1a";
@@ -122,8 +133,8 @@ TEST_F(SdsTest, NoHealthChecker) {
 
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json")));
+  message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
+      TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response.json"))));
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -150,8 +161,9 @@ TEST_F(SdsTest, NoHealthChecker) {
 
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_weight_change.json")));
+  message->body().reset(
+      new Buffer::OwnedImpl(Filesystem::fileReadToEnd(TestEnvironment::runfilesPath(
+          "test/common/upstream/test_data/sds_response_weight_change.json"))));
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
@@ -210,8 +222,8 @@ TEST_F(SdsTest, HealthChecker) {
   // all the hosts to load in unhealthy.
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response.json")));
+  message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
+      TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response.json"))));
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
@@ -256,8 +268,8 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json")));
+  message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
+      TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response_2.json"))));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(14UL, cluster_->hosts().size());
   EXPECT_EQ(13UL, cluster_->healthyHosts().size());
@@ -276,8 +288,8 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_2.json")));
+  message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
+      TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response_2.json"))));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());
@@ -295,8 +307,8 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*timer_, enableTimer(_));
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(
-      Filesystem::fileReadToEnd("test/common/upstream/test_data/sds_response_3.json")));
+  message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
+      TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response_3.json"))));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(13UL, cluster_->hosts().size());
   EXPECT_EQ(12UL, cluster_->healthyHosts().size());

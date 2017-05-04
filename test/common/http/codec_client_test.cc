@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/http/codec_client.h"
 #include "common/http/exception.h"
@@ -10,7 +12,11 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;

@@ -1,5 +1,10 @@
 #pragma once
 
+#include <unistd.h>
+
+#include <memory>
+#include <string>
+
 #include "envoy/network/listen_socket.h"
 
 #include "common/ssl/context_impl.h"

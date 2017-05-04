@@ -1,6 +1,9 @@
+#include <string>
+
 #include "envoy/network/connection.h"
 
 #include "common/filter/echo.h"
+
 #include "server/configuration_impl.h"
 
 namespace Server {

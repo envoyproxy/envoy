@@ -1,8 +1,11 @@
 #pragma once
 
+#include <functional>
+#include <memory>
+
 #include "envoy/common/pure.h"
-#include "envoy/http/codec.h"
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/http/codec.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Http {

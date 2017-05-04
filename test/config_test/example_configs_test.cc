@@ -1,5 +1,8 @@
 #include "test/config_test/config_test.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(

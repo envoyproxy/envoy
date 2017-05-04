@@ -1,6 +1,12 @@
-package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
 
 envoy_cc_library(
     name = "codec_lib",
@@ -14,6 +20,7 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:to_lower_table_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codec_helper_lib",
         "//source/common/http:codes_lib",

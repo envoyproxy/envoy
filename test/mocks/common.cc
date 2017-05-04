@@ -5,3 +5,6 @@ ReadyWatcher::~ReadyWatcher() {}
 
 MockSystemTimeSource::MockSystemTimeSource() {}
 MockSystemTimeSource::~MockSystemTimeSource() {}
+
+MockMonotonicTimeSource::MockMonotonicTimeSource() {}
+MockMonotonicTimeSource::~MockMonotonicTimeSource() {}

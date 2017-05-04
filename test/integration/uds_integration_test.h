@@ -1,12 +1,14 @@
 #pragma once
 
+#include "common/http/codec_client.h"
+#include "common/stats/stats_impl.h"
+
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/server.h"
 #include "test/test_common/environment.h"
 
-#include "common/http/codec_client.h"
-#include "common/stats/stats_impl.h"
+#include "gtest/gtest.h"
 
 class UdsIntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:

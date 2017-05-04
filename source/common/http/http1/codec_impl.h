@@ -1,10 +1,17 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/to_lower_table.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
 
@@ -145,13 +152,6 @@ protected:
 private:
   enum class HeaderParsingState { Field, Value, Done };
 
-  struct ToLowerTable {
-    ToLowerTable();
-    void toLowerCase(HeaderString& text) const;
-
-    std::array<uint8_t, 256> table_;
-  };
-
   /**
    * Called in order to complete an in progress header decode.
    */
@@ -223,7 +223,7 @@ private:
   virtual void sendProtocolError() PURE;
 
   static http_parser_settings settings_;
-  static const ToLowerTable to_lower_table_;
+  static const ToLowerTable& toLowerTable();
 
   HeaderMapImplPtr current_header_map_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};

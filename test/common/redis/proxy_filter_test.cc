@@ -1,9 +1,16 @@
+#include <memory>
+#include <string>
+
 #include "common/redis/proxy_filter.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/redis/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/printers.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ByRef;
@@ -27,7 +34,7 @@ TEST(RedisProxyFilterConfigTest, Normal) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Upstream::MockClusterManager> cm;
   Stats::IsolatedStoreImpl store;
   ProxyFilterConfig config(*json_config, cm, store);
@@ -43,7 +50,7 @@ TEST(RedisProxyFilterConfigTest, InvalidCluster) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Upstream::MockClusterManager> cm;
   Stats::IsolatedStoreImpl store;
   EXPECT_CALL(cm, get("fake_cluster")).WillOnce(Return(nullptr));
@@ -58,7 +65,7 @@ TEST(RedisProxyFilterConfigTest, BadRedisProxyConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Upstream::MockClusterManager> cm;
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW(ProxyFilterConfig(*json_config, cm, store), Json::Exception);
@@ -75,7 +82,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr json_config = Json::Factory::LoadFromString(json_string);
+    Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
     NiceMock<Upstream::MockClusterManager> cm;
     config_.reset(new ProxyFilterConfig(*json_config, cm, store_));
     filter_.reset(new ProxyFilter(*this, EncoderPtr{encoder_}, splitter_, config_));

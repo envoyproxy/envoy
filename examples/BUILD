@@ -1,4 +1,11 @@
-package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # Apache 2
+
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_package",
+)
+
+envoy_package()
 
 filegroup(
     name = "configs",
