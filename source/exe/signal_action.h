@@ -30,15 +30,18 @@
  * The signal handler must run on an alternative stack so that we can do the
  * stack unwind on the original stack. Memory is allocated for this purpose when
  * this object is constructed. When this object goes out of scope the memory
- * used for the alternate signal stack is destroyed and the default signal handler
- * is restored.
+ * used for the alternate signal stack is destroyed and the previous signal handler
+ * and alt stack if previously used are restored.
  *
- * NOTE: Existing non-default signal handlers are overridden and will not be
- * restored. If this behavior is ever required it can be implemented.
+ * Note that we do NOT restore the previously saved sigaction and alt stack in
+ * the signal handler itself. This is fraught with complexity and has little
+ * benefit. The inner most scope SignalAction will terminate the process by
+ * re-raising the fatal signal with default handler.
  *
  * It is recommended that this object be instantiated at the highest possible
  * scope, eg, in main(). This enables fatal signal handling for almost all code
- * executed.
+ * executed.  Because of the save-and-restore behavior it is possible for
+ * SignalAction to be used at both wider and tighter scopes without issue.
  */
 class SignalAction : NonCopyable {
 public:
@@ -79,8 +82,10 @@ private:
    * This constant array defines the signals we will insert handlers for.
    *
    * Essentially this is the list of signals that would cause a core dump.
+   * The object will contain an array of struct sigactions with the same number
+   * of elements that are in this array.
    */
-  static constexpr int FATAL_SIGS[] = {SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGSEGV};
+  static const constexpr int FATAL_SIGS[] = {SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGSEGV};
   /**
    * Return the memory size we actually map including two guard pages.
    */
@@ -114,4 +119,6 @@ private:
    */
   void unmapStackMemory();
   char* altstack_;
+  std::array<struct sigaction, sizeof(FATAL_SIGS) / sizeof(int)> previous_handlers_;
+  stack_t previous_altstack_;
 };
