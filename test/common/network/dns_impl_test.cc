@@ -240,10 +240,23 @@ private:
   DnsResolverImpl* resolver_;
 };
 
+TEST(DnsImplConstructor, SupportsCustomResolvers) {
+  Event::DispatcherImpl dispatcher;
+  auto resolver = dispatcher.createDnsResolver({"127.0.0.1:53"});
+  auto peer = new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 53);
+  EXPECT_STREQ(inet_ntoa(resolvers->addr.addr4), "127.0.0.1");
+  ares_free_data(resolvers);
+}
+
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   void SetUp() override {
-    resolver_ = dispatcher_.createDnsResolver();
+    resolver_ = dispatcher_.createDnsResolver({});
 
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_.reset(new TestDnsServer());

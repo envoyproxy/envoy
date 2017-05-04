@@ -20,6 +20,7 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
+#include "common/network/dns_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/connection_impl.h"
 #include "common/ssl/context_config_impl.h"
@@ -118,11 +119,27 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
   if (string_type == "static") {
     new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager));
   } else if (string_type == "strict_dns") {
-    new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                               dns_resolver, dispatcher));
+    if (cluster.hasObject("dns_resolvers")) {
+      auto resolvers = cluster.getStringArray("dns_resolvers");
+      Network::DnsResolverPtr custom_dns_resolver{
+          new Network::DnsResolverImpl(dispatcher, resolvers)};
+      new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
+                                                 *custom_dns_resolver,
+                                                 std::move(custom_dns_resolver), dispatcher));
+    } else {
+      new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
+                                                 dns_resolver, nullptr, dispatcher));
+    }
   } else if (string_type == "logical_dns") {
-    new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager,
-                                            dns_resolver, tls, dispatcher));
+    if (cluster.hasObject("dns_resolvers")) {
+      auto resolvers = cluster.getStringArray("dns_resolvers");
+      Network::DnsResolverPtr custom_dns_resolver{
+          new Network::DnsResolverImpl(dispatcher, resolvers)};
+      new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager, *custom_dns_resolver, std::move(custom_dns_resolver), tls, dispatcher));
+    } else {
+
+      new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager, dns_resolver, nullptr, tls, dispatcher));
+    }
   } else {
     ASSERT(string_type == "sds");
     if (!sds_config.valid()) {
@@ -366,10 +383,13 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
                                            Stats::Store& stats,
                                            Ssl::ContextManager& ssl_context_manager,
                                            Network::DnsResolver& dns_resolver,
+                                           Network::DnsResolverPtr custom_dns_resolver,
                                            Event::Dispatcher& dispatcher)
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
-      dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
-                                       config.getInteger("dns_refresh_rate_ms", 5000))) {
+      dns_resolver_(dns_resolver), custom_dns_resolver_(std::move(custom_dns_resolver)),
+      dns_refresh_rate_ms_(
+          std::chrono::milliseconds(config.getInteger("dns_refresh_rate_ms", 5000))) {
+
   std::string dns_lookup_family = config.getString("dns_lookup_family", "v4_only");
   if (dns_lookup_family == "v6_only") {
     dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
@@ -383,6 +403,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
   for (Json::ObjectSharedPtr host : config.getObjectArray("hosts")) {
     resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, host->getString("url")));
   }
+
   // We have to first construct resolve_targets_ before invoking startResolve(),
   // since startResolve() might resolve immediately and relies on
   // resolve_targets_ indirectly for performing host updates on resolution.

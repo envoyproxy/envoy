@@ -122,6 +122,15 @@ std::vector<std::string> StringUtil::split(const std::string& source, const std:
   return ret;
 }
 
+std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {
+  std::stringstream ret;
+  for (auto it = source.begin(); it != source.end(); ++it) {
+    ret << (*it);
+    ret << delimiter;
+  }
+  return ret.str();
+}
+
 std::string StringUtil::subspan(const std::string& source, size_t start, size_t end) {
   return source.substr(start, end - start);
 }

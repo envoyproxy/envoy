@@ -13,9 +13,9 @@ namespace Upstream {
 
 LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime,
                                      Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                                     Network::DnsResolver& dns_resolver, ThreadLocal::Instance& tls,
+                                     Network::DnsResolver& dns_resolver, Network::DnsResolverPtr custom_dns_resolver, ThreadLocal::Instance& tls,
                                      Event::Dispatcher& dispatcher)
-    : ClusterImplBase(config, runtime, stats, ssl_context_manager), dns_resolver_(dns_resolver),
+    : ClusterImplBase(config, runtime, stats, ssl_context_manager), dns_resolver_(dns_resolver), custom_dns_resolver_(std::move(custom_dns_resolver)),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(config.getInteger("dns_refresh_rate_ms", 5000))),
       tls_(tls), tls_slot_(tls.allocateSlot()), initialized_(false),

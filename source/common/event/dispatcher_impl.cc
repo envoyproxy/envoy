@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <mutex>
+#include <string>
 #include <vector>
 
 #include "envoy/network/listen_socket.h"
@@ -73,8 +74,8 @@ DispatcherImpl::createSslClientConnection(Ssl::ClientContext& ssl_ctx,
   return Network::ClientConnectionPtr{new Ssl::ClientConnectionImpl(*this, ssl_ctx, address)};
 }
 
-Network::DnsResolverPtr DispatcherImpl::createDnsResolver() {
-  return Network::DnsResolverPtr{new Network::DnsResolverImpl(*this)};
+Network::DnsResolverPtr DispatcherImpl::createDnsResolver(std::vector<std::string> resolvers) {
+  return Network::DnsResolverPtr{new Network::DnsResolverImpl(*this, resolvers)};
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,

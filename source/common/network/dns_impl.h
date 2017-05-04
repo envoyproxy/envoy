@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"
+#include "common/common/utility.h"
 
 #include "common/common/linked_object.h"
 
@@ -25,7 +26,7 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver {
 public:
-  DnsResolverImpl(Event::Dispatcher& dispatcher);
+  DnsResolverImpl(Event::Dispatcher& dispatcher, std::vector<std::string> resolvers);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver

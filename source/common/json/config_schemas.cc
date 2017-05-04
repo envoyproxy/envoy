@@ -1205,6 +1205,10 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "enum" : ["http2"]
       },
       "http_codec_options" : {"type" : "string"},
+      "dns_resolvers": {
+        "type" : "array",
+        "items" : {"type" : "string"}
+      },
       "dns_refresh_rate_ms" : {
         "type" : "integer",
         "minimum" : 0,

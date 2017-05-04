@@ -38,8 +38,8 @@ public:
   HostDescriptionImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                       Network::Address::InstanceConstSharedPtr address, bool canary,
                       const std::string& zone)
-      : cluster_(cluster), hostname_(hostname), address_(address), canary_(canary), zone_(zone),
-        stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {}
+      : cluster_(cluster), hostname_(hostname), address_(address), canary_(canary),
+        zone_(zone), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))} {}
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -321,7 +321,7 @@ class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   StrictDnsClusterImpl(const Json::Object& config, Runtime::Loader& runtime, Stats::Store& stats,
                        Ssl::ContextManager& ssl_context_manager, Network::DnsResolver& dns_resolver,
-                       Event::Dispatcher& dispatcher);
+                       Network::DnsResolverPtr custom_dns_resolver, Event::Dispatcher& dispatcher);
 
   // Upstream::Cluster
   void initialize() override {}
@@ -348,6 +348,8 @@ private:
                       const std::vector<HostSharedPtr>& hosts_removed);
 
   Network::DnsResolver& dns_resolver_;
+  // owning pointer in case we use a custom resolver
+  Network::DnsResolverPtr custom_dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;

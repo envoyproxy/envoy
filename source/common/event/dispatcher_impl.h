@@ -36,7 +36,7 @@ public:
   Network::ClientConnectionPtr
   createSslClientConnection(Ssl::ClientContext& ssl_ctx,
                             Network::Address::InstanceConstSharedPtr address) override;
-  Network::DnsResolverPtr createDnsResolver() override;
+  Network::DnsResolverPtr createDnsResolver(std::vector<std::string> resolvers) override;
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;

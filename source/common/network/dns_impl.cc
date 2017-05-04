@@ -19,7 +19,7 @@
 namespace Envoy {
 namespace Network {
 
-DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher)
+DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher, std::vector<std::string> resolvers)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
   // This is also done in main(), to satisfy the requirement that c-ares is
@@ -28,7 +28,16 @@ DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher)
   // launch via main().
   ares_library_init(ARES_LIB_INIT_ALL);
   ares_options options;
+
   initializeChannel(&options, 0);
+
+  if (resolvers.size() > 0) {
+    std::string resolvers_csv = StringUtil::join(resolvers, ",");
+    int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
+    if (result != ARES_SUCCESS) {
+      throw EnvoyException(fmt::format("dns: error setting resolvers: {}", result));
+    }
+  }
 }
 
 DnsResolverImpl::~DnsResolverImpl() {

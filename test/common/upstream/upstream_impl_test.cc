@@ -126,7 +126,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
       }));
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
-                               dispatcher);
+                               nullptr, dispatcher);
   cluster.setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_EQ(2UL, cluster.hosts().size());
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
@@ -173,7 +173,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
-                               dispatcher);
+                               nullptr, dispatcher);
   EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(57U,
             cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
