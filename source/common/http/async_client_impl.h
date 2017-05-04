@@ -169,7 +169,7 @@ private:
     RouteEntryImpl route_entry_;
   };
 
-  struct NullSpan: public Tracing::Span {
+  struct NullSpan : public Tracing::Span {
 
     // Tracing::Span
     void setTag(const std::string&, const std::string&) override { NOT_IMPLEMENTED; }
