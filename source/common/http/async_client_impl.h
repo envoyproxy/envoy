@@ -25,6 +25,7 @@
 #include "common/http/access_log/request_info_impl.h"
 #include "common/http/message_impl.h"
 #include "common/router/router.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
 
@@ -169,13 +170,6 @@ private:
     RouteEntryImpl route_entry_;
   };
 
-  struct NullSpan : public Tracing::Span {
-
-    // Tracing::Span
-    void setTag(const std::string&, const std::string&) override { NOT_IMPLEMENTED; }
-    void finishSpan() override { NOT_IMPLEMENTED; }
-  };
-
   void cleanup();
   void closeLocal(bool end_stream);
   void closeRemote(bool end_stream);
@@ -207,7 +201,7 @@ private:
   Router::ProdFilter router_;
   std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
-  NullSpan active_span_;
+  Tracing::NullSpan active_span_;
   std::shared_ptr<RouteImpl> route_;
   bool local_closed_{};
   bool remote_closed_{};
