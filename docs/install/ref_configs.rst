@@ -33,7 +33,7 @@ To generate the example configurations run the following from the root of the re
 .. code-block:: console
 
   mkdir -p generated/configs
-  configs/configgen.sh generated/configs
+  python ./configs/configgen.py generated/configs
 
 The previous command will produce three fully expanded configurations using some variables
 defined inside of `configgen.py`. See the comments inside of `configgen.py` for detailed
