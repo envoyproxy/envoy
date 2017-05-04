@@ -90,17 +90,17 @@ filegroup(
 
 cc_library(
     name = "rapidjson",
-    hdrs = glob(["thirdparty/rapidjson-1.1.0/include/**/*.h"]),
-    includes = ["thirdparty/rapidjson-1.1.0/include"],
+    hdrs = glob(["thirdparty/rapidjson/include/**/*.h"]),
+    includes = ["thirdparty/rapidjson/include"],
 )
 
 cc_library(
     name = "spdlog",
     hdrs = glob([
-        "thirdparty/spdlog-0.11.0/include/**/*.cc",
-        "thirdparty/spdlog-0.11.0/include/**/*.h",
+        "thirdparty/spdlog/include/**/*.cc",
+        "thirdparty/spdlog/include/**/*.h",
     ]),
-    includes = ["thirdparty/spdlog-0.11.0/include"],
+    includes = ["thirdparty/spdlog/include"],
 )
 
 cc_library(
@@ -111,8 +111,8 @@ cc_library(
 
 cc_library(
     name = "tclap",
-    hdrs = glob(["thirdparty/tclap-1.2.1/include/**/*.h"]),
-    includes = ["thirdparty/tclap-1.2.1/include"],
+    hdrs = glob(["thirdparty/tclap/include/**/*.h"]),
+    includes = ["thirdparty/tclap/include"],
 )
 
 cc_library(
