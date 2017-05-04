@@ -1,5 +1,5 @@
 #!/bin/bash
-ENVOY_BUILD_SHA=060cb67f0772a425a8ceaf30d28421967d69c0c6
+ENVOY_BUILD_SHA=f7f2a34fe7dcfb39a81ed21728c8df2af223bbb0
 
 # Script that lists all the steps take by the CI system when doing Envoy builds.
 set -e
@@ -17,6 +17,12 @@ then
   ./docs/build.sh
   ./docs/publish.sh
   exit 0
+elif [ "$TEST_TYPE" == "build_image" ]
+then
+  # The script builds lyft/envoy-build and pushes that image when ci/build_container
+  # has changed on a push to master.
+  echo "lyft/envoy-build pushing..."
+  ./ci/build_container/docker_push.sh
 else
   docker run -t -i -v "$ENVOY_BUILD_DIR":/build -v $TRAVIS_BUILD_DIR:/source \
     lyft/envoy-build:$ENVOY_BUILD_SHA /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
