@@ -20,8 +20,10 @@ envoy_cc_test_library(
     deps = [
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
-        "//source/exe:sigaction_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:printers_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": ["//source/exe:sigaction_lib"],
+    }),
 )
