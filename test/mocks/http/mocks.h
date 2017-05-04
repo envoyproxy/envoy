@@ -20,6 +20,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 
@@ -210,6 +211,7 @@ public:
   std::function<void()> reset_callback_;
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<AccessLog::MockRequestInfo> request_info_;
+  std::shared_ptr<Tracing::MockSpan> active_span_;
   std::shared_ptr<Router::MockRoute> route_;
   std::string downstream_address_;
 };
@@ -229,6 +231,7 @@ public:
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
+  MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
 
   // Http::StreamDecoderFilterCallbacks
@@ -261,6 +264,7 @@ public:
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
+  MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
 
   // Http::StreamEncoderFilterCallbacks

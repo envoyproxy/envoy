@@ -18,6 +18,7 @@
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
@@ -168,6 +169,13 @@ private:
     RouteEntryImpl route_entry_;
   };
 
+  struct NullSpan: public Tracing::Span {
+
+    // Tracing::Span
+    void setTag(const std::string&, const std::string&) override { NOT_IMPLEMENTED; }
+    void finishSpan() override { NOT_IMPLEMENTED; }
+  };
+
   void cleanup();
   void closeLocal(bool end_stream);
   void closeRemote(bool end_stream);
@@ -184,6 +192,7 @@ private:
   Router::RouteConstSharedPtr route() override { return route_; }
   uint64_t streamId() override { return stream_id_; }
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
+  Tracing::Span& activeSpan() override { return active_span_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
   Buffer::InstancePtr& decodingBuffer() override {
@@ -198,6 +207,7 @@ private:
   Router::ProdFilter router_;
   std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
+  NullSpan active_span_;
   std::shared_ptr<RouteImpl> route_;
   bool local_closed_{};
   bool remote_closed_{};
