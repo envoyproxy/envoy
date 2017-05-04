@@ -10,7 +10,7 @@ envoy_dependencies(
 
 new_local_repository(
     name = "protobuf_bzl",
-    path = "/thirdparty/protobuf-3.2.0",
+    path = "/thirdparty/protobuf",
     # We only want protobuf.bzl, so don't support building out of this repo.
     build_file_content = "",
 )

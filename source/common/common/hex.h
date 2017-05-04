@@ -32,4 +32,10 @@ public:
    * @return binary data
    */
   static std::vector<uint8_t> decode(const std::string& input);
+
+  /**
+   * Converts the given 64-bit integer into a hexadecimal string.
+   * @param value The integer to be converted.
+   */
+  static std::string uint64ToHex(uint64_t value);
 };
