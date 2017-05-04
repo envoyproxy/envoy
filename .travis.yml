@@ -1,4 +1,4 @@
-language: minimal
+language: cpp
 sudo: required
 services:
   - docker
