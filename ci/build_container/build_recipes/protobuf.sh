@@ -7,6 +7,7 @@ VERSION=3.2.0
 wget -O protobuf-$VERSION.tar.gz https://github.com/google/protobuf/releases/download/v$VERSION/protobuf-cpp-$VERSION.tar.gz
 tar xf protobuf-$VERSION.tar.gz
 rsync -av protobuf-$VERSION $THIRDPARTY_SRC
+rsync -av protobuf-$VERSION/* $THIRDPARTY_SRC/protobuf
 cd protobuf-$VERSION
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no
 make install
