@@ -60,7 +60,7 @@ Zipkin driver
   }
 
 collector_cluster
-  *(required, string)* The cluster manager cluster that hosts the LightStep collectors.
+  *(required, string)* The cluster manager cluster that hosts the Zipkin collectors.
 
 collector_endpoint
   *(required, string)* The API endpoint of the Zipkin service where the
