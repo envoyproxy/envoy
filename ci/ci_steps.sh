@@ -26,6 +26,10 @@ then
 else
   docker run -t -i -v "$ENVOY_BUILD_DIR":/build -v $TRAVIS_BUILD_DIR:/source \
     lyft/envoy-build:$ENVOY_BUILD_SHA /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
+  if [ "$TEST_TYPE" == "bazel.coverage" ]
+  then
+    ./ci/coverage_publish.sh
+  fi
 fi
 
 if [ "$TEST_TYPE" == "bazel.release" ]
