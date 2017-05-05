@@ -10,7 +10,7 @@ def _repository_impl(ctxt):
     for r in ctxt.attr.recipes:
         ctxt.symlink(Label("//ci/build_container/build_recipes:" + r + ".sh"),
                      "build_recipes/" + r + ".sh")
-    ctxt.symlink(Label("//ci/prebuilt:BUILD"), "BUILD")
+    ctxt.symlink(Label("//ci/prebuilt:BUILD.deps"), "BUILD")
 
     # Run the build script.
     environment = {}

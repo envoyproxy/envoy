@@ -57,6 +57,9 @@ export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=stand
 export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE \
   --cache_test_results=no --test_output=all"
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
+
+# Setup "${ENVOY_SRCDIR}" ci/prebuilt for prebuilt external deps.
+cp -f "${ENVOY_SRCDIR}"/ci/prebuilt/BUILD.deps "${ENVOY_SRCDIR}"/ci/prebuilt/BUILD
 ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
 ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
 
@@ -101,5 +104,7 @@ function cleanup() {
   rm -f "${ENVOY_CI_DIR}"/bazel-*
   rm -rf "${ENVOY_CI_DIR}"/bazel
   rm -rf "${ENVOY_CI_DIR}"/tools
+  rm -f "${ENVOY_SRCDIR}"/ci/prebuilt/BUILD
+  touch "${ENVOY_SRCDIR}"/ci/prebuilt/BUILD
 }
 trap cleanup EXIT
