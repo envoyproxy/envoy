@@ -22,7 +22,8 @@ http
 driver
   *(optional, object)* Provides the driver that handles trace and span creation.
 
-Currently only `LightStep <http://lightstep.com/>`_ is supported.
+Currently `LightStep <http://lightstep.com/>`_  and `Zipkin
+<http://zipkin.io>` drivers are supported.
 
 LightStep driver
 ----------------
@@ -43,3 +44,25 @@ access_token_file
 
 collector_cluster
   *(required, string)* The cluster manager cluster that hosts the LightStep collectors.
+
+
+Zipkin driver
+----------------
+
+.. code-block:: json
+
+  {
+    "type": "zipkin",
+    "config": {
+      "collector_cluster": "...",
+      "collector_endpoint": "..."
+    }
+  }
+
+collector_cluster
+  *(required, string)* The cluster manager cluster that hosts the LightStep collectors.
+
+collector_endpoint
+  *(required, string)* The API endpoint of the Zipkin service where the
+  spans will be sent. When using a standard Zipkin installation, the
+  API endpoint is typically `/api/v1/spans`.

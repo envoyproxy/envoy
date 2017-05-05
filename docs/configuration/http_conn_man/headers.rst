@@ -169,9 +169,11 @@ x-ot-span-context
 -----------------
 
 The *x-ot-span-context* HTTP header is used by Envoy to establish proper parent-child relationships
-between tracing spans for LightStep tracing. *x-ot-span-context* is a Base64 encoded
-`binary OT <https://github.com/opentracing/basictracer-go/blob/master/wire/wire.proto>`_ carrier.
-Envoy relies on data from the *x-ot-span-context* header to extract the parent
+between tracing spans. For the Lightstep tracer, *x-ot-span-context* is a base64 encoded
+`binary OT <https://github.com/opentracing/basictracer-go/blob/master/wire/wire.proto>`_
+carrier. For the Zipkin tracer, *x-ot-span-context* contains information
+about `client-send`, `server-receive`, `server-send` and `client-receive` annotations.
+In all cases, Envoy relies on data from the *x-ot-span-context* header to extract the parent
 context for the current span. For example, an egress span is a child of an ingress
 span (if the ingress span was present). Envoy injects the *x-ot-span-context* header on ingress requests and
 forwards it to the local service. Envoy relies on the application to propagate *x-ot-span-context* on
