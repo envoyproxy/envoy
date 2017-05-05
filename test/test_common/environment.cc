@@ -16,7 +16,6 @@
 
 #include "spdlog/spdlog.h"
 
-#include <regex>
 #if __cplusplus < 201103L ||                               \
     (defined(__GLIBCXX__) && (__cplusplus < 201402L) &&    \
         (!defined(_GLIBCXX_REGEX_DFS_QUANTIFIERS_LIMIT) && \
