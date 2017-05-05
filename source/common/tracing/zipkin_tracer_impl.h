@@ -138,6 +138,15 @@ private:
  */
 class ZipkinReporter : public Zipkin::Reporter, Http::AsyncClient::Callbacks {
 public:
+  /**
+   * Constructor.
+   *
+   * @param driver ZipkinDriver to be associated with the reporter.
+   * @param dispatcher Controls the timer used to flush buffered spans.
+   * @param collector_endpoint String representing the Zipkin endpoint to be used
+   * when making HTTP POST requests carrying spans. This value comes from the
+   * Zipkin-related tracing configuration.
+   */
   ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
                  const std::string& collector_endpoint);
 
@@ -160,6 +169,9 @@ public:
    *
    * @param driver ZipkinDriver to be associated with the reporter.
    * @param dispatcher Controls the timer used to flush buffered spans.
+   * @param collector_endpoint String representing the Zipkin endpoint to be used
+   * when making HTTP POST requests carrying spans. This value comes from the
+   * Zipkin-related tracing configuration.
    *
    * @return Pointer to the newly-created ZipkinReporter.
    */
