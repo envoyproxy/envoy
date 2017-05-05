@@ -26,6 +26,7 @@ front_envoy_clusters = {
     'service1': {},
     'service2': {},
     'service3': {},
+    'ratelimit': {}
 }
 
 # This is the set of internal services that local Envoys will route to. All services that will be
