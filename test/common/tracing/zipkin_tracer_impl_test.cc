@@ -42,7 +42,9 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));
     }
 
-    driver_.reset(new ZipkinDriver(config, cm_, stats_, tls_, runtime_, local_info_));
+    random_ = new NiceMock<Runtime::MockRandomGenerator>();
+
+    driver_.reset(new ZipkinDriver(config, cm_, stats_, tls_, runtime_, local_info_, *random_));
   }
 
   void setupValidDriver() {
@@ -74,6 +76,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Runtime::MockRandomGenerator>* random_;
 };
 
 TEST_F(ZipkinDriverTest, InitializeDriver) {
@@ -168,34 +171,24 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  std::cout << "XXX Before 1st startSpan" << std::endl;
   SpanPtr first_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  std::cout << "XXX After 1st startSpan" << std::endl;
   first_span->finishSpan();
-  std::cout << "XXX After 1st finishSpan" << std::endl;
 
-  std::cout << "XXX Before 2nd startSpan" << std::endl;
   SpanPtr second_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
-  std::cout << "XXX After 2nd startSpan" << std::endl;
   second_span->finishSpan();
-  std::cout << "XXX After 2nd finishSpan" << std::endl;
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "202"}}}));
 
-  std::cout << "XXX Before onSucess" << std::endl;
   callback->onSuccess(std::move(msg));
 
   EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
 
-  std::cout << "XXX Before onFailure" << std::endl;
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
-  std::cout << "XXX After onFailure" << std::endl;
 
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_dropped").value());
-  std::cout << "XXX END" << std::endl;
 }
 
 TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
@@ -284,7 +277,7 @@ TEST_F(ZipkinDriverTest, SerializeAndDeserializeContext) {
   injected_ctx = request_headers_.OtSpanContext()->value().c_str();
   EXPECT_FALSE(injected_ctx.empty());
 
-  // TODO(fabolive): need more tests for B3 annotations
+  // TODO(fabolive): need more end-to-end tests including valid context.
 }
 
 } // Tracing

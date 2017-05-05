@@ -60,7 +60,8 @@ public:
    * in all annotations' endpoints of the spans created by the Tracer.
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address)
-      : service_name_(service_name), address_(address), random_generator_(nullptr) {}
+      : service_name_(service_name), address_(address), reporter_(nullptr),
+        random_generator_(nullptr) {}
 
   /**
    * Creates a "root" Zipkin span.
@@ -85,8 +86,14 @@ public:
    */
   void reportSpan(Span&& span) override;
 
+  /**
+   * @return the service-name attribute associated with the Tracer.
+   */
   const std::string& serviceName() const { return service_name_; }
 
+  /**
+   * @return the pointer to the address object associated with the Tracer.
+   */
   const Network::Address::InstanceConstSharedPtr address() const { return address_; }
 
   /**
@@ -94,6 +101,10 @@ public:
    */
   void setReporter(ReporterPtr reporter);
 
+  /**
+   * @return the reporter associated with the Tracer.
+   * This is only implemented to support the move constructor.
+   */
   ReporterPtr reporter() { return std::move(reporter_); }
 
   /**
@@ -104,6 +115,10 @@ public:
    */
   void setRandomGenerator(Runtime::RandomGeneratorPtr random_generator);
 
+  /**
+   *  @return the random generator associated with the Tracer
+   *  This is only implemented to support the move constructor.
+   */
   Runtime::RandomGeneratorPtr randomGenerator() { return std::move(random_generator_); }
 
 private:

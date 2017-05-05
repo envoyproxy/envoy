@@ -110,8 +110,9 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   std::string type = driver->getString("type");
   log().info(fmt::format("  loading tracing driver: {}", type));
 
+  ::Runtime::RandomGenerator& rand = server_.random();
+
   if (type == "lightstep") {
-    ::Runtime::RandomGenerator& rand = server_.random();
     Json::ObjectPtr lightstep_config = driver->getObject("config");
 
     std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
@@ -137,9 +138,9 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
                            "--service-cluster option.");
     }
 
-    Tracing::DriverPtr zipkin_driver(
-        new Tracing::ZipkinDriver(*driver->getObject("config"), *cluster_manager_, server_.stats(),
-                                  server_.threadLocal(), server_.runtime(), server_.localInfo()));
+    Tracing::DriverPtr zipkin_driver(new Tracing::ZipkinDriver(
+        *driver->getObject("config"), *cluster_manager_, server_.stats(), server_.threadLocal(),
+        server_.runtime(), server_.localInfo(), rand));
 
     http_tracer_.reset(new Tracing::HttpTracerImpl(std::move(zipkin_driver), server_.localInfo()));
   } else {

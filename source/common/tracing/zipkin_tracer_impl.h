@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -7,9 +8,8 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
-
-#include "zipkin/tracer.h"
-#include "zipkin/span_buffer.h"
+#include "common/tracing/zipkin/span_buffer.h"
+#include "common/tracing/zipkin/tracer.h"
 
 namespace Tracing {
 
@@ -23,13 +23,43 @@ struct ZipkinTracerStats {
   ZIPKIN_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+/**
+ * Class for Zipkin spans, wrapping a Zipkin::Span object.
+ */
 class ZipkinSpan : public Span {
 public:
+  /**
+   * Constructor. Wraps a Zipkin::Span object.
+   *
+   * @param span to be wrapped.
+   */
   ZipkinSpan(Zipkin::Span& span);
 
+  /**
+   * Calls Zipkin::Span::finishSpan() to perform all actions needed to finalize the span.
+   * This function is called by Tracing::HttpTracerUtility::finalizeSpan().
+   */
   void finishSpan() override;
+
+  /**
+   * This function adds a Zipkin "string" binary annotation to this span.
+   * In Zipkin, binary annotations of the type "string" allow arbitrary key-value pairs
+   * to be associated with a span.
+   *
+   * This function will only add the binary annotation to the span IF
+   * it contains the CS (Client Send) basic annotation. If this span contains the CS basic
+   * annotation then this Envoy instance initiated the span. Only the Envoy that initiates a Zipkin
+   * span should add binary annotations to it; otherwise, duplicate binary annotations
+   * would be created.
+
+   * Note that Tracing::HttpTracerUtility::finalizeSpan() makes several calls to this function,
+   * associating several key-value pairs with this span.
+   */
   void setTag(const std::string& name, const std::string& value) override;
 
+  /**
+   * @returns true if this span has a CS (Client Send) basic annotation, or false otherwise.
+   */
   bool hasCSAnnotation();
 
 private:
@@ -38,27 +68,48 @@ private:
 
 typedef std::unique_ptr<ZipkinSpan> ZipkinSpanPtr;
 
+/**
+ * Class for a Zipkin-specific Driver.
+ */
 class ZipkinDriver : public Driver {
 public:
+  /**
+   * Constructor. It adds itself and a newly-created Zipkin::Tracer object to a thread-local store.
+   * Also, it associates the given random-number generator to the Zipkin::Tracer object it creates.
+   */
   ZipkinDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-               const LocalInfo::LocalInfo& localinfo);
+               const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator);
 
+  /**
+   * This function is inherited from the abstract Driver class.
+   *
+   * It starts a new Zipkin span. Depending on the request headers, it can create a root span,
+   * a child span, or a shared-context span.
+   *
+   * The second parameter (operation_name) does not actually make sense for Zipkin.
+   * Thus, this implementation of the virtual function startSpan() ignores the operation name
+   * ("ingress" or "egress") passed by the caller.
+   */
   SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string&,
                     SystemTime start_time) override;
 
+  // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
   Upstream::ClusterInfoConstSharedPtr cluster() { return cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
 
 private:
+  /**
+   * Thread-local store containing ZipkinDriver and Zipkin::Tracer objects.
+   */
   struct TlsZipkinTracer : ThreadLocal::ThreadLocalObject {
-    TlsZipkinTracer(Zipkin::Tracer tracer, ZipkinDriver& driver);
+    TlsZipkinTracer(Zipkin::Tracer&& tracer, ZipkinDriver& driver);
 
-    void shutdown() override {}
+    void shutdown() override { tracer_.reset(); }
 
-    Zipkin::Tracer tracer_;
+    Zipkin::TracerPtr tracer_;
     ZipkinDriver& driver_;
   };
 
@@ -71,22 +122,59 @@ private:
   uint32_t tls_slot_;
 };
 
+/**
+ * This class derives from the abstract Zipkin::Reporter.
+ * It buffers spans and relies on Http::AsyncClient to send spans to
+ * Zipkin using JSON over HTTP.
+ *
+ * Two runtime parameters control the span buffering/flushing behavior, namely:
+ * tracing.zipkin.min_flush_spans and tracing.zipkin.flush_interval_ms.
+ *
+ * Up to `tracing.zipkin.min_flush_spans` will be buffered. Spans are flushed (sent to Zipkin)
+ * either when the buffer is full, or when a timer, set to `tracing.zipkin.flush_interval_ms`,
+ * expires, whichever happens first.
+ *
+ * The default values for the runtime parameters are 5 spans and 5000ms.
+ */
 class ZipkinReporter : public Zipkin::Reporter, Http::AsyncClient::Callbacks {
 public:
   ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
                  const std::string& collector_endpoint);
 
+  /**
+   * Implementation of Zipkin::Reporter::reportSpan().
+   *
+   * Buffers the given span and calls flushSpans() if the buffer is full.
+   *
+   * @param span The span to be buffered.
+   */
   void reportSpan(Zipkin::Span&& span) override;
 
+  // Http::AsyncClient::Callbacks.
+  // The callbacks below record Zipkin-span-related stats.
   void onSuccess(Http::MessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
-  static std::unique_ptr<Zipkin::Reporter> NewInstance(ZipkinDriver& driver,
-                                                       Event::Dispatcher& dispatcher,
-                                                       const std::string& collector_endpoint);
+  /**
+   * Creates a heap-allocated ZipkinReporter.
+   *
+   * @param driver ZipkinDriver to be associated with the reporter.
+   * @param dispatcher Controls the timer used to flush buffered spans.
+   *
+   * @return Pointer to the newly-created ZipkinReporter.
+   */
+  static Zipkin::ReporterPtr NewInstance(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
+                                         const std::string& collector_endpoint);
 
 private:
+  /**
+   * Enables the span-flushing timer.
+   */
   void enableTimer();
+
+  /**
+   * Removes all spans from the span buffer and sends them to Zipkin using Http::AsyncClient.
+   */
   void flushSpans();
 
   ZipkinDriver& driver_;

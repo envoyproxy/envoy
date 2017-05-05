@@ -11,6 +11,22 @@
 
 namespace Zipkin {
 
+TEST(ZipkinTracerTest, moveConstructor) {
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
+  Tracer tracer("my_service_name", addr);
+  Tracer tracer2(std::move(tracer));
+
+  EXPECT_EQ("my_service_name", tracer2.serviceName());
+  Network::Address::InstanceConstSharedPtr addr2 = tracer2.address();
+  EXPECT_EQ("127.0.0.1", addr2->ip()->addressAsString());
+  EXPECT_EQ(9000UL, addr2->ip()->port());
+  ReporterPtr reporter = tracer2.reporter();
+  EXPECT_EQ(nullptr, reporter);
+  Runtime::RandomGeneratorPtr random = tracer2.randomGenerator();
+  EXPECT_EQ(nullptr, random);
+}
+
 class TestReporterImpl : public Reporter {
 public:
   TestReporterImpl(int value) : value_(value) {}

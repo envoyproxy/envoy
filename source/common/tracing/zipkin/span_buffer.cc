@@ -2,7 +2,7 @@
 
 namespace Zipkin {
 
-bool SpanBuffer::addSpan(SpanPtr&& span) {
+bool SpanBuffer::addSpan(Span&& span) {
   if (span_buffer_.size() == span_buffer_.capacity()) {
     // Buffer full
     return false;
@@ -16,11 +16,11 @@ std::string SpanBuffer::toStringifiedJsonArray() {
   std::string stringified_json_array = "[";
 
   if (pendingSpans()) {
-    stringified_json_array += span_buffer_[0]->toJson();
+    stringified_json_array += span_buffer_[0].toJson();
     const uint64_t size = span_buffer_.size();
     for (uint64_t i = 1; i < size; i++) {
       stringified_json_array += ",";
-      stringified_json_array += span_buffer_[i]->toJson();
+      stringified_json_array += span_buffer_[i].toJson();
     }
   }
   stringified_json_array += "]";
