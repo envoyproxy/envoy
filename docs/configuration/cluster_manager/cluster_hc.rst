@@ -24,8 +24,8 @@ Health checking
 
 type
   *(required, string)* The type of health checking to perform. Currently supported types are
-  *http* and *tcp*. See the :ref:`architecture overview <arch_overview_health_checking>` for more
-  information.
+  *http*, *redis*, and *tcp*. See the :ref:`architecture overview <arch_overview_health_checking>`
+  for more information.
 
 timeout_ms
   *(required, integer)* The time in milliseconds to wait for a health check response. If the
