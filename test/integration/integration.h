@@ -166,20 +166,14 @@ public:
   IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
 
   // Test-wide port map.
-  static void registerPort(const std::string& key, uint32_t port);
-  static uint32_t lookupPort(const std::string& key);
-  static std::string substitutePorts(const std::string& json_path);
+  void registerPort(const std::string& key, uint32_t port);
+  uint32_t lookupPort(const std::string& key);
 
-  static void registerTestServerPorts(const std::vector<std::string>& port_names);
+  void registerTestServerPorts(const std::vector<std::string>& port_names);
   // TODO(hennna): Deprecate when IPv6 test support is finished.
-  static void createTestServer(const std::string& json_path,
-                               const std::vector<std::string>& port_names);
-  static void createTestServer(const std::string& json_path,
-                               const Network::Address::IpVersion version,
-                               const std::vector<std::string>& port_names);
-
-  static IntegrationTestServerPtr test_server_;
-  static std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
+  void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
+  void createTestServer(const std::string& json_path, const Network::Address::IpVersion version,
+                        const std::vector<std::string>& port_names);
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -216,10 +210,8 @@ protected:
   void testDownstreamResetBeforeResponseComplete();
   void testTrailers(uint64_t request_size, uint64_t response_size);
 
-  static TestEnvironment::PortMap& port_map() {
-    static auto* port_map = new TestEnvironment::PortMap();
-    return *port_map;
-  }
-
+  std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   spdlog::level::level_enum default_log_level_;
+  IntegrationTestServerPtr test_server_;
+  TestEnvironment::PortMap port_map_;
 };

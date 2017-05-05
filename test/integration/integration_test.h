@@ -11,6 +11,7 @@ public:
    * Initializer for individual integration tests.
    */
   void SetUp() override {
+    // TODO(hennna): Upstream IPv6 support.
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));

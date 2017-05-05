@@ -17,15 +17,7 @@ using testing::Return;
 
 namespace Ssl {
 
-std::unique_ptr<Runtime::Loader> SslIntegrationTest::runtime_;
-std::unique_ptr<ContextManager> SslIntegrationTest::context_manager_;
-ServerContextPtr SslIntegrationTest::upstream_ssl_ctx_;
-ClientContextPtr SslIntegrationTest::client_ssl_ctx_plain_;
-ClientContextPtr SslIntegrationTest::client_ssl_ctx_alpn_;
-ClientContextPtr SslIntegrationTest::client_ssl_ctx_san_;
-ClientContextPtr SslIntegrationTest::client_ssl_ctx_alpn_san_;
-
-void SslIntegrationTest::SetUpTestCase() {
+void SslIntegrationTest::SetUp() {
   context_manager_.reset(new ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
   fake_upstreams_.emplace_back(
@@ -35,7 +27,7 @@ void SslIntegrationTest::SetUpTestCase() {
       new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
   registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
   test_server_ = MockRuntimeIntegrationTestServer::create(TestEnvironment::temporaryFileSubstitute(
-      "test/config/integration/server_ssl.json", port_map()));
+      "test/config/integration/server_ssl.json", port_map_));
   registerTestServerPorts({"http"});
   client_ssl_ctx_plain_ = createClientSslContext(false, false);
   client_ssl_ctx_alpn_ = createClientSslContext(true, false);
@@ -43,7 +35,7 @@ void SslIntegrationTest::SetUpTestCase() {
   client_ssl_ctx_alpn_san_ = createClientSslContext(true, true);
 }
 
-void SslIntegrationTest::TearDownTestCase() {
+void SslIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
   upstream_ssl_ctx_.reset();
