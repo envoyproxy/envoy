@@ -85,7 +85,7 @@ private:
    * The object will contain an array of struct sigactions with the same number
    * of elements that are in this array.
    */
-  static const constexpr int FATAL_SIGS[] = {SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGSEGV};
+  static constexpr int FATAL_SIGS[] = {SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGSEGV};
   /**
    * Return the memory size we actually map including two guard pages.
    */
