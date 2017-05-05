@@ -263,7 +263,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
         Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
-	filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
+        filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
         data.drain(4);
       }));
