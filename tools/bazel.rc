@@ -2,10 +2,42 @@
 
 build --workspace_status_command=bazel/get_workspace_status
 
-build:asan --copt -fsanitize=address
-build:asan --linkopt -fsanitize=address
+# Basic ASAN/UBSAN that works for gcc-4.9
+build:asan --copt -fsanitize=address,undefined
+build:asan --linkopt -fsanitize=address,undefined
 build:asan --linkopt -ldl
 build:asan --define tcmalloc=disabled
 build:asan --build_tag_filters=-no_asan
 build:asan --test_tag_filters=-no_asan
 build:asan --define signal_trace=disabled
+
+# Clang 5.0 ASAN
+build:clang-asan --copt -D__SANITIZE_ADDRESS__
+build:clang-asan --copt -fsanitize=address,undefined
+build:clang-asan --linkopt -fsanitize=address,undefined
+build:clang-asan --copt -fno-sanitize=vptr
+build:clang-asan --linkopt -fno-sanitize=vptr
+build:clang-asan --copt -fno-sanitize=vptr
+# TODO(htuch): We should cleanup unaligned pointers at some point.
+# https://github.com/lyft/envoy/issues/914
+build:clang-asan --linkopt -fno-sanitize=alignment
+build:clang-asan --copt -fno-sanitize=alignment
+build:clang-asan --linkopt -fno-sanitize=vptr
+build:clang-asan --copt -fno-sanitize-recover=all
+build:clang-asan --linkopt -ldl
+build:clang-asan --define tcmalloc=disabled
+build:clang-asan --build_tag_filters=-no_asan
+build:clang-asan --test_tag_filters=-no_asan
+build:clang-asan --define signal_trace=disabled
+
+# Clang 5.0 TSAN
+build:clang-tsan --copt -fsanitize=thread
+build:clang-tsan --linkopt -fsanitize=thread
+build:clang-tsan --define tcmalloc=disabled
+
+# Clang 5.0 MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
+# support (see https://github.com/lyft/envoy/issues/443).
+build:clang-msan --copt -fsanitize=memory
+build:clang-msan --linkopt -fsanitize=memory
+build:clang-msan --define tcmalloc=disabled
+build:clang-msan --copt -fsanitize-memory-track-origins=2

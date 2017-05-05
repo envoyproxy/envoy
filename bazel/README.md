@@ -147,13 +147,32 @@ You can use the `-c <compilation_mode>` flag to control this, e.g.
 ```
 bazel build -c opt //source/exe:envoy-static
 ```
-To build and run tests with the compiler's address sanitizer (ASAN) enabled:
+
+
+## Sanitizers
+
+To build and run tests with the gcc-4.9 compiler's [address sanitizer
+(ASAN)](https://github.com/google/sanitizers/wiki/AddressSanitizer) and
+[undefined behavior
+(UBSAN)](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan) sanitizer enabled:
 
 ```
 bazel test -c dbg --config=asan //test/...
 ```
 
-The ASAN failure stack traces include line numbers as a results of running ASAN with a `dbg` build above.
+The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above.
+
+If you have clang-5.0, additional checks are provided with:
+
+```
+bazel test -c dbg --config=clang-asan //test/...
+```
+
+Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) testing:
+
+```
+bazel test -c dbg --config=clang-tsan //test/...
+```
 
 # Release builds
 
