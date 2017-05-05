@@ -7,6 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/access_log.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/access_log/access_log_formatter.h"
@@ -244,6 +245,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks)
                                  -> void { callbacks.addStreamDecoderFilter(filter); }));
+  // Verify if the activeSpan interface returns reference to the current span.
+  EXPECT_CALL(*span, setTag("service-cluster", "scoobydoo"));
+  filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
   Http::StreamDecoder* decoder = nullptr;
   NiceMock<Http::MockStreamEncoder> encoder;
