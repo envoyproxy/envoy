@@ -26,7 +26,7 @@ TEST(Signals, InvalidAddressDeathTest) {
     // Oooooops!
     volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
     *(nasty_ptr) = 0;
-  }(), "Segmentation fault");
+  }(), "backtrace.*Segmentation fault");
 }
 
 TEST(Signals, BusDeathTest) {
@@ -40,7 +40,7 @@ TEST(Signals, BusDeathTest) {
     // int *p = mmap(0, 4, PROT_WRITE, MAP_PRIVATE, fileno(f), 0);
     // *p = 0;
     raise(SIGBUS);
-  }(), "Bus");
+  }(), "backtrace.*Bus");
 }
 
 TEST(Signals, BadMathDeathTest) {
@@ -49,7 +49,7 @@ TEST(Signals, BadMathDeathTest) {
     // It turns out to be really hard to not have the optimizer get rid of a
     // division by zero.  Just raise the signal for this test.
     raise(SIGFPE);
-  }(), "Floating point");
+  }(), "backtrace.*Floating point");
 }
 #endif
 
@@ -60,13 +60,25 @@ TEST(Signals, IllegalInstructionDeathTest) {
   EXPECT_DEATH([]() -> void {
     // Intel defines the "ud2" opcode to be an invalid instruction:
     __asm__("ud2");
-  }(), "Illegal");
+  }(), "backtrace.*Illegal");
 }
 #endif
 
 TEST(Signals, AbortDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH([]() -> void { abort(); }(), "Aborted");
+  EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Aborted");
+}
+
+TEST(Signals, RestoredPreviousHandlerDeathTest) {
+  SignalAction action;
+  {
+    SignalAction inner_action;
+    // Test case for a previously encountered misfeature:
+    // We should restore the previous SignalAction when the inner action
+    // goes out of scope, NOT the default.
+  }
+  // Outer SignalAction should be active again:
+  EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Aborted");
 }
 
 TEST(Signals, IllegalStackAccessDeathTest) {
