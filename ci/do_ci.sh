@@ -30,7 +30,7 @@ elif [[ "$1" == "bazel.release.server_only" ]]; then
   exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
   echo "bazel ASAN debug build with tests..."
-  cd "${ENVOY_CONSUMER_SRCDIR}"
+  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
   # TODO(htuch): This should switch to using clang when available.
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=asan @envoy//test/... \
