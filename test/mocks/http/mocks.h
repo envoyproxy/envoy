@@ -20,6 +20,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 
@@ -229,6 +230,7 @@ public:
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
+  MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
 
   // Http::StreamDecoderFilterCallbacks
@@ -261,6 +263,7 @@ public:
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(requestInfo, Http::AccessLog::RequestInfo&());
+  MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(downstreamAddress, const std::string&());
 
   // Http::StreamEncoderFilterCallbacks
