@@ -97,7 +97,6 @@ response):
       {"binary": "24636d6400"},
       {"binary": "00000000"},
       {"binary": "FFFFFFFF"},
-
       {"binary": "13000000"},
       {"binary": "01"},
       {"binary": "70696e6700"},
@@ -119,9 +118,14 @@ response):
  }
 
 During each health check cycle, all of the "send" bytes are sent to the target server. Each
-binary block can be of arbitrary length and is just concatenated together when sent.
+binary block can be of arbitrary length and is just concatenated together when sent. (Separating
+into multiple blocks can be useful for readability).
 
-On the receive side, "fuzzy" matching is performed such that each binary block must be found,
+When checking the response, "fuzzy" matching is performed such that each binary block must be found,
 and in the order specified, but not necessarly contiguous. Thus, in the example above,
 "FFFFFFFF" could be inserted in the response between "EEEEEEEE" and "01000000" and the check
-would still pass.
+would still pass. This is done to support protocols that insert non-deterministic data, such as
+time, into the response.
+
+Health checks that require a more complex pattern such as send/receive/send/receive are not
+currently possible.

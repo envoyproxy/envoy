@@ -33,7 +33,7 @@ HealthCheckerPtr HealthCheckerFactory::create(const Json::Object& hc_config,
                                               Event::Dispatcher& dispatcher) {
   hc_config.validateSchema(Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA);
 
-  std::string hc_type = hc_config.getString("type");
+  const std::string hc_type = hc_config.getString("type");
   if (hc_type == "http") {
     return HealthCheckerPtr{
         new ProdHttpHealthCheckerImpl(cluster, hc_config, dispatcher, runtime, random)};
@@ -82,7 +82,7 @@ void HealthCheckerImplBase::incHealthy() {
   refreshHealthyStat();
 }
 
-std::chrono::milliseconds HealthCheckerImplBase::interval() {
+std::chrono::milliseconds HealthCheckerImplBase::interval() const {
   // See if the cluster has ever made a connection. If so, we use the defined HC interval. If not,
   // we use a much slower interval to keep the host info relatively up to date in case we suddenly
   // start sending traffic to this cluster. In general host updates are rare and this should

@@ -122,7 +122,7 @@ private:
   void decHealthy();
   HealthCheckerStats generateStats(Stats::Scope& scope);
   void incHealthy();
-  std::chrono::milliseconds interval();
+  std::chrono::milliseconds interval() const;
   void onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
                              const std::vector<HostSharedPtr>& hosts_removed);
   void refreshHealthyStat();
