@@ -860,11 +860,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
 
   EXPECT_CALL(*decoder_filter2, decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs(
-          [&]() -> Http::FilterHeadersStatus { return Http::FilterHeadersStatus::Continue; }));
+          [&]() -> Http::FilterHeadersStatus { return Http::FilterHeadersStatus::StopIteration; }));
 
   EXPECT_CALL(*decoder_filter2, decodeData(_, true))
-      .WillOnce(InvokeWithoutArgs(
-          [&]() -> Http::FilterDataStatus { return Http::FilterDataStatus::Continue; }));
+      .WillOnce(InvokeWithoutArgs([&]() -> Http::FilterDataStatus {
+        return Http::FilterDataStatus::StopIterationAndBuffer;
+      }));
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
