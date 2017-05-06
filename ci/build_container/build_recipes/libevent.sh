@@ -8,4 +8,4 @@ wget -O libevent-$VERSION.tar.gz https://github.com/libevent/libevent/releases/d
 tar xf libevent-$VERSION.tar.gz
 cd libevent-$VERSION
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --disable-libevent-regress --disable-openssl
-make install
+make V=1 install

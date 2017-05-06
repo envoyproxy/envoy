@@ -8,6 +8,10 @@ RECIPES := build_recipes
 CC ?= gcc
 CXX ?= g++
 
+# Common compiler flags
+CXXFLAGS ?= "-ggdb3 -fno-omit-frame-pointer -O2 -DNDEBUG"
+CFLAGS ?= "-ggdb3 -fno-omit-frame-pointer -O2 -DNDEBUG"
+
 # If $(BUILD_DISTINCT) is set in the make environment, the artifacts are built and installed in
 # distinct directories under $(THIRDPARTY_BUILD) and $(THIRDPARTY_SRC). They end up looking like
 # $(THIRDPARTY_BUILD)/protobuf.dep/include, etc. instead of all being under
@@ -35,6 +39,8 @@ build-recipe = cd $(THIRDPARTY_SRC) && \
 	   THIRDPARTY_BUILD=$(THIRDPARTY_BUILD)/$(DISTINCT_PATH) \
 	   CC=$(CC) \
 	   CXX=$(CXX) \
+	   CFLAGS=$(CFLAGS) \
+	   CXXFLAGS=$(CXXFLAGS) \
 	   $(1) \
 	   time bash $(CURDIR)/recipe_wrapper.sh $(realpath $<) 2>&1) > $@.log) || (cat $@.log; exit 1)) && \
 	$(build-complete)
