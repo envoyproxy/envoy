@@ -23,7 +23,7 @@ namespace Server {
 
 // Increment this whenever there is a shared memory / RPC change that will prevent a hot restart
 // from working. Operations code can then cope with this and do a full restart.
-const uint64_t SharedMemory::VERSION = 7;
+const uint64_t SharedMemory::VERSION = 8;
 
 SharedMemory& SharedMemory::initialize(Options& options) {
   int flags = O_RDWR;
