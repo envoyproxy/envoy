@@ -211,7 +211,6 @@ public:
   std::function<void()> reset_callback_;
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<AccessLog::MockRequestInfo> request_info_;
-  std::shared_ptr<Tracing::MockSpan> active_span_;
   std::shared_ptr<Router::MockRoute> route_;
   std::string downstream_address_;
 };

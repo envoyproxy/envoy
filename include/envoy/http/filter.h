@@ -120,7 +120,7 @@ public:
 
   /**
    * @return span context used for tracing purposes. Individual filters may add or modify
-   * information in the span context.
+   *              information in the span context.
    */
   virtual Tracing::Span& activeSpan() PURE;
 
