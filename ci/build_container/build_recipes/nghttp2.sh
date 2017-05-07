@@ -8,4 +8,4 @@ wget -O nghttp2-$VERSION.tar.gz https://github.com/nghttp2/nghttp2/releases/down
 tar xf nghttp2-$VERSION.tar.gz
 cd nghttp2-$VERSION
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no --enable-lib-only
-make install
+make V=1 install

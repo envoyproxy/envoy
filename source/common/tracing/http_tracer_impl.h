@@ -82,4 +82,11 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 };
 
+class NullSpan : public Tracing::Span {
+public:
+  // Tracing::Span
+  void setTag(const std::string&, const std::string&) override {}
+  void finishSpan() override {}
+};
+
 } // Tracing
