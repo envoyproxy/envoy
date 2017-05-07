@@ -878,6 +878,10 @@ AccessLog::RequestInfo& ConnectionManagerImpl::ActiveStreamFilterBase::requestIn
   return parent_.request_info_;
 }
 
+Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
+  return *parent_.active_span_;
+}
+
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
   if (!parent_.cached_route_.valid()) {
     parent_.cached_route_.value(

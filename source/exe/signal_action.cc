@@ -42,21 +42,24 @@ void SignalAction::installSigHandlers() {
   stack.ss_size = altstack_size_;        // ... guard page at the other
   stack.ss_flags = 0;
 
-  RELEASE_ASSERT(sigaltstack(&stack, nullptr) == 0);
+  RELEASE_ASSERT(sigaltstack(&stack, &previous_altstack_) == 0);
 
+  int hidx = 0;
   for (const auto& sig : FATAL_SIGS) {
     struct sigaction saction;
     std::memset(&saction, 0, sizeof(saction));
     sigemptyset(&saction.sa_mask);
     saction.sa_flags = (SA_SIGINFO | SA_ONSTACK | SA_RESETHAND | SA_NODEFER);
     saction.sa_sigaction = sigHandler;
-    RELEASE_ASSERT(sigaction(sig, &saction, nullptr) == 0);
+    RELEASE_ASSERT(sigaction(sig, &saction, &previous_handlers_[hidx++]) == 0);
   }
 }
 
 void SignalAction::removeSigHandlers() {
+  RELEASE_ASSERT(sigaltstack(&previous_altstack_, nullptr) == 0);
+  int hidx = 0;
   for (const auto& sig : FATAL_SIGS) {
-    signal(sig, SIG_DFL);
+    RELEASE_ASSERT(sigaction(sig, &previous_handlers_[hidx++], nullptr) == 0);
   }
 }
 

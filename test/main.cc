@@ -1,9 +1,18 @@
 #include "test/test_common/environment.h"
 #include "test/test_runner.h"
 
+#ifdef ENVOY_HANDLE_SIGNALS
+#include "exe/signal_action.h"
+#endif
+
 // The main entry point (and the rest of this file) should have no logic in it,
 // this allows overriding by site specific versions of main.cc.
 int main(int argc, char** argv) {
+#ifdef ENVOY_HANDLE_SIGNALS
+  // Enabled by default. Control with "bazel --define=signal_trace=disabled"
+  SignalAction handle_sigs;
+#endif
+
   ::setenv("TEST_RUNDIR", (TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
                            TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE")).c_str(),
            1);
