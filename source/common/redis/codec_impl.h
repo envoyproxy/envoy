@@ -43,7 +43,7 @@ private:
       negative_ = false;
     }
 
-    int64_t integer_;
+    uint64_t integer_;
     bool negative_;
   };
 
