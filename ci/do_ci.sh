@@ -41,7 +41,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
   echo "bazel TSAN debug build with tests..."
-  cd "${ENVOY_CONSUMER_SRCDIR}"
+  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan @envoy//test/... \
     //:echo2_integration_test
