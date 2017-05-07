@@ -148,17 +148,8 @@ void FakeConnectionBase::close() {
 
 void FakeConnectionBase::readDisable(bool disable) {
   std::unique_lock<std::mutex> lock(lock_);
-  if (!disconnected_) {
-    connection_.dispatcher().post([this, disable]() -> void {
-      if (!disconnected_) {
-        connection_.readDisable(disable);
-      }
-    });
-  } else {
-    // Someone has tried to disable a connection which is in the disconnected
-    // state, so something bad has happened.
-    NOT_IMPLEMENTED;
-  }
+  RELEASE_ASSERT(!disconnected_);
+  connection_.dispatcher().post([this, disable]() -> void { connection_.readDisable(disable); });
 }
 
 Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {

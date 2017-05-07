@@ -75,6 +75,8 @@ typedef std::unique_ptr<FakeStream> FakeStreamPtr;
  * that take place in the queued state by failing the test. Once a
  * QueuedConnectionWrapper object is instantiated by FakeHttpConnection or
  * FakeRawConnection, it no longer plays a role.
+ * TODO(htuch): We can simplify the storage lifetime by destructing if/when
+ * removeConnectionCallbacks is added.
  */
 class QueuedConnectionWrapper : public Network::ConnectionCallbacks {
 public:
