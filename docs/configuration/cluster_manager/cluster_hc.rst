@@ -62,10 +62,13 @@ send
       {"binary": "000000FF"}
     ]
 
+  The array is allowed to be empty in the case of "connect only" health checking.
+
 receive
   *(sometimes required, array)* This parameter is required if the type is *tcp*. It specified the
   bytes that are expected in a successful health check response. It is an array of hex byte strings
-  specified similarly to the *send* parameter.
+  specified similarly to the *send* parameter. The array is allowed to be empty in the case of
+  "connect only" health checking.
 
 interval_jitter_ms
   *(optional, integer)* An optional jitter amount in millseconds. If specified, during every
@@ -129,3 +132,7 @@ time, into the response.
 
 Health checks that require a more complex pattern such as send/receive/send/receive are not
 currently possible.
+
+If both "send" and "receive" are empty arrays, Envoy will perform "connect only" TCP health
+checking. During each cycle, Envoy will attempt to connect to the upstream host, and consider it
+a success if the connection succeeds. A new connection is created for each health check cycle.

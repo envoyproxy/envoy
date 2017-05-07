@@ -59,6 +59,45 @@ TEST(ConnectionImplDeathTest, BadFd) {
                ".*assert failure: fd_ != -1.*");
 }
 
+TEST(ConnectionImplTest, CloseDuringConnectCallback) {
+  Stats::IsolatedStoreImpl stats_store;
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(Network::Utility::getIpv4AnyAddress(), true);
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener =
+      dispatcher.createListener(connection_handler, socket, listener_callbacks, stats_store,
+                                Network::ListenerOptions::listenerOptionsWithBindToPort());
+
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createClientConnection(socket.localAddress());
+  MockConnectionCallbacks client_callbacks;
+  client_connection->addConnectionCallbacks(client_callbacks);
+  Buffer::OwnedImpl buffer("hello world");
+  client_connection->write(buffer);
+  client_connection->connect();
+
+  EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](uint32_t)
+                           -> void { client_connection->close(ConnectionCloseType::NoFlush); }));
+  EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::LocalClose));
+
+  Network::ConnectionPtr server_connection;
+  Network::MockConnectionCallbacks server_callbacks;
+  std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->addConnectionCallbacks(server_callbacks);
+        server_connection->addReadFilter(read_filter);
+      }));
+
+  EXPECT_CALL(server_callbacks, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher.exit(); }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+}
+
 struct MockBufferStats {
   Connection::BufferStats toBufferStats() {
     return {rx_total_, rx_current_, tx_total_, tx_current_};
