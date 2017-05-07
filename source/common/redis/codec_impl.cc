@@ -231,6 +231,9 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         if (pending_integer_.integer_ == 0 || !pending_integer_.negative_) {
           current_value.value_->asInteger() = pending_integer_.integer_;
         } else {
+          // By subtracting 1 (and later correcting) we ensure that we remain within the int64_t
+          // range to allow a valid static_cast. This is an issue when we have a value of -2^63,
+          // which cannot be represented as 2^63 in the intermediate int64_t.
           current_value.value_->asInteger() =
               static_cast<int64_t>(pending_integer_.integer_ - 1) * -1 - 1;
         }
@@ -397,6 +400,9 @@ void EncoderImpl::encodeInteger(int64_t integer, Buffer::Instance& out) {
     current += StringUtil::itoa(current, 31, integer);
   } else {
     *current++ = '-';
+    // By adding 1 (and later correcting) we ensure that we remain within the int64_t
+    // range prior to the static_cast. This is an issue when we have a value of -2^63,
+    // which cannot be represented as 2^63 in the intermediate int64_t.
     current += StringUtil::itoa(current, 30, static_cast<uint64_t>((integer + 1) * -1) + 1ULL);
   }
 
