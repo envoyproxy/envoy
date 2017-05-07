@@ -202,8 +202,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
 const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
   ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
 
-  if (host_set_.hosts().empty() ||
-      LoadBalancerUtility::isGlobalPanic(host_set_, stats_, runtime_)) {
+  if (LoadBalancerUtility::isGlobalPanic(host_set_, stats_, runtime_)) {
     return host_set_.hosts();
   }
 
@@ -215,8 +214,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  if (local_host_set_->hosts().empty() ||
-      LoadBalancerUtility::isGlobalPanic(*local_host_set_, stats_, runtime_)) {
+  if (LoadBalancerUtility::isGlobalPanic(*local_host_set_, stats_, runtime_)) {
     stats_.lb_local_cluster_not_ok_.inc();
     return host_set_.healthyHosts();
   }
