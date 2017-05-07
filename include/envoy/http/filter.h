@@ -11,6 +11,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/tracing/http_tracer.h"
 
 namespace Http {
 
@@ -116,6 +117,12 @@ public:
    * put into the access log.
    */
   virtual AccessLog::RequestInfo& requestInfo() PURE;
+
+  /**
+   * @return span context used for tracing purposes. Individual filters may add or modify
+   *              information in the span context.
+   */
+  virtual Tracing::Span& activeSpan() PURE;
 
   /**
    * @return the trusted downstream address for the connection.
