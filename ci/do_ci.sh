@@ -12,10 +12,21 @@ function bazel_release_binary_build() {
   cd "${ENVOY_CI_DIR}"
   bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static.stripped.stamped
   # Copy the envoy-static binary somewhere that we can access outside of the
-  # container for building Docker images.
+  # container.
   cp -f \
     "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stripped.stamped \
     "${ENVOY_DELIVERY_DIR}"/envoy
+}
+
+function bazel_debug_binary_build() {
+  echo "Building..."
+  cd "${ENVOY_CI_DIR}"
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static.stamped
+  # Copy the envoy-static binary somewhere that we can access outside of the
+  # container.
+  cp -f \
+    "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stamped \
+    "${ENVOY_DELIVERY_DIR}"/envoy-debug
 }
 
 if [[ "$1" == "bazel.release" ]]; then
@@ -27,6 +38,16 @@ if [[ "$1" == "bazel.release" ]]; then
 elif [[ "$1" == "bazel.release.server_only" ]]; then
   echo "bazel release build..."
   bazel_release_binary_build
+  exit 0
+elif [[ "$1" == "bazel.debug" ]]; then
+  echo "bazel debug build with tests..."
+  bazel_debug_binary_build
+  echo "Testing..."
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg //test/...
+  exit 0
+elif [[ "$1" == "bazel.debug.server_only" ]]; then
+  echo "bazel debug build..."
+  bazel_debug_binary_build
   exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
   echo "bazel ASAN debug build with tests..."

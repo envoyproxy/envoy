@@ -41,12 +41,23 @@ For a release version of the Envoy binary you can run:
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release.server_only'
 ```
 
-The artifacts can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
+The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
+`$ENVOY_DOCKER_BUILD_DIR` points).
+
+For a debug version of the Envoy binary you can run:
+
+```bash
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.debug.server_only'
+```
+
+The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=asan`.
+* `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
+* `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
 * `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild`.
 * `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt`.
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt`.
