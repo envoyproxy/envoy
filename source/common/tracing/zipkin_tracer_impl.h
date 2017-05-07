@@ -51,7 +51,7 @@ public:
    * annotation then this Envoy instance initiated the span. Only the Envoy that initiates a Zipkin
    * span should add binary annotations to it; otherwise, duplicate binary annotations
    * would be created.
-
+   *
    * Note that Tracing::HttpTracerUtility::finalizeSpan() makes several calls to this function,
    * associating several key-value pairs with this span.
    */
