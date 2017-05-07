@@ -125,7 +125,9 @@ bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, ClusterStats& s
                                         Runtime::Loader& runtime) {
   uint64_t global_panic_threshold =
       std::min<uint64_t>(100, runtime.snapshot().getInteger(RuntimePanicThreshold, 50));
-  double healthy_percent = 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
+  double healthy_percent = host_set.hosts().size() == 0
+                               ? 0
+                               : 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
 
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
   if (healthy_percent < global_panic_threshold) {
