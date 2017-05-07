@@ -9,4 +9,4 @@ tar xf protobuf-$VERSION.tar.gz
 rsync -av protobuf-$VERSION/* $THIRDPARTY_SRC/protobuf
 cd protobuf-$VERSION
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no
-make install
+make V=1 install
