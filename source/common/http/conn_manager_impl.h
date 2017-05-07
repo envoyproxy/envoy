@@ -282,6 +282,7 @@ private:
     Router::RouteConstSharedPtr route() override;
     uint64_t streamId() override;
     AccessLog::RequestInfo& requestInfo() override;
+    Tracing::Span& activeSpan() override;
     const std::string& downstreamAddress() override;
 
     ActiveStream& parent_;

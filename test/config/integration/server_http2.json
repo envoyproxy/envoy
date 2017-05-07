@@ -14,7 +14,7 @@
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http2",
-        "drain_timeout_ms": 10,
+        "drain_timeout_ms": 5000,
         "access_log": [
         {
           "path": "/dev/null",
@@ -95,7 +95,7 @@
       "name": "http_connection_manager",
       "config": {
         "codec_type": "http2",
-        "drain_timeout_ms": 10,
+        "drain_timeout_ms": 5000,
         "access_log": [
         {
           "path": "/dev/null",
@@ -218,21 +218,21 @@
     "clusters": [
     {
       "name": "cluster_1",
-      "connect_timeout_ms": 250,
+      "connect_timeout_ms": 5000,
       "type": "static",
       "lb_type": "round_robin",
       "hosts": [{"url": "tcp://127.0.0.1:{{ upstream_0 }}"}]
     },
     {
       "name": "cluster_2",
-      "connect_timeout_ms": 250,
+      "connect_timeout_ms": 5000,
       "type": "logical_dns",
       "lb_type": "round_robin",
       "hosts": [{"url": "tcp://localhost:{{ upstream_1 }}"}]
     },
     {
       "name": "statsd",
-      "connect_timeout_ms": 250,
+      "connect_timeout_ms": 5000,
       "type": "strict_dns",
       "lb_type": "round_robin",
       "hosts": [{"url": "tcp://localhost:10009"}]
@@ -240,7 +240,7 @@
     {
       "name": "lightstep_saas",
       "features": "http2",
-      "connect_timeout_ms": 250,
+      "connect_timeout_ms": 5000,
       "type": "strict_dns",
       "lb_type": "round_robin",
       "hosts": [{"url": "tcp://localhost:10010"}]

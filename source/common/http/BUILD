@@ -26,6 +26,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/http/access_log:request_info_lib",
         "//source/common/router:router_lib",
+        "//source/common/tracing:http_tracer_lib",
     ],
 )
 
