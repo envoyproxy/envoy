@@ -1,7 +1,7 @@
 #include <iostream>
 #include <memory>
-#include <regex>
 
+#include "common/common/compiler_requirements.h"
 #include "common/event/libevent.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
@@ -20,12 +20,6 @@
 
 #include "ares.h"
 #include "spdlog/spdlog.h"
-
-#if __cplusplus < 201103L ||                                                                       \
-    (defined(__GLIBCXX__) && (__cplusplus < 201402L) &&                                            \
-     (!defined(_GLIBCXX_REGEX_DFS_QUANTIFIERS_LIMIT) && !defined(_GLIBCXX_REGEX_STATE_LIMIT)))
-#error "Your compiler does not support std::regex properly.  GCC 4.9+ or Clang required."
-#endif
 
 namespace Server {
 

@@ -11,16 +11,11 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/compiler_requirements.h"
 
 #include "server/options_impl.h"
 
 #include "spdlog/spdlog.h"
-
-#if __cplusplus < 201103L ||                                                                       \
-    (defined(__GLIBCXX__) && (__cplusplus < 201402L) &&                                            \
-     (!defined(_GLIBCXX_REGEX_DFS_QUANTIFIERS_LIMIT) && !defined(_GLIBCXX_REGEX_STATE_LIMIT)))
-#error "Your compiler does not support std::regex properly.  GCC 4.9+ or Clang required."
-#endif
 
 namespace {
 
