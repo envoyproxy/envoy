@@ -71,6 +71,13 @@ Annotation& Annotation::operator=(const Annotation& ann) {
   return *this;
 }
 
+void Annotation::changeEndpointServiceName(const std::string& service_name) {
+  if (endpoint_.valid()) {
+    Endpoint& endpoint = const_cast<Endpoint&>(endpoint_.value());
+    endpoint.setServiceName(service_name);
+  }
+}
+
 const std::string Annotation::toJson() {
   rapidjson::StringBuffer s;
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
@@ -179,6 +186,12 @@ Span& Span::operator=(const Span& span) {
   tracer_ = span.tracer();
 
   return *this;
+}
+
+void Span::setServiceName(const std::string& service_name) {
+  for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
+    it->changeEndpointServiceName(service_name);
+  }
 }
 
 const std::string Span::toJson() {
