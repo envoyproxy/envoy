@@ -10,7 +10,9 @@ Envoy expects the service discovery service to expose the following API (See Lyf
 
   Asks the discovery service to return all hosts for a particular `service_name`. `service_name`
   corresponds to the :ref:`service_name <config_cluster_manager_cluster_service_name>` cluster
-  parameter. Responses use the following JSON schema:
+  parameter. Additionally, the `--server-cluster`, `--server-node`, and `--server-zone` CLI
+  options are passed along in the request headers `x-envoy-cluster`, `x-envoy-node`, and `x-envoy-zone`
+  respectively. Responses use the following JSON schema:
 
   .. code-block:: json
 
