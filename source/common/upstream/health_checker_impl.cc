@@ -414,7 +414,10 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(uint32_t events)
     // sure what situations cause this. If this turns into a problem, we may need to introduce a
     // timer and see if the connection stays alive for some period of time while waiting to read.
     // (Though we may never get a FIN and won't know until if/when we try to write). In short, this
-    // may need get more complicated but we can start here.
+    // may need to get more complicated but we can start here.
+    // TODO(mattklein123): If we had a way on the connection interface to do an immediate read (vs.
+    // evented), that would be a good check to run here to make sure it returns the equivalent of
+    // EAGAIN. Need to think through how that would look from an interface perspective.
     client_->close(Network::ConnectionCloseType::NoFlush);
     handleSuccess();
   }
