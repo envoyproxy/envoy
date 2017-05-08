@@ -41,12 +41,15 @@ TEST(UUIDUtilsTest, checkDistribution) {
   const int required_percentage = 11;
   int total_samples = 0;
   int interesting_samples = 0;
+  // For some reason, ASAN/UBSAN seems to run very slowly unless this is defined outside the loop
+  // condition.
+  const int iters = 500000;
 
-  for (int i = 0; i < 500000; ++i) {
+  for (int i = 0; i < iters; ++i) {
     std::string uuid = random.uuid();
 
     uint16_t value;
-    UuidUtils::uuidModBy(uuid, value, mod);
+    ASSERT_TRUE(UuidUtils::uuidModBy(uuid, value, mod));
 
     if (value < required_percentage) {
       interesting_samples++;

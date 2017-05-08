@@ -73,7 +73,18 @@ TEST_F(RedisEncoderDecoderImplTest, Integer) {
   EXPECT_EQ(0UL, buffer_.length());
 }
 
-TEST_F(RedisEncoderDecoderImplTest, NegativeInteger) {
+TEST_F(RedisEncoderDecoderImplTest, NegativeIntegerSmall) {
+  RespValue value;
+  value.type(RespType::Integer);
+  value.asInteger() = -1;
+  encoder_.encode(value, buffer_);
+  EXPECT_EQ(":-1\r\n", TestUtility::bufferToString(buffer_));
+  decoder_.decode(buffer_);
+  EXPECT_EQ(value, *decoded_values_[0]);
+  EXPECT_EQ(0UL, buffer_.length());
+}
+
+TEST_F(RedisEncoderDecoderImplTest, NegativeIntegerLarge) {
   RespValue value;
   value.type(RespType::Integer);
   value.asInteger() = std::numeric_limits<int64_t>::min();

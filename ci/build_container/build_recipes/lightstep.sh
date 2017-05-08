@@ -11,4 +11,4 @@ cd lightstep-tracer-cpp-$VERSION
 [ -z "$PROTOBUF_BUILD" ] && PROTOBUF_BUILD="$THIRDPARTY_BUILD"
 ./configure --disable-grpc --prefix=$THIRDPARTY_BUILD --enable-shared=no \
 	    protobuf_CFLAGS="-I$PROTOBUF_BUILD/include" protobuf_LIBS="-L$PROTOBUF_BUILD/lib -lprotobuf" PROTOC=$PROTOBUF_BUILD/bin/protoc
-make install
+make V=1 install
