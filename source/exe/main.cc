@@ -63,14 +63,14 @@ int main(int argc, char** argv) {
                                       options.serviceClusterName(), options.serviceNodeName());
 
   switch (options.mode()) {
-    case Server::Mode::Serve:
-      break;
-    case Server::Mode::Validate:
-      return validateConfig(options, component_factory, local_info);
-    case Server::Mode::ValidateLight:
-      NOT_IMPLEMENTED;
-    default:
-      NOT_REACHED;
+  case Server::Mode::Serve:
+    break;
+  case Server::Mode::Validate:
+    return validateConfig(options, component_factory, local_info);
+  case Server::Mode::ValidateLight:
+    NOT_IMPLEMENTED;
+  default:
+    NOT_REACHED;
   }
 
   ares_library_init(ARES_LIB_INIT_ALL);
