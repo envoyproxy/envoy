@@ -19,7 +19,7 @@ if [ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]; then
   COVERAGE_DIR="$(readlink -f ${ENVOY_BUILD_DIR}/bazel-envoy)/../envoy/generated/coverage"
   S3_LOCATION="lyft-envoy/coverage/report-${TRAVIS_BRANCH}"
 
-  aws s3 cp "${COVERAGE_DIR}" "s3://${S3_LOCATION}" --recursive --profile coverage --acl public-read --quiet
+  aws s3 cp "${COVERAGE_DIR}" "s3://${S3_LOCATION}" --recursive --profile coverage --acl public-read
   echo "Coverage report for this branch is available for viewing at https://s3.amazonaws.com/${S3_LOCATION}/coverage.html."
 else
   echo "Coverage report will not be uploaded for this build."
