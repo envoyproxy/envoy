@@ -11,7 +11,10 @@ fi
 # available for master builds and PRs from originating repository (not forks)
 if [ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]; then
   mkdir -p ~/.aws
-  echo -e "[coverage]\naws_access_key_id=${COVERAGE_AWS_ACCESS_KEY_ID}\naws_secret_access_key=${COVERAGE_AWS_SECRET_ACCESS_KEY}\n" >> ~/.aws/credentials
+  echo "[profile coverage]" >> ~/.aws/config
+  echo "aws_access_key_id=${COVERAGE_AWS_ACCESS_KEY_ID}" >> ~/.aws/config
+  echo "aws_secret_access_key=${COVERAGE_AWS_SECRET_ACCESS_KEY}" >> ~/.aws/config
+  echo "region=us-east-1" >> ~/.aws/config
 
   COVERAGE_DIR="$(readlink -f ${ENVOY_BUILD_DIR}/bazel-envoy)/../envoy/generated/coverage"
   S3_LOCATION="lyft-envoy/coverage/report-${TRAVIS_BRANCH}"
