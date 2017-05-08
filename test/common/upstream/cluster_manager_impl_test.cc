@@ -838,4 +838,33 @@ TEST(ClusterManagerInitHelper, AddSecondaryAfterSecondaryInit) {
   cluster2.initialize_callback_();
 }
 
+TEST(ClusterManagerInitHelper, RemoveClusterWithinInitLoop) {
+  InSequence s;
+  ClusterManagerInitHelper init_helper;
+
+  // Tests the scenario encountered in Issue 903: The cluster was removed from
+  // the secondary init list while traversing the list.
+  NiceMock<MockCluster> cluster;
+  // Fake that we are in the secondary InitializePhase for this test.
+  ON_CALL(cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  // We expect that initialize() should be called first upon addCluster.  In the
+  // bug scenario this initialize was not able to complete right away because of
+  // DNS lookup, so the initializedCb containing the call to removeCluster was not called
+  // yet.  The same scenario is simulated here by taking no action upon
+  // initialize().
+  EXPECT_CALL(cluster, initialize());
+  init_helper.addCluster(cluster);
+
+  // Short circuit by making initialize immediately call
+  // init_helper.removeCluster().  In the real bug scenario actual initialization
+  // happens followed by a call to addCluster(), which calls removeCluster()
+  // because initialization is complete.
+  ON_CALL(cluster, initialize())
+      .WillByDefault(Invoke([&]() -> void { init_helper.removeCluster(cluster); }));
+
+  // Now call onStaticLoadComplete which will exercise maybeFinishInitialize()
+  // In the real bug scenario this was reached once DNS lookup attempt finished.
+  init_helper.onStaticLoadComplete();
+}
+
 } // Upstream
