@@ -18,6 +18,7 @@ using testing::Return;
 namespace Ssl {
 
 void SslIntegrationTest::SetUp() {
+  runtime_.reset(new NiceMock<Runtime::MockLoader>());
   context_manager_.reset(new ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
   fake_upstreams_.emplace_back(
@@ -44,6 +45,7 @@ void SslIntegrationTest::TearDown() {
   client_ssl_ctx_san_.reset();
   client_ssl_ctx_alpn_san_.reset();
   context_manager_.reset();
+  runtime_.reset();
 }
 
 ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {

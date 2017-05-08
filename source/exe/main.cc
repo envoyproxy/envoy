@@ -1,6 +1,7 @@
 #include <iostream>
 #include <memory>
 
+#include "common/common/compiler_requirements.h"
 #include "common/event/libevent.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
