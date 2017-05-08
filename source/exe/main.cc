@@ -39,12 +39,14 @@ namespace {
 
 int validateConfig(OptionsImpl& options, Server::ProdComponentFactory& component_factory,
                    const LocalInfo::LocalInfoImpl& local_info) {
+  Thread::MutexBasicLockable access_log_lock;
+  Thread::MutexBasicLockable log_lock;
   Server::ValidationHotRestart restarter;
-  Logger::Registry::initialize(options.logLevel(), restarter.logLock());
+  Logger::Registry::initialize(options.logLevel(), log_lock);
   Stats::HeapRawStatDataAllocator alloc;
   Stats::ThreadLocalStoreImpl stats_store(alloc);
 
-  Server::ValidationInstance server(options, restarter, stats_store, restarter.accessLogLock(),
+  Server::ValidationInstance server(options, restarter, stats_store, access_log_lock,
                                     component_factory, local_info);
   std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
   server.shutdown();
@@ -60,8 +62,15 @@ int main(int argc, char** argv) {
   LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(), options.serviceZone(),
                                       options.serviceClusterName(), options.serviceNodeName());
 
-  if (options.mode() != Server::Mode::Serve) {
-    return validateConfig(options, component_factory, local_info);
+  switch (options.mode()) {
+    case Server::Mode::Serve:
+      break;
+    case Server::Mode::Validate:
+      return validateConfig(options, component_factory, local_info);
+    case Server::Mode::ValidateLight:
+      NOT_IMPLEMENTED;
+    default:
+      NOT_REACHED;
   }
 
   ares_library_init(ARES_LIB_INIT_ALL);

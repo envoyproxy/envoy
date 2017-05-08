@@ -14,9 +14,6 @@ namespace Server {
  */
 class ValidationHotRestart : public HotRestart {
 public:
-  Thread::BasicLockable& accessLogLock() { return access_log_lock_; }
-  Thread::BasicLockable& logLock() { return log_lock_; }
-
   // Server::HotRestart
   void drainParentListeners() {}
   int duplicateParentListenSocket(const std::string&) { return -1; }
@@ -26,10 +23,6 @@ public:
   void terminateParent() {}
   void shutdown() {}
   std::string version() { return ""; }
-
-private:
-  Thread::MutexBasicLockable access_log_lock_;
-  Thread::MutexBasicLockable log_lock_;
 };
 
 } // Server
