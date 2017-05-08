@@ -19,12 +19,8 @@ if [ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]; then
   COVERAGE_DIR="${ENVOY_BUILD_DIR}/envoy/bazel-envoy/generated/coverage"
   S3_LOCATION="lyft-envoy/coverage/report-${TRAVIS_BRANCH}"
 
-  set +e
-  echo "NOTE: Coverage dir ${COVERAGE_DIR}"
-  ls -laR ${COVERAGE_DIR}
-  echo "NOTE: ls of all build dir"
-  ls -laR "${ENVOY_BUILD_DIR}"
-  set -e
+  find -L ${ENVOY_BUILD_DIR} | grep coverage.html
+  dirname $(find -L ${ENVOY_BUILD_DIR} | grep coverage.html | tail -n1)
 
   echo "Uploading coverage report..."
   aws s3 cp "${COVERAGE_DIR}" "s3://${S3_LOCATION}" --recursive --profile coverage --acl public-read
