@@ -48,8 +48,8 @@ public:
    */
   Tracer(Tracer&& tracer)
       : service_name_(tracer.serviceName()), address_(tracer.address()),
-        reporter_(std::move(tracer.reporter())),
-        random_generator_(std::move(tracer.randomGenerator())) {}
+        reporter_(tracer.reporter()),
+        random_generator_(tracer.randomGenerator()) {}
 
   /**
    * Constructor.
