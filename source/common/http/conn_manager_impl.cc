@@ -486,7 +486,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
         headers, end_stream && continue_data_entry == decoder_filters_.end());
     stream_log_trace("decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!(*entry)->commonHandleAfterHeadersCallback(status)) {
+    if (!(*entry)->commonHandleAfterHeadersCallback(status) &&
+        std::next(entry) != decoder_filters_.end()) {
+      // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
+      // processing since we need to handle the case where a terminal filter wants to buffer, but
+      // a previous filter has added body.
       return;
     }
 
