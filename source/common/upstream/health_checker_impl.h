@@ -12,15 +12,36 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/redis/conn_pool.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/logger.h"
 #include "common/http/codec_client.h"
 #include "common/json/json_loader.h"
+#include "common/json/json_validator.h"
 #include "common/network/filter_impl.h"
 
 namespace Upstream {
+
+/**
+ * Factory for creating health checker implementations.
+ */
+class HealthCheckerFactory {
+public:
+  /**
+   * Create a health checker.
+   * @param hc_config supplies the JSON Configuration.
+   * @param cluster supplies the owning cluster.
+   * @param runtime supplies the runtime loader.
+   * @param random supplies the random generator.
+   * @param dispatcher supplies the dispatcher.
+   * @return a health checker.
+   */
+  static HealthCheckerPtr create(const Json::Object& hc_config, Upstream::Cluster& cluster,
+                                 Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                 Event::Dispatcher& dispatcher);
+};
 
 /**
  * All health checker stats. @see stats_macros.h
@@ -30,8 +51,7 @@ namespace Upstream {
   COUNTER(attempt)                                                                                 \
   COUNTER(success)                                                                                 \
   COUNTER(failure)                                                                                 \
-  COUNTER(timeout)                                                                                 \
-  COUNTER(protocol_error)                                                                          \
+  COUNTER(network_failure)                                                                         \
   COUNTER(verify_cluster)                                                                          \
   GAUGE  (healthy)
 // clang-format on
@@ -50,19 +70,29 @@ class HealthCheckerImplBase : public HealthChecker, protected Logger::Loggable<L
 public:
   // Upstream::HealthChecker
   void addHostCheckCompleteCb(HostStatusCb callback) override { callbacks_.push_back(callback); }
+  void start() override;
 
 protected:
-  struct ActiveHealthCheckSession {
-    ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
+  class ActiveHealthCheckSession {
+  public:
     virtual ~ActiveHealthCheckSession();
+    void start() { onIntervalBase(); }
+
+  protected:
+    ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
 
     void handleSuccess();
-    void handleFailure(bool timeout);
+    void handleFailure(bool network_failure);
+
+    HostSharedPtr host_;
+
+  private:
     virtual void onInterval() PURE;
+    void onIntervalBase();
     virtual void onTimeout() PURE;
+    void onTimeoutBase();
 
     HealthCheckerImplBase& parent_;
-    HostSharedPtr host_;
     Event::TimerPtr interval_timer_;
     Event::TimerPtr timeout_timer_;
     uint32_t num_unhealthy_{};
@@ -70,14 +100,13 @@ protected:
     bool first_check_{true};
   };
 
+  typedef std::unique_ptr<ActiveHealthCheckSession> ActiveHealthCheckSessionPtr;
+
   HealthCheckerImplBase(const Cluster& cluster, const Json::Object& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random);
 
-  std::chrono::milliseconds interval();
-
-  virtual void onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
-                                     const std::vector<HostSharedPtr>& hosts_removed) PURE;
+  virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
 
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
@@ -85,14 +114,17 @@ protected:
   const uint32_t unhealthy_threshold_;
   const uint32_t healthy_threshold_;
   HealthCheckerStats stats_;
-  uint64_t local_process_healthy_{};
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
 
 private:
+  void addHosts(const std::vector<HostSharedPtr>& hosts);
   void decHealthy();
   HealthCheckerStats generateStats(Stats::Scope& scope);
   void incHealthy();
+  std::chrono::milliseconds interval() const;
+  void onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
+                             const std::vector<HostSharedPtr>& hosts_removed);
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, bool changed_state);
 
@@ -101,6 +133,8 @@ private:
   std::list<HostStatusCb> callbacks_;
   const std::chrono::milliseconds interval_;
   const std::chrono::milliseconds interval_jitter_;
+  std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
+  uint64_t local_process_healthy_{};
 };
 
 /**
@@ -111,9 +145,6 @@ public:
   HttpHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random);
-
-  // Upstream::HealthChecker
-  void start() override;
 
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
@@ -156,12 +187,12 @@ private:
 
   virtual Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
 
-  // HealthChecker
-  void onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
-                             const std::vector<HostSharedPtr>& hosts_removed) override;
+  // HealthCheckerImplBase
+  ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
+    return ActiveHealthCheckSessionPtr{new HttpActiveHealthCheckSession(*this, host)};
+  }
 
   const std::string path_;
-  std::unordered_map<HostSharedPtr, HttpActiveHealthCheckSessionPtr> active_sessions_;
   Optional<std::string> service_name_;
 };
 
@@ -236,9 +267,6 @@ public:
                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random);
 
-  // Upstream::HealthChecker
-  void start() override;
-
 private:
   struct TcpActiveHealthCheckSession;
 
@@ -260,10 +288,7 @@ private:
 
   struct TcpActiveHealthCheckSession : public ActiveHealthCheckSession {
     TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, HostSharedPtr host)
-        : ActiveHealthCheckSession(parent, host), parent_(parent) {
-      onInterval();
-    }
-
+        : ActiveHealthCheckSession(parent, host), parent_(parent) {}
     ~TcpActiveHealthCheckSession();
 
     void onData(Buffer::Instance& data);
@@ -276,18 +301,78 @@ private:
     TcpHealthCheckerImpl& parent_;
     Network::ClientConnectionPtr client_;
     std::shared_ptr<TcpSessionCallbacks> session_callbacks_;
-    bool expect_close_{};
   };
 
   typedef std::unique_ptr<TcpActiveHealthCheckSession> TcpActiveHealthCheckSessionPtr;
 
-  // HealthChecker
-  void onClusterMemberUpdate(const std::vector<HostSharedPtr>& hosts_added,
-                             const std::vector<HostSharedPtr>& hosts_removed) override;
+  // HealthCheckerImplBase
+  ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
+    return ActiveHealthCheckSessionPtr{new TcpActiveHealthCheckSession(*this, host)};
+  }
 
   const TcpHealthCheckMatcher::MatchSegments send_bytes_;
   const TcpHealthCheckMatcher::MatchSegments receive_bytes_;
-  std::unordered_map<HostSharedPtr, TcpActiveHealthCheckSessionPtr> active_sessions_;
+};
+
+/**
+ * Redis health checker implementation. Sends PING and expects PONG.
+ */
+class RedisHealthCheckerImpl : public HealthCheckerImplBase {
+public:
+  RedisHealthCheckerImpl(const Cluster& cluster, const Json::Object& config,
+                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                         Runtime::RandomGenerator& random,
+                         Redis::ConnPool::ClientFactory& client_factory);
+
+  static const Redis::RespValue& healthCheckRequest() {
+    static HealthCheckRequest* request = new HealthCheckRequest();
+    return request->request_;
+  }
+
+private:
+  struct RedisActiveHealthCheckSession : public ActiveHealthCheckSession,
+                                         public Redis::ConnPool::Config,
+                                         public Redis::ConnPool::PoolCallbacks,
+                                         public Network::ConnectionCallbacks {
+    RedisActiveHealthCheckSession(RedisHealthCheckerImpl& parent, HostSharedPtr host);
+    ~RedisActiveHealthCheckSession();
+
+    // ActiveHealthCheckSession
+    void onInterval() override;
+    void onTimeout() override;
+
+    // Redis::ConnPool::Config
+    std::chrono::milliseconds opTimeout() const override {
+      // Allow the main HC infra to control timeout.
+      return parent_.timeout_ * 2;
+    }
+
+    // Redis::ConnPool::PoolCallbacks
+    void onResponse(Redis::RespValuePtr&& value) override;
+    void onFailure() override;
+
+    // Network::ConnectionCallbacks
+    void onEvent(uint32_t events) override;
+
+    RedisHealthCheckerImpl& parent_;
+    Redis::ConnPool::ClientPtr client_;
+    Redis::ConnPool::PoolRequest* current_request_{};
+  };
+
+  struct HealthCheckRequest {
+    HealthCheckRequest();
+
+    Redis::RespValue request_;
+  };
+
+  typedef std::unique_ptr<RedisActiveHealthCheckSession> RedisActiveHealthCheckSessionPtr;
+
+  // HealthCheckerImplBase
+  ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
+    return ActiveHealthCheckSessionPtr{new RedisActiveHealthCheckSession(*this, host)};
+  }
+
+  Redis::ConnPool::ClientFactory& client_factory_;
 };
 
 } // Upstream
