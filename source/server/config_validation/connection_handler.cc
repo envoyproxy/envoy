@@ -1,5 +1,7 @@
 #include "server/config_validation/connection_handler.h"
 
+#include "common/common/assert.h"
+
 namespace Server {
 
 ValidationConnectionHandler::ValidationConnectionHandler(Api::ApiPtr&& api)
@@ -11,13 +13,13 @@ ValidationConnectionHandler::~ValidationConnectionHandler() {
 
 void ValidationConnectionHandler::addListener(Network::FilterChainFactory&, Network::ListenSocket&,
                                               Stats::Scope&, const Network::ListenerOptions&) {
-  throw EnvoyException("ValidationConnectionHandler::addListener() unimplemented");
+  NOT_IMPLEMENTED;
 }
 
 void ValidationConnectionHandler::addSslListener(Network::FilterChainFactory&, Ssl::ServerContext&,
                                                  Network::ListenSocket&, Stats::Scope&,
                                                  const Network::ListenerOptions&) {
-  throw EnvoyException("ValidationConnectionHandler::addSslListener() unimplemented");
+  NOT_IMPLEMENTED;
 }
 
 } // Server

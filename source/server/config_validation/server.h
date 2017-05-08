@@ -7,6 +7,7 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_manager_impl.h"
+#include "common/common/assert.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -46,28 +47,14 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return handler_.dispatcher(); }
   Network::DnsResolver& dnsResolver() override { return dns_resolver_; }
-  bool draining() override {
-    throw EnvoyException("ValidationInstance::draining() not implemented");
-  }
-  void drainListeners() override {
-    throw EnvoyException("ValidationInstance::drainListeners() not implemented");
-  }
-  DrainManager& drainManager() override {
-    throw EnvoyException("ValidationInstance::drainManager() not implemented");
-  }
+  bool draining() override { NOT_IMPLEMENTED; }
+  void drainListeners() override { NOT_IMPLEMENTED; }
+  DrainManager& drainManager() override { NOT_IMPLEMENTED; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
-  void failHealthcheck(bool) override {
-    throw EnvoyException("ValidationInstance::failHealthcheck() not implemented");
-  }
-  int getListenSocketFd(const std::string&) override {
-    throw EnvoyException("ValidationInstance::getListenSocketFd() not implemented");
-  }
-  Network::ListenSocket* getListenSocketByIndex(uint32_t) override {
-    throw EnvoyException("ValidationInstance::getListenSocketByIndex() not implemented");
-  }
-  void getParentStats(HotRestart::GetParentStatsInfo&) override {
-    throw EnvoyException("ValidationInstance::getParentStats() not implemented");
-  }
+  void failHealthcheck(bool) override { NOT_IMPLEMENTED; }
+  int getListenSocketFd(const std::string&) override { NOT_IMPLEMENTED; }
+  Network::ListenSocket* getListenSocketByIndex(uint32_t) override { NOT_IMPLEMENTED; }
+  void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED; }
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
@@ -77,19 +64,11 @@ public:
   }
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
-  void shutdownAdmin() override {
-    throw EnvoyException("ValidationInstance::shutdownAdmin() not implemented");
-  }
-  bool healthCheckFailed() override {
-    throw EnvoyException("ValidationInstance::healthCheckFailed() not implemented");
-  }
+  void shutdownAdmin() override { NOT_IMPLEMENTED; }
+  bool healthCheckFailed() override { NOT_IMPLEMENTED; }
   Options& options() override { return options_; }
-  time_t startTimeCurrentEpoch() override {
-    throw EnvoyException("ValidationInstance::startTimeCurrentEpoch() not implemented");
-  }
-  time_t startTimeFirstEpoch() override {
-    throw EnvoyException("ValidationInstance::startTimeFirstEpoch() not implemented");
-  }
+  time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED; }
+  time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED; }
   Stats::Store& stats() override { return stats_store_; }
   Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }

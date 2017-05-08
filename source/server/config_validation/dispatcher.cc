@@ -1,35 +1,35 @@
 #include "server/config_validation/dispatcher.h"
 
+#include "common/common/assert.h"
+
 namespace Event {
 
 Network::ClientConnectionPtr
     ValidationDispatcher::createClientConnection(Network::Address::InstanceConstSharedPtr) {
-  throw EnvoyException("ValidationDispatcher::createClientConnection() not implemented.");
+  NOT_IMPLEMENTED;
 }
 
 Network::ClientConnectionPtr
 ValidationDispatcher::createSslClientConnection(Ssl::ClientContext&,
                                                 Network::Address::InstanceConstSharedPtr) {
-  throw EnvoyException("ValidationDispatcher::createSslClientConnection() not implemented.");
+  NOT_IMPLEMENTED;
 }
 
-Network::DnsResolverPtr ValidationDispatcher::createDnsResolver() {
-  throw EnvoyException("ValidationDispatcher::createDnsResolver() not implemented.");
-}
+Network::DnsResolverPtr ValidationDispatcher::createDnsResolver() { NOT_IMPLEMENTED; }
 
 Network::ListenerPtr ValidationDispatcher::createListener(Network::ConnectionHandler&,
                                                           Network::ListenSocket&,
                                                           Network::ListenerCallbacks&,
                                                           Stats::Scope&,
                                                           const Network::ListenerOptions&) {
-  throw EnvoyException("ValidationDispatcher::createListener() not implemented.");
+  NOT_IMPLEMENTED;
 }
 
 Network::ListenerPtr
 ValidationDispatcher::createSslListener(Network::ConnectionHandler&, Ssl::ServerContext&,
                                         Network::ListenSocket&, Network::ListenerCallbacks&,
                                         Stats::Scope&, const Network::ListenerOptions&) {
-  throw EnvoyException("ValidationDispatcher::CreateSslListener() not implemented.");
+  NOT_IMPLEMENTED;
 }
 
 } // Event
