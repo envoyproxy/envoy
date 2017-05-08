@@ -78,6 +78,8 @@ service_name
   the health checked cluster. See the :ref:`architecture overview
   <arch_overview_health_checking_identity>` for more information.
 
+.. _config_cluster_manager_cluster_hc_tcp_health_checking:
+
 TCP health checking
 -------------------
 
