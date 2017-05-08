@@ -9,6 +9,7 @@ matrix:
 env:
   - TEST_TYPE=bazel.release
   - TEST_TYPE=bazel.asan
+  - TEST_TYPE=bazel.tsan
   - TEST_TYPE=bazel.coverage
   - TEST_TYPE=check_format
   - TEST_TYPE=docs

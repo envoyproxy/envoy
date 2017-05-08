@@ -360,6 +360,7 @@ TEST_F(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   HostListsSharedPtr local_hosts_per_zone(new std::vector<std::vector<HostSharedPtr>>({{}, {}}));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillOnce(Return(50))
       .WillOnce(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillOnce(Return(true));
