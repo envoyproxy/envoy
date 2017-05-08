@@ -99,6 +99,9 @@ void SdsClusterImpl::createRequest(Http::Message& message) {
   log_debug("starting sds refresh for cluster: {}", info_->name());
   info_->stats().update_attempt_.inc();
 
+  message.headers().addStatic(Http::Headers::get().EnvoyCluster, local_info_.clusterName());
+  message.headers().addStatic(Http::Headers::get().EnvoyNode, local_info_.nodeName());
+  message.headers().addStatic(Http::Headers::get().EnvoyZone, local_info_.zoneName());
   message.headers().insertMethod().value(Http::Headers::get().MethodValues.Get);
   message.headers().insertPath().value("/v1/registration/" + service_name_);
 }
