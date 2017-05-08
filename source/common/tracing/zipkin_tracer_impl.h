@@ -58,9 +58,14 @@ public:
   void setTag(const std::string& name, const std::string& value) override;
 
   /**
-   * @returns true if this span has a CS (Client Send) basic annotation, or false otherwise.
+   * @return true if this span has a CS (Client Send) basic annotation, or false otherwise.
    */
   bool hasCSAnnotation();
+
+  /**
+   * @return a reference to the Zipkin::Span object.
+   */
+  Zipkin::Span& span() { return span_; }
 
 private:
   Zipkin::Span span_;
