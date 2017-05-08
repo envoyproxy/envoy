@@ -48,8 +48,7 @@ public:
    */
   Tracer(Tracer&& tracer)
       : service_name_(tracer.serviceName()), address_(tracer.address()),
-        reporter_(tracer.reporter()),
-        random_generator_(tracer.randomGenerator()) {}
+        reporter_(tracer.reporter()), random_generator_(tracer.randomGenerator()) {}
 
   /**
    * Constructor.
