@@ -762,6 +762,8 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
 
+  connection_->raiseEvents(Network::ConnectionEvent::Connected);
+
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Buffer::OwnedImpl response;
@@ -783,6 +785,8 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   cluster_->runCallbacks({cluster_->hosts_.back()}, {});
 
+  connection_->raiseEvents(Network::ConnectionEvent::Connected);
+
   Buffer::OwnedImpl response;
   add_uint8(response, 1);
   read_filter_->onData(response);
@@ -798,6 +802,8 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
 
+  connection_->raiseEvents(Network::ConnectionEvent::Connected);
+
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
@@ -808,6 +814,8 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   EXPECT_CALL(*connection_, write(_));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
+
+  connection_->raiseEvents(Network::ConnectionEvent::Connected);
 
   std::vector<HostSharedPtr> removed{cluster_->hosts_.back()};
   cluster_->hosts_.clear();
