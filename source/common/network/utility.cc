@@ -87,8 +87,12 @@ const std::string Utility::TCP_SCHEME = "tcp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
+  // TODO(mattklein123): IPv6 support.
+  // TODO(mattklein123): We still support the legacy tcp:// and unix:// names. We should
+  // support/parse ip:// and pipe:// as better names.
   if (url.find(TCP_SCHEME) == 0) {
-    return Address::parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
+    return Address::InstanceConstSharedPtr{
+        new Address::Ipv4Instance(hostFromTcpUrl(url), portFromTcpUrl(url))};
   } else if (url.find(UNIX_SCHEME) == 0) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};

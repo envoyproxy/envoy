@@ -15,7 +15,7 @@ public:
   /**
    * Global initializer for all integration tests.
    */
-  void SetUp() override {
+  static void SetUpTestCase() {
     fake_upstreams_.emplace_back(new FakeUpstream(
         TestEnvironment::unixDomainSocketPath("udstest.1.sock"), FakeHttpConnection::Type::HTTP1));
     fake_upstreams_.emplace_back(new FakeUpstream(
@@ -26,7 +26,7 @@ public:
   /**
    * Global destructor for all integration tests.
    */
-  void TearDown() override {
+  static void TearDownTestCase() {
     test_server_.reset();
     fake_upstreams_.clear();
   }
