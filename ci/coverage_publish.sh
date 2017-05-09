@@ -18,17 +18,24 @@ if [ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]; then
 
 
   COVERAGE_FILE=$(find -L ${ENVOY_BUILD_DIR} -name "coverage\.html" 2>&1 | grep "coverage\.html" | tail -n1)
-  if [[ -z "${COVERAGE_FILE}" ]]; then
+  if [ -z "${COVERAGE_FILE}" ]; then
     echo "ERROR: Coverage file not found."
     exit 1
-  fi  
+  fi
 
   COVERAGE_DIR=$(dirname "${COVERAGE_FILE}")
-  S3_LOCATION="lyft-envoy/coverage/report-${TRAVIS_BRANCH}"
+
+  if [ -n "${TRAVIS_PULL_REQUEST_BRANCH}" ]; then
+    BRANCH_NAME="${TRAVIS_PULL_REQUEST_BRANCH}"
+  else
+    BRANCH_NAME="${TRAVIS_BRANCH}"
+  fi
+
+  S3_LOCATION="lyft-envoy/coverage/report-${BRANCH_NAME}"
 
   echo "Uploading coverage report..."
   aws s3 cp "${COVERAGE_DIR}" "s3://${S3_LOCATION}" --recursive --profile coverage --acl public-read --quiet
-  echo "Coverage report for this branch is available for viewing at https://s3.amazonaws.com/${S3_LOCATION}/coverage.html."
+  echo "Coverage report for branch '${BRANCH_NAME}': https://s3.amazonaws.com/${S3_LOCATION}/coverage.html"
 else
   echo "Coverage report will not be uploaded for this build."
 fi
