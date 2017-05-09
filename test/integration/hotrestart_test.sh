@@ -4,9 +4,9 @@ set -e
 
 [[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_RUNDIR}"/source/exe/envoy-static
 
-# TODO(htuch): Clean this up when Bazelifying the hot restart test below.In this test script,
-# we are duplicating work done in test_environment.cc via sed.Instead, we can add a simple C++
-# binary that links against test_environment.cc and uses the substitution methods provided there.
+# TODO(htuch): In this test script, we are duplicating work done in test_environment.cc via sed.
+# Instead, we can add a simple C++ binary that links against test_environment.cc and uses the
+# substitution methods provided there.
 # TODO(henna): Parameterize IPv4 and IPv6 testing.
 HOT_RESTART_JSON="${TEST_TMPDIR}"/hot_restart.json
 cat "${TEST_RUNDIR}"/test/config/integration/server.json |

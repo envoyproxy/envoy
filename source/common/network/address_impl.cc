@@ -185,10 +185,10 @@ int Ipv6Instance::connect(int fd) const {
 }
 
 int Ipv6Instance::socket(SocketType type) const {
-  int fd = ::socket(AF_INET6, flagsFromSocketType(type), 0);
+  const int fd = ::socket(AF_INET6, flagsFromSocketType(type), 0);
   RELEASE_ASSERT(fd != -1);
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
-  int v6only = 1;
+  const int v6only = 1;
   RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1);
   return fd;
 }
