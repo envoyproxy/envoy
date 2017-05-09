@@ -157,6 +157,7 @@
       }
     }]
   },
+  {# The following listener is configured to use route discovery service. #}
   {
     "address": "tcp://127.0.0.1:9002",
     "filters": [
@@ -347,7 +348,6 @@
         "connect_timeout_ms": 250,
         "type": "strict_dns",
         "lb_type": "round_robin",
-        "features": "http2",
         "hosts": [{"url": "tcp://cds.yourcompany.net:80"}]
       }
     },
@@ -436,7 +436,6 @@
       "connect_timeout_ms": 250,
       "type": "strict_dns",
       "lb_type": "round_robin",
-      "features": "http2",
       "hosts": [{"url": "tcp://rds.yourcompany.net:80"}]
     },
     {
