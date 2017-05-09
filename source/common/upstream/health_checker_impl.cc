@@ -418,6 +418,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(uint32_t events)
     // TODO(mattklein123): If we had a way on the connection interface to do an immediate read (vs.
     // evented), that would be a good check to run here to make sure it returns the equivalent of
     // EAGAIN. Need to think through how that would look from an interface perspective.
+    // TODO(mattklein123): In the case that a user configured bytes to write, they will not be
+    // be written, since we currently have no way to know if the bytes actually get written via
+    // the connection interface. We might want to figure out how to handle this better later.
     client_->close(Network::ConnectionCloseType::NoFlush);
     handleSuccess();
   }
