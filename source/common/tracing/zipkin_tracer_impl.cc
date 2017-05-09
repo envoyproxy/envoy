@@ -56,7 +56,7 @@ ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager&
                     cluster_->name()));
   }
 
-  const std::string& collector_endpoint = config.getString("collector_endpoint");
+  const std::string collector_endpoint = config.getString("collector_endpoint");
 
   tls_.set(tls_slot_, [this, collector_endpoint, &random_generator](Event::Dispatcher& dispatcher)
                           -> ThreadLocal::ThreadLocalObjectSharedPtr {
