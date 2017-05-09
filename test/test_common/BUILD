@@ -19,8 +19,10 @@ envoy_cc_test_library(
     srcs = ["environment.cc"],
     hdrs = ["environment.h"],
     deps = [
+        ":network_utility_lib",
         "//include/envoy/server:options_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:compiler_requirements_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",

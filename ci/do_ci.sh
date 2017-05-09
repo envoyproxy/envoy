@@ -12,31 +12,63 @@ function bazel_release_binary_build() {
   cd "${ENVOY_CI_DIR}"
   bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static.stripped.stamped
   # Copy the envoy-static binary somewhere that we can access outside of the
-  # container for building Docker images.
+  # container.
   cp -f \
     "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stripped.stamped \
     "${ENVOY_DELIVERY_DIR}"/envoy
 }
 
+function bazel_debug_binary_build() {
+  echo "Building..."
+  cd "${ENVOY_CI_DIR}"
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static.stamped
+  # Copy the envoy-static binary somewhere that we can access outside of the
+  # container.
+  cp -f \
+    "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stamped \
+    "${ENVOY_DELIVERY_DIR}"/envoy-debug
+}
+
 if [[ "$1" == "bazel.release" ]]; then
+  setup_gcc_toolchain
   echo "bazel release build with tests..."
   bazel_release_binary_build
   echo "Testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/...
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
+  setup_gcc_toolchain
   echo "bazel release build..."
   bazel_release_binary_build
   exit 0
+elif [[ "$1" == "bazel.debug" ]]; then
+  echo "bazel debug build with tests..."
+  bazel_debug_binary_build
+  echo "Testing..."
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg //test/...
+  exit 0
+elif [[ "$1" == "bazel.debug.server_only" ]]; then
+  echo "bazel debug build..."
+  bazel_debug_binary_build
+  exit 0
 elif [[ "$1" == "bazel.asan" ]]; then
-  echo "bazel ASAN debug build with tests..."
-  cd "${ENVOY_CONSUMER_SRCDIR}"
+  setup_clang_toolchain
+  echo "bazel ASAN/UBSAN debug build with tests..."
+  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
-  # TODO(htuch): This should switch to using clang when available.
-  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=asan @envoy//test/... \
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
+    //:echo2_integration_test
+  exit 0
+elif [[ "$1" == "bazel.tsan" ]]; then
+  setup_clang_toolchain
+  echo "bazel TSAN debug build with tests..."
+  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  echo "Building and testing..."
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan @envoy//test/... \
     //:echo2_integration_test
   exit 0
 elif [[ "$1" == "bazel.dev" ]]; then
+  setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild build with tests..."
   cd "${ENVOY_CI_DIR}"
@@ -51,6 +83,7 @@ elif [[ "$1" == "bazel.dev" ]]; then
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
+  setup_gcc_toolchain
   echo "bazel coverage build with tests..."
   export GCOVR="/thirdparty/gcovr/scripts/gcovr"
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"

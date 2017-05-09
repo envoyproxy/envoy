@@ -24,8 +24,8 @@ Health checking
 
 type
   *(required, string)* The type of health checking to perform. Currently supported types are
-  *http* and *tcp*. See the :ref:`architecture overview <arch_overview_health_checking>` for more
-  information.
+  *http*, *redis*, and *tcp*. See the :ref:`architecture overview <arch_overview_health_checking>`
+  for more information.
 
 timeout_ms
   *(required, integer)* The time in milliseconds to wait for a health check response. If the
@@ -77,3 +77,55 @@ service_name
   *(optional, string)* An optional service name parameter which is used to validate the identity of
   the health checked cluster. See the :ref:`architecture overview
   <arch_overview_health_checking_identity>` for more information.
+
+TCP health checking
+-------------------
+
+The type of matching performed is the following (this is the MongoDB health check request and
+response):
+
+.. code-block:: json
+
+  {
+    "send": [
+      {"binary": "39000000"},
+      {"binary": "EEEEEEEE"},
+      {"binary": "00000000"},
+      {"binary": "d4070000"},
+      {"binary": "00000000"},
+      {"binary": "746573742e"},
+      {"binary": "24636d6400"},
+      {"binary": "00000000"},
+      {"binary": "FFFFFFFF"},
+      {"binary": "13000000"},
+      {"binary": "01"},
+      {"binary": "70696e6700"},
+      {"binary": "000000000000f03f"},
+      {"binary": "00"}
+     ],
+     "receive": [
+      {"binary": "EEEEEEEE"},
+      {"binary": "01000000"},
+      {"binary": "00000000"},
+      {"binary": "0000000000000000"},
+      {"binary": "00000000"},
+      {"binary": "11000000"},
+      {"binary": "01"},
+      {"binary": "6f6b"},
+      {"binary": "00000000000000f03f"},
+      {"binary": "00"}
+     ]
+ }
+
+During each health check cycle, all of the "send" bytes are sent to the target server. Each
+binary block can be of arbitrary length and is just concatenated together when sent. (Separating
+into multiple blocks can be useful for readability).
+
+When checking the response, "fuzzy" matching is performed such that each binary block must be found,
+and in the order specified, but not necessarly contiguous. Thus, in the example above,
+"FFFFFFFF" could be inserted in the response between "EEEEEEEE" and "01000000" and the check
+would still pass. This is done to support protocols that insert non-deterministic data, such as
+time, into the response.
+
+Health checks that require a more complex pattern such as send/receive/send/receive are not
+currently possible.

@@ -18,12 +18,14 @@
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
 #include "common/http/access_log/request_info_impl.h"
 #include "common/http/message_impl.h"
 #include "common/router/router.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Http {
 
@@ -184,6 +186,7 @@ private:
   Router::RouteConstSharedPtr route() override { return route_; }
   uint64_t streamId() override { return stream_id_; }
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
+  Tracing::Span& activeSpan() override { return active_span_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
   Buffer::InstancePtr& decodingBuffer() override {
@@ -198,6 +201,7 @@ private:
   Router::ProdFilter router_;
   std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
+  Tracing::NullSpan active_span_;
   std::shared_ptr<RouteImpl> route_;
   bool local_closed_{};
   bool remote_closed_{};

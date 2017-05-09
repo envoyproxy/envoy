@@ -25,8 +25,17 @@ testing purposes. The specific versions of the Envoy dependencies used in this b
 up-to-date with the latest security patches.
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
-2. `bazel build //source/exe:envoy-static` from the Envoy source directory.
+2.  Install external dependencies libtoolize, cmake, and realpath libraries separately.
+```
+On Ubuntu Machine, run the following commands:
+ apt-get install libtoolize
+ apt-get install cmake
+ apt-get install realpath
+```
+3.  Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
+and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
+4. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
+5. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Bazel with the CI Docker image
 
@@ -147,13 +156,32 @@ You can use the `-c <compilation_mode>` flag to control this, e.g.
 ```
 bazel build -c opt //source/exe:envoy-static
 ```
-To build and run tests with the compiler's address sanitizer (ASAN) enabled:
+
+
+## Sanitizers
+
+To build and run tests with the gcc-4.9 compiler's [address sanitizer
+(ASAN)](https://github.com/google/sanitizers/wiki/AddressSanitizer) and
+[undefined behavior
+(UBSAN)](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan) sanitizer enabled:
 
 ```
 bazel test -c dbg --config=asan //test/...
 ```
 
-The ASAN failure stack traces include line numbers as a results of running ASAN with a `dbg` build above.
+The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above.
+
+If you have clang-5.0, additional checks are provided with:
+
+```
+bazel test -c dbg --config=clang-asan //test/...
+```
+
+Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) testing:
+
+```
+bazel test -c dbg --config=clang-tsan //test/...
+```
 
 # Release builds
 

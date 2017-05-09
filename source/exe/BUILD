@@ -52,6 +52,7 @@ envoy_cc_library(
     name = "envoy_main_lib",
     srcs = ["main.cc"],
     deps = [
+        "//source/common/common:compiler_requirements_lib",
         ":envoy_common_lib",
         ":hot_restart_lib",
     ] + select({

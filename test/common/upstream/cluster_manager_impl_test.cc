@@ -838,4 +838,25 @@ TEST(ClusterManagerInitHelper, AddSecondaryAfterSecondaryInit) {
   cluster2.initialize_callback_();
 }
 
+TEST(ClusterManagerInitHelper, RemoveClusterWithinInitLoop) {
+  // Tests the scenario encountered in Issue 903: The cluster was removed from
+  // the secondary init list while traversing the list.
+
+  InSequence s;
+  ClusterManagerInitHelper init_helper;
+  NiceMock<MockCluster> cluster;
+  ON_CALL(cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  init_helper.addCluster(cluster);
+
+  // Set up the scenario seen in Issue 903 where initialize() ultimately results
+  // in the removeCluster() call. In the real bug this was a long and complex call
+  // chain.
+  EXPECT_CALL(cluster, initialize())
+      .WillOnce(Invoke([&]() -> void { init_helper.removeCluster(cluster); }));
+
+  // Now call onStaticLoadComplete which will exercise maybeFinishInitialize()
+  // which calls initialize() on the members of the secondary init list.
+  init_helper.onStaticLoadComplete();
+}
+
 } // Upstream

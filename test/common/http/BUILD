@@ -82,6 +82,7 @@ envoy_cc_test(
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:access_log_interface",
+        "//include/envoy/tracing:http_tracer_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",

@@ -64,6 +64,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
+        "//include/envoy/tracing:http_tracer_interface",
     ],
 )
 
