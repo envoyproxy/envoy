@@ -79,6 +79,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:filter_lib",
+        "//source/common/redis:conn_pool_lib",
     ],
 )
 

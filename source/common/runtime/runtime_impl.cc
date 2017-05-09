@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <random>
 #include <string>
 
 #include "envoy/event/dispatcher.h"

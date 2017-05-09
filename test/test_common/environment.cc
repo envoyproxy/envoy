@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/compiler_requirements.h"
 
 #include "server/options_impl.h"
 
