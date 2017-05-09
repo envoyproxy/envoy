@@ -14,25 +14,25 @@ ENVOY_PACKAGE_STRING = (
 def FixBuild(path):
   with open(path, 'r') as f:
     outlines = [LICENSE_STRING]
-    load = 0
-    seen_ebs = 0
-    seen_epkg = 0
+    in_load = False
+    seen_ebs = False
+    seen_epkg = False
     for line in f:
       if line.startswith('package(') and not path.endswith(
           'bazel/BUILD') and not path.endswith('ci/prebuilt/BUILD'):
         continue
-      if load == 0 and line.startswith('load('):
-        load = 1
-      if load == 1:
+      if in_load == False and line.startswith('load('):
+        in_load = True
+      if in_load:
         if 'envoy_build_system.bzl' in line:
-          seen_ebs = 1
+          seen_ebs = True
         if 'envoy_package' in line:
-          seen_epkg = 1
-        if line.strip().endswith(')'):
-          load = 2
+          seen_epkg = True
+        if line.rstrip().endswith(')'):
+          in_load = None  # investigate only first load() directive
           if seen_ebs:
             if not seen_epkg:
-              outlines.append(line.strip()[:-1] + ', "envoy_package")\n')
+              outlines.append(line.rstrip()[:-1] + ', "envoy_package")\n')
               outlines.append('\nenvoy_package()\n')
               continue
           else:
