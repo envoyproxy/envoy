@@ -105,6 +105,7 @@ private:
     bool shutdown_{};
   };
 
+  // Somewhat arbitrary 16MiB limit for buffered stats.
   static constexpr uint32_t MaxBufferedStatsBytes = (1024 * 1024 * 16);
 
   const LocalInfo::LocalInfo& local_info_;
