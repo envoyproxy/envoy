@@ -33,6 +33,12 @@ public:
 
   MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
   MOCK_METHOD0(finishSpan, void());
+
+  SpanPtr spawnChild(const std::string& name, SystemTime start_time) override {
+    return SpanPtr{spawnChild_(name, start_time)};
+  }
+
+  MOCK_METHOD2(spawnChild_, Span*(const std::string& name, SystemTime start_time));
 };
 
 class MockHttpTracer : public HttpTracer {

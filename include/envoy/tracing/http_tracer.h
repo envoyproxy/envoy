@@ -33,15 +33,19 @@ public:
 /*
  * Basic abstraction for span.
  */
+class Span;
+
+typedef std::unique_ptr<Span> SpanPtr;
+
 class Span {
 public:
   virtual ~Span() {}
 
   virtual void setTag(const std::string& name, const std::string& value) PURE;
   virtual void finishSpan() PURE;
+  // virtual void inject(Http::HeaderMap& request_headers) PURE;
+  virtual SpanPtr spawnChild(const std::string& name, SystemTime start_time) PURE;
 };
-
-typedef std::unique_ptr<Span> SpanPtr;
 
 /**
  * Tracing driver is responsible for span creation.

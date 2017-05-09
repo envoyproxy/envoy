@@ -87,6 +87,11 @@ public:
   // Tracing::Span
   void setTag(const std::string&, const std::string&) override {}
   void finishSpan() override {}
+  SpanPtr spawnChild(const std::string&, SystemTime) override {
+    SpanPtr nullSpan;
+    nullSpan.reset(new NullSpan());
+    return std::move(nullSpan);
+  }
 };
 
 } // Tracing
