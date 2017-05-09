@@ -33,7 +33,6 @@ if [ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]; then
   S3_LOCATION="lyft-envoy/coverage/report-${BRANCH_NAME}"
 
   echo "Uploading coverage report..."
-  ls -l /build/envoy/bazel-envoy/generated/coverage/coverage.html
   aws s3 cp "${COVERAGE_DIR}" "s3://${S3_LOCATION}" --recursive --profile coverage --acl public-read --quiet
   echo "Coverage report for branch '${BRANCH_NAME}': https://s3.amazonaws.com/${S3_LOCATION}/coverage.html"
 else
