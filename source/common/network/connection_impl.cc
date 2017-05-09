@@ -379,6 +379,11 @@ void ConnectionImpl::onWriteReady() {
       conn_log_debug("connected", *this);
       state_ &= ~InternalState::Connecting;
       onConnected();
+      // It's possible that we closed during the connect callback.
+      if (state() != State::Open) {
+        conn_log_debug("close during connected callback", *this);
+        return;
+      }
     } else {
       conn_log_debug("delayed connection error: {}", *this, error);
       closeSocket(ConnectionEvent::RemoteClose);
