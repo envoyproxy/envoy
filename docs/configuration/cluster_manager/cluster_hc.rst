@@ -133,6 +133,6 @@ time, into the response.
 Health checks that require a more complex pattern such as send/receive/send/receive are not
 currently possible.
 
-If both "send" and "receive" are empty arrays, Envoy will perform "connect only" TCP health
-checking. During each cycle, Envoy will attempt to connect to the upstream host, and consider it
-a success if the connection succeeds. A new connection is created for each health check cycle.
+If "receive" is an empty array, Envoy will perform "connect only" TCP health checking. During each
+cycle, Envoy will attempt to connect to the upstream host, and consider it a success if the
+connection succeeds. A new connection is created for each health check cycle.
