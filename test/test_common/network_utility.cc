@@ -80,6 +80,13 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
   return instance;
 }
 
+const std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v6) {
+    return std::string("[::1]");
+  }
+  return std::string("127.0.0.1");
+}
+
 Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     // Pick a random address in 127.0.0.0/8.
@@ -97,6 +104,13 @@ Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion versio
     // There is only one IPv6 loopback address.
     return Network::Utility::getIpv6LoopbackAddress();
   }
+}
+
+Address::InstanceConstSharedPtr getAnyAddress(Address::IpVersion version) {
+  if (version == Address::IpVersion::v4) {
+    return Network::Utility::getIpv4AnyAddress();
+  }
+  return Network::Utility::getIpv6AnyAddress();
 }
 
 std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
