@@ -16,8 +16,15 @@ if [ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]; then
   echo "aws_secret_access_key=${COVERAGE_AWS_SECRET_ACCESS_KEY}" >> ~/.aws/config
   echo "region=us-east-1" >> ~/.aws/config
 
+
+  COVERAGE_FILE=$(find -L ${ENVOY_BUILD_DIR} -name "coverage\.html" 2>&1 | grep "coverage\.html" | tail -n1)
+  if [[ -z "${COVERAGE FILE}" ]]; then
+    echo "ERROR: Coverage file not found."
+    exit 1
+  fi  
+
+  COVERAGE_DIR=$(dirname "${COVERAGE_FILE}")
   S3_LOCATION="lyft-envoy/coverage/report-${TRAVIS_BRANCH}"
-  COVERAGE_DIR=$(dirname $(find -L ${ENVOY_BUILD_DIR} | grep coverage.html | tail -n1))
 
   echo "Uploading coverage report..."
   aws s3 cp "${COVERAGE_DIR}" "s3://${S3_LOCATION}" --recursive --profile coverage --acl public-read --quiet
