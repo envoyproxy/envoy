@@ -9,7 +9,7 @@ public:
   /**
    * Global initializer for all integration tests.
    */
-  static void SetUpTestCase() {
+  void SetUp() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1));
@@ -20,7 +20,7 @@ public:
   /**
    * Global destructor for all integration tests.
    */
-  static void TearDownTestCase() {
+  void TearDown() override {
     test_server_.reset();
     fake_upstreams_.clear();
   }

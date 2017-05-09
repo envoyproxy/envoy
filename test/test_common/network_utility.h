@@ -33,6 +33,13 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
                                                     Address::SocketType type);
 
 /**
+ * Get a URL ready IP loopback address as a string.
+ * @param version IP address version of loopback address.
+ * @return std::string URL ready loopback address as a string.
+ */
+const std::string getLoopbackAddressUrlString(const Address::IpVersion version);
+
+/**
  * Returns a loopback address for the specified IP version. For IPv6 this is always the same,
  * but for IPv4 it is anywhere in the range 127.0.0.0/8.
  * @param version the IP version of the loopback address.
