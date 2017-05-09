@@ -25,8 +25,17 @@ testing purposes. The specific versions of the Envoy dependencies used in this b
 up-to-date with the latest security patches.
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
-2. `bazel build //source/exe:envoy-static` from the Envoy source directory.
+2.  Install external dependencies libtoolize, cmake, and realpath libraries separately.
+```
+On Ubuntu Machine, run the following commands:
+ apt-get install libtoolize
+ apt-get install cmake
+ apt-get install realpath
+```
+3.  Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
+and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
+4. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
+5. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Bazel with the CI Docker image
 
