@@ -40,26 +40,26 @@ public:
   /**
    * Global initializer for all integration tests.
    */
-  void SetUp() override;
+  static void SetUpTestCase();
 
   /**
    * Global destructor for all integration tests.
    */
-  void TearDown() override;
+  static void TearDownTestCase();
 
   Network::ClientConnectionPtr makeSslClientConnection(bool alpn, bool san);
-  ServerContextPtr createUpstreamSslContext();
-  ClientContextPtr createClientSslContext(bool alpn, bool san);
+  static ServerContextPtr createUpstreamSslContext();
+  static ClientContextPtr createClientSslContext(bool alpn, bool san);
   void checkStats();
 
 private:
-  std::unique_ptr<Runtime::Loader> runtime_;
-  std::unique_ptr<ContextManager> context_manager_;
-  ServerContextPtr upstream_ssl_ctx_;
-  ClientContextPtr client_ssl_ctx_plain_;
-  ClientContextPtr client_ssl_ctx_alpn_;
-  ClientContextPtr client_ssl_ctx_san_;
-  ClientContextPtr client_ssl_ctx_alpn_san_;
+  static std::unique_ptr<Runtime::Loader> runtime_;
+  static std::unique_ptr<ContextManager> context_manager_;
+  static ServerContextPtr upstream_ssl_ctx_;
+  static ClientContextPtr client_ssl_ctx_plain_;
+  static ClientContextPtr client_ssl_ctx_alpn_;
+  static ClientContextPtr client_ssl_ctx_san_;
+  static ClientContextPtr client_ssl_ctx_alpn_san_;
 };
 
 } // Ssl

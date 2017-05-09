@@ -46,14 +46,6 @@ void testSocketBindAndConnect(const std::string& addr_port_str) {
   ASSERT_GE(listen_fd, 0) << addr_port->asString();
   ScopedFdCloser closer1(listen_fd);
 
-  // Check that IPv6 sockets accept IPv6 connections only.
-  if (addr_port->ip()->ipv6() != nullptr) {
-    int v6only = 0;
-    socklen_t size_int = sizeof(v6only);
-    ASSERT_GE(::getsockopt(listen_fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, &size_int), 0);
-    EXPECT_EQ(v6only, 1);
-  }
-
   // Bind the socket to the desired address and port.
   int rc = addr_port->bind(listen_fd);
   int err = errno;
