@@ -18,7 +18,7 @@ if [ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]; then
 
 
   COVERAGE_FILE=$(find -L ${ENVOY_BUILD_DIR} -name "coverage\.html" 2>&1 | grep "coverage\.html" | tail -n1)
-  if [[ -z "${COVERAGE FILE}" ]]; then
+  if [[ -z "${COVERAGE_FILE}" ]]; then
     echo "ERROR: Coverage file not found."
     exit 1
   fi  
