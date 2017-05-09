@@ -16,14 +16,11 @@ if [ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]; then
   echo "aws_secret_access_key=${COVERAGE_AWS_SECRET_ACCESS_KEY}" >> ~/.aws/config
   echo "region=us-east-1" >> ~/.aws/config
 
-  COVERAGE_DIR="${ENVOY_BUILD_DIR}/envoy/bazel-envoy/generated/coverage"
   S3_LOCATION="lyft-envoy/coverage/report-${TRAVIS_BRANCH}"
-
-  find -L ${ENVOY_BUILD_DIR} | grep coverage.html
-  dirname $(find -L ${ENVOY_BUILD_DIR} | grep coverage.html | tail -n1)
+  COVERAGE_DIR=$(dirname $(find -L ${ENVOY_BUILD_DIR} | grep coverage.html | tail -n1))
 
   echo "Uploading coverage report..."
-  aws s3 cp "${COVERAGE_DIR}" "s3://${S3_LOCATION}" --recursive --profile coverage --acl public-read
+  aws s3 cp "${COVERAGE_DIR}" "s3://${S3_LOCATION}" --recursive --profile coverage --acl public-read --quiet
   echo "Coverage report for this branch is available for viewing at https://s3.amazonaws.com/${S3_LOCATION}/coverage.html."
 else
   echo "Coverage report will not be uploaded for this build."
