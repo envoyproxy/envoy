@@ -6,7 +6,7 @@
 #include "common/common/assert.h"
 #include "common/http/headers.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 void ShadowWriterImpl::shadow(const std::string& cluster, Http::MessagePtr&& request,
@@ -25,4 +25,4 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::MessagePtr&& req
 }
 
 } // Router
-} // Lyft
+} // Envoy

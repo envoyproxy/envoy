@@ -7,7 +7,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/event/event_impl_base.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 
 /**
@@ -33,4 +33,4 @@ private:
 };
 
 } // Event
-} // Lyft
+} // Envoy

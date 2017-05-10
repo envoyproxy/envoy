@@ -3,7 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -21,4 +21,4 @@ public:
 };
 
 } // Http
-} // Lyft
+} // Envoy

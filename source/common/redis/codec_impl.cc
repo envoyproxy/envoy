@@ -9,7 +9,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Redis {
 
 std::string RespValue::toString() const {
@@ -419,4 +419,4 @@ void EncoderImpl::encodeSimpleString(const std::string& string, Buffer::Instance
 }
 
 } // Redis
-} // Lyft
+} // Envoy

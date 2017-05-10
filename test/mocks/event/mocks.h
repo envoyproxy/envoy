@@ -18,7 +18,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 
 class MockDispatcher : public Dispatcher {
@@ -125,4 +125,4 @@ public:
 };
 
 } // Event
-} // Lyft
+} // Envoy

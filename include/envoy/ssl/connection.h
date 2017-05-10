@@ -4,7 +4,7 @@
 
 #include "envoy/common/pure.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Ssl {
 
 /**
@@ -28,4 +28,4 @@ public:
 };
 
 } // Ssl
-} // Lyft
+} // Envoy

@@ -22,7 +22,7 @@ extern "C" {
 void evconnlistener_free(evconnlistener*);
 }
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 namespace Libevent {
 
@@ -44,4 +44,4 @@ typedef CSmartPtr<evconnlistener, evconnlistener_free> ListenerPtr;
 
 } // Libevent
 } // Event
-} // Lyft
+} // Envoy

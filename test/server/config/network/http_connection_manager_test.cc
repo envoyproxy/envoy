@@ -8,7 +8,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::Return;
 
 namespace Server {
@@ -60,4 +60,4 @@ TEST(HttpConnectionManagerConfigUtilityTest, determineNextProtocol) {
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

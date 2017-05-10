@@ -6,7 +6,7 @@
 
 #include "envoy/http/message.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 /**
@@ -31,4 +31,4 @@ public:
 typedef std::unique_ptr<ShadowWriter> ShadowWriterPtr;
 
 } // Router
-} // Lyft
+} // Envoy

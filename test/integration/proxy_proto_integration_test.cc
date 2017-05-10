@@ -6,7 +6,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 TEST_F(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
 
@@ -16,4 +16,4 @@ TEST_F(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(std::move(conn), Http::CodecClient::Type::HTTP1, 1024, 512,
                                        false);
 }
-} // Lyft
+} // Envoy

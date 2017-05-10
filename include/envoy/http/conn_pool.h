@@ -8,7 +8,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/upstream/upstream.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 namespace ConnectionPool {
 
@@ -101,4 +101,4 @@ typedef std::unique_ptr<Instance> InstancePtr;
 
 } // ConnectionPool
 } // Http
-} // Lyft
+} // Envoy

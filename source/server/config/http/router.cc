@@ -6,7 +6,7 @@
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -38,4 +38,4 @@ static RegisterHttpFilterConfigFactory<RouterFilterConfig> register_;
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

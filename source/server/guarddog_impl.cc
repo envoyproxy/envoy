@@ -9,7 +9,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
@@ -118,4 +118,4 @@ void GuardDogImpl::stop() {
 }
 
 } // Server
-} // Lyft
+} // Envoy

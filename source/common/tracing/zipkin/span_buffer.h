@@ -2,7 +2,7 @@
 
 #include "common/tracing/zipkin/zipkin_core_types.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Zipkin {
 
 /**
@@ -62,4 +62,4 @@ private:
   std::vector<SpanPtr> span_buffer_;
 };
 } // Zipkin
-} // Lyft
+} // Envoy

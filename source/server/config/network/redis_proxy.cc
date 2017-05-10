@@ -8,7 +8,7 @@
 #include "common/redis/conn_pool_impl.h"
 #include "common/redis/proxy_filter.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -42,4 +42,4 @@ static RegisterNetworkFilterConfigFactory<RedisProxyFilterConfigFactory> registe
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

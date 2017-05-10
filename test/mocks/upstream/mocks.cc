@@ -11,7 +11,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 using testing::Return;
@@ -128,4 +128,4 @@ MockCdsApi::MockCdsApi() {
 MockCdsApi::~MockCdsApi() {}
 
 } // Upstream
-} // Lyft
+} // Envoy

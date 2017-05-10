@@ -8,7 +8,7 @@
 
 #include "common/http/conn_manager_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -36,4 +36,4 @@ private:
 };
 
 } // Http
-} // Lyft
+} // Envoy

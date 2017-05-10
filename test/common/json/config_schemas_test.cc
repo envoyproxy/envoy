@@ -11,7 +11,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 
 namespace Json {
@@ -60,4 +60,4 @@ TEST_P(ConfigSchemasTest, CheckValidationExpectation) {
 
 INSTANTIATE_TEST_CASE_P(Default, ConfigSchemasTest, testing::ValuesIn(generateTestInputs()));
 }
-} // Lyft
+} // Envoy

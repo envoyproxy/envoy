@@ -14,7 +14,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 class TestHotRestart : public HotRestart {
@@ -75,4 +75,4 @@ void IntegrationTestServer::threadRoutine() {
   server_->run();
   server_.reset();
 }
-} // Lyft
+} // Envoy

@@ -5,7 +5,7 @@
 
 #include "envoy/http/access_log.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
@@ -58,4 +58,4 @@ struct RequestInfoImpl : public RequestInfo {
 
 } // AccessLog
 } // Http
-} // Lyft
+} // Envoy

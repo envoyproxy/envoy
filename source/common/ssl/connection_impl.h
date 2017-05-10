@@ -6,7 +6,7 @@
 #include "common/network/connection_impl.h"
 #include "common/ssl/context_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Ssl {
 
 class ConnectionImpl : public Network::ConnectionImpl, public Connection {
@@ -52,4 +52,4 @@ public:
 };
 
 } // Ssl
-} // Lyft
+} // Envoy

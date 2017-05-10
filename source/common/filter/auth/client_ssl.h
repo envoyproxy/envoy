@@ -15,7 +15,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Filter {
 namespace Auth {
 namespace ClientSsl {
@@ -128,4 +128,4 @@ private:
 } // ClientSsl
 } // Auth
 } // Filter
-} // Lyft
+} // Envoy

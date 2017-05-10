@@ -5,7 +5,7 @@
 #include "common/http/filter/fault_filter.h"
 #include "common/json/config_schemas.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -33,4 +33,4 @@ static RegisterHttpFilterConfigFactory<FaultFilterConfig> register_;
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

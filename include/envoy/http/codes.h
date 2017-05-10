@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -73,4 +73,4 @@ enum class Code {
 };
 
 } // Http
-} // Lyft
+} // Envoy

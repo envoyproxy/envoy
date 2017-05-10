@@ -12,7 +12,7 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_validator.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 /**
@@ -53,4 +53,4 @@ public:
 };
 
 } // Router
-} // Lyft
+} // Envoy

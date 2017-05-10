@@ -5,7 +5,7 @@
 
 #include "common/http/filter/ratelimit.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -33,4 +33,4 @@ static RegisterHttpFilterConfigFactory<RateLimitFilterConfig> register_;
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

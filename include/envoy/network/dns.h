@@ -8,7 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 /**
@@ -51,4 +51,4 @@ public:
 typedef std::unique_ptr<DnsResolver> DnsResolverPtr;
 
 } // Network
-} // Lyft
+} // Envoy

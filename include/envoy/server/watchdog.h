@@ -5,7 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 /**
@@ -42,4 +42,4 @@ public:
 typedef std::shared_ptr<WatchDog> WatchDogSharedPtr;
 
 } // Server
-} // Lyft
+} // Envoy

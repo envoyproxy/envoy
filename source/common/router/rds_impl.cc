@@ -11,7 +11,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 RouteConfigProviderPtr RouteConfigProviderUtil::create(
@@ -125,4 +125,4 @@ void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager)
 }
 
 } // Router
-} // Lyft
+} // Envoy

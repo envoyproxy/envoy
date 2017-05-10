@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Hooks in the server to allow for integration testing. The real server just uses an empty
  * implementation defined below.
@@ -23,4 +23,4 @@ public:
   // TestHooks
   void onServerInitialized() override {}
 };
-} // Lyft
+} // Envoy

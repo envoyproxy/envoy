@@ -12,7 +12,7 @@
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Grpc {
 
 void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
@@ -123,4 +123,4 @@ void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
 }
 
 } // Grpc
-} // Lyft
+} // Envoy

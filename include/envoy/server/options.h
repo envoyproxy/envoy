@@ -8,7 +8,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 /**
@@ -69,4 +69,4 @@ public:
 };
 
 } // Server
-} // Lyft
+} // Envoy

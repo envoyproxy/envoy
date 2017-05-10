@@ -7,7 +7,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context_manager.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Ssl {
 
 /**
@@ -42,4 +42,4 @@ private:
 };
 
 } // Ssl
-} // Lyft
+} // Envoy

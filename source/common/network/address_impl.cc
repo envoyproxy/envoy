@@ -16,7 +16,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 namespace Address {
 
@@ -283,4 +283,4 @@ InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& addr) {
 
 } // Address
 } // Network
-} // Lyft
+} // Envoy

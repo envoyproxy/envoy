@@ -9,7 +9,7 @@
 
 #include "common/common/assert.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Grpc {
 
 /**
@@ -64,4 +64,4 @@ private:
 };
 
 } // Grpc
-} // Lyft
+} // Envoy

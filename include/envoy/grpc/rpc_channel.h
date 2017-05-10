@@ -13,7 +13,7 @@
 
 namespace proto = ::google::protobuf;
 
-namespace Lyft {
+namespace Envoy {
 namespace Grpc {
 
 /**
@@ -76,4 +76,4 @@ public:
 };
 
 } // Grpc
-} // Lyft
+} // Envoy

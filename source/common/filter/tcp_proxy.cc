@@ -17,7 +17,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Filter {
 
 TcpProxyConfig::Route::Route(const Json::Object& config) {
@@ -238,4 +238,4 @@ void TcpProxy::onUpstreamEvent(uint32_t event) {
 }
 
 } // Filter
-} // Lyft
+} // Envoy

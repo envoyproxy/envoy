@@ -3,7 +3,7 @@
 #include "common/common/utility.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Zipkin {
 
 namespace {
@@ -151,4 +151,4 @@ void SpanContext::populateFromString(const std::string& span_context_str) {
   }
 }
 } // Zipkin
-} // Lyft
+} // Envoy

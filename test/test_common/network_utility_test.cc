@@ -5,7 +5,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 namespace Test {
 
@@ -47,4 +47,4 @@ TEST_P(NetworkUtilityTest, DISABLED_ValidateBindFreeLoopbackPort) {
 
 } // namespace Test
 } // namespace Network
-} // Lyft
+} // Envoy

@@ -16,7 +16,7 @@
 #include "lightstep/carrier.h"
 #include "lightstep/tracer.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Tracing {
 
 #define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
@@ -110,4 +110,4 @@ private:
 };
 
 } // Tracing
-} // Lyft
+} // Envoy

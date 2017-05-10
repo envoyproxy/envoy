@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Wraps compiled in code versioning.
  */
@@ -15,4 +15,4 @@ public:
   // Repository information and build type.
   static std::string version();
 };
-} // Lyft
+} // Envoy

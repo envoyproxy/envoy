@@ -19,7 +19,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
@@ -457,4 +457,4 @@ ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                      null_local_address_) {}
 
 } // Network
-} // Lyft
+} // Envoy

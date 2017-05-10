@@ -19,7 +19,7 @@
 #include "common/json/json_loader.h"
 #include "common/upstream/sds.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -232,4 +232,4 @@ private:
 };
 
 } // Upstream
-} // Lyft
+} // Envoy

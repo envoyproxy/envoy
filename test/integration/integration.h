@@ -18,7 +18,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Stream decoder wrapper used during integration testing.
  */
@@ -220,4 +220,4 @@ protected:
 
   spdlog::level::level_enum default_log_level_;
 };
-} // Lyft
+} // Envoy

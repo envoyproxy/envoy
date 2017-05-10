@@ -6,7 +6,7 @@
 
 #include "common/common/assert.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 void FilterManagerImpl::addWriteFilter(WriteFilterSharedPtr filter) {
@@ -83,4 +83,4 @@ FilterStatus FilterManagerImpl::onWrite() {
 }
 
 } // Network
-} // Lyft
+} // Envoy

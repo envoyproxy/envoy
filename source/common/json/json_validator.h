@@ -4,7 +4,7 @@
 
 #include "envoy/json/json_object.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Json {
 
 /**
@@ -18,4 +18,4 @@ public:
 };
 
 } // Json
-} // Lyft
+} // Envoy

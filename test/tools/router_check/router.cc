@@ -7,7 +7,7 @@
 
 #include "test/test_common/printers.h"
 
-namespace Lyft {
+namespace Envoy {
 // static
 ToolConfig ToolConfig::create(const Json::ObjectPtr& check_config) {
   Json::ObjectPtr input = check_config->getObject("input");
@@ -190,4 +190,4 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   }
   return false;
 }
-} // Lyft
+} // Envoy

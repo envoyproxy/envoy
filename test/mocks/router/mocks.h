@@ -14,7 +14,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 class MockRedirectEntry : public RedirectEntry {
@@ -63,7 +63,7 @@ public:
   MOCK_CONST_METHOD0(disableKey, const std::string&());
   MOCK_CONST_METHOD5(populateDescriptors,
                      void(const RouteEntry& route,
-                          std::vector<Lyft::RateLimit::Descriptor>& descriptors,
+                          std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,
                           const std::string& remote_address));
 
@@ -205,4 +205,4 @@ public:
 };
 
 } // Router
-} // Lyft
+} // Envoy

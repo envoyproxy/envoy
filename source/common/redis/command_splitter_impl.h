@@ -11,7 +11,7 @@
 #include "common/common/logger.h"
 #include "common/common/to_lower_table.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Redis {
 namespace CommandSplitter {
 
@@ -146,4 +146,4 @@ private:
 
 } // CommandSplitter
 } // Redis
-} // Lyft
+} // Envoy

@@ -7,7 +7,7 @@
 
 #include "common/common/logger.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 /**
@@ -36,4 +36,4 @@ private:
 };
 
 } // Server
-} // Lyft
+} // Envoy

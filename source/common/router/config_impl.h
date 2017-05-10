@@ -18,7 +18,7 @@
 #include "common/router/config_utility.h"
 #include "common/router/router_ratelimit.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 /**
@@ -468,4 +468,4 @@ private:
 };
 
 } // Router
-} // Lyft
+} // Envoy

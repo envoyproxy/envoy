@@ -9,7 +9,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Redis {
 namespace CommandSplitter {
 
@@ -197,4 +197,4 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
 
 } // CommandSplitter
 } // Redis
-} // Lyft
+} // Envoy

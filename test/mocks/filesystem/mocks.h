@@ -10,7 +10,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Filesystem {
 
 class MockOsSysCalls : public OsSysCalls {
@@ -53,4 +53,4 @@ public:
 };
 
 } // Filesystem
-} // Lyft
+} // Envoy

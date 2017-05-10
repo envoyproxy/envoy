@@ -12,7 +12,7 @@
 #include "common/json/json_validator.h"
 #include "common/router/config_utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 /**
@@ -113,7 +113,7 @@ public:
   uint64_t stage() const override { return stage_; }
   const std::string& disableKey() const override { return disable_key_; }
   void populateDescriptors(const Router::RouteEntry& route,
-                           std::vector<Lyft::RateLimit::Descriptor>& descriptors,
+                           std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::HeaderMap&,
                            const std::string& remote_address) const override;
 
@@ -146,4 +146,4 @@ private:
 };
 
 } // Router
-} // Lyft
+} // Envoy

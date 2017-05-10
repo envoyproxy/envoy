@@ -9,7 +9,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/tracing/context.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace RateLimit {
 
 /**
@@ -99,4 +99,4 @@ public:
 typedef std::unique_ptr<ClientFactory> ClientFactoryPtr;
 
 } // RateLimit
-} // Lyft
+} // Envoy

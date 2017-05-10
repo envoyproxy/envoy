@@ -16,7 +16,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -203,4 +203,4 @@ private:
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

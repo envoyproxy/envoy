@@ -11,7 +11,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Grpc {
 
 TEST(GrpcCodecTest, encodeHeader) {
@@ -154,4 +154,4 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
 }
 
 } // Grpc
-} // Lyft
+} // Envoy

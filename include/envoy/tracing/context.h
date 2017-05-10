@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 namespace Tracing {
 
 struct TransportContext {
@@ -13,4 +13,4 @@ struct TransportContext {
 static const TransportContext EMPTY_CONTEXT = {"", ""};
 
 } // Tracing
-} // Lyft
+} // Envoy

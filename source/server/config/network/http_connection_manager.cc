@@ -20,7 +20,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -217,4 +217,4 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

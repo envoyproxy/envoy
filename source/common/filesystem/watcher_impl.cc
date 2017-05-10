@@ -14,7 +14,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
@@ -86,4 +86,4 @@ void WatcherImpl::onInotifyEvent() {
 }
 
 } // Filesystem
-} // Lyft
+} // Envoy

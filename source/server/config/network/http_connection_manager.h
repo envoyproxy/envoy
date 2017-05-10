@@ -17,7 +17,7 @@
 
 #include "server/configuration_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -152,4 +152,4 @@ public:
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

@@ -10,7 +10,7 @@
 #include "common/tracing/zipkin/tracer_interface.h"
 #include "common/tracing/zipkin/util.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Zipkin {
 
 /**
@@ -532,4 +532,4 @@ private:
   TracerInterface* tracer_;
 };
 } // Zipkin
-} // Lyft
+} // Envoy

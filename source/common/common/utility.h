@@ -9,7 +9,7 @@
 
 #include "envoy/common/time.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Utility class for formatting dates given a strftime style format string.
  */
@@ -160,4 +160,4 @@ public:
    */
   static bool startsWith(const char* source, const std::string& start, bool case_sensitive = true);
 };
-} // Lyft
+} // Envoy

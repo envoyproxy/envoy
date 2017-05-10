@@ -7,7 +7,7 @@
 
 #include "server/backtrace.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * This class installs signal handlers for fatal signal types.
  *
@@ -123,4 +123,4 @@ private:
   std::array<struct sigaction, sizeof(FATAL_SIGS) / sizeof(int)> previous_handlers_;
   stack_t previous_altstack_;
 };
-} // Lyft
+} // Envoy

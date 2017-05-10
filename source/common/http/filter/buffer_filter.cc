@@ -12,7 +12,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 BufferFilter::BufferFilter(BufferFilterConfigConstSharedPtr config) : config_(config) {}
@@ -74,4 +74,4 @@ void BufferFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callb
 }
 
 } // Http
-} // Lyft
+} // Envoy

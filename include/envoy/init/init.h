@@ -4,7 +4,7 @@
 
 #include "envoy/common/pure.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Init {
 
 /**
@@ -37,4 +37,4 @@ public:
 };
 
 } // Init
-} // Lyft
+} // Envoy

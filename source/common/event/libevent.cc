@@ -6,7 +6,7 @@
 
 #include "event2/thread.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 namespace Libevent {
 
@@ -19,4 +19,4 @@ void Global::initialize() {
 
 } // Libevent
 } // Event
-} // Lyft
+} // Envoy

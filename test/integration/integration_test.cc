@@ -10,7 +10,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 TEST_F(IntegrationTest, Echo) {
   Buffer::OwnedImpl buffer("hello");
   std::string response;
@@ -166,4 +166,4 @@ TEST_F(IntegrationTest, TcpProxyDownstreamDisconnect) {
        [&]() -> void { fake_upstream_connection->waitForData(10); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
-} // Lyft
+} // Envoy

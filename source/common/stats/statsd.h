@@ -10,7 +10,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Stats {
 namespace Statsd {
 
@@ -119,4 +119,4 @@ private:
 
 } // Statsd
 } // Stats
-} // Lyft
+} // Envoy

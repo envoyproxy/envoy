@@ -10,7 +10,7 @@
 
 #include "envoy/common/pure.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 namespace Address {
 
@@ -141,4 +141,4 @@ typedef std::shared_ptr<const Instance> InstanceConstSharedPtr;
 
 } // Address
 } // Network
-} // Lyft
+} // Envoy

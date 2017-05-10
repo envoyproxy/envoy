@@ -9,7 +9,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace AccessLog {
 
 class MockAccessLogManager : public AccessLogManager {
@@ -25,4 +25,4 @@ public:
 };
 
 } // AccessLog
-} // Lyft
+} // Envoy

@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 namespace Filesystem {
 
 MockOsSysCalls::MockOsSysCalls() { num_writes_ = num_open_ = 0; }
@@ -36,4 +36,4 @@ MockWatcher::MockWatcher() {}
 MockWatcher::~MockWatcher() {}
 
 } // Filesystem
-} // Lyft
+} // Envoy

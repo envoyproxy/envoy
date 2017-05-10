@@ -10,7 +10,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::Eq;
 using testing::NiceMock;
 using testing::Pointee;
@@ -332,4 +332,4 @@ TEST_F(MongoCodecImplTest, QueryToStringWithEscape) {
 }
 
 } // Mongo
-} // Lyft
+} // Envoy

@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 namespace AccessLog {
 
 void AccessLogManagerImpl::reopen() {
@@ -21,4 +21,4 @@ Filesystem::FileSharedPtr AccessLogManagerImpl::createAccessLog(const std::strin
 }
 
 } // AccessLog
-} // Lyft
+} // Envoy

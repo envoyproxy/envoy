@@ -6,7 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/filesystem/filesystem.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace AccessLog {
 
 class AccessLogManager {
@@ -29,4 +29,4 @@ public:
 typedef std::unique_ptr<AccessLogManager> AccessLogManagerPtr;
 
 } // AccessLog
-} // Lyft
+} // Envoy

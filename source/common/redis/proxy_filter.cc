@@ -8,7 +8,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 // TODO(mattklein123): Graceful drain support.
 
 namespace Redis {
@@ -116,4 +116,4 @@ ProxyFilter::PendingRequest::~PendingRequest() {
 }
 
 } // Redis
-} // Lyft
+} // Envoy

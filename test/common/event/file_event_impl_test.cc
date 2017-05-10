@@ -8,7 +8,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 
 class FileEventImplTest : public testing::Test {
@@ -141,4 +141,4 @@ TEST_F(FileEventImplTest, SetEnabled) {
 }
 
 } // Event
-} // Lyft
+} // Envoy

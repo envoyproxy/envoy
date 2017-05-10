@@ -8,7 +8,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 RestApiFetcher::RestApiFetcher(Upstream::ClusterManager& cm, const std::string& remote_cluster_name,
@@ -68,4 +68,4 @@ void RestApiFetcher::requestComplete() {
 }
 
 } // Http
-} // Lyft
+} // Envoy

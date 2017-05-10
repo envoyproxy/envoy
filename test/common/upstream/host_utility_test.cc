@@ -6,7 +6,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 
 TEST(HostUtilityTest, All) {
@@ -25,4 +25,4 @@ TEST(HostUtilityTest, All) {
 }
 
 } // Upstream
-} // Lyft
+} // Envoy

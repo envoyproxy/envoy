@@ -11,7 +11,7 @@
 
 #include "common/router/config_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -90,4 +90,4 @@ private:
 };
 
 } // Http
-} // Lyft
+} // Envoy

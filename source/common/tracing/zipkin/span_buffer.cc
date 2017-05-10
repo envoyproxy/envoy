@@ -1,6 +1,6 @@
 #include "common/tracing/zipkin/span_buffer.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Zipkin {
 
 bool SpanBuffer::addSpan(SpanPtr&& span) {
@@ -29,4 +29,4 @@ std::string SpanBuffer::toStringifiedJsonArray() {
   return stringified_json_array;
 }
 } // Zipkin
-} // Lyft
+} // Envoy

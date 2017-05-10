@@ -9,7 +9,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 
 SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
@@ -115,4 +115,4 @@ void SdsClusterImpl::onFetchComplete() {
 }
 
 } // Upstream
-} // Lyft
+} // Envoy

@@ -15,7 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
@@ -275,4 +275,4 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
 
 } // Http2
 } // Http
-} // Lyft
+} // Envoy

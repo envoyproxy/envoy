@@ -16,7 +16,7 @@
 #include "envoy/ssl/context.h"
 #include "envoy/stats/stats.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 
 /**
@@ -153,4 +153,4 @@ public:
 typedef std::unique_ptr<Dispatcher> DispatcherPtr;
 
 } // Event
-} // Lyft
+} // Envoy

@@ -7,7 +7,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/outlier_detection.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -79,4 +79,4 @@ public:
 typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
 
 } // Upstream
-} // Lyft
+} // Envoy

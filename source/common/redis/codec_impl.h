@@ -9,7 +9,7 @@
 
 #include "common/common/logger.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Redis {
 
 /**
@@ -90,4 +90,4 @@ private:
 };
 
 } // Redis
-} // Lyft
+} // Envoy

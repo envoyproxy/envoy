@@ -1,8 +1,8 @@
 #pragma once
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Friendly name for a pure virtual routine.
  */
 #define PURE = 0
-} // Lyft
+} // Envoy

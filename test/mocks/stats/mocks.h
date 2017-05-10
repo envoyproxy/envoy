@@ -12,7 +12,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Stats {
 
 class MockCounter : public Counter {
@@ -96,4 +96,4 @@ public:
 };
 
 } // Stats
-} // Lyft
+} // Envoy

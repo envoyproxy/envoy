@@ -8,7 +8,7 @@
 #include "common/tracing/zipkin/tracer_interface.h"
 #include "common/tracing/zipkin/zipkin_core_types.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Zipkin {
 
 /**
@@ -103,4 +103,4 @@ private:
   Runtime::RandomGeneratorPtr random_generator_;
 };
 } // Zipkin
-} // Lyft
+} // Envoy

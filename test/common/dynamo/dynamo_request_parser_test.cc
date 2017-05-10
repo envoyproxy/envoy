@@ -10,7 +10,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Dynamo {
 
 TEST(DynamoRequestParser, parseOperation) {
@@ -266,4 +266,4 @@ TEST(DynamoRequestParser, parsePartitionIds) {
 }
 
 } // Dynamo
-} // Lyft
+} // Envoy

@@ -10,7 +10,7 @@
 
 #include "common/common/logger.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Bson {
 
 /**
@@ -262,4 +262,4 @@ private:
 };
 
 } // Bson
-} // Lyft
+} // Envoy

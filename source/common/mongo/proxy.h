@@ -20,7 +20,7 @@
 #include "common/mongo/utility.h"
 #include "common/network/filter_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Mongo {
 
 /**
@@ -61,7 +61,7 @@ struct MongoProxyStats {
  */
 class AccessLog {
 public:
-  AccessLog(const std::string& file_name, Lyft::AccessLog::AccessLogManager& log_manager);
+  AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogManager& log_manager);
 
   void logMessage(const Message& message, bool full,
                   const Upstream::HostDescription* upstream_host);
@@ -158,4 +158,4 @@ public:
 };
 
 } // Mongo
-} // Lyft
+} // Envoy

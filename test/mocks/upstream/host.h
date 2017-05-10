@@ -13,7 +13,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 namespace Outlier {
 
@@ -125,4 +125,4 @@ public:
 };
 
 } // Upstream
-} // Lyft
+} // Envoy

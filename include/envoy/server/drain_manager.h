@@ -4,7 +4,7 @@
 
 #include "envoy/network/drain_decision.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 /**
@@ -33,4 +33,4 @@ public:
 typedef std::unique_ptr<DrainManager> DrainManagerPtr;
 
 } // Server
-} // Lyft
+} // Envoy

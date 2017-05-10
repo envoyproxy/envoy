@@ -11,7 +11,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 
 CdsApiPtr CdsApiImpl::create(const Json::Object& config, ClusterManager& cm,
@@ -87,4 +87,4 @@ void CdsApiImpl::onFetchFailure(EnvoyException* e) {
 }
 
 } // Upstream
-} // Lyft
+} // Envoy

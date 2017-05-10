@@ -8,7 +8,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 void PrintTo(const HeaderMapImpl& headers, std::ostream* os) {
   headers.iterate([](const HeaderEntry& header, void* context) -> void {
@@ -41,4 +41,4 @@ void PrintTo(const RespValue& value, std::ostream* os) { *os << value.toString()
 
 void PrintTo(const RespValuePtr& value, std::ostream* os) { *os << value->toString(); }
 } // Redis
-} // Lyft
+} // Envoy

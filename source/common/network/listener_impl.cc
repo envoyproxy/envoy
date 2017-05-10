@@ -16,7 +16,7 @@
 #include "event2/listener.h"
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 Address::InstanceConstSharedPtr ListenerImpl::getOriginalDst(int fd) {
@@ -115,4 +115,4 @@ void SslListenerImpl::newConnection(int fd, Address::InstanceConstSharedPtr remo
 }
 
 } // Network
-} // Lyft
+} // Envoy

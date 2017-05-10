@@ -22,7 +22,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -111,7 +111,7 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   log().info(fmt::format("  loading tracing driver: {}", type));
 
   ASSERT(type == "lightstep");
-  Lyft::Runtime::RandomGenerator& rand = server_.random();
+  Envoy::Runtime::RandomGenerator& rand = server_.random();
   Json::ObjectPtr lightstep_config = driver->getObject("config");
 
   std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
@@ -224,4 +224,4 @@ InitialImpl::InitialImpl(const Json::Object& json) {
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

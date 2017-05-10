@@ -7,7 +7,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Bson {
 
 TEST(BsonImplTest, BadCast) {
@@ -60,4 +60,4 @@ TEST(BufferHelperTest, InvalidSize) {
 }
 
 } // Bson
-} // Lyft
+} // Envoy

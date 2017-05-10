@@ -4,7 +4,7 @@
 #include "envoy/server/watchdog.h"
 #include "envoy/stats/stats.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 /**
@@ -42,4 +42,4 @@ public:
 };
 
 } // Server
-} // Lyft
+} // Envoy

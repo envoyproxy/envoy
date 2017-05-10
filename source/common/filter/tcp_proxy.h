@@ -16,7 +16,7 @@
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Filter {
 
 /**
@@ -138,4 +138,4 @@ private:
 };
 
 } // Filter
-} // Lyft
+} // Envoy

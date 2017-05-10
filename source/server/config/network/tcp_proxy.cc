@@ -7,7 +7,7 @@
 
 #include "common/filter/tcp_proxy.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -34,4 +34,4 @@ static RegisterNetworkFilterConfigFactory<TcpProxyConfigFactory> registered_;
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

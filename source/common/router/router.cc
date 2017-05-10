@@ -24,7 +24,7 @@
 #include "common/router/config_impl.h"
 #include "common/router/retry_state_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
@@ -749,4 +749,4 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request
 }
 
 } // Router
-} // Lyft
+} // Envoy

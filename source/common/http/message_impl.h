@@ -9,7 +9,7 @@
 #include "common/common/non_copyable.h"
 #include "common/http/header_map_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -45,4 +45,4 @@ public:
 };
 
 } // Http
-} // Lyft
+} // Envoy

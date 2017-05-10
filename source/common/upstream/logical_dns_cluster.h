@@ -10,7 +10,7 @@
 #include "common/common/empty_string.h"
 #include "common/upstream/upstream_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -102,4 +102,4 @@ private:
 };
 
 } // Upstream
-} // Lyft
+} // Envoy

@@ -4,7 +4,7 @@
 
 #include "envoy/stats/stats.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * These are helper macros for allocating "fixed" stats throughout the code base in a way that
  * is also easy to mock and test. The general flow looks like this:
@@ -39,4 +39,4 @@ namespace Lyft {
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
 #define POOL_GAUGE(POOL) POOL_GAUGE_PREFIX(POOL, "")
 #define POOL_TIMER(POOL) POOL_TIMER_PREFIX(POOL, "")
-} // Lyft
+} // Envoy

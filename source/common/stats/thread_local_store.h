@@ -13,7 +13,7 @@
 
 #include "common/stats/stats_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Stats {
 
 /**
@@ -126,4 +126,4 @@ private:
 };
 
 } // Stats
-} // Lyft
+} // Envoy

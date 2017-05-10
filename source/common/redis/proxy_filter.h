@@ -14,7 +14,7 @@
 #include "common/json/json_loader.h"
 #include "common/json/json_validator.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Redis {
 
 /**
@@ -109,4 +109,4 @@ private:
 };
 
 } // Redis
-} // Lyft
+} // Envoy

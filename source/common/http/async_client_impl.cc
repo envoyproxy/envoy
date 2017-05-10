@@ -8,7 +8,7 @@
 
 #include "common/http/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
@@ -206,4 +206,4 @@ void AsyncRequestImpl::cancel() {
 }
 
 } // Http
-} // Lyft
+} // Envoy

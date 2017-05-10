@@ -14,7 +14,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 
@@ -111,4 +111,4 @@ TEST_F(AdminInstanceTest, AdminBadAddressOutPath) {
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 } // namespace Server
-} // Lyft
+} // Envoy

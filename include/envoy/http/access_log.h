@@ -12,7 +12,7 @@
 #include "envoy/http/protocol.h"
 #include "envoy/upstream/upstream.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
@@ -168,4 +168,4 @@ typedef std::unique_ptr<Formatter> FormatterPtr;
 
 } // AccessLog
 } // Http
-} // Lyft
+} // Envoy

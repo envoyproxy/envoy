@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 /**
@@ -22,4 +22,4 @@ public:
 };
 
 } // Network
-} // Lyft
+} // Envoy

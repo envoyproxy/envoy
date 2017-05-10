@@ -16,7 +16,7 @@
 #include "common/network/listener_impl.h"
 #include "common/network/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 const std::string ProxyProtocol::ActiveConnection::PROXY_TCP4 = "PROXY TCP4 ";
@@ -131,4 +131,4 @@ bool ProxyProtocol::ActiveConnection::readLine(int fd, std::string& s) {
 }
 
 } // Network
-} // Lyft
+} // Envoy

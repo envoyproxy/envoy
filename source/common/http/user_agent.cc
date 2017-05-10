@@ -8,7 +8,7 @@
 
 #include "common/http/headers.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 void UserAgent::completeConnectionLength(Stats::Timespan& span) {
@@ -59,4 +59,4 @@ void UserAgent::onConnectionDestroy(uint32_t events, bool active_streams) {
 }
 
 } // Http
-} // Lyft
+} // Envoy

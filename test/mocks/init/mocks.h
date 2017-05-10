@@ -9,7 +9,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Init {
 
 class MockTarget : public Target {
@@ -41,4 +41,4 @@ public:
 };
 
 } // Init
-} // Lyft
+} // Envoy

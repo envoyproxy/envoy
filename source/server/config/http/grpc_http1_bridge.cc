@@ -4,7 +4,7 @@
 
 #include "common/grpc/http1_bridge_filter.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -30,4 +30,4 @@ static RegisterHttpFilterConfigFactory<GrpcHttp1BridgeFilterConfig> register_;
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

@@ -10,7 +10,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 TEST(IpListTest, Errors) {
@@ -264,4 +264,4 @@ TEST(PortRangeListTest, Normal) {
 }
 
 } // Network
-} // Lyft
+} // Envoy

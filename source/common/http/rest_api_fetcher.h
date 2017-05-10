@@ -7,7 +7,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -68,4 +68,4 @@ private:
 };
 
 } // Http
-} // Lyft
+} // Envoy

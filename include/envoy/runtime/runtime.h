@@ -6,7 +6,7 @@
 
 #include "envoy/common/pure.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Runtime {
 
 /**
@@ -116,4 +116,4 @@ public:
 typedef std::unique_ptr<Loader> LoaderPtr;
 
 } // Runtime
-} // Lyft
+} // Envoy

@@ -11,7 +11,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 // These are defined in envoy/server/router.h, however during certain cases the compiler is
@@ -173,4 +173,4 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
 }
 
 } // Router
-} // Lyft
+} // Envoy

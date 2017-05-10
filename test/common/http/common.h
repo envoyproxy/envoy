@@ -8,7 +8,7 @@
 
 #include "test/mocks/common.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * A fake CodecClient that 1) allows a mock codec to be passed in and 2) Allows for a destroy
  * callback.
@@ -65,4 +65,4 @@ class HttpTestUtility {
 public:
   static void addDefaultHeaders(Http::HeaderMap& headers);
 };
-} // Lyft
+} // Envoy

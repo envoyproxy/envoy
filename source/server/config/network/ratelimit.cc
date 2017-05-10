@@ -7,7 +7,7 @@
 
 #include "common/filter/ratelimit.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -34,4 +34,4 @@ static RegisterNetworkFilterConfigFactory<RateLimitConfigFactory> registered_;
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

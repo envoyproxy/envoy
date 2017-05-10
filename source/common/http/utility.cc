@@ -18,7 +18,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address) {
@@ -189,4 +189,4 @@ std::string Utility::getLastAddressFromXFF(const Http::HeaderMap& request_header
 }
 
 } // Http
-} // Lyft
+} // Envoy

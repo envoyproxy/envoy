@@ -8,7 +8,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 class Stream;
@@ -229,4 +229,4 @@ public:
 typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
 
 } // Http
-} // Lyft
+} // Envoy

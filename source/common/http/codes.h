@@ -8,7 +8,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -77,4 +77,4 @@ public:
 };
 
 } // Http
-} // Lyft
+} // Envoy

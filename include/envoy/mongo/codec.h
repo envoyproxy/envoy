@@ -7,7 +7,7 @@
 
 #include "envoy/mongo/bson.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * General implementation of https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/
  */
@@ -186,4 +186,4 @@ public:
 };
 
 } // Mongo
-} // Lyft
+} // Envoy

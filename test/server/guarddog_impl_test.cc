@@ -16,7 +16,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::InSequence;
 using testing::NiceMock;
 
@@ -234,4 +234,4 @@ TEST(WatchDogTimeTest, AtomicIsAtomicTest) {
 }
 
 } // Server
-} // Lyft
+} // Envoy

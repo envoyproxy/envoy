@@ -9,7 +9,7 @@
 
 #include "common/common/logger.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Mongo {
 
 class MessageImpl : public virtual Message {
@@ -216,4 +216,4 @@ private:
 };
 
 } // Mongo
-} // Lyft
+} // Envoy

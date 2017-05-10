@@ -2,7 +2,7 @@
 
 #include "event2/event.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 
 ImplBase::~ImplBase() {
@@ -11,4 +11,4 @@ ImplBase::~ImplBase() {
 }
 
 } // Event
-} // Lyft
+} // Envoy

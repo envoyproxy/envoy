@@ -9,7 +9,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Zipkin {
 
 class TestReporterImpl : public Reporter {
@@ -217,4 +217,4 @@ TEST(ZipkinTracerTest, finishSpan) {
   EXPECT_EQ("my_service_name", endpoint.serviceName());
 }
 } // Zipkin
-} // Lyft
+} // Envoy

@@ -10,7 +10,7 @@
 #include "common/api/api_impl.h"
 #include "common/common/thread.h"
 
-namespace Lyft {
+namespace Envoy {
 Worker::Worker(ThreadLocal::Instance& tls, std::chrono::milliseconds file_flush_interval_msec)
     : tls_(tls), handler_(new Server::ConnectionHandlerImpl(
                      log(), Api::ApiPtr{new Api::Impl(file_flush_interval_msec)})) {
@@ -76,4 +76,4 @@ void Worker::threadRoutine(Server::GuardDog& guard_dog) {
   watchdog.reset();
   handler_.reset();
 }
-} // Lyft
+} // Envoy

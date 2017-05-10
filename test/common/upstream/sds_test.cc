@@ -21,7 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::DoAll;
 using testing::Invoke;
@@ -360,4 +360,4 @@ TEST_F(SdsTest, FailureArray) {
 }
 
 } // Upstream
-} // Lyft
+} // Envoy

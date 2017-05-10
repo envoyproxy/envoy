@@ -8,7 +8,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/network/listen_socket.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 /**
@@ -43,4 +43,4 @@ public:
 };
 
 } // Server
-} // Lyft
+} // Envoy

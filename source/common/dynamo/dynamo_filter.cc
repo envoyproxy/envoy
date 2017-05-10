@@ -15,7 +15,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Dynamo {
 
 Http::FilterHeadersStatus DynamoFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
@@ -227,4 +227,4 @@ void DynamoFilter::chargeTablePartitionIdStats(const Json::Object& json_body) {
 }
 
 } // Dynamo
-} // Lyft
+} // Envoy

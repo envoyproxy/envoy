@@ -17,7 +17,7 @@
 
 #include "server/config/network/http_connection_manager.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 /**
@@ -162,4 +162,4 @@ private:
 };
 
 } // Server
-} // Lyft
+} // Envoy

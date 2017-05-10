@@ -5,7 +5,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::Return;
 using testing::ReturnRef;
 
@@ -21,4 +21,4 @@ MockLocalInfo::MockLocalInfo() : address_(new Network::Address::Ipv4Instance("12
 MockLocalInfo::~MockLocalInfo() {}
 
 } // LocalInfo
-} // Lyft
+} // Envoy

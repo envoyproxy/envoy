@@ -2,7 +2,7 @@
 
 #include "envoy/common/exception.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Contains an optional value. Like boost::optional and std::optional (not included in C++11).
  */
@@ -47,4 +47,4 @@ private:
   T value_;
   bool valid_{};
 };
-} // Lyft
+} // Envoy

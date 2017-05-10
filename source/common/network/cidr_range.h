@@ -4,7 +4,7 @@
 
 #include "envoy/network/address.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 namespace Address {
 
@@ -119,4 +119,4 @@ private:
 
 } // Address
 } // Network
-} // Lyft
+} // Envoy

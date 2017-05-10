@@ -4,7 +4,7 @@
 
 #include "common/common/logger.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Filter {
 
 /**
@@ -24,4 +24,4 @@ private:
 };
 
 } // Filter
-} // Lyft
+} // Envoy

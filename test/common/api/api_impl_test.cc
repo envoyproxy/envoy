@@ -8,7 +8,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Api {
 
 TEST(ApiImplTest, readFileToEnd) {
@@ -33,4 +33,4 @@ TEST(ApiImplTest, fileExists) {
 }
 
 } // Api
-} // Lyft
+} // Envoy
