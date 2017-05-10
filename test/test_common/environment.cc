@@ -12,8 +12,11 @@
 
 #include "common/common/assert.h"
 #include "common/common/compiler_requirements.h"
+#include "common/common/logger.h"
 
 #include "server/options_impl.h"
+
+#include "test/test_common/network_utility.h"
 
 #include "spdlog/spdlog.h"
 
@@ -65,12 +68,17 @@ bool TestEnvironment::shouldRunTestForIpVersion(const Network::Address::IpVersio
 
 std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest() {
   std::vector<Network::Address::IpVersion> parameters;
-  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    parameters.push_back(Network::Address::IpVersion::v4);
-  }
-
-  if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
-    parameters.push_back(Network::Address::IpVersion::v6);
+  for (auto version : {Network::Address::IpVersion::v4, Network::Address::IpVersion::v6}) {
+    if (TestEnvironment::shouldRunTestForIpVersion(version)) {
+      parameters.push_back(version);
+      if (Network::Test::supportsIpVersion(version) == false) {
+        Logger::Registry::getLog(Logger::Id::testing)
+            .warn(fmt::format("Parameterized testing with IP{} addresses may not be supported."
+                              " If testing fails, set enviroment variable ENVOY_IP_TEST_VERSIONS "
+                              "in test/main.cc",
+                              Network::Test::addressVersionAsString(version)));
+      }
+    }
   }
   return parameters;
 }
