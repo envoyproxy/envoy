@@ -330,7 +330,7 @@ void InstanceImpl::initializeStatSinks() {
     log().info("statsd TCP cluster: {}", config_->statsdTcpClusterName().value());
     stat_sinks_.emplace_back(
         new Stats::Statsd::TcpStatsdSink(local_info_, config_->statsdTcpClusterName().value(),
-                                         thread_local_, config_->clusterManager()));
+                                         thread_local_, config_->clusterManager(), stats_store_));
     stats_store_.addSink(*stat_sinks_.back());
   }
 }
