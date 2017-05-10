@@ -4,6 +4,7 @@
 
 #include "common/common/singleton.h"
 
+namespace Lyft {
 namespace Zipkin {
 
 class ZipkinCoreConstantValues {
@@ -41,3 +42,4 @@ public:
 typedef ConstSingleton<ZipkinCoreConstantValues> ZipkinCoreConstants;
 
 } // Zipkin
+} // Lyft

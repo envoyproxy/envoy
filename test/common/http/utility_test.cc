@@ -12,6 +12,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Http {
 
 // Satisfy linker
@@ -171,3 +172,4 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
 }
 
 } // Http
+} // Lyft

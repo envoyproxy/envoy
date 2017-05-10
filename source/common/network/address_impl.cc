@@ -16,6 +16,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Network {
 namespace Address {
 
@@ -282,3 +283,4 @@ InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& addr) {
 
 } // Address
 } // Network
+} // Lyft

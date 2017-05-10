@@ -9,6 +9,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/ratelimit/ratelimit.h"
 
+namespace Lyft {
 namespace Router {
 /**
  * Base interface for generic rate limit action.
@@ -26,7 +27,7 @@ public:
    * @param remote_address supplies the trusted downstream address for the connection.
    * @return true if the RateLimitAction populated the descriptor.
    */
-  virtual bool populateDescriptor(const RouteEntry& route, ::RateLimit::Descriptor& descriptor,
+  virtual bool populateDescriptor(const RouteEntry& route, RateLimit::Descriptor& descriptor,
                                   const std::string& local_service_cluster,
                                   const Http::HeaderMap& headers,
                                   const std::string& remote_address) const PURE;
@@ -60,7 +61,7 @@ public:
    * @param remote_address supplies the trusted downstream address for the connection.
    */
   virtual void populateDescriptors(const RouteEntry& route,
-                                   std::vector<::RateLimit::Descriptor>& descriptors,
+                                   std::vector<RateLimit::Descriptor>& descriptors,
                                    const std::string& local_service_cluster,
                                    const Http::HeaderMap& headers,
                                    const std::string& remote_address) const PURE;
@@ -87,3 +88,4 @@ public:
 };
 
 } // Router
+} // Lyft

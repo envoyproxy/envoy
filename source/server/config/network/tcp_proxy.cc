@@ -7,6 +7,7 @@
 
 #include "common/filter/tcp_proxy.h"
 
+namespace Lyft {
 namespace Server {
 namespace Configuration {
 
@@ -33,3 +34,4 @@ static RegisterNetworkFilterConfigFactory<TcpProxyConfigFactory> registered_;
 
 } // Configuration
 } // Server
+} // Lyft

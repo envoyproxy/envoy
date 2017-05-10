@@ -8,6 +8,7 @@
 #include "common/tracing/zipkin/tracer_interface.h"
 #include "common/tracing/zipkin/zipkin_core_types.h"
 
+namespace Lyft {
 namespace Zipkin {
 
 /**
@@ -110,3 +111,4 @@ private:
 typedef std::unique_ptr<Tracer> TracerPtr;
 
 } // Zipkin
+} // Lyft

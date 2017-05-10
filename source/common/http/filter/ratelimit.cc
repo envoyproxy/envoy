@@ -13,6 +13,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Http {
 namespace RateLimit {
 
@@ -47,7 +48,7 @@ void Filter::initiateCall(const HeaderMap& headers) {
   }
   cluster_ = cluster->info();
 
-  std::vector<::RateLimit::Descriptor> descriptors;
+  std::vector<Lyft::RateLimit::Descriptor> descriptors;
 
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
@@ -102,17 +103,17 @@ void Filter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) 
   });
 }
 
-void Filter::complete(::RateLimit::LimitStatus status) {
+void Filter::complete(Lyft::RateLimit::LimitStatus status) {
   state_ = State::Complete;
 
   switch (status) {
-  case ::RateLimit::LimitStatus::OK:
+  case Lyft::RateLimit::LimitStatus::OK:
     cluster_->statsScope().counter("ratelimit.ok").inc();
     break;
-  case ::RateLimit::LimitStatus::Error:
+  case Lyft::RateLimit::LimitStatus::Error:
     cluster_->statsScope().counter("ratelimit.error").inc();
     break;
-  case ::RateLimit::LimitStatus::OverLimit:
+  case Lyft::RateLimit::LimitStatus::OverLimit:
     cluster_->statsScope().counter("ratelimit.over_limit").inc();
     Http::CodeUtility::ResponseStatInfo info{
         config_->globalStore(), cluster_->statsScope(), EMPTY_STRING, *getTooManyRequestsHeader(),
@@ -121,7 +122,7 @@ void Filter::complete(::RateLimit::LimitStatus status) {
     break;
   }
 
-  if (status == ::RateLimit::LimitStatus::OverLimit &&
+  if (status == Lyft::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
     Http::HeaderMapPtr response_headers{new HeaderMapImpl(*getTooManyRequestsHeader())};
@@ -133,7 +134,7 @@ void Filter::complete(::RateLimit::LimitStatus status) {
 }
 
 void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                                          std::vector<::RateLimit::Descriptor>& descriptors,
+                                          std::vector<Lyft::RateLimit::Descriptor>& descriptors,
                                           const Router::RouteEntry* route_entry,
                                           const HeaderMap& headers) const {
   for (const Router::RateLimitPolicyEntry& rate_limit :
@@ -151,3 +152,4 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
 
 } // RateLimit
 } // Http
+} // Lyft

@@ -7,6 +7,7 @@
 
 #include "common/common/linked_object.h"
 
+namespace Lyft {
 namespace Network {
 
 /**
@@ -74,3 +75,4 @@ private:
 };
 
 } // Network
+} // Lyft

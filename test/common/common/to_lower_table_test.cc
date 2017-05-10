@@ -2,6 +2,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Lyft {
 TEST(ToLowerTableTest, All) {
   ToLowerTable table;
 
@@ -26,3 +27,4 @@ TEST(ToLowerTableTest, All) {
     EXPECT_EQ(input, "\x90hello\x90");
   }
 }
+} // Lyft

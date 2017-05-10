@@ -9,6 +9,7 @@
 
 #include "common/common/linked_object.h"
 
+namespace Lyft {
 namespace Network {
 
 class ListenerImpl;
@@ -80,3 +81,4 @@ private:
 };
 
 } // Network
+} // Lyft

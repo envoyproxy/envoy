@@ -14,6 +14,7 @@
 #include "openssl/x509v3.h"
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Ssl {
 
 /**
@@ -389,3 +390,4 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
 }
 
 } // Ssl
+} // Lyft

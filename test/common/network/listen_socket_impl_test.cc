@@ -8,6 +8,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Lyft {
 namespace Network {
 
 class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -59,3 +60,4 @@ TEST_P(ListenSocketImplTest, BindPortZero) {
 }
 
 } // Network
+} // Lyft

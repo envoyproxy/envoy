@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::NiceMock;
 
@@ -176,3 +177,4 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
 
 } // Configuration
 } // Server
+} // Lyft

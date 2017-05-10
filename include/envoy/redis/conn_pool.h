@@ -7,6 +7,7 @@
 #include "envoy/redis/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 
+namespace Lyft {
 namespace Redis {
 namespace ConnPool {
 
@@ -127,3 +128,4 @@ typedef std::unique_ptr<Instance> InstancePtr;
 
 } // ConnPool
 } // Redis
+} // Lyft

@@ -21,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::DoAll;
 using testing::InSequence;
@@ -963,3 +964,4 @@ TEST_F(RedisHealthCheckerImplTest, All) {
 }
 
 } // Upstream
+} // Lyft

@@ -9,6 +9,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Http {
 namespace AccessLog {
 
@@ -338,3 +339,4 @@ std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_header
 
 } // AccessLog
 } // Http
+} // Lyft

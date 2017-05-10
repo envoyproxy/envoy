@@ -3,6 +3,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::Return;
 
@@ -15,3 +16,4 @@ MockAccessLogManager::MockAccessLogManager() {
 MockAccessLogManager::~MockAccessLogManager() {}
 
 } // AccessLog
+} // Lyft

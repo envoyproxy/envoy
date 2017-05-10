@@ -2,6 +2,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Lyft {
 namespace Zipkin {
 
 TEST(ZipkinUtilTest, utilTests) {
@@ -38,3 +39,4 @@ TEST(ZipkinUtilTest, utilTests) {
   EXPECT_EQ(expected_json, merged_json);
 }
 } // Zipkin
+} // Lyft

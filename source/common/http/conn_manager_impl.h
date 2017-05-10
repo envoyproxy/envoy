@@ -28,6 +28,7 @@
 #include "common/http/user_agent.h"
 #include "common/tracing/http_tracer_impl.h"
 
+namespace Lyft {
 namespace Http {
 
 /**
@@ -490,3 +491,4 @@ private:
 };
 
 } // Http
+} // Lyft

@@ -10,6 +10,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Bson {
 
 int32_t BufferHelper::peakInt32(Buffer::Instance& data) {
@@ -550,3 +551,4 @@ const Field* DocumentImpl::find(const std::string& name, Field::Type type) const
 }
 
 } // Bson
+} // Lyft

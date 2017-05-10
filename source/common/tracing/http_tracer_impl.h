@@ -11,6 +11,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
+namespace Lyft {
 namespace Tracing {
 
 enum class Reason {
@@ -90,3 +91,4 @@ public:
 };
 
 } // Tracing
+} // Lyft

@@ -19,6 +19,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::NiceMock;
 
 namespace Upstream {
@@ -141,3 +142,4 @@ public:
 };
 
 } // Upstream
+} // Lyft

@@ -10,6 +10,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 namespace Filesystem {
 
 class WatchCallback {
@@ -59,3 +60,4 @@ TEST(WatcherImplTest, All) {
 }
 
 } // Filesystem
+} // Lyft

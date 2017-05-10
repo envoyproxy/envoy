@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+namespace Lyft {
 namespace Http {
 
 std::string MessageImpl::bodyAsString() const {
@@ -19,3 +20,4 @@ std::string MessageImpl::bodyAsString() const {
 }
 
 } // Http
+} // Lyft

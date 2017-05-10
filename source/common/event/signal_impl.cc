@@ -4,6 +4,7 @@
 
 #include "event2/event.h"
 
+namespace Lyft {
 namespace Event {
 
 SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, int signal_num, SignalCb cb)
@@ -16,3 +17,4 @@ SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, int signal_num, Sig
 }
 
 } // Event
+} // Lyft

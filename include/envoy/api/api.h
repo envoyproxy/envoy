@@ -7,6 +7,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/thread/thread.h"
 
+namespace Lyft {
 namespace Api {
 
 /**
@@ -47,3 +48,4 @@ public:
 typedef std::unique_ptr<Api> ApiPtr;
 
 } // Api
+} // Lyft

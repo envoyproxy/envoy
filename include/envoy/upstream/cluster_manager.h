@@ -13,6 +13,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
+namespace Lyft {
 namespace Upstream {
 
 /**
@@ -159,3 +160,4 @@ public:
 };
 
 } // Upstream
+} // Lyft

@@ -6,6 +6,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 
 namespace Dynamo {
@@ -56,3 +57,4 @@ TEST(DynamoUtility, PartitionIdStatString) {
 }
 
 } // Dynamo
+} // Lyft

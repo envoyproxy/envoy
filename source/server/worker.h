@@ -12,6 +12,7 @@
 
 #include "server/connection_handler_impl.h"
 
+namespace Lyft {
 typedef std::map<Server::Configuration::Listener*, Network::TcpListenSocketPtr> SocketMap;
 
 /**
@@ -43,3 +44,4 @@ private:
 };
 
 typedef std::unique_ptr<Worker> WorkerPtr;
+} // Lyft

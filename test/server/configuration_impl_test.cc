@@ -12,6 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
@@ -369,3 +370,4 @@ TEST(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguratio
 
 } // Configuration
 } // Server
+} // Lyft

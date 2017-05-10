@@ -21,6 +21,7 @@
 
 #include "nghttp2/nghttp2.h"
 
+namespace Lyft {
 namespace Http {
 namespace Http2 {
 
@@ -265,3 +266,4 @@ private:
 
 } // Http2
 } // Http
+} // Lyft

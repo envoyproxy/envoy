@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 
+namespace Lyft {
 namespace Event {
 
 /**
@@ -21,3 +22,4 @@ public:
 typedef std::unique_ptr<SignalEvent> SignalEventPtr;
 
 } // Event
+} // Lyft

@@ -6,6 +6,7 @@
 
 #include "gperftools/malloc_extension.h"
 
+namespace Lyft {
 namespace Memory {
 
 uint64_t Stats::totalCurrentlyAllocated() {
@@ -21,14 +22,17 @@ uint64_t Stats::totalCurrentlyReserved() {
 }
 
 } // Memory
+} // Lyft
 
 #else
 
+namespace Lyft {
 namespace Memory {
 
 uint64_t Stats::totalCurrentlyAllocated() { return 0; }
 uint64_t Stats::totalCurrentlyReserved() { return 0; }
 
 } // Memory
+} // Lyft
 
 #endif // #ifdef TCMALLOC

@@ -10,6 +10,7 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+namespace Lyft {
 namespace Http {
 namespace Http2 {
 
@@ -252,3 +253,4 @@ uint32_t ProdConnPoolImpl::maxTotalStreams() { return MAX_STREAMS; }
 
 } // Http2
 } // Http
+} // Lyft

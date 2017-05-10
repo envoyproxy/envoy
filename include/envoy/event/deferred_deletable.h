@@ -2,6 +2,7 @@
 
 #include <memory>
 
+namespace Lyft {
 namespace Event {
 
 /**
@@ -17,3 +18,4 @@ public:
 typedef std::unique_ptr<DeferredDeletable> DeferredDeletablePtr;
 
 } // Event
+} // Lyft

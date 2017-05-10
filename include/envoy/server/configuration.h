@@ -13,6 +13,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+namespace Lyft {
 namespace Server {
 namespace Configuration {
 
@@ -213,3 +214,4 @@ public:
 
 } // Configuration
 } // Server
+} // Lyft

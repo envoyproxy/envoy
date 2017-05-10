@@ -13,6 +13,7 @@
 #include "common/common/logger.h"
 #include "common/event/libevent.h"
 
+namespace Lyft {
 namespace Event {
 
 /**
@@ -69,3 +70,4 @@ private:
 };
 
 } // Event
+} // Lyft

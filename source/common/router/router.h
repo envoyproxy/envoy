@@ -16,6 +16,7 @@
 
 #include "common/common/logger.h"
 
+namespace Lyft {
 namespace Router {
 
 /**
@@ -249,3 +250,4 @@ private:
 };
 
 } // Router
+} // Lyft

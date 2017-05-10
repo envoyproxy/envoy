@@ -14,6 +14,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Upstream {
 namespace Outlier {
 
@@ -470,3 +471,4 @@ Optional<double> SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_re
 
 } // Outlier
 } // Upstream
+} // Lyft

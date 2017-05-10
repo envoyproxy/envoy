@@ -21,7 +21,7 @@ done
 #include "gtest/gtest.h"
 
 TEST(ShTest, ${TEST_NAME}) {
-  TestEnvironment::exec({${EXEC_ARGS}});
+  Lyft::TestEnvironment::exec({${EXEC_ARGS}});
 }
 EOF
 )

@@ -9,6 +9,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
+namespace Lyft {
 namespace Upstream {
 
 class Host;
@@ -132,3 +133,4 @@ typedef std::shared_ptr<EventLogger> EventLoggerSharedPtr;
 
 } // Outlier
 } // Upstream
+} // Lyft

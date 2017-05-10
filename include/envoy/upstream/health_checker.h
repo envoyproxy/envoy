@@ -5,6 +5,7 @@
 
 #include "envoy/upstream/upstream.h"
 
+namespace Lyft {
 namespace Upstream {
 
 /**
@@ -38,3 +39,4 @@ public:
 typedef std::unique_ptr<HealthChecker> HealthCheckerPtr;
 
 } // Upstream
+} // Lyft

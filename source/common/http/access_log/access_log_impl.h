@@ -10,6 +10,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Lyft {
 namespace Http {
 namespace AccessLog {
 
@@ -132,10 +133,10 @@ private:
 class InstanceImpl : public Instance {
 public:
   InstanceImpl(const std::string& access_log_path, FilterPtr&& filter, FormatterPtr&& formatter,
-               ::AccessLog::AccessLogManager& log_manager);
+               Lyft::AccessLog::AccessLogManager& log_manager);
 
   static InstanceSharedPtr fromJson(Json::Object& json, Runtime::Loader& runtime,
-                                    ::AccessLog::AccessLogManager& log_manager);
+                                    Lyft::AccessLog::AccessLogManager& log_manager);
 
   // Http::AccessLog::Instance
   void log(const HeaderMap* request_headers, const HeaderMap* response_headers,
@@ -149,3 +150,4 @@ private:
 
 } // AccessLog
 } // Http
+} // Lyft

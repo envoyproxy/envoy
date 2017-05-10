@@ -8,6 +8,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Server {
 
 /**
@@ -68,3 +69,4 @@ public:
 };
 
 } // Server
+} // Lyft

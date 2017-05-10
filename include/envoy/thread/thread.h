@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Lyft {
 namespace Thread {
 
 /**
@@ -38,3 +39,4 @@ private:
 };
 
 } // Thread
+} // Lyft

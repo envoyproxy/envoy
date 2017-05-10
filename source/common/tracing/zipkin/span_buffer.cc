@@ -1,5 +1,6 @@
 #include "common/tracing/zipkin/span_buffer.h"
 
+namespace Lyft {
 namespace Zipkin {
 
 // TODO(fabolive): Need to avoid the copy to improve performance.
@@ -29,3 +30,4 @@ std::string SpanBuffer::toStringifiedJsonArray() {
   return stringified_json_array;
 }
 } // Zipkin
+} // Lyft

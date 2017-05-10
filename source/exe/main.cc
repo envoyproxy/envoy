@@ -21,6 +21,7 @@
 #include "ares.h"
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Server {
 
 class ProdComponentFactory : public ComponentFactory {
@@ -37,20 +38,21 @@ public:
 };
 
 } // Server
+} // Lyft
 
 int main(int argc, char** argv) {
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
-  SignalAction handle_sigs;
+  Lyft::SignalAction handle_sigs;
 #endif
   ares_library_init(ARES_LIB_INIT_ALL);
-  Event::Libevent::Global::initialize();
-  OptionsImpl options(argc, argv, Server::SharedMemory::version(), spdlog::level::warn);
+  Lyft::Event::Libevent::Global::initialize();
+  Lyft::OptionsImpl options(argc, argv, Lyft::Server::SharedMemory::version(), spdlog::level::warn);
 
-  std::unique_ptr<Server::HotRestartImpl> restarter;
+  std::unique_ptr<Lyft::Server::HotRestartImpl> restarter;
   try {
-    restarter.reset(new Server::HotRestartImpl(options));
-  } catch (EnvoyException& e) {
+    restarter.reset(new Lyft::Server::HotRestartImpl(options));
+  } catch (Lyft::EnvoyException& e) {
     std::cerr << "unable to initialize hot restart: " << e.what() << std::endl;
     return 1;
   }

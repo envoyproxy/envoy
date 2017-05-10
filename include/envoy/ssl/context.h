@@ -5,6 +5,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Lyft {
 namespace Ssl {
 
 /**
@@ -39,3 +40,4 @@ class ServerContext : public virtual Context {};
 typedef std::unique_ptr<ServerContext> ServerContextPtr;
 
 } // SSL
+} // Lyft

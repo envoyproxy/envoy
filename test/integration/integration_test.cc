@@ -151,3 +151,4 @@ TEST_F(IntegrationTest, TcpProxyDownstreamDisconnect) {
        [&]() -> void { fake_upstream_connection->waitForData(10); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
+} // Lyft

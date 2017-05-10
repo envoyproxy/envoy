@@ -33,6 +33,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
@@ -147,7 +148,7 @@ public:
   NiceMock<Tracing::MockHttpTracer> tracer_;
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockDispatcher dispatcher_;
-  NiceMock<::AccessLog::MockAccessLogManager> log_manager_;
+  NiceMock<Lyft::AccessLog::MockAccessLogManager> log_manager_;
   std::string access_log_path_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   Stats::IsolatedStoreImpl fake_stats_;
@@ -1125,3 +1126,4 @@ TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
 }
 
 } // Http
+} // Lyft

@@ -13,6 +13,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Http {
 
 void CodeUtility::chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
@@ -187,3 +188,4 @@ const char* CodeUtility::toString(Code code) {
 }
 
 } // Http
+} // Lyft

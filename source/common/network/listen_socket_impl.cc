@@ -13,6 +13,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Network {
 
 void ListenSocketImpl::doBind() {
@@ -57,3 +58,4 @@ UdsListenSocket::UdsListenSocket(const std::string& uds_path) {
 }
 
 } // Network
+} // Lyft

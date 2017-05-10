@@ -3,6 +3,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 
 namespace Stats {
@@ -26,3 +27,4 @@ MockIsolatedStatsStore::MockIsolatedStatsStore() {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
 
 } // Stats
+} // Lyft

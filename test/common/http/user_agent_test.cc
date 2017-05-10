@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Lyft {
 namespace Http {
 
 TEST(UserAgentTest, All) {
@@ -56,3 +57,4 @@ TEST(UserAgentTest, All) {
 }
 
 } // Http
+} // Lyft

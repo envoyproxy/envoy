@@ -4,6 +4,7 @@
 
 #include "server/configuration_impl.h"
 
+namespace Lyft {
 namespace Server {
 namespace Configuration {
 
@@ -20,3 +21,4 @@ public:
 
 } // Configuration
 } // Server
+} // Lyft

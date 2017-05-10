@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
@@ -267,3 +268,4 @@ TEST_F(RdsImplTest, FailureArray) {
 }
 
 } // Upstream
+} // Lyft

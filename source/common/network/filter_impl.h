@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Lyft {
 namespace Network {
 
 /**
@@ -21,3 +22,4 @@ public:
 };
 
 } // Network
+} // Lyft

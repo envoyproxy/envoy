@@ -21,6 +21,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Server {
 
 /**
@@ -164,3 +165,4 @@ private:
   Server::TestDrainManager* drain_manager_{};
   Stats::TestIsolatedStoreImpl stats_store_;
 };
+} // Lyft

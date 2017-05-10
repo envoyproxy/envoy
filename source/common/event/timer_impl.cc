@@ -7,6 +7,7 @@
 
 #include "event2/event.h"
 
+namespace Lyft {
 namespace Event {
 
 TimerImpl::TimerImpl(DispatcherImpl& dispatcher, TimerCb cb) : cb_(cb) {
@@ -31,3 +32,4 @@ void TimerImpl::enableTimer(const std::chrono::milliseconds& d) {
 }
 
 } // Event
+} // Lyft

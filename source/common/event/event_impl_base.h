@@ -2,6 +2,7 @@
 
 #include "event2/event_struct.h"
 
+namespace Lyft {
 namespace Event {
 
 /**
@@ -16,3 +17,4 @@ protected:
 };
 
 } // Event
+} // Lyft

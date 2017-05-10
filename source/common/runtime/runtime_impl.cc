@@ -16,6 +16,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Runtime {
 
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
@@ -154,3 +155,4 @@ void LoaderImpl::onSymlinkSwap() {
 Snapshot& LoaderImpl::snapshot() { return tls_.getTyped<Snapshot>(tls_slot_); }
 
 } // Runtime
+} // Lyft

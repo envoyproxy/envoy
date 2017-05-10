@@ -8,6 +8,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace RateLimit {
 namespace TcpFilter {
 
@@ -99,3 +100,4 @@ void Instance::complete(LimitStatus status) {
 
 } // TcpFilter
 } // RateLimit
+} // Lyft

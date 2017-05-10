@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_set>
 
+namespace Lyft {
 namespace Stats {
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(RawStatDataAllocator& alloc)
@@ -220,3 +221,4 @@ Timer& ThreadLocalStoreImpl::ScopeImpl::timer(const std::string& name) {
 }
 
 } // Stats
+} // Lyft

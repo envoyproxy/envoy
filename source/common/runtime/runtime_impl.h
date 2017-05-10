@@ -21,6 +21,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Runtime {
 
 /**
@@ -207,3 +208,4 @@ private:
 };
 
 } // Runtime
+} // Lyft

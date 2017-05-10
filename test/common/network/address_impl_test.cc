@@ -18,6 +18,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Lyft {
 namespace Network {
 namespace Address {
 namespace {
@@ -313,3 +314,4 @@ TEST(AddressFromSockAddr, Pipe) {
 
 } // Address
 } // Network
+} // Lyft

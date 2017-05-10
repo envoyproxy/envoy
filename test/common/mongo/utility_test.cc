@@ -6,6 +6,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Lyft {
 namespace Mongo {
 
 TEST(QueryMessageInfoTest, FindCommand) {
@@ -189,3 +190,4 @@ TEST(QueryMessageInfoTest, Command) {
 }
 
 } // Mongo
+} // Lyft

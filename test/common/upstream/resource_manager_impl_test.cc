@@ -5,6 +5,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::NiceMock;
 using testing::Return;
 
@@ -47,3 +48,4 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
 }
 
 } // Upstream
+} // Lyft

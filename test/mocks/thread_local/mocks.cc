@@ -3,6 +3,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::Invoke;
 
@@ -19,3 +20,4 @@ MockInstance::MockInstance() {
 MockInstance::~MockInstance() {}
 
 } // ThreadLocal
+} // Lyft

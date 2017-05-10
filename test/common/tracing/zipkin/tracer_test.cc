@@ -284,3 +284,4 @@ TEST(ZipkinTracerTest, finishSpan) {
   EXPECT_EQ("my_service_name", endpoint.serviceName());
 }
 } // Zipkin
+} // Lyft

@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
+namespace Lyft {
 namespace Network {
 
 /**
@@ -33,3 +34,4 @@ public:
 typedef std::unique_ptr<ListenSocket> ListenSocketPtr;
 
 } // Network
+} // Lyft

@@ -23,6 +23,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+namespace Lyft {
 class FakeHttpConnection;
 
 /**
@@ -229,3 +230,4 @@ private:
   std::list<QueuedConnectionWrapperPtr> new_connections_;
   FakeHttpConnection::Type http_type_;
 };
+} // Lyft

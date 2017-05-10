@@ -5,6 +5,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+namespace Lyft {
 namespace Grpc {
 
 /**
@@ -50,3 +51,4 @@ private:
 };
 
 } // Grpc
+} // Lyft

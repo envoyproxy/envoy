@@ -12,6 +12,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Lyft {
 namespace Stats {
 
 class MockCounter : public Counter {
@@ -95,3 +96,4 @@ public:
 };
 
 } // Stats
+} // Lyft

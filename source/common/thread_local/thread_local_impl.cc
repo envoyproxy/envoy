@@ -9,6 +9,7 @@
 #include "common/common/assert.h"
 #include "common/common/stl_helpers.h"
 
+namespace Lyft {
 namespace ThreadLocal {
 
 std::atomic<uint32_t> InstanceImpl::next_slot_id_;
@@ -75,3 +76,4 @@ void InstanceImpl::reset() {
 }
 
 } // ThreadLocal
+} // Lyft

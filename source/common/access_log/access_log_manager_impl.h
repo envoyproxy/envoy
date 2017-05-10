@@ -6,6 +6,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 
+namespace Lyft {
 namespace AccessLog {
 
 class AccessLogManagerImpl : public AccessLogManager {
@@ -27,3 +28,4 @@ private:
 };
 
 } // AccessLog
+} // Lyft
