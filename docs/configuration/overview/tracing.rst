@@ -47,7 +47,7 @@ collector_cluster
 
 
 Zipkin driver
-----------------
+-------------
 
 .. code-block:: json
 
@@ -60,7 +60,8 @@ Zipkin driver
   }
 
 collector_cluster
-  *(required, string)* The cluster manager cluster that hosts the Zipkin collectors.
+  *(required, string)* The cluster manager cluster that hosts the Zipkin collectors. Note that the
+  Zipkin cluster must be defined under `clusters` in the cluster manager configuration section.
 
 collector_endpoint
   *(required, string)* The API endpoint of the Zipkin service where the
