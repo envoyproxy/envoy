@@ -14,6 +14,8 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -177,14 +179,14 @@ TEST(ConnectionImplTest, BufferStats) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-class ReadBufferLimitTest : public testing::Test {
+class ReadBufferLimitTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
 
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
-    Network::TcpListenSocket socket(Network::Utility::getIpv6AnyAddress(), true);
+    Network::TcpListenSocket socket(Network::Test::getAnyAddress(GetParam()), true);
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
     Network::ListenerPtr listener =
@@ -237,9 +239,12 @@ public:
   }
 };
 
-TEST_F(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
+INSTANTIATE_TEST_CASE_P(IpVersions, ReadBufferLimitTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-TEST_F(ReadBufferLimitTest, SomeLimit) { readBufferLimitTest(32 * 1024, 32 * 1024); }
+TEST_P(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
+
+TEST_P(ReadBufferLimitTest, SomeLimit) { readBufferLimitTest(32 * 1024, 32 * 1024); }
 
 TEST(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   Event::DispatcherImpl dispatcher;
