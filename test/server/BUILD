@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
@@ -5,6 +7,13 @@ load(
 )
 
 envoy_package()
+
+envoy_cc_test(
+    name = "backtrace_test",
+    srcs = ["backtrace_test.cc"],
+    tags = ["backtrace"],
+    deps = ["//source/server:backtrace_lib"],
+)
 
 envoy_cc_test(
     name = "configuration_impl_test",

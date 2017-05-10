@@ -6,15 +6,10 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
 
+#include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
 
 #include "gtest/gtest.h"
-
-#ifdef BAZEL_BRINGUP
-#include "test/proto/helloworld.pb.h"
-#else
-#include "test/generated/helloworld.pb.h"
-#endif
 
 namespace Grpc {
 

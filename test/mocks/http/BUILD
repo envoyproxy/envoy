@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
@@ -19,10 +21,12 @@ envoy_cc_mock(
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/ssl:connection_interface",
+        "//include/envoy/tracing:http_tracer_interface",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/router:router_mocks",
+        "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
     ],
 )

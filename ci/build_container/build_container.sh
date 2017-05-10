@@ -12,6 +12,11 @@ apt-get install -y gdb strace
 add-apt-repository -y ppa:ubuntu-toolchain-r/test
 apt-get update
 apt-get install -y g++-4.9
+# clang head (currently 5.0)
+wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial main"
+apt-get update
+apt-get install -y clang-5.0
 # Bazel and related dependencies.
 apt-get install -y openjdk-8-jdk curl
 echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list

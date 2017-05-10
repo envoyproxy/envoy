@@ -7,6 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/access_log.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/access_log/access_log_formatter.h"
@@ -235,6 +236,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   // Verify tag is set based on the request headers.
   EXPECT_CALL(*span, setTag(":method", "GET"));
+  // Verify if the activeSpan interface returns reference to the current span.
+  EXPECT_CALL(*span, setTag("service-cluster", "scoobydoo"));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
 
@@ -260,6 +263,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
         Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
         data.drain(4);
       }));
@@ -860,11 +864,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
 
   EXPECT_CALL(*decoder_filter2, decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs(
-          [&]() -> Http::FilterHeadersStatus { return Http::FilterHeadersStatus::Continue; }));
+          [&]() -> Http::FilterHeadersStatus { return Http::FilterHeadersStatus::StopIteration; }));
 
   EXPECT_CALL(*decoder_filter2, decodeData(_, true))
-      .WillOnce(InvokeWithoutArgs(
-          [&]() -> Http::FilterDataStatus { return Http::FilterDataStatus::Continue; }));
+      .WillOnce(InvokeWithoutArgs([&]() -> Http::FilterDataStatus {
+        return Http::FilterDataStatus::StopIterationAndBuffer;
+      }));
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");

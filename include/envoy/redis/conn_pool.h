@@ -45,7 +45,7 @@ public:
 /**
  * A single redis client connection.
  */
-class Client {
+class Client : public Event::DeferredDeletable {
 public:
   virtual ~Client() {}
 

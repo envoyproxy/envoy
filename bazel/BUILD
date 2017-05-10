@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
@@ -21,11 +23,11 @@ config_setting(
 )
 
 config_setting(
-    name = "debug_symbols",
-    values = {"define": "debug_symbols=yes"},
+    name = "disable_tcmalloc",
+    values = {"define": "tcmalloc=disabled"},
 )
 
 config_setting(
-    name = "disable_tcmalloc",
-    values = {"define": "tcmalloc=disabled"},
+    name = "disable_signal_trace",
+    values = {"define": "signal_trace=disabled"},
 )

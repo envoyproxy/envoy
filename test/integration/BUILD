@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
@@ -16,6 +18,7 @@ envoy_sh_test(
         "//test/common/runtime:filesystem_setup.sh",
         "//test/common/runtime:filesystem_test_data",
         "//test/config/integration:server_config_files",
+        "//tools:socket_passing",
     ],
     # Need to disable test execution sandboxing for this test, since it uses shmem.
     # TODO(htuch): When most folks are using a Bazel with the recent

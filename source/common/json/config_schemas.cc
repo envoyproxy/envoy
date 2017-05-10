@@ -1024,7 +1024,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
   }
   )EOF");
 
-const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
+const std::string Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
     "definitions" : {
@@ -1034,53 +1034,59 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
           "binary" : {"type" : "string"}
         },
         "additionalProperties" : false
+      }
+    },
+    "type" : "object",
+    "properties" : {
+      "type" : {
+        "type" : "string",
+        "enum" : ["http", "redis", "tcp"]
       },
-      "health_check" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "type" : "string",
-            "enum" : ["http", "tcp"]
-          },
-          "timeout_ms" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "exclusiveMinimum" : true
-          },
-          "interval_ms" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "exclusiveMinimum" : true
-          },
-          "unhealthy_threshold" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "exclusiveMinimum" : true
-          },
-          "healthy_threshold" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "exclusiveMinimum" : true
-          },
-          "path" : {"type" : "string"},
-          "send" : {
-            "type" : "array",
-            "items" : {"$ref" : "#/definitions/health_check_bytes"}
-          },
-          "receive" : {
-            "type" : "array",
-            "items" : {"$ref" : "#/definitions/health_check_bytes"}
-          },
-          "interval_jitter_ms" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "exclusiveMinimum" : true
-          },
-          "service_name" : {"type" : "string"}
-        },
-        "required" : ["type", "timeout_ms", "interval_ms", "unhealthy_threshold", "healthy_threshold"],
-        "additionalProperties" : false
+      "timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       },
+      "interval_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "unhealthy_threshold" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "healthy_threshold" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "path" : {"type" : "string"},
+      "send" : {
+        "type" : "array",
+        "items" : {"$ref" : "#/definitions/health_check_bytes"}
+      },
+      "receive" : {
+        "type" : "array",
+        "items" : {"$ref" : "#/definitions/health_check_bytes"}
+      },
+      "interval_jitter_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "service_name" : {"type" : "string"}
+    },
+    "required" : ["type", "timeout_ms", "interval_ms", "unhealthy_threshold", "healthy_threshold"],
+    "additionalProperties" : false
+  }
+  )EOF");
+
+const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
+  {
+    "$schema": "http://json-schema.org/schema#",
+    "definitions" : {
       "circuit_breakers" : {
         "type" : "object",
         "properties" : {
@@ -1152,7 +1158,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         }
       },
       "service_name" : {"type" : "string"},
-      "health_check" : {"$ref" : "#/definitions/health_check"},
+      "health_check" : {"type" : "object"},
       "max_requests_per_connection" : {
         "type" : "integer",
         "minimum" : 0,
@@ -1279,9 +1285,8 @@ const std::string Json::Schema::SDS_SCHEMA(R"EOF(
       "hosts" : {
         "type" : "array",
         "items" : {"$ref" : "#/definitions/host"}
-      },
-      "required" : ["hosts"],
-      "additionalProperties" : false
-    }
+      }
+    },
+    "required" : ["hosts"]
   }
   )EOF");

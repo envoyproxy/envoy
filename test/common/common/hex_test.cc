@@ -27,3 +27,9 @@ TEST(Hex, RoundTrip) {
 TEST(Hex, BadHex) { EXPECT_THROW(Hex::decode("abcde"), EnvoyException); }
 
 TEST(Hex, DecodeUppercase) { Hex::decode("ABCDEFAB"); }
+
+TEST(Hex, UIntToHex) {
+  std::string base16_string = Hex::uint64ToHex(2722130815203937912ULL);
+  EXPECT_EQ("25c6f38dd0600e78", base16_string);
+  EXPECT_EQ("0000000000000000", Hex::uint64ToHex(0ULL));
+}

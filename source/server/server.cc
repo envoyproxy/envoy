@@ -72,7 +72,7 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   failHealthcheck(false);
 
   uint64_t version_int;
-  if (!StringUtil::atoul(VersionInfo::GIT_SHA.substr(0, 6).c_str(), version_int, 16)) {
+  if (!StringUtil::atoul(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
     throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
   }
   server_stats_.version_.set(version_int);
@@ -179,7 +179,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
              restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  Json::ObjectPtr config_json = Json::Factory::LoadFromFile(options.configPath());
+  Json::ObjectPtr config_json = Json::Factory::loadFromFile(options.configPath());
   config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
   log().info("admin address: {}", initial_config.admin().address()->asString());
@@ -189,8 +189,9 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
   restarter_.shutdownParentAdmin(info);
   original_start_time_ = info.original_start_time_;
   admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
-                             initial_config.admin().profilePath(), initial_config.admin().address(),
-                             *this));
+                             initial_config.admin().profilePath(), options.adminAddressPath(),
+                             initial_config.admin().address(), *this));
+
   admin_scope_ = stats_store_.createScope("listener.admin.");
   handler_.addListener(*admin_, admin_->mutable_socket(), *admin_scope_,
                        Network::ListenerOptions::listenerOptionsWithBindToPort());
@@ -329,7 +330,7 @@ void InstanceImpl::initializeStatSinks() {
     log().info("statsd TCP cluster: {}", config_->statsdTcpClusterName().value());
     stat_sinks_.emplace_back(
         new Stats::Statsd::TcpStatsdSink(local_info_, config_->statsdTcpClusterName().value(),
-                                         thread_local_, config_->clusterManager()));
+                                         thread_local_, config_->clusterManager(), stats_store_));
     stats_store_.addSink(*stat_sinks_.back());
   }
 }

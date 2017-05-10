@@ -41,6 +41,11 @@ public:
   virtual const std::string& configPath() PURE;
 
   /**
+   * @return const std::string& the admin address output file.
+   */
+  virtual const std::string& adminAddressPath() PURE;
+
+  /**
    * @return spdlog::level::level_enum the default log level for the server.
    */
   virtual spdlog::level::level_enum logLevel() PURE;

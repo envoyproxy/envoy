@@ -11,19 +11,16 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/compiler_requirements.h"
+#include "common/common/logger.h"
 
 #include "server/options_impl.h"
+
+#include "test/test_common/network_utility.h"
 
 #include "spdlog/spdlog.h"
 
 namespace {
-
-std::string getCheckedEnvVar(const std::string& var) {
-  // Bazel style temp dirs. Should be set by test runner or Bazel.
-  const char* path = ::getenv(var.c_str());
-  RELEASE_ASSERT(path != nullptr);
-  return std::string(path);
-}
 
 std::string getOrCreateUnixDomainSocketDirectory() {
   const char* path = ::getenv("TEST_UDSDIR");
@@ -44,9 +41,46 @@ char** argv_;
 
 } // namespace
 
+std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
+  // Bazel style temp dirs. Should be set by test runner or Bazel.
+  const char* path = ::getenv(var.c_str());
+  RELEASE_ASSERT(path != nullptr);
+  return std::string(path);
+}
+
 void TestEnvironment::initializeOptions(int argc, char** argv) {
   argc_ = argc;
   argv_ = argv;
+}
+
+bool TestEnvironment::shouldRunTestForIpVersion(const Network::Address::IpVersion& type) {
+  const char* value = ::getenv("ENVOY_IP_TEST_VERSIONS");
+  std::string option(value ? value : "");
+  if (option.empty()) {
+    return true;
+  }
+  if ((type == Network::Address::IpVersion::v4 && option == "v6only") ||
+      (type == Network::Address::IpVersion::v6 && option == "v4only")) {
+    return false;
+  }
+  return true;
+}
+
+std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest() {
+  std::vector<Network::Address::IpVersion> parameters;
+  for (auto version : {Network::Address::IpVersion::v4, Network::Address::IpVersion::v6}) {
+    if (TestEnvironment::shouldRunTestForIpVersion(version)) {
+      parameters.push_back(version);
+      if (!Network::Test::supportsIpVersion(version)) {
+        Logger::Registry::getLog(Logger::Id::testing)
+            .warn(
+                fmt::format("Testing with IP{} addresses may not be supported on this machine. If "
+                            "testing fails, set the environment variable ENVOY_IP_TEST_VERSIONS.",
+                            Network::Test::addressVersionAsString(version)));
+      }
+    }
+  }
+  return parameters;
 }
 
 Server::Options& TestEnvironment::getOptions() {
@@ -60,8 +94,7 @@ const std::string& TestEnvironment::temporaryDirectory() {
 }
 
 const std::string& TestEnvironment::runfilesDirectory() {
-  static const std::string* runfiles_directory =
-      new std::string(getCheckedEnvVar("TEST_SRCDIR") + "/" + getCheckedEnvVar("TEST_WORKSPACE"));
+  static const std::string* runfiles_directory = new std::string(getCheckedEnvVar("TEST_RUNDIR"));
   return *runfiles_directory;
 }
 
@@ -118,7 +151,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
 }
 
 Json::ObjectPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
-  return Json::Factory::LoadFromString(substitute(json));
+  return Json::Factory::loadFromString(substitute(json));
 }
 
 void TestEnvironment::exec(const std::vector<std::string>& args) {

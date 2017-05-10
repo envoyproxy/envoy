@@ -73,9 +73,8 @@ If health check is configured, the cluster has an additional statistics tree roo
 
   attempt, Counter, Number of health checks
   success, Counter, Number of successful health checks
-  failure, Counter, Number of failed health checks
-  timeout, Counter, Number of timed out health checks
-  protocol_error, Counter, Number of protocol errors
+  failure, Counter, Number of immediately failed health checks (e.g. HTTP 503) as well as network failures
+  network_failure, Counter, Number of health check failures due to network error
   verify_cluster, Counter, Number of health checks that attempted cluster name verification
   healthy, Gauge, Number of healthy members
 

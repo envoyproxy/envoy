@@ -95,7 +95,12 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
     if (!started_secondary_initialize_) {
       log().info("cm init: initializing secondary clusters");
       started_secondary_initialize_ = true;
-      for (Cluster* cluster : secondary_init_clusters_) {
+      // Cluster::initialize() method can modify the list of secondary_init_clusters_ to remove
+      // the item currently being initialized, so we eschew range-based-for and do this complicated
+      // dance to increment the iterator before calling initialize.
+      for (auto iter = secondary_init_clusters_.begin(); iter != secondary_init_clusters_.end();) {
+        Cluster* cluster = *iter;
+        ++iter;
         cluster->initialize();
       }
     }

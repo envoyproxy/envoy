@@ -4,10 +4,8 @@ def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
 # Compute the final copts based on various options.
-def envoy_copts(repository):
+def envoy_copts(repository, test = False):
     return [
-        # TODO(htuch): Remove this when Bazel bringup is done.
-        "-DBAZEL_BRINGUP",
         "-Wall",
         "-Wextra",
         "-Werror",
@@ -17,16 +15,15 @@ def envoy_copts(repository):
         "-std=c++0x",
     ] + select({
         # Bazel adds an implicit -DNDEBUG for opt.
-        repository + "//bazel:opt_build": [],
+        repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
         repository + "//bazel:fastbuild_build": [],
         repository + "//bazel:dbg_build": ["-ggdb3"],
     }) + select({
         repository + "//bazel:disable_tcmalloc": [],
         "//conditions:default": ["-DTCMALLOC"],
     }) + select({
-        # Allow debug symbols to be added to opt/fastbuild as well.
-        repository + "//bazel:debug_symbols": ["-ggdb3"],
-        "//conditions:default": [],
+        repository + "//bazel:disable_signal_trace": [],
+        "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
     })
 
 # References to Envoy external dependencies should be wrapped with this function.
@@ -66,6 +63,8 @@ def envoy_cc_library(name,
                      external_deps = [],
                      tcmalloc_dep = None,
                      repository = "",
+                     linkstamp = None,
+                     tags = [],
                      deps = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
@@ -75,6 +74,7 @@ def envoy_cc_library(name,
         hdrs = hdrs,
         copts = envoy_copts(repository) + copts,
         visibility = visibility,
+        tags = tags,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//include/envoy/common:base_includes",
             envoy_external_dep_path('spdlog'),
@@ -82,25 +82,21 @@ def envoy_cc_library(name,
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         alwayslink = 1,
         linkstatic = 1,
+        linkstamp = linkstamp,
     )
 
 def _git_stamped_genrule(repository, name):
     # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
     # do binary rewriting to replace the linker produced MD5 hash with the
     # version_generated.cc git SHA1 hash (truncated).
-    version_generated = repository + "//:version_generated.cc"
     rewriter = repository + "//tools:git_sha_rewriter.py"
     native.genrule(
         name = name + "_stamped",
-        srcs = [
-            name,
-            version_generated,
-        ],
+        srcs = [name],
         outs = [name + ".stamped"],
         cmd = "cp $(location " + name + ") $@ && " +
               "chmod u+w $@ && " +
-              "$(location " + rewriter + ") " +
-              "$(location " + version_generated + ") $@",
+              "$(location " + rewriter + ") $@",
         tools = [rewriter],
     )
 
@@ -142,8 +138,9 @@ def envoy_cc_binary(name,
         linkstatic = 1,
         visibility = visibility,
         malloc = tcmalloc_external_dep(repository),
-        # See above comment on MD5 hash.
-        stamp = 0,
+        # See above comment on MD5 hash, this is another "force MD5 stamps" to make sure our
+        # rewriting is robust.
+        stamp = 1,
         deps = deps,
     )
 
@@ -170,7 +167,7 @@ def envoy_cc_test(name,
     )
     native.cc_test(
         name = name,
-        copts = envoy_copts(repository),
+        copts = envoy_copts(repository, test = True),
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic is not needed on all platforms. Make this more granular.
         linkopts = ["-pthread", "-latomic"],
@@ -199,7 +196,7 @@ def envoy_cc_test_library(name,
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = envoy_copts(repository),
+        copts = envoy_copts(repository, test = True),
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             envoy_external_dep_path('googletest'),
@@ -267,6 +264,7 @@ def envoy_proto_library(name, srcs = [], deps = []):
         default_runtime = "//external:protobuf",
         protoc = "//external:protoc",
         deps = deps,
+        linkstatic = 1,
     )
     # We can't use include_prefix directly in cc_proto_library, since it
     # confuses protoc. Instead, we create a shim cc_library that performs the

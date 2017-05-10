@@ -29,7 +29,7 @@ namespace Upstream {
 namespace Outlier {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
-  Json::ObjectPtr loader = Json::Factory::LoadFromString("{}");
+  Json::ObjectPtr loader = Json::Factory::loadFromString("{}");
   NiceMock<MockCluster> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -44,7 +44,7 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
   NiceMock<MockCluster> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -85,7 +85,7 @@ public:
   CallbackChecker checker_;
   MockMonotonicTimeSource time_source_;
   std::shared_ptr<MockEventLogger> event_logger_{new MockEventLogger()};
-  Json::ObjectPtr loader_ = Json::Factory::LoadFromString("{}");
+  Json::ObjectPtr loader_ = Json::Factory::loadFromString("{}");
 };
 
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
@@ -103,7 +103,7 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr custom_config = Json::Factory::LoadFromString(json);
+  Json::ObjectPtr custom_config = Json::Factory::loadFromString(json);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100)));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
       cluster_, *custom_config, dispatcher_, runtime_, time_source_, event_logger_));
@@ -538,7 +538,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                            "\"eject\", \"type\": \"5xx\", \"num_ejections\": \"0\", "
                            "\"enforced\": \"true\"}\n")).WillOnce(SaveArg<0>(&log1));
   event_logger.logEject(host, detector, EjectionType::Consecutive5xx, true);
-  Json::Factory::LoadFromString(log1);
+  Json::Factory::loadFromString(log1);
 
   std::string log2;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
@@ -547,7 +547,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                            "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
                            "\"num_ejections\": 0}\n")).WillOnce(SaveArg<0>(&log2));
   event_logger.logUneject(host);
-  Json::Factory::LoadFromString(log2);
+  Json::Factory::loadFromString(log2);
 
   // now test with time since last action.
   time.value(time_source.currentTime() - std::chrono::seconds(30));
@@ -567,7 +567,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                            "\"-1\", \"cluster_success_rate_ejection_threshold\": \"-1\""
                            "}\n")).WillOnce(SaveArg<0>(&log3));
   event_logger.logEject(host, detector, EjectionType::SuccessRate, false);
-  Json::Factory::LoadFromString(log3);
+  Json::Factory::loadFromString(log3);
 
   std::string log4;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
@@ -576,7 +576,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                            "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
                            "\"num_ejections\": 0}\n")).WillOnce(SaveArg<0>(&log4));
   event_logger.logUneject(host);
-  Json::Factory::LoadFromString(log4);
+  Json::Factory::loadFromString(log4);
 }
 
 TEST(OutlierUtility, SRThreshold) {

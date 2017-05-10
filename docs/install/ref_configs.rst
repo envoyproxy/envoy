@@ -33,7 +33,8 @@ To generate the example configurations run the following from the root of the re
 .. code-block:: console
 
   mkdir -p generated/configs
-  configs/configgen.sh generated/configs
+  bazel build //configs:example_configs
+  tar xvf $PWD/bazel-genfiles/configs/example_configs.tar -C generated/configs
 
 The previous command will produce three fully expanded configurations using some variables
 defined inside of `configgen.py`. See the comments inside of `configgen.py` for detailed
@@ -50,6 +51,10 @@ A few notes about the example configurations:
 * The configuration demonstrates the use of a :ref:`global rate limiting service
   <arch_overview_rate_limit>`. To disable this delete the :ref:`rate limit configuration
   <config_rate_limit_service>`.
+* :ref:`Route discovery service <config_http_conn_man_rds>` is configured for the service to service
+  reference configuration and it is assumed to be running at `rds.yourcompany.net`.
+* :ref:`Cluster discovery service <config_cluster_manager_cds>` is configured for the service to
+  service reference configuration and it is assumed that be running at `cds.yourcompany.net`.
 
 Smoketest configuration
 -----------------------

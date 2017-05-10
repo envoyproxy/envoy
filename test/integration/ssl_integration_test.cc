@@ -26,6 +26,7 @@ ClientContextPtr SslIntegrationTest::client_ssl_ctx_san_;
 ClientContextPtr SslIntegrationTest::client_ssl_ctx_alpn_san_;
 
 void SslIntegrationTest::SetUpTestCase() {
+  runtime_.reset(new NiceMock<Runtime::MockLoader>());
   context_manager_.reset(new ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
   fake_upstreams_.emplace_back(
@@ -52,6 +53,7 @@ void SslIntegrationTest::TearDownTestCase() {
   client_ssl_ctx_san_.reset();
   client_ssl_ctx_alpn_san_.reset();
   context_manager_.reset();
+  runtime_.reset();
 }
 
 ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
@@ -113,7 +115,8 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn, bool san)
   }
   Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(target);
   ContextConfigImpl cfg(*loader);
-  return context_manager_->createSslClientContext(test_server_->store(), cfg);
+  static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
+  return context_manager_->createSslClientContext(*client_stats_store, cfg);
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn, bool san) {

@@ -13,71 +13,56 @@ binary built from the latest tip of master that passed tests.
 
 ## Alpine envoy image
 
-Minimal images based on alpine Linux allow for quicker deployment of Envoy. Two alpine based images are built,
+Minimal images based on Alpine Linux allow for quicker deployment of Envoy. Two Alpine based images are built,
 one with an Envoy binary with debug (`lyft/envoy-alpine-debug`) symbols and one stripped of them (`lyft/envoy-alpine`).
 Both images are pushed with two different tags: `<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
 master commit at which the binary was compiled, and `latest` corresponds to a binary built from the latest tip of master that passed tests.
 
-# Building a debug image
-An example basic invocation to build a debug image and run all tests is:
+# Building and running tests as a developer
+
+An example basic invocation to build a developer version of the Envoy static binary (using the Bazel `fastbuild` type) is:
 
 ```bash
-docker pull lyft/envoy-build:latest && docker run -t -i -u $(id -u):$(id -g) -v <BUILD_DIR>:/build -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
-On OSX using the command below may work better. Unlike on Linux, users are not
-synced between the container and OS. Additionally, the bind mount will not
-create artifacts with the same ownership as in the container ([read more about
-osxfs][osxfs]).
+The Envoy binary can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-fastbuild` on the Docker host. You
+can control this by setting `ENVOY_DOCKER_BUILD_DIR` in the environment, e.g. to
+generate the binary in `~/build/envoy/source/exe/envoy-fastbuild` you can run:
+
 
 ```bash
-docker pull lyft/envoy-build:latest && docker run -t -i -u root:root -v <BUILD_DIR>:/build -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh debug"
+ENVOY_DOCKER_BUILD_DIR=~/build ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev.server_only'
 ```
 
-This bind mounts `<SOURCE_DIR>`, which allows for changes on the local
-filesystem to be consumed and outputs build artifacts in `<SOURCE_DIR>/build`.
-The static Envoy binary can be found in `<SOURCE_DIR>/build_debug/source/exe/envoy`.
-
-The `do_ci.sh` targets are:
-
-* `asan` &mdash; build and run tests with [AddressSanitizer](https://github.com/google/sanitizers/wiki/AddressSanitizer).
-* `coverage` &mdash; build and run tests, generating coverage information in `<SOURCE_DIR>/build_coverage/coverage.html`.
-* `debug` &mdash; build debug binary and run tests.
-* `bazel.coverage` &mdash; build and run tests with Bazel, generating coverage information in `<SOURCE_DIR>/generated/coverage/coverage.html`.
-* `bazel.debug` &mdash; build debug binary and run tests with Bazel.
-* `fix_format`&mdash; run `clang-format` 3.6 on entire source tree.
-* `normal` &mdash; build unstripped optimized binary and run tests .
-* `server_only` &mdash; build stripped optimized binary only.
-
-A convenient shell function to define is:
+For a release version of the Envoy binary you can run:
 
 ```bash
-run_envoy_docker() { docker pull lyft/envoy-build:latest && docker run -t -i -u $(id -u):$(id -g) -v /tmp/envoy-docker-build:/build -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release.server_only'
 ```
 
-Or on OSX.
+The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
+`$ENVOY_DOCKER_BUILD_DIR` points).
+
+For a debug version of the Envoy binary you can run:
 
 ```bash
-run_envoy_docker() { docker pull lyft/envoy-build:latest && docker run -t -i -u root:root -v /tmp/envoy-docker-build:/build -v $PWD:/source lyft/envoy-build:latest /bin/bash -c "cd /source && $*";}
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.debug.server_only'
 ```
 
-This then allows for a simple invocation of `run_envoy_docker './ci/do_ci.sh debug'` from the
-Envoy source tree.
+The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
+`$ENVOY_DOCKER_BUILD_DIR` points).
 
-## Advanced developer features
-
-* Any parameters following the `do_ci.sh` target are passed in as command-line
-  arguments to the `envoy-test` binary during unit test execution. This allows
-  for [GTest](https://github.com/google/googletest) flags to be passed, e.g.
-  `run_envoy_docker './ci/do_ci.sh debug --gtest_filter="*Dns*"'`.
-
-* A `UNIT_TEST_ONLY` environment variable is available to control test execution to limit testing to
-  just unit tests, e.g. `run_envoy_docker 'UNIT_TEST_ONLY=1 ./ci/do_ci.sh debug --gtest_filter="*Dns*"'`.
-
-* A `RUN_TEST_UNDER` environment variable is available to specify an executable to run the tests
-  under. For example, to run a subset of tests under `gdb`: `run_envoy_docker 'RUN_TEST_UNDER="gdb --args" UNIT_TEST_ONLY=1 ./ci/do_ci.sh debug --gtest_filter="*Dns*"'`.
-
-* A `SKIP_CHECK_FORMAT` environment variable is available to skip `clang-format` checks while developing locally, e.g. `run_envoy_docker 'SKIP_CHECK_FORMAT=1 ./ci/do_ci.sh debug'`.
+The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
 
-[osxfs]: https://docs.docker.com/docker-for-mac/osxfs/
+* `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang-5.0.
+* `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
+* `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
+* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with gcc-4.9.
+* `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with gcc-4.9.
+* `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc-4.9.
+* `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc-4.9, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
+* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-5.0.
+* `check_format`&mdash; run `clang-format` 3.6 and `buildifier` on entire source tree.
+* `fix_format`&mdash; run and enforce `clang-format` 3.6 and `buildifier` on entire source tree.

@@ -37,6 +37,7 @@ public:
 
   // Cluster Schemas
   static const std::string CLUSTER_MANAGER_SCHEMA;
+  static const std::string CLUSTER_HEALTH_CHECK_SCHEMA;
   static const std::string CLUSTER_SCHEMA;
 
   // Discovery Service Schemas

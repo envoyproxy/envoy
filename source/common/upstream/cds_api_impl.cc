@@ -46,7 +46,7 @@ void CdsApiImpl::createRequest(Http::Message& request) {
 
 void CdsApiImpl::parseResponse(const Http::Message& response) {
   log_debug("cds: parsing response");
-  Json::ObjectPtr response_json = Json::Factory::LoadFromString(response.bodyAsString());
+  Json::ObjectPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
   response_json->validateSchema(Json::Schema::CDS_SCHEMA);
   std::vector<Json::ObjectPtr> clusters = response_json->getObjectArray("clusters");
 

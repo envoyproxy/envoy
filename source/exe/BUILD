@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
@@ -50,9 +52,13 @@ envoy_cc_library(
     name = "envoy_main_lib",
     srcs = ["main.cc"],
     deps = [
+        "//source/common/common:compiler_requirements_lib",
         ":envoy_common_lib",
         ":hot_restart_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [":sigaction_lib"],
+    }),
 )
 
 envoy_cc_library(
@@ -68,5 +74,17 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "sigaction_lib",
+    srcs = ["signal_action.cc"],
+    hdrs = ["signal_action.h"],
+    tags = ["backtrace"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:non_copyable",
+        "//source/server:backtrace_lib",
     ],
 )

@@ -99,10 +99,10 @@ TEST_F(MongoCodecImplTest, Query) {
   query2.query(Bson::DocumentImpl::create()->addString("string2", "string2_value"));
   query2.returnFieldsSelector(Bson::DocumentImpl::create()->addDouble("double2", -2.3));
 
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(query.toString(true)));
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(query.toString(false)));
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(query2.toString(true)));
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(query2.toString(false)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(false)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query2.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query2.toString(false)));
 
   encoder_.encodeQuery(query);
   encoder_.encodeQuery(query2);
@@ -146,8 +146,8 @@ TEST_F(MongoCodecImplTest, Reply) {
   reply.documents().push_back(Bson::DocumentImpl::create());
   reply.documents().push_back(Bson::DocumentImpl::create());
 
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(reply.toString(true)));
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(reply.toString(false)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(reply.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(reply.toString(false)));
 
   encoder_.encodeReply(reply);
   EXPECT_CALL(callbacks_, decodeReply_(Pointee(Eq(reply))));
@@ -176,8 +176,8 @@ TEST_F(MongoCodecImplTest, GetMore) {
   get_more.numberToReturn(20);
   get_more.cursorId(20000);
 
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(get_more.toString(true)));
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(get_more.toString(false)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(get_more.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(get_more.toString(false)));
 
   encoder_.encodeGetMore(get_more);
   EXPECT_CALL(callbacks_, decodeGetMore_(Pointee(Eq(get_more))));
@@ -217,8 +217,8 @@ TEST_F(MongoCodecImplTest, Insert) {
   insert.documents().push_back(Bson::DocumentImpl::create());
   insert.documents().push_back(Bson::DocumentImpl::create());
 
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(insert.toString(true)));
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(insert.toString(false)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(insert.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(insert.toString(false)));
 
   encoder_.encodeInsert(insert);
   EXPECT_CALL(callbacks_, decodeInsert_(Pointee(Eq(insert))));
@@ -256,8 +256,8 @@ TEST_F(MongoCodecImplTest, KillCursors) {
   kill.numberOfCursorIds(2);
   kill.cursorIds({20000, 40000});
 
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(kill.toString(true)));
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(kill.toString(false)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(kill.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(kill.toString(false)));
 
   encoder_.encodeKillCursors(kill);
   EXPECT_CALL(callbacks_, decodeKillCursors_(Pointee(Eq(kill))));
@@ -326,8 +326,8 @@ TEST_F(MongoCodecImplTest, QueryToStringWithEscape) {
       R"EOF({"string_need_esc": "{\"foo\": \"bar\n\"}"}, "fields": {}})EOF",
       query.toString(true));
 
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(query.toString(true)));
-  EXPECT_NO_THROW(Json::Factory::LoadFromString(query.toString(false)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(false)));
 }
 
 } // Mongo

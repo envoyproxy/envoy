@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -5,6 +7,14 @@ load(
 )
 
 envoy_package()
+
+envoy_cc_library(
+    name = "backtrace_lib",
+    hdrs = ["backtrace.h"],
+    external_deps = ["backward"],
+    tags = ["backtrace"],
+    deps = ["//source/common/common:logger_lib"],
+)
 
 envoy_cc_library(
     name = "configuration_lib",
@@ -96,7 +106,6 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
-        "//source/version_generated",
     ],
 )
 
@@ -134,7 +143,6 @@ envoy_cc_library(
         "//source/common/stats:statsd_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/server/http:admin_lib",
-        "//source/version_generated",
     ],
 )
 

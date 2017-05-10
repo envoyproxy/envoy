@@ -41,6 +41,7 @@ void LoadBalancerBase::regenerateZoneRoutingStructures() {
   }
 
   size_t num_zones = host_set_.healthyHostsPerZone().size();
+  ASSERT(num_zones > 0);
 
   uint64_t local_percentage[num_zones];
   calculateZonePercentage(local_host_set_->healthyHostsPerZone(), local_percentage);
@@ -124,7 +125,9 @@ bool LoadBalancerUtility::isGlobalPanic(const HostSet& host_set, ClusterStats& s
                                         Runtime::Loader& runtime) {
   uint64_t global_panic_threshold =
       std::min<uint64_t>(100, runtime.snapshot().getInteger(RuntimePanicThreshold, 50));
-  double healthy_percent = 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
+  double healthy_percent = host_set.hosts().size() == 0
+                               ? 0
+                               : 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
 
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
   if (healthy_percent < global_panic_threshold) {
@@ -142,11 +145,9 @@ void LoadBalancerBase::calculateZonePercentage(
     total_hosts += zone_hosts.size();
   }
 
-  if (total_hosts != 0) {
-    size_t i = 0;
-    for (const auto& zone_hosts : hosts_per_zone) {
-      ret[i++] = 10000ULL * zone_hosts.size() / total_hosts;
-    }
+  size_t i = 0;
+  for (const auto& zone_hosts : hosts_per_zone) {
+    ret[i++] = total_hosts > 0 ? 10000ULL * zone_hosts.size() / total_hosts : 0;
   }
 }
 
@@ -201,8 +202,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::tryChooseLocalZoneHosts() {
 const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
   ASSERT(host_set_.healthyHosts().size() <= host_set_.hosts().size());
 
-  if (host_set_.hosts().empty() ||
-      LoadBalancerUtility::isGlobalPanic(host_set_, stats_, runtime_)) {
+  if (LoadBalancerUtility::isGlobalPanic(host_set_, stats_, runtime_)) {
     return host_set_.hosts();
   }
 
@@ -214,8 +214,7 @@ const std::vector<HostSharedPtr>& LoadBalancerBase::hostsToUse() {
     return host_set_.healthyHosts();
   }
 
-  if (local_host_set_->hosts().empty() ||
-      LoadBalancerUtility::isGlobalPanic(*local_host_set_, stats_, runtime_)) {
+  if (LoadBalancerUtility::isGlobalPanic(*local_host_set_, stats_, runtime_)) {
     stats_.lb_local_cluster_not_ok_.inc();
     return host_set_.healthyHosts();
   }
