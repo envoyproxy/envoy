@@ -12,6 +12,7 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
@@ -40,6 +41,8 @@ void testSocketBindAndConnect(const std::string& addr_port_str) {
   if (addr_port->ip()->port() == 0) {
     addr_port = Network::Test::findOrCheckFreePort(addr_port, SocketType::Stream);
   }
+  ASSERT_NE(addr_port, nullptr);
+  ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
   const int listen_fd = addr_port->socket(SocketType::Stream);
@@ -80,6 +83,16 @@ void testSocketBindAndConnect(const std::string& addr_port_str) {
   ASSERT_EQ(rc, 0) << addr_port->asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
 }
 } // namespace
+
+class AddressImplSocketTest : public testing::TestWithParam<IpVersion> {};
+INSTANTIATE_TEST_CASE_P(IpVersions, AddressImplSocketTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(AddressImplSocketTest, SocketBindAndConnect) {
+  // Test listening on and connecting to an unused port with an IP loopback address.
+  testSocketBindAndConnect(
+      fmt::format("{}:0", Network::Test::getLoopbackAddressUrlString(GetParam())));
+}
 
 TEST(Ipv4InstanceTest, SocketAddress) {
   sockaddr_in addr4;
@@ -136,11 +149,6 @@ TEST(Ipv4InstanceTest, BadAddress) {
   EXPECT_EQ(parseInternetAddress("1.2.3.4.5"), nullptr);
   EXPECT_EQ(parseInternetAddress("1.2.3.256"), nullptr);
   EXPECT_EQ(parseInternetAddress("foo"), nullptr);
-}
-
-TEST(Ipv4InstanceTest, SocketBindAndConnect) {
-  // Test listening on and connecting to an unused port on the IPv4 loopback address.
-  testSocketBindAndConnect("127.0.0.1:0");
 }
 
 TEST(Ipv4InstanceTest, ParseInternetAddressAndPort) {
@@ -216,11 +224,6 @@ TEST(Ipv6InstanceTest, BadAddress) {
   EXPECT_EQ(parseInternetAddress("0:0:0:0"), nullptr);
   EXPECT_EQ(parseInternetAddress("fffff::"), nullptr);
   EXPECT_EQ(parseInternetAddress("/foo"), nullptr);
-}
-
-TEST(Ipv6InstanceTest, SocketBindAndConnect) {
-  // Test listening on and connecting to an unused port on the IPv6 loopback address.
-  testSocketBindAndConnect("[::1]:0");
 }
 
 TEST(Ipv6InstanceTest, ParseInternetAddressAndPort) {

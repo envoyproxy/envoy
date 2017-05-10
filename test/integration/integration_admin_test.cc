@@ -4,15 +4,11 @@
 
 #include "test/integration/integration_test.h"
 #include "test/integration/utility.h"
-#include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-INSTANTIATE_TEST_CASE_P(AdminIntegrationTestIpVersions, IntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
-
-TEST_P(IntegrationTest, HealthCheck) {
+TEST_F(IntegrationTest, HealthCheck) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/healthcheck", "", Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
@@ -44,7 +40,7 @@ TEST_P(IntegrationTest, HealthCheck) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
-TEST_P(IntegrationTest, AdminLogging) {
+TEST_F(IntegrationTest, AdminLogging) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/logging", "", Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
@@ -88,7 +84,7 @@ TEST_P(IntegrationTest, AdminLogging) {
   }
 }
 
-TEST_P(IntegrationTest, Admin) {
+TEST_F(IntegrationTest, Admin) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/", "", Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
@@ -145,7 +141,7 @@ TEST_P(IntegrationTest, Admin) {
 // Successful call to startProfiler requires tcmalloc.
 #ifdef TCMALLOC
 
-TEST_P(IntegrationTest, AdminCpuProfilerStart) {
+TEST_F(IntegrationTest, AdminCpuProfilerStart) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/cpuprofiler?enable=y", "", Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());

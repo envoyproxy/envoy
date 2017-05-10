@@ -51,10 +51,7 @@ class RawConnectionDriver {
 public:
   typedef std::function<void(Network::ClientConnection&, const Buffer::Instance&)> ReadCallback;
 
-  // TODO(hennna): Deprecate when IPv6 test support is finished.
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback);
-  RawConnectionDriver(uint32_t port, Network::Address::IpVersion version,
-                      Buffer::Instance& initial_data, ReadCallback data_callback);
   ~RawConnectionDriver();
   void run();
   void close();

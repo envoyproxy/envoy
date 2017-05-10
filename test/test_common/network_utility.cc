@@ -87,6 +87,13 @@ const std::string getLoopbackAddressUrlString(const Address::IpVersion version) 
   return std::string("127.0.0.1");
 }
 
+const std::string addressVersionAsString(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v4) {
+    return std::string("v4");
+  }
+  return std::string("v6");
+}
+
 Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     // Pick a random address in 127.0.0.0/8.
@@ -104,6 +111,29 @@ Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion versio
     // There is only one IPv6 loopback address.
     return Network::Utility::getIpv6LoopbackAddress();
   }
+}
+
+Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v4) {
+    return Network::Utility::getIpv4AnyAddress();
+  }
+  return Network::Utility::getIpv6AnyAddress();
+}
+
+bool supportsIpVersion(const Address::IpVersion version) {
+  Address::InstanceConstSharedPtr addr = getSomeLoopbackAddress(version);
+  const int fd = addr->socket(Address::SocketType::Stream);
+  if (fd < 0) {
+    // Socket creation failed.
+    return false;
+  }
+  if (0 != addr->bind(fd)) {
+    // Socket bind failed.
+    RELEASE_ASSERT(::close(fd) == 0);
+    return false;
+  }
+  RELEASE_ASSERT(::close(fd) == 0);
+  return true;
 }
 
 std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
