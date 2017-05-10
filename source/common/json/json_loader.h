@@ -5,6 +5,7 @@
 
 #include "envoy/json/json_object.h"
 
+namespace Lyft {
 namespace Json {
 
 class Factory {
@@ -23,3 +24,4 @@ public:
 };
 
 } // Json
+} // Lyft

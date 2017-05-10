@@ -2,6 +2,7 @@
 
 #include <string>
 
+namespace Lyft {
 const std::string& Json::ToolSchema::routerCheckSchema() {
   static const std::string* router_check_schema = new std::string(R"EOF(
   {
@@ -73,3 +74,4 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
 
   return *router_check_schema;
 }
+} // Lyft

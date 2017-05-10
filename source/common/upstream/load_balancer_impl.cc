@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 
+namespace Lyft {
 namespace Upstream {
 
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
@@ -297,3 +298,4 @@ HostConstSharedPtr RandomLoadBalancer::chooseHost(const LoadBalancerContext*) {
 }
 
 } // Upstream
+} // Lyft

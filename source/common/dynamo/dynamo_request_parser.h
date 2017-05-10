@@ -8,6 +8,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Lyft {
 namespace Dynamo {
 
 /*
@@ -100,3 +101,4 @@ private:
 };
 
 } // Dynamo
+} // Lyft

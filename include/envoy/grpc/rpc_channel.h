@@ -11,8 +11,9 @@
 
 #include "google/protobuf/service.h"
 
-namespace proto = google::protobuf;
+namespace proto = ::google::protobuf;
 
+namespace Lyft {
 namespace Grpc {
 
 /**
@@ -75,3 +76,4 @@ public:
 };
 
 } // Grpc
+} // Lyft

@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Lyft {
 namespace Upstream {
 
 /**
@@ -31,3 +32,4 @@ public:
 };
 
 } // Upstream
+} // Lyft

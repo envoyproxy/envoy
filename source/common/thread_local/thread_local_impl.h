@@ -9,6 +9,7 @@
 
 #include "common/common/logger.h"
 
+namespace Lyft {
 namespace ThreadLocal {
 
 /**
@@ -43,3 +44,4 @@ private:
 };
 
 } // ThreadLocal
+} // Lyft

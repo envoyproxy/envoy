@@ -16,6 +16,7 @@
 
 #include "ares.h"
 
+namespace Lyft {
 namespace Network {
 
 DnsResolverImpl::DnsResolverImpl(Event::Dispatcher& dispatcher)
@@ -135,3 +136,4 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name, ResolveCb 
 }
 
 } // Network
+} // Lyft

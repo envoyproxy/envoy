@@ -6,6 +6,7 @@
 #include "envoy/ssl/context_config.h"
 #include "envoy/stats/stats.h"
 
+namespace Lyft {
 namespace Ssl {
 
 /**
@@ -37,3 +38,4 @@ public:
 };
 
 } // Ssl
+} // Lyft

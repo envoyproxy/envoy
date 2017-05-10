@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Lyft {
 /**
  * @return the size of a C array.
  */
@@ -15,3 +16,4 @@
  * Stop the compiler from complaining about an unreferenced parameter.
  */
 #define UNREFERENCED_PARAMETER(X) ((void)(X))
+} // Lyft

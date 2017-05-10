@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Lyft {
 namespace Network {
 
 class DrainDecision {
@@ -16,3 +17,4 @@ public:
 };
 
 } // Network
+} // Lyft

@@ -4,6 +4,7 @@
 
 #include "server/config/network/http_connection_manager.h"
 
+namespace Lyft {
 namespace Server {
 namespace Configuration {
 
@@ -19,3 +20,4 @@ public:
 
 } // Configuration
 } // Server
+} // Lyft

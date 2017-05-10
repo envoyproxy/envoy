@@ -7,6 +7,7 @@
 #include "common/common/assert.h"
 #include "common/upstream/load_balancer_impl.h"
 
+namespace Lyft {
 namespace Upstream {
 
 RingHashLoadBalancer::RingHashLoadBalancer(HostSet& host_set, ClusterStats& stats,
@@ -126,3 +127,4 @@ void RingHashLoadBalancer::refresh() {
 }
 
 } // Upstream
+} // Lyft

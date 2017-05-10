@@ -10,6 +10,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
+namespace Lyft {
 namespace Http {
 
 /**
@@ -66,3 +67,4 @@ private:
 };
 
 } // Http
+} // Lyft

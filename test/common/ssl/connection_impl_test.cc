@@ -23,6 +23,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::Invoke;
 
@@ -382,3 +383,4 @@ TEST_F(SslReadBufferLimitTest, SomeLimit) {
 }
 
 } // Ssl
+} // Lyft

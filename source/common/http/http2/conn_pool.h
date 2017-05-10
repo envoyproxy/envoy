@@ -11,6 +11,7 @@
 
 #include "common/http/codec_client.h"
 
+namespace Lyft {
 namespace Http {
 namespace Http2 {
 
@@ -102,3 +103,4 @@ private:
 
 } // Http2
 } // Http
+} // Lyft

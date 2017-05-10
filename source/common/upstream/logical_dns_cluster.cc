@@ -8,6 +8,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+namespace Lyft {
 namespace Upstream {
 
 LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader& runtime,
@@ -106,3 +107,4 @@ LogicalDnsCluster::LogicalHost::createConnection(Event::Dispatcher& dispatcher) 
 }
 
 } // Upstream
+} // Lyft

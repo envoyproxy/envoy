@@ -8,6 +8,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Lyft {
 namespace Http {
 
 /**
@@ -94,3 +95,4 @@ public:
 };
 
 } // Http
+} // Lyft

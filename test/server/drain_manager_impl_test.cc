@@ -7,6 +7,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::Return;
 using testing::SaveArg;
@@ -51,3 +52,4 @@ TEST(DrainManagerImplTest, All) {
 }
 
 } // Server
+} // Lyft

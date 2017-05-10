@@ -10,6 +10,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Lyft {
 namespace Filesystem {
 
 class MockOsSysCalls : public OsSysCalls {
@@ -52,3 +53,4 @@ public:
 };
 
 } // Filesystem
+} // Lyft

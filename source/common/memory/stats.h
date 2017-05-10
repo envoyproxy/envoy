@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+namespace Lyft {
 namespace Memory {
 
 /**
@@ -22,3 +23,4 @@ public:
 };
 
 } // Memory
+} // Lyft

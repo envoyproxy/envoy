@@ -6,6 +6,7 @@
 #include "common/common/assert.h"
 #include "common/ssl/context_impl.h"
 
+namespace Lyft {
 namespace Ssl {
 
 ContextManagerImpl::~ContextManagerImpl() { ASSERT(contexts_.empty()); }
@@ -50,3 +51,4 @@ void ContextManagerImpl::iterateContexts(std::function<void(Context&)> callback)
 }
 
 } // Ssl
+} // Lyft

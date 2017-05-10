@@ -24,6 +24,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Upstream {
 
 void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
@@ -578,3 +579,4 @@ CdsApiPtr ProdClusterManagerFactory::createCds(const Json::Object& config, Clust
 }
 
 } // Upstream
+} // Lyft

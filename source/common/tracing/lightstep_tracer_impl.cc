@@ -12,6 +12,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Tracing {
 
 LightStepSpan::LightStepSpan(lightstep::Span& span) : span_(span) {}
@@ -169,3 +170,4 @@ void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
 }
 
 } // Tracing
+} // Lyft

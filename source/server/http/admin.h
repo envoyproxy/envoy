@@ -17,6 +17,7 @@
 
 #include "server/config/network/http_connection_manager.h"
 
+namespace Lyft {
 namespace Server {
 
 /**
@@ -161,3 +162,4 @@ private:
 };
 
 } // Server
+} // Lyft

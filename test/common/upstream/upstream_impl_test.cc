@@ -23,6 +23,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::ContainerEq;
 using testing::Invoke;
@@ -473,3 +474,4 @@ TEST(ClusterDefinitionTest, BadClusterConfig) {
 }
 
 } // Upstream
+} // Lyft

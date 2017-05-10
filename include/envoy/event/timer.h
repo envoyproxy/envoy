@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Lyft {
 namespace Event {
 
 /**
@@ -34,3 +35,4 @@ public:
 typedef std::unique_ptr<Timer> TimerPtr;
 
 } // Event
+} // Lyft

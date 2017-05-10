@@ -13,6 +13,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Lyft {
 namespace RateLimit {
 namespace TcpFilter {
 
@@ -97,3 +98,4 @@ private:
 
 } // TcpFilter
 } // RateLimit
+} // Lyft

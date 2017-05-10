@@ -5,6 +5,7 @@
 #include "common/tracing/zipkin/util.h"
 #include "common/tracing/zipkin/zipkin_core_types.h"
 
+namespace Lyft {
 namespace Zipkin {
 
 /**
@@ -117,3 +118,4 @@ private:
   bool is_initialized_;
 };
 } // Zipkin
+} // Lyft

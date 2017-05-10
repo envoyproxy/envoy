@@ -8,6 +8,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Lyft {
 namespace Event {
 
 class FileEventImplTest : public testing::Test {
@@ -140,3 +141,4 @@ TEST_F(FileEventImplTest, SetEnabled) {
 }
 
 } // Event
+} // Lyft

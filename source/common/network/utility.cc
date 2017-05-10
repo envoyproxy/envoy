@@ -22,6 +22,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Network {
 
 IpList::IpList(const std::vector<std::string>& subnets) {
@@ -264,3 +265,4 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
 }
 
 } // Network
+} // Lyft

@@ -7,6 +7,7 @@
 #include "common/http/filter/buffer_filter.h"
 #include "common/json/config_schemas.h"
 
+namespace Lyft {
 namespace Server {
 namespace Configuration {
 
@@ -38,3 +39,4 @@ static RegisterHttpFilterConfigFactory<BufferFilterConfig> register_;
 
 } // Configuration
 } // Server
+} // Lyft

@@ -32,6 +32,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 using testing::NiceMock;
 
 namespace Server {
@@ -181,3 +182,4 @@ public:
 
 } // Configuration
 } // Server
+} // Lyft

@@ -4,6 +4,7 @@
 
 #include "envoy/mongo/codec.h"
 
+namespace Lyft {
 namespace Mongo {
 
 /**
@@ -68,3 +69,4 @@ private:
 };
 
 } // Mongo
+} // Lyft

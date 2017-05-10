@@ -6,6 +6,7 @@
 
 #include "envoy/thread/thread.h"
 
+namespace Lyft {
 namespace Thread {
 
 /**
@@ -47,3 +48,4 @@ private:
 };
 
 } // Thread
+} // Lyft

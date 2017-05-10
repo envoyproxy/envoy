@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 
+namespace Lyft {
 namespace Server {
 
 DrainManagerImpl::DrainManagerImpl(Instance& server) : server_(server) {}
@@ -58,3 +59,4 @@ void DrainManagerImpl::startParentShutdownSequence() {
 }
 
 } // Server
+} // Lyft

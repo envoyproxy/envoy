@@ -2,6 +2,7 @@
 
 #include <string>
 
+namespace Lyft {
 namespace Ssl {
 
 const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
@@ -44,3 +45,4 @@ ContextConfigImpl::ContextConfigImpl(const Json::Object& config) {
 }
 
 } // Ssl
+} // Lyft

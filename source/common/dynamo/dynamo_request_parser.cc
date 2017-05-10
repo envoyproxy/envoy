@@ -7,6 +7,7 @@
 
 #include "common/common/utility.h"
 
+namespace Lyft {
 namespace Dynamo {
 
 /*
@@ -142,3 +143,4 @@ RequestParser::parsePartitions(const Json::Object& json_data) {
 }
 
 } // Dynamo
+} // Lyft

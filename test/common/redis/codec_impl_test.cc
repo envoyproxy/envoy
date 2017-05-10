@@ -10,6 +10,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Lyft {
 namespace Redis {
 
 class RedisEncoderDecoderImplTest : public testing::Test, public DecoderCallbacks {
@@ -186,3 +187,4 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidBulkStringExpectLF) {
 }
 
 } // Redis
+} // Lyft

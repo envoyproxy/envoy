@@ -15,6 +15,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Lyft {
 namespace Network {
 
 class MockConnectionCallbacks : public ConnectionCallbacks {
@@ -233,3 +234,4 @@ public:
 };
 
 } // Network
+} // Lyft

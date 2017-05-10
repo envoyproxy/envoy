@@ -10,6 +10,7 @@
 #include "common/dynamo/dynamo_request_parser.h"
 #include "common/json/json_loader.h"
 
+namespace Lyft {
 namespace Dynamo {
 
 /**
@@ -67,3 +68,4 @@ private:
 };
 
 } // Dynamo
+} // Lyft

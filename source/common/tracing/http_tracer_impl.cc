@@ -14,6 +14,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Tracing {
 
 static std::string buildRequestLine(const Http::HeaderMap& request_headers,
@@ -177,3 +178,4 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
 }
 
 } // Tracing
+} // Lyft

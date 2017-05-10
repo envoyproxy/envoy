@@ -1,5 +1,6 @@
 #include "mocks.h"
 
+namespace Lyft {
 namespace Ssl {
 
 MockContextManager::MockContextManager() {}
@@ -12,3 +13,4 @@ MockClientContext::MockClientContext() {}
 MockClientContext::~MockClientContext() {}
 
 } // Ssl
+} // Lyft

@@ -15,6 +15,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Lyft {
 #define EXPECT_THROW_WITH_MESSAGE(statement, expected_exception, message)                          \
   try {                                                                                            \
     statement;                                                                                     \
@@ -109,3 +110,4 @@ public:
 };
 
 } // Http
+} // Lyft

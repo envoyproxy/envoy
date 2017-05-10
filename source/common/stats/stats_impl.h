@@ -14,6 +14,7 @@
 
 #include "common/common/assert.h"
 
+namespace Lyft {
 namespace Stats {
 
 /**
@@ -249,3 +250,4 @@ private:
 };
 
 } // Stats
+} // Lyft

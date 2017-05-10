@@ -14,6 +14,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Mongo {
 
 std::string
@@ -393,3 +394,4 @@ void EncoderImpl::encodeReply(const ReplyMessage& message) {
 }
 
 } // Mongo
+} // Lyft

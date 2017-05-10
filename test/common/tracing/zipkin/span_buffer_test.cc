@@ -2,6 +2,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Lyft {
 namespace Zipkin {
 
 TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
@@ -103,3 +104,4 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 }
 } // Zipkin
+} // Lyft

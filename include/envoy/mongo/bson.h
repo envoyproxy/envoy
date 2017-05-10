@@ -8,6 +8,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 
+namespace Lyft {
 /**
  * Implementation of http://bsonspec.org/spec.html
  */
@@ -114,3 +115,4 @@ public:
 };
 
 } // Bson
+} // Lyft

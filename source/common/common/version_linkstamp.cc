@@ -1,3 +1,4 @@
+// NOLINT(namespace-lyft)
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
 

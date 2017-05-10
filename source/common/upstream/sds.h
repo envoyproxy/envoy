@@ -8,6 +8,7 @@
 #include "common/http/rest_api_fetcher.h"
 #include "common/upstream/upstream_impl.h"
 
+namespace Lyft {
 namespace Upstream {
 
 /**
@@ -37,3 +38,4 @@ private:
 };
 
 } // Upstream
+} // Lyft

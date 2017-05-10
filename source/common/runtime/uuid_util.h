@@ -2,6 +2,7 @@
 
 #include <string>
 
+namespace Lyft {
 enum class UuidTraceStatus { NoTrace, Sampled, Client, Forced };
 
 /*
@@ -49,3 +50,4 @@ private:
   // Initial value for freshly generated uuid4.
   static const char NO_TRACE = '4';
 };
+} // Lyft

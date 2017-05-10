@@ -12,6 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::ByRef;
 using testing::DoAll;
@@ -218,3 +219,4 @@ TEST_F(RedisProxyFilterTest, ProtocolError) {
 }
 
 } // Redis
+} // Lyft

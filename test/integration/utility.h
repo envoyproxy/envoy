@@ -14,6 +14,7 @@
 
 #include "test/test_common/printers.h"
 
+namespace Lyft {
 /**
  * A buffering response decoder used for testing.
  */
@@ -99,3 +100,4 @@ public:
                                                      Http::CodecClient::Type type,
                                                      const std::string& host = "host");
 };
+} // Lyft

@@ -23,6 +23,8 @@ std::ostream& operator<<(std::ostream& out, const std::pair<First, Second>& p) {
 
 } // std
 
+namespace Lyft {
+
 namespace Network {
 namespace Address {
 
@@ -244,3 +246,4 @@ TEST(Ipv6CidrRange, BigRange) {
 
 } // Address
 } // Network
+} // Lyft

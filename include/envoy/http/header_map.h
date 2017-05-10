@@ -9,6 +9,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Lyft {
 namespace Http {
 
 /**
@@ -311,3 +312,4 @@ public:
 typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
 
 } // Http
+} // Lyft

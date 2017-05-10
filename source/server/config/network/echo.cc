@@ -6,6 +6,7 @@
 
 #include "server/configuration_impl.h"
 
+namespace Lyft {
 namespace Server {
 namespace Configuration {
 
@@ -33,3 +34,4 @@ static RegisterNetworkFilterConfigFactory<EchoConfigFactory> registered_;
 
 } // Configuration
 } // Server
+} // Lyft

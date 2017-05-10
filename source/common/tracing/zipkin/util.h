@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+namespace Lyft {
 namespace Zipkin {
 
 /**
@@ -45,3 +46,4 @@ public:
   static uint64_t generateRandom64();
 };
 } // Zipkin
+} // Lyft

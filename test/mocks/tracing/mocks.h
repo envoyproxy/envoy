@@ -8,6 +8,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Lyft {
 namespace Tracing {
 
 inline bool operator==(const TransportContext& lhs, const TransportContext& rhs) {
@@ -64,3 +65,4 @@ public:
 };
 
 } // Tracing
+} // Lyft

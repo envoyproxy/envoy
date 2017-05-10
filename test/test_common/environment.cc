@@ -20,6 +20,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace {
 
 std::string getOrCreateUnixDomainSocketDirectory() {
@@ -167,3 +168,4 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
     RELEASE_ASSERT(false);
   }
 }
+} // Lyft

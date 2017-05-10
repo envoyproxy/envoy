@@ -27,6 +27,7 @@
 #include "common/router/router.h"
 #include "common/tracing/http_tracer_impl.h"
 
+namespace Lyft {
 namespace Http {
 
 class AsyncStreamImpl;
@@ -240,3 +241,4 @@ private:
 };
 
 } // Http
+} // Lyft

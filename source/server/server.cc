@@ -30,6 +30,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Server {
 
 void InitManagerImpl::initialize(std::function<void()> callback) {
@@ -406,3 +407,4 @@ void InstanceImpl::shutdownAdmin() {
 }
 
 } // Server
+} // Lyft

@@ -7,6 +7,7 @@
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
 
+namespace Lyft {
 const std::string& VersionInfo::revision() {
   static std::string* git_sha1 = new std::string(build_scm_revision);
   return *git_sha1;
@@ -26,3 +27,4 @@ std::string VersionInfo::version() {
 #endif
                      );
 }
+} // Lyft

@@ -15,6 +15,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Lyft {
 namespace Http {
 namespace Http1 {
 
@@ -565,3 +566,4 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
 
 } // Http1
 } // Http
+} // Lyft

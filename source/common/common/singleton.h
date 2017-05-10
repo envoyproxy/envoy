@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Lyft {
 /**
  * Immutable singleton pattern.
  */
@@ -16,3 +17,4 @@ public:
 };
 
 // TODO(htuch): Add a mutable Singleton if there is a need for this.
+} // Lyft

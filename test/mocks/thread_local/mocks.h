@@ -9,6 +9,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Lyft {
 namespace ThreadLocal {
 
 class MockInstance : public Instance {
@@ -40,3 +41,4 @@ public:
 };
 
 } // ThreadLocal
+} // Lyft

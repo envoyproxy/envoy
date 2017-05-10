@@ -11,6 +11,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -140,3 +141,4 @@ TEST_F(RingHashLoadBalancerTest, UnevenHosts) {
 }
 
 } // Upstream
+} // Lyft

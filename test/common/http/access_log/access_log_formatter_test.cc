@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Lyft {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -262,3 +263,4 @@ TEST(AccessLogFormatterTest, ParserFailures) {
 
 } // AccessLog
 } // Http
+} // Lyft

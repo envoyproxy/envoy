@@ -12,6 +12,7 @@
 #include "openssl/err.h"
 #include "openssl/x509v3.h"
 
+namespace Lyft {
 namespace Ssl {
 
 ConnectionImpl::ConnectionImpl(Event::DispatcherImpl& dispatcher, int fd,
@@ -274,3 +275,4 @@ std::string ConnectionImpl::nextProtocol() {
 }
 
 } // Ssl
+} // Lyft
