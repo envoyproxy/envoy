@@ -125,11 +125,10 @@ TEST(HttpUtility, TestParseCookie) {
 }
 
 TEST(HttpUtility, TestParseCookieBadValues) {
-  TestHeaderMapImpl headers{
-      {"cookie", "token1=abc123; = "},
-      {"cookie", "token2=abc123;   "},
-      {"cookie", "; token3=abc123;"},
-      {"cookie", "=; token4=\"abc123\""}};
+  TestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
+                            {"cookie", "token2=abc123;   "},
+                            {"cookie", "; token3=abc123;"},
+                            {"cookie", "=; token4=\"abc123\""}};
 
   EXPECT_EQ(Utility::parseCookieValue(headers, "token1"), "abc123");
   EXPECT_EQ(Utility::parseCookieValue(headers, "token2"), "abc123");
