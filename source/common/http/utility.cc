@@ -80,6 +80,9 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
       for (const std::string& s : StringUtil::split(std::string{header.value().c_str()}, ';')) {
         size_t first_non_space = s.find_first_not_of(" ");
         size_t equals_index = s.find('=');
+        if (first_non_space == std::string::npos || equals_index == std::string::npos || equals_index < first_non_space) {
+            break;
+        }
         std::string k = s.substr(first_non_space, equals_index - first_non_space);
         State* state = static_cast<State*>(context);
         if (k == state->key_) {
