@@ -42,12 +42,14 @@ elif [[ "$1" == "bazel.release.server_only" ]]; then
   bazel_release_binary_build
   exit 0
 elif [[ "$1" == "bazel.debug" ]]; then
+  setup_gcc_toolchain
   echo "bazel debug build with tests..."
   bazel_debug_binary_build
   echo "Testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg //test/...
   exit 0
 elif [[ "$1" == "bazel.debug.server_only" ]]; then
+  setup_gcc_toolchain
   echo "bazel debug build..."
   bazel_debug_binary_build
   exit 0
