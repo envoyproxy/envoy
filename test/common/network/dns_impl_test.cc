@@ -61,14 +61,14 @@ private:
       buffer_.add(data);
       while (true) {
         if (size_ == 0) {
-          if (buffer_.length() < sizeof(uint16_t)) {
+          uint16_t size_n;
+          if (buffer_.length() < sizeof(size_n)) {
             // If we don't have enough bytes to determine size, wait until we do.
             return;
           }
-          uint16_t size_n;
-          void* mem = buffer_.linearize(sizeof(uint16_t));
-          std::memcpy(reinterpret_cast<void*>(&size_n), mem, sizeof(uint16_t));
-          buffer_.drain(sizeof(uint16_t));
+          void* mem = buffer_.linearize(sizeof(size_n));
+          std::memcpy(reinterpret_cast<void*>(&size_n), mem, sizeof(size_n));
+          buffer_.drain(sizeof(size_n));
           size_ = ntohs(size_n);
         }
 
