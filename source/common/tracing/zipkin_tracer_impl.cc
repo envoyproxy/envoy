@@ -1,8 +1,6 @@
 #include "common/tracing/zipkin_tracer_impl.h"
 
 #include "common/common/enum_to_int.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -60,11 +58,10 @@ ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager&
 
   tls_.set(tls_slot_, [this, collector_endpoint, &random_generator](Event::Dispatcher& dispatcher)
                           -> ThreadLocal::ThreadLocalObjectSharedPtr {
-                            Zipkin::Tracer tracer(local_info_.clusterName(), local_info_.address());
+                            Zipkin::Tracer tracer(local_info_.clusterName(), local_info_.address(),
+                                                  random_generator);
                             tracer.setReporter(ZipkinReporter::NewInstance(
                                 std::ref(*this), std::ref(dispatcher), collector_endpoint));
-                            Runtime::RandomGeneratorPtr rand_ptr(&random_generator);
-                            tracer.setRandomGenerator(std::move(rand_ptr));
                             return ThreadLocal::ThreadLocalObjectSharedPtr{
                                 new TlsZipkinTracer(std::move(tracer), *this)};
                           });
@@ -73,7 +70,6 @@ ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager&
 SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::string&,
                                 SystemTime start_time) {
   Zipkin::Tracer& tracer = *tls_.getTyped<TlsZipkinTracer>(tls_slot_).tracer_;
-  ZipkinSpanPtr active_span;
   Zipkin::SpanPtr new_zipkin_span;
 
   if (request_headers.OtSpanContext()) {
@@ -86,10 +82,20 @@ SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::str
     context.populateFromString(request_headers.OtSpanContext()->value().c_str());
 
     // Create either a child or a shared-context Zipkin span.
+    //
+    // An all-new child span will be started if the current context carries the SR annotation. In
+    // this case, we are dealing with an egress operation that causally succeeds a previous
+    // ingress operation. This envoy instance will be the the client-side of the new span, to which
+    // it will add the CS annotation.
+    //
+    // Differently, a shared-context span will be created if the current context carries the CS
+    // annotation. In this case, we are dealing with an ingress operation. This envoy instance,
+    // being at the receiving end, will add the SR annotation to the shared span context.
+
     new_zipkin_span =
         tracer.startSpan(request_headers.Host()->value().c_str(), start_time, context);
   } else {
-    // Create a root Zipkin span.
+    // Create a root Zipkin span. No context was found in the headers.
     new_zipkin_span = tracer.startSpan(request_headers.Host()->value().c_str(), start_time);
   }
 
@@ -103,12 +109,13 @@ SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::str
   }
 
   // Set the sampled header.
-  request_headers.insertXB3Sampled().value(std::string(("1")));
-
-  Zipkin::SpanContext new_span_context(*new_zipkin_span);
+  request_headers.insertXB3Sampled().value(Zipkin::ZipkinCoreConstants::get().ALWAYS_SAMPLE);
 
   // Set the ot-span-context header with the new context.
+  Zipkin::SpanContext new_span_context(*new_zipkin_span);
   request_headers.insertOtSpanContext().value(new_span_context.serializeToString());
+
+  ZipkinSpanPtr active_span;
   active_span.reset(new ZipkinSpan(*new_zipkin_span));
 
   return std::move(active_span);
@@ -179,7 +186,7 @@ void ZipkinReporter::flushSpans() {
 }
 
 void ZipkinReporter::onFailure(Http::AsyncClient::FailureReason) {
-  driver_.tracerStats().reports_dropped_.inc();
+  driver_.tracerStats().reports_failed_.inc();
 }
 
 void ZipkinReporter::onSuccess(Http::MessagePtr&& http_response) {

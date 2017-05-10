@@ -24,6 +24,7 @@ envoy_cc_test(
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/common/tracing/zipkin:zipkin_lib",
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",

@@ -1,5 +1,6 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/tracing/zipkin/tracer.h"
 #include "common/tracing/zipkin/util.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
@@ -14,8 +15,12 @@ namespace Zipkin {
 TEST(ZipkinTracerTest, moveConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
-  Tracer tracer("my_service_name", addr);
+  Runtime::MockRandomGenerator random_generator;
+  Tracer tracer("my_service_name", addr, random_generator);
   Tracer tracer2(std::move(tracer));
+
+  Runtime::RandomGenerator& gen = tracer.randomGenerator();
+  gen.random();
 
   EXPECT_EQ("my_service_name", tracer2.serviceName());
   Network::Address::InstanceConstSharedPtr addr2 = tracer2.address();
@@ -23,8 +28,6 @@ TEST(ZipkinTracerTest, moveConstructor) {
   EXPECT_EQ(9000UL, addr2->ip()->port());
   ReporterPtr reporter = tracer2.reporter();
   EXPECT_EQ(nullptr, reporter);
-  Runtime::RandomGeneratorPtr random = tracer2.randomGenerator();
-  EXPECT_EQ(nullptr, random);
 }
 
 class TestReporterImpl : public Reporter {
@@ -42,7 +45,8 @@ private:
 TEST(ZipkinTracerTest, spanCreation) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
-  Tracer tracer("my_service_name", addr);
+  Runtime::RandomGeneratorImpl random_generator;
+  Tracer tracer("my_service_name", addr, random_generator);
   MockSystemTimeSource mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
@@ -172,8 +176,8 @@ TEST(ZipkinTracerTest, spanCreation) {
 TEST(ZipkinTracerTest, finishSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
-  Tracer tracer("my_service_name", addr);
-  tracer.setRandomGenerator(Runtime::RandomGeneratorPtr(new Runtime::MockRandomGenerator()));
+  Runtime::MockRandomGenerator random_generator;
+  Tracer tracer("my_service_name", addr, random_generator);
   MockSystemTimeSource mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 

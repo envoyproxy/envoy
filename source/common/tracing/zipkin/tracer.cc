@@ -20,7 +20,7 @@ SpanPtr Tracer::startSpan(const std::string& span_name, SystemTime timestamp) {
   // Create an all-new span, with no parent id
   SpanPtr span_ptr(new Span());
   span_ptr->setName(span_name);
-  uint64_t random_number = generateRandomNumber();
+  uint64_t random_number = random_generator_.random();
   span_ptr->setId(random_number);
   span_ptr->setTraceId(random_number);
   int64_t start_time_micro =
@@ -55,7 +55,7 @@ SpanPtr Tracer::startSpan(const std::string& span_name, SystemTime timestamp,
     // We need to create a new span that is a child of the previous span; no shared context
 
     // Create a new span id
-    uint64_t random_number = generateRandomNumber();
+    uint64_t random_number = random_generator_.random();
     span_ptr->setId(random_number);
 
     span_ptr->setName(span_name);
@@ -112,11 +112,4 @@ void Tracer::reportSpan(Span&& span) {
 
 void Tracer::setReporter(ReporterPtr reporter) { reporter_ = std::move(reporter); }
 
-void Tracer::setRandomGenerator(Runtime::RandomGeneratorPtr random_generator) {
-  random_generator_ = std::move(random_generator);
-}
-
-uint64_t Tracer::generateRandomNumber() {
-  return random_generator_ ? random_generator_->random() : Util::generateRandom64();
-}
 } // Zipkin

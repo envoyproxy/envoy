@@ -42,9 +42,7 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));
     }
 
-    random_ = new NiceMock<Runtime::MockRandomGenerator>();
-
-    driver_.reset(new ZipkinDriver(config, cm_, stats_, tls_, runtime_, local_info_, *random_));
+    driver_.reset(new ZipkinDriver(config, cm_, stats_, tls_, runtime_, local_info_, random_));
   }
 
   void setupValidDriver() {
@@ -76,7 +74,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Runtime::MockRandomGenerator>* random_;
+  Runtime::RandomGeneratorImpl random_;
 };
 
 TEST_F(ZipkinDriverTest, InitializeDriver) {
@@ -185,10 +183,11 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
   EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
 
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
 
-  EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_dropped").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_failed").value());
 }
 
 TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
@@ -227,6 +226,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
 }
 
 TEST_F(ZipkinDriverTest, FlushSpansTimer) {
@@ -279,5 +279,4 @@ TEST_F(ZipkinDriverTest, SerializeAndDeserializeContext) {
 
   // TODO(fabolive): need more end-to-end tests including valid context.
 }
-
 } // Tracing

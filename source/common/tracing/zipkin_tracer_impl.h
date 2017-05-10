@@ -17,7 +17,8 @@ namespace Tracing {
   COUNTER(spans_sent)                                                                              \
   COUNTER(timer_flushed)                                                                           \
   COUNTER(reports_sent)                                                                            \
-  COUNTER(reports_dropped)
+  COUNTER(reports_dropped)                                                                         \
+  COUNTER(reports_failed)
 
 struct ZipkinTracerStats {
   ZIPKIN_TRACER_STATS(GENERATE_COUNTER_STRUCT)
