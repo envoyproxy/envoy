@@ -40,12 +40,35 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
 const std::string getLoopbackAddressUrlString(const Address::IpVersion version);
 
 /**
+ * Return a string version of enum IpVersion version.
+ * @param version IP address version.
+ * @return std::string string version of IpVersion.
+ */
+const std::string addressVersionAsString(const Address::IpVersion version);
+
+/**
  * Returns a loopback address for the specified IP version. For IPv6 this is always the same,
  * but for IPv4 it is anywhere in the range 127.0.0.0/8.
  * @param version the IP version of the loopback address.
  * @returns a loopback address for the specified IP version.
  */
 Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion version);
+
+/**
+ * Returns the any address for the specified IP version.
+ * @param version the IP version of the any address.
+ * @returns the any address for the specified IP version.
+ */
+Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version);
+
+/**
+ * This function tries to create a socket of type IpVersion version and bind to it. If
+ * successful this function returns true. If either socket creation or socket
+ * bind fail, this function returns false.
+ * @param version the IP verson to test.
+ * @return bool whether IpVersion addresses are "supported".
+ */
+bool supportsIpVersion(const Address::IpVersion version);
 
 /**
  * Bind a socket to a free port on a loopback address, and return the socket's fd and bound address.

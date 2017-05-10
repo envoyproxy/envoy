@@ -405,6 +405,25 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(uint32_t events)
       events & Network::ConnectionEvent::LocalClose) {
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
+
+  if ((events & Network::ConnectionEvent::Connected) && parent_.receive_bytes_.empty()) {
+    // In this case we are just testing that we can connect, so immediately succeed. Also, since
+    // we are just doing a connection test, close the connection.
+    // NOTE(mattklein123): I've seen cases where the kernel will report a successful connection, and
+    // then proceed to fail subsequent calls (so the connection did not actually succeed). I'm not
+    // sure what situations cause this. If this turns into a problem, we may need to introduce a
+    // timer and see if the connection stays alive for some period of time while waiting to read.
+    // (Though we may never get a FIN and won't know until if/when we try to write). In short, this
+    // may need to get more complicated but we can start here.
+    // TODO(mattklein123): If we had a way on the connection interface to do an immediate read (vs.
+    // evented), that would be a good check to run here to make sure it returns the equivalent of
+    // EAGAIN. Need to think through how that would look from an interface perspective.
+    // TODO(mattklein123): In the case that a user configured bytes to write, they will not be
+    // be written, since we currently have no way to know if the bytes actually get written via
+    // the connection interface. We might want to figure out how to handle this better later.
+    client_->close(Network::ConnectionCloseType::NoFlush);
+    handleSuccess();
+  }
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
@@ -418,12 +437,14 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
     client_->noDelay(true);
   }
 
-  Buffer::OwnedImpl data;
-  for (const std::vector<uint8_t>& segment : parent_.send_bytes_) {
-    data.add(&segment[0], segment.size());
-  }
+  if (!parent_.send_bytes_.empty()) {
+    Buffer::OwnedImpl data;
+    for (const std::vector<uint8_t>& segment : parent_.send_bytes_) {
+      data.add(&segment[0], segment.size());
+    }
 
-  client_->write(data);
+    client_->write(data);
+  }
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
@@ -475,7 +496,7 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onInterval() {
 void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
     Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
-  if (value->type() == Redis::RespType::BulkString && value->asString() == "PONG") {
+  if (value->type() == Redis::RespType::SimpleString && value->asString() == "PONG") {
     handleSuccess();
   } else {
     handleFailure(false);

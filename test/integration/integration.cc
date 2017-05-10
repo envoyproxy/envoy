@@ -27,6 +27,9 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+IntegrationTestServerPtr BaseIntegrationTest::test_server_;
+std::vector<std::unique_ptr<FakeUpstream>> BaseIntegrationTest::fake_upstreams_;
+
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
@@ -258,12 +261,12 @@ IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
-  port_map_[key] = port;
+  port_map()[key] = port;
 }
 
 uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
-  auto it = port_map_.find(key);
-  if (it != port_map_.end()) {
+  auto it = port_map().find(key);
+  if (it != port_map().end()) {
     return it->second;
   }
   RELEASE_ASSERT(false);
@@ -280,17 +283,10 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const Network::Address::IpVersion version,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, version, port_map_));
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map()));
   registerTestServerPorts(port_names);
-}
-
-// TODO(hennna): Deprecate when IPv6 test support is finished.
-void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const std::vector<std::string>& port_names) {
-  BaseIntegrationTest::createTestServer(json_path, Network::Address::IpVersion::v4, port_names);
 }
 
 void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,

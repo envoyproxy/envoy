@@ -16,7 +16,7 @@ unhealthy, successes required before marking a host healthy, etc.):
   immediately notify downstream hosts to no longer forward traffic to it.
 * **L3/L4**: During L3/L4 health checking, Envoy will send a configurable byte buffer to the
   upstream host. It expects the byte buffer to be echoed in the response if the host is to be
-  considered healthy.
+  considered healthy. Envoy also supports connect only L3/L4 health checking.
 * **Redis**: Envoy will send a Redis PING command and expect a PONG response. The upstream Redis
   server can respond with anything other than PONG to cause an immediate active health check
   failure.

@@ -61,6 +61,12 @@
               "max_request_time_s": 120
             }
           },
+          { "type": "decoder", "name": "rate_limit",
+            "config" : {
+              "domain": "envoy_front",
+              "request_type": "external"
+            }
+          },
           { "type": "decoder", "name": "router", "config": {} }
         ]
       }
@@ -104,7 +110,18 @@
     "override_subdirectory": "envoy_override"
   },
 
+  "rate_limit_service": {
+    "type": "grpc_service",
+    "config": {
+      "cluster_name": "ratelimit"
+    }
+  },
+
   "cluster_manager": {
+    "outlier_detection": {
+      "event_log_path": "/var/log/envoy/outlier_events.log"
+    },
+
     "sds": {
       "cluster": {
         "name": "sds",
