@@ -11,7 +11,6 @@ env:
   - TEST_TYPE=bazel.asan
   - TEST_TYPE=bazel.tsan
   - TEST_TYPE=bazel.coverage
-  - TEST_TYPE=bazel.debug
   - TEST_TYPE=check_format
   - TEST_TYPE=docs
   - TEST_TYPE=build_image
