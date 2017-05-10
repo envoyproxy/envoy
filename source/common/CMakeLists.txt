@@ -47,6 +47,7 @@ add_library(
   generated/ratelimit.pb.cc
   grpc/codec.cc
   grpc/common.cc
+  grpc/grpc_web_filter.cc
   grpc/http1_bridge_filter.cc
   grpc/rpc_channel_impl.cc
   http/access_log/access_log_formatter.cc

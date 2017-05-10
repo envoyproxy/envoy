@@ -726,6 +726,9 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
   }, this);
 #endif
 
+  if (buffered_response_data_ && buffered_response_data_->length() > 0) {
+    response_encoder_->encodeData(*buffered_response_data_, false);
+  }
   response_encoder_->encodeTrailers(trailers);
   maybeEndEncode(true);
 }
