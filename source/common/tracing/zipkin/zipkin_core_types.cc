@@ -9,7 +9,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
-namespace Lyft {
+namespace Envoy {
 // TODO(fabolive): Need to add interfaces to the JSON namespace
 
 namespace Zipkin {
@@ -255,4 +255,4 @@ void Span::setTag(const std::string& name, const std::string& value) {
   }
 }
 } // Zipkin
-} // Lyft
+} // Envoy

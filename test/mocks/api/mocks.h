@@ -10,7 +10,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Api {
 
 class MockApi : public Api {
@@ -34,4 +34,4 @@ public:
 };
 
 } // Api
-} // Lyft
+} // Envoy

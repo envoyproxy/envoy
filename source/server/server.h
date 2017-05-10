@@ -24,7 +24,7 @@
 #include "server/test_hooks.h"
 #include "server/worker.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 /**
@@ -179,4 +179,4 @@ private:
 };
 
 } // Server
-} // Lyft
+} // Envoy

@@ -5,7 +5,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 
@@ -29,4 +29,4 @@ MockManager::MockManager() {
 MockManager::~MockManager() {}
 
 } // Init
-} // Lyft
+} // Envoy

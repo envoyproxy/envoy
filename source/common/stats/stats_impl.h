@@ -14,7 +14,7 @@
 
 #include "common/common/assert.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Stats {
 
 /**
@@ -250,4 +250,4 @@ private:
 };
 
 } // Stats
-} // Lyft
+} // Envoy

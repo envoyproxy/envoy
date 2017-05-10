@@ -9,7 +9,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 /**
@@ -157,4 +157,4 @@ public:
 };
 
 } // Network
-} // Lyft
+} // Envoy

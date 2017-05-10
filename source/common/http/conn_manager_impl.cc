@@ -30,7 +30,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
@@ -993,4 +993,4 @@ const std::string& ConnectionManagerImpl::ActiveStreamFilterBase::downstreamAddr
 }
 
 } // Http
-} // Lyft
+} // Envoy

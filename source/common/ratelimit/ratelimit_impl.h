@@ -13,7 +13,7 @@
 #include "common/json/json_loader.h"
 #include "common/ratelimit/ratelimit.pb.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace RateLimit {
 
 class GrpcClientImpl : public Client, public Grpc::RpcChannelCallbacks {
@@ -79,4 +79,4 @@ public:
 };
 
 } // RateLimit
-} // Lyft
+} // Envoy

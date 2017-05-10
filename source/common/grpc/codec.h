@@ -6,7 +6,7 @@
 
 #include "envoy/buffer/buffer.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Grpc {
 // Last bit for an expanded message without compression.
 const uint8_t GRPC_FH_DEFAULT = 0b0u;
@@ -82,4 +82,4 @@ private:
   Frame frame_;
 };
 } // Grpc
-} // Lyft
+} // Envoy

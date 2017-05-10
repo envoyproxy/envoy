@@ -11,7 +11,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Ssl {
 
 class MockContextManager : public ContextManager {
@@ -53,4 +53,4 @@ public:
 };
 
 } // Ssl
-} // Lyft
+} // Envoy

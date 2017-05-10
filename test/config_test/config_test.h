@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 namespace ConfigTest {
 
 /**
@@ -14,4 +14,4 @@ namespace ConfigTest {
 uint32_t run(const std::string& path);
 
 } // ConfigTest
-} // Lyft
+} // Envoy

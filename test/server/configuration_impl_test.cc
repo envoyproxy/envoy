@@ -12,7 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
@@ -370,4 +370,4 @@ TEST(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguratio
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

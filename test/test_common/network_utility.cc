@@ -15,7 +15,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 namespace Test {
 
@@ -175,4 +175,4 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
 
 } // Test
 } // Network
-} // Lyft
+} // Envoy

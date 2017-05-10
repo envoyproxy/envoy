@@ -10,7 +10,7 @@
 
 #include "event2/event.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 /**
@@ -71,4 +71,4 @@ private:
 };
 
 } // Network
-} // Lyft
+} // Envoy

@@ -5,7 +5,7 @@
 
 #include "common/common/assert.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Mixin class that allows an object contained in a unique pointer to be easily linked and unlinked
  * from lists.
@@ -83,4 +83,4 @@ private:
   bool inserted_; // iterators do not have any "invalid" value so we need this boolean for sanity
                   // checking.
 };
-} // Lyft
+} // Envoy

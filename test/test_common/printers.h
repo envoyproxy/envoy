@@ -5,7 +5,7 @@
 
 #include "test/test_common/printers.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 /**
  * Pretty print const HeaderMapImpl&
@@ -45,4 +45,4 @@ typedef std::unique_ptr<RespValue> RespValuePtr;
 void PrintTo(const RespValue& value, std::ostream* os);
 void PrintTo(const RespValuePtr& value, std::ostream* os);
 } // Redis
-} // Lyft
+} // Envoy

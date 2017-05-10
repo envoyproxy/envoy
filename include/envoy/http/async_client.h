@@ -6,7 +6,7 @@
 #include "envoy/common/optional.h"
 #include "envoy/http/message.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -157,4 +157,4 @@ public:
 typedef std::unique_ptr<AsyncClient> AsyncClientPtr;
 
 } // Http
-} // Lyft
+} // Envoy

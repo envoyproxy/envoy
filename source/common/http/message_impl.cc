@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 std::string MessageImpl::bodyAsString() const {
@@ -20,4 +20,4 @@ std::string MessageImpl::bodyAsString() const {
 }
 
 } // Http
-} // Lyft
+} // Envoy

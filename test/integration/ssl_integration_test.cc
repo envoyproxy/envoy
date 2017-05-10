@@ -13,7 +13,7 @@
 #include "integration.h"
 #include "utility.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::Return;
 
 namespace Ssl {
@@ -208,4 +208,4 @@ TEST_F(SslIntegrationTest, AltAlpn) {
 }
 
 } // Ssl
-} // Lyft
+} // Envoy

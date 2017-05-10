@@ -15,7 +15,7 @@
 #include "common/http/codec_wrappers.h"
 #include "common/network/filter_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -200,4 +200,4 @@ public:
 };
 
 } // Http
-} // Lyft
+} // Envoy

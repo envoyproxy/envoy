@@ -13,7 +13,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -378,4 +378,4 @@ public:
 };
 
 } // Http
-} // Lyft
+} // Envoy

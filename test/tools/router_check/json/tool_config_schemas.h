@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 namespace Json {
 
 class ToolSchema {
@@ -15,4 +15,4 @@ public:
 };
 
 } // Json
-} // Lyft
+} // Envoy

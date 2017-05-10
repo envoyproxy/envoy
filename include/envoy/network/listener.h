@@ -7,7 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 /**
@@ -71,4 +71,4 @@ public:
 };
 
 } // Network
-} // Lyft
+} // Envoy

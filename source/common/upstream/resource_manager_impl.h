@@ -10,7 +10,7 @@
 
 #include "common/common/assert.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -68,4 +68,4 @@ private:
 typedef std::unique_ptr<ResourceManagerImpl> ResourceManagerImplPtr;
 
 } // Upstream
-} // Lyft
+} // Envoy

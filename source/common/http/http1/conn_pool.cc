@@ -16,7 +16,7 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 namespace Http1 {
 
@@ -310,4 +310,4 @@ CodecClientPtr ConnPoolImplProd::createCodecClient(Upstream::Host::CreateConnect
 
 } // Http1
 } // Http
-} // Lyft
+} // Envoy

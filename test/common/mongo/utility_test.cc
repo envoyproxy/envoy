@@ -6,7 +6,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Mongo {
 
 TEST(QueryMessageInfoTest, FindCommand) {
@@ -190,4 +190,4 @@ TEST(QueryMessageInfoTest, Command) {
 }
 
 } // Mongo
-} // Lyft
+} // Envoy

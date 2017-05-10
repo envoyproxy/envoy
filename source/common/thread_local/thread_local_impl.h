@@ -9,7 +9,7 @@
 
 #include "common/common/logger.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace ThreadLocal {
 
 /**
@@ -44,4 +44,4 @@ private:
 };
 
 } // ThreadLocal
-} // Lyft
+} // Envoy

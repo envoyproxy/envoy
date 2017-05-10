@@ -7,7 +7,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 TEST_F(Http2UpstreamIntegrationTest, RouterNotFound) {
   testRouterNotFound(Http::CodecClient::Type::HTTP2);
 }
@@ -295,4 +295,4 @@ TEST_F(Http2UpstreamIntegrationTest, SimultaneousRequest) {
        [&]() -> void { fake_upstream_connection->close(); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
-} // Lyft
+} // Envoy

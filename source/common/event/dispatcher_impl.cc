@@ -20,7 +20,7 @@
 
 #include "event2/event.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl()
@@ -156,4 +156,4 @@ void DispatcherImpl::runPostCallbacks() {
 }
 
 } // Event
-} // Lyft
+} // Envoy

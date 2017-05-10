@@ -14,7 +14,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace RateLimit {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::RpcChannelFactory& factory,
@@ -98,4 +98,4 @@ Grpc::RpcChannelPtr GrpcFactoryImpl::create(Grpc::RpcChannelCallbacks& callbacks
 }
 
 } // RateLimit
-} // Lyft
+} // Envoy

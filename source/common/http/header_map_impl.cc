@@ -9,7 +9,7 @@
 #include "common/common/singleton.h"
 #include "common/common/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 HeaderString::HeaderString() : type_(Type::Inline) {
@@ -402,4 +402,4 @@ void HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
 }
 
 } // Http
-} // Lyft
+} // Envoy

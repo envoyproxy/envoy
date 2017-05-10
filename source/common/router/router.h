@@ -16,7 +16,7 @@
 
 #include "common/common/logger.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 /**
@@ -250,4 +250,4 @@ private:
 };
 
 } // Router
-} // Lyft
+} // Envoy

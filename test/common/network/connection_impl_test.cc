@@ -21,7 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::Sequence;
 using testing::InSequence;
@@ -270,4 +270,4 @@ TEST(TcpClientConnectionImplTest, BadConnectConnRefused) {
 }
 
 } // Network
-} // Lyft
+} // Envoy

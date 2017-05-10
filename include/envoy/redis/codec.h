@@ -7,7 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Redis {
 
 /**
@@ -132,4 +132,4 @@ public:
 };
 
 } // Redis
-} // Lyft
+} // Envoy

@@ -11,7 +11,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 /**
@@ -57,4 +57,4 @@ private:
 };
 
 } // Router
-} // Lyft
+} // Envoy

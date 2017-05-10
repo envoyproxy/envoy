@@ -2,7 +2,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 TEST(Optional, All) {
   Optional<int> optional;
   EXPECT_FALSE(optional.valid());
@@ -20,4 +20,4 @@ TEST(Optional, All) {
   EXPECT_TRUE(optional_const_2.valid());
   EXPECT_EQ(10, optional_const_2.value());
 }
-} // Lyft
+} // Envoy

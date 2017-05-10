@@ -18,7 +18,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Stream decoder wrapper used during integration testing.
  */
@@ -217,4 +217,4 @@ protected:
   IntegrationTestServerPtr test_server_;
   TestEnvironment::PortMap port_map_;
 };
-} // Lyft
+} // Envoy

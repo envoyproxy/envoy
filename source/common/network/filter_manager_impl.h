@@ -7,7 +7,7 @@
 
 #include "common/common/linked_object.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 /**
@@ -75,4 +75,4 @@ private:
 };
 
 } // Network
-} // Lyft
+} // Envoy

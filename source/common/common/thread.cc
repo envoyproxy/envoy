@@ -7,7 +7,7 @@
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Thread {
 
 Thread::Thread(std::function<void()> thread_routine) : thread_routine_(thread_routine) {
@@ -28,4 +28,4 @@ void Thread::join() {
 }
 
 } // Thread
-} // Lyft
+} // Envoy

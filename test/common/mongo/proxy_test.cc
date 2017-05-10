@@ -18,7 +18,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::AtLeast;
 using testing::Invoke;
@@ -77,7 +77,7 @@ public:
   AccessLogSharedPtr access_log_;
   std::unique_ptr<TestProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
-  Lyft::AccessLog::MockAccessLogManager log_manager_;
+  Envoy::AccessLog::MockAccessLogManager log_manager_;
 };
 
 TEST_F(MongoProxyFilterTest, Stats) {
@@ -368,4 +368,4 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
 }
 
 } // Mongo
-} // Lyft
+} // Envoy

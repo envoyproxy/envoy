@@ -10,7 +10,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 class UdsIntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:
   /**
@@ -32,4 +32,4 @@ public:
     fake_upstreams_.clear();
   }
 };
-} // Lyft
+} // Envoy

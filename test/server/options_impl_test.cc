@@ -10,7 +10,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
 // separated by a single space: no fancy quoting or escaping.
 std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
@@ -51,4 +51,4 @@ TEST(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
   EXPECT_EQ("", options->adminAddressPath());
 }
-} // Lyft
+} // Envoy

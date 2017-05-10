@@ -24,7 +24,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 
@@ -393,4 +393,4 @@ TEST_P(SslReadBufferLimitTest, SomeLimit) {
 }
 
 } // Ssl
-} // Lyft
+} // Envoy

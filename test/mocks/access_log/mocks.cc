@@ -3,7 +3,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::Return;
 
@@ -16,4 +16,4 @@ MockAccessLogManager::MockAccessLogManager() {
 MockAccessLogManager::~MockAccessLogManager() {}
 
 } // AccessLog
-} // Lyft
+} // Envoy

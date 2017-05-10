@@ -8,7 +8,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 TEST_F(IntegrationTest, HealthCheck) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/healthcheck", "", Http::CodecClient::Type::HTTP1);
@@ -154,4 +154,4 @@ TEST_F(IntegrationTest, AdminCpuProfilerStart) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 #endif
-} // Lyft
+} // Envoy

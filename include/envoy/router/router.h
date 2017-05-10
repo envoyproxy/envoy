@@ -13,7 +13,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/resource_manager.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 /**
@@ -320,4 +320,4 @@ public:
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
 
 } // Router
-} // Lyft
+} // Envoy

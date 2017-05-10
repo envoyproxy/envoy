@@ -6,7 +6,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Grpc {
 
 Encoder::Encoder() {}
@@ -92,4 +92,4 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
 }
 
 } // namespace Grpc
-} // Lyft
+} // Envoy

@@ -5,7 +5,7 @@
 
 #include "common/common/assert.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Filter {
 
 Network::FilterStatus Echo::onData(Buffer::Instance& data) {
@@ -16,4 +16,4 @@ Network::FilterStatus Echo::onData(Buffer::Instance& data) {
 }
 
 } // Filter
-} // Lyft
+} // Envoy

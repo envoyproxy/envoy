@@ -2,7 +2,7 @@
 
 #include <vector>
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 class StreamCallbackHelper {
@@ -47,4 +47,4 @@ private:
 };
 
 } // Http
-} // Lyft
+} // Envoy

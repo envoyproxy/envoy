@@ -1,6 +1,6 @@
 #include "test/mocks/common.h"
 
-namespace Lyft {
+namespace Envoy {
 ReadyWatcher::ReadyWatcher() {}
 ReadyWatcher::~ReadyWatcher() {}
 
@@ -9,4 +9,4 @@ MockSystemTimeSource::~MockSystemTimeSource() {}
 
 MockMonotonicTimeSource::MockMonotonicTimeSource() {}
 MockMonotonicTimeSource::~MockMonotonicTimeSource() {}
-} // Lyft
+} // Envoy

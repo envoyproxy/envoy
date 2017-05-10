@@ -8,7 +8,7 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
@@ -135,4 +135,4 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
 }
 
 } // Http
-} // Lyft
+} // Envoy

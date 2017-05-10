@@ -18,7 +18,7 @@
 #include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
@@ -165,4 +165,4 @@ void FaultFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callba
 }
 
 } // Http
-} // Lyft
+} // Envoy

@@ -10,7 +10,7 @@
 
 #include "date_provider.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -59,4 +59,4 @@ public:
 };
 
 } // Http
-} // Lyft
+} // Envoy

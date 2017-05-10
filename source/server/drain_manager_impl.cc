@@ -10,7 +10,7 @@
 
 #include "common/common/assert.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 DrainManagerImpl::DrainManagerImpl(Instance& server) : server_(server) {}
@@ -59,4 +59,4 @@ void DrainManagerImpl::startParentShutdownSequence() {
 }
 
 } // Server
-} // Lyft
+} // Envoy

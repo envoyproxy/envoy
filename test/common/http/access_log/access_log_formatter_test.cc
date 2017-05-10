@@ -15,7 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -263,4 +263,4 @@ TEST(AccessLogFormatterTest, ParserFailures) {
 
 } // AccessLog
 } // Http
-} // Lyft
+} // Envoy

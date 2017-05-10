@@ -6,7 +6,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 /**
@@ -30,4 +30,4 @@ private:
 };
 
 } // Router
-} // Lyft
+} // Envoy

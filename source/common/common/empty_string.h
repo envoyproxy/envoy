@@ -2,6 +2,6 @@
 
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 static const std::string EMPTY_STRING = "";
-} // Lyft
+} // Envoy

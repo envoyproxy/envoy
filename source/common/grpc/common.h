@@ -12,7 +12,7 @@
 
 #include "google/protobuf/message.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Grpc {
 
 class Exception : public EnvoyException {
@@ -58,4 +58,4 @@ private:
 };
 
 } // Grpc
-} // Lyft
+} // Envoy

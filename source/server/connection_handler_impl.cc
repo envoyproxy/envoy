@@ -9,7 +9,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Api::ApiPtr&& api)
@@ -149,4 +149,4 @@ ListenerStats ConnectionHandlerImpl::generateStats(Stats::Scope& scope) {
 }
 
 } // Server
-} // Lyft
+} // Envoy

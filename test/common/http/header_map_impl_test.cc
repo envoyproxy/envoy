@@ -7,7 +7,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 TEST(HeaderStringTest, All) {
@@ -320,4 +320,4 @@ TEST(HeaderMapImplTest, LargeCharInHeader) {
 }
 
 } // Http
-} // Lyft
+} // Envoy

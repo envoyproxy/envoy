@@ -2,7 +2,7 @@
 
 #include "common/common/logger.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * assert macro that uses our builtin logging which gives us thread ID and can log to various
  * sinks.
@@ -36,4 +36,4 @@ namespace Lyft {
 // shouldn't be possible to arrive there, assuming no horrendous bugs. For example, after a
 // switch (some_enum) with all enum values included in the cases.
 #define NOT_REACHED PANIC("not reached")
-} // Lyft
+} // Envoy

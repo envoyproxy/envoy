@@ -23,7 +23,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
@@ -116,4 +116,4 @@ RawConnectionDriver::~RawConnectionDriver() {}
 void RawConnectionDriver::run() { dispatcher_->run(Event::Dispatcher::RunType::Block); }
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
-} // Lyft
+} // Envoy

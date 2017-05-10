@@ -9,7 +9,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Json {
 class Object;
 
@@ -161,4 +161,4 @@ public:
 };
 
 } // Json
-} // Lyft
+} // Envoy

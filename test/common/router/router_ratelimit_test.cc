@@ -17,7 +17,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 using testing::ReturnRef;
@@ -209,11 +209,11 @@ TEST_F(RateLimitConfiguration, TestGetApplicationRateLimit) {
       route_->rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(1U, rate_limits.size());
 
-  std::vector<Lyft::RateLimit::Descriptor> descriptors;
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(*route_, descriptors, "", header_, address);
   }
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
               testing::ContainerEq(descriptors));
 }
 
@@ -251,11 +251,11 @@ TEST_F(RateLimitConfiguration, TestVirtualHost) {
       route_->virtualHost().rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(1U, rate_limits.size());
 
-  std::vector<Lyft::RateLimit::Descriptor> descriptors;
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, "");
   }
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>({{{{"destination_cluster", "www2test"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"destination_cluster", "www2test"}}}}),
               testing::ContainerEq(descriptors));
 }
 
@@ -312,11 +312,11 @@ TEST_F(RateLimitConfiguration, Stages) {
       route_->rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(2U, rate_limits.size());
 
-  std::vector<Lyft::RateLimit::Descriptor> descriptors;
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, address);
   }
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>(
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
                   {{{{"destination_cluster", "www2test"}}},
                    {{{"destination_cluster", "www2test"}, {"source_cluster", "service_cluster"}}}}),
               testing::ContainerEq(descriptors));
@@ -328,7 +328,7 @@ TEST_F(RateLimitConfiguration, Stages) {
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
     rate_limit.populateDescriptors(*route_, descriptors, "service_cluster", header_, address);
   }
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
               testing::ContainerEq(descriptors));
 
   rate_limits = route_->rateLimitPolicy().getApplicableRateLimit(10UL);
@@ -346,7 +346,7 @@ public:
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestHeaderMapImpl header_;
   NiceMock<MockRouteEntry> route_;
-  std::vector<Lyft::RateLimit::Descriptor> descriptors_;
+  std::vector<Envoy::RateLimit::Descriptor> descriptors_;
 };
 
 TEST_F(RateLimitPolicyEntryTest, RateLimitPolicyEntryMembers) {
@@ -383,7 +383,7 @@ TEST_F(RateLimitPolicyEntryTest, RemoteAddress) {
   std::string address = "10.0.0.1";
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, address);
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", address}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -418,8 +418,9 @@ TEST_F(RateLimitPolicyEntryTest, SourceService) {
   SetUpTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>({{{{"source_cluster", "service_cluster"}}}}),
-              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"source_cluster", "service_cluster"}}}}),
+      testing::ContainerEq(descriptors_));
 }
 
 TEST_F(RateLimitPolicyEntryTest, DestinationService) {
@@ -437,7 +438,7 @@ TEST_F(RateLimitPolicyEntryTest, DestinationService) {
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
   EXPECT_THAT(
-      std::vector<Lyft::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"}}}}),
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"}}}}),
       testing::ContainerEq(descriptors_));
 }
 
@@ -458,7 +459,7 @@ TEST_F(RateLimitPolicyEntryTest, RequestHeaders) {
   Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header, "");
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -497,7 +498,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitKey) {
   SetUpTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, "");
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -524,7 +525,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatch) {
   Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -578,7 +579,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchHeadersNotPresent) {
   Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, "");
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -626,9 +627,10 @@ TEST_F(RateLimitPolicyEntryTest, CompoundActions) {
   SetUpTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_, "");
-  EXPECT_THAT(std::vector<Lyft::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"},
-                                                          {"source_cluster", "service_cluster"}}}}),
-              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::Descriptor>(
+          {{{{"destination_cluster", "fake_cluster"}, {"source_cluster", "service_cluster"}}}}),
+      testing::ContainerEq(descriptors_));
 }
 
 TEST_F(RateLimitPolicyEntryTest, CompoundActionsNoDescriptor) {
@@ -660,4 +662,4 @@ TEST_F(RateLimitPolicyEntryTest, CompoundActionsNoDescriptor) {
 }
 
 } // Router
-} // Lyft
+} // Envoy

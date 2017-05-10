@@ -12,7 +12,7 @@
 
 #include "google/protobuf/message.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Grpc {
 
 void RpcChannelImpl::cancel() {
@@ -93,4 +93,4 @@ void RpcChannelImpl::onComplete() {
 }
 
 } // Grpc
-} // Lyft
+} // Envoy

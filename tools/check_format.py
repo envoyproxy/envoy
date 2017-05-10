@@ -28,9 +28,9 @@ def printError(error):
 def checkNamespace(file_path):
   with open(file_path) as f:
     text = f.read()
-    if not re.search('^\s*namespace\s+Lyft\s*{', text, re.MULTILINE) and \
-       not re.search('NOLINT\(namespace-lyft\)', text, re.MULTILINE):
-      printError("Unable to find Lyft namespace or NOLINT(namespace-lint) for file: %s" % file_path)
+    if not re.search('^\s*namespace\s+Envoy\s*{', text, re.MULTILINE) and \
+       not re.search('NOLINT\(namespace-envoy\)', text, re.MULTILINE):
+      printError("Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path)
       return False
   return True
 

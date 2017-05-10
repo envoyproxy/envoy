@@ -15,7 +15,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Json {
 
 /**
@@ -254,4 +254,4 @@ const std::string Factory::listAsJsonString(const std::list<std::string>& items)
 }
 
 } // Json
-} // Lyft
+} // Envoy

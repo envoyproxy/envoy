@@ -16,7 +16,7 @@
 #include "test/test_common/utility.h"
 #include "test/tools/router_check/json/tool_config_schemas.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Struct that stores the configuration parameters of the router check tool extracted from a json
  * input file.
@@ -92,4 +92,4 @@ private:
   std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm_;
   std::unique_ptr<Router::ConfigImpl> config_;
 };
-} // Lyft
+} // Envoy

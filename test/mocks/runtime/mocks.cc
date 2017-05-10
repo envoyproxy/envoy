@@ -3,7 +3,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::ReturnArg;
 
@@ -18,4 +18,4 @@ MockLoader::MockLoader() { ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(sn
 MockLoader::~MockLoader() {}
 
 } // Runtime
-} // Lyft
+} // Envoy

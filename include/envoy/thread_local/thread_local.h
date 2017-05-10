@@ -7,7 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace ThreadLocal {
 
 /**
@@ -84,4 +84,4 @@ public:
 };
 
 } // ThreadLocal
-} // Lyft
+} // Envoy

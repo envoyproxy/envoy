@@ -20,7 +20,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 // clang-format off
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, TIMER)                                                  \
   COUNTER(downstream_cx_total)                                                                     \
@@ -147,4 +147,4 @@ private:
 typedef std::unique_ptr<ConnectionHandlerImpl> ConnectionHandlerImplPtr;
 
 } // Server
-} // Lyft
+} // Envoy

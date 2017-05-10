@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 
 std::string HostUtility::healthFlagsToString(const Host& host) {
@@ -23,4 +23,4 @@ std::string HostUtility::healthFlagsToString(const Host& host) {
 }
 
 } // Upstream
-} // Lyft
+} // Envoy

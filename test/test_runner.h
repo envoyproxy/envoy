@@ -7,7 +7,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 class TestRunner {
 public:
   static int RunTests(int argc, char** argv) {
@@ -33,4 +33,4 @@ public:
     return RUN_ALL_TESTS();
   }
 };
-} // Lyft
+} // Envoy

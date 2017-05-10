@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace Lyft {
+namespace Envoy {
 namespace Memory {
 
 /**
@@ -23,4 +23,4 @@ public:
 };
 
 } // Memory
-} // Lyft
+} // Envoy

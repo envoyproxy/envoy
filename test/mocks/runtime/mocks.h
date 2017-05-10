@@ -7,7 +7,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Runtime {
 
 class MockRandomGenerator : public RandomGenerator {
@@ -41,4 +41,4 @@ public:
 };
 
 } // Runtime
-} // Lyft
+} // Envoy

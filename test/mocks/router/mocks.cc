@@ -5,7 +5,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -78,4 +78,4 @@ MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&rout
 MockRoute::~MockRoute() {}
 
 } // Router
-} // Lyft
+} // Envoy

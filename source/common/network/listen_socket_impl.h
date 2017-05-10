@@ -9,7 +9,7 @@
 
 #include "common/ssl/context_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 class ListenSocketImpl : public ListenSocket {
@@ -51,4 +51,4 @@ public:
 };
 
 } // Network
-} // Lyft
+} // Envoy

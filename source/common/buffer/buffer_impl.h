@@ -7,7 +7,7 @@
 
 #include "common/event/libevent.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Buffer {
 
 /**
@@ -41,4 +41,4 @@ private:
 };
 
 } // Buffer
-} // Lyft
+} // Envoy

@@ -20,7 +20,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
@@ -861,4 +861,4 @@ TEST(ClusterManagerInitHelper, RemoveClusterWithinInitLoop) {
 }
 
 } // Upstream
-} // Lyft
+} // Envoy

@@ -5,7 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace LocalInfo {
 
 /**
@@ -37,4 +37,4 @@ public:
 };
 
 } // LocalInfo
-} // Lyft
+} // Envoy

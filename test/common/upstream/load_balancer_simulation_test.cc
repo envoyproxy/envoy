@@ -14,7 +14,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::NiceMock;
 using testing::Return;
 
@@ -190,4 +190,4 @@ TEST_F(DISABLED_SimulationTest, unequalZoneDistribution6) {
 }
 
 } // Upstream
-} // Lyft
+} // Envoy

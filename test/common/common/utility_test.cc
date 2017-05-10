@@ -7,7 +7,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 TEST(StringUtil, atoul) {
   uint64_t out;
   EXPECT_FALSE(StringUtil::atoul("123b", out));
@@ -148,4 +148,4 @@ TEST(StringUtil, escape) {
   EXPECT_EQ(StringUtil::escape("\t\nworld\r\n"), "\\t\\nworld\\r\\n");
   EXPECT_EQ(StringUtil::escape("{\"linux\": \"penguin\"}"), "{\\\"linux\\\": \\\"penguin\\\"}");
 }
-} // Lyft
+} // Envoy

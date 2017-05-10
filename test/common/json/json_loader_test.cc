@@ -5,7 +5,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Json {
 
 TEST(JsonLoaderTest, Basic) {
@@ -267,4 +267,4 @@ TEST(JsonLoaderTest, ListAsString) {
 }
 
 } // Json
-} // Lyft
+} // Envoy

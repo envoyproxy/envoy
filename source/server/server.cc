@@ -30,7 +30,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 void InitManagerImpl::initialize(std::function<void()> callback) {
@@ -403,4 +403,4 @@ void InstanceImpl::shutdownAdmin() {
 }
 
 } // Server
-} // Lyft
+} // Envoy

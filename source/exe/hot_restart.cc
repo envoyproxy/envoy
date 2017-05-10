@@ -19,7 +19,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 // Increment this whenever there is a shared memory / RPC change that will prevent a hot restart
@@ -422,4 +422,4 @@ void HotRestartImpl::shutdown() { socket_event_.reset(); }
 std::string HotRestartImpl::version() { return SharedMemory::version(); }
 
 } // Server
-} // Lyft
+} // Envoy

@@ -6,7 +6,7 @@
 #include "envoy/api/api.h"
 #include "envoy/filesystem/filesystem.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Api {
 
 /**
@@ -30,4 +30,4 @@ private:
 };
 
 } // Api
-} // Lyft
+} // Envoy

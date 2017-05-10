@@ -7,7 +7,7 @@
 
 #include "common/filter/auth/client_ssl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -35,4 +35,4 @@ static RegisterNetworkFilterConfigFactory<ClientSslAuthConfigFactory> registered
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

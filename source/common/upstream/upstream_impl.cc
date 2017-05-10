@@ -29,7 +29,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 
 Outlier::DetectorHostSinkNullImpl HostDescriptionImpl::null_outlier_detector_;
@@ -452,4 +452,4 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 }
 
 } // Upstream
-} // Lyft
+} // Envoy

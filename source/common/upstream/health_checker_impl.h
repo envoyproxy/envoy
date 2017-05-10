@@ -22,7 +22,7 @@
 #include "common/json/json_validator.h"
 #include "common/network/filter_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -377,4 +377,4 @@ private:
 };
 
 } // Upstream
-} // Lyft
+} // Envoy

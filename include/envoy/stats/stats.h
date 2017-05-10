@@ -8,7 +8,7 @@
 
 #include "envoy/common/pure.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 class Dispatcher;
 }
@@ -210,4 +210,4 @@ public:
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;
 
 } // Stats
-} // Lyft
+} // Envoy

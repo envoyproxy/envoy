@@ -13,7 +13,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 class MockConnectionCallbacks : public ConnectionCallbacks {
@@ -232,4 +232,4 @@ public:
 };
 
 } // Network
-} // Lyft
+} // Envoy

@@ -6,7 +6,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace LocalInfo {
 
 class MockLocalInfo : public LocalInfo {
@@ -26,4 +26,4 @@ public:
 };
 
 } // LocalInfo
-} // Lyft
+} // Envoy

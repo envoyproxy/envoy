@@ -13,7 +13,7 @@
 #include "common/common/logger.h"
 #include "common/http/rest_api_fetcher.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 /**
@@ -121,4 +121,4 @@ private:
 };
 
 } // Router
-} // Lyft
+} // Envoy

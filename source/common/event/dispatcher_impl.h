@@ -13,7 +13,7 @@
 #include "common/common/logger.h"
 #include "common/event/libevent.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 
 /**
@@ -70,4 +70,4 @@ private:
 };
 
 } // Event
-} // Lyft
+} // Envoy

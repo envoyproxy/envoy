@@ -18,7 +18,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 namespace Address {
 namespace {
@@ -314,4 +314,4 @@ TEST(AddressFromSockAddr, Pipe) {
 
 } // Address
 } // Network
-} // Lyft
+} // Envoy

@@ -5,7 +5,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
 #define ASANITIZED /* Sanitized by Clang */
@@ -107,4 +107,4 @@ TEST(Signals, LegalStackAccessTest) {
   SignalAction actions;
   actions.doGoodAccessForTest();
 }
-} // Lyft
+} // Envoy

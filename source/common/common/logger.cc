@@ -9,7 +9,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Logger {
 
 #define GENERATE_LOGGER(X) Logger(#X),
@@ -42,4 +42,4 @@ void Registry::initialize(uint64_t log_level, Thread::BasicLockable& lock) {
 }
 
 } // Logger
-} // Lyft
+} // Envoy

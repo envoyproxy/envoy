@@ -13,7 +13,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Redis {
 
 bool operator==(const RespValue& lhs, const RespValue& rhs);
@@ -121,4 +121,4 @@ public:
 
 } // CommandSplitter
 } // Redis
-} // Lyft
+} // Envoy

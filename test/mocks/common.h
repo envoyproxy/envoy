@@ -4,7 +4,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * This action allows us to save a reference parameter to a pointer target.
  */
@@ -44,4 +44,4 @@ public:
 
   MOCK_METHOD0(currentTime, MonotonicTime());
 };
-} // Lyft
+} // Envoy

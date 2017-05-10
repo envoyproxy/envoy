@@ -13,7 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 
@@ -177,4 +177,4 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

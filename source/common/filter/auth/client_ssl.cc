@@ -16,7 +16,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Filter {
 namespace Auth {
 namespace ClientSsl {
@@ -125,4 +125,4 @@ void Instance::onEvent(uint32_t events) {
 } // Client Ssl
 } // Auth
 } // Filter
-} // Lyft
+} // Envoy

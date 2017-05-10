@@ -9,7 +9,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 
@@ -97,4 +97,4 @@ MockInstance::~MockInstance() {}
 
 } // CommandSplitter
 } // Redis
-} // Lyft
+} // Envoy

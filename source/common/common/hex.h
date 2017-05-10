@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Hex encoder/decoder. Produces lowercase hex digits. Can consume either lowercase or uppercase
  * digits.
@@ -40,4 +40,4 @@ public:
    */
   static std::string uint64ToHex(uint64_t value);
 };
-} // Lyft
+} // Envoy

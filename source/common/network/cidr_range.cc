@@ -18,7 +18,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 namespace Address {
 
@@ -195,4 +195,4 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
 
 } // Address
 } // Network
-} // Lyft
+} // Envoy

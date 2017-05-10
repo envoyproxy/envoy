@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 namespace Profiler {
 
 /**
@@ -36,4 +36,4 @@ private:
 };
 
 } // Profiler
-} // Lyft
+} // Envoy

@@ -10,7 +10,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::InSequence;
 
@@ -76,4 +76,4 @@ TEST_F(ServerInstanceImplTest, NoListenSocketFds) {
 }
 
 } // Server
-} // Lyft
+} // Envoy

@@ -14,7 +14,7 @@
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 /**
@@ -154,4 +154,4 @@ public:
 };
 
 } // Network
-} // Lyft
+} // Envoy

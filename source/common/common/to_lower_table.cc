@@ -1,6 +1,6 @@
 #include "common/common/to_lower_table.h"
 
-namespace Lyft {
+namespace Envoy {
 ToLowerTable::ToLowerTable() {
   for (size_t c = 0; c < 256; c++) {
     table_[c] = c;
@@ -15,4 +15,4 @@ void ToLowerTable::toLowerCase(char* buffer, uint32_t size) const {
     buffer[i] = table_[static_cast<uint8_t>(buffer[i])];
   }
 }
-} // Lyft
+} // Envoy

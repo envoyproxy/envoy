@@ -9,7 +9,7 @@
 #include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
@@ -148,4 +148,4 @@ RateLimitPolicyImpl::getApplicableRateLimit(uint64_t stage) const {
 }
 
 } // Router
-} // Lyft
+} // Envoy

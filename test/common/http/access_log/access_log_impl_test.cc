@@ -27,7 +27,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -87,7 +87,7 @@ public:
   std::shared_ptr<Filesystem::MockFile> file_;
   std::string output_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Lyft::AccessLog::MockAccessLogManager log_manager_;
+  Envoy::AccessLog::MockAccessLogManager log_manager_;
 };
 
 TEST_F(AccessLogImplTest, LogMoreData) {
@@ -345,7 +345,7 @@ TEST_F(AccessLogImplTest, requestTracing) {
 
 TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
   Runtime::MockLoader runtime;
-  Lyft::AccessLog::MockAccessLogManager log_manager;
+  Envoy::AccessLog::MockAccessLogManager log_manager;
 
   {
     std::string json = R"EOF(
@@ -527,4 +527,4 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
 
 } // AccessLog
 } // Http
-} // Lyft
+} // Envoy

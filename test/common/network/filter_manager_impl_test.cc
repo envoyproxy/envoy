@@ -20,7 +20,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
@@ -139,9 +139,9 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
     )EOF";
 
   Json::ObjectPtr tcp_proxy_config_loader = Json::Factory::loadFromString(tcp_proxy_json);
-  Lyft::Filter::TcpProxyConfigSharedPtr tcp_proxy_config(
-      new Lyft::Filter::TcpProxyConfig(*tcp_proxy_config_loader, cm, stats_store));
-  manager.addReadFilter(ReadFilterSharedPtr{new Lyft::Filter::TcpProxy(tcp_proxy_config, cm)});
+  Envoy::Filter::TcpProxyConfigSharedPtr tcp_proxy_config(
+      new Envoy::Filter::TcpProxyConfig(*tcp_proxy_config_loader, cm, stats_store));
+  manager.addReadFilter(ReadFilterSharedPtr{new Envoy::Filter::TcpProxy(tcp_proxy_config, cm)});
 
   RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
@@ -172,4 +172,4 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
 }
 
 } // Network
-} // Lyft
+} // Envoy

@@ -21,7 +21,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Runtime {
 
 /**
@@ -208,4 +208,4 @@ private:
 };
 
 } // Runtime
-} // Lyft
+} // Envoy

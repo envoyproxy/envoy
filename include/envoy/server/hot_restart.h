@@ -6,7 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 class Instance;
@@ -81,4 +81,4 @@ public:
 };
 
 } // Server
-} // Lyft
+} // Envoy

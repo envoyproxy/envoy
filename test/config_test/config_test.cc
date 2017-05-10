@@ -12,7 +12,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -63,4 +63,4 @@ uint32_t run(const std::string& directory) {
 }
 
 } // ConfigTest
-} // Lyft
+} // Envoy

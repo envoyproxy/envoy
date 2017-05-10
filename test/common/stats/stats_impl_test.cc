@@ -4,7 +4,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Stats {
 
 TEST(StatsIsolatedStoreImplTest, All) {
@@ -36,4 +36,4 @@ TEST(StatsIsolatedStoreImplTest, All) {
 }
 
 } // Stats
-} // Lyft
+} // Envoy

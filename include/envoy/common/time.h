@@ -4,7 +4,7 @@
 
 #include "envoy/common/pure.h"
 
-namespace Lyft {
+namespace Envoy {
 /**
  * Less typing for common system time and steady time type.
  *
@@ -39,4 +39,4 @@ public:
    */
   virtual MonotonicTime currentTime() PURE;
 };
-} // Lyft
+} // Envoy

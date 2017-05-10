@@ -14,7 +14,7 @@
 
 #include "ares.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Network {
 
 class DnsResolverImplPeer;
@@ -72,4 +72,4 @@ private:
 };
 
 } // Network
-} // Lyft
+} // Envoy

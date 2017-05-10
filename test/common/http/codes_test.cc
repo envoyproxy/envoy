@@ -15,7 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 
 namespace Http {
@@ -192,4 +192,4 @@ TEST(CodeUtilityResponseTimingTest, All) {
 }
 
 } // Http
-} // Lyft
+} // Envoy

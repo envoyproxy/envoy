@@ -4,7 +4,7 @@
 
 #include "common/dynamo/dynamo_filter.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -30,4 +30,4 @@ static RegisterHttpFilterConfigFactory<DynamoFilterConfig> register_;
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

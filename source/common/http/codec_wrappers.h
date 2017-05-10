@@ -2,7 +2,7 @@
 
 #include "envoy/http/codec.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -94,4 +94,4 @@ protected:
 };
 
 } // Http
-} // Lyft
+} // Envoy

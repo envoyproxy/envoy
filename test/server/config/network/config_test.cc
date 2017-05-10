@@ -12,7 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 
@@ -330,4 +330,4 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

@@ -6,7 +6,7 @@
 
 #include "common/common/assert.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 
 Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& config) {
@@ -44,4 +44,4 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
 }
 
 } // Router
-} // Lyft
+} // Envoy

@@ -8,7 +8,7 @@
 
 #include "gmock/gmock.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace RateLimit {
 
 class MockClient : public Client {
@@ -32,4 +32,4 @@ inline bool operator==(const Descriptor& lhs, const Descriptor& rhs) {
 }
 
 } // RateLimit
-} // Lyft
+} // Envoy

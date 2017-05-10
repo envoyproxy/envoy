@@ -32,7 +32,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 #define MAKE_HANDLER(X)                                                                            \
@@ -424,4 +424,4 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 }
 
 } // Server
-} // Lyft
+} // Envoy

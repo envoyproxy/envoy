@@ -7,7 +7,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/watchdog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 
 /**
@@ -45,4 +45,4 @@ private:
 };
 
 } // namespace Server
-} // Lyft
+} // Envoy

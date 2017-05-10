@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace Lyft {
+namespace Envoy {
 namespace Dynamo {
 
 class Utility {
@@ -25,4 +25,4 @@ public:
 };
 
 } // Dynamo
-} // Lyft
+} // Envoy

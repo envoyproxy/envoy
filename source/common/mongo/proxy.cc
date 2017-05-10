@@ -14,10 +14,11 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Mongo {
 
-AccessLog::AccessLog(const std::string& file_name, Lyft::AccessLog::AccessLogManager& log_manager) {
+AccessLog::AccessLog(const std::string& file_name,
+                     Envoy::AccessLog::AccessLogManager& log_manager) {
   file_ = log_manager.createAccessLog(file_name);
 }
 
@@ -242,5 +243,5 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
   return DecoderPtr{new DecoderImpl(callbacks)};
 }
 
-} // Lyft
+} // Envoy
 } // Mongo

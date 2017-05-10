@@ -14,7 +14,7 @@
 
 #include "openssl/ssl.h"
 
-namespace Lyft {
+namespace Envoy {
 #ifndef OPENSSL_IS_BORINGSSL
 #error Envoy requires BoringSSL
 #endif
@@ -140,4 +140,4 @@ private:
 };
 
 } // Ssl
-} // Lyft
+} // Envoy

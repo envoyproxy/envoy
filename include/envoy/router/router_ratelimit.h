@@ -9,7 +9,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/ratelimit/ratelimit.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Router {
 /**
  * Base interface for generic rate limit action.
@@ -88,4 +88,4 @@ public:
 };
 
 } // Router
-} // Lyft
+} // Envoy

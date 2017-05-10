@@ -11,7 +11,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/ssl/connection.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Event {
 class Dispatcher;
 }
@@ -181,4 +181,4 @@ public:
 typedef std::unique_ptr<ClientConnection> ClientConnectionPtr;
 
 } // Network
-} // Lyft
+} // Envoy

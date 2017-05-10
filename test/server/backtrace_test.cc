@@ -2,7 +2,7 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 TEST(Backward, Basic) {
   // There isn't much to test here and this feature is really just useful for
   // debugging.  This test simply verifies that we do not cause a crash when
@@ -17,4 +17,4 @@ TEST(Backward, InvalidUsageTest) {
   BackwardsTrace tracer;
   tracer.logTrace();
 }
-} // Lyft
+} // Envoy

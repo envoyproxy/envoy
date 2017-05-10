@@ -10,6 +10,21 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
+TEST_F(IntegrationTest, Echo) {
+  Buffer::OwnedImpl buffer("hello");
+  std::string response;
+  RawConnectionDriver connection(lookupPort("echo"), buffer,
+                                 [&](Network::ClientConnection&, const Buffer::Instance& data)
+                                     -> void {
+                                       response.append(TestUtility::bufferToString(data));
+                                       connection.close();
+                                     });
+
+  connection.run();
+  EXPECT_EQ("hello", response);
+}
+
 TEST_F(IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP1); }
 
 TEST_F(IntegrationTest, RouterNotFoundBodyNoBuffer) {
@@ -151,4 +166,4 @@ TEST_F(IntegrationTest, TcpProxyDownstreamDisconnect) {
        [&]() -> void { fake_upstream_connection->waitForData(10); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
-} // Lyft
+} // Envoy

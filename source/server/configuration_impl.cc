@@ -23,7 +23,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -236,4 +236,4 @@ InitialImpl::InitialImpl(const Json::Object& json) {
 
 } // Configuration
 } // Server
-} // Lyft
+} // Envoy

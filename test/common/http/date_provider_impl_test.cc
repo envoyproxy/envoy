@@ -10,7 +10,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 using testing::NiceMock;
 
 namespace Http {
@@ -35,4 +35,4 @@ TEST(DateProviderImplTest, All) {
 }
 
 } // Http
-} // Lyft
+} // Envoy

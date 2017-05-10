@@ -15,7 +15,7 @@
 #include "common/http/codec_client.h"
 #include "common/http/codec_wrappers.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 namespace Http1 {
 
@@ -139,4 +139,4 @@ public:
 
 } // Http1
 } // Http
-} // Lyft
+} // Envoy

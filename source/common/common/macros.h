@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Lyft {
+namespace Envoy {
 /**
  * @return the size of a C array.
  */
@@ -16,4 +16,4 @@ namespace Lyft {
  * Stop the compiler from complaining about an unreferenced parameter.
  */
 #define UNREFERENCED_PARAMETER(X) ((void)(X))
-} // Lyft
+} // Envoy

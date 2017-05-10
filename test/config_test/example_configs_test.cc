@@ -4,10 +4,10 @@
 
 #include "gtest/gtest.h"
 
-namespace Lyft {
+namespace Envoy {
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
   EXPECT_EQ(8UL, ConfigTest::run(TestEnvironment::temporaryDirectory() + "/test/config_test"));
 }
-} // Lyft
+} // Envoy

@@ -6,7 +6,7 @@
 
 #include "common/common/singleton.h"
 
-namespace Lyft {
+namespace Envoy {
 namespace Http {
 
 /**
@@ -111,4 +111,4 @@ public:
 typedef ConstSingleton<HeaderValues> Headers;
 
 } // Http
-} // Lyft
+} // Envoy
