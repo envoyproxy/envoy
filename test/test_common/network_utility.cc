@@ -129,10 +129,10 @@ bool supportsIpVersion(const Address::IpVersion version) {
   }
   if (0 != addr->bind(fd)) {
     // Socket bind failed.
-    ::close(fd);
+    RELEASE_ASSERT(::close(fd) == 0);
     return false;
   }
-  ::close(fd);
+  RELEASE_ASSERT(::close(fd) == 0);
   return true;
 }
 
