@@ -36,7 +36,7 @@ if [ "${TRAVIS_SECURE_ENV_VARS}" == "true" ]; then
   aws s3 cp "${COVERAGE_DIR}" "s3://${S3_LOCATION}" --recursive --profile coverage --acl public-read --quiet
   echo "Coverage report for branch '${BRANCH_NAME}': https://s3.amazonaws.com/${S3_LOCATION}/coverage.html"
 
-  find -L /build -name coverage.html
+  find -L ${ENVOY_BUILD_DIR} -name coverage.html
 else
   echo "Coverage report will not be uploaded for this build."
 fi
