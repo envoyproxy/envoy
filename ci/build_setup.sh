@@ -92,6 +92,10 @@ cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE "${ENVOY_BUILD_DIR}"
 export ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
 mkdir -p "${ENVOY_DELIVERY_DIR}"
 
+# This is where we copy the coverage report to.
+export ENVOY_COVERAGE_DIR="${ENVOY_BUILD_DIR}"/generated/coverage
+mkdir -p "${ENVOY_COVERAGE_DIR}"
+
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
 
