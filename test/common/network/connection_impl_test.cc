@@ -147,7 +147,6 @@ public:
 
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
-
     Network::TcpListenSocket socket(Network::Test::getAnyAddress(GetParam()), true);
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
