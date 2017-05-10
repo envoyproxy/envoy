@@ -47,9 +47,8 @@ public:
   virtual ClusterInfoMap clusters() PURE;
 
   /**
-   * @return ClusterInfoConstSharedPtr the thread local cluster with the given name or nullptr if it
-   *does not
-   * exist. This is thread safe.
+   * @return ThreadLocalCluster* the thread local cluster with the given name or nullptr if it
+   * does not exist. This is thread safe.
    *
    * NOTE: The pointer returned by this function is ONLY safe to use in the context of the owning
    * call (or if the caller knows that the cluster is fully static and will never be deleted). In

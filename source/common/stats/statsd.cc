@@ -63,14 +63,16 @@ void UdpStatsdSink::onTimespanComplete(const std::string& name, std::chrono::mil
 
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::Instance& tls,
-                             Upstream::ClusterManager& cluster_manager)
-    : local_info_(local_info), cluster_name_(cluster_name), tls_(tls),
-      tls_slot_(tls.allocateSlot()), cluster_manager_(cluster_manager) {
+                             Upstream::ClusterManager& cluster_manager, Stats::Scope& scope)
+    : local_info_(local_info), tls_(tls), tls_slot_(tls.allocateSlot()),
+      cluster_manager_(cluster_manager), cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
 
-  if (!cluster_manager.get(cluster_name)) {
+  Upstream::ThreadLocalCluster* cluster = cluster_manager.get(cluster_name);
+  if (!cluster) {
     throw EnvoyException(fmt::format("unknown TCP statsd upstream cluster: {}", cluster_name));
   }
 
+  cluster_info_ = cluster->info();
   if (local_info_.clusterName().empty() || local_info_.nodeName().empty()) {
     throw EnvoyException(
         fmt::format("TCP statsd requires setting --service-cluster and --service-node"));
@@ -119,15 +121,38 @@ void TcpStatsdSink::TlsSink::write(const std::string& stat) {
     return;
   }
 
+  // Guard against the stats connection backing up. In this case we probably have no visibility
+  // into what is going on externally, but we also increment a stat that should be viewable
+  // locally.
+  // NOTE: In the current implementation, we write most stats on the main thread, but timers
+  //       get emitted on the worker threads. Since this is using global buffered data, it's
+  //       possible that we are about to kill the connection that is not actually backed up.
+  //       This is essentially a panic state, so it's not worth keeping per thread buffer stats,
+  //       since if we stay over, the other threads will eventually kill their connections too.
+  // TODO(mattklein123): The use of the stat is somewhat of a hack, and should be replaced with
+  // real flow control callbacks once they are available.
+  if (parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_.value() >
+      MaxBufferedStatsBytes) {
+    if (connection_) {
+      connection_->close(Network::ConnectionCloseType::NoFlush);
+    }
+    parent_.cx_overflow_stat_.inc();
+    return;
+  }
+
   if (!connection_) {
     Upstream::Host::CreateConnectionData info =
-        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_name_);
+        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name());
     if (!info.connection_) {
       return;
     }
 
     connection_ = std::move(info.connection_);
     connection_->addConnectionCallbacks(*this);
+    connection_->setBufferStats({parent_.cluster_info_->stats().upstream_cx_rx_bytes_total_,
+                                 parent_.cluster_info_->stats().upstream_cx_rx_bytes_buffered_,
+                                 parent_.cluster_info_->stats().upstream_cx_tx_bytes_total_,
+                                 parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_});
     connection_->connect();
   }
 

@@ -22,7 +22,7 @@ namespace Http {
 // clang-format on
 
 /**
- * Wrapper struct for connection manager stats. @see stats_macros.h
+ * Wrapper struct for buffer filter stats. @see stats_macros.h
  */
 struct BufferFilterStats {
   ALL_BUFFER_FILTER_STATS(GENERATE_COUNTER_STRUCT)
