@@ -496,7 +496,7 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onInterval() {
 void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
     Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
-  if (value->type() == Redis::RespType::BulkString && value->asString() == "PONG") {
+  if (value->type() == Redis::RespType::SimpleString && value->asString() == "PONG") {
     handleSuccess();
   } else {
     handleFailure(false);

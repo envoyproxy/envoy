@@ -915,7 +915,7 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Redis::RespValuePtr response(new Redis::RespValue());
-  response->type(Redis::RespType::BulkString);
+  response->type(Redis::RespType::SimpleString);
   response->asString() = "PONG";
   pool_callbacks_->onResponse(std::move(response));
 
