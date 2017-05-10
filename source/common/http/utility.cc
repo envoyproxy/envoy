@@ -80,7 +80,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
     if (header.key() == Http::Headers::get().Cookie.get().c_str()) {
       // Split the cookie header into individual cookies.
       for (const std::string& s : StringUtil::split(std::string{header.value().c_str()}, ';')) {
-        // Find the key part of the cookie (i.e. the name of the cookie)
+        // Find the key part of the cookie (i.e. the name of the cookie).
         size_t first_non_space = s.find_first_not_of(" ");
         size_t equals_index = s.find('=');
         if (first_non_space == std::string::npos || equals_index == std::string::npos) {
