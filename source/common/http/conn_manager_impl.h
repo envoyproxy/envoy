@@ -312,8 +312,11 @@ private:
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
 
     // Http::StreamDecoderFilterCallbacks
+    void addDecodedData(Buffer::Instance& data) override;
     void continueDecoding() override;
-    Buffer::InstancePtr& decodingBuffer() override { return parent_.buffered_request_data_; }
+    const Buffer::Instance* decodingBuffer() override {
+      return parent_.buffered_request_data_.get();
+    }
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
@@ -345,8 +348,11 @@ private:
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
 
     // Http::StreamEncoderFilterCallbacks
+    void addEncodedData(Buffer::Instance& data) override;
     void continueEncoding() override;
-    Buffer::InstancePtr& encodingBuffer() override { return parent_.buffered_response_data_; }
+    const Buffer::Instance* encodingBuffer() override {
+      return parent_.buffered_response_data_.get();
+    }
 
     StreamEncoderFilterSharedPtr handle_;
   };
@@ -371,9 +377,11 @@ private:
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     uint64_t connectionId();
     Ssl::Connection* ssl();
+    void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data);
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
+    void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
@@ -398,11 +406,25 @@ private:
     virtual Tracing::OperationName operationName() const override;
     virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
 
-    // All state for the stream. Put here for readability. We could move this to a bit field
-    // eventually if we want.
+    /**
+     * Flags that keep track of which filter calls are currently in progress.
+     */
+    // clang-format off
+    struct FilterCallState {
+      static constexpr uint32_t DecodeHeaders   = 0x01;
+      static constexpr uint32_t DecodeData      = 0x02;
+      static constexpr uint32_t DecodeTrailers  = 0x04;
+      static constexpr uint32_t EncodeHeaders   = 0x08;
+      static constexpr uint32_t EncodeData      = 0x10;
+      static constexpr uint32_t EncodeTrailers  = 0x20;
+    };
+    // clang-format on
+
+    // All state for the stream. Put here for readability.
     struct State {
       State() : remote_complete_(false), local_complete_(false), saw_connection_close_(false) {}
 
+      uint32_t filter_call_state_{0};
       bool remote_complete_ : 1;
       bool local_complete_ : 1;
       bool saw_connection_close_ : 1;

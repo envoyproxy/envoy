@@ -81,14 +81,14 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
 
 MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
-  ON_CALL(*this, decodingBuffer()).WillByDefault(ReturnRef(buffer_));
+  ON_CALL(*this, decodingBuffer()).WillByDefault(Return(buffer_.get()));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
 
 MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
-  ON_CALL(*this, encodingBuffer()).WillByDefault(ReturnRef(buffer_));
+  ON_CALL(*this, encodingBuffer()).WillByDefault(Return(buffer_.get()));
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() {}
