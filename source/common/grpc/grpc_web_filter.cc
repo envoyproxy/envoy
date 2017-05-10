@@ -92,13 +92,15 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   }
   encoder_callbacks_->encodingBuffer()->add(&GrpcWebFilter::GRPC_WEB_TRAILER, 1);
   trailers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
-    Buffer::InstancePtr& buffer =
-        static_cast<GrpcWebFilter*>(context)->encoder_callbacks_->encodingBuffer();
-    buffer->add(header.key().c_str(), header.key().size());
-    buffer->add(":");
-    buffer->add(header.value().c_str(), header.value().size());
-    buffer->add("\r\n");
+    Buffer::Instance& temp = static_cast<GrpcWebFilter*>(context)->encoding_buffer_trailers_;
+    temp.add(header.key().c_str(), header.key().size());
+    temp.add(":");
+    temp.add(header.value().c_str(), header.value().size());
+    temp.add("\r\n");
   }, this);
+  uint64_t length = htonl(encoding_buffer_trailers_.length());
+  encoder_callbacks_->encodingBuffer()->add(&length, 4);
+  encoder_callbacks_->encodingBuffer()->move(encoding_buffer_trailers_);
   return Http::FilterTrailersStatus::Continue;
 }
 } // namespace Grpc
