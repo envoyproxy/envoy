@@ -44,8 +44,8 @@ Buffer::InstancePtr Common::serializeBody(const google::protobuf::Message& messa
   iovec.len_ = alloc_size;
   uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
   *current++ = 0; // flags
-  uint32_t nsize = htonl(size);
-  std::memcpy(current, reinterpret_cast<void*>(&nsize), sizeof(uint32_t));
+  const uint32_t nsize = htonl(size);
+  std::memcpy(current, reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
   current += sizeof(uint32_t);
   google::protobuf::io::ArrayOutputStream stream(current, size, -1);
   google::protobuf::io::CodedOutputStream codec_stream(&stream);
