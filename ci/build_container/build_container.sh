@@ -5,13 +5,7 @@ set -e
 # Setup basic requirements and install them.
 apt-get update
 apt-get install -y wget software-properties-common make cmake git python python-pip \
-  clang-format-3.6 bc libtool automake zip time
-apt-get install -y golang
-# For debugging.
-apt-get install -y gdb strace
-add-apt-repository -y ppa:ubuntu-toolchain-r/test
-apt-get update
-apt-get install -y g++-4.9
+  clang-format-3.6 bc libtool automake zip time golang g++ gdb strace
 # clang head (currently 5.0)
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial main"
@@ -32,9 +26,14 @@ pip install virtualenv
 export GOPATH=/usr/lib/go
 go get github.com/bazelbuild/buildifier/buildifier
 
-# GCC 4.9 for everything.
-export CC=gcc-4.9
-export CXX=g++-4.9
+# GCC for everything.
+export CC=gcc
+export CXX=g++
+CXX_VERSION="$(${CXX} --version | grep ^g++)"
+if [[ "${CXX_VERSION}" != "g++ (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609" ]]; then
+  echo "Unexpected compiler version: ${CXX_VERSION}"
+  exit 1
+fi
 
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty
