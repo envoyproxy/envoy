@@ -29,7 +29,10 @@ go get github.com/bazelbuild/buildifier/buildifier
 # GCC for everything.
 export CC=gcc
 export CXX=g++
-g++ --version
+if [[ "$(${CXX} --version)" != "hello" ]]; then
+  echo "Unexpected compiler version: $(${CXX} --version)"
+  exit 1
+fi
 
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty
