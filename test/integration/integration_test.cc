@@ -118,12 +118,15 @@ TEST_F(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 TEST_F(IntegrationTest, TcpProxyUpstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
+  // TSAN seems to get upset if we destroy this in a closure below, so keep it alive.
+  // https://github.com/lyft/envoy/issues/944
+  const std::string upstream_write_data("world");
   executeActions(
       {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy")); },
        [&]() -> void { tcp_client->write("hello"); },
        [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
        [&]() -> void { fake_upstream_connection->waitForData(5); },
-       [&]() -> void { fake_upstream_connection->write("world"); },
+       [&]() -> void { fake_upstream_connection->write(upstream_write_data); },
        [&]() -> void { fake_upstream_connection->close(); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
        [&]() -> void { tcp_client->waitForDisconnect(); }});
@@ -134,12 +137,15 @@ TEST_F(IntegrationTest, TcpProxyUpstreamDisconnect) {
 TEST_F(IntegrationTest, TcpProxyDownstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
+  // TSAN seems to get upset if we destroy this in a closure below, so keep it alive.
+  // https://github.com/lyft/envoy/issues/944
+  const std::string upstream_write_data("world");
   executeActions(
       {[&]() -> void { tcp_client = makeTcpConnection(lookupPort("tcp_proxy")); },
        [&]() -> void { tcp_client->write("hello"); },
        [&]() -> void { fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(); },
        [&]() -> void { fake_upstream_connection->waitForData(5); },
-       [&]() -> void { fake_upstream_connection->write("world"); },
+       [&]() -> void { fake_upstream_connection->write(upstream_write_data); },
        [&]() -> void { tcp_client->waitForData("world"); },
        [&]() -> void { tcp_client->write("hello"); }, [&]() -> void { tcp_client->close(); },
        [&]() -> void { fake_upstream_connection->waitForData(10); },
