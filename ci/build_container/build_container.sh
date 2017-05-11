@@ -9,9 +9,6 @@ apt-get install -y wget software-properties-common make cmake git python python-
 apt-get install -y golang
 # For debugging.
 apt-get install -y gdb strace
-add-apt-repository -y ppa:ubuntu-toolchain-r/test
-apt-get update
-apt-get install -y g++-4.9
 # clang head (currently 5.0)
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial main"
@@ -31,10 +28,6 @@ pip install virtualenv
 # buildifier
 export GOPATH=/usr/lib/go
 go get github.com/bazelbuild/buildifier/buildifier
-
-# GCC 4.9 for everything.
-export CC=gcc-4.9
-export CXX=g++-4.9
 
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty
