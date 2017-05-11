@@ -192,7 +192,7 @@ trace. Every span in a trace shares this ID. See more on zipkin tracing
 .. _config_http_conn_man_headers_x-b3-spanid:
 
 x-b3-spanid
-------------
+-----------
 
 The *x-b3-spanid* HTTP header is used by the Zipkin tracer in Envoy.
 The SpanId is 64-bit in length and indicates the position of the current
@@ -203,7 +203,7 @@ may not be derived from the value of the TraceId. See more on zipkin tracing
 .. _config_http_conn_man_headers_x-b3-parentspanid:
 
 x-b3-parentspanid
-------------
+-----------------
 
 The *x-b3-parentspanid* HTTP header is used by the Zipkin tracer in Envoy.
 The ParentSpanId is 64-bit in length and indicates the position of the
@@ -227,7 +227,7 @@ value should be consistently sent downstream. See more on zipkin tracing
 .. _config_http_conn_man_headers_x-b3-flags:
 
 x-b3-flags
-------------
+----------
 
 The *x-b3-flags* HTTP header is used by the Zipkin tracer in Envoy.
 The encode one or more options. For example, Debug is encoded as
