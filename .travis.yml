@@ -1,8 +1,11 @@
-language: minimal
+language: generic
 sudo: required
+
 services:
   - docker
-install:
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y awscli
   - gem install travis --no-rdoc --no-ri
 matrix:
   fast_finish: true

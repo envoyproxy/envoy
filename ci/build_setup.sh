@@ -81,7 +81,6 @@ fi
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
 # This is the hash on https://github.com/lyft/envoy-filter-example.git we pin to.
-# TODO(hennna): Point to updated hash.
 (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git checkout 9f006f6be519007e9be3b29ad531b8e8be5a18d6)
 
 # Also setup some space for building Envoy standalone.
@@ -92,6 +91,10 @@ cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE "${ENVOY_BUILD_DIR}"
 # This is where we copy build deliverables to.
 export ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
 mkdir -p "${ENVOY_DELIVERY_DIR}"
+
+# This is where we copy the coverage report to.
+export ENVOY_COVERAGE_DIR="${ENVOY_BUILD_DIR}"/generated/coverage
+mkdir -p "${ENVOY_COVERAGE_DIR}"
 
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci

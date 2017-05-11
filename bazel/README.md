@@ -85,8 +85,16 @@ example, for extremely verbose test debugging:
 bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="-l trace"
 ```
 
-Bazel will by default cache successful test results. To force it to rerun tests:
+By default, testing exercises both IPv4 and IPv6 address connections. In IPv4 or IPv6 only
+environments, set the environment variable ENVOY_IP_TEST_VERSIONS to "v4only" or
+"v6only", respectively.
 
+```
+bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v6only
+```
+
+Bazel will by default cache successful test results. To force it to rerun tests:
 
 ```
 bazel test //test/common/http:async_client_impl_test --cache_test_results=no
