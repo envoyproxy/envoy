@@ -17,12 +17,6 @@ build:clang-asan --copt -fsanitize=address,undefined
 build:clang-asan --linkopt -fsanitize=address,undefined
 build:clang-asan --copt -fno-sanitize=vptr
 build:clang-asan --linkopt -fno-sanitize=vptr
-build:clang-asan --copt -fno-sanitize=vptr
-# TODO(htuch): We should cleanup unaligned pointers at some point.
-# https://github.com/lyft/envoy/issues/914
-build:clang-asan --linkopt -fno-sanitize=alignment
-build:clang-asan --copt -fno-sanitize=alignment
-build:clang-asan --linkopt -fno-sanitize=vptr
 build:clang-asan --copt -fno-sanitize-recover=all
 build:clang-asan --linkopt -ldl
 build:clang-asan --define tcmalloc=disabled
