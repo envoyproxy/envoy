@@ -29,10 +29,12 @@ go get github.com/bazelbuild/buildifier/buildifier
 # GCC for everything.
 export CC=gcc
 export CXX=g++
-if [[ "$(${CXX} --version)" != "hello" ]]; then
-  echo "Unexpected compiler version: $(${CXX} --version)"
+CXX_VERSION="$(${CXX} --version | grep ^g++)"
+if [[ "${CXX_VERSION}" != "g++ (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609" ]]; then
+  echo "Unexpected compiler version: ${CXX_VERSION}"
   exit 1
 fi
+
 
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty
