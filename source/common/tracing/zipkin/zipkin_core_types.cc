@@ -163,31 +163,6 @@ Span::Span(const Span& span) {
   tracer_ = span.tracer();
 }
 
-Span& Span::operator=(const Span& span) {
-  trace_id_ = span.traceId();
-  name_ = span.name();
-  id_ = span.id();
-  if (span.isSetParentId()) {
-    parent_id_ = span.parentId();
-  }
-  debug_ = span.debug();
-  annotations_ = span.annotations();
-  binary_annotations_ = span.binaryAnnotations();
-  if (span.isSetTimestamp()) {
-    timestamp_ = span.timestamp();
-  }
-  if (span.isSetDuration()) {
-    duration_ = span.duration();
-  }
-  if (span.isSetTraceIdHigh()) {
-    trace_id_high_ = span.traceIdHigh();
-  }
-  monotonic_start_time_ = span.startTime();
-  tracer_ = span.tracer();
-
-  return *this;
-}
-
 void Span::setServiceName(const std::string& service_name) {
   for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
     it->changeEndpointServiceName(service_name);

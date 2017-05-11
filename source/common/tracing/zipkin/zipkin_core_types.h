@@ -298,11 +298,6 @@ public:
   Span(const Span&);
 
   /**
-   * Assignment operator.
-   */
-  Span& operator=(const Span&);
-
-  /**
    * Default constructor. Creates an empty span.
    */
   Span()
