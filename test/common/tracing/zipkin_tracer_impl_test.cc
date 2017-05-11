@@ -8,6 +8,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
+#include "common/tracing/zipkin/zipkin_core_constants.h"
 #include "common/tracing/zipkin_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -276,7 +277,55 @@ TEST_F(ZipkinDriverTest, SerializeAndDeserializeContext) {
   SpanPtr span_with_parent = driver_->startSpan(request_headers_, operation_name_, start_time_);
   injected_ctx = request_headers_.OtSpanContext()->value().c_str();
   EXPECT_FALSE(injected_ctx.empty());
+}
 
-  // TODO(fabolive): need more end-to-end tests including valid context.
+TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
+  setupValidDriver();
+
+  // ====
+  // Test effective setTag()
+  // ====
+
+  request_headers_.removeOtSpanContext();
+
+  // New span will have a CS annotation
+  SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+
+  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+  zipkin_span->setTag("key", "value");
+
+  Zipkin::Span& zipkin_zipkin_span = zipkin_span->span();
+  EXPECT_EQ(1ULL, zipkin_zipkin_span.binaryAnnotations().size());
+  EXPECT_EQ("key", zipkin_zipkin_span.binaryAnnotations()[0].key());
+  EXPECT_EQ("value", zipkin_zipkin_span.binaryAnnotations()[0].value());
+
+  // ====
+  // Test innocuous setTag() with annotated span
+  // ====
+
+  const std::string trace_id = Hex::uint64ToHex(Zipkin::Util::generateRandom64());
+  const std::string span_id = Hex::uint64ToHex(Zipkin::Util::generateRandom64());
+  const std::string parent_id = Hex::uint64ToHex(Zipkin::Util::generateRandom64());
+  const std::string context = trace_id + ";" + span_id + ";" + parent_id + ";" +
+                              Zipkin::ZipkinCoreConstants::get().CLIENT_SEND;
+
+  request_headers_.insertOtSpanContext().value(context);
+
+  // New span will have an SR annotation
+  SpanPtr span2 = driver_->startSpan(request_headers_, operation_name_, start_time_);
+
+  ZipkinSpanPtr zipkin_span2(dynamic_cast<ZipkinSpan*>(span2.release()));
+  zipkin_span2->setTag("key", "value");
+
+  Zipkin::Span& zipkin_zipkin_span2 = zipkin_span2->span();
+  EXPECT_EQ(0ULL, zipkin_zipkin_span2.binaryAnnotations().size());
+
+  // ====
+  // Test innocuous setTag() with empty annotations vector
+  // ====
+  std::vector<Zipkin::Annotation> annotations;
+  zipkin_zipkin_span2.setAnnotations(annotations);
+  zipkin_span2->setTag("key", "value");
+  EXPECT_EQ(0ULL, zipkin_zipkin_span2.binaryAnnotations().size());
 }
 } // Tracing
