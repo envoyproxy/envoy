@@ -10,6 +10,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
 
+#include "common/common/assert.h"
 #include "common/http/codec_client.h"
 
 #include "test/test_common/printers.h"
@@ -22,7 +23,10 @@ public:
   BufferingStreamDecoder(std::function<void()> on_complete_cb) : on_complete_cb_(on_complete_cb) {}
 
   bool complete() { return complete_; }
-  const Http::HeaderMap& headers() { return *headers_; }
+  const Http::HeaderMap& headers() {
+    ASSERT(headers_ != nullptr);
+    return *headers_;
+  }
   const std::string& body() { return body_; }
 
   // Http::StreamDecoder
@@ -51,7 +55,10 @@ class RawConnectionDriver {
 public:
   typedef std::function<void(Network::ClientConnection&, const Buffer::Instance&)> ReadCallback;
 
+  // TODO(hennna): Deprecate when IPv6 test support is finished.
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback);
+  RawConnectionDriver(uint32_t port, const Network::Address::IpVersion version,
+                      Buffer::Instance& initial_data, ReadCallback data_callback);
   ~RawConnectionDriver();
   void run();
   void close();
@@ -84,6 +91,7 @@ class IntegrationUtil {
 public:
   /**
    * Make a new connection, issues a request, and then disconnect when the request is complete.
+   * @param version the IP addess version of the client and server.
    * @param port supplies the port to connect to on localhost.
    * @param method supplies the request method.
    * @param url supplies the request url.
@@ -93,6 +101,11 @@ public:
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
    *         remote easly disconnection.
    */
+  static BufferingStreamDecoderPtr
+  makeSingleRequest(const Network::Address::IpVersion version, uint32_t port,
+                    const std::string& method, const std::string& url, const std::string& body,
+                    Http::CodecClient::Type type, const std::string& host = "host");
+  // TODO(henna): Deprecate when IPv6 test support is finished.
   static BufferingStreamDecoderPtr makeSingleRequest(uint32_t port, const std::string& method,
                                                      const std::string& url,
                                                      const std::string& body,

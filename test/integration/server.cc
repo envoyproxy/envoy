@@ -31,16 +31,17 @@ public:
 
 } // Server
 
-IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config_path) {
+IntegrationTestServerPtr IntegrationTestServer::create(const std::string& config_path,
+                                                       const Network::Address::IpVersion version) {
   IntegrationTestServerPtr server{new IntegrationTestServer(config_path)};
-  server->start();
+  server->start(version);
   return server;
 }
 
-void IntegrationTestServer::start() {
+void IntegrationTestServer::start(const Network::Address::IpVersion version) {
   log().info("starting integration test server");
   ASSERT(!thread_);
-  thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
+  thread_.reset(new Thread::Thread([version, this]() -> void { threadRoutine(version); }));
   // First, we want to wait until we know the server's worker threads are all
   // started.
   server_initialized_.waitReady();
@@ -53,20 +54,21 @@ void IntegrationTestServer::start() {
 IntegrationTestServer::~IntegrationTestServer() {
   log().info("stopping integration test server");
 
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(BaseIntegrationTest::lookupPort("admin"), "GET",
-                                         "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      server_->admin().socket().localAddress()->ip()->version(),
+      server_->admin().socket().localAddress()->ip()->port(), "GET", "/quitquitquit", "",
+      Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
   thread_->join();
 }
 
-void IntegrationTestServer::threadRoutine() {
+void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version) {
   Server::TestOptionsImpl options(config_path_);
   Server::TestHotRestart restarter;
   Thread::MutexBasicLockable lock;
-  LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(), "zone_name",
+  LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(version), "zone_name",
                                       "cluster_name", "node_name");
   server_.reset(
       new Server::InstanceImpl(options, *this, restarter, stats_store_, lock, *this, local_info));

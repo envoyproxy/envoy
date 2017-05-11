@@ -140,6 +140,7 @@ envoy_cc_test_library(
         "//source/server/http:health_check_lib",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -158,6 +159,19 @@ envoy_cc_test(
         ":integration_lib",
         "//source/common/http:header_map_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "echo_integration_test",
+    srcs = [
+        "echo_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration:echo_server.json",
+    ],
+    deps = [
+        ":integration_lib",
     ],
 )
 

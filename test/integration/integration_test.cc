@@ -5,6 +5,7 @@
 #include "common/http/header_map_impl.h"
 
 #include "test/integration/utility.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 

@@ -13,9 +13,9 @@
 class UdsIntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:
   /**
-   * Global initializer for all integration tests.
+   * Initializer for an individual test.
    */
-  static void SetUpTestCase() {
+  void SetUp() override {
     fake_upstreams_.emplace_back(new FakeUpstream(
         TestEnvironment::unixDomainSocketPath("udstest.1.sock"), FakeHttpConnection::Type::HTTP1));
     fake_upstreams_.emplace_back(new FakeUpstream(
@@ -24,9 +24,9 @@ public:
   }
 
   /**
-   * Global destructor for all integration tests.
+   * Destructor for an individual test.
    */
-  static void TearDownTestCase() {
+  void TearDown() override {
     test_server_.reset();
     fake_upstreams_.clear();
   }

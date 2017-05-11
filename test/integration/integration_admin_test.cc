@@ -4,6 +4,7 @@
 
 #include "test/integration/integration_test.h"
 #include "test/integration/utility.h"
+#include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"

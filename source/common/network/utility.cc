@@ -129,7 +129,11 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   }
 }
 
-Address::InstanceConstSharedPtr Utility::getLocalAddress() {
+// TODO(hennna): Currently getLocalAddress does not support choosing between
+// multiple interfaces and addresses not returned by getifaddrs. In additon,
+// the default is to return a loopback address of type version. This fucntion may
+// need to be updated in the future.
+Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersion version) {
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;
   Address::InstanceConstSharedPtr ret;
@@ -144,10 +148,13 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress() {
       continue;
     }
 
-    if (ifa->ifa_addr->sa_family == AF_INET) {
-      sockaddr_in* addr = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
-      if (htonl(INADDR_LOOPBACK) != addr->sin_addr.s_addr) {
-        ret.reset(new Address::Ipv4Instance(addr));
+    if ((ifa->ifa_addr->sa_family == AF_INET && version == Address::IpVersion::v4) ||
+        (ifa->ifa_addr->sa_family == AF_INET6 && version == Address::IpVersion::v6)) {
+      const struct sockaddr_storage* addr =
+          reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
+      ret = Address::addressFromSockAddr(
+          *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
+      if (!isLoopbackAddress(*ret)) {
         break;
       }
     }
@@ -157,6 +164,14 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress() {
     freeifaddrs(ifaddr);
   }
 
+  // If the local address is not found above, then return the loopback addresss by default.
+  if (ret == nullptr) {
+    if (version == Address::IpVersion::v4) {
+      ret.reset(new Address::Ipv4Instance("127.0.0.1"));
+    } else if (version == Address::IpVersion::v6) {
+      ret.reset(new Address::Ipv6Instance("::1"));
+    }
+  }
   return ret;
 }
 
@@ -183,7 +198,14 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     return false;
   }
 
-  return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
+  if (address.ip()->version() == Address::IpVersion::v4) {
+    // Compare to the canonical v4 loopback address: 127.0.0.1.
+    return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
+  } else if (address.ip()->version() == Address::IpVersion::v6) {
+    std::array<uint8_t, 16> addr = address.ip()->ipv6()->address();
+    return 0 == memcmp(&addr, &in6addr_loopback, sizeof(struct in6_addr));
+  }
+  return false;
 }
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
