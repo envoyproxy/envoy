@@ -54,6 +54,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_web_lib",
+    srcs = ["grpc_web.cc"],
+    hdrs = ["grpc_web.h"],
+    deps = [
+        "//include/envoy/server:instance_interface",
+        "//source/common/grpc:grpc_web_filter_lib",
+        "//source/server/config/network:http_connection_manager_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],

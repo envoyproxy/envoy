@@ -9,12 +9,12 @@ HttpFilterFactoryCb GrpcWebFilterConfig::tryCreateFilterFactory(HttpFilterType t
                                                                 const std::string& name,
                                                                 const Json::Object&,
                                                                 const std::string&,
-                                                                Server::Instance& server) {
+                                                                Server::Instance&) {
   if (type != HttpFilterType::Both || name != "grpc_web") {
     return nullptr;
   }
 
-  return [&server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new Grpc::GrpcWebFilter()});
   };
 }

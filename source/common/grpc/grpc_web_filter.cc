@@ -1,17 +1,10 @@
 #include "common/grpc/grpc_web_filter.h"
 
+#include <arpa/inet.h>
+
 #include "common/common/base64.h"
 
 namespace Grpc {
-
-const std::string GrpcWebFilter::GRPC_WEB_CONTENT_TYPE{"application/grpc-web"};
-const std::string GrpcWebFilter::GRPC_WEB_TEXT_CONTENT_TYPE{"application/grpc-web-text"};
-const std::string GrpcWebFilter::GRPC_CONTENT_TYPE{"application/grpc"};
-const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
-const Http::LowerCaseString GrpcWebFilter::HTTP_TE_KEY{"te"};
-const std::string GrpcWebFilter::HTTP_TE_VALUE{"trailers"};
-const Http::LowerCaseString GrpcWebFilter::GRPC_ACCEPT_ENCODING_KEY{"grpc-accept-encoding"};
-const std::string GrpcWebFilter::GRPC_ACCEPT_ENCODING_VALUE{"identity,deflate,gzip"};
 
 GrpcWebFilter::GrpcWebFilter() : is_text_request_(false), is_text_response_(false) {}
 
@@ -20,18 +13,21 @@ GrpcWebFilter::~GrpcWebFilter() {}
 // Implements StreamDecoderFilter.
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   const Http::HeaderEntry* content_type = headers.ContentType();
-  if (content_type != nullptr && GRPC_WEB_TEXT_CONTENT_TYPE == content_type->value().c_str()) {
+  if (content_type != nullptr &&
+      Constants::get().CONTENT_TYPE_GRPC_WEB_TEXT() == content_type->value().c_str()) {
     is_text_request_ = true;
   }
   headers.removeContentType();
-  headers.insertContentType().value(GRPC_CONTENT_TYPE);
+  headers.insertContentType().value(Constants::get().CONTENT_TYPE_GRPC());
 
   const Http::HeaderEntry* accept = headers.get(Http::LowerCaseString("accept"));
-  if (accept != nullptr && GRPC_WEB_TEXT_CONTENT_TYPE == accept->value().c_str()) {
+  if (accept != nullptr &&
+      Constants::get().CONTENT_TYPE_GRPC_WEB_TEXT() == accept->value().c_str()) {
     is_text_response_ = true;
   }
-  headers.addStatic(HTTP_TE_KEY, HTTP_TE_VALUE);
-  headers.addStatic(GRPC_ACCEPT_ENCODING_KEY, GRPC_ACCEPT_ENCODING_VALUE);
+  headers.addStatic(Constants::get().HTTP_KEY_TE(), Constants::get().HTTP_KEY_TE_VALUE());
+  headers.addStatic(Constants::get().HTTP_KEY_GRPC_ACCEPT_ENCODING(),
+                    Constants::get().HTTP_KEY_GRPC_ACCEPT_ENCODING_VALUE());
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -61,9 +57,9 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
 // Implements StreamEncoderFilter.
 Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
   if (is_text_response_) {
-    headers.ContentType()->value(GRPC_WEB_TEXT_CONTENT_TYPE);
+    headers.ContentType()->value(Constants::get().CONTENT_TYPE_GRPC_WEB_TEXT());
   } else {
-    headers.ContentType()->value(GRPC_WEB_CONTENT_TYPE);
+    headers.ContentType()->value(Constants::get().CONTENT_TYPE_GRPC_WEB());
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -90,7 +86,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   if (!encoder_callbacks_->encodingBuffer()) {
     encoder_callbacks_->encodingBuffer().reset(new Buffer::OwnedImpl());
   }
-  encoder_callbacks_->encodingBuffer()->add(&GrpcWebFilter::GRPC_WEB_TRAILER, 1);
+  encoder_callbacks_->encodingBuffer()->add(&Constants::get().GRPC_WEB_TRAILER, 1);
   trailers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
     Buffer::Instance& temp = static_cast<GrpcWebFilter*>(context)->encoding_buffer_trailers_;
     temp.add(header.key().c_str(), header.key().size());

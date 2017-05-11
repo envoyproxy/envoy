@@ -1049,7 +1049,8 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   EXPECT_CALL(*encoder_filter2, encodeData(_, false))
       .WillOnce(Return(Http::FilterDataStatus::Continue));
   EXPECT_CALL(encoder, encodeData(_, false))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool) { buffer.drain(buffer.length()); }));
+      .WillRepeatedly(
+          Invoke([](Buffer::Instance& buffer, bool) { buffer.drain(buffer.length()); }));
   EXPECT_CALL(*encoder_filter2, encodeTrailers(_))
       .WillOnce(Return(Http::FilterTrailersStatus::Continue));
   EXPECT_CALL(encoder, encodeTrailers(_));
