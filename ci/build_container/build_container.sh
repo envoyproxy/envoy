@@ -26,6 +26,11 @@ pip install virtualenv
 export GOPATH=/usr/lib/go
 go get github.com/bazelbuild/buildifier/buildifier
 
+# GCC for everything.
+export CC=gcc
+export CXX=g++
+g++ --version
+
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty
 export THIRDPARTY_BUILD=/thirdparty_build
