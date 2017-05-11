@@ -83,7 +83,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
         // Find the key part of the cookie (i.e. the name of the cookie).
         size_t first_non_space = s.find_first_not_of(" ");
         size_t equals_index = s.find('=');
-        if (first_non_space == std::string::npos || equals_index == std::string::npos) {
+        if (equals_index == std::string::npos) {
           // The cookie is malformed if it does not have an `=`. Continue
           // checking other cookies in this header.
           continue;
