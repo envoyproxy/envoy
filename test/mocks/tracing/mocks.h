@@ -40,6 +40,8 @@ public:
   MockHttpTracer();
   ~MockHttpTracer();
 
+  void installDriver(DriverPtr&&) {}
+
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                     const Http::AccessLog::RequestInfo& request_info) override {
     return SpanPtr{startSpan_(config, request_headers, request_info)};

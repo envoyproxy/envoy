@@ -15,6 +15,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 
@@ -33,8 +34,8 @@ namespace Http {
 class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
-      : client_(*cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
-                cm_, runtime_, random_,
+      : client_(*cm_.thread_local_cluster_.cluster_.info_, stats_store_, tracer_, dispatcher_,
+                local_info_, cm_, runtime_, random_,
                 Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}) {
     message_->headers().insertMethod().value(std::string("GET"));
     message_->headers().insertHost().value(std::string("host"));
@@ -67,6 +68,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Tracing::MockHttpTracer> tracer_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   AsyncClientImpl client_;

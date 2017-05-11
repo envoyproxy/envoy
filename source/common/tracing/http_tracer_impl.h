@@ -64,14 +64,28 @@ public:
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
+  void installDriver(DriverPtr&&) override {}
+
+  // Tracing::HttpTracer
   SpanPtr startSpan(const Config&, Http::HeaderMap&, const Http::AccessLog::RequestInfo&) override {
     return nullptr;
   }
 };
 
+class NullDriver : public Driver {
+public:
+  // Tracing::Driver
+  SpanPtr startSpan(Http::HeaderMap&, const std::string&, SystemTime) override { return nullptr; }
+};
+
 class HttpTracerImpl : public HttpTracer {
 public:
   HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info);
+
+  /**
+   * Replace the driver for this tracer at runtime.
+   */
+  void installDriver(DriverPtr&& driver) override;
 
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,

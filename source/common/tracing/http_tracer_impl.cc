@@ -158,6 +158,8 @@ void HttpTracerUtility::finalizeSpan(Span& active_span, const Http::HeaderMap& r
 HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
     : driver_(std::move(driver)), local_info_(local_info) {}
 
+void HttpTracerImpl::installDriver(DriverPtr&& driver) { driver_ = std::move(driver); }
+
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
                                   const Http::AccessLog::RequestInfo& request_info) {
   std::string span_name = HttpTracerUtility::toString(config.operationName());
