@@ -63,14 +63,9 @@ envoy_cc_library(
     deps = [
         ":codec_lib",
         ":common_lib",
-        "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:base64_lib",
-        "//source/common/common:enum_to_int",
-        "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http/http1:codec_lib",
     ],
 )
 

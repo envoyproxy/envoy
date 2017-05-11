@@ -3,8 +3,11 @@
 #include <arpa/inet.h>
 
 #include "common/common/base64.h"
+#include "common/http/headers.h"
 
 namespace Grpc {
+
+const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
 
 GrpcWebFilter::GrpcWebFilter() : is_text_request_(false), is_text_response_(false) {}
 
@@ -14,20 +17,20 @@ GrpcWebFilter::~GrpcWebFilter() {}
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr &&
-      Constants::get().CONTENT_TYPE_GRPC_WEB_TEXT() == content_type->value().c_str()) {
+      Http::Headers::get().ContentTypeValues.GrpcWebText == content_type->value().c_str()) {
     is_text_request_ = true;
   }
   headers.removeContentType();
-  headers.insertContentType().value(Constants::get().CONTENT_TYPE_GRPC());
+  headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Grpc);
 
   const Http::HeaderEntry* accept = headers.get(Http::LowerCaseString("accept"));
   if (accept != nullptr &&
-      Constants::get().CONTENT_TYPE_GRPC_WEB_TEXT() == accept->value().c_str()) {
+      Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().c_str()) {
     is_text_response_ = true;
   }
-  headers.addStatic(Constants::get().HTTP_KEY_TE(), Constants::get().HTTP_KEY_TE_VALUE());
-  headers.addStatic(Constants::get().HTTP_KEY_GRPC_ACCEPT_ENCODING(),
-                    Constants::get().HTTP_KEY_GRPC_ACCEPT_ENCODING_VALUE());
+  headers.addStatic(Http::Headers::get().TE, Http::Headers::get().TEValues.Trailers);
+  headers.addStatic(Http::Headers::get().GrpcAcceptEncoding,
+                    Http::Headers::get().GrpcAcceptEncodingValues.Default);
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -57,9 +60,9 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
 // Implements StreamEncoderFilter.
 Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
   if (is_text_response_) {
-    headers.ContentType()->value(Constants::get().CONTENT_TYPE_GRPC_WEB_TEXT());
+    headers.ContentType()->value(Http::Headers::get().ContentTypeValues.GrpcWebText);
   } else {
-    headers.ContentType()->value(Constants::get().CONTENT_TYPE_GRPC_WEB());
+    headers.ContentType()->value(Http::Headers::get().ContentTypeValues.GrpcWeb);
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -86,7 +89,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   if (!encoder_callbacks_->encodingBuffer()) {
     encoder_callbacks_->encodingBuffer().reset(new Buffer::OwnedImpl());
   }
-  encoder_callbacks_->encodingBuffer()->add(&Constants::get().GRPC_WEB_TRAILER, 1);
+  encoder_callbacks_->encodingBuffer()->add(&GRPC_WEB_TRAILER, 1);
   trailers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
     Buffer::Instance& temp = static_cast<GrpcWebFilter*>(context)->encoding_buffer_trailers_;
     temp.add(header.key().c_str(), header.key().size());

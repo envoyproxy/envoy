@@ -43,6 +43,7 @@ public:
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};
+  const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
   const LowerCaseString KeepAlive{"keep-alive"};
@@ -56,6 +57,7 @@ public:
   const LowerCaseString Server{"server"};
   const LowerCaseString Status{":status"};
   const LowerCaseString TransferEncoding{"transfer-encoding"};
+  const LowerCaseString TE{"te"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
 
@@ -65,6 +67,9 @@ public:
 
   struct {
     const std::string Text{"text/plain"};
+    const std::string Grpc{"application/grpc"};
+    const std::string GrpcWeb{"application/grpc-web"};
+    const std::string GrpcWebText{"application/grpc-web-text"};
   } ContentTypeValues;
 
   struct {
@@ -100,6 +105,14 @@ public:
   struct {
     const std::string EnvoyHealthChecker{"Envoy/HC"};
   } UserAgentValues;
+
+  struct {
+    const std::string Default{"identity,deflate,gzip"};
+  } GrpcAcceptEncodingValues;
+
+  struct {
+    const std::string Trailers{"trailers"};
+  } TEValues;
 };
 
 typedef ConstSingleton<HeaderValues> Headers;
