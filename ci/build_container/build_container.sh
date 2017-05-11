@@ -35,7 +35,6 @@ if [[ "${CXX_VERSION}" != "g++ (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609" ]
   exit 1
 fi
 
-
 export THIRDPARTY_DEPS=/tmp
 export THIRDPARTY_SRC=/thirdparty
 export THIRDPARTY_BUILD=/thirdparty_build
