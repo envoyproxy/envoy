@@ -168,7 +168,7 @@ bazel build -c opt //source/exe:envoy-static
 
 ## Sanitizers
 
-To build and run tests with the gcc-4.9 compiler's [address sanitizer
+To build and run tests with the gcc compiler's [address sanitizer
 (ASAN)](https://github.com/google/sanitizers/wiki/AddressSanitizer) and
 [undefined behavior
 (UBSAN)](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan) sanitizer enabled:
