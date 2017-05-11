@@ -171,6 +171,54 @@ TEST(ZipkinTracerTest, spanCreation) {
 
   // Duration is not set at span-creation time
   EXPECT_FALSE(child_span->isSetDuration());
+
+  // ==============
+  // Test the creation of a shared-context span with a parent --> SR
+  // ==============
+
+  const std::string generated_parent_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string modified_root_span_context_str =
+      root_span_context.traceIdAsHexString() + ";" + root_span_context.idAsHexString() + ";" +
+      generated_parent_id + ";" + ZipkinCoreConstants::get().CLIENT_SEND;
+  SpanContext modified_root_span_context;
+  modified_root_span_context.populateFromString(modified_root_span_context_str);
+  SpanPtr new_shared_context_span =
+      tracer.startSpan("new_shared_context_span", timestamp, modified_root_span_context);
+  EXPECT_NE(0LL, new_shared_context_span->startTime());
+
+  // span name should NOT be set (it was set in the CS side)
+  EXPECT_EQ("", new_shared_context_span->name());
+
+  // trace id must be the same in the CS and SR sides
+  EXPECT_EQ(root_span->traceId(), new_shared_context_span->traceId());
+
+  // span id must be the same in the CS and SR sides
+  EXPECT_EQ(root_span->id(), new_shared_context_span->id());
+
+  // The parent should be the same as in the CS side
+  EXPECT_TRUE(new_shared_context_span->isSetParentId());
+  EXPECT_EQ(modified_root_span_context.parent_id(), new_shared_context_span->parentId());
+
+  // span timestamp should not be set (it was set in the CS side)
+  EXPECT_FALSE(new_shared_context_span->isSetTimestamp());
+
+  // An SR annotation must have been added
+  EXPECT_EQ(1ULL, new_shared_context_span->annotations().size());
+  ann = new_shared_context_span->annotations()[0];
+  EXPECT_EQ(ZipkinCoreConstants::get().SERVER_RECV, ann.value());
+  // annotation's timestamp must be set
+  EXPECT_EQ(
+      std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count(),
+      ann.timestamp());
+  EXPECT_TRUE(ann.isSetEndpoint());
+  endpoint = ann.endpoint();
+  EXPECT_EQ("my_service_name", endpoint.serviceName());
+
+  // The tracer must have been properly set
+  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), new_shared_context_span->tracer());
+
+  // Duration is not set at span-creation time
+  EXPECT_FALSE(new_shared_context_span->isSetDuration());
 }
 
 TEST(ZipkinTracerTest, finishSpan) {
