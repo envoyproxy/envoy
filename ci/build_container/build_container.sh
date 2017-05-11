@@ -5,10 +5,7 @@ set -e
 # Setup basic requirements and install them.
 apt-get update
 apt-get install -y wget software-properties-common make cmake git python python-pip \
-  clang-format-3.6 bc libtool automake zip time
-apt-get install -y golang
-# For debugging.
-apt-get install -y gdb strace
+  clang-format-3.6 bc libtool automake zip time golang g++ gdb strace
 # clang head (currently 5.0)
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial main"
