@@ -58,7 +58,7 @@ envoy_cc_library(
         "//include/envoy/network:listener_interface",
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",
-        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:listener_lib",
     ],
