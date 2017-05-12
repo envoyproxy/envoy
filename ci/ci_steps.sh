@@ -34,6 +34,7 @@ else
   then
     mkdir -p build_release
     cp -f "$ENVOY_BUILD_DIR"/envoy/source/exe/envoy ./build_release
+    cp -f "$ENVOY_BUILD_DIR"/envoy/source/exe/envoy-debug-sym ./build_release
     # This script builds a lyft/envoy image and pushes that image on merge to master.
     ./ci/docker_push.sh
     # This script runs on every PRs release run to test the docker examples.
