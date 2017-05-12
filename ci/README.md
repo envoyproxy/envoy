@@ -18,6 +18,11 @@ one with an Envoy binary with debug (`lyft/envoy-alpine-debug`) symbols and one 
 Both images are pushed with two different tags: `<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
 master commit at which the binary was compiled, and `latest` corresponds to a binary built from the latest tip of master that passed tests.
 
+# Build image base and compiler versions
+
+The current build image is based on Ubuntu 16.04 (Xenial) which uses the GCC 5.4 compiler. We also
+install and use the clang-5.0 compiler for some sanitizing runs.
+
 # Building and running tests as a developer
 
 An example basic invocation to build a developer version of the Envoy static binary (using the Bazel `fastbuild` type) is:
