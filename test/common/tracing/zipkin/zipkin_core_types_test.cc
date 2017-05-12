@@ -506,59 +506,6 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
   EXPECT_EQ(span.isSetTraceIdHigh(), span2.isSetTraceIdHigh());
 }
 
-TEST(ZipkinCoreTypesSpanTest, moveConstructor) {
-  Span span;
-
-  const uint64_t id = Util::generateRandom64();
-  const std::string id_hex = Hex::uint64ToHex(id);
-  span.setId(id);
-  span.setParentId(id);
-  span.setTraceId(id);
-  const int64_t timestamp =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
-  span.setTimestamp(timestamp);
-  span.setDuration(3000LL);
-  span.setName("span_name");
-
-  Endpoint endpoint;
-  Annotation ann;
-  BinaryAnnotation bann;
-  std::vector<Zipkin::Annotation> annotations;
-
-  endpoint.setServiceName("my_service_name");
-  Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("192.168.1.2:3306");
-  endpoint.setAddress(addr);
-
-  ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_SEND);
-  ann.setTimestamp(timestamp);
-  ann.setEndpoint(endpoint);
-  annotations.push_back(ann);
-
-  span.setAnnotations(annotations);
-
-  Span span2(std::move(span));
-
-  EXPECT_EQ(id, span2.id());
-  EXPECT_EQ(id, span2.parentId());
-  EXPECT_EQ(id, span2.traceId());
-  EXPECT_EQ("span_name", span2.name());
-  EXPECT_EQ(1ULL, span2.annotations().size());
-  EXPECT_EQ(0ULL, span2.binaryAnnotations().size());
-  EXPECT_EQ(id_hex, span2.idAsHexString());
-  EXPECT_EQ(id_hex, span2.parentIdAsHexString());
-  EXPECT_EQ(id_hex, span2.traceIdAsHexString());
-  EXPECT_EQ(timestamp, span2.timestamp());
-  EXPECT_EQ(3000LL, span2.duration());
-  EXPECT_EQ(0LL, span2.startTime());
-  EXPECT_FALSE(span2.debug());
-  EXPECT_TRUE(span2.isSetDuration());
-  EXPECT_TRUE(span2.isSetParentId());
-  EXPECT_TRUE(span2.isSetTimestamp());
-  EXPECT_FALSE(span2.isSetTraceIdHigh());
-}
-
 TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
   Span span;
 

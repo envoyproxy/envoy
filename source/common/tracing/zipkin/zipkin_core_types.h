@@ -298,15 +298,6 @@ public:
   Span(const Span&);
 
   /**
-   * Move constructor.
-   *
-   * This constructor is used so that a Span object can safely pass itself
-   * (when its finish() method is called) via move semantics to a SpanBuffer, thereby avoiding the
-   * copy.
-   */
-  Span(const Span&&);
-
-  /**
    * Default constructor. Creates an empty span.
    */
   Span()
