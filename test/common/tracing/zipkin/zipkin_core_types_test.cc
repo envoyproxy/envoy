@@ -514,8 +514,9 @@ TEST(ZipkinCoreTypesSpanTest, moveConstructor) {
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
-  const int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
+  const int64_t timestamp =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          ProdSystemTimeSource::instance_.currentTime().time_since_epoch()).count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
   span.setName("span_name");
