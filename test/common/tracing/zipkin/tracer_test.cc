@@ -8,7 +8,11 @@
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Return;
+using testing::NiceMock;
 
 namespace Zipkin {
 
@@ -27,23 +31,20 @@ private:
 TEST(ZipkinTracerTest, spanCreation) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
-  // Runtime::RandomGeneratorImpl random_generator;
-  Runtime::MockRandomGenerator random_generator;
+  NiceMock<Runtime::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator);
-  MockSystemTimeSource mock_start_time;
+  NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
   // ==============
   // Test the creation of a root span --> CS
   // ==============
-
+  ON_CALL(random_generator, random()).WillByDefault(Return(1000));
   SpanPtr root_span = tracer.startSpan("my_span", timestamp);
 
   EXPECT_EQ("my_span", root_span->name());
   EXPECT_NE(0LL, root_span->startTime());
-
-  // Commenting out line below because MockRandomGenerator::random() returns 0
-  // EXPECT_NE(0ULL, root_span->traceId());            // trace id must be set
+  EXPECT_NE(0ULL, root_span->traceId());            // trace id must be set
   EXPECT_EQ(root_span->traceId(), root_span->id()); // span id and trace id must be the same
   EXPECT_FALSE(root_span->isSetParentId());         // no parent set
   // span's timestamp must be set
@@ -115,7 +116,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   // ==============
   // Test the creation of a child span --> CS
   // ==============
-
+  ON_CALL(random_generator, random()).WillByDefault(Return(2000));
   SpanContext server_side_context(*server_side_shared_context_span);
   SpanPtr child_span = tracer.startSpan("my_child_span", timestamp, server_side_context);
 
@@ -123,13 +124,11 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_NE(0LL, child_span->startTime());
 
   // trace id must be retained
-  // Commenting out line below because MockRandomGenerator::random() returns 0
-  // EXPECT_NE(0ULL, child_span->traceId());
+  EXPECT_NE(0ULL, child_span->traceId());
   EXPECT_EQ(server_side_shared_context_span->traceId(), child_span->traceId());
 
   // span id and trace id must NOT be the same
-  // Commenting out line below because MockRandomGenerator::random() returns 0
-  // EXPECT_NE(child_span->traceId(), child_span->id());
+  EXPECT_NE(child_span->traceId(), child_span->id());
 
   // parent should be the previous span
   EXPECT_TRUE(child_span->isSetParentId());
@@ -210,9 +209,9 @@ TEST(ZipkinTracerTest, spanCreation) {
 TEST(ZipkinTracerTest, finishSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
-  Runtime::MockRandomGenerator random_generator;
+  NiceMock<Runtime::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator);
-  MockSystemTimeSource mock_start_time;
+  NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
   // ==============
