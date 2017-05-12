@@ -15,7 +15,8 @@ binary:
 	docker run -t -i --name build-envoy-alpine-ct -v ${ROOT_DIR}/../../:/source -v $(ENVOY_BUILD_DIR):/build lyft/envoy-build:latest /bin/bash -c \
 		"set -x && cd /source && \
 		cp /build/envoy/source/exe/envoy /source/ci/build_alpine_container/bin/stripped/ && \
-		cp /build/envoy/source/exe/envoy-debug-sym /source/ci/build_alpine_container/bin/debug/ && \
+		strip /source/ci/build_alpine_container/bin/stripped/envoy && \
+		cp /build/envoy/source/exe/envoy /source/ci/build_alpine_container/bin/debug/ && \
 		cp /source/configs/google_com_proxy.json /source/ci/build_alpine_container/bin/configs/"
 	docker rm -f build-envoy-alpine-ct
 	# Fail build if a core file gets generated during the build.

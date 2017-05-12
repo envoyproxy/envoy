@@ -1,6 +1,6 @@
 FROM ubuntu:14.04
 
-ADD build_release/envoy build_release/envoy-debug-sym /usr/local/bin/envoy
+ADD build_release/envoy /usr/local/bin/envoy
 RUN apt-get update && apt-get install -y \
     build-essential
 RUN strip /usr/local/bin/envoy
