@@ -15,7 +15,6 @@
 #include "envoy/ssl/connection.h"
 
 #include "common/http/conn_manager_impl.h"
-#include "common/http/header_map_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
