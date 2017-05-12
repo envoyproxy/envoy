@@ -9,7 +9,7 @@
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
-#include "common/tracing/zipkin_tracer_impl.h"
+#include "common/tracing/zipkin/zipkin_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -30,7 +30,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::Test;
 
-namespace Tracing {
+namespace Zipkin {
 
 class ZipkinDriverTest : public Test {
 public:
@@ -153,10 +153,10 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr first_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  Tracing::SpanPtr first_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
   first_span->finishSpan();
 
-  SpanPtr second_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  Tracing::SpanPtr second_span = driver_->startSpan(request_headers_, operation_name_, start_time_);
   second_span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -198,7 +198,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  Tracing::SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
   span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -222,7 +222,7 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
       .WillOnce(Return(5));
 
-  SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  Tracing::SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
   span->finishSpan();
 
   // Timer should be re-enabled.
@@ -251,13 +251,14 @@ TEST_F(ZipkinDriverTest, SerializeAndDeserializeContext) {
 
   // Supply empty context.
   request_headers_.removeOtSpanContext();
-  SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  Tracing::SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
 
   injected_ctx = request_headers_.OtSpanContext()->value().c_str();
   EXPECT_FALSE(injected_ctx.empty());
 
   // Supply parent context, request_headers has properly populated x-ot-span-context.
-  SpanPtr span_with_parent = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  Tracing::SpanPtr span_with_parent =
+      driver_->startSpan(request_headers_, operation_name_, start_time_);
   injected_ctx = request_headers_.OtSpanContext()->value().c_str();
   EXPECT_FALSE(injected_ctx.empty());
 }
@@ -272,12 +273,12 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   request_headers_.removeOtSpanContext();
 
   // New span will have a CS annotation
-  SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  Tracing::SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
   zipkin_span->setTag("key", "value");
 
-  Zipkin::Span& zipkin_zipkin_span = zipkin_span->span();
+  Span& zipkin_zipkin_span = zipkin_span->span();
   EXPECT_EQ(1ULL, zipkin_zipkin_span.binaryAnnotations().size());
   EXPECT_EQ("key", zipkin_zipkin_span.binaryAnnotations()[0].key());
   EXPECT_EQ("value", zipkin_zipkin_span.binaryAnnotations()[0].value());
@@ -286,29 +287,29 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   // Test innocuous setTag() with annotated span
   // ====
 
-  const std::string trace_id = Hex::uint64ToHex(Zipkin::Util::generateRandom64());
-  const std::string span_id = Hex::uint64ToHex(Zipkin::Util::generateRandom64());
-  const std::string parent_id = Hex::uint64ToHex(Zipkin::Util::generateRandom64());
-  const std::string context = trace_id + ";" + span_id + ";" + parent_id + ";" +
-                              Zipkin::ZipkinCoreConstants::get().CLIENT_SEND;
+  const std::string trace_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string span_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string parent_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string context =
+      trace_id + ";" + span_id + ";" + parent_id + ";" + ZipkinCoreConstants::get().CLIENT_SEND;
 
   request_headers_.insertOtSpanContext().value(context);
 
   // New span will have an SR annotation
-  SpanPtr span2 = driver_->startSpan(request_headers_, operation_name_, start_time_);
+  Tracing::SpanPtr span2 = driver_->startSpan(request_headers_, operation_name_, start_time_);
 
   ZipkinSpanPtr zipkin_span2(dynamic_cast<ZipkinSpan*>(span2.release()));
   zipkin_span2->setTag("key", "value");
 
-  Zipkin::Span& zipkin_zipkin_span2 = zipkin_span2->span();
+  Span& zipkin_zipkin_span2 = zipkin_span2->span();
   EXPECT_EQ(0ULL, zipkin_zipkin_span2.binaryAnnotations().size());
 
   // ====
   // Test innocuous setTag() with empty annotations vector
   // ====
-  std::vector<Zipkin::Annotation> annotations;
+  std::vector<Annotation> annotations;
   zipkin_zipkin_span2.setAnnotations(annotations);
   zipkin_span2->setTag("key", "value");
   EXPECT_EQ(0ULL, zipkin_zipkin_span2.binaryAnnotations().size());
 }
-} // Tracing
+} // Zipkin

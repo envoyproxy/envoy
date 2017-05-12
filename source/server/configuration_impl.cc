@@ -18,7 +18,7 @@
 #include "common/ssl/context_config_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/lightstep_tracer_impl.h"
-#include "common/tracing/zipkin_tracer_impl.h"
+#include "common/tracing/zipkin/zipkin_tracer_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "spdlog/spdlog.h"
@@ -136,7 +136,7 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   } else {
     ASSERT(type == "zipkin");
 
-    Tracing::DriverPtr zipkin_driver(new Tracing::ZipkinDriver(
+    Tracing::DriverPtr zipkin_driver(new Zipkin::ZipkinDriver(
         *driver->getObject("config"), *cluster_manager_, server_.stats(), server_.threadLocal(),
         server_.runtime(), server_.localInfo(), rand));
 

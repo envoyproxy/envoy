@@ -11,7 +11,7 @@
 #include "common/tracing/zipkin/span_buffer.h"
 #include "common/tracing/zipkin/tracer.h"
 
-namespace Tracing {
+namespace Zipkin {
 
 #define ZIPKIN_TRACER_STATS(COUNTER)                                                               \
   COUNTER(spans_sent)                                                                              \
@@ -27,7 +27,7 @@ struct ZipkinTracerStats {
 /**
  * Class for Zipkin spans, wrapping a Zipkin::Span object.
  */
-class ZipkinSpan : public Span {
+class ZipkinSpan : public Tracing::Span {
 public:
   /**
    * Constructor. Wraps a Zipkin::Span object.
@@ -77,7 +77,7 @@ typedef std::unique_ptr<ZipkinSpan> ZipkinSpanPtr;
 /**
  * Class for a Zipkin-specific Driver.
  */
-class ZipkinDriver : public Driver {
+class ZipkinDriver : public Tracing::Driver {
 public:
   /**
    * Constructor. It adds itself and a newly-created Zipkin::Tracer object to a thread-local store.
@@ -97,8 +97,8 @@ public:
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string&,
-                    SystemTime start_time) override;
+  Tracing::SpanPtr startSpan(Http::HeaderMap& request_headers, const std::string&,
+                             SystemTime start_time) override;
 
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
@@ -111,11 +111,11 @@ private:
    * Thread-local store containing ZipkinDriver and Zipkin::Tracer objects.
    */
   struct TlsZipkinTracer : ThreadLocal::ThreadLocalObject {
-    TlsZipkinTracer(Zipkin::TracerPtr tracer, ZipkinDriver& driver);
+    TlsZipkinTracer(TracerPtr tracer, ZipkinDriver& driver);
 
     void shutdown() override { tracer_.reset(); }
 
-    Zipkin::TracerPtr tracer_;
+    TracerPtr tracer_;
     ZipkinDriver& driver_;
   };
 
@@ -142,7 +142,7 @@ private:
  *
  * The default values for the runtime parameters are 5 spans and 5000ms.
  */
-class ZipkinReporter : public Zipkin::Reporter, Http::AsyncClient::Callbacks {
+class ZipkinReporter : public Reporter, Http::AsyncClient::Callbacks {
 public:
   /**
    * Constructor.
@@ -181,8 +181,8 @@ public:
    *
    * @return Pointer to the newly-created ZipkinReporter.
    */
-  static Zipkin::ReporterPtr NewInstance(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
-                                         const std::string& collector_endpoint);
+  static ReporterPtr NewInstance(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
+                                 const std::string& collector_endpoint);
 
 private:
   /**
@@ -197,7 +197,7 @@ private:
 
   ZipkinDriver& driver_;
   Event::TimerPtr flush_timer_;
-  Zipkin::SpanBuffer span_buffer_;
+  SpanBuffer span_buffer_;
   const std::string collector_endpoint_;
 };
-} // Tracing
+} // Zipkin

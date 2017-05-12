@@ -1,4 +1,4 @@
-#include "common/tracing/zipkin_tracer_impl.h"
+#include "common/tracing/zipkin/zipkin_tracer_impl.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/http/headers.h"
@@ -9,7 +9,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace Tracing {
+namespace Zipkin {
 
 ZipkinSpan::ZipkinSpan(Zipkin::Span& span) : span_(span) {}
 
@@ -25,12 +25,12 @@ bool ZipkinSpan::hasCSAnnotation() {
   auto annotations = span_.annotations();
   if (annotations.size() > 0) {
     // We currently expect only one annotation to be in the span when this function is called.
-    return annotations[0].value() == Zipkin::ZipkinCoreConstants::get().CLIENT_SEND;
+    return annotations[0].value() == ZipkinCoreConstants::get().CLIENT_SEND;
   }
   return false;
 }
 
-ZipkinDriver::TlsZipkinTracer::TlsZipkinTracer(Zipkin::TracerPtr tracer, ZipkinDriver& driver)
+ZipkinDriver::TlsZipkinTracer::TlsZipkinTracer(TracerPtr tracer, ZipkinDriver& driver)
     : tracer_(std::move(tracer)), driver_(driver) {}
 
 ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
@@ -48,14 +48,13 @@ ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager&
   }
   cluster_ = cluster->info();
 
-  const std::string collector_endpoint = config.getString(
-      "collector_endpoint", Zipkin::ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT);
+  const std::string collector_endpoint =
+      config.getString("collector_endpoint", ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT);
 
   tls_.set(tls_slot_, [this, collector_endpoint, &random_generator](Event::Dispatcher& dispatcher)
                           -> ThreadLocal::ThreadLocalObjectSharedPtr {
-                            Zipkin::TracerPtr tracer(new Zipkin::Tracer(local_info_.clusterName(),
-                                                                        local_info_.address(),
-                                                                        random_generator));
+                            TracerPtr tracer(new Tracer(local_info_.clusterName(),
+                                                        local_info_.address(), random_generator));
                             tracer->setReporter(ZipkinReporter::NewInstance(
                                 std::ref(*this), std::ref(dispatcher), collector_endpoint));
                             return ThreadLocal::ThreadLocalObjectSharedPtr{
@@ -63,17 +62,17 @@ ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager&
                           });
 }
 
-SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::string&,
-                                SystemTime start_time) {
-  Zipkin::Tracer& tracer = *tls_.getTyped<TlsZipkinTracer>(tls_slot_).tracer_;
-  Zipkin::SpanPtr new_zipkin_span;
+Tracing::SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::string&,
+                                         SystemTime start_time) {
+  Tracer& tracer = *tls_.getTyped<TlsZipkinTracer>(tls_slot_).tracer_;
+  SpanPtr new_zipkin_span;
 
   if (request_headers.OtSpanContext()) {
     // Get the open-tracing span context.
     // This header contains a span's parent-child relationships set by the downstream Envoy.
     // The context built from this header allows the Zipkin tracer to
     // properly set the span id and the parent span id.
-    Zipkin::SpanContext context;
+    SpanContext context;
 
     context.populateFromString(request_headers.OtSpanContext()->value().c_str());
 
@@ -105,10 +104,10 @@ SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::str
   }
 
   // Set the sampled header.
-  request_headers.insertXB3Sampled().value(Zipkin::ZipkinCoreConstants::get().ALWAYS_SAMPLE);
+  request_headers.insertXB3Sampled().value(ZipkinCoreConstants::get().ALWAYS_SAMPLE);
 
   // Set the ot-span-context header with the new context.
-  Zipkin::SpanContext new_span_context(*new_zipkin_span);
+  SpanContext new_span_context(*new_zipkin_span);
   request_headers.insertOtSpanContext().value(new_span_context.serializeToString());
 
   ZipkinSpanPtr active_span;
@@ -133,13 +132,12 @@ ZipkinReporter::ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatch
   enableTimer();
 }
 
-Zipkin::ReporterPtr ZipkinReporter::NewInstance(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
-                                                const std::string& collector_endpoint) {
-  return std::unique_ptr<Zipkin::Reporter>(
-      new ZipkinReporter(driver, dispatcher, collector_endpoint));
+ReporterPtr ZipkinReporter::NewInstance(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
+                                        const std::string& collector_endpoint) {
+  return std::unique_ptr<Reporter>(new ZipkinReporter(driver, dispatcher, collector_endpoint));
 }
 
-void ZipkinReporter::reportSpan(Zipkin::Span&& span) {
+void ZipkinReporter::reportSpan(Span&& span) {
   span_buffer_.addSpan(std::move(span));
 
   const uint64_t min_flush_spans =
@@ -193,5 +191,4 @@ void ZipkinReporter::onSuccess(Http::MessagePtr&& http_response) {
     driver_.tracerStats().reports_sent_.inc();
   }
 }
-
-} // Tracing
+} // Zipkin
