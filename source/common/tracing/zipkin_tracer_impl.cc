@@ -30,8 +30,8 @@ bool ZipkinSpan::hasCSAnnotation() {
   return false;
 }
 
-ZipkinDriver::TlsZipkinTracer::TlsZipkinTracer(Zipkin::Tracer&& tracer, ZipkinDriver& driver)
-    : tracer_(new Zipkin::Tracer(std::move(tracer))), driver_(driver) {}
+ZipkinDriver::TlsZipkinTracer::TlsZipkinTracer(Zipkin::TracerPtr tracer, ZipkinDriver& driver)
+    : tracer_(std::move(tracer)), driver_(driver) {}
 
 ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
                            Stats::Store& stats, ThreadLocal::Instance& tls,
@@ -54,13 +54,15 @@ ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager&
                     cluster_->name()));
   }
 
-  const std::string collector_endpoint = config.getString("collector_endpoint");
+  const std::string collector_endpoint = config.getString(
+      "collector_endpoint", Zipkin::ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT);
 
   tls_.set(tls_slot_, [this, collector_endpoint, &random_generator](Event::Dispatcher& dispatcher)
                           -> ThreadLocal::ThreadLocalObjectSharedPtr {
-                            Zipkin::Tracer tracer(local_info_.clusterName(), local_info_.address(),
-                                                  random_generator);
-                            tracer.setReporter(ZipkinReporter::NewInstance(
+                            Zipkin::TracerPtr tracer(new Zipkin::Tracer(local_info_.clusterName(),
+                                                                        local_info_.address(),
+                                                                        random_generator));
+                            tracer->setReporter(ZipkinReporter::NewInstance(
                                 std::ref(*this), std::ref(dispatcher), collector_endpoint));
                             return ThreadLocal::ThreadLocalObjectSharedPtr{
                                 new TlsZipkinTracer(std::move(tracer), *this)};

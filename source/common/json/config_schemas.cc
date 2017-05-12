@@ -967,7 +967,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
               "collector_cluster" : {"type" : "string"},
               "collector_endpoint": {"type": "string"}
             },
-            "required": ["collector_cluster", "collector_endpoint"],
+            "required": ["collector_cluster"],
             "additionalProperties" : false
           }
         },

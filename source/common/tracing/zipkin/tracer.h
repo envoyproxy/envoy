@@ -44,13 +44,6 @@ typedef std::unique_ptr<Reporter> ReporterPtr;
 class Tracer : public TracerInterface {
 public:
   /**
-   * Move constructor.
-   */
-  Tracer(Tracer&& tracer)
-      : service_name_(tracer.serviceName()), address_(tracer.address()),
-        reporter_(tracer.reporter()), random_generator_(tracer.randomGenerator()) {}
-
-  /**
    * Constructor.
    *
    * @param service_name The name of the service where the Tracer is running. This name is
@@ -101,12 +94,6 @@ public:
    * Associates a Reporter object with this Tracer.
    */
   void setReporter(ReporterPtr reporter);
-
-  /**
-   * @return the reporter associated with the Tracer.
-   * This is only implemented to support the move constructor.
-   */
-  ReporterPtr reporter() { return std::move(reporter_); }
 
   /**
    * @return the random-number generator associated with the Tracer.

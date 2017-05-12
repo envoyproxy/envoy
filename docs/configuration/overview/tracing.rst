@@ -64,6 +64,6 @@ collector_cluster
   Zipkin cluster must be defined under `clusters` in the cluster manager configuration section.
 
 collector_endpoint
-  *(required, string)* The API endpoint of the Zipkin service where the
+  *(optional, string)* The API endpoint of the Zipkin service where the
   spans will be sent. When using a standard Zipkin installation, the
-  API endpoint is typically `/api/v1/spans`.
+  API endpoint is typically `/api/v1/spans`, which is the default value.

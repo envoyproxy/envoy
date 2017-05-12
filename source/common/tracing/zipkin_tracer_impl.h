@@ -111,7 +111,7 @@ private:
    * Thread-local store containing ZipkinDriver and Zipkin::Tracer objects.
    */
   struct TlsZipkinTracer : ThreadLocal::ThreadLocalObject {
-    TlsZipkinTracer(Zipkin::Tracer&& tracer, ZipkinDriver& driver);
+    TlsZipkinTracer(Zipkin::TracerPtr tracer, ZipkinDriver& driver);
 
     void shutdown() override { tracer_.reset(); }
 
