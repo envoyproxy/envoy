@@ -73,8 +73,9 @@ Annotation& Annotation::operator=(const Annotation& ann) {
 
 void Annotation::changeEndpointServiceName(const std::string& service_name) {
   if (endpoint_.valid()) {
-    Endpoint& endpoint = const_cast<Endpoint&>(endpoint_.value());
+    Endpoint endpoint(endpoint_.value());
     endpoint.setServiceName(service_name);
+    setEndpoint(std::move(endpoint));
   }
 }
 
