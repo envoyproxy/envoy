@@ -116,8 +116,7 @@ TEST(Ipv4CidrRangeTest, StringAndLengthCtor) {
   rng = CidrRange::create("1.2.3.4", -10); // Invalid length.
   EXPECT_FALSE(rng.isValid());
 
-  rng = CidrRange::create("bogus", 31); // Invalid address.
-  EXPECT_FALSE(rng.isValid());
+  EXPECT_THROW(CidrRange::create("bogus", 31), EnvoyException); // Invalid address.
 }
 
 TEST(Ipv4CidrRangeTest, StringCtor) {
@@ -131,7 +130,7 @@ TEST(Ipv4CidrRangeTest, StringCtor) {
   EXPECT_TRUE(rng.isInRange(parseInternetAddress("1.2.3.5")));
   EXPECT_FALSE(rng.isInRange(parseInternetAddress("1.2.3.6")));
 
-  CidrRange rng2 = CidrRange::create("1.2.3.4/-10"); // Invalid length.
+EXPECT_THROW( CidrRange::create("1.2.3.4/-10"); // Invalid length.
   EXPECT_FALSE(rng2.isValid());
 
   CidrRange rng3 = CidrRange::create("bogus/31"); // Invalid address.

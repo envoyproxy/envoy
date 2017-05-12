@@ -161,6 +161,7 @@ TEST(Ipv4InstanceTest, ParseInternetAddressAndPort) {
   EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3:1"));
   EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4]:2"));
   EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:65536"));
+  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:8008/"));
 
   auto ptr = parseInternetAddressAndPort("0.0.0.0:0");
   ASSERT_NE(ptr, nullptr);

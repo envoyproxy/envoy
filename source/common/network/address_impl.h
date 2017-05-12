@@ -178,7 +178,7 @@ private:
  * @param ip_addr string to be parsed as an internet address.
  * @return pointer to the Instance, or nullptr if unable to parse the address.
  */
-InstanceConstSharedPtr parseInternetAddress(const std::string& ip_addr);
+InstanceConstSharedPtr parseInternetAddress(const std::string& ip_address);
 
 /*
  * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it.
@@ -187,8 +187,12 @@ InstanceConstSharedPtr parseInternetAddress(const std::string& ip_addr);
  *        - "[1234:5678::9]:443"
  * @return pointer to the Instance, or nullptr if unable to parse the address.
  */
-InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_addr);
+InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_address);
 
+class ParseUtility {
+public:
+  static InstanceConstSharedPtr parseInternetAddressAndPortWorker(const std::string& ip_address);
+};
 /**
  * Implementation of a pipe address (unix domain socket on unix).
  */
