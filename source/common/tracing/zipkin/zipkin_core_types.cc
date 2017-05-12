@@ -163,6 +163,27 @@ Span::Span(const Span& span) {
   tracer_ = span.tracer();
 }
 
+Span::Span(const Span&& span)
+    : trace_id_(std::move(span.traceId())), name_(std::move(span.name())),
+      id_(std::move(span.id())), debug_(std::move(span.debug())),
+      annotations_(std::move(span.annotations())),
+      binary_annotations_(std::move(span.binaryAnnotations())),
+      monotonic_start_time_(std::move(span.startTime())), tracer_(std::move(span.tracer())) {
+
+  if (span.isSetParentId()) {
+    parent_id_.value(std::move(span.parentId()));
+  }
+  if (span.isSetTimestamp()) {
+    timestamp_.value(std::move(span.timestamp()));
+  }
+  if (span.isSetDuration()) {
+    duration_.value(std::move(span.duration()));
+  }
+  if (span.isSetTraceIdHigh()) {
+    trace_id_high_.value(std::move(span.traceIdHigh()));
+  }
+}
+
 void Span::setServiceName(const std::string& service_name) {
   for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
     it->changeEndpointServiceName(service_name);
