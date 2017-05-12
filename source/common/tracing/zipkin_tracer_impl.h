@@ -125,7 +125,7 @@ private:
   ThreadLocal::Instance& tls_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
-  uint32_t tls_slot_;
+  const uint32_t tls_slot_;
 };
 
 /**
@@ -198,6 +198,6 @@ private:
   ZipkinDriver& driver_;
   Event::TimerPtr flush_timer_;
   Zipkin::SpanBuffer span_buffer_;
-  std::string collector_endpoint_;
+  const std::string collector_endpoint_;
 };
 } // Tracing

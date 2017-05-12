@@ -111,24 +111,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
   }
 
   {
-    // Valid config, but upstream cluster supports only http2.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-        .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
-    std::string valid_config = R"EOF(
-      {
-       "collector_cluster": "fake_cluster",
-       "collector_endpoint": "/api/v1/spans"
-       }
-    )EOF";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
-
-    EXPECT_THROW(setup(*loader, false), EnvoyException);
-  }
-
-  {
-    // valid config, without http2 cluster will work
+    // valid config
     EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
 

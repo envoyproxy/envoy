@@ -48,12 +48,6 @@ ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager&
   }
   cluster_ = cluster->info();
 
-  if (cluster_->features() & Upstream::ClusterInfo::Features::HTTP2) {
-    throw EnvoyException(
-        fmt::format("Zipkin collector service (cluster {}) can be accessed over http1.1 only",
-                    cluster_->name()));
-  }
-
   const std::string collector_endpoint = config.getString(
       "collector_endpoint", Zipkin::ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT);
 
