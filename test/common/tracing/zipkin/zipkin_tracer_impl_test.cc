@@ -48,8 +48,6 @@ public:
 
   void setupValidDriver() {
     EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-        .WillByDefault(Return(0)); // No HTTP2 for zipkin upstreams
 
     std::string valid_config = R"EOF(
       {
@@ -75,7 +73,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Runtime::RandomGeneratorImpl random_;
+  Runtime::MockRandomGenerator random_;
 };
 
 TEST_F(ZipkinDriverTest, InitializeDriver) {

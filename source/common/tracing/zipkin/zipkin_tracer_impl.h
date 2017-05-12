@@ -111,7 +111,7 @@ private:
    * Thread-local store containing ZipkinDriver and Zipkin::Tracer objects.
    */
   struct TlsZipkinTracer : ThreadLocal::ThreadLocalObject {
-    TlsZipkinTracer(TracerPtr tracer, ZipkinDriver& driver);
+    TlsZipkinTracer(TracerPtr&& tracer, ZipkinDriver& driver);
 
     void shutdown() override { tracer_.reset(); }
 
@@ -163,7 +163,7 @@ public:
    *
    * @param span The span to be buffered.
    */
-  void reportSpan(Zipkin::Span&& span) override;
+  void reportSpan(Span&& span) override;
 
   // Http::AsyncClient::Callbacks.
   // The callbacks below record Zipkin-span-related stats.

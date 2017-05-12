@@ -30,7 +30,7 @@ bool ZipkinSpan::hasCSAnnotation() {
   return false;
 }
 
-ZipkinDriver::TlsZipkinTracer::TlsZipkinTracer(TracerPtr tracer, ZipkinDriver& driver)
+ZipkinDriver::TlsZipkinTracer::TlsZipkinTracer(TracerPtr&& tracer, ZipkinDriver& driver)
     : tracer_(std::move(tracer)), driver_(driver) {}
 
 ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
