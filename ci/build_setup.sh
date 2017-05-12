@@ -12,17 +12,14 @@ NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 export ENVOY_SRCDIR=/source
 
 function setup_gcc_toolchain() {
-  export CC=gcc-4.9
-  export CXX=g++-4.9
+  export CC=gcc
+  export CXX=g++
   echo "$CC/$CXX toolchain configured"
 }
 
 function setup_clang_toolchain() {
   export CC=clang-5.0
   export CXX=clang++-5.0
-  # Ensure clang doesn't use a C++ ABI incompatible with the prebuilts.
-  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --copt=-D_GLIBCXX_USE_CXX11_ABI=0"
-  export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --copt=-D_GLIBCXX_USE_CXX11_ABI=0"
   echo "$CC/$CXX toolchain configured"
 }
 
