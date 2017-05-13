@@ -16,6 +16,7 @@ to find out more about the origin story and design philosophy of Envoy.
 * [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev): Envoy developer discussion (APIs,
   feature design, etc.).
 * [#lyft-envoy](http://webchat.freenode.net/?channels=lyft-envoy): IRC (synced to Gitter)
+* [Twitter](https://twitter.com/EnvoyProxy/): Follow along on Twitter!
 * [lyft/envoy](https://gitter.im/lyft/envoy): Gitter (most people use Gitter)
 
 ## Reporting security vulnerabilities
