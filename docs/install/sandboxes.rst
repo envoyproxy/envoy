@@ -297,9 +297,12 @@ This image has all software needed to build envoy. From your envoy directory::
 
   $ pwd
   src/envoy
-  $ docker run -t -i -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh normal"
+  $ ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 
 That command will take some time to run because it is compiling an envoy binary.
+
+For more information on building, please refer to
+`this documentation <https://github.com/lyft/envoy/tree/master/ci#building-and-running-tests-as-a-developer>`_.
 
 **Step 2: Build image with only envoy binary**
 
