@@ -30,13 +30,12 @@ bool ZipkinSpan::hasCSAnnotation() {
   return false;
 }
 
-ZipkinDriver::TlsZipkinTracer::TlsZipkinTracer(TracerPtr&& tracer, ZipkinDriver& driver)
+Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
     : tracer_(std::move(tracer)), driver_(driver) {}
 
-ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-                           Stats::Store& stats, ThreadLocal::Instance& tls,
-                           Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-                           Runtime::RandomGenerator& random_generator)
+Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
+               Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+               const LocalInfo::LocalInfo& local_info, Runtime::RandomGenerator& random_generator)
     : cm_(cluster_manager),
       tracer_stats_{ZIPKIN_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.zipkin."))}, tls_(tls),
       runtime_(runtime), local_info_(local_info), tls_slot_(tls.allocateSlot()) {
@@ -55,16 +54,16 @@ ZipkinDriver::ZipkinDriver(const Json::Object& config, Upstream::ClusterManager&
                           -> ThreadLocal::ThreadLocalObjectSharedPtr {
                             TracerPtr tracer(new Tracer(local_info_.clusterName(),
                                                         local_info_.address(), random_generator));
-                            tracer->setReporter(ZipkinReporter::NewInstance(
+                            tracer->setReporter(Reporter::NewInstance(
                                 std::ref(*this), std::ref(dispatcher), collector_endpoint));
                             return ThreadLocal::ThreadLocalObjectSharedPtr{
-                                new TlsZipkinTracer(std::move(tracer), *this)};
+                                new TlsTracer(std::move(tracer), *this)};
                           });
 }
 
-Tracing::SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const std::string&,
-                                         SystemTime start_time) {
-  Tracer& tracer = *tls_.getTyped<TlsZipkinTracer>(tls_slot_).tracer_;
+Tracing::SpanPtr Driver::startSpan(Http::HeaderMap& request_headers, const std::string&,
+                                   SystemTime start_time) {
+  Tracer& tracer = *tls_.getTyped<TlsTracer>(tls_slot_).tracer_;
   SpanPtr new_zipkin_span;
 
   if (request_headers.OtSpanContext()) {
@@ -116,8 +115,8 @@ Tracing::SpanPtr ZipkinDriver::startSpan(Http::HeaderMap& request_headers, const
   return std::move(active_span);
 }
 
-ZipkinReporter::ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
-                               const std::string& collector_endpoint)
+Reporter::Reporter(Driver& driver, Event::Dispatcher& dispatcher,
+                   const std::string& collector_endpoint)
     : driver_(driver), collector_endpoint_(collector_endpoint) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
@@ -132,12 +131,12 @@ ZipkinReporter::ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatch
   enableTimer();
 }
 
-ReporterPtr ZipkinReporter::NewInstance(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
-                                        const std::string& collector_endpoint) {
-  return std::unique_ptr<Reporter>(new ZipkinReporter(driver, dispatcher, collector_endpoint));
+ReporterPtr Reporter::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+                                  const std::string& collector_endpoint) {
+  return std::unique_ptr<ReporterInterface>(new Reporter(driver, dispatcher, collector_endpoint));
 }
 
-void ZipkinReporter::reportSpan(Span&& span) {
+void Reporter::reportSpan(Span&& span) {
   span_buffer_.addSpan(std::move(span));
 
   const uint64_t min_flush_spans =
@@ -148,13 +147,13 @@ void ZipkinReporter::reportSpan(Span&& span) {
   }
 }
 
-void ZipkinReporter::enableTimer() {
+void Reporter::enableTimer() {
   const uint64_t flush_interval =
       driver_.runtime().snapshot().getInteger("tracing.zipkin.flush_interval_ms", 5000U);
   flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
 
-void ZipkinReporter::flushSpans() {
+void Reporter::flushSpans() {
   if (span_buffer_.pendingSpans()) {
     driver_.tracerStats().spans_sent_.add(span_buffer_.pendingSpans());
 
@@ -179,11 +178,11 @@ void ZipkinReporter::flushSpans() {
   }
 }
 
-void ZipkinReporter::onFailure(Http::AsyncClient::FailureReason) {
+void Reporter::onFailure(Http::AsyncClient::FailureReason) {
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void ZipkinReporter::onSuccess(Http::MessagePtr&& http_response) {
+void Reporter::onSuccess(Http::MessagePtr&& http_response) {
   if (Http::Utility::getResponseStatus(http_response->headers()) !=
       enumToInt(Http::Code::Accepted)) {
     driver_.tracerStats().reports_dropped_.inc();

@@ -136,9 +136,9 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   } else {
     ASSERT(type == "zipkin");
 
-    Tracing::DriverPtr zipkin_driver(new Zipkin::ZipkinDriver(
-        *driver->getObject("config"), *cluster_manager_, server_.stats(), server_.threadLocal(),
-        server_.runtime(), server_.localInfo(), rand));
+    Tracing::DriverPtr zipkin_driver(
+        new Zipkin::Driver(*driver->getObject("config"), *cluster_manager_, server_.stats(),
+                           server_.threadLocal(), server_.runtime(), server_.localInfo(), rand));
 
     http_tracer_.reset(new Tracing::HttpTracerImpl(std::move(zipkin_driver), server_.localInfo()));
   }

@@ -16,7 +16,7 @@ using testing::NiceMock;
 
 namespace Zipkin {
 
-class TestReporterImpl : public Reporter {
+class TestReporterImpl : public ReporterInterface {
 public:
   TestReporterImpl(int value) : value_(value) {}
   void reportSpan(Span&& span) { reported_spans_.push_back(span); }

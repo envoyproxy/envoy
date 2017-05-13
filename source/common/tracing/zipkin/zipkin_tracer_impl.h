@@ -77,15 +77,15 @@ typedef std::unique_ptr<ZipkinSpan> ZipkinSpanPtr;
 /**
  * Class for a Zipkin-specific Driver.
  */
-class ZipkinDriver : public Tracing::Driver {
+class Driver : public Tracing::Driver {
 public:
   /**
    * Constructor. It adds itself and a newly-created Zipkin::Tracer object to a thread-local store.
    * Also, it associates the given random-number generator to the Zipkin::Tracer object it creates.
    */
-  ZipkinDriver(const Json::Object& config, Upstream::ClusterManager& cluster_manager,
-               Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-               const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator);
+  Driver(const Json::Object& config, Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+         const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator);
 
   /**
    * This function is inherited from the abstract Driver class.
@@ -110,13 +110,13 @@ private:
   /**
    * Thread-local store containing ZipkinDriver and Zipkin::Tracer objects.
    */
-  struct TlsZipkinTracer : ThreadLocal::ThreadLocalObject {
-    TlsZipkinTracer(TracerPtr&& tracer, ZipkinDriver& driver);
+  struct TlsTracer : ThreadLocal::ThreadLocalObject {
+    TlsTracer(TracerPtr&& tracer, Driver& driver);
 
     void shutdown() override { tracer_.reset(); }
 
     TracerPtr tracer_;
-    ZipkinDriver& driver_;
+    Driver& driver_;
   };
 
   Upstream::ClusterManager& cm_;
@@ -142,7 +142,7 @@ private:
  *
  * The default values for the runtime parameters are 5 spans and 5000ms.
  */
-class ZipkinReporter : public Reporter, Http::AsyncClient::Callbacks {
+class Reporter : public ReporterInterface, Http::AsyncClient::Callbacks {
 public:
   /**
    * Constructor.
@@ -153,8 +153,7 @@ public:
    * when making HTTP POST requests carrying spans. This value comes from the
    * Zipkin-related tracing configuration.
    */
-  ZipkinReporter(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
-                 const std::string& collector_endpoint);
+  Reporter(Driver& driver, Event::Dispatcher& dispatcher, const std::string& collector_endpoint);
 
   /**
    * Implementation of Zipkin::Reporter::reportSpan().
@@ -181,7 +180,7 @@ public:
    *
    * @return Pointer to the newly-created ZipkinReporter.
    */
-  static ReporterPtr NewInstance(ZipkinDriver& driver, Event::Dispatcher& dispatcher,
+  static ReporterPtr NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
                                  const std::string& collector_endpoint);
 
 private:
@@ -195,7 +194,7 @@ private:
    */
   void flushSpans();
 
-  ZipkinDriver& driver_;
+  Driver& driver_;
   Event::TimerPtr flush_timer_;
   SpanBuffer span_buffer_;
   const std::string collector_endpoint_;

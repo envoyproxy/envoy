@@ -43,7 +43,7 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));
     }
 
-    driver_.reset(new ZipkinDriver(config, cm_, stats_, tls_, runtime_, local_info_, random_));
+    driver_.reset(new Driver(config, cm_, stats_, tls_, runtime_, local_info_, random_));
   }
 
   void setupValidDriver() {
@@ -66,7 +66,7 @@ public:
   SystemTime start_time_;
   Http::AccessLog::MockRequestInfo request_info_;
 
-  std::unique_ptr<ZipkinDriver> driver_;
+  std::unique_ptr<Driver> driver_;
   NiceMock<Event::MockTimer>* timer_;
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
