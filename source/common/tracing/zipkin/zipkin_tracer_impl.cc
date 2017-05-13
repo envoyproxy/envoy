@@ -54,7 +54,7 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
                           -> ThreadLocal::ThreadLocalObjectSharedPtr {
                             TracerPtr tracer(new Tracer(local_info_.clusterName(),
                                                         local_info_.address(), random_generator));
-                            tracer->setReporter(Reporter::NewInstance(
+                            tracer->setReporter(ReporterImpl::NewInstance(
                                 std::ref(*this), std::ref(dispatcher), collector_endpoint));
                             return ThreadLocal::ThreadLocalObjectSharedPtr{
                                 new TlsTracer(std::move(tracer), *this)};
@@ -115,8 +115,8 @@ Tracing::SpanPtr Driver::startSpan(Http::HeaderMap& request_headers, const std::
   return std::move(active_span);
 }
 
-Reporter::Reporter(Driver& driver, Event::Dispatcher& dispatcher,
-                   const std::string& collector_endpoint)
+ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
+                           const std::string& collector_endpoint)
     : driver_(driver), collector_endpoint_(collector_endpoint) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
@@ -131,13 +131,14 @@ Reporter::Reporter(Driver& driver, Event::Dispatcher& dispatcher,
   enableTimer();
 }
 
-ReporterPtr Reporter::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
-                                  const std::string& collector_endpoint) {
-  return std::unique_ptr<ReporterInterface>(new Reporter(driver, dispatcher, collector_endpoint));
+ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+                                      const std::string& collector_endpoint) {
+  return ReporterPtr(new ReporterImpl(driver, dispatcher, collector_endpoint));
 }
 
-void Reporter::reportSpan(Span&& span) {
-  span_buffer_.addSpan(std::move(span));
+// TODO(fabolive): Need to avoid the copy to improve performance.
+void ReporterImpl::reportSpan(const Span& span) {
+  span_buffer_.addSpan(span);
 
   const uint64_t min_flush_spans =
       driver_.runtime().snapshot().getInteger("tracing.zipkin.min_flush_spans", 5U);
@@ -147,13 +148,13 @@ void Reporter::reportSpan(Span&& span) {
   }
 }
 
-void Reporter::enableTimer() {
+void ReporterImpl::enableTimer() {
   const uint64_t flush_interval =
       driver_.runtime().snapshot().getInteger("tracing.zipkin.flush_interval_ms", 5000U);
   flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
 
-void Reporter::flushSpans() {
+void ReporterImpl::flushSpans() {
   if (span_buffer_.pendingSpans()) {
     driver_.tracerStats().spans_sent_.add(span_buffer_.pendingSpans());
 
@@ -178,11 +179,11 @@ void Reporter::flushSpans() {
   }
 }
 
-void Reporter::onFailure(Http::AsyncClient::FailureReason) {
+void ReporterImpl::onFailure(Http::AsyncClient::FailureReason) {
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void Reporter::onSuccess(Http::MessagePtr&& http_response) {
+void ReporterImpl::onSuccess(Http::MessagePtr&& http_response) {
   if (Http::Utility::getResponseStatus(http_response->headers()) !=
       enumToInt(Http::Code::Accepted)) {
     driver_.tracerStats().reports_dropped_.inc();

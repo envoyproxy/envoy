@@ -142,7 +142,7 @@ private:
  *
  * The default values for the runtime parameters are 5 spans and 5000ms.
  */
-class Reporter : public ReporterInterface, Http::AsyncClient::Callbacks {
+class ReporterImpl : public Reporter, Http::AsyncClient::Callbacks {
 public:
   /**
    * Constructor.
@@ -153,7 +153,8 @@ public:
    * when making HTTP POST requests carrying spans. This value comes from the
    * Zipkin-related tracing configuration.
    */
-  Reporter(Driver& driver, Event::Dispatcher& dispatcher, const std::string& collector_endpoint);
+  ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
+               const std::string& collector_endpoint);
 
   /**
    * Implementation of Zipkin::Reporter::reportSpan().
@@ -162,7 +163,7 @@ public:
    *
    * @param span The span to be buffered.
    */
-  void reportSpan(Span&& span) override;
+  void reportSpan(const Span& span) override;
 
   // Http::AsyncClient::Callbacks.
   // The callbacks below record Zipkin-span-related stats.

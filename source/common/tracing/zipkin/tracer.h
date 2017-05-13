@@ -15,12 +15,12 @@ namespace Zipkin {
  * of "reporting" a Zipkin span that has ended its life cycle. "Reporting" can mean that the
  * span will be sent to out to Zipkin, or buffered so that it can be sent out later.
  */
-class ReporterInterface {
+class Reporter {
 public:
   /**
    * Destructor.
    */
-  virtual ~ReporterInterface() {}
+  virtual ~Reporter() {}
 
   /**
    * Method that a concrete Reporter class must implement to handle finished spans.
@@ -28,10 +28,10 @@ public:
    *
    * @param span The span that needs action.
    */
-  virtual void reportSpan(Span&& span) PURE;
+  virtual void reportSpan(const Span& span) PURE;
 };
 
-typedef std::unique_ptr<ReporterInterface> ReporterPtr;
+typedef std::unique_ptr<Reporter> ReporterPtr;
 
 /**
  * This class implements the Zipkin tracer. It has methods to create the appropriate Zipkin span

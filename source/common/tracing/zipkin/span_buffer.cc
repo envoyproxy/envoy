@@ -2,7 +2,8 @@
 
 namespace Zipkin {
 
-bool SpanBuffer::addSpan(Span&& span) {
+// TODO(fabolive): Need to avoid the copy to improve performance.
+bool SpanBuffer::addSpan(const Span& span) {
   if (span_buffer_.size() == span_buffer_.capacity()) {
     // Buffer full
     return false;

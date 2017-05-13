@@ -37,7 +37,7 @@ public:
    *
    * @return true if the span was successfully added, or false if the buffer was full.
    */
-  bool addSpan(Span&& span);
+  bool addSpan(const Span& span);
 
   /**
    * Empties the buffer. This method is supposed to be called when all buffered spans
