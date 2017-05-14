@@ -113,6 +113,13 @@ Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion versio
   }
 }
 
+Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion version) {
+  if (version == Address::IpVersion::v4) {
+    return Network::Utility::getCanonicalIpv4LoopbackAddress();
+  }
+  return Network::Utility::getIpv6LoopbackAddress();
+}
+
 Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     return Network::Utility::getIpv4AnyAddress();
@@ -121,7 +128,7 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version) 
 }
 
 bool supportsIpVersion(const Address::IpVersion version) {
-  Address::InstanceConstSharedPtr addr = getSomeLoopbackAddress(version);
+  Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   const int fd = addr->socket(Address::SocketType::Stream);
   if (fd < 0) {
     // Socket creation failed.

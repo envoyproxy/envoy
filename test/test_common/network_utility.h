@@ -55,6 +55,13 @@ const std::string addressVersionAsString(const Address::IpVersion version);
 Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion version);
 
 /**
+ * Returns a loopback address for the specified IP version (127.0.0.1 for IPv4 and ::1 for IPv6).
+ * @param version the IP version of the loopback address.
+ * @returns a loopback address for the specified IP version.
+ */
+Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(const Address::IpVersion version);
+
+/**
  * Returns the any address for the specified IP version.
  * @param version the IP version of the any address.
  * @returns the any address for the specified IP version.
