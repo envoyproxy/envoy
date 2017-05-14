@@ -19,12 +19,13 @@ using testing::Return;
 
 namespace Network {
 
-static void errorCallbackTest() {
+static void errorCallbackTest(Address::IpVersion version) {
   // Force the error callback to fire by closing the socket under the listener. We run this entire
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
+
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -48,8 +49,12 @@ static void errorCallbackTest() {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-TEST(ListenerImplDeathTest, ErrorCallback) {
-  EXPECT_DEATH(errorCallbackTest(), ".*listener accept failure.*");
+class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
+INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplDeathTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ListenerImplDeathTest, ErrorCallback) {
+  EXPECT_DEATH(errorCallbackTest(GetParam()), ".*listener accept failure.*");
 }
 
 class TestListenerImpl : public ListenerImpl {
