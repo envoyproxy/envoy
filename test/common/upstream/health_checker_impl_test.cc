@@ -686,7 +686,9 @@ TEST(TcpHealthCheckMatcher, match) {
 
 class TcpHealthCheckerImplTest : public testing::Test {
 public:
-  TcpHealthCheckerImplTest() : cluster_(new NiceMock<MockCluster>()) {
+  TcpHealthCheckerImplTest() : cluster_(new NiceMock<MockCluster>()) {}
+
+  void setupData() {
     std::string json = R"EOF(
     {
       "type": "tcp",
@@ -708,15 +710,33 @@ public:
         new TcpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
   }
 
+  void setupNoData() {
+    std::string json = R"EOF(
+    {
+      "type": "tcp",
+      "timeout_ms": 1000,
+      "interval_ms": 1000,
+      "unhealthy_threshold": 2,
+      "healthy_threshold": 2,
+      "send": [],
+      "receive": []
+    }
+    )EOF";
+
+    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    health_checker_.reset(
+        new TcpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
+  }
+
   void expectSessionCreate() {
-    timeout_timer_ = new Event::MockTimer(&dispatcher_);
     interval_timer_ = new Event::MockTimer(&dispatcher_);
+    timeout_timer_ = new Event::MockTimer(&dispatcher_);
   }
 
   void expectClientCreate() {
     connection_ = new NiceMock<Network::MockClientConnection>();
-    EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
     EXPECT_CALL(dispatcher_, createClientConnection_(_)).WillOnce(Return(connection_));
+    EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
   }
 
   std::shared_ptr<MockCluster> cluster_;
@@ -731,12 +751,18 @@ public:
 };
 
 TEST_F(TcpHealthCheckerImplTest, Success) {
+  InSequence s;
+
+  setupData();
   cluster_->hosts_ = {HostSharedPtr{new HostImpl(
       cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
   expectSessionCreate();
   expectClientCreate();
+  EXPECT_CALL(*connection_, write(_));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   health_checker_->start();
+
+  connection_->raiseEvents(Network::ConnectionEvent::Connected);
 
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -746,28 +772,37 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
 }
 
 TEST_F(TcpHealthCheckerImplTest, Timeout) {
+  InSequence s;
+
+  setupData();
   health_checker_->start();
 
   expectSessionCreate();
   expectClientCreate();
   cluster_->hosts_ = {HostSharedPtr{new HostImpl(
       cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
+  EXPECT_CALL(*connection_, write(_));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   cluster_->runCallbacks({cluster_->hosts_.back()}, {});
+
+  connection_->raiseEvents(Network::ConnectionEvent::Connected);
 
   Buffer::OwnedImpl response;
   add_uint8(response, 1);
   read_filter_->onData(response);
 
+  EXPECT_CALL(*connection_, close(_));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  EXPECT_CALL(*connection_, close(_));
   timeout_timer_->callback_();
   EXPECT_TRUE(cluster_->hosts_[0]->healthy());
 
   expectClientCreate();
+  EXPECT_CALL(*connection_, write(_));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
+
+  connection_->raiseEvents(Network::ConnectionEvent::Connected);
 
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -776,13 +811,39 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   EXPECT_FALSE(cluster_->hosts_[0]->healthy());
 
   expectClientCreate();
+  EXPECT_CALL(*connection_, write(_));
   EXPECT_CALL(*timeout_timer_, enableTimer(_));
   interval_timer_->callback_();
+
+  connection_->raiseEvents(Network::ConnectionEvent::Connected);
 
   std::vector<HostSharedPtr> removed{cluster_->hosts_.back()};
   cluster_->hosts_.clear();
   EXPECT_CALL(*connection_, close(_));
   cluster_->runCallbacks({}, removed);
+}
+
+TEST_F(TcpHealthCheckerImplTest, NoData) {
+  InSequence s;
+
+  setupNoData();
+  cluster_->hosts_ = {HostSharedPtr{new HostImpl(
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, 1, "")}};
+  expectSessionCreate();
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_)).Times(0);
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  connection_->raiseEvents(Network::ConnectionEvent::Connected);
+
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_)).Times(0);
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  interval_timer_->callback_();
 }
 
 class RedisHealthCheckerImplTest : public testing::Test, public Redis::ConnPool::ClientFactory {
@@ -854,7 +915,7 @@ TEST_F(RedisHealthCheckerImplTest, All) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Redis::RespValuePtr response(new Redis::RespValue());
-  response->type(Redis::RespType::BulkString);
+  response->type(Redis::RespType::SimpleString);
   response->asString() = "PONG";
   pool_callbacks_->onResponse(std::move(response));
 

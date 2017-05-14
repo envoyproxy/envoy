@@ -12,17 +12,14 @@ NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 export ENVOY_SRCDIR=/source
 
 function setup_gcc_toolchain() {
-  export CC=gcc-4.9
-  export CXX=g++-4.9
+  export CC=gcc
+  export CXX=g++
   echo "$CC/$CXX toolchain configured"
 }
 
 function setup_clang_toolchain() {
   export CC=clang-5.0
   export CXX=clang++-5.0
-  # Ensure clang doesn't use a C++ ABI incompatible with the prebuilts.
-  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --copt=-D_GLIBCXX_USE_CXX11_ABI=0"
-  export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --copt=-D_GLIBCXX_USE_CXX11_ABI=0"
   echo "$CC/$CXX toolchain configured"
 }
 
@@ -81,7 +78,6 @@ fi
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
 # This is the hash on https://github.com/lyft/envoy-filter-example.git we pin to.
-# TODO(hennna): Point to updated hash.
 (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git checkout 9f006f6be519007e9be3b29ad531b8e8be5a18d6)
 
 # Also setup some space for building Envoy standalone.
@@ -92,6 +88,10 @@ cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE "${ENVOY_BUILD_DIR}"
 # This is where we copy build deliverables to.
 export ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
 mkdir -p "${ENVOY_DELIVERY_DIR}"
+
+# This is where we copy the coverage report to.
+export ENVOY_COVERAGE_DIR="${ENVOY_BUILD_DIR}"/generated/coverage
+mkdir -p "${ENVOY_COVERAGE_DIR}"
 
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci

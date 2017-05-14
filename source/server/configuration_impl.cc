@@ -18,6 +18,7 @@
 #include "common/ssl/context_config_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/lightstep_tracer_impl.h"
+#include "common/tracing/zipkin/zipkin_tracer_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "spdlog/spdlog.h"
@@ -102,6 +103,11 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
     return;
   }
 
+  if (server_.localInfo().clusterName().empty()) {
+    throw EnvoyException("cluster name must be defined if tracing is enabled. See "
+                         "--service-cluster option.");
+  }
+
   // Initialize tracing driver.
   Json::ObjectPtr http_tracer_config = tracing_configuration->getObject("http");
   Json::ObjectPtr driver = http_tracer_config->getObject("driver");
@@ -109,27 +115,33 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   std::string type = driver->getString("type");
   log().info(fmt::format("  loading tracing driver: {}", type));
 
-  ASSERT(type == "lightstep");
   ::Runtime::RandomGenerator& rand = server_.random();
-  Json::ObjectPtr lightstep_config = driver->getObject("config");
 
-  std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
-  opts->access_token =
-      server_.api().fileReadToEnd(lightstep_config->getString("access_token_file"));
-  StringUtil::rtrim(opts->access_token);
+  if (type == "lightstep") {
+    Json::ObjectPtr lightstep_config = driver->getObject("config");
 
-  if (server_.localInfo().clusterName().empty()) {
-    throw EnvoyException("cluster name must be defined if LightStep tracing is enabled. See "
-                         "--service-cluster option.");
+    std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
+    opts->access_token =
+        server_.api().fileReadToEnd(lightstep_config->getString("access_token_file"));
+    StringUtil::rtrim(opts->access_token);
+
+    opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
+    opts->guid_generator = [&rand]() { return rand.random(); };
+
+    Tracing::DriverPtr lightstep_driver(
+        new Tracing::LightStepDriver(*lightstep_config, *cluster_manager_, server_.stats(),
+                                     server_.threadLocal(), server_.runtime(), std::move(opts)));
+    http_tracer_.reset(
+        new Tracing::HttpTracerImpl(std::move(lightstep_driver), server_.localInfo()));
+  } else {
+    ASSERT(type == "zipkin");
+
+    Tracing::DriverPtr zipkin_driver(
+        new Zipkin::Driver(*driver->getObject("config"), *cluster_manager_, server_.stats(),
+                           server_.threadLocal(), server_.runtime(), server_.localInfo(), rand));
+
+    http_tracer_.reset(new Tracing::HttpTracerImpl(std::move(zipkin_driver), server_.localInfo()));
   }
-  opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
-  opts->guid_generator = [&rand]() { return rand.random(); };
-
-  Tracing::DriverPtr lightstep_driver(
-      new Tracing::LightStepDriver(*lightstep_config, *cluster_manager_, server_.stats(),
-                                   server_.threadLocal(), server_.runtime(), std::move(opts)));
-
-  http_tracer_.reset(new Tracing::HttpTracerImpl(std::move(lightstep_driver), server_.localInfo()));
 }
 
 const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { return listeners_; }

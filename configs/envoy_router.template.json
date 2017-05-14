@@ -6,6 +6,9 @@
       "name": "www",
       "require_ssl": "all",
       "domains": ["www.yourcompany.net"],
+      "rate_limits": [
+        { "actions": [ { "type": "remote_address" } ] }
+      ],
       "routes": [
         {
           "prefix": "/foo/bar",
@@ -25,6 +28,9 @@
       "name": "www_redirect",
       "require_ssl": "all",
       "domains": ["wwww.yourcompany.net"],
+      "rate_limits": [
+        { "actions": [ { "type": "remote_address" } ] }
+      ],
       "routes": [
         {
           "prefix": "/",
@@ -36,6 +42,9 @@
       "name": "api",
       "require_ssl": "external_only",
       "domains": ["api.yourcompany.net"],
+      "rate_limits": [
+        { "actions": [ { "type": "remote_address" } ] }
+      ],
       "routes": [
         {
           "path": "/foo/bar",

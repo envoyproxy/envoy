@@ -14,6 +14,8 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -57,6 +59,45 @@ TEST(ConnectionImplDeathTest, BadFd) {
   EXPECT_DEATH(ConnectionImpl(dispatcher, -1, Utility::resolveUrl("tcp://127.0.0.1:0"),
                               Utility::resolveUrl("tcp://127.0.0.1:0")),
                ".*assert failure: fd_ != -1.*");
+}
+
+TEST(ConnectionImplTest, CloseDuringConnectCallback) {
+  Stats::IsolatedStoreImpl stats_store;
+  Event::DispatcherImpl dispatcher;
+  Network::TcpListenSocket socket(Network::Utility::getIpv4AnyAddress(), true);
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener =
+      dispatcher.createListener(connection_handler, socket, listener_callbacks, stats_store,
+                                Network::ListenerOptions::listenerOptionsWithBindToPort());
+
+  Network::ClientConnectionPtr client_connection =
+      dispatcher.createClientConnection(socket.localAddress());
+  MockConnectionCallbacks client_callbacks;
+  client_connection->addConnectionCallbacks(client_callbacks);
+  Buffer::OwnedImpl buffer("hello world");
+  client_connection->write(buffer);
+  client_connection->connect();
+
+  EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](uint32_t)
+                           -> void { client_connection->close(ConnectionCloseType::NoFlush); }));
+  EXPECT_CALL(client_callbacks, onEvent(ConnectionEvent::LocalClose));
+
+  Network::ConnectionPtr server_connection;
+  Network::MockConnectionCallbacks server_callbacks;
+  std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
+  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
+      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+        server_connection = std::move(conn);
+        server_connection->addConnectionCallbacks(server_callbacks);
+        server_connection->addReadFilter(read_filter);
+      }));
+
+  EXPECT_CALL(server_callbacks, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](uint32_t) -> void { dispatcher.exit(); }));
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
 struct MockBufferStats {
@@ -138,14 +179,14 @@ TEST(ConnectionImplTest, BufferStats) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-class ReadBufferLimitTest : public testing::Test {
+class ReadBufferLimitTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
 
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
-    Network::TcpListenSocket socket(Network::Utility::getIpv6AnyAddress(), true);
+    Network::TcpListenSocket socket(Network::Test::getAnyAddress(GetParam()), true);
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
     Network::ListenerPtr listener =
@@ -198,9 +239,12 @@ public:
   }
 };
 
-TEST_F(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
+INSTANTIATE_TEST_CASE_P(IpVersions, ReadBufferLimitTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-TEST_F(ReadBufferLimitTest, SomeLimit) { readBufferLimitTest(32 * 1024, 32 * 1024); }
+TEST_P(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
+
+TEST_P(ReadBufferLimitTest, SomeLimit) { readBufferLimitTest(32 * 1024, 32 * 1024); }
 
 TEST(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   Event::DispatcherImpl dispatcher;

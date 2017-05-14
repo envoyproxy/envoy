@@ -10,11 +10,11 @@ echo "building using ${NUM_CPUS} CPUs"
 function bazel_release_binary_build() {
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
-  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static.stripped.stamped
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static.stamped
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp -f \
-    "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stripped.stamped \
+    "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stamped \
     "${ENVOY_DELIVERY_DIR}"/envoy
 }
 
@@ -42,12 +42,14 @@ elif [[ "$1" == "bazel.release.server_only" ]]; then
   bazel_release_binary_build
   exit 0
 elif [[ "$1" == "bazel.debug" ]]; then
+  setup_gcc_toolchain
   echo "bazel debug build with tests..."
   bazel_debug_binary_build
   echo "Testing..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c dbg //test/...
   exit 0
 elif [[ "$1" == "bazel.debug.server_only" ]]; then
+  setup_gcc_toolchain
   echo "bazel debug build..."
   bazel_debug_binary_build
   exit 0
@@ -101,6 +103,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   cd "${ENVOY_BUILD_DIR}"
   export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg"
   SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
+  rsync -av "${ENVOY_BUILD_DIR}"/bazel-envoy/generated/coverage/ "${ENVOY_COVERAGE_DIR}"
   exit 0
 elif [[ "$1" == "fix_format" ]]; then
   echo "fix_format..."

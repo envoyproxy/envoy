@@ -46,11 +46,16 @@ A few notes about the example configurations:
   to be running at `discovery.yourcompany.net`.
 * DNS for `yourcompany.net` is assumed to be setup for various things. Search the configuration
   templates for different instances of this.
-* Tracing is configured for `LightStep <http://lightstep.com/>`_. To disable this delete the
-  :ref:`tracing configuration <config_tracing>`.
+* Tracing is configured for `LightStep <http://lightstep.com/>`_. To
+  disable this or enable `Zipkin <http://zipkin.io>` tracing, delete or
+  change the :ref:`tracing configuration <config_tracing>` accordingly.
 * The configuration demonstrates the use of a :ref:`global rate limiting service
   <arch_overview_rate_limit>`. To disable this delete the :ref:`rate limit configuration
   <config_rate_limit_service>`.
+* :ref:`Route discovery service <config_http_conn_man_rds>` is configured for the service to service
+  reference configuration and it is assumed to be running at `rds.yourcompany.net`.
+* :ref:`Cluster discovery service <config_cluster_manager_cds>` is configured for the service to
+  service reference configuration and it is assumed that be running at `cds.yourcompany.net`.
 
 Smoketest configuration
 -----------------------

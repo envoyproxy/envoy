@@ -8,8 +8,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/stats/stats_impl.h"
-
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 
