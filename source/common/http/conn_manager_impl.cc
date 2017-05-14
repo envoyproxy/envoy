@@ -558,7 +558,7 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
                                                          Buffer::Instance& data) {
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::DecodeHeaders)) {
-    // If not call is happening or we are in the decode headers callback, buffer the data. Inline
+    // If no call is happening or we are in the decode headers callback, buffer the data. Inline
     // processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
@@ -567,7 +567,7 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
     decodeData(&filter, data, false);
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
-    // throw and exception here.
+    // throw an exception here.
     NOT_IMPLEMENTED;
   }
 }
@@ -726,7 +726,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
                                                          Buffer::Instance& data) {
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::EncodeHeaders)) {
-    // If not call is happening or we are in the decode headers callback, buffer the data. Inline
+    // If no call is happening or we are in the decode headers callback, buffer the data. Inline
     // processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
@@ -735,7 +735,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
     encodeData(&filter, data, false);
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
-    // throw and exception here.
+    // throw an exception here.
     NOT_IMPLEMENTED;
   }
 }
