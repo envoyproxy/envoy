@@ -20,9 +20,18 @@ sources of latency. Envoy supports three features related to system wide tracing
   be used to join untrusted request IDs to the trusted internal
   :ref:`config_http_conn_man_headers_x-request-id`.
 
-Envoy relies on properly propagated :ref:`config_http_conn_man_headers_x-request-id` and
-:ref:`config_http_conn_man_headers_x-ot-span-context` HTTP headers for LightStep tracing
-functionality.
+When using the LightStep tracer, Envoy relies on a service to propagate
+:ref:`config_http_conn_man_headers_x-request-id` and
+:ref:`config_http_conn_man_headers_x-ot-span-context` HTTP headers
+while sending HTTP requests to other services. When using the Zipkin
+tracer, Envoy relies on the service to
+propagate :ref:`config_http_conn_man_headers_x-request-id`,
+:ref:`config_http_conn_man_headers_x-ot-span-context`,
+:ref:`config_http_conn_man_headers_x-b3-traceid`,
+:ref:`config_http_conn_man_headers_x-b3-spanid`,
+:ref:`config_http_conn_man_headers_x-b3-parentspanid`,
+:ref:`config_http_conn_man_headers_x-b3-sampled`, and
+:ref:`config_http_conn_man_headers_x-b3-flags` HTTP headers.
 
 How to initiate a trace
 -----------------------
