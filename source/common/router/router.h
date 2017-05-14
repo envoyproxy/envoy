@@ -111,13 +111,15 @@ public:
 
   ~Filter();
 
+  // Http::StreamFilterBase
+  void onDestroy() override;
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
-    callbacks_->addResetStreamCallback([this]() -> void { onResetStream(); });
   }
 
 private:
@@ -202,7 +204,6 @@ private:
   Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
   void onRequestComplete();
-  void onResetStream();
   void onResponseTimeout();
   void onUpstreamHeaders(Http::HeaderMapPtr&& headers, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);

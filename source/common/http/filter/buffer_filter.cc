@@ -56,7 +56,7 @@ BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::
   return {ALL_BUFFER_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
 }
 
-void BufferFilter::onResetStream() { resetInternalState(); }
+void BufferFilter::onDestroy() { resetInternalState(); }
 
 void BufferFilter::onRequestTimeout() {
   Http::HeaderMapPtr response_headers{new HeaderMapImpl{
@@ -69,7 +69,6 @@ void BufferFilter::resetInternalState() { request_timeout_.reset(); }
 
 void BufferFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  callbacks_->addResetStreamCallback([this]() -> void { onResetStream(); });
 }
 
 } // Http

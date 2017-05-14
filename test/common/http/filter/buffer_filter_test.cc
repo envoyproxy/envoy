@@ -73,7 +73,7 @@ TEST_F(BufferFilterTest, RequestTimeout) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   timer_->callback_();
 
-  callbacks_.reset_callback_();
+  filter_.onDestroy();
   EXPECT_EQ(1U, config_->stats_.rq_timeout_.value());
 }
 
@@ -94,7 +94,7 @@ TEST_F(BufferFilterTest, RequestTooLarge) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
 
-  callbacks_.reset_callback_();
+  filter_.onDestroy();
   EXPECT_EQ(1U, config_->stats_.rq_too_large_.value());
 }
 
@@ -114,7 +114,7 @@ TEST_F(BufferFilterTest, TxResetAfterEndStream) {
 
   // It's possible that the stream will be reset on the TX side even after RX end stream. Mimic
   // that here.
-  callbacks_.reset_callback_();
+  filter_.onDestroy();
 }
 
 } // Http

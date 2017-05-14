@@ -347,7 +347,7 @@ void Filter::onRequestComplete() {
   }
 }
 
-void Filter::onResetStream() {
+void Filter::onDestroy() {
   if (upstream_request_) {
     upstream_request_->resetStream();
   }

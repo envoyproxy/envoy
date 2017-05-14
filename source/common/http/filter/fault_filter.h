@@ -71,13 +71,16 @@ public:
   FaultFilter(FaultFilterConfigSharedPtr config);
   ~FaultFilter();
 
+  // Http::StreamFilterBase
+  void onDestroy() override;
+
+  // Http::StreamDecoderFilter
   FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
   FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  void onResetStream();
   void resetTimerState();
   void postDelayInjection();
   void abortWithHTTPStatus();

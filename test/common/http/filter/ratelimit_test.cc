@@ -296,7 +296,7 @@ TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_CALL(*client_, cancel());
-  filter_callbacks_.reset_callback_();
+  filter_->onDestroy();
 }
 
 TEST_F(HttpRateLimitFilterTest, RouteRateLimitDisabledForRouteKey) {
