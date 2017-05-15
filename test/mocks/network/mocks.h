@@ -8,8 +8,6 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 
-#include "common/network/proxy_protocol.h"
-
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/printers.h"
 

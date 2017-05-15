@@ -14,7 +14,6 @@
 
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
-#include "common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"

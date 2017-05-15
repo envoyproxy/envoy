@@ -15,7 +15,6 @@
 #include "envoy/ssl/connection.h"
 
 #include "common/http/conn_manager_impl.h"
-#include "common/http/header_map_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -240,7 +239,8 @@ public:
   void encodeTrailers(HeaderMapPtr&& trailers) override { encodeTrailers_(*trailers); }
 
   MOCK_METHOD0(continueDecoding, void());
-  MOCK_METHOD0(decodingBuffer, Buffer::InstancePtr&());
+  MOCK_METHOD1(addDecodedData, void(Buffer::Instance& data));
+  MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers_, void(HeaderMap& trailers));
@@ -267,8 +267,9 @@ public:
   MOCK_METHOD0(downstreamAddress, const std::string&());
 
   // Http::StreamEncoderFilterCallbacks
+  MOCK_METHOD1(addEncodedData, void(Buffer::Instance& data));
   MOCK_METHOD0(continueEncoding, void());
-  MOCK_METHOD0(encodingBuffer, Buffer::InstancePtr&());
+  MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
 
   Buffer::InstancePtr buffer_;
 };

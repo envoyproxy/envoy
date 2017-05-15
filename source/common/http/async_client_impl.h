@@ -189,7 +189,8 @@ private:
   Tracing::Span& activeSpan() override { return active_span_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
-  Buffer::InstancePtr& decodingBuffer() override {
+  void addDecodedData(Buffer::Instance&) override { NOT_IMPLEMENTED; }
+  const Buffer::Instance* decodingBuffer() override {
     throw EnvoyException("buffering is not supported in streaming");
   }
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -229,7 +230,7 @@ private:
   void onReset() override;
 
   // Http::StreamDecoderFilterCallbacks
-  Buffer::InstancePtr& decodingBuffer() override { return request_->body(); }
+  const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
 
   MessagePtr request_;
   AsyncClient::Callbacks& callbacks_;

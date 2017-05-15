@@ -5,6 +5,7 @@
 #include "common/event/dispatcher_impl.h"
 
 #include "test/mocks/common.h"
+#include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 
@@ -29,8 +30,18 @@ protected:
   int fds_[2];
 };
 
-TEST_F(FileEventImplTest, Activate) {
-  int fd = socket(AF_INET, SOCK_STREAM, 0);
+class FileEventImplActivateTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, FileEventImplActivateTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(FileEventImplActivateTest, Activate) {
+  int fd;
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+  } else {
+    fd = socket(AF_INET6, SOCK_STREAM, 0);
+  }
   ASSERT_NE(-1, fd);
 
   DispatcherImpl dispatcher;
