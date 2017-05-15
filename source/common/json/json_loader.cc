@@ -58,7 +58,7 @@ public:
     checkType(Type::Object);
     auto value_itr = value_.object_value_.find(name);
     if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Boolean)) {
-      throw EnvoyException(fmt::format("key '{}' missing or not a boolean", name));
+      throw Exception(fmt::format("key '{}' missing or not a boolean", name));
     }
     return value_itr->second->booleanValue();
   }
@@ -77,7 +77,7 @@ public:
     checkType(Type::Object);
     auto value_itr = value_.object_value_.find(name);
     if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Double)) {
-      throw EnvoyException(fmt::format("key '{}' missing or not a double", name));
+      throw Exception(fmt::format("key '{}' missing or not a double", name));
     }
     return value_itr->second->doubleValue();
   }
@@ -96,7 +96,7 @@ public:
     checkType(Type::Object);
     auto value_itr = value_.object_value_.find(name);
     if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Integer)) {
-      throw EnvoyException(fmt::format("key '{}' missing or not an integer", name));
+      throw Exception(fmt::format("key '{}' missing or not an integer", name));
     }
     return value_itr->second->integerValue();
   }
@@ -118,10 +118,10 @@ public:
       if (allow_empty) {
         return createObject();
       } else {
-        throw EnvoyException(fmt::format("key '{}' missing", name));
+        throw Exception(fmt::format("key '{}' missing", name));
       }
     } else if (!value_itr->second->isType(Type::Object)) {
-      throw EnvoyException(fmt::format("key '{}' not an object", name));
+      throw Exception(fmt::format("key '{}' not an object", name));
     } else {
       return value_itr->second;
     }
@@ -131,7 +131,7 @@ public:
     checkType(Type::Object);
     auto value_itr = value_.object_value_.find(name);
     if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
-      throw EnvoyException(fmt::format("key '{}' missing or not an array", name));
+      throw Exception(fmt::format("key '{}' missing or not an array", name));
     }
 
     std::vector<FieldPtr> array_value = value_itr->second->arrayValue();
@@ -142,7 +142,7 @@ public:
     checkType(Type::Object);
     auto value_itr = value_.object_value_.find(name);
     if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::String)) {
-      throw EnvoyException(fmt::format("key '{}' missing or not a string", name));
+      throw Exception(fmt::format("key '{}' missing or not a string", name));
     }
     return value_itr->second->stringValue();
   }
@@ -161,7 +161,7 @@ public:
     checkType(Type::Object);
     auto value_itr = value_.object_value_.find(name);
     if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
-      throw EnvoyException(fmt::format("key '{}' missing or not an array", name));
+      throw Exception(fmt::format("key '{}' missing or not an array", name));
     }
 
     std::vector<FieldPtr> array = value_itr->second->arrayValue();
@@ -169,7 +169,7 @@ public:
     string_array.reserve(array.size());
     for (const auto& element : array) {
       if (!element > isType(Type::String)) {
-        throw EnvoyException(fmt::format("array '{}' does not contain all strings", name));
+        throw Exception(fmt::format("array '{}' does not contain all strings", name));
       }
       string_array.push_back(element->stringValue());
     }
@@ -191,7 +191,7 @@ public:
     } else if (isType(Type::Array)) {
       return value_.array_value_.empty();
     } else {
-      throw EnvoyException(fmt::format("cannot check empty on type other than array or object"));
+      throw Exception(fmt::format("cannot check empty on type other than array or object"));
     }
   }
 
@@ -229,7 +229,7 @@ public:
       schema_validator.GetInvalidSchemaPointer().StringifyUriFragment(schema_string_buffer);
       schema_validator.GetInvalidDocumentPointer().StringifyUriFragment(document_string_buffer);
 
-      throw EnvoyException(fmt::format(
+      throw Exception(fmt::format(
           "JSON at lines {}-{} does not conform to schema.\n Invalid schema: {}.\n Invalid "
           "keyword: "
           "{}.\n Invalid document key: {}",
@@ -307,7 +307,7 @@ public:
       break;
     }
     default:
-      throw EnvoyException("Json has a non-object or non-array at the root.");
+      throw Exception("Json has a non-object or non-array at the root.");
     }
   }
 
@@ -354,7 +354,7 @@ private:
 
   void checkType(Type type) const {
     if (!isType(type)) {
-      throw EnvoyException("invalid field type");
+      throw Exception("invalid field type");
     }
   }
 
@@ -550,7 +550,7 @@ public:
   bool Int64(int64_t value) { return handleValueEvent(Field::createValue(value)); }
   bool Uint64(uint64_t value) {
     if (value > std::numeric_limits<int64_t>::max()) {
-      throw EnvoyException("Json does not support numbers larger than int64_t");
+      throw Exception("Json does not support numbers larger than int64_t");
     }
     return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
   }
@@ -564,7 +564,7 @@ public:
     return false;
   }
 
-  bool Null() { throw EnvoyException("Json does not support null values"); }
+  bool Null() { throw Exception("Json does not support null values"); }
 
   ObjectPtr getRoot() { return root_; }
 
@@ -611,8 +611,8 @@ ObjectPtr Factory::loadFromString(const std::string& json) {
   reader.Parse(json_stream, handler);
 
   if (reader.HasParseError()) {
-    throw EnvoyException(fmt::format("Error(offset {}): {}\n", reader.GetErrorOffset(),
-                                     GetParseError_En(reader.GetParseErrorCode())));
+    throw Exception(fmt::format("Error(offset {}): {}\n", reader.GetErrorOffset(),
+                                GetParseError_En(reader.GetParseErrorCode())));
   }
 
   return handler.getRoot();
