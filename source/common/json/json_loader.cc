@@ -25,7 +25,6 @@
 namespace Json {
 
 class Field;
-
 typedef std::shared_ptr<Field> FieldPtr;
 
 class Field : public Object, public std::enable_shared_from_this<Field> {
@@ -36,6 +35,7 @@ public:
   // Container factories for handler.
   static FieldPtr createObject() { return FieldPtr{new Field(Type::Object)}; }
   static FieldPtr createArray() { return FieldPtr{new Field(Type::Array)}; }
+  static FieldPtr createNull() { return FieldPtr{new Field(Type::Null)}; }
 
   bool isArray() const { return type_ == Type::Array; }
   bool isObject() const { return type_ == Type::Object; }
@@ -191,7 +191,8 @@ public:
     } else if (isType(Type::Array)) {
       return value_.array_value_.empty();
     } else {
-      throw Exception(fmt::format("cannot check empty on type other than array or object"));
+      throw Exception(
+          fmt::format("Json does not support empty() on types other than array and object"));
     }
   }
 
@@ -214,9 +215,9 @@ public:
   void validateSchema(const std::string& schema) const override {
     rapidjson::Document schema_document;
     if (schema_document.Parse<0>(schema.c_str()).HasParseError()) {
-      throw std::invalid_argument(fmt::format("invalid schema \n Error(offset {}) : {}\n",
-                                              schema_document.GetErrorOffset(),
-                                              GetParseError_En(schema_document.GetParseError())));
+      throw std::invalid_argument(fmt::format(
+          "Schema supplied to validateSchema is not valid JSON\n Error(offset {}) : {}\n",
+          schema_document.GetErrorOffset(), GetParseError_En(schema_document.GetParseError())));
     }
 
     rapidjson::SchemaDocument schema_document_for_validator(schema_document);
@@ -230,9 +231,9 @@ public:
       schema_validator.GetInvalidDocumentPointer().StringifyUriFragment(document_string_buffer);
 
       throw Exception(fmt::format(
-          "JSON at lines {}-{} does not conform to schema.\n Invalid schema: {}.\n Invalid "
-          "keyword: "
-          "{}.\n Invalid document key: {}",
+          "JSON at lines {}-{} does not conform to schema.\n Invalid schema: {}.\n"
+          " Schema violation: {}.\n"
+          " Offending document key: {}",
           line_number_start_, line_number_end_, schema_string_buffer.GetString(),
           schema_validator.GetInvalidSchemaKeyword(), document_string_buffer.GetString()));
     }
@@ -243,72 +244,6 @@ public:
     rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
     build(*this, document, allocator);
     return document;
-  }
-
-  static void build(const Field& field, rapidjson::Value& value,
-                    rapidjson::Document::AllocatorType& allocator) {
-
-    switch (field.type_) {
-    case Type::Array: {
-      value.SetArray();
-      value.Reserve(field.value_.array_value_.size(), allocator);
-      for (const auto& element : field.value_.array_value_) {
-        switch (element->type_) {
-        case Type::Array:
-        case Type::Object: {
-          rapidjson::Value nested_value;
-          build(*element, nested_value, allocator);
-          value.PushBack(nested_value, allocator);
-          break;
-        }
-        case Type::Boolean:
-          value.PushBack(element->value_.boolean_value_, allocator);
-          break;
-        case Type::Double:
-          value.PushBack(element->value_.double_value_, allocator);
-          break;
-        case Type::Integer:
-          value.PushBack(element->value_.integer_value_, allocator);
-          break;
-        case Type::String:
-          value.PushBack(rapidjson::StringRef(element->value_.string_value_.c_str()), allocator);
-        }
-      }
-      break;
-    }
-    case Type::Object: {
-      value.SetObject();
-      for (const auto& item : field.value_.object_value_) {
-        auto name = rapidjson::StringRef(item.first.c_str());
-
-        switch (item.second->type_) {
-        case Type::Array:
-        case Type::Object: {
-          rapidjson::Value nested_value;
-          build(*item.second, nested_value, allocator);
-          value.AddMember(name, nested_value, allocator);
-          break;
-        }
-        case Type::Boolean:
-          value.AddMember(name, item.second->value_.boolean_value_, allocator);
-          break;
-        case Type::Double:
-          value.AddMember(name, item.second->value_.double_value_, allocator);
-          break;
-        case Type::Integer:
-          value.AddMember(name, item.second->value_.integer_value_, allocator);
-          break;
-        case Type::String:
-          value.AddMember(name, rapidjson::StringRef(item.second->value_.string_value_.c_str()),
-                          allocator);
-          break;
-        }
-      }
-      break;
-    }
-    default:
-      throw Exception("Json has a non-object or non-array at the root.");
-    }
   }
 
   uint64_t hash() const override {
@@ -324,14 +259,15 @@ private:
     Boolean,
     Double,
     Integer,
+    Null,
     Object,
     String,
   };
 
-  // empty container ctor
+  // Array, Object, Null ctors. Empty.
   explicit Field(Type type) : type_(type) {}
 
-  // type ctors
+  // Type ctors.
   explicit Field(const std::string& value) {
     type_ = Type::String;
     value_.string_value_ = value;
@@ -386,6 +322,78 @@ private:
     return value_.integer_value_;
   }
 
+  static void build(const Field& field, rapidjson::Value& value,
+                    rapidjson::Document::AllocatorType& allocator) {
+
+    switch (field.type_) {
+    case Type::Array: {
+      value.SetArray();
+      value.Reserve(field.value_.array_value_.size(), allocator);
+      for (const auto& element : field.value_.array_value_) {
+        switch (element->type_) {
+        case Type::Array:
+        case Type::Object: {
+          rapidjson::Value nested_value;
+          build(*element, nested_value, allocator);
+          value.PushBack(nested_value, allocator);
+          break;
+        }
+        case Type::Boolean:
+          value.PushBack(element->value_.boolean_value_, allocator);
+          break;
+        case Type::Double:
+          value.PushBack(element->value_.double_value_, allocator);
+          break;
+        case Type::Integer:
+          value.PushBack(element->value_.integer_value_, allocator);
+          break;
+        case Type::Null:
+          value.PushBack(rapidjson::Value(), allocator);
+          break;
+        case Type::String:
+          value.PushBack(rapidjson::StringRef(element->value_.string_value_.c_str()), allocator);
+        }
+      }
+      break;
+    }
+    case Type::Object: {
+      value.SetObject();
+      for (const auto& item : field.value_.object_value_) {
+        auto name = rapidjson::StringRef(item.first.c_str());
+
+        switch (item.second->type_) {
+        case Type::Array:
+        case Type::Object: {
+          rapidjson::Value nested_value;
+          build(*item.second, nested_value, allocator);
+          value.AddMember(name, nested_value, allocator);
+          break;
+        }
+        case Type::Boolean:
+          value.AddMember(name, item.second->value_.boolean_value_, allocator);
+          break;
+        case Type::Double:
+          value.AddMember(name, item.second->value_.double_value_, allocator);
+          break;
+        case Type::Integer:
+          value.AddMember(name, item.second->value_.integer_value_, allocator);
+          break;
+        case Type::Null:
+          value.AddMember(name, rapidjson::Value(), allocator);
+          break;
+        case Type::String:
+          value.AddMember(name, rapidjson::StringRef(item.second->value_.string_value_.c_str()),
+                          allocator);
+          break;
+        }
+      }
+      break;
+    }
+    default:
+      throw Exception("Json has a non-object or non-array at the root.");
+    }
+  }
+
   struct Value {
     std::vector<FieldPtr> array_value_;
     bool boolean_value_;
@@ -401,25 +409,9 @@ private:
   Value value_;
 };
 
-class LineCountingFileStream : public rapidjson::StringStream {
-public:
-  LineCountingFileStream(const Ch* src) : rapidjson::StringStream(src), line_number_(1) {}
-
-  Ch Take() {
-    Ch ret = rapidjson::StringStream::Take();
-    if (ret == '\n') {
-      line_number_++;
-    }
-    return ret;
-  }
-
-  uint64_t getLineNumber() { return line_number_; }
-
-private:
-  uint64_t line_number_;
-};
-
 class LineCountingStringStream : public rapidjson::StringStream {
+
+  // Ch is typdef in parent class specific to character encoding.
 public:
   LineCountingStringStream(const Ch* src) : rapidjson::StringStream(src), line_number_(1) {}
 
@@ -555,6 +547,8 @@ public:
     return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
   }
 
+  bool Null() { return handleValueEvent(Field::createNull()); }
+
   bool String(const char* value, rapidjson::SizeType size, bool) {
     return handleValueEvent(Field::createValue(std::string(value, size)));
   }
@@ -563,8 +557,6 @@ public:
     // Only called if kParseNumbersAsStrings is set as a parse flag, which it is not.
     return false;
   }
-
-  bool Null() { throw Exception("Json does not support null values"); }
 
   ObjectPtr getRoot() { return root_; }
 
