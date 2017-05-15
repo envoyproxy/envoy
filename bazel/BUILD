@@ -31,3 +31,11 @@ config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
 )
+
+# TODO(tschroed): This allows linking against Google code, but is very hacky.
+# https://github.com/lyft/envoy/issues/967 to do it properly, at which point
+# this can be deleted.
+config_setting(
+    name = "disable_lightstep_tracing",
+    values = {"define": "lightstep_tracing=disabled"},
+)

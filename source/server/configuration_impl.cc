@@ -17,7 +17,9 @@
 #include "common/ratelimit/ratelimit_impl.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/tracing/http_tracer_impl.h"
+#ifndef DISABLE_LIGHTSTEP_TRACING
 #include "common/tracing/lightstep_tracer_impl.h"
++#endif // DISABLE_LIGHTSTEP_TRACING
 #include "common/tracing/zipkin/zipkin_tracer_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
@@ -117,6 +119,7 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
 
   ::Runtime::RandomGenerator& rand = server_.random();
 
+#ifndef DISABLE_LIGHTSTEP_TRACING
   if (type == "lightstep") {
     Json::ObjectPtr lightstep_config = driver->getObject("config");
 
@@ -134,6 +137,10 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
     http_tracer_.reset(
         new Tracing::HttpTracerImpl(std::move(lightstep_driver), server_.localInfo()));
   } else {
+  if (type == "zipkin" ) {
+#else
+  {
+#ifndef DISABLE_LIGHTSTEP_TRACING
     ASSERT(type == "zipkin");
 
     Tracing::DriverPtr zipkin_driver(
