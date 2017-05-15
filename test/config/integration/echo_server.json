@@ -1,0 +1,27 @@
+{
+  "listeners": [
+  {
+    "address": "tcp://{{ ip_loopback_address }}:0",
+    "use_original_dst": true,
+    "filters": [
+      { "type": "read", "name": "ratelimit",
+        "config": {
+          "domain": "foo",
+          "descriptors": [[{"key": "foo", "value": "bar"}]],
+          "stat_prefix": "name"
+        }
+      },
+      { "type": "read", "name": "echo", "config": {} }
+    ]
+  }],
+
+  "admin": {
+    "access_log_path": "/dev/null",
+    "profile_path": "{{ test_tmpdir }}/envoy.prof",
+    "address": "tcp://{{ ip_loopback_address }}:0"
+  },
+
+  "cluster_manager": {
+    "clusters": []
+  }
+}

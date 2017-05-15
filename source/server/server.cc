@@ -77,10 +77,6 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
   }
   server_stats_.version_.set(version_int);
 
-  if (!local_info_.address()) {
-    throw EnvoyException("could not resolve local address");
-  }
-
   restarter_.initialize(handler_.dispatcher(), *this);
   drain_manager_ = component_factory.createDrainManager(*this);
 
