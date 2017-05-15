@@ -13,6 +13,7 @@ public:
    * Constructs a Json Object from a File.
    */
   static ObjectPtr loadFromFile(const std::string& file_path);
+  // static ObjectPtr loadFromFileTwo(const std::string& file_path);
 
   /*
    * Constructs a Json Object from a String.

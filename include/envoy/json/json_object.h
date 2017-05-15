@@ -12,7 +12,7 @@
 namespace Json {
 class Object;
 
-typedef std::unique_ptr<Object> ObjectPtr;
+typedef std::shared_ptr<Object> ObjectPtr;
 
 // @return false if immediate exit from iteration required.
 typedef std::function<bool(const std::string&, const Object&)> ObjectCallback;
