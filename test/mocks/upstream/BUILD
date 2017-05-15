@@ -14,7 +14,6 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
-        "//source/common/stats:stats_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
     ],
@@ -41,7 +40,6 @@ envoy_cc_mock(
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/mocks/http:http_mocks",

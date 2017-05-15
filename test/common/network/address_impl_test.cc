@@ -50,7 +50,7 @@ void testSocketBindAndConnect(const std::string& addr_port_str) {
   ScopedFdCloser closer1(listen_fd);
 
   // Check that IPv6 sockets accept IPv6 connections only.
-  if (addr_port->ip()->ipv6() != nullptr) {
+  if (addr_port->ip()->version() == IpVersion::v6) {
     int v6only = 0;
     socklen_t size_int = sizeof(v6only);
     ASSERT_GE(::getsockopt(listen_fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, &size_int), 0);

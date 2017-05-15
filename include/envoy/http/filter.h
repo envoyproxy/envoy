@@ -148,22 +148,30 @@ public:
   virtual void continueDecoding() PURE;
 
   /**
-   * @return Buffer::InstancePtr& the currently buffered data as buffered by this filter or previous
-   *         ones in the filter chain. May be nullptr if nothing has been buffered yet. Callers
-   *         are free to remove, reallocate, and generally modify the buffered data.
-   *
-   *         NOTE: For common buffering cases, there is no need for each filter to manually handle
-   *         buffering. If decodeData() returns StopIterationAndBuffer, the filter manager will
-   *         buffer the data passed to the callback on behalf of the filter.
-   *
-   *         NOTE: In complex cases, the filter may wish to manually modify the buffer. One example
-   *         of this is switching a header only request to a request with body data. If a filter
-   *         receives decodeHeaders(..., true), it has the option of filling decodingBuffer() with
-   *         body data. Subsequent filters will receive decodeHeaders(..., false) followed by
-   *         decodeData(..., true). This works both in the direct iteration as well as the
-   *         continuation case.
+   * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
+   *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
    */
-  virtual Buffer::InstancePtr& decodingBuffer() PURE;
+  virtual const Buffer::Instance* decodingBuffer() PURE;
+
+  /**
+   * Add buffered body data. This method is used in advanced cases where returning
+   * StopIterationAndBuffer from decodeData() is not sufficient.
+   *
+   * 1) If a headers only request needs to be turned into a request with a body, this method can
+   * be called to add body in the decodeHeaders() callback. Subsequent filters will receive
+   * decodeHeaders(..., false) followed by decodeData(..., true). This works both in the direct
+   * iteration as well as the continuation case.
+   *
+   * 2) If additional buffered body data needs to be added by a filter before continuation of
+   * data to further filters (outside of callback context).
+   *
+   * 3) If additional data needs to be added in the decodeTrailers() callback, this method can be
+   * called in the context of the callback. All further filters will receive decodeData(..., false)
+   * followed by decodeTrailers().
+   *
+   * It is an error to call this method in any other case.
+   */
+  virtual void addDecodedData(Buffer::Instance& data) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -246,22 +254,30 @@ public:
   virtual void continueEncoding() PURE;
 
   /**
-   * @return Buffer::InstancePtr& the currently buffered data as buffered by this filter or previous
-   *         ones in the filter chain. May be nullptr if nothing has been buffered yet. Callers
-   *         are free to remove, reallocate, and generally modify the buffered data.
-   *
-   *         NOTE: For common buffering cases, there is no need for each filter to manually handle
-   *         buffering. If encodeData() returns StopIterationAndBuffer, the filter manager will
-   *         buffer the data passed to the callback on behalf of the filter.
-   *
-   *         NOTE: In complex cases, the filter may wish to manually modify the buffer. One example
-   *         of this is switching a header only request to a request with body data. If a filter
-   *         receives encodeHeaders(..., true), it has the option of filling encodingBuffer() with
-   *         body data. Subsequent filters will receive encodeHeaders(..., false) followed by
-   *         encodeData(..., true). This works both in the direct iteration as well as the
-   *         continuation case.
+   * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
+   *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
    */
-  virtual Buffer::InstancePtr& encodingBuffer() PURE;
+  virtual const Buffer::Instance* encodingBuffer() PURE;
+
+  /**
+   * Add buffered body data. This method is used in advanced cases where returning
+   * StopIterationAndBuffer from encodeData() is not sufficient.
+   *
+   * 1) If a headers only response needs to be turned into a response with a body, this method can
+   * be called to add body in the encodeHeaders() callback. Subsequent filters will receive
+   * encodeHeaders(..., false) followed by encodeData(..., true). This works both in the direct
+   * iteration as well as the continuation case.
+   *
+   * 2) If additional buffered body data needs to be added by a filter before continuation of
+   * data to further filters (outside of callback context).
+   *
+   * 3) If additional data needs to be added in the encodeTrailers() callback, this method can be
+   * called in the context of the callback. All further filters will receive encodeData(..., false)
+   * followed by encodeTrailers().
+   *
+   * It is an error to call this method in any other case.
+   */
+  virtual void addEncodedData(Buffer::Instance& data) PURE;
 };
 
 /**

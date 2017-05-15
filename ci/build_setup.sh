@@ -12,17 +12,14 @@ NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 export ENVOY_SRCDIR=/source
 
 function setup_gcc_toolchain() {
-  export CC=gcc-4.9
-  export CXX=g++-4.9
+  export CC=gcc
+  export CXX=g++
   echo "$CC/$CXX toolchain configured"
 }
 
 function setup_clang_toolchain() {
   export CC=clang-5.0
   export CXX=clang++-5.0
-  # Ensure clang doesn't use a C++ ABI incompatible with the prebuilts.
-  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --copt=-D_GLIBCXX_USE_CXX11_ABI=0"
-  export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --copt=-D_GLIBCXX_USE_CXX11_ABI=0"
   echo "$CC/$CXX toolchain configured"
 }
 
@@ -81,7 +78,7 @@ fi
 cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
 # This is the hash on https://github.com/lyft/envoy-filter-example.git we pin to.
-(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git checkout 9f006f6be519007e9be3b29ad531b8e8be5a18d6)
+(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout 03f5353c939b0d796925c67d94db52e8055ee732)
 
 # Also setup some space for building Envoy standalone.
 export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy

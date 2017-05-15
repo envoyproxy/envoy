@@ -8,6 +8,8 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "test/test_common/environment.h"
+
 #include "gtest/gtest.h"
 
 namespace Network {
@@ -147,7 +149,14 @@ TEST(NetworkUtility, resolveUrl) {
   EXPECT_EQ("[a:b:c:d::]:0", Utility::resolveUrl("tcp://[a:b:c:d::]:0")->asString());
 }
 
-TEST(NetworkUtility, getLocalAddress) { EXPECT_NE(nullptr, Utility::getLocalAddress()); }
+class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, NetworkUtilityGetLocalAddress,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(NetworkUtilityGetLocalAddress, getLocalAddress) {
+  EXPECT_NE(nullptr, Utility::getLocalAddress(GetParam()));
+}
 
 TEST(NetworkUtility, getOriginalDst) { EXPECT_EQ(nullptr, Utility::getOriginalDst(-1)); }
 
@@ -162,6 +171,14 @@ TEST(NetworkUtility, loopbackAddress) {
   }
   {
     Address::PipeInstance address("/foo");
+    EXPECT_FALSE(Utility::isLoopbackAddress(address));
+  }
+  {
+    Address::Ipv6Instance address("::1");
+    EXPECT_TRUE(Utility::isLoopbackAddress(address));
+  }
+  {
+    Address::Ipv6Instance address("::");
     EXPECT_FALSE(Utility::isLoopbackAddress(address));
   }
   EXPECT_EQ("127.0.0.1:0", Utility::getCanonicalIpv4LoopbackAddress()->asString());

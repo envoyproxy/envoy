@@ -7,9 +7,9 @@
 class Http2UpstreamIntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:
   /**
-   * Global initializer for all integration tests.
+   * Initializer for an individual test.
    */
-  static void SetUpTestCase() {
+  void SetUp() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2));
@@ -19,9 +19,9 @@ public:
   }
 
   /**
-   * Global destructor for all integration tests.
+   * Destructor for an individual test.
    */
-  static void TearDownTestCase() {
+  void TearDown() override {
     test_server_.reset();
     fake_upstreams_.clear();
   }

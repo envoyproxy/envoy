@@ -138,5 +138,6 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//test/test_common:environment_lib",
     ],
 )

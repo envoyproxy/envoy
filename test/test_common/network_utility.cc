@@ -87,6 +87,13 @@ const std::string getLoopbackAddressUrlString(const Address::IpVersion version) 
   return std::string("127.0.0.1");
 }
 
+const std::string getAnyAddressUrlString(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v6) {
+    return std::string("[::]");
+  }
+  return std::string("0.0.0.0");
+}
+
 const std::string addressVersionAsString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     return std::string("v4");
@@ -113,6 +120,13 @@ Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion versio
   }
 }
 
+Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion version) {
+  if (version == Address::IpVersion::v4) {
+    return Network::Utility::getCanonicalIpv4LoopbackAddress();
+  }
+  return Network::Utility::getIpv6LoopbackAddress();
+}
+
 Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     return Network::Utility::getIpv4AnyAddress();
@@ -121,7 +135,7 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version) 
 }
 
 bool supportsIpVersion(const Address::IpVersion version) {
-  Address::InstanceConstSharedPtr addr = getSomeLoopbackAddress(version);
+  Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   const int fd = addr->socket(Address::SocketType::Stream);
   if (fd < 0) {
     // Socket creation failed.

@@ -71,6 +71,12 @@ Annotation& Annotation::operator=(const Annotation& ann) {
   return *this;
 }
 
+void Annotation::changeEndpointServiceName(const std::string& service_name) {
+  if (endpoint_.valid()) {
+    endpoint_.value().setServiceName(service_name);
+  }
+}
+
 const std::string Annotation::toJson() {
   rapidjson::StringBuffer s;
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
@@ -156,29 +162,10 @@ Span::Span(const Span& span) {
   tracer_ = span.tracer();
 }
 
-Span& Span::operator=(const Span& span) {
-  trace_id_ = span.traceId();
-  name_ = span.name();
-  id_ = span.id();
-  if (span.isSetParentId()) {
-    parent_id_ = span.parentId();
+void Span::setServiceName(const std::string& service_name) {
+  for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
+    it->changeEndpointServiceName(service_name);
   }
-  debug_ = span.debug();
-  annotations_ = span.annotations();
-  binary_annotations_ = span.binaryAnnotations();
-  if (span.isSetTimestamp()) {
-    timestamp_ = span.timestamp();
-  }
-  if (span.isSetDuration()) {
-    duration_ = span.duration();
-  }
-  if (span.isSetTraceIdHigh()) {
-    trace_id_high_ = span.traceIdHigh();
-  }
-  monotonic_start_time_ = span.startTime();
-  tracer_ = span.tracer();
-
-  return *this;
 }
 
 const std::string Span::toJson() {

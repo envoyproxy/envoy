@@ -2,7 +2,7 @@
 
 build --workspace_status_command=bazel/get_workspace_status
 
-# Basic ASAN/UBSAN that works for gcc-4.9
+# Basic ASAN/UBSAN that works for gcc
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
 build:asan --linkopt -ldl
@@ -16,12 +16,6 @@ build:clang-asan --copt -D__SANITIZE_ADDRESS__
 build:clang-asan --copt -fsanitize=address,undefined
 build:clang-asan --linkopt -fsanitize=address,undefined
 build:clang-asan --copt -fno-sanitize=vptr
-build:clang-asan --linkopt -fno-sanitize=vptr
-build:clang-asan --copt -fno-sanitize=vptr
-# TODO(htuch): We should cleanup unaligned pointers at some point.
-# https://github.com/lyft/envoy/issues/914
-build:clang-asan --linkopt -fno-sanitize=alignment
-build:clang-asan --copt -fno-sanitize=alignment
 build:clang-asan --linkopt -fno-sanitize=vptr
 build:clang-asan --copt -fno-sanitize-recover=all
 build:clang-asan --linkopt -ldl

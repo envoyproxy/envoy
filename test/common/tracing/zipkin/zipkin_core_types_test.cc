@@ -124,6 +124,15 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
                   R"(","endpoint":{"ipv4":"192.168.1.1",)"
                   R"("port":5555,"serviceName":"my_service_2"}})";
   EXPECT_EQ(expected_json, ann.toJson());
+
+  // Test changeEndpointServiceName
+  ann.changeEndpointServiceName("NEW_SERVICE_NAME");
+  EXPECT_EQ("NEW_SERVICE_NAME", ann.endpoint().serviceName());
+  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
+                  ZipkinCoreConstants::get().CLIENT_SEND +
+                  R"(","endpoint":{"ipv4":"192.168.1.1",)"
+                  R"("port":5555,"serviceName":"NEW_SERVICE_NAME"}})";
+  EXPECT_EQ(expected_json, ann.toJson());
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
@@ -414,6 +423,42 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
                 std::to_string(timestamp) +
                 R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
                 R"("serviceName":"my_service_name"}}],)"
+                R"("binaryAnnotations":[{"key":"lc","value":"my_component_name",)"
+                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                R"("serviceName":"my_service_name"}},)"
+                R"({"key":"http.return_code","value":"200",)"
+                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                R"("serviceName":"my_service_name"}},)"
+                R"({"key":"http.return_code","value":"400",)"
+                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                R"("serviceName":"my_service_name"}}]})",
+            span.toJson());
+
+  // Test setSourceServiceName and setDestinationServiceName
+
+  ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_RECV);
+  span.addAnnotation(ann);
+  span.setServiceName("NEW_SERVICE_NAME");
+  EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
+                span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
+                R"(","timestamp":)" + std::to_string(span.timestamp()) + R"(,"duration":3000,)"
+                                                                         R"("annotations":[)"
+                                                                         R"({"timestamp":)" +
+                std::to_string(timestamp) +
+                R"(,"value":"cs","endpoint":)"
+                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"NEW_SERVICE_NAME"}},)"
+                R"({"timestamp":)" +
+                std::to_string(timestamp) + R"(,"value":"ss",)"
+                                            R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                                            R"("serviceName":"NEW_SERVICE_NAME"}},)"
+                                            R"({"timestamp":)" +
+                std::to_string(timestamp) +
+                R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+                R"("serviceName":"NEW_SERVICE_NAME"}},)"
+                R"({"timestamp":)" +
+                std::to_string(timestamp) +
+                R"(,"value":"cr","endpoint":)"
+                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"NEW_SERVICE_NAME"}}],)"
                 R"("binaryAnnotations":[{"key":"lc","value":"my_component_name",)"
                 R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
                 R"("serviceName":"my_service_name"}},)"
