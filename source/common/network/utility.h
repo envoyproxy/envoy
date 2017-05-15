@@ -79,9 +79,13 @@ public:
   static uint32_t portFromTcpUrl(const std::string& url);
 
   /**
+   * Get the local address of the first interface address that is of type
+   * version and is not a loopback address. If no matches are found, return the
+   * loopback address of type version.
+   * @param the local address IP version.
    * @return the local IP address of the server
    */
-  static Address::InstanceConstSharedPtr getLocalAddress();
+  static Address::InstanceConstSharedPtr getLocalAddress(const Address::IpVersion version);
 
   /**
    * Determine whether this is an internal (RFC1918) address.
@@ -91,6 +95,7 @@ public:
 
   /**
    * Check if address is loopback address.
+   * @param address IP address to check.
    * @return true if so, otherwise false
    */
   static bool isLoopbackAddress(const Address::Instance& address);

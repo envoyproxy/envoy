@@ -42,6 +42,17 @@ public:
     return value_;
   }
 
+  /**
+   * @return the contained value. Will throw if the contained value is not valid.
+   */
+  T& value() {
+    if (!valid_) {
+      throw EnvoyException("fetching invalid Optional value");
+    }
+
+    return value_;
+  }
+
 private:
   T value_;
   bool valid_{};
