@@ -126,11 +126,16 @@ void IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers,
   flushWrite();
 }
 
+void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, Buffer::Instance& data,
+                                      bool end_stream) {
+  encoder.encodeData(data, end_stream);
+  flushWrite();
+}
+
 void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, uint64_t size,
                                       bool end_stream) {
   Buffer::OwnedImpl data(std::string(size, 'a'));
-  encoder.encodeData(data, end_stream);
-  flushWrite();
+  sendData(encoder, data, end_stream);
 }
 
 void IntegrationCodecClient::sendTrailers(Http::StreamEncoder& encoder,

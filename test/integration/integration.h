@@ -68,6 +68,7 @@ public:
   void makeRequestWithBody(const Http::HeaderMap& headers, uint64_t body_size,
                            IntegrationStreamDecoder& response);
   bool sawGoAway() { return saw_goaway_; }
+  void sendData(Http::StreamEncoder& encoder, Buffer::Instance& data, bool end_stream);
   void sendData(Http::StreamEncoder& encoder, uint64_t size, bool end_stream);
   void sendTrailers(Http::StreamEncoder& encoder, const Http::HeaderMap& trailers);
   void sendReset(Http::StreamEncoder& encoder);
