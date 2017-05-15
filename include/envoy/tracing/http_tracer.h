@@ -43,7 +43,7 @@ public:
 
   virtual void setTag(const std::string& name, const std::string& value) PURE;
   virtual void finishSpan() PURE;
-  // virtual void inject(Http::HeaderMap& request_headers) PURE;
+  virtual void injectContext(Http::HeaderMap& request_headers) PURE;
   virtual SpanPtr spawnChild(const std::string& name, SystemTime start_time) PURE;
 };
 

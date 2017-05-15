@@ -33,6 +33,7 @@ public:
   // Tracing::Span
   void finishSpan() override;
   void setTag(const std::string& name, const std::string& value) override;
+  void injectContext(Http::HeaderMap& request_headers) override;
   SpanPtr spawnChild(const std::string& name, SystemTime start_time) override;
 
   lightstep::SpanContext context() { return span_.context(); }

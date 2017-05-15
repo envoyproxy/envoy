@@ -87,6 +87,7 @@ public:
   // Tracing::Span
   void setTag(const std::string&, const std::string&) override {}
   void finishSpan() override {}
+  void injectContext(Http::HeaderMap&) override {}
   SpanPtr spawnChild(const std::string&, SystemTime) override {
     SpanPtr nullSpan;
     nullSpan.reset(new NullSpan());
