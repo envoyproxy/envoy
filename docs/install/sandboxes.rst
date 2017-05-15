@@ -301,8 +301,7 @@ This image has all software needed to build envoy. From your envoy directory::
 
 That command will take some time to run because it is compiling an envoy binary.
 
-For more information on building, please refer to
-`this documentation <https://github.com/lyft/envoy/tree/master/ci#building-and-running-tests-as-a-developer>`_.
+For more information on building, please refer to :repo:`ci/README.md`.
 
 **Step 2: Build image with only envoy binary**
 
