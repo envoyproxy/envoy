@@ -140,6 +140,7 @@ envoy_cc_test_library(
         "//source/server/http:health_check_lib",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
     ],
 )
