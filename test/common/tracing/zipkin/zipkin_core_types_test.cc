@@ -1,5 +1,6 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/utility.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
 #include "common/tracing/zipkin/zipkin_core_types.h"
 
@@ -14,11 +15,11 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   EXPECT_EQ(R"({"ipv4":"","port":0,"serviceName":""})", ep.toJson());
 
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddress("127.0.0.1");
+      Network::Utility::parseInternetAddress("127.0.0.1");
   ep.setAddress(addr);
   EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":0,"serviceName":""})", ep.toJson());
 
-  addr = Network::Address::parseInternetAddressAndPort(
+  addr = Network::Utility::parseInternetAddressAndPort(
       "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
   ep.setAddress(addr);
   EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":""})", ep.toJson());
@@ -33,13 +34,13 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
 
 TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
 
   EXPECT_EQ("my_service", ep.serviceName());
   EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})", ep.toJson());
 
-  addr = Network::Address::parseInternetAddressAndPort(
+  addr = Network::Utility::parseInternetAddressAndPort(
       "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
   ep.setAddress(addr);
 
@@ -50,7 +51,7 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
 
 TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
   Endpoint ep2(ep1);
 
@@ -63,7 +64,7 @@ TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
 
 TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
   Endpoint ep2 = ep1;
 
@@ -96,7 +97,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
 
   // Test the copy-semantics flavor of setEndpoint
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   ann.setEndpoint(ep);
   EXPECT_TRUE(ann.isSetEndpoint());
@@ -111,7 +112,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ(expected_json, ann.toJson());
 
   // Test the move-semantics flavor of setEndpoint
-  addr = Network::Address::parseInternetAddressAndPort("192.168.1.1:5555");
+  addr = Network::Utility::parseInternetAddressAndPort("192.168.1.1:5555");
   Endpoint ep2(std::string("my_service_2"), addr);
   ann.setEndpoint(std::move(ep2));
   EXPECT_TRUE(ann.isSetEndpoint());
@@ -137,7 +138,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
 
 TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   uint64_t timestamp =
       std::chrono::duration_cast<std::chrono::microseconds>(
@@ -161,7 +162,7 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
 
 TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   uint64_t timestamp =
       std::chrono::duration_cast<std::chrono::microseconds>(
@@ -178,7 +179,7 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
 
 TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   uint64_t timestamp =
       std::chrono::duration_cast<std::chrono::microseconds>(
@@ -213,7 +214,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   // Test the copy-semantics flavor of setEndpoint
 
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   ann.setEndpoint(ep);
   EXPECT_TRUE(ann.isSetEndpoint());
@@ -229,7 +230,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   EXPECT_EQ(expected_json, ann.toJson());
 
   // Test the move-semantics flavor of setEndpoint
-  addr = Network::Address::parseInternetAddressAndPort("192.168.1.1:5555");
+  addr = Network::Utility::parseInternetAddressAndPort("192.168.1.1:5555");
   Endpoint ep2(std::string("my_service_2"), addr);
   ann.setEndpoint(std::move(ep2));
   EXPECT_TRUE(ann.isSetEndpoint());
@@ -353,7 +354,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 
   endpoint.setServiceName("my_service_name");
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("192.168.1.2:3306");
+      Network::Utility::parseInternetAddressAndPort("192.168.1.2:3306");
   endpoint.setAddress(addr);
 
   ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_SEND);

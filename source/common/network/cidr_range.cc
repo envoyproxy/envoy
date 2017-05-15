@@ -106,14 +106,14 @@ CidrRange CidrRange::create(InstanceConstSharedPtr address, int length) {
 
 // static
 CidrRange CidrRange::create(const std::string& address, int length) {
-  return create(parseInternetAddress(address), length);
+  return create(Utility::parseInternetAddress(address), length);
 }
 
 // static
 CidrRange CidrRange::create(const std::string& range) {
   std::vector<std::string> parts = StringUtil::split(range, '/');
   if (parts.size() == 2) {
-    InstanceConstSharedPtr ptr = parseInternetAddress(parts[0]);
+    InstanceConstSharedPtr ptr = Utility::parseInternetAddress(parts[0]);
     if (ptr != nullptr && ptr->type() == Type::Ip) {
       uint64_t length64;
       if (StringUtil::atoul(parts[1].c_str(), length64, 10)) {

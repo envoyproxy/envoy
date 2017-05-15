@@ -7,6 +7,7 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/cidr_range.h"
+#include "common/network/utility.h"
 
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
@@ -66,7 +67,7 @@ TEST(TruncateIpAddressAndLength, Various) {
   };
   test_cases.size();
   for (const auto& kv : test_cases) {
-    InstanceConstSharedPtr inPtr = parseInternetAddress(kv.first.first);
+    InstanceConstSharedPtr inPtr = Utility::parseInternetAddress(kv.first.first);
     EXPECT_NE(inPtr, nullptr) << kv.first.first;
     int length_io = kv.first.second;
     InstanceConstSharedPtr outPtr = CidrRange::truncateIpAddressAndLength(inPtr, &length_io);
@@ -82,16 +83,16 @@ TEST(TruncateIpAddressAndLength, Various) {
 }
 
 TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
-  InstanceConstSharedPtr ptr = parseInternetAddress("1.2.3.5");
+  InstanceConstSharedPtr ptr = Utility::parseInternetAddress("1.2.3.5");
   CidrRange rng(CidrRange::create(ptr, 31)); // Copy ctor.
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.length(), 31);
   EXPECT_EQ(rng.version(), IpVersion::v4);
   EXPECT_EQ(rng.asString(), "1.2.3.4/31");
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("1.2.3.3")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("1.2.3.4")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("1.2.3.5")));
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("1.2.3.6")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("1.2.3.3")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("1.2.3.4")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("1.2.3.5")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("1.2.3.6")));
 
   CidrRange rng2(CidrRange::create(ptr, -1)); // Invalid length.
   EXPECT_FALSE(rng2.isValid());
@@ -108,16 +109,15 @@ TEST(Ipv4CidrRangeTest, StringAndLengthCtor) {
   EXPECT_EQ(rng.asString(), "1.2.3.4/31");
   EXPECT_EQ(rng.length(), 31);
   EXPECT_EQ(rng.version(), IpVersion::v4);
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("1.2.3.3")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("1.2.3.4")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("1.2.3.5")));
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("1.2.3.6")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("1.2.3.3")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("1.2.3.4")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("1.2.3.5")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("1.2.3.6")));
 
   rng = CidrRange::create("1.2.3.4", -10); // Invalid length.
   EXPECT_FALSE(rng.isValid());
 
-  rng = CidrRange::create("bogus", 31); // Invalid address.
-  EXPECT_FALSE(rng.isValid());
+  EXPECT_THROW(CidrRange::create("bogus", 31), EnvoyException); // Invalid address.
 }
 
 TEST(Ipv4CidrRangeTest, StringCtor) {
@@ -126,16 +126,15 @@ TEST(Ipv4CidrRangeTest, StringCtor) {
   EXPECT_EQ(rng.asString(), "1.2.3.4/31");
   EXPECT_EQ(rng.length(), 31);
   EXPECT_EQ(rng.version(), IpVersion::v4);
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("1.2.3.3")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("1.2.3.4")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("1.2.3.5")));
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("1.2.3.6")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("1.2.3.3")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("1.2.3.4")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("1.2.3.5")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("1.2.3.6")));
 
   CidrRange rng2 = CidrRange::create("1.2.3.4/-10"); // Invalid length.
   EXPECT_FALSE(rng2.isValid());
 
-  CidrRange rng3 = CidrRange::create("bogus/31"); // Invalid address.
-  EXPECT_FALSE(rng3.isValid());
+  EXPECT_THROW(CidrRange::create("bogus/31"), EnvoyException); // Invalid address.
 
   CidrRange rng4 = CidrRange::create("/31"); // Missing address.
   EXPECT_FALSE(rng4.isValid());
@@ -150,28 +149,28 @@ TEST(Ipv4CidrRangeTest, BigRange) {
   EXPECT_EQ(rng.asString(), "10.0.0.0/8");
   EXPECT_EQ(rng.length(), 8);
   EXPECT_EQ(rng.version(), IpVersion::v4);
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("9.255.255.255")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("9.255.255.255")));
   std::string addr;
   for (int i = 0; i < 256; ++i) {
     addr = fmt::format("10.{}.0.1", i);
-    EXPECT_TRUE(rng.isInRange(parseInternetAddress(addr))) << addr;
+    EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress(addr))) << addr;
     addr = fmt::format("10.{}.255.255", i);
-    EXPECT_TRUE(rng.isInRange(parseInternetAddress(addr))) << addr;
+    EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress(addr))) << addr;
   }
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("11.0.0.0")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("11.0.0.0")));
 }
 
 TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
-  InstanceConstSharedPtr ptr = parseInternetAddress("abcd::0345");
+  InstanceConstSharedPtr ptr = Utility::parseInternetAddress("abcd::0345");
   CidrRange rng(CidrRange::create(ptr, 127)); // Copy ctor.
   EXPECT_TRUE(rng.isValid());
   EXPECT_EQ(rng.length(), 127);
   EXPECT_EQ(rng.version(), IpVersion::v6);
   EXPECT_EQ(rng.asString(), "abcd::344/127");
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("abcd::343")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("abcd::344")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("abcd::345")));
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("abcd::346")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("abcd::343")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("abcd::344")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("abcd::345")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("abcd::346")));
 
   CidrRange rng2(CidrRange::create(ptr, -1)); // Invalid length.
   EXPECT_FALSE(rng2.isValid());
@@ -188,16 +187,15 @@ TEST(Ipv6CidrRange, StringAndLengthCtor) {
   EXPECT_EQ(rng.asString(), "::ffc0/122");
   EXPECT_EQ(rng.length(), 122);
   EXPECT_EQ(rng.version(), IpVersion::v6);
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("::ffbf")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("::ffc0")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("::ffff")));
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("::1:0")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("::ffbf")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("::ffc0")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("::ffff")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("::1:0")));
 
   rng = CidrRange::create("::ffff", -2); // Invalid length.
   EXPECT_FALSE(rng.isValid());
 
-  rng = CidrRange::create("bogus", 122); // Invalid address.
-  EXPECT_FALSE(rng.isValid());
+  EXPECT_THROW(CidrRange::create("bogus", 122), EnvoyException); // Invalid address.
 }
 
 TEST(Ipv6CidrRange, StringCtor) {
@@ -206,16 +204,15 @@ TEST(Ipv6CidrRange, StringCtor) {
   EXPECT_EQ(rng.asString(), "::fc00/118");
   EXPECT_EQ(rng.length(), 118);
   EXPECT_EQ(rng.version(), IpVersion::v6);
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("::fbff")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("::fc00")));
-  EXPECT_TRUE(rng.isInRange(parseInternetAddress("::ffff")));
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("::1:00")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("::fbff")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("::fc00")));
+  EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress("::ffff")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("::1:00")));
 
   CidrRange rng2 = CidrRange::create("::fc1f/-10"); // Invalid length.
   EXPECT_FALSE(rng2.isValid());
 
-  CidrRange rng3 = CidrRange::create("::fc1f00/118"); // Invalid address.
-  EXPECT_FALSE(rng3.isValid());
+  EXPECT_THROW(CidrRange::create("::fc1f00/118"), EnvoyException); // Invalid address.
 
   CidrRange rng4 = CidrRange::create("/118"); // Missing address.
   EXPECT_FALSE(rng4.isValid());
@@ -231,15 +228,18 @@ TEST(Ipv6CidrRange, BigRange) {
   EXPECT_EQ(rng.asString(), "2001:db8:85a3::/64");
   EXPECT_EQ(rng.length(), 64);
   EXPECT_EQ(rng.version(), IpVersion::v6);
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("2001:0db8:85a2:ffff:ffff:ffff:ffff:ffff")));
+  EXPECT_FALSE(
+      rng.isInRange(Utility::parseInternetAddress("2001:0db8:85a2:ffff:ffff:ffff:ffff:ffff")));
   std::string addr;
   for (char c : std::string("0123456789abcdef")) {
     addr = fmt::format("{}:000{}::", prefix, std::string(1, c));
-    EXPECT_TRUE(rng.isInRange(parseInternetAddress(addr))) << addr << " not in " << rng.asString();
+    EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress(addr))) << addr << " not in "
+                                                                    << rng.asString();
     addr = fmt::format("{}:fff{}:ffff:ffff:ffff", prefix, std::string(1, c));
-    EXPECT_TRUE(rng.isInRange(parseInternetAddress(addr))) << addr << " not in " << rng.asString();
+    EXPECT_TRUE(rng.isInRange(Utility::parseInternetAddress(addr))) << addr << " not in "
+                                                                    << rng.asString();
   }
-  EXPECT_FALSE(rng.isInRange(parseInternetAddress("2001:0db8:85a4::")));
+  EXPECT_FALSE(rng.isInRange(Utility::parseInternetAddress("2001:0db8:85a4::")));
 }
 
 } // Address
