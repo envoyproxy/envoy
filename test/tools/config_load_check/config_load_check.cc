@@ -1,6 +1,6 @@
 #include <iostream>
-#include <string>
 #include <stdexcept>
+#include <string>
 
 #include "test/config_test/config_test.h"
 
