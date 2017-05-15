@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
   DefaultTestHooks default_test_hooks;
   Stats::ThreadLocalStoreImpl stats_store(*restarter);
   Server::ProdComponentFactory component_factory;
-  // TODO(henna): Parameterize local address IP version.
+  // TODO(henna): Add CLI option for local address IP version.
   LocalInfo::LocalInfoImpl local_info(
       Network::Utility::getLocalAddress(Network::Address::IpVersion::v4), options.serviceZone(),
       options.serviceClusterName(), options.serviceNodeName());

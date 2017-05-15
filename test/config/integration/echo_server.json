@@ -15,9 +15,13 @@
     ]
   }],
 
-  "admin": { "access_log_path": "/dev/null", "profile_path": "{{ test_tmpdir }}/envoy.prof", "address": "tcp://{{ ip_loopback_address }}:0" },
+  "admin": {
+    "access_log_path": "/dev/null",
+    "profile_path": "{{ test_tmpdir }}/envoy.prof",
+    "address": "tcp://{{ ip_loopback_address }}:0"
+  },
 
   "cluster_manager": {
-      "clusters": []
+    "clusters": []
   }
 }

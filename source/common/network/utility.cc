@@ -131,8 +131,8 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
 
 // TODO(hennna): Currently getLocalAddress does not support choosing between
 // multiple interfaces and addresses not returned by getifaddrs. In additon,
-// the default is to return a loopback address of type version. This fucntion may
-// need to be updated in the future.
+// the default is to return a loopback address of type version. This function may
+// need to be updated in the future. Discussion can be found at Github issue #939.
 Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersion version) {
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;
@@ -203,9 +203,9 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
   } else if (address.ip()->version() == Address::IpVersion::v6) {
     std::array<uint8_t, 16> addr = address.ip()->ipv6()->address();
-    return 0 == memcmp(&addr, &in6addr_loopback, sizeof(struct in6_addr));
+    return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
   }
-  return false;
+  NOT_IMPLEMENTED;
 }
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {

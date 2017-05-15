@@ -5,25 +5,10 @@
 #include "common/http/header_map_impl.h"
 
 #include "test/integration/utility.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-
-TEST_F(IntegrationTest, Echo) {
-  Buffer::OwnedImpl buffer("hello");
-  std::string response;
-  RawConnectionDriver connection(lookupPort("echo"), buffer,
-                                 [&](Network::ClientConnection&, const Buffer::Instance& data)
-                                     -> void {
-                                       response.append(TestUtility::bufferToString(data));
-                                       connection.close();
-                                     });
-
-  connection.run();
-  EXPECT_EQ("hello", response);
-}
 
 TEST_F(IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP1); }
 

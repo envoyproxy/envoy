@@ -23,10 +23,7 @@ public:
   BufferingStreamDecoder(std::function<void()> on_complete_cb) : on_complete_cb_(on_complete_cb) {}
 
   bool complete() { return complete_; }
-  const Http::HeaderMap& headers() {
-    ASSERT(headers_ != nullptr);
-    return *headers_;
-  }
+  const Http::HeaderMap& headers() { return *headers_; }
   const std::string& body() { return body_; }
 
   // Http::StreamDecoder
