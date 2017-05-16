@@ -107,6 +107,8 @@ private:
       return "Object";
     case Type::String:
       return "String";
+    default:
+      return "Unknown";
     }
   }
 
@@ -489,8 +491,8 @@ void Field::validateSchema(const std::string& schema) const {
     schema_validator.GetInvalidDocumentPointer().StringifyUriFragment(document_string_buffer);
 
     throw Exception(fmt::format(
-        "JSON at lines {}-{} does not conform to schema.\n Invalid schema: {}.\n"
-        " Schema violation: {}.\n"
+        "JSON at lines {}-{} does not conform to schema.\n Invalid schema: {}\n"
+        " Schema violation: {}\n"
         " Offending document key: {}",
         line_number_start_, line_number_end_, schema_string_buffer.GetString(),
         schema_validator.GetInvalidSchemaKeyword(), document_string_buffer.GetString()));

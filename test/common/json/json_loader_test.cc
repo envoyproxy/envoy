@@ -259,7 +259,7 @@ TEST(JsonLoaderTest, NestedSchema) {
 
   EXPECT_THROW_WITH_MESSAGE(json->getObject("foo")->validateSchema(schema), Exception,
                             "JSON at lines 4-7 does not conform to schema.\n Invalid schema: "
-                            "#/properties/value1.\n Schema violation: type.\n Offending document "
+                            "#/properties/value1\n Schema violation: type\n Offending document "
                             "key: #/value1");
 }
 
