@@ -7,14 +7,10 @@
 
 #include "envoy/json/json_object.h"
 
-// Do not let RapidJson leak outside of this file.
+// Do not let RapidJson leak outside json_loader.
 #include "rapidjson/document.h"
-#include "rapidjson/error/en.h"
 #include "rapidjson/reader.h"
-#include "rapidjson/schema.h"
 #include "rapidjson/stream.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/writer.h"
 
 namespace Json {
 
@@ -24,7 +20,6 @@ public:
    * Constructs a Json Object from a File.
    */
   static ObjectPtr loadFromFile(const std::string& file_path);
-  // static ObjectPtr loadFromFileTwo(const std::string& file_path);
 
   /*
    * Constructs a Json Object from a String.
@@ -117,7 +112,7 @@ private:
     bool isType(Type type) const { return type == type_; }
     void checkType(Type type) const {
       if (!isType(type)) {
-        throw Exception("invalid field type");
+        throw Exception("Field access in JSON with correct type.");
       }
     }
     // value rtype funcs
@@ -153,7 +148,7 @@ private:
   };
 
   class LineCountingStringStream : public rapidjson::StringStream {
-    // Ch is typdef in parent class specific to character encoding.
+    // Ch is typdef in parent class to handle character encoding.
   public:
     LineCountingStringStream(const Ch* src) : rapidjson::StringStream(src), line_number_(1) {}
     Ch Take() {
@@ -170,7 +165,7 @@ private:
   };
 
   /*
-   * SAX domain parser.
+   * Consume events from SAX callbacks to build JSON Field.
    */
   class ObjectHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, ObjectHandler> {
   public:

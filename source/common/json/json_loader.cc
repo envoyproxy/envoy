@@ -13,7 +13,7 @@
 
 #include "spdlog/spdlog.h"
 
-// Do not let RapidJson leak outside of this file.
+// Do not let RapidJson leak outside of json_loader.
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/reader.h"
@@ -36,7 +36,8 @@ ObjectPtr Factory::loadFromString(const std::string& json) {
   reader.Parse(json_stream, handler);
 
   if (reader.HasParseError()) {
-    throw Exception(fmt::format("Error(offset {}): {}\n", reader.GetErrorOffset(),
+    throw Exception(fmt::format("JSON supplied is not valid. Error(offset {}): {}\n",
+                                reader.GetErrorOffset(),
                                 GetParseError_En(reader.GetParseErrorCode())));
   }
 
@@ -324,8 +325,6 @@ void Factory::Field::validateSchema(const std::string& schema) const {
         schema_validator.GetInvalidSchemaKeyword(), document_string_buffer.GetString()));
   }
 }
-
-/////////////
 
 bool Factory::ObjectHandler::StartObject() {
   FieldPtr object = Field::createObject();
