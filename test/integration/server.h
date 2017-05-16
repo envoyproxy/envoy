@@ -121,7 +121,8 @@ class IntegrationTestServer : Logger::Loggable<Logger::Id::testing>,
                               public TestHooks,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr create(const std::string& config_path);
+  static IntegrationTestServerPtr create(const std::string& config_path,
+                                         const Network::Address::IpVersion version);
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
@@ -129,6 +130,7 @@ public:
     RELEASE_ASSERT(server_ != nullptr);
     return *server_;
   }
+  void start(const Network::Address::IpVersion version);
   void start();
   Stats::Store& store() { return stats_store_; }
 
@@ -152,7 +154,7 @@ private:
   /**
    * Runs the real server on a thread.
    */
-  void threadRoutine();
+  void threadRoutine(const Network::Address::IpVersion version);
 
   const std::string config_path_;
   Thread::ThreadPtr thread_;

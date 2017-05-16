@@ -695,7 +695,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
                              callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
                              return nullptr;
                            }));
-  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(ReturnRef(body_data));
+  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
   EXPECT_CALL(encoder2, encodeHeaders(_, false));
   EXPECT_CALL(encoder2, encodeData(_, false));
   EXPECT_CALL(encoder2, encodeTrailers(_));
@@ -747,7 +747,9 @@ TEST_F(RouterTest, Shadow) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(body_data));
+  EXPECT_CALL(callbacks_, decodingBuffer())
+      .Times(AtLeast(1))
+      .WillRepeatedly(Return(body_data.get()));
   EXPECT_CALL(*shadow_writer_, shadow_("foo", _, std::chrono::milliseconds(10)))
       .WillOnce(Invoke([](const std::string&, Http::MessagePtr& request, std::chrono::milliseconds)
                            -> void {

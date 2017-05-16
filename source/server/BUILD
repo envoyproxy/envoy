@@ -37,6 +37,7 @@ envoy_cc_library(
         "//source/common/ratelimit:ratelimit_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing/zipkin:zipkin_lib",
         "//source/common/upstream:cluster_manager_lib",
     ],
 )
@@ -58,7 +59,7 @@ envoy_cc_library(
         "//include/envoy/network:listener_interface",
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",
-        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:listener_lib",
     ],

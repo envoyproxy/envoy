@@ -55,6 +55,12 @@ appropriate, an arbitrary compiler toolchain and standard library location can b
 slight caveat is that (at the time of writing), Bazel expects the binutils in `$(dirname $CC)` to be
 unprefixed, e.g. `as` instead of `x86_64-linux-gnu-as`.
 
+## Supported compiler versions
+
+Though Envoy has been run in production compiled with GCC 4.9 extensively, we now strongly
+recommend GCC >= 5 due to known issues with std::string thread safety. Clang >= 4.0 is also known
+to work.
+
 # Testing Envoy with Bazel
 
 All the Envoy tests can be built and run with:
@@ -168,7 +174,7 @@ bazel build -c opt //source/exe:envoy-static
 
 ## Sanitizers
 
-To build and run tests with the gcc-4.9 compiler's [address sanitizer
+To build and run tests with the gcc compiler's [address sanitizer
 (ASAN)](https://github.com/google/sanitizers/wiki/AddressSanitizer) and
 [undefined behavior
 (UBSAN)](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan) sanitizer enabled:

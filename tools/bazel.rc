@@ -2,7 +2,7 @@
 
 build --workspace_status_command=bazel/get_workspace_status
 
-# Basic ASAN/UBSAN that works for gcc-4.9
+# Basic ASAN/UBSAN that works for gcc
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
 build:asan --linkopt -ldl

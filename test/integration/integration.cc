@@ -27,9 +27,6 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-IntegrationTestServerPtr BaseIntegrationTest::test_server_;
-std::vector<std::unique_ptr<FakeUpstream>> BaseIntegrationTest::fake_upstreams_;
-
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
@@ -129,11 +126,16 @@ void IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers,
   flushWrite();
 }
 
+void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, Buffer::Instance& data,
+                                      bool end_stream) {
+  encoder.encodeData(data, end_stream);
+  flushWrite();
+}
+
 void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, uint64_t size,
                                       bool end_stream) {
   Buffer::OwnedImpl data(std::string(size, 'a'));
-  encoder.encodeData(data, end_stream);
-  flushWrite();
+  sendData(encoder, data, end_stream);
 }
 
 void IntegrationCodecClient::sendTrailers(Http::StreamEncoder& encoder,
@@ -261,12 +263,12 @@ IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
-  port_map()[key] = port;
+  port_map_[key] = port;
 }
 
 uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
-  auto it = port_map().find(key);
-  if (it != port_map().end()) {
+  auto it = port_map_.find(key);
+  if (it != port_map_.end()) {
     return it->second;
   }
   RELEASE_ASSERT(false);
@@ -283,10 +285,17 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
+                                           const Network::Address::IpVersion version,
                                            const std::vector<std::string>& port_names) {
   test_server_ = IntegrationTestServer::create(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map()));
+      TestEnvironment::temporaryFileSubstitute(json_path, version, port_map_), version);
   registerTestServerPorts(port_names);
+}
+
+// TODO(hennna): Deprecate when IPv6 test support is finished.
+void BaseIntegrationTest::createTestServer(const std::string& json_path,
+                                           const std::vector<std::string>& port_names) {
+  BaseIntegrationTest::createTestServer(json_path, Network::Address::IpVersion::v4, port_names);
 }
 
 void BaseIntegrationTest::testRouterRequestAndResponseWithBody(Network::ClientConnectionPtr&& conn,
@@ -813,9 +822,6 @@ void BaseIntegrationTest::testUpstreamProtocolError() {
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeRawConnectionPtr fake_upstream_connection;
-  // TSAN seems to get upset if we destroy this in a closure below, so keep it alive.
-  // https://github.com/lyft/envoy/issues/944
-  const std::string upstream_write_data("bad protocol data!");
   executeActions(
       {[&]() -> void {
         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
@@ -830,7 +836,7 @@ void BaseIntegrationTest::testUpstreamProtocolError() {
        // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
        // be fixed.
        [&]() -> void { fake_upstream_connection->waitForData(187); },
-       [&]() -> void { fake_upstream_connection->write(upstream_write_data); },
+       [&]() -> void { fake_upstream_connection->write("bad protocol data!"); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
        [&]() -> void { codec_client->waitForDisconnect(); }});
 
