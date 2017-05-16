@@ -1,8 +1,8 @@
 licenses(["notice"])  # Apache 2
 
-package(default_visibility = ["//visibility:public"])
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test")
+envoy_package()
 
 envoy_cc_test(
     name = "server_test",
