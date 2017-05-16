@@ -274,6 +274,8 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
   // Supply empty context.
   request_headers_.removeOtSpanContext();
   SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+
+  EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
   span->injectContext(request_headers_);
 
   injected_ctx = request_headers_.OtSpanContext()->value().c_str();
