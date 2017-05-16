@@ -129,15 +129,23 @@ TEST(JsonLoaderTest, Basic) {
   }
 
   {
-    std::string json = R"EOF(
-    {
-    }
-    )EOF";
-
+    std::string json = R"EOF({})EOF";
     ObjectSharedPtr config = Factory::loadFromString(json);
     ObjectSharedPtr object = config->getObject("foo", true);
     EXPECT_EQ(2, object->getInteger("bar", 2));
     EXPECT_TRUE(object->empty());
+  }
+
+  {
+    std::string json = R"EOF({"foo": []})EOF";
+    ObjectSharedPtr config = Factory::loadFromString(json);
+    EXPECT_TRUE(config->getStringArray("foo").empty());
+  }
+
+  {
+    std::string json = R"EOF({"foo": ["bar", "baz"]})EOF";
+    ObjectSharedPtr config = Factory::loadFromString(json);
+    EXPECT_FALSE(config->getStringArray("foo").empty());
   }
 }
 
@@ -185,52 +193,67 @@ TEST(JsonLoaderTest, Hash) {
 }
 
 TEST(JsonLoaderTest, Schema) {
-  std::string invalid_json_schema = R"EOF(
   {
-    "properties": {"value1"}
-  }
-  )EOF";
-
-  std::string invalid_schema = R"EOF(
-  {
-    "properties" : {
-      "value1": {"type" : "faketype"}
+    std::string invalid_json_schema = R"EOF(
+    {
+      "properties": {"value1"}
     }
-  }
-  )EOF";
+    )EOF";
 
-  std::string different_schema = R"EOF(
+    std::string invalid_schema = R"EOF(
+    {
+      "properties" : {
+        "value1": {"type" : "faketype"}
+      }
+    }
+    )EOF";
+
+    std::string different_schema = R"EOF(
+    {
+      "properties" : {
+        "value1" : {"type" : "number"}
+      },
+      "additionalProperties" : false
+    }
+    )EOF";
+
+    std::string valid_schema = R"EOF(
+    {
+      "properties": {
+        "value1": {"type" : "number"},
+        "value2": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+    )EOF";
+
+    std::string json_string = R"EOF(
+    {
+      "value1": 10,
+      "value2" : "test"
+    }
+    )EOF";
+
+    ObjectSharedPtr json = Factory::loadFromString(json_string);
+    EXPECT_THROW(json->validateSchema(invalid_json_schema), std::invalid_argument);
+    EXPECT_THROW(json->validateSchema(invalid_schema), Exception);
+    EXPECT_THROW(json->validateSchema(different_schema), Exception);
+    EXPECT_NO_THROW(json->validateSchema(valid_schema));
+  }
+
   {
-    "properties" : {
-      "value1" : {"type" : "number"}
-    },
-    "additionalProperties" : false
+    std::string json_string = R"EOF(
+    {
+      "value1": [false, 2.01, 3, null],
+      "value2" : "test"
+    }
+    )EOF";
+
+    std::string empty_schema = R"EOF({})EOF";
+
+    ObjectSharedPtr json = Factory::loadFromString(json_string);
+    EXPECT_NO_THROW(json->validateSchema(empty_schema));
   }
-  )EOF";
-
-  std::string valid_schema = R"EOF(
-  {
-    "properties": {
-      "value1": {"type" : "number"},
-      "value2": {"type": "string"}
-    },
-    "additionalProperties": false
-  }
-  )EOF";
-
-  std::string json_string = R"EOF(
-  {
-    "value1": 10,
-    "value2" : "test"
-  }
-  )EOF";
-
-  ObjectSharedPtr json = Factory::loadFromString(json_string);
-
-  EXPECT_THROW(json->validateSchema(invalid_json_schema), std::invalid_argument);
-  EXPECT_THROW(json->validateSchema(invalid_schema), Exception);
-  EXPECT_THROW(json->validateSchema(different_schema), Exception);
-  EXPECT_NO_THROW(json->validateSchema(valid_schema));
 }
 
 TEST(JsonLoaderTest, NestedSchema) {
