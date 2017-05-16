@@ -15,6 +15,9 @@ class Http1BridgeFilter : public Http::StreamFilter {
 public:
   Http1BridgeFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
 
+  // Http::StreamFilterBase
+  void onDestroy() override {}
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {

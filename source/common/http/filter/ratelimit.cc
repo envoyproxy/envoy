@@ -96,11 +96,13 @@ FilterTrailersStatus Filter::decodeTrailers(HeaderMap&) {
 
 void Filter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  callbacks.addResetStreamCallback([this]() -> void {
-    if (state_ == State::Calling) {
-      client_->cancel();
-    }
-  });
+}
+
+void Filter::onDestroy() {
+  if (state_ == State::Calling) {
+    state_ = State::Complete;
+    client_->cancel();
+  }
 }
 
 void Filter::complete(Envoy::RateLimit::LimitStatus status) {

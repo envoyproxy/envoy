@@ -142,6 +142,9 @@ class AdminFilter : public Http::StreamDecoderFilter, Logger::Loggable<Logger::I
 public:
   AdminFilter(AdminImpl& parent);
 
+  // Http::StreamFilterBase
+  void onDestroy() override {}
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;

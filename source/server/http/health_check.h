@@ -63,6 +63,9 @@ public:
       : server_(server), pass_through_mode_(pass_through_mode), cache_manager_(cache_manager),
         endpoint_(endpoint) {}
 
+  // Http::StreamFilterBase
+  void onDestroy() override {}
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;

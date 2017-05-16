@@ -79,6 +79,9 @@ public:
   Filter(FilterConfigSharedPtr config, Envoy::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
+  // Http::StreamFilterBase
+  void onDestroy() override;
+
   // Http::StreamDecoderFilter
   FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
   FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;

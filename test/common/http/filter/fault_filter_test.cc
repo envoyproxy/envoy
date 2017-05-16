@@ -471,7 +471,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
 
-  filter_callbacks_.reset_callback_();
+  filter_->onDestroy();
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {

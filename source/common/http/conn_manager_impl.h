@@ -259,7 +259,8 @@ private:
    * Base class wrapper for both stream encoder and decoder filters.
    */
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
-    ActiveStreamFilterBase(ActiveStream& parent) : parent_(parent) {}
+    ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
+        : parent_(parent), headers_continued_(false), stopped_(false), dual_filter_(dual_filter) {}
 
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status);
     void commonHandleBufferData(Buffer::Instance& provided_data);
@@ -275,7 +276,6 @@ private:
     virtual const HeaderMapPtr& trailers() PURE;
 
     // Http::StreamFilterCallbacks
-    void addResetStreamCallback(std::function<void()> callback) override;
     uint64_t connectionId() override;
     Ssl::Connection* ssl() override;
     Event::Dispatcher& dispatcher() override;
@@ -287,8 +287,9 @@ private:
     const std::string& downstreamAddress() override;
 
     ActiveStream& parent_;
-    bool headers_continued_{};
-    bool stopped_{};
+    bool headers_continued_ : 1;
+    bool stopped_ : 1;
+    const bool dual_filter_ : 1;
   };
 
   /**
@@ -297,8 +298,9 @@ private:
   struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                      public StreamDecoderFilterCallbacks,
                                      LinkedObject<ActiveStreamDecoderFilter> {
-    ActiveStreamDecoderFilter(ActiveStream& parent, StreamDecoderFilterSharedPtr filter)
-        : ActiveStreamFilterBase(parent), handle_(filter) {}
+    ActiveStreamDecoderFilter(ActiveStream& parent, StreamDecoderFilterSharedPtr filter,
+                              bool dual_filter)
+        : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
 
     // ActiveStreamFilterBase
     Buffer::InstancePtr& bufferedData() override { return parent_.buffered_request_data_; }
@@ -333,8 +335,9 @@ private:
   struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                      public StreamEncoderFilterCallbacks,
                                      LinkedObject<ActiveStreamEncoderFilter> {
-    ActiveStreamEncoderFilter(ActiveStream& parent, StreamEncoderFilterSharedPtr filter)
-        : ActiveStreamFilterBase(parent), handle_(filter) {}
+    ActiveStreamEncoderFilter(ActiveStream& parent, StreamEncoderFilterSharedPtr filter,
+                              bool dual_filter)
+        : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
 
     // ActiveStreamFilterBase
     Buffer::InstancePtr& bufferedData() override { return parent_.buffered_response_data_; }
@@ -373,6 +376,8 @@ private:
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
 
+    void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
+    void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
     void chargeStats(HeaderMap& headers);
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
@@ -398,9 +403,16 @@ private:
     void decodeTrailers(HeaderMapPtr&& trailers) override;
 
     // Http::FilterChainFactoryCallbacks
-    void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override;
-    void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override;
-    void addStreamFilter(StreamFilterSharedPtr filter) override;
+    void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
+      addStreamDecoderFilterWorker(filter, false);
+    }
+    void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
+      addStreamEncoderFilterWorker(filter, false);
+    }
+    void addStreamFilter(StreamFilterSharedPtr filter) override {
+      addStreamDecoderFilterWorker(filter, true);
+      addStreamEncoderFilterWorker(filter, true);
+    }
     void addAccessLogHandler(Http::AccessLog::InstanceSharedPtr handler) override;
 
     // Tracing::TracingConfig
@@ -446,7 +458,6 @@ private:
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<Http::AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_timer_;
-    std::list<std::function<void()>> reset_callbacks_;
     State state_;
     AccessLog::RequestInfoImpl request_info_;
     std::string downstream_address_;
@@ -462,9 +473,15 @@ private:
   void checkForDeferredClose();
 
   /**
-   * Do a delayed destruction of a stream to allow for stack unwind.
+   * Do a delayed destruction of a stream to allow for stack unwind. Also calls onDestroy() for
+   * each filter.
    */
-  void destroyStream(ActiveStream& stream);
+  void doDeferredStreamDestroy(ActiveStream& stream);
+
+  /**
+   * Process a stream that is ending due to upstream response or reset.
+   */
+  void doEndStream(ActiveStream& stream);
 
   void resetAllStreams();
   void onIdleTimeout();
