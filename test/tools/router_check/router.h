@@ -28,7 +28,7 @@ struct ToolConfig {
    * @return ToolConfig a ToolConfig instance with member variables set by the tool config json
    * file.
    */
-  static ToolConfig create(const Json::ObjectPtr& check_config);
+  static ToolConfig create(const Json::ObjectSharedPtr& check_config);
 
   std::unique_ptr<Http::TestHeaderMapImpl> headers_;
   Router::RouteConstSharedPtr route_;

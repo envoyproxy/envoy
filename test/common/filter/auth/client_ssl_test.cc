@@ -52,7 +52,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
     EXPECT_CALL(cm_, get("vpn"));
     setupRequest();
     config_ = Config::create(*loader, tls_, cm_, dispatcher_, stats_store_, random_);
@@ -99,7 +99,7 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
   EXPECT_THROW(Config::create(*loader, tls_, cm_, dispatcher_, stats_store_, random_),
                EnvoyException);
@@ -115,7 +115,7 @@ TEST_F(ClientSslAuthFilterTest, BadClientSslAuthConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   EXPECT_THROW(Config::create(*json_config, tls_, cm_, dispatcher_, stats_store_, random_),
                Json::Exception);
 }

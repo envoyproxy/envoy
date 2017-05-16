@@ -92,7 +92,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("tracing")) {
-    Json::ObjectPtr tracing_config = config.getObject("tracing");
+    Json::ObjectSharedPtr tracing_config = config.getObject("tracing");
 
     const std::string operation_name = tracing_config->getString("operation_name");
     Tracing::OperationName tracing_operation_name;
@@ -120,7 +120,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
   }
 
   if (config.hasObject("access_log")) {
-    for (Json::ObjectPtr& access_log : config.getObjectArray("access_log")) {
+    for (Json::ObjectSharedPtr& access_log : config.getObjectArray("access_log")) {
       Http::AccessLog::InstanceSharedPtr current_access_log =
           Http::AccessLog::InstanceImpl::fromJson(*access_log, server.runtime(),
                                                   server.accessLogManager());
@@ -140,11 +140,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     codec_type_ = CodecType::AUTO;
   }
 
-  std::vector<Json::ObjectPtr> filters = config.getObjectArray("filters");
+  std::vector<Json::ObjectSharedPtr> filters = config.getObjectArray("filters");
   for (size_t i = 0; i < filters.size(); i++) {
     std::string string_type = filters[i]->getString("type");
     std::string string_name = filters[i]->getString("name");
-    Json::ObjectPtr config_object = filters[i]->getObject("config");
+    Json::ObjectSharedPtr config_object = filters[i]->getObject("config");
 
     log().info("    filter #{}", i);
     log().info("      type: {}", string_type);

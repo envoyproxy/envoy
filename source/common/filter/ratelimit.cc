@@ -17,9 +17,9 @@ Config::Config(const Json::Object& config, Stats::Store& stats_store, Runtime::L
 
   config.validateSchema(Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA);
 
-  for (const Json::ObjectPtr& descriptor : config.getObjectArray("descriptors")) {
+  for (const Json::ObjectSharedPtr& descriptor : config.getObjectArray("descriptors")) {
     Descriptor new_descriptor;
-    for (const Json::ObjectPtr& entry : descriptor->asObjectArray()) {
+    for (const Json::ObjectSharedPtr& entry : descriptor->asObjectArray()) {
       new_descriptor.entries_.push_back({entry->getString("key"), entry->getString("value")});
     }
     descriptors_.push_back(new_descriptor);

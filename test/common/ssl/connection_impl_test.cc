@@ -37,7 +37,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
-  Json::ObjectPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
+  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
@@ -50,7 +50,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
       dispatcher.createSslListener(connection_handler, *server_ctx, socket, callbacks, stats_store,
                                    Network::ListenerOptions::listenerOptionsWithBindToPort());
 
-  Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
+  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Network::ClientConnectionPtr client_connection =
@@ -179,7 +179,7 @@ TEST_P(SslConnectionImplTest, ClientAuthBadVerification) {
   }
   )EOF";
 
-  Json::ObjectPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
+  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
@@ -199,7 +199,7 @@ TEST_P(SslConnectionImplTest, ClientAuthBadVerification) {
   }
   )EOF";
 
-  Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
+  Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Network::ClientConnectionPtr client_connection =
@@ -236,7 +236,7 @@ TEST_P(SslConnectionImplTest, SslError) {
   }
   )EOF";
 
-  Json::ObjectPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
+  Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   ContextConfigImpl server_ctx_config(*server_ctx_loader);
   ContextManagerImpl manager(runtime);
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
@@ -292,7 +292,7 @@ public:
       "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
     }
     )EOF";
-    Json::ObjectPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
+    Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
     ContextConfigImpl server_ctx_config(*server_ctx_loader);
     Runtime::MockLoader runtime;
     ContextManagerImpl manager(runtime);
@@ -312,7 +312,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
+    Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
     ContextConfigImpl client_ctx_config(*client_ctx_loader);
     ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
 

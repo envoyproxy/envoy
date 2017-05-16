@@ -37,7 +37,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(config_json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
     cds_ = CdsApiImpl::create(*config, cm_, dispatcher_, random_, local_info_, store_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
@@ -99,7 +99,7 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::loadFromString(config_json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   local_info_.cluster_name_ = "";
   local_info_.node_name_ = "";
   EXPECT_THROW(CdsApiImpl::create(*config, cm_, dispatcher_, random_, local_info_, store_),

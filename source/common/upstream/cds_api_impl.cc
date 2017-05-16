@@ -46,9 +46,9 @@ void CdsApiImpl::createRequest(Http::Message& request) {
 
 void CdsApiImpl::parseResponse(const Http::Message& response) {
   log_debug("cds: parsing response");
-  Json::ObjectPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
+  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
   response_json->validateSchema(Json::Schema::CDS_SCHEMA);
-  std::vector<Json::ObjectPtr> clusters = response_json->getObjectArray("clusters");
+  std::vector<Json::ObjectSharedPtr> clusters = response_json->getObjectArray("clusters");
 
   // We need to keep track of which clusters we might need to remove.
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();

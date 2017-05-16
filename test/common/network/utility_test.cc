@@ -22,7 +22,7 @@ TEST(IpListTest, Errors) {
     }
     )EOF";
 
-    Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
     EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
   }
 
@@ -33,7 +33,7 @@ TEST(IpListTest, Errors) {
     }
     )EOF";
 
-    Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
     EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
   }
 
@@ -44,7 +44,7 @@ TEST(IpListTest, Errors) {
     }
     )EOF";
 
-    Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
     EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
   }
 
@@ -55,7 +55,7 @@ TEST(IpListTest, Errors) {
     }
     )EOF";
 
-    Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
     EXPECT_THROW({ IpList wl(*loader, "ip_white_list"); }, EnvoyException);
   }
 }
@@ -71,7 +71,7 @@ TEST(IpListTest, Normal) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   IpList wl(*loader, "ip_white_list");
 
   EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.0")));
@@ -102,7 +102,7 @@ TEST(IpListTest, MatchAny) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   IpList wl(*loader, "ip_white_list");
 
   EXPECT_TRUE(wl.contains(Address::Ipv4Instance("192.168.3.3")));

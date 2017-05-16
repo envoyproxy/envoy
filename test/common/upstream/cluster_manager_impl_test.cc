@@ -102,7 +102,7 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_CALL(log_manager_, createAccessLog("foo"));
   create(*loader);
 }
@@ -120,7 +120,7 @@ TEST_F(ClusterManagerImplTest, NoSdsConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
 }
 
@@ -137,7 +137,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
 }
 
@@ -163,7 +163,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
 }
 
@@ -178,7 +178,7 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), Json::Exception);
 }
 
@@ -211,7 +211,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
 
   EXPECT_EQ(3UL, factory_.stats_.counter("cluster_manager.cluster_added").value());
@@ -241,7 +241,7 @@ TEST_F(ClusterManagerImplTest, DuplicateCluster) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
 }
 
@@ -262,7 +262,7 @@ TEST_F(ClusterManagerImplTest, UnknownHcType) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW(create(*loader), EnvoyException);
 }
 
@@ -276,7 +276,7 @@ TEST_F(ClusterManagerImplTest, MaxClusterName) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
                             "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
                             "#/properties/name.\n Schema violation: maxLength.\n Offending "
@@ -293,7 +293,7 @@ TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
                             "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
                             "#/properties/name.\n Schema violation: pattern.\n Offending document "
@@ -327,7 +327,7 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(factory_.dispatcher_, createClientConnection_(PointeesEq(Network::Utility::resolveUrl(
                                         "tcp://127.0.0.1:11001")))).WillOnce(Return(connection));
@@ -349,7 +349,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_EQ(nullptr,
@@ -377,7 +377,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setReadBufferLimit(8192));
@@ -401,7 +401,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
@@ -457,7 +457,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster2));
   ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
 
   ReadyWatcher initialized;
@@ -484,7 +484,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   }
   )EOF";
 
-  Json::ObjectPtr loader_api = Json::Factory::loadFromString(json_api);
+  Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api);
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster3));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   cluster_manager_->addOrUpdatePrimaryCluster(*loader_api);
@@ -533,7 +533,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
 
   InSequence s;
@@ -547,7 +547,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   }
   )EOF";
 
-  Json::ObjectPtr loader_api = Json::Factory::loadFromString(json_api);
+  Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api);
   MockCluster* cluster1 = new NiceMock<MockCluster>();
   EXPECT_CALL(factory_, clusterFromJson_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
@@ -625,7 +625,7 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize());
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   create(*loader);
 
   ReadyWatcher initialized;
@@ -640,7 +640,7 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   }
   )EOF";
 
-  Json::ObjectPtr loader_api = Json::Factory::loadFromString(json_api);
+  Json::ObjectSharedPtr loader_api = Json::Factory::loadFromString(json_api);
   EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(*loader_api));
 
   // Attempt to remove a static cluster.
@@ -663,7 +663,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);

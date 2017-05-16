@@ -108,7 +108,7 @@ bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header
 }
 
 OperatorFilter::OperatorFilter(const Json::Object& json, Runtime::Loader& runtime) {
-  for (Json::ObjectPtr& filter : json.getObjectArray("filters")) {
+  for (Json::ObjectSharedPtr& filter : json.getObjectArray("filters")) {
     filters_.emplace_back(FilterImpl::fromJson(*filter, runtime));
   }
 }
@@ -161,7 +161,7 @@ InstanceSharedPtr InstanceImpl::fromJson(Json::Object& json, Runtime::Loader& ru
 
   FilterPtr filter;
   if (json.hasObject("filter")) {
-    Json::ObjectPtr filterObject = json.getObject("filter");
+    Json::ObjectSharedPtr filterObject = json.getObject("filter");
     filter = FilterImpl::fromJson(*filterObject, runtime);
   }
 

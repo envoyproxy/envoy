@@ -43,7 +43,7 @@ public:
   }
 
   void SetUpTest(const std::string json) {
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     config_.reset(new FilterConfig(*config, local_info_, stats_store_, runtime_, cm_));
 
     client_ = new ::RateLimit::MockClient();
@@ -88,7 +88,7 @@ TEST_F(HttpRateLimitFilterTest, BadConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::loadFromString(filter_config);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(filter_config);
   EXPECT_THROW(FilterConfig(*config, local_info_, stats_store_, runtime_, cm_), Json::Exception);
 }
 

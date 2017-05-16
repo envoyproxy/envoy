@@ -162,7 +162,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   return out_json_path;
 }
 
-Json::ObjectPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
+Json::ObjectSharedPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
   return Json::Factory::loadFromString(substitute(json));
 }
 

@@ -44,7 +44,7 @@ public:
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enforcing", 100))
         .WillByDefault(Return(true));
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     config_.reset(new Config(*config, stats_store_, runtime_));
     client_ = new MockClient();
     filter_.reset(new Instance(config_, ClientPtr{client_}));
@@ -76,7 +76,7 @@ TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   EXPECT_THROW(Config(*json_config, stats_store_, runtime_), Json::Exception);
 }
 

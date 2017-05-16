@@ -67,12 +67,12 @@ public:
   double getDouble(const std::string& name, double default_value) const override;
   int64_t getInteger(const std::string& name) const override;
   int64_t getInteger(const std::string& name, int64_t default_value) const override;
-  ObjectPtr getObject(const std::string& name, bool allow_empty) const override;
-  std::vector<ObjectPtr> getObjectArray(const std::string& name) const override;
+  ObjectSharedPtr getObject(const std::string& name, bool allow_empty) const override;
+  std::vector<ObjectSharedPtr> getObjectArray(const std::string& name) const override;
   std::string getString(const std::string& name) const override;
   std::string getString(const std::string& name, const std::string& default_value) const override;
   std::vector<std::string> getStringArray(const std::string& name) const override;
-  std::vector<ObjectPtr> asObjectArray() const override;
+  std::vector<ObjectSharedPtr> asObjectArray() const override;
   std::string asString() const override { return stringValue(); }
 
   bool empty() const override;
@@ -207,7 +207,7 @@ public:
   bool String(const char* value, rapidjson::SizeType size, bool);
   bool RawNumber(const char*, rapidjson::SizeType, bool);
 
-  ObjectPtr getRoot() { return root_; }
+  ObjectSharedPtr getRoot() { return root_; }
 
 private:
   bool handleValueEvent(FieldSharedPtr ptr);
@@ -371,7 +371,7 @@ int64_t Field::getInteger(const std::string& name, int64_t default_value) const 
   }
 }
 
-ObjectPtr Field::getObject(const std::string& name, bool allow_empty) const {
+ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end()) {
@@ -387,7 +387,7 @@ ObjectPtr Field::getObject(const std::string& name, bool allow_empty) const {
   }
 }
 
-std::vector<ObjectPtr> Field::getObjectArray(const std::string& name) const {
+std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
@@ -437,7 +437,7 @@ std::vector<std::string> Field::getStringArray(const std::string& name) const {
   return string_array;
 }
 
-std::vector<ObjectPtr> Field::asObjectArray() const {
+std::vector<ObjectSharedPtr> Field::asObjectArray() const {
   checkType(Type::Array);
   return {value_.array_value_.begin(), value_.array_value_.end()};
 }
@@ -639,7 +639,7 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 
 } // namespace
 
-ObjectPtr Factory::loadFromFile(const std::string& file_path) {
+ObjectSharedPtr Factory::loadFromFile(const std::string& file_path) {
   try {
     return loadFromString(Filesystem::fileReadToEnd(file_path));
   } catch (EnvoyException& e) {
@@ -647,7 +647,7 @@ ObjectPtr Factory::loadFromFile(const std::string& file_path) {
   }
 }
 
-ObjectPtr Factory::loadFromString(const std::string& json) {
+ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   LineCountingStringStream json_stream(json.c_str());
 
   ObjectHandler handler(json_stream);

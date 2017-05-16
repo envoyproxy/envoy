@@ -55,7 +55,7 @@ public:
        "collector_endpoint": "/api/v1/spans"
        }
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
 
     setup(*loader, true);
   }
@@ -81,14 +81,14 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     std::string invalid_config = R"EOF(
       {"fake" : "fake"}
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(invalid_config);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(invalid_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
 
   {
     std::string empty_config = "{}";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(empty_config);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(empty_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
@@ -103,7 +103,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
        "collector_endpoint": "/api/v1/spans"
        }
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
@@ -119,7 +119,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
        "collector_endpoint": "/api/v1/spans"
        }
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
 
     setup(*loader, true);
   }

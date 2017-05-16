@@ -51,7 +51,7 @@ void DynamoFilter::onDecodeComplete(const Buffer::Instance& data) {
   std::string body = buildBody(decoder_callbacks_->decodingBuffer(), data);
   if (!body.empty()) {
     try {
-      Json::ObjectPtr json_body = Json::Factory::loadFromString(body);
+      Json::ObjectSharedPtr json_body = Json::Factory::loadFromString(body);
       table_descriptor_ = RequestParser::parseTable(operation_, *json_body);
     } catch (const Json::Exception& jsonEx) {
       // Body parsing failed. This should not happen, just put a stat for that.
@@ -71,7 +71,7 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
   std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
   if (!body.empty()) {
     try {
-      Json::ObjectPtr json_body = Json::Factory::loadFromString(body);
+      Json::ObjectSharedPtr json_body = Json::Factory::loadFromString(body);
       chargeTablePartitionIdStats(*json_body);
 
       if (Http::CodeUtility::is4xx(status)) {

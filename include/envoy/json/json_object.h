@@ -12,7 +12,7 @@
 namespace Json {
 class Object;
 
-typedef std::shared_ptr<Object> ObjectPtr;
+typedef std::shared_ptr<Object> ObjectSharedPtr;
 
 // @return false if immediate exit from iteration required.
 typedef std::function<bool(const std::string&, const Object&)> ObjectCallback;
@@ -35,9 +35,9 @@ public:
   /**
    * Convert a generic object into an array of objects. This is useful for dealing
    * with arrays of arrays.
-   * @return std::vector<ObjectPtr> the converted object.
+   * @return std::vector<ObjectSharedPtr> the converted object.
    */
-  virtual std::vector<ObjectPtr> asObjectArray() const PURE;
+  virtual std::vector<ObjectSharedPtr> asObjectArray() const PURE;
 
   /**
    * Get a boolean value by name.
@@ -74,16 +74,16 @@ public:
    * @param name supplies the key name.
    * @param allow_empty supplies whether to return an empty object if the key does not
    * exist.
-   * @return ObjectObjectPtr the sub-object.
+   * @return ObjectObjectSharedPtr the sub-object.
    */
-  virtual ObjectPtr getObject(const std::string& name, bool allow_empty = false) const PURE;
+  virtual ObjectSharedPtr getObject(const std::string& name, bool allow_empty = false) const PURE;
 
   /**
    * Get an array by name.
    * @param name supplies the key name.
-   * @return std::vector<ObjectPtr> the array of JSON  objects.
+   * @return std::vector<ObjectSharedPtr> the array of JSON  objects.
    */
-  virtual std::vector<ObjectPtr> getObjectArray(const std::string& name) const PURE;
+  virtual std::vector<ObjectSharedPtr> getObjectArray(const std::string& name) const PURE;
 
   /**
    * Get a string value by name.

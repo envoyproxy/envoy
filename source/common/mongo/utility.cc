@@ -84,7 +84,7 @@ std::string QueryMessageInfo::parseCallingFunction(const QueryMessage& query) {
 
 std::string QueryMessageInfo::parseCallingFunctionJson(const std::string& json_string) {
   try {
-    Json::ObjectPtr json = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json = Json::Factory::loadFromString(json_string);
     return json->getString("callingFunction");
   } catch (Json::Exception&) {
     return "";
