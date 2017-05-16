@@ -8,23 +8,23 @@
 namespace Json {
 
 TEST(JsonLoaderTest, Basic) {
-  EXPECT_THROW(Factory::loadFromFile("bad_file"), EnvoyException);
-  EXPECT_THROW(Factory::loadFromString("{"), EnvoyException);
+  EXPECT_THROW(Factory::loadFromFile("bad_file"), Exception);
+  EXPECT_THROW(Factory::loadFromString("{"), Exception);
 
   {
     ObjectPtr json = Factory::loadFromString("{\"hello\":123}");
     EXPECT_TRUE(json->hasObject("hello"));
     EXPECT_FALSE(json->hasObject("world"));
     EXPECT_FALSE(json->empty());
-    EXPECT_THROW(json->getObject("world"), EnvoyException);
-    EXPECT_THROW(json->getBoolean("hello"), EnvoyException);
-    EXPECT_THROW(json->getObjectArray("hello"), EnvoyException);
-    EXPECT_THROW(json->getString("hello"), EnvoyException);
+    EXPECT_THROW(json->getObject("world"), Exception);
+    EXPECT_THROW(json->getBoolean("hello"), Exception);
+    EXPECT_THROW(json->getObjectArray("hello"), Exception);
+    EXPECT_THROW(json->getString("hello"), Exception);
   }
 
   {
     ObjectPtr json = Factory::loadFromString("{\"hello\":\"123\"}");
-    EXPECT_THROW(json->getInteger("hello"), EnvoyException);
+    EXPECT_THROW(json->getInteger("hello"), Exception);
   }
 
   {
@@ -36,8 +36,8 @@ TEST(JsonLoaderTest, Basic) {
 
   {
     ObjectPtr json = Factory::loadFromString("{\"hello\": [\"a\", \"b\", 3]}");
-    EXPECT_THROW(json->getStringArray("hello"), EnvoyException);
-    EXPECT_THROW(json->getStringArray("world"), EnvoyException);
+    EXPECT_THROW(json->getStringArray("hello"), Exception);
+    EXPECT_THROW(json->getStringArray("world"), Exception);
   }
 
   {
@@ -108,7 +108,7 @@ TEST(JsonLoaderTest, Basic) {
 
     ObjectPtr config = Factory::loadFromString(json);
     std::vector<ObjectPtr> array = config->getObjectArray("descriptors");
-    EXPECT_THROW(array[0]->asObjectArray(), EnvoyException);
+    EXPECT_THROW(array[0]->asObjectArray(), Exception);
   }
 
   {
@@ -155,7 +155,7 @@ TEST(JsonLoaderTest, Double) {
   }
   {
     ObjectPtr json = Factory::loadFromString("{\"foo\": \"bar\"}");
-    EXPECT_THROW(json->getDouble("foo"), EnvoyException);
+    EXPECT_THROW(json->getDouble("foo"), Exception);
   }
 }
 
@@ -163,10 +163,8 @@ TEST(JsonLoaderTest, Hash) {
   ObjectPtr json1 = Factory::loadFromString("{\"value1\": 10.5, \"value2\": -12.3}");
   ObjectPtr json2 = Factory::loadFromString("{\"value2\": -12.3, \"value1\": 10.5}");
   ObjectPtr json3 = Factory::loadFromString("  {  \"value2\":  -12.3, \"value1\":  10.5} ");
-  ObjectPtr json4 = Factory::loadFromString("{\"value1\": 10.5}");
-  EXPECT_EQ(json1->hash(), json2->hash());
+  EXPECT_NE(json1->hash(), json2->hash());
   EXPECT_EQ(json2->hash(), json3->hash());
-  EXPECT_NE(json2->hash(), json4->hash());
 }
 
 TEST(JsonLoaderTest, Schema) {
@@ -213,9 +211,8 @@ TEST(JsonLoaderTest, Schema) {
   ObjectPtr json = Factory::loadFromString(json_string);
 
   EXPECT_THROW(json->validateSchema(invalid_json_schema), std::invalid_argument);
-  // EXPECT_THROW_WITH_MESSAGE(json->validateSchema(invalid_json_schema), EnvoyException, "foo");
-  EXPECT_THROW(json->validateSchema(invalid_schema), EnvoyException);
-  EXPECT_THROW(json->validateSchema(different_schema), EnvoyException);
+  EXPECT_THROW(json->validateSchema(invalid_schema), Exception);
+  EXPECT_THROW(json->validateSchema(different_schema), Exception);
   EXPECT_NO_THROW(json->validateSchema(valid_schema));
 }
 
@@ -227,7 +224,7 @@ TEST(JsonLoaderTest, AsString) {
     if (key == "name1") {
       EXPECT_EQ("value1", value.asString());
     } else {
-      EXPECT_THROW(value.asString(), EnvoyException);
+      EXPECT_THROW(value.asString(), Exception);
     }
     return true;
   });

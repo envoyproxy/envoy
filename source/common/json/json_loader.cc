@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <fstream>
 #include <limits>
-#include <map>
 #include <sstream>
 #include <stack>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "common/common/utility.h"
@@ -30,7 +30,7 @@ namespace {
  * Internal representation of Object.
  */
 class Field;
-typedef std::shared_ptr<Field> FieldPtr;
+typedef std::shared_ptr<Field> FieldSharedPtr;
 
 class Field : public Object, public std::enable_shared_from_this<Field> {
 public:
@@ -38,21 +38,23 @@ public:
   void setLineNumberEnd(uint64_t line_number) { line_number_end_ = line_number; }
 
   // Container factories for handler.
-  static FieldPtr createObject() { return FieldPtr{new Field(Type::Object)}; }
-  static FieldPtr createArray() { return FieldPtr{new Field(Type::Array)}; }
-  static FieldPtr createNull() { return FieldPtr{new Field(Type::Null)}; }
+  static FieldSharedPtr createObject() { return FieldSharedPtr{new Field(Type::Object)}; }
+  static FieldSharedPtr createArray() { return FieldSharedPtr{new Field(Type::Array)}; }
+  static FieldSharedPtr createNull() { return FieldSharedPtr{new Field(Type::Null)}; }
 
   bool isArray() const { return type_ == Type::Array; }
   bool isObject() const { return type_ == Type::Object; }
 
   // Value factory.
-  template <typename T> static FieldPtr createValue(T value) { return FieldPtr{new Field(value)}; }
+  template <typename T> static FieldSharedPtr createValue(T value) {
+    return FieldSharedPtr{new Field(value)};
+  }
 
-  void append(FieldPtr field_ptr) {
+  void append(FieldSharedPtr field_ptr) {
     checkType(Type::Array);
     value_.array_value_.push_back(field_ptr);
   }
-  void insert(const std::string& key, FieldPtr field_ptr) {
+  void insert(const std::string& key, FieldSharedPtr field_ptr) {
     checkType(Type::Object);
     value_.object_value_[key] = field_ptr;
   }
@@ -88,13 +90,31 @@ private:
     Object,
     String,
   };
+  static const char* typeAsString(Type t) {
+    switch (t) {
+    case Type::Array:
+      return "Array";
+    case Type::Boolean:
+      return "Boolean";
+    case Type::Double:
+      return "Double";
+    case Type::Integer:
+      return "Integer";
+    case Type::Null:
+      return "Null";
+    case Type::Object:
+      return "Object";
+    case Type::String:
+      return "String";
+    }
+  }
 
   struct Value {
-    std::vector<FieldPtr> array_value_;
+    std::vector<FieldSharedPtr> array_value_;
     bool boolean_value_;
     double double_value_;
     int64_t integer_value_;
-    std::map<const std::string, FieldPtr> object_value_;
+    std::unordered_map<std::string, FieldSharedPtr> object_value_;
     std::string string_value_;
   };
 
@@ -107,15 +127,18 @@ private:
   bool isType(Type type) const { return type == type_; }
   void checkType(Type type) const {
     if (!isType(type)) {
-      throw Exception("Field access in JSON with correct type.");
+      throw Exception(
+          fmt::format("Field accessed JSON with type '{}' does not match actual type '{}'.",
+                      typeAsString(type), typeAsString(type_)));
     }
   }
-  // value rtype funcs
+
+  // Value return type functions.
   std::string stringValue() const {
     checkType(Type::String);
     return value_.string_value_;
   }
-  std::vector<FieldPtr> arrayValue() const {
+  std::vector<FieldSharedPtr> arrayValue() const {
     checkType(Type::Array);
     return value_.array_value_;
   }
@@ -133,8 +156,8 @@ private:
   }
 
   rapidjson::Document asRapidJsonDocument() const;
-  static void build(const Field& field, rapidjson::Value& value,
-                    rapidjson::Document::AllocatorType& allocator);
+  static void buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
+                                     rapidjson::Document::AllocatorType& allocator);
 
   uint64_t line_number_start_;
   uint64_t line_number_end_;
@@ -142,6 +165,9 @@ private:
   Value value_;
 };
 
+/*
+ * Custom stream to allow access to the line number for each object.
+ */
 class LineCountingStringStream : public rapidjson::StringStream {
   // Ch is typdef in parent class to handle character encoding.
 public:
@@ -153,7 +179,7 @@ public:
     }
     return ret;
   }
-  uint64_t getLineNumber() { return line_number_; }
+  uint64_t getLineNumber() const { return line_number_; }
 
 private:
   uint64_t line_number_;
@@ -184,7 +210,7 @@ public:
   ObjectPtr getRoot() { return root_; }
 
 private:
-  bool handleValueEvent(FieldPtr ptr);
+  bool handleValueEvent(FieldSharedPtr ptr);
 
   enum State {
     expectRoot,
@@ -196,14 +222,14 @@ private:
   State state_;
   LineCountingStringStream& stream_;
 
-  std::stack<FieldPtr> stack_;
+  std::stack<FieldSharedPtr> stack_;
   std::string key_;
 
-  FieldPtr root_;
+  FieldSharedPtr root_;
 };
 
-void Field::build(const Field& field, rapidjson::Value& value,
-                  rapidjson::Document::AllocatorType& allocator) {
+void Field::buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
+                                   rapidjson::Document::AllocatorType& allocator) {
 
   switch (field.type_) {
   case Type::Array: {
@@ -214,7 +240,7 @@ void Field::build(const Field& field, rapidjson::Value& value,
       case Type::Array:
       case Type::Object: {
         rapidjson::Value nested_value;
-        build(*element, nested_value, allocator);
+        buildRapidJsonDocument(*element, nested_value, allocator);
         value.PushBack(nested_value, allocator);
         break;
       }
@@ -245,7 +271,7 @@ void Field::build(const Field& field, rapidjson::Value& value,
       case Type::Array:
       case Type::Object: {
         rapidjson::Value nested_value;
-        build(*item.second, nested_value, allocator);
+        buildRapidJsonDocument(*item.second, nested_value, allocator);
         value.AddMember(name, nested_value, allocator);
         break;
       }
@@ -277,7 +303,7 @@ void Field::build(const Field& field, rapidjson::Value& value,
 rapidjson::Document Field::asRapidJsonDocument() const {
   rapidjson::Document document;
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  build(*this, document, allocator);
+  buildRapidJsonDocument(*this, document, allocator);
   return document;
 }
 
@@ -368,7 +394,7 @@ std::vector<ObjectPtr> Field::getObjectArray(const std::string& name) const {
     throw Exception(fmt::format("key '{}' missing or not an array", name));
   }
 
-  std::vector<FieldPtr> array_value = value_itr->second->arrayValue();
+  std::vector<FieldSharedPtr> array_value = value_itr->second->arrayValue();
   return {array_value.begin(), array_value.end()};
 }
 
@@ -398,11 +424,11 @@ std::vector<std::string> Field::getStringArray(const std::string& name) const {
     throw Exception(fmt::format("key '{}' missing or not an array", name));
   }
 
-  std::vector<FieldPtr> array = value_itr->second->arrayValue();
+  std::vector<FieldSharedPtr> array = value_itr->second->arrayValue();
   std::vector<std::string> string_array;
   string_array.reserve(array.size());
   for (const auto& element : array) {
-    if (!element > isType(Type::String)) {
+    if (!element->isType(Type::String)) {
       throw Exception(fmt::format("array '{}' does not contain all strings", name));
     }
     string_array.push_back(element->stringValue());
@@ -471,7 +497,7 @@ void Field::validateSchema(const std::string& schema) const {
 }
 
 bool ObjectHandler::StartObject() {
-  FieldPtr object = Field::createObject();
+  FieldSharedPtr object = Field::createObject();
   object->setLineNumberStart(stream_.getLineNumber());
 
   switch (state_) {
@@ -526,7 +552,7 @@ bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
 }
 
 bool ObjectHandler::StartArray() {
-  FieldPtr array = Field::createArray();
+  FieldSharedPtr array = Field::createArray();
   array->setLineNumberStart(stream_.getLineNumber());
 
   switch (state_) {
@@ -597,7 +623,7 @@ bool ObjectHandler::RawNumber(const char*, rapidjson::SizeType, bool) {
   return false;
 }
 
-bool ObjectHandler::handleValueEvent(FieldPtr ptr) {
+bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
   switch (state_) {
   case expectValueOrStartObjectArray:
     state_ = expectKeyOrEndObject;
@@ -614,7 +640,11 @@ bool ObjectHandler::handleValueEvent(FieldPtr ptr) {
 } // namespace
 
 ObjectPtr Factory::loadFromFile(const std::string& file_path) {
-  return loadFromString(Filesystem::fileReadToEnd(file_path));
+  try {
+    return loadFromString(Filesystem::fileReadToEnd(file_path));
+  } catch (EnvoyException& e) {
+    throw Exception(e.what());
+  }
 }
 
 ObjectPtr Factory::loadFromString(const std::string& json) {
