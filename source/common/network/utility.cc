@@ -148,23 +148,23 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string&
 Address::InstanceConstSharedPtr
 Utility::parseInternetAddressAndPort(const std::string& ip_address) {
   if (ip_address.empty()) {
-    Utility::throwWithMalformedIp(ip_address);
+    throwWithMalformedIp(ip_address);
   }
   if (ip_address[0] == '[') {
     // Appears to be an IPv6 address. Find the "]:" that separates the address from the port.
     auto pos = ip_address.rfind("]:");
     if (pos == std::string::npos) {
-      Utility::throwWithMalformedIp(ip_address);
+      throwWithMalformedIp(ip_address);
     }
     const auto ip_str = ip_address.substr(1, pos - 1);
     const auto port_str = ip_address.substr(pos + 2);
     uint64_t port64 = 0;
     if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
-      Utility::throwWithMalformedIp(ip_address);
+      throwWithMalformedIp(ip_address);
     }
     sockaddr_in6 sa6;
     if (ip_str.empty() || inet_pton(AF_INET6, ip_str.c_str(), &sa6.sin6_addr) != 1) {
-      Utility::throwWithMalformedIp(ip_address);
+      throwWithMalformedIp(ip_address);
     }
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port64);
@@ -173,17 +173,17 @@ Utility::parseInternetAddressAndPort(const std::string& ip_address) {
   // Treat it as an IPv4 address followed by a port.
   auto pos = ip_address.rfind(":");
   if (pos == std::string::npos) {
-    Utility::throwWithMalformedIp(ip_address);
+    throwWithMalformedIp(ip_address);
   }
   const auto ip_str = ip_address.substr(0, pos);
   const auto port_str = ip_address.substr(pos + 1);
   uint64_t port64 = 0;
   if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
-    Utility::throwWithMalformedIp(ip_address);
+    throwWithMalformedIp(ip_address);
   }
   sockaddr_in sa4;
   if (ip_str.empty() || inet_pton(AF_INET, ip_str.c_str(), &sa4.sin_addr) != 1) {
-    Utility::throwWithMalformedIp(ip_address);
+    throwWithMalformedIp(ip_address);
   }
   sa4.sin_family = AF_INET;
   sa4.sin_port = htons(port64);

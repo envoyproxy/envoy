@@ -114,7 +114,7 @@ CidrRange CidrRange::create(const std::string& range) {
   std::vector<std::string> parts = StringUtil::split(range, '/');
   if (parts.size() == 2) {
     InstanceConstSharedPtr ptr = Utility::parseInternetAddress(parts[0]);
-    if (ptr != nullptr && ptr->type() == Type::Ip) {
+    if (ptr->type() == Type::Ip) {
       uint64_t length64;
       if (StringUtil::atoul(parts[1].c_str(), length64, 10)) {
         if ((ptr->ip()->version() == IpVersion::v6 && length64 <= 128) ||
