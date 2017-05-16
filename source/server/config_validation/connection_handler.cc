@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 
+namespace Envoy {
 namespace Server {
 
 ValidationConnectionHandler::ValidationConnectionHandler(Api::ApiPtr&& api)
@@ -23,3 +24,4 @@ void ValidationConnectionHandler::addSslListener(Network::FilterChainFactory&, S
 }
 
 } // Server
+} // Envoy

@@ -2,6 +2,7 @@
 
 #include "server/config_validation/dispatcher.h"
 
+namespace Envoy {
 namespace Api {
 
 ValidationImpl::ValidationImpl(std::chrono::milliseconds file_flush_interval_msec)
@@ -12,3 +13,4 @@ Event::DispatcherPtr ValidationImpl::allocateDispatcher() {
 }
 
 } // Api
+} // Envoy

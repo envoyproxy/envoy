@@ -3,6 +3,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 
+namespace Envoy {
 namespace Network {
 
 /**
@@ -18,3 +19,4 @@ public:
 };
 
 } // Network
+} // Envoy

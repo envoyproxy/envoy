@@ -6,6 +6,7 @@
 
 #include "server/config_validation/async_client.h"
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -56,3 +57,4 @@ private:
 };
 
 } // Upstream
+} // Envoy

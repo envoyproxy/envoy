@@ -1,5 +1,6 @@
 #include "server/config_validation/cluster_manager.h"
 
+namespace Envoy {
 namespace Upstream {
 
 ValidationClusterManagerFactory::ValidationClusterManagerFactory(
@@ -47,3 +48,4 @@ Http::AsyncClient& ValidationClusterManager::httpAsyncClientForCluster(const std
 }
 
 } // Upstream
+} // Envoy

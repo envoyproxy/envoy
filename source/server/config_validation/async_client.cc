@@ -1,5 +1,6 @@
 #include "server/config_validation/async_client.h"
 
+namespace Envoy {
 namespace Http {
 
 AsyncClient::Request* ValidationAsyncClient::send(MessagePtr&&, Callbacks&,
@@ -13,3 +14,4 @@ AsyncClient::Stream* ValidationAsyncClient::start(StreamCallbacks&,
 }
 
 } // Http
+} // Envoy

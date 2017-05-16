@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 
+namespace Envoy {
 namespace Event {
 
 Network::ClientConnectionPtr
@@ -33,3 +34,4 @@ ValidationDispatcher::createSslListener(Network::ConnectionHandler&, Ssl::Server
 }
 
 } // Event
+} // Envoy

@@ -4,6 +4,7 @@
 
 #include "server/configuration_impl.h"
 
+namespace Envoy {
 namespace Server {
 
 ValidationInstance::ValidationInstance(Options& options, HotRestart& restarter,
@@ -67,3 +68,4 @@ void ValidationInstance::shutdown() {
 }
 
 } // Server
+} // Envoy

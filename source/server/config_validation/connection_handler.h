@@ -5,6 +5,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -36,3 +37,4 @@ private:
 };
 
 } // Server
+} // Envoy

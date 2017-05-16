@@ -6,6 +6,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 
+namespace Envoy {
 namespace Server {
 
 // Test param is the path to the config file to validate.
@@ -36,3 +37,4 @@ INSTANTIATE_TEST_CASE_P(ValidConfigs, ValidationServerTest,
                                               {{"upstream_0", 0}, {"upstream_1", 0}})));
 
 } // Server
+} // Envoy

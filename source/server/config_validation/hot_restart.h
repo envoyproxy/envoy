@@ -6,6 +6,7 @@
 
 #include "common/common/thread.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -26,3 +27,4 @@ public:
 };
 
 } // Server
+} // Envoy

@@ -5,6 +5,7 @@
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -21,3 +22,4 @@ public:
 };
 
 } // Http
+} // Envoy

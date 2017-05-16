@@ -4,6 +4,7 @@
 
 #include "common/event/dispatcher_impl.h"
 
+namespace Envoy {
 namespace Event {
 
 /**
@@ -27,3 +28,4 @@ public:
 };
 
 } // Event
+} // Envoy

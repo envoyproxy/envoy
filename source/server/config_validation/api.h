@@ -5,6 +5,7 @@
 
 #include "common/api/api_impl.h"
 
+namespace Envoy {
 namespace Api {
 
 /**
@@ -19,3 +20,4 @@ public:
 };
 
 } // Api
+} // Envoy

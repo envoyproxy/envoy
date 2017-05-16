@@ -44,17 +44,18 @@ public:
 
 namespace {
 
-int validateConfig(OptionsImpl& options, Server::ProdComponentFactory& component_factory,
-                   const LocalInfo::LocalInfoImpl& local_info) {
-  Thread::MutexBasicLockable access_log_lock;
-  Thread::MutexBasicLockable log_lock;
-  Server::ValidationHotRestart restarter;
-  Logger::Registry::initialize(options.logLevel(), log_lock);
-  Stats::HeapRawStatDataAllocator alloc;
-  Stats::ThreadLocalStoreImpl stats_store(alloc);
+int validateConfig(Envoy::OptionsImpl& options,
+                   Envoy::Server::ProdComponentFactory& component_factory,
+                   const Envoy::LocalInfo::LocalInfoImpl& local_info) {
+  Envoy::Thread::MutexBasicLockable access_log_lock;
+  Envoy::Thread::MutexBasicLockable log_lock;
+  Envoy::Server::ValidationHotRestart restarter;
+  Envoy::Logger::Registry::initialize(options.logLevel(), log_lock);
+  Envoy::Stats::HeapRawStatDataAllocator alloc;
+  Envoy::Stats::ThreadLocalStoreImpl stats_store(alloc);
 
-  Server::ValidationInstance server(options, restarter, stats_store, access_log_lock,
-                                    component_factory, local_info);
+  Envoy::Server::ValidationInstance server(options, restarter, stats_store, access_log_lock,
+                                           component_factory, local_info);
   std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
   server.shutdown();
   return 0;
@@ -70,17 +71,17 @@ int main(int argc, char** argv) {
   Envoy::Event::Libevent::Global::initialize();
   Envoy::OptionsImpl options(argc, argv, Envoy::Server::SharedMemory::version(),
                              spdlog::level::warn);
-  Server::ProdComponentFactory component_factory;
+  Envoy::Server::ProdComponentFactory component_factory;
   Envoy::LocalInfo::LocalInfoImpl local_info(
       Envoy::Network::Utility::getLocalAddress(Envoy::Network::Address::IpVersion::v4),
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   switch (options.mode()) {
-  case Server::Mode::Serve:
+  case Envoy::Server::Mode::Serve:
     break;
-  case Server::Mode::Validate:
+  case Envoy::Server::Mode::Validate:
     return validateConfig(options, component_factory, local_info);
-  case Server::Mode::ValidateLight:
+  case Envoy::Server::Mode::ValidateLight:
     NOT_IMPLEMENTED;
   default:
     NOT_REACHED;
