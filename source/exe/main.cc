@@ -5,6 +5,7 @@
 #include "common/event/libevent.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/stats_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "exe/hot_restart.h"
@@ -51,8 +52,7 @@ int validateConfig(Envoy::OptionsImpl& options,
   Envoy::Thread::MutexBasicLockable log_lock;
   Envoy::Server::ValidationHotRestart restarter;
   Envoy::Logger::Registry::initialize(options.logLevel(), log_lock);
-  Envoy::Stats::HeapRawStatDataAllocator alloc;
-  Envoy::Stats::ThreadLocalStoreImpl stats_store(alloc);
+  Envoy::Stats::IsolatedStoreImpl stats_store;
 
   Envoy::Server::ValidationInstance server(options, restarter, stats_store, access_log_lock,
                                            component_factory, local_info);

@@ -99,6 +99,7 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/ssl:context_lib",
+        "//source/common/stats:stats_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/server:configuration_lib",
         "//source/server:server_lib",

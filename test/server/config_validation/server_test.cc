@@ -21,7 +21,7 @@ protected:
 
   testing::NiceMock<MockOptions> options_;
   ValidationHotRestart restarter_;
-  Stats::TestIsolatedStoreImpl store_;
+  Stats::IsolatedStoreImpl store_;
   Thread::MutexBasicLockable access_log_lock_;
   TestComponentFactory component_factory_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;

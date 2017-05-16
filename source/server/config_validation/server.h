@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/ssl/context_manager_impl.h"
+#include "common/stats/stats_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/config_validation/api.h"
@@ -37,7 +38,7 @@ namespace Server {
  */
 class ValidationInstance : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
-  ValidationInstance(Options& options, HotRestart& restarter, Stats::StoreRoot& store,
+  ValidationInstance(Options& options, HotRestart& restarter, Stats::IsolatedStoreImpl& store,
                      Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                      const LocalInfo::LocalInfo& local_info);
 
@@ -83,7 +84,7 @@ private:
 
   Options& options_;
   HotRestart& restarter_;
-  Stats::StoreRoot& stats_store_;
+  Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   ValidationConnectionHandler handler_;
   Runtime::LoaderPtr runtime_loader_;

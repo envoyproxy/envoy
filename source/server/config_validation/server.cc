@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Server {
 
 ValidationInstance::ValidationInstance(Options& options, HotRestart& restarter,
-                                       Stats::StoreRoot& store,
+                                       Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,
                                        ComponentFactory& component_factory,
                                        const LocalInfo::LocalInfo& local_info)
@@ -39,7 +39,6 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
   config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
   thread_local_.registerThread(handler_.dispatcher(), true);
-  stats_store_.initializeThreading(handler_.dispatcher(), thread_local_);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   ssl_context_manager_.reset(new Ssl::ContextManagerImpl(*runtime_loader_));
   cluster_manager_factory_.reset(new Upstream::ValidationClusterManagerFactory(
@@ -58,7 +57,6 @@ void ValidationInstance::shutdown() {
   // This normally happens at the bottom of InstanceImpl::run(), but we don't have a run(). We can
   // do an abbreviated shutdown here since there's less to clean up -- for example, no workers to
   // exit.
-  stats_store_.shutdownThreading();
   config_->clusterManager().shutdown();
   thread_local_.shutdownThread();
 }
