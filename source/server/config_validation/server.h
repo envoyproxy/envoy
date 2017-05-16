@@ -42,7 +42,7 @@ public:
                      const LocalInfo::LocalInfo& local_info);
 
   // Server::Instance
-  Admin& admin() override { throw EnvoyException("ValidationInstance::admin() not implemented"); }
+  Admin& admin() override { NOT_IMPLEMENTED; }
   Api::Api& api() override { return handler_.api(); }
   Upstream::ClusterManager& clusterManager() override { return config_->clusterManager(); }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
