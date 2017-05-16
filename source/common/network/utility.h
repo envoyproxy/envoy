@@ -171,6 +171,9 @@ public:
    * @return whether the port appears in at least one of the ranges in the list
    */
   static bool portInRangeList(const Address::Instance& address, const std::list<PortRange>& list);
+
+private:
+  static void throwWithMalformedIp(const std::string& ip_address);
 };
 
 } // Network
