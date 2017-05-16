@@ -208,7 +208,7 @@ static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port) {
 static Network::ListenSocketPtr makeTcpListenSocket(const Network::Address::IpVersion version,
                                                     uint32_t port) {
   return Network::ListenSocketPtr{new Network::TcpListenSocket(
-      Network::Address::parseInternetAddressAndPort(
+      Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:{}", Network::Test::getAnyAddressUrlString(version), port)),
       true)};
 }

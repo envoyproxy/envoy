@@ -89,7 +89,7 @@ const std::string Utility::UNIX_SCHEME = "unix://";
 
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   if (url.find(TCP_SCHEME) == 0) {
-    return Address::parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
+    return parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
   } else if (url.find(UNIX_SCHEME) == 0) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
@@ -128,6 +128,72 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   } catch (const std::invalid_argument& e) {
     throw EnvoyException(e.what());
   }
+}
+
+Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address) {
+  sockaddr_in sa4;
+  if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
+    sa4.sin_family = AF_INET;
+    sa4.sin_port = 0;
+    return std::make_shared<Address::Ipv4Instance>(&sa4);
+  }
+  sockaddr_in6 sa6;
+  if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
+    sa6.sin6_family = AF_INET6;
+    sa6.sin6_port = 0;
+    return std::make_shared<Address::Ipv6Instance>(sa6);
+  }
+  throwWithMalformedIp(ip_address);
+  NOT_REACHED;
+}
+
+Address::InstanceConstSharedPtr
+Utility::parseInternetAddressAndPort(const std::string& ip_address) {
+  if (ip_address.empty()) {
+    throwWithMalformedIp(ip_address);
+  }
+  if (ip_address[0] == '[') {
+    // Appears to be an IPv6 address. Find the "]:" that separates the address from the port.
+    auto pos = ip_address.rfind("]:");
+    if (pos == std::string::npos) {
+      throwWithMalformedIp(ip_address);
+    }
+    const auto ip_str = ip_address.substr(1, pos - 1);
+    const auto port_str = ip_address.substr(pos + 2);
+    uint64_t port64 = 0;
+    if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
+      throwWithMalformedIp(ip_address);
+    }
+    sockaddr_in6 sa6;
+    if (ip_str.empty() || inet_pton(AF_INET6, ip_str.c_str(), &sa6.sin6_addr) != 1) {
+      throwWithMalformedIp(ip_address);
+    }
+    sa6.sin6_family = AF_INET6;
+    sa6.sin6_port = htons(port64);
+    return std::make_shared<Address::Ipv6Instance>(sa6);
+  }
+  // Treat it as an IPv4 address followed by a port.
+  auto pos = ip_address.rfind(":");
+  if (pos == std::string::npos) {
+    throwWithMalformedIp(ip_address);
+  }
+  const auto ip_str = ip_address.substr(0, pos);
+  const auto port_str = ip_address.substr(pos + 1);
+  uint64_t port64 = 0;
+  if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
+    throwWithMalformedIp(ip_address);
+  }
+  sockaddr_in sa4;
+  if (ip_str.empty() || inet_pton(AF_INET, ip_str.c_str(), &sa4.sin_addr) != 1) {
+    throwWithMalformedIp(ip_address);
+  }
+  sa4.sin_family = AF_INET;
+  sa4.sin_port = htons(port64);
+  return std::make_shared<Address::Ipv4Instance>(&sa4);
+}
+
+void Utility::throwWithMalformedIp(const std::string& ip_address) {
+  throw EnvoyException(fmt::format("malformed IP address: {}", ip_address));
 }
 
 // TODO(hennna): Currently getLocalAddress does not support choosing between

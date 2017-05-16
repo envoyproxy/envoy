@@ -173,23 +173,6 @@ private:
   IpHelper ip_;
 };
 
-/*
- * Parse an internet host address (IPv4 or IPv6) and create an Instance from it.
- * The address must not include a port number.
- * @param ip_addr string to be parsed as an internet address.
- * @return pointer to the Instance, or nullptr if unable to parse the address.
- */
-InstanceConstSharedPtr parseInternetAddress(const std::string& ip_addr);
-
-/*
- * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it.
- * @param ip_addr string to be parsed as an internet address and port. Examples:
- *        - "1.2.3.4:80"
- *        - "[1234:5678::9]:443"
- * @return pointer to the Instance, or nullptr if unable to parse the address.
- */
-InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_addr);
-
 /**
  * Implementation of a pipe address (unix domain socket on unix).
  */

@@ -1,5 +1,6 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/zipkin/tracer.h"
 #include "common/tracing/zipkin/util.h"
@@ -31,7 +32,7 @@ private:
 
 TEST(ZipkinTracerTest, spanCreation) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator);
   NiceMock<MockSystemTimeSource> mock_start_time;
@@ -209,7 +210,7 @@ TEST(ZipkinTracerTest, spanCreation) {
 
 TEST(ZipkinTracerTest, finishSpan) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Address::parseInternetAddressAndPort("127.0.0.1:9000");
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator);
   NiceMock<MockSystemTimeSource> mock_start_time;
