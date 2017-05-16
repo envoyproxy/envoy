@@ -7,6 +7,7 @@
 
 #include "event2/buffer.h"
 
+namespace Envoy {
 namespace Buffer {
 
 // RawSlice is the same structure as evbuffer_iovec. This was put into place to avoid leaking
@@ -110,3 +111,4 @@ OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
 
 } // Buffer
+} // Envoy

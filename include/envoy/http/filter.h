@@ -13,6 +13,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -68,12 +69,6 @@ enum class FilterTrailersStatus {
 class StreamFilterCallbacks {
 public:
   virtual ~StreamFilterCallbacks() {}
-
-  /**
-   * Register a callback that will get called when the underlying stream has been reset (either
-   * upstream reset from another filter or downstream reset from the remote side).
-   */
-  virtual void addResetStreamCallback(std::function<void()> callback) PURE;
 
   /**
    * @return uint64_t the ID of the originating connection for logging purposes.
@@ -148,22 +143,30 @@ public:
   virtual void continueDecoding() PURE;
 
   /**
-   * @return Buffer::InstancePtr& the currently buffered data as buffered by this filter or previous
-   *         ones in the filter chain. May be nullptr if nothing has been buffered yet. Callers
-   *         are free to remove, reallocate, and generally modify the buffered data.
-   *
-   *         NOTE: For common buffering cases, there is no need for each filter to manually handle
-   *         buffering. If decodeData() returns StopIterationAndBuffer, the filter manager will
-   *         buffer the data passed to the callback on behalf of the filter.
-   *
-   *         NOTE: In complex cases, the filter may wish to manually modify the buffer. One example
-   *         of this is switching a header only request to a request with body data. If a filter
-   *         receives decodeHeaders(..., true), it has the option of filling decodingBuffer() with
-   *         body data. Subsequent filters will receive decodeHeaders(..., false) followed by
-   *         decodeData(..., true). This works both in the direct iteration as well as the
-   *         continuation case.
+   * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
+   *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
    */
-  virtual Buffer::InstancePtr& decodingBuffer() PURE;
+  virtual const Buffer::Instance* decodingBuffer() PURE;
+
+  /**
+   * Add buffered body data. This method is used in advanced cases where returning
+   * StopIterationAndBuffer from decodeData() is not sufficient.
+   *
+   * 1) If a headers only request needs to be turned into a request with a body, this method can
+   * be called to add body in the decodeHeaders() callback. Subsequent filters will receive
+   * decodeHeaders(..., false) followed by decodeData(..., true). This works both in the direct
+   * iteration as well as the continuation case.
+   *
+   * 2) If additional buffered body data needs to be added by a filter before continuation of
+   * data to further filters (outside of callback context).
+   *
+   * 3) If additional data needs to be added in the decodeTrailers() callback, this method can be
+   * called in the context of the callback. All further filters will receive decodeData(..., false)
+   * followed by decodeTrailers().
+   *
+   * It is an error to call this method in any other case.
+   */
+  virtual void addDecodedData(Buffer::Instance& data) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -191,12 +194,28 @@ public:
 };
 
 /**
+ * Common base class for both decoder and encoder filters.
+ */
+class StreamFilterBase {
+public:
+  virtual ~StreamFilterBase() {}
+
+  /**
+   * This routine is called prior to a filter being destroyed. This may happen after normal stream
+   * finish (both downstream and upstream) or due to reset. Every filter is responsible for making
+   * sure that any async events are cleaned up in the context of this routine. This includes timers,
+   * network calls, etc. The reason there is an onDestroy() method vs. doing this type of cleanup
+   * in the destructor is due to the deferred deletion model that Envoy uses to avoid stack unwind
+   * complications.
+   */
+  virtual void onDestroy() PURE;
+};
+
+/**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter {
+class StreamDecoderFilter : public StreamFilterBase {
 public:
-  virtual ~StreamDecoderFilter() {}
-
   /**
    * Called with decoded headers, optionally indicating end of stream.
    * @param headers supplies the decoded headers map.
@@ -246,31 +265,37 @@ public:
   virtual void continueEncoding() PURE;
 
   /**
-   * @return Buffer::InstancePtr& the currently buffered data as buffered by this filter or previous
-   *         ones in the filter chain. May be nullptr if nothing has been buffered yet. Callers
-   *         are free to remove, reallocate, and generally modify the buffered data.
-   *
-   *         NOTE: For common buffering cases, there is no need for each filter to manually handle
-   *         buffering. If encodeData() returns StopIterationAndBuffer, the filter manager will
-   *         buffer the data passed to the callback on behalf of the filter.
-   *
-   *         NOTE: In complex cases, the filter may wish to manually modify the buffer. One example
-   *         of this is switching a header only request to a request with body data. If a filter
-   *         receives encodeHeaders(..., true), it has the option of filling encodingBuffer() with
-   *         body data. Subsequent filters will receive encodeHeaders(..., false) followed by
-   *         encodeData(..., true). This works both in the direct iteration as well as the
-   *         continuation case.
+   * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
+   *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
    */
-  virtual Buffer::InstancePtr& encodingBuffer() PURE;
+  virtual const Buffer::Instance* encodingBuffer() PURE;
+
+  /**
+   * Add buffered body data. This method is used in advanced cases where returning
+   * StopIterationAndBuffer from encodeData() is not sufficient.
+   *
+   * 1) If a headers only response needs to be turned into a response with a body, this method can
+   * be called to add body in the encodeHeaders() callback. Subsequent filters will receive
+   * encodeHeaders(..., false) followed by encodeData(..., true). This works both in the direct
+   * iteration as well as the continuation case.
+   *
+   * 2) If additional buffered body data needs to be added by a filter before continuation of
+   * data to further filters (outside of callback context).
+   *
+   * 3) If additional data needs to be added in the encodeTrailers() callback, this method can be
+   * called in the context of the callback. All further filters will receive encodeData(..., false)
+   * followed by encodeTrailers().
+   *
+   * It is an error to call this method in any other case.
+   */
+  virtual void addEncodedData(Buffer::Instance& data) PURE;
 };
 
 /**
  * Stream encoder filter interface.
  */
-class StreamEncoderFilter {
+class StreamEncoderFilter : public StreamFilterBase {
 public:
-  virtual ~StreamEncoderFilter() {}
-
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
    * @param headers supplies the headers to be encoded.
@@ -361,3 +386,4 @@ public:
 };
 
 } // Http
+} // Envoy

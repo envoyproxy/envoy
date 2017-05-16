@@ -6,6 +6,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 using testing::Return;
@@ -71,8 +72,6 @@ MockFilterChainFactory::~MockFilterChainFactory() {}
 
 template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks) {
   callbacks.route_.reset(new NiceMock<Router::MockRoute>());
-  ON_CALL(callbacks, addResetStreamCallback(_))
-      .WillByDefault(SaveArg<0>(&callbacks.reset_callback_));
   ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(callbacks.dispatcher_));
   ON_CALL(callbacks, requestInfo()).WillByDefault(ReturnRef(callbacks.request_info_));
   ON_CALL(callbacks, route()).WillByDefault(Return(callbacks.route_));
@@ -81,24 +80,22 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
 
 MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
-  ON_CALL(*this, decodingBuffer()).WillByDefault(ReturnRef(buffer_));
+  ON_CALL(*this, decodingBuffer()).WillByDefault(Return(buffer_.get()));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
 
 MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
-  ON_CALL(*this, encodingBuffer()).WillByDefault(ReturnRef(buffer_));
+  ON_CALL(*this, encodingBuffer()).WillByDefault(Return(buffer_.get()));
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() {}
 
 MockStreamDecoderFilter::MockStreamDecoderFilter() {
   ON_CALL(*this, setDecoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
-        callbacks_ = &callbacks;
-        callbacks_->addResetStreamCallback([this]() -> void { reset_stream_called_.ready(); });
-      }));
+      .WillByDefault(Invoke([this](StreamDecoderFilterCallbacks& callbacks)
+                                -> void { callbacks_ = &callbacks; }));
 }
 
 MockStreamDecoderFilter::~MockStreamDecoderFilter() {}
@@ -110,6 +107,17 @@ MockStreamEncoderFilter::MockStreamEncoderFilter() {
 }
 
 MockStreamEncoderFilter::~MockStreamEncoderFilter() {}
+
+MockStreamFilter::MockStreamFilter() {
+  ON_CALL(*this, setDecoderFilterCallbacks(_))
+      .WillByDefault(Invoke([this](StreamDecoderFilterCallbacks& callbacks)
+                                -> void { decoder_callbacks_ = &callbacks; }));
+  ON_CALL(*this, setEncoderFilterCallbacks(_))
+      .WillByDefault(Invoke([this](StreamEncoderFilterCallbacks& callbacks)
+                                -> void { encoder_callbacks_ = &callbacks; }));
+}
+
+MockStreamFilter::~MockStreamFilter() {}
 
 MockAsyncClient::MockAsyncClient() {}
 MockAsyncClient::~MockAsyncClient() {}
@@ -155,3 +163,4 @@ MockRequestInfo::~MockRequestInfo() {}
 
 } // AccessLog
 } // Http
+} // Envoy

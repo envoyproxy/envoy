@@ -16,6 +16,7 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+namespace Envoy {
 namespace Http {
 namespace Http1 {
 
@@ -309,3 +310,4 @@ CodecClientPtr ConnPoolImplProd::createCodecClient(Upstream::Host::CreateConnect
 
 } // Http1
 } // Http
+} // Envoy

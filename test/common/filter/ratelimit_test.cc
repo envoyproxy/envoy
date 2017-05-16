@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
@@ -228,3 +229,4 @@ TEST_F(RateLimitFilterTest, RuntimeDisable) {
 
 } // TcpFilter
 } // RateLimit
+} // Envoy

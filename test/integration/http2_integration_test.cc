@@ -12,6 +12,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 TEST_F(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP2); }
 
 TEST_F(Http2IntegrationTest, RouterNotFoundBodyNoBuffer) {
@@ -269,3 +270,4 @@ TEST_F(Http2IntegrationTest, SimultaneousRequest) {
        [&]() -> void { fake_upstream_connection2->close(); },
        [&]() -> void { fake_upstream_connection2->waitForDisconnect(); }});
 }
+} // Envoy

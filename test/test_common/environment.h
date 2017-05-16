@@ -10,6 +10,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 class TestEnvironment {
 public:
   typedef std::unordered_map<std::string, uint32_t> PortMap;
@@ -103,6 +104,7 @@ public:
    */
   static std::string substitute(const std::string str);
 
+  // TODO(hennna): Deprecate after IPv6 test support is finished.
   /**
    * Substitue ports and paths in a JSON file in the private writable test temporary directory.
    * @param path path prefix for the input file with port and path templates.
@@ -110,6 +112,18 @@ public:
    * @return std::string path for the generated file.
    */
   static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map);
+
+  /**
+   * Substitue ports, paths, and IP loopback addressses in a JSON file in the
+   * private writable test temporary directory.
+   * @param path path prefix for the input file with port and path templates.
+   * @param version IP address version to substitute.
+   * @param port_map map from port name to port number.
+   * @return std::string path for the generated file.
+   */
+  static std::string temporaryFileSubstitute(const std::string& path,
+                                             const Network::Address::IpVersion& version,
+                                             const PortMap& port_map);
 
   /**
    * Build JSON object from a string subject to environment path substitution.
@@ -124,3 +138,4 @@ public:
    */
   static void exec(const std::vector<std::string>& args);
 };
+} // Envoy

@@ -26,6 +26,7 @@
 #include "ares_dns.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Network {
 
 namespace {
@@ -367,3 +368,4 @@ TEST_F(DnsImplZeroTimeoutTest, Timeout) {
 }
 
 } // Network
+} // Envoy

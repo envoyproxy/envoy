@@ -4,6 +4,7 @@
 
 #include "envoy/network/address.h"
 
+namespace Envoy {
 namespace Network {
 namespace Test {
 
@@ -38,6 +39,13 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
  * @return std::string URL ready loopback address as a string.
  */
 const std::string getLoopbackAddressUrlString(const Address::IpVersion version);
+
+/**
+ * Get a URL ready IP any address as a string.
+ * @param version IP address version of any address.
+ * @return std::string URL ready any address as a string.
+ */
+const std::string getAnyAddressUrlString(const Address::IpVersion version);
 
 /**
  * Return a string version of enum IpVersion version.
@@ -90,3 +98,4 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
 
 } // Test
 } // Network
+} // Envoy

@@ -11,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Grpc {
 
 TEST(GrpcCodecTest, encodeHeader) {
@@ -153,3 +154,4 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
 }
 
 } // Grpc
+} // Envoy

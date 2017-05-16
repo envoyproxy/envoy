@@ -15,6 +15,7 @@
 #include "common/http/codec_wrappers.h"
 #include "common/network/filter_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -199,3 +200,4 @@ public:
 };
 
 } // Http
+} // Envoy

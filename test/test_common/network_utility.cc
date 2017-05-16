@@ -15,6 +15,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Network {
 namespace Test {
 
@@ -71,7 +72,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
                                                     Address::SocketType type) {
-  auto instance = Address::parseInternetAddressAndPort(addr_port);
+  auto instance = Utility::parseInternetAddressAndPort(addr_port);
   if (instance != nullptr) {
     instance = findOrCheckFreePort(instance, type);
   } else {
@@ -85,6 +86,13 @@ const std::string getLoopbackAddressUrlString(const Address::IpVersion version) 
     return std::string("[::1]");
   }
   return std::string("127.0.0.1");
+}
+
+const std::string getAnyAddressUrlString(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v6) {
+    return std::string("[::]");
+  }
+  return std::string("0.0.0.0");
 }
 
 const std::string addressVersionAsString(const Address::IpVersion version) {
@@ -167,3 +175,4 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
 
 } // Test
 } // Network
+} // Envoy

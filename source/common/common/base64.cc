@@ -5,6 +5,7 @@
 
 #include "common/common/empty_string.h"
 
+namespace Envoy {
 static constexpr char CHAR_TABLE[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -150,3 +151,4 @@ std::string Base64::encode(const char* input, uint64_t length) {
 
   return ret;
 }
+} // Envoy

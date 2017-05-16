@@ -8,6 +8,7 @@
 #include "common/json/config_schemas.h"
 #include "common/mongo/proxy.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -40,3 +41,4 @@ static RegisterNetworkFilterConfigFactory<MongoProxyFilterConfigFactory> registe
 
 } // Configuration
 } // Server
+} // Envoy

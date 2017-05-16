@@ -14,6 +14,7 @@
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
 
+namespace Envoy {
 namespace Network {
 
 /**
@@ -153,3 +154,4 @@ public:
 };
 
 } // Network
+} // Envoy

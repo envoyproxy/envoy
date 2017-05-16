@@ -15,10 +15,13 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/utility.h"
 
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+namespace Envoy {
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder)
     : parent_(parent), encoder_(encoder) {
   encoder.getStream().addCallbacks(*this);
@@ -195,15 +198,32 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
   log().info("starting fake server on unix domain socket {}", uds_path);
 }
 
+// TODO(henna): Deprecate when IPv6 test support is finished.
 static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port) {
   auto addr =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("0.0.0.0", port)};
   return Network::ListenSocketPtr{new Network::TcpListenSocket(addr, true)};
 }
 
+static Network::ListenSocketPtr makeTcpListenSocket(const Network::Address::IpVersion version,
+                                                    uint32_t port) {
+  return Network::ListenSocketPtr{new Network::TcpListenSocket(
+      Network::Utility::parseInternetAddressAndPort(
+          fmt::format("{}:{}", Network::Test::getAnyAddressUrlString(version), port)),
+      true)};
+}
+
+// TODO(henna): Deprecate when IPv6 test support is finished.
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type)
     : FakeUpstream(nullptr, makeTcpListenSocket(port), type) {
   log().info("starting fake server on port {}", this->localAddress()->ip()->port());
+}
+
+FakeUpstream::FakeUpstream(Network::Address::IpVersion version, uint32_t port,
+                           FakeHttpConnection::Type type)
+    : FakeUpstream(nullptr, makeTcpListenSocket(version, port), type) {
+  log().info("starting fake server on port {}. Address version is {}",
+             this->localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port,
@@ -304,3 +324,4 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
   parent_.connection_event_.notify_one();
   return Network::FilterStatus::StopIteration;
 }
+} // Envoy

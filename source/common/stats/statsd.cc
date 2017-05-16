@@ -15,6 +15,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Stats {
 namespace Statsd {
 
@@ -162,3 +163,4 @@ void TcpStatsdSink::TlsSink::write(const std::string& stat) {
 
 } // Statsd
 } // Stats
+} // Envoy

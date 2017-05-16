@@ -15,6 +15,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
+namespace Envoy {
 namespace Filter {
 namespace Auth {
 namespace ClientSsl {
@@ -127,3 +128,4 @@ private:
 } // ClientSsl
 } // Auth
 } // Filter
+} // Envoy

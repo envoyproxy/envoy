@@ -23,6 +23,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+namespace Envoy {
 class FakeHttpConnection;
 
 /**
@@ -200,6 +201,8 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>, public Network::Filt
 public:
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type);
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type);
+  FakeUpstream(const Network::Address::IpVersion version, uint32_t port,
+               FakeHttpConnection::Type type);
   FakeUpstream(Ssl::ServerContext* ssl_ctx, uint32_t port, FakeHttpConnection::Type type);
   ~FakeUpstream();
 
@@ -227,3 +230,4 @@ private:
   std::list<QueuedConnectionWrapperPtr> new_connections_;
   FakeHttpConnection::Type http_type_;
 };
+} // Envoy

@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 using testing::Return;
@@ -301,3 +302,4 @@ TEST_F(GrpcRequestImplTest, RequestTimeoutSet) {
 }
 
 } // Grpc
+} // Envoy

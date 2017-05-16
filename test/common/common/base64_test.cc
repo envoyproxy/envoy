@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 TEST(Base64Test, EmptyBufferEncode) {
   {
     Buffer::OwnedImpl buffer;
@@ -94,3 +95,4 @@ TEST(Base64Test, BinaryBufferEncode) {
   EXPECT_EQ("AAECAwgKCQCqvA==", Base64::encode(buffer, 10));
   EXPECT_EQ("AAECAwgKCQCqvN4=", Base64::encode(buffer, 30));
 }
+} // Envoy

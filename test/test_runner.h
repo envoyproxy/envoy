@@ -7,6 +7,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 class TestRunner {
 public:
   static int RunTests(int argc, char** argv) {
@@ -32,3 +33,4 @@ public:
     return RUN_ALL_TESTS();
   }
 };
+} // Envoy

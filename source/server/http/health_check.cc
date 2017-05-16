@@ -17,6 +17,7 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -152,3 +153,4 @@ void HealthCheckFilter::onComplete() {
 
   callbacks_->encodeHeaders(std::move(headers), true);
 }
+} // Envoy

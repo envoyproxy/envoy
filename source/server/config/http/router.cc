@@ -6,6 +6,7 @@
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -37,3 +38,4 @@ static RegisterHttpFilterConfigFactory<RouterFilterConfig> register_;
 
 } // Configuration
 } // Server
+} // Envoy

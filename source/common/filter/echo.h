@@ -4,6 +4,7 @@
 
 #include "common/common/logger.h"
 
+namespace Envoy {
 namespace Filter {
 
 /**
@@ -23,3 +24,4 @@ private:
 };
 
 } // Filter
+} // Envoy

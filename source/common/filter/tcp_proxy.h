@@ -16,6 +16,7 @@
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
 
+namespace Envoy {
 namespace Filter {
 
 /**
@@ -137,3 +138,4 @@ private:
 };
 
 } // Filter
+} // Envoy

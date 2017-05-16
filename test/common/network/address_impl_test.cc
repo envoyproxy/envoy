@@ -11,6 +11,7 @@
 
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/utility.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -18,6 +19,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Network {
 namespace Address {
 namespace {
@@ -36,7 +38,7 @@ void makeFdBlocking(int fd) {
 }
 
 void testSocketBindAndConnect(const std::string& addr_port_str) {
-  auto addr_port = parseInternetAddressAndPort(addr_port_str);
+  auto addr_port = Network::Utility::parseInternetAddressAndPort(addr_port_str);
   ASSERT_NE(addr_port, nullptr);
   if (addr_port->ip()->port() == 0) {
     addr_port = Network::Test::findOrCheckFreePort(addr_port, SocketType::Stream);
@@ -50,7 +52,7 @@ void testSocketBindAndConnect(const std::string& addr_port_str) {
   ScopedFdCloser closer1(listen_fd);
 
   // Check that IPv6 sockets accept IPv6 connections only.
-  if (addr_port->ip()->ipv6() != nullptr) {
+  if (addr_port->ip()->version() == IpVersion::v6) {
     int v6only = 0;
     socklen_t size_int = sizeof(v6only);
     ASSERT_GE(::getsockopt(listen_fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, &size_int), 0);
@@ -106,7 +108,7 @@ TEST(Ipv4InstanceTest, SocketAddress) {
   EXPECT_EQ("1.2.3.4", address.ip()->addressAsString());
   EXPECT_EQ(6502U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
-  EXPECT_TRUE(addressesEqual(parseInternetAddress("1.2.3.4"), address));
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1.2.3.4"), address));
 }
 
 TEST(Ipv4InstanceTest, AddressOnly) {
@@ -116,7 +118,7 @@ TEST(Ipv4InstanceTest, AddressOnly) {
   EXPECT_EQ("3.4.5.6", address.ip()->addressAsString());
   EXPECT_EQ(0U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
-  EXPECT_TRUE(addressesEqual(parseInternetAddress("3.4.5.6"), address));
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("3.4.5.6"), address));
 }
 
 TEST(Ipv4InstanceTest, AddressAndPort) {
@@ -127,7 +129,7 @@ TEST(Ipv4InstanceTest, AddressAndPort) {
   EXPECT_FALSE(address.ip()->isAnyAddress());
   EXPECT_EQ(80U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
-  EXPECT_TRUE(addressesEqual(parseInternetAddress("127.0.0.1"), address));
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("127.0.0.1"), address));
 }
 
 TEST(Ipv4InstanceTest, PortOnly) {
@@ -138,37 +140,12 @@ TEST(Ipv4InstanceTest, PortOnly) {
   EXPECT_TRUE(address.ip()->isAnyAddress());
   EXPECT_EQ(443U, address.ip()->port());
   EXPECT_EQ(IpVersion::v4, address.ip()->version());
-  EXPECT_TRUE(addressesEqual(parseInternetAddress("0.0.0.0"), address));
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("0.0.0.0"), address));
 }
 
 TEST(Ipv4InstanceTest, BadAddress) {
   EXPECT_THROW(Ipv4Instance("foo"), EnvoyException);
   EXPECT_THROW(Ipv4Instance("bar", 1), EnvoyException);
-  EXPECT_EQ(parseInternetAddress(""), nullptr);
-  EXPECT_EQ(parseInternetAddress("1.2.3"), nullptr);
-  EXPECT_EQ(parseInternetAddress("1.2.3.4.5"), nullptr);
-  EXPECT_EQ(parseInternetAddress("1.2.3.256"), nullptr);
-  EXPECT_EQ(parseInternetAddress("foo"), nullptr);
-}
-
-TEST(Ipv4InstanceTest, ParseInternetAddressAndPort) {
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4::1"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:-1"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort(":1"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort(" :1"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3:1"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4]:2"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("1.2.3.4:65536"));
-
-  auto ptr = parseInternetAddressAndPort("0.0.0.0:0");
-  ASSERT_NE(ptr, nullptr);
-  EXPECT_EQ(ptr->asString(), "0.0.0.0:0");
-
-  ptr = parseInternetAddressAndPort("255.255.255.255:65535");
-  ASSERT_NE(ptr, nullptr);
-  EXPECT_EQ(ptr->asString(), "255.255.255.255:65535");
 }
 
 TEST(Ipv6InstanceTest, SocketAddress) {
@@ -184,7 +161,7 @@ TEST(Ipv6InstanceTest, SocketAddress) {
   EXPECT_FALSE(address.ip()->isAnyAddress());
   EXPECT_EQ(32000U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
-  EXPECT_TRUE(addressesEqual(parseInternetAddress("1:0023::0Ef"), address));
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1:0023::0Ef"), address));
 }
 
 TEST(Ipv6InstanceTest, AddressOnly) {
@@ -194,7 +171,8 @@ TEST(Ipv6InstanceTest, AddressOnly) {
   EXPECT_EQ("2001:db8:85a3::8a2e:370:7334", address.ip()->addressAsString());
   EXPECT_EQ(0U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
-  EXPECT_TRUE(addressesEqual(parseInternetAddress("2001:db8:85a3::8a2e:0370:7334"), address));
+  EXPECT_TRUE(addressesEqual(
+      Network::Utility::parseInternetAddress("2001:db8:85a3::8a2e:0370:7334"), address));
 }
 
 TEST(Ipv6InstanceTest, AddressAndPort) {
@@ -204,7 +182,7 @@ TEST(Ipv6InstanceTest, AddressAndPort) {
   EXPECT_EQ("::1", address.ip()->addressAsString());
   EXPECT_EQ(80U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
-  EXPECT_TRUE(addressesEqual(parseInternetAddress("0:0:0:0:0:0:0:1"), address));
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("0:0:0:0:0:0:0:1"), address));
 }
 
 TEST(Ipv6InstanceTest, PortOnly) {
@@ -215,40 +193,12 @@ TEST(Ipv6InstanceTest, PortOnly) {
   EXPECT_TRUE(address.ip()->isAnyAddress());
   EXPECT_EQ(443U, address.ip()->port());
   EXPECT_EQ(IpVersion::v6, address.ip()->version());
-  EXPECT_TRUE(addressesEqual(parseInternetAddress("::0000"), address));
+  EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("::0000"), address));
 }
 
 TEST(Ipv6InstanceTest, BadAddress) {
   EXPECT_THROW(Ipv6Instance("foo"), EnvoyException);
   EXPECT_THROW(Ipv6Instance("bar", 1), EnvoyException);
-  EXPECT_EQ(parseInternetAddress("0:0:0:0"), nullptr);
-  EXPECT_EQ(parseInternetAddress("fffff::"), nullptr);
-  EXPECT_EQ(parseInternetAddress("/foo"), nullptr);
-}
-
-TEST(Ipv6InstanceTest, ParseInternetAddressAndPort) {
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort(""));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("::1"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("::"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[[::]]:1"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:1]:2"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("]:[::1]:2"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[1.2.3.4:0"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[1.2.3.4]:0"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:-1"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:bogus"));
-
-  auto ptr = parseInternetAddressAndPort("[::]:0");
-  ASSERT_NE(ptr, nullptr);
-  EXPECT_EQ(ptr->asString(), "[::]:0");
-
-  ptr = parseInternetAddressAndPort("[1::1]:65535");
-  ASSERT_NE(ptr, nullptr);
-  EXPECT_EQ(ptr->asString(), "[1::1]:65535");
-
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[::]:-1"));
-  EXPECT_EQ(nullptr, parseInternetAddressAndPort("[1::1]:65536"));
 }
 
 TEST(PipeInstanceTest, Basic) {
@@ -313,3 +263,4 @@ TEST(AddressFromSockAddr, Pipe) {
 
 } // Address
 } // Network
+} // Envoy

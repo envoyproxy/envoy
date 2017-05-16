@@ -25,6 +25,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
@@ -207,7 +208,6 @@ public:
 
 class MockStreamFilterCallbacksBase {
 public:
-  std::function<void()> reset_callback_;
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<AccessLog::MockRequestInfo> request_info_;
   std::shared_ptr<Router::MockRoute> route_;
@@ -221,7 +221,6 @@ public:
   ~MockStreamDecoderFilterCallbacks();
 
   // Http::StreamFilterCallbacks
-  MOCK_METHOD1(addResetStreamCallback, void(std::function<void()> callback));
   MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
@@ -239,7 +238,8 @@ public:
   void encodeTrailers(HeaderMapPtr&& trailers) override { encodeTrailers_(*trailers); }
 
   MOCK_METHOD0(continueDecoding, void());
-  MOCK_METHOD0(decodingBuffer, Buffer::InstancePtr&());
+  MOCK_METHOD1(addDecodedData, void(Buffer::Instance& data));
+  MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(encodeTrailers_, void(HeaderMap& trailers));
@@ -254,7 +254,6 @@ public:
   ~MockStreamEncoderFilterCallbacks();
 
   // Http::StreamFilterCallbacks
-  MOCK_METHOD1(addResetStreamCallback, void(std::function<void()> callback));
   MOCK_METHOD0(connectionId, uint64_t());
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
@@ -266,8 +265,9 @@ public:
   MOCK_METHOD0(downstreamAddress, const std::string&());
 
   // Http::StreamEncoderFilterCallbacks
+  MOCK_METHOD1(addEncodedData, void(Buffer::Instance& data));
   MOCK_METHOD0(continueEncoding, void());
-  MOCK_METHOD0(encodingBuffer, Buffer::InstancePtr&());
+  MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
 
   Buffer::InstancePtr buffer_;
 };
@@ -277,6 +277,9 @@ public:
   MockStreamDecoderFilter();
   ~MockStreamDecoderFilter();
 
+  // Http::StreamFilterBase
+  MOCK_METHOD0(onDestroy, void());
+
   // Http::StreamDecoderFilter
   MOCK_METHOD2(decodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(decodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
@@ -284,13 +287,15 @@ public:
   MOCK_METHOD1(setDecoderFilterCallbacks, void(StreamDecoderFilterCallbacks& callbacks));
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  ReadyWatcher reset_stream_called_;
 };
 
 class MockStreamEncoderFilter : public StreamEncoderFilter {
 public:
   MockStreamEncoderFilter();
   ~MockStreamEncoderFilter();
+
+  // Http::StreamFilterBase
+  MOCK_METHOD0(onDestroy, void());
 
   // Http::MockStreamEncoderFilter
   MOCK_METHOD2(encodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
@@ -299,6 +304,30 @@ public:
   MOCK_METHOD1(setEncoderFilterCallbacks, void(StreamEncoderFilterCallbacks& callbacks));
 
   Http::StreamEncoderFilterCallbacks* callbacks_{};
+};
+
+class MockStreamFilter : public StreamFilter {
+public:
+  MockStreamFilter();
+  ~MockStreamFilter();
+
+  // Http::StreamFilterBase
+  MOCK_METHOD0(onDestroy, void());
+
+  // Http::StreamDecoderFilter
+  MOCK_METHOD2(decodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
+  MOCK_METHOD2(decodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD1(decodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
+  MOCK_METHOD1(setDecoderFilterCallbacks, void(StreamDecoderFilterCallbacks& callbacks));
+
+  // Http::MockStreamEncoderFilter
+  MOCK_METHOD2(encodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
+  MOCK_METHOD2(encodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD1(encodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
+  MOCK_METHOD1(setEncoderFilterCallbacks, void(StreamEncoderFilterCallbacks& callbacks));
+
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 };
 
 class MockAsyncClient : public AsyncClient {
@@ -409,3 +438,4 @@ MATCHER_P(HeaderMapEqualRef, rhs, "") {
   const Http::HeaderMapImpl& lhs = *dynamic_cast<const Http::HeaderMapImpl*>(&arg);
   return lhs == *dynamic_cast<const Http::HeaderMapImpl*>(rhs);
 }
+} // Envoy

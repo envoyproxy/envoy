@@ -9,6 +9,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Event {
 
 class FileEventImplTest : public testing::Test {
@@ -151,3 +152,4 @@ TEST_F(FileEventImplTest, SetEnabled) {
 }
 
 } // Event
+} // Envoy

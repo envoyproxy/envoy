@@ -5,6 +5,7 @@
 
 #include "common/http/filter/ratelimit.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -32,3 +33,4 @@ static RegisterHttpFilterConfigFactory<RateLimitFilterConfig> register_;
 
 } // Configuration
 } // Server
+} // Envoy
