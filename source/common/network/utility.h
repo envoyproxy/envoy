@@ -88,7 +88,7 @@ public:
 
   /*
   * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it.
-  * Throw an exception if unable to parse the address.
+  * @throws an exception if unable to parse the address.
   * @param ip_addr string to be parsed as an internet address and port. Examples:
   *        - "1.2.3.4:80"
   *        - "[1234:5678::9]:443"

@@ -142,7 +142,8 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string&
     sa6.sin6_port = 0;
     return std::make_shared<Address::Ipv6Instance>(sa6);
   }
-  throw EnvoyException(fmt::format("malformed IP address: {}", ip_address));
+  throwWithMalformedIp(ip_address);
+  NOT_REACHED;
 }
 
 Address::InstanceConstSharedPtr
