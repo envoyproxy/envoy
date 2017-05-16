@@ -19,6 +19,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Http {
 namespace Http2 {
 
@@ -686,3 +687,4 @@ int ServerConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 
 } // Http2
 } // Http
+} // Envoy

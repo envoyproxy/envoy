@@ -19,6 +19,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+namespace Envoy {
 namespace Network {
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
@@ -379,6 +380,11 @@ void ConnectionImpl::onWriteReady() {
       conn_log_debug("connected", *this);
       state_ &= ~InternalState::Connecting;
       onConnected();
+      // It's possible that we closed during the connect callback.
+      if (state() != State::Open) {
+        conn_log_debug("close during connected callback", *this);
+        return;
+      }
     } else {
       conn_log_debug("delayed connection error: {}", *this, error);
       closeSocket(ConnectionEvent::RemoteClose);
@@ -451,3 +457,4 @@ ClientConnectionImpl::ClientConnectionImpl(Event::DispatcherImpl& dispatcher,
                      null_local_address_) {}
 
 } // Network
+} // Envoy

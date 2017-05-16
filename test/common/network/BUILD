@@ -13,6 +13,8 @@ envoy_cc_test(
     srcs = ["address_impl_test.cc"],
     deps = [
         "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
     ],
@@ -42,6 +44,8 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
     ],
 )
 
@@ -90,6 +94,7 @@ envoy_cc_test(
     deps = [
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
     ],
 )
@@ -105,6 +110,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
     ],
 )
@@ -133,5 +139,6 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//test/test_common:environment_lib",
     ],
 )

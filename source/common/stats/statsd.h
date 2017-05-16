@@ -10,6 +10,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+namespace Envoy {
 namespace Stats {
 namespace Statsd {
 
@@ -62,7 +63,8 @@ private:
 class TcpStatsdSink : public Sink {
 public:
   TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
-                ThreadLocal::Instance& tls, Upstream::ClusterManager& cluster_manager);
+                ThreadLocal::Instance& tls, Upstream::ClusterManager& cluster_manager,
+                Stats::Scope& scope);
 
   // Stats::Sink
   void flushCounter(const std::string& name, uint64_t delta) override {
@@ -104,12 +106,17 @@ private:
     bool shutdown_{};
   };
 
+  // Somewhat arbitrary 16MiB limit for buffered stats.
+  static constexpr uint32_t MaxBufferedStatsBytes = (1024 * 1024 * 16);
+
   const LocalInfo::LocalInfo& local_info_;
-  std::string cluster_name_;
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
   ThreadLocal::Instance& tls_;
   uint32_t tls_slot_;
   Upstream::ClusterManager& cluster_manager_;
+  Stats::Counter& cx_overflow_stat_;
 };
 
 } // Statsd
 } // Stats
+} // Envoy

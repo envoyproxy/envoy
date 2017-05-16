@@ -10,6 +10,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Filesystem {
 
 class MockOsSysCalls : public OsSysCalls {
@@ -52,3 +53,4 @@ public:
 };
 
 } // Filesystem
+} // Envoy

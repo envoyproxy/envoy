@@ -8,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/json/config_schemas.h"
 
+namespace Envoy {
 namespace Redis {
 namespace ConnPool {
 
@@ -228,7 +229,7 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(uint32_t events) {
       (events & Network::ConnectionEvent::LocalClose)) {
     auto client_to_delete = parent_.client_map_.find(host_);
     ASSERT(client_to_delete != parent_.client_map_.end());
-    parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second));
+    parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->redis_client_));
     parent_.client_map_.erase(client_to_delete);
   }
 }
@@ -241,3 +242,4 @@ void InstanceImpl::ThreadLocalPool::shutdown() {
 
 } // ConnPool
 } // Redis
+} // Envoy

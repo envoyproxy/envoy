@@ -7,7 +7,7 @@ Active health checking can be :ref:`configured <config_cluster_manager_cluster_h
 upstream cluster basis. As described in the :ref:`service discovery
 <arch_overview_service_discovery>` section, active health checking and the SDS service discovery
 type go hand in hand. However, there are other scenarios where active health checking is desired
-even when using the other service discovery types. Envoy supports two different types of health
+even when using the other service discovery types. Envoy supports three different types of health
 checking along with various settings (check interval, failures required before marking a host
 unhealthy, successes required before marking a host healthy, etc.):
 
@@ -16,7 +16,10 @@ unhealthy, successes required before marking a host healthy, etc.):
   immediately notify downstream hosts to no longer forward traffic to it.
 * **L3/L4**: During L3/L4 health checking, Envoy will send a configurable byte buffer to the
   upstream host. It expects the byte buffer to be echoed in the response if the host is to be
-  considered healthy.
+  considered healthy. Envoy also supports connect only L3/L4 health checking.
+* **Redis**: Envoy will send a Redis PING command and expect a PONG response. The upstream Redis
+  server can respond with anything other than PONG to cause an immediate active health check
+  failure.
 
 Note that Envoy also supports passive health checking via :ref:`outlier detection
 <arch_overview_outlier_detection>`.

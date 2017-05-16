@@ -16,6 +16,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -201,3 +202,4 @@ private:
 
 } // Configuration
 } // Server
+} // Envoy

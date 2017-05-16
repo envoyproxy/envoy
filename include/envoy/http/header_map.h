@@ -9,6 +9,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -227,7 +228,12 @@ private:
   HEADER_FUNC(Status)                                                                              \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \
-  HEADER_FUNC(UserAgent)
+  HEADER_FUNC(UserAgent)                                                                           \
+  HEADER_FUNC(XB3TraceId)                                                                          \
+  HEADER_FUNC(XB3SpanId)                                                                           \
+  HEADER_FUNC(XB3ParentSpanId)                                                                     \
+  HEADER_FUNC(XB3Sampled)                                                                          \
+  HEADER_FUNC(XB3Flags)
 
 /**
  * The following functions are defined for each inline header above. E.g., for ContentLength we
@@ -311,3 +317,4 @@ public:
 typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
 
 } // Http
+} // Envoy

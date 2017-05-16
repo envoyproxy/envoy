@@ -6,6 +6,7 @@
 
 #include "envoy/http/access_log.h"
 
+namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
@@ -147,3 +148,4 @@ private:
 
 } // AccessLog
 } // Http
+} // Envoy

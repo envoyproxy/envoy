@@ -8,13 +8,12 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 
-#include "common/network/proxy_protocol.h"
-
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Network {
 
 class MockConnectionCallbacks : public ConnectionCallbacks {
@@ -233,3 +232,4 @@ public:
 };
 
 } // Network
+} // Envoy

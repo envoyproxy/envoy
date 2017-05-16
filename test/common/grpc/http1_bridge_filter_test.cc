@@ -10,6 +10,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -141,7 +142,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingNormalResponse) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl("hello"));
-  ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(ReturnRef(buffer));
+  ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(buffer.get()));
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -176,3 +177,4 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
 }
 
 } // Grpc
+} // Envoy

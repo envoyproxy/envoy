@@ -25,8 +25,17 @@ testing purposes. The specific versions of the Envoy dependencies used in this b
 up-to-date with the latest security patches.
 
 1. [Install Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
-2. `bazel build //source/exe:envoy-static` from the Envoy source directory.
+2.  Install external dependencies libtoolize, cmake, and realpath libraries separately.
+```
+On Ubuntu Machine, run the following commands:
+ apt-get install libtoolize
+ apt-get install cmake
+ apt-get install realpath
+```
+3.  Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
+and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
+4. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
+5. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Bazel with the CI Docker image
 
@@ -45,6 +54,12 @@ By setting the `CC` and `LD_LIBRARY_PATH` in the environment that Bazel executes
 appropriate, an arbitrary compiler toolchain and standard library location can be specified. One
 slight caveat is that (at the time of writing), Bazel expects the binutils in `$(dirname $CC)` to be
 unprefixed, e.g. `as` instead of `x86_64-linux-gnu-as`.
+
+## Supported compiler versions
+
+Though Envoy has been run in production compiled with GCC 4.9 extensively, we now strongly
+recommend GCC >= 5 due to known issues with std::string thread safety. Clang >= 4.0 is also known
+to work.
 
 # Testing Envoy with Bazel
 
@@ -76,8 +91,16 @@ example, for extremely verbose test debugging:
 bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="-l trace"
 ```
 
-Bazel will by default cache successful test results. To force it to rerun tests:
+By default, testing exercises both IPv4 and IPv6 address connections. In IPv4 or IPv6 only
+environments, set the environment variable ENVOY_IP_TEST_VERSIONS to "v4only" or
+"v6only", respectively.
 
+```
+bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+bazel test //test/... --test_env=ENVOY_IP_TEST_VERSIONS=v6only
+```
+
+Bazel will by default cache successful test results. To force it to rerun tests:
 
 ```
 bazel test //test/common/http:async_client_impl_test --cache_test_results=no
@@ -93,11 +116,11 @@ bazel test //test/common/http:async_client_impl_test --strategy=TestRunner=stand
 ```
 # Stack trace symbol resolution
 
-Envoy can produce backtraces on demand or from assertions and other activity.
-The stack traces written in the log or to stderr contain addresses rather than
-resolved symbols.  The `tools/stack_decode.py` script exists to process the output
-and do symbol resolution to make the stack traces useful.  Any log lines not
-relevant to the backtrace capability are passed through the script unchanged
+Envoy can produce backtraces on demand and from assertions and other fatal
+actions like segfaults.  The stack traces written in the log or to stderr contain
+addresses rather than resolved symbols.  The `tools/stack_decode.py` script exists
+to process the output and do symbol resolution to make the stack traces useful.  Any
+log lines not relevant to the backtrace capability are passed through the script unchanged
 (it acts like a filter).
 
 The script runs in one of two modes. If passed no arguments it anticipates
@@ -113,14 +136,24 @@ bazel test -c dbg //test/server:backtrace_test
 --cache_test_results=no --test_output=all
 ```
 
-You will need to use either a `dbg` build type or the `--define
-debug_symbols=yes` option to get symbol information in the binaries.
+You will need to use either a `dbg` build type or the `opt` build type to get symbol
+information in the binaries.
+
+By default main.cc will install signal handlers to print backtraces at the
+location where a fatal signal occurred.  The signal handler will re-raise the
+fatal signal with the default handler so a core file will still be dumped after
+the stack trace is logged.  To inhibit this behavior use
+`--define=signal_trace=disabled` on the Bazel command line. No signal handlers will
+be installed.
 
 # Running a single Bazel test under GDB
 
 ```
-tools/bazel-test-gdb //test/common/http:async_client_impl_test
+tools/bazel-test-gdb //test/common/http:async_client_impl_test -c dbg
 ```
+
+Without the `-c dbg` Bazel option at the end of the command line the test
+binaries will not include debugging symbols and GDB will not be very useful.
 
 # Additional Envoy build and test options
 
@@ -137,13 +170,32 @@ You can use the `-c <compilation_mode>` flag to control this, e.g.
 ```
 bazel build -c opt //source/exe:envoy-static
 ```
-To build and run tests with the compiler's address sanitizer (ASAN) enabled:
+
+
+## Sanitizers
+
+To build and run tests with the gcc compiler's [address sanitizer
+(ASAN)](https://github.com/google/sanitizers/wiki/AddressSanitizer) and
+[undefined behavior
+(UBSAN)](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan) sanitizer enabled:
 
 ```
 bazel test -c dbg --config=asan //test/...
 ```
 
-The ASAN failure stack traces include line numbers as a results of running ASAN with a `dbg` build above.
+The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above.
+
+If you have clang-5.0, additional checks are provided with:
+
+```
+bazel test -c dbg --config=clang-asan //test/...
+```
+
+Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) testing:
+
+```
+bazel test -c dbg --config=clang-tsan //test/...
+```
 
 # Release builds
 
@@ -215,3 +267,8 @@ To get more verbose explanations:
 ```
 bazel build --explain=file.txt --verbose_explanations //source/...
 ```
+
+# Resolving paths in bazel build output
+
+Sometimes it's useful to see real system paths in bazel error message output (vs. symbolic links).
+`tools/path_fix.sh` is provided to help with this. See the comments in that file.

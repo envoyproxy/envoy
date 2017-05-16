@@ -11,6 +11,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Tracing {
 
 enum class Reason {
@@ -82,4 +83,12 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 };
 
+class NullSpan : public Tracing::Span {
+public:
+  // Tracing::Span
+  void setTag(const std::string&, const std::string&) override {}
+  void finishSpan() override {}
+};
+
 } // Tracing
+} // Envoy

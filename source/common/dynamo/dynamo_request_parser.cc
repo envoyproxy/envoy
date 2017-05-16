@@ -1,11 +1,13 @@
 #include "common/dynamo/dynamo_request_parser.h"
 
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "common/common/utility.h"
 
+namespace Envoy {
 namespace Dynamo {
 
 /*
@@ -141,3 +143,4 @@ RequestParser::parsePartitions(const Json::Object& json_data) {
 }
 
 } // Dynamo
+} // Envoy

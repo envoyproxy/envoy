@@ -4,14 +4,24 @@
 
 set -e
 
-export CC=gcc-4.9
-export CXX=g++-4.9
 export HEAPCHECK=normal
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
 NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 
 export ENVOY_SRCDIR=/source
+
+function setup_gcc_toolchain() {
+  export CC=gcc
+  export CXX=g++
+  echo "$CC/$CXX toolchain configured"
+}
+
+function setup_clang_toolchain() {
+  export CC=clang-5.0
+  export CXX=clang++-5.0
+  echo "$CC/$CXX toolchain configured"
+}
 
 # Create a fake home. Python site libs tries to do getpwuid(3) if we don't and the CI
 # Docker image gets confused as it has no passwd entry when running non-root
@@ -27,7 +37,7 @@ then
   echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}?"
   exit 1
 fi
-export ENVOY_CONSUMER_SRCDIR="${BUILD_DIR}/envoy-consumer"
+export ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
 # Make sure that /source doesn't contain /build on the underlying host
 # filesystem, including via hard links or symlinks. We can get into weird
@@ -61,15 +71,14 @@ ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
 ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
 
 # Setup Envoy consuming project.
-if [[ ! -a "${ENVOY_CONSUMER_SRCDIR}" ]]
+if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]
 then
-  # TODO(htuch): Update to non-htuch when https://github.com/lyft/envoy/issues/404 is sorted.
-  git clone https://github.com/htuch/envoy-consumer.git "${ENVOY_CONSUMER_SRCDIR}"
+  git clone https://github.com/lyft/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
 fi
-cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.consumer "${ENVOY_CONSUMER_SRCDIR}"/WORKSPACE
+cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
-# This is the hash on https://github.com/htuch/envoy-consumer.git we pin to.
-(cd "${ENVOY_CONSUMER_SRCDIR}" && git checkout 94e11fa753a1e787c82cccaec642eda5e5b61ed8)
+# This is the hash on https://github.com/lyft/envoy-filter-example.git we pin to.
+(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout e90e73c222fec574ab50b9e72880a9c8885f4f96)
 
 # Also setup some space for building Envoy standalone.
 export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
@@ -80,18 +89,22 @@ cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE "${ENVOY_BUILD_DIR}"
 export ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
 mkdir -p "${ENVOY_DELIVERY_DIR}"
 
+# This is where we copy the coverage report to.
+export ENVOY_COVERAGE_DIR="${ENVOY_BUILD_DIR}"/generated/coverage
+mkdir -p "${ENVOY_COVERAGE_DIR}"
+
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
 
 # Hack due to https://github.com/lyft/envoy/issues/838 and the need to have
 # tools and bazel.rc available for build linkstamping.
-mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/tools
+mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools
 mkdir -p "${ENVOY_CI_DIR}"/tools
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CONSUMER_SRCDIR}"/tools/
+ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools/
 ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
-mkdir -p "${ENVOY_CONSUMER_SRCDIR}"/bazel
+mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 mkdir -p "${ENVOY_CI_DIR}"/bazel
-ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CONSUMER_SRCDIR}"/bazel/
+ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
 
 function cleanup() {

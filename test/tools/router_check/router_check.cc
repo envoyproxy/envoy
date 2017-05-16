@@ -1,3 +1,4 @@
+// NOLINT(namespace-envoy)
 #include <iostream>
 #include <string>
 
@@ -9,7 +10,7 @@ int main(int argc, char* argv[]) {
   }
 
   try {
-    RouterCheckTool checktool = RouterCheckTool::create(argv[1]);
+    Envoy::RouterCheckTool checktool = Envoy::RouterCheckTool::create(argv[1]);
 
     // TODO(hennna): Switch to gflags
     if (argc == 4 && std::string(argv[3]) == "--details") {
@@ -20,7 +21,7 @@ int main(int argc, char* argv[]) {
     if (!checktool.compareEntriesInJson(argv[2])) {
       return EXIT_FAILURE;
     }
-  } catch (const EnvoyException& ex) {
+  } catch (const Envoy::EnvoyException& ex) {
     std::cerr << ex.what() << std::endl;
     return EXIT_FAILURE;
   }

@@ -8,6 +8,7 @@
 
 #include "common/http/utility.h"
 
+namespace Envoy {
 namespace Http {
 
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
@@ -68,8 +69,6 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   router_.setDecoderFilterCallbacks(*this);
   // TODO(mattklein123): Correctly set protocol in request info when we support access logging.
 }
-
-AsyncStreamImpl::~AsyncStreamImpl() { ASSERT(!reset_callback_); }
 
 void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
 #ifndef NDEBUG
@@ -136,13 +135,11 @@ void AsyncStreamImpl::closeRemote(bool end_stream) {
 }
 
 void AsyncStreamImpl::reset() {
-  reset_callback_();
+  router_.onDestroy();
   resetStream();
 }
 
 void AsyncStreamImpl::cleanup() {
-  reset_callback_ = nullptr;
-
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.
   if (inserted()) {
@@ -208,3 +205,4 @@ void AsyncRequestImpl::cancel() {
 }
 
 } // Http
+} // Envoy

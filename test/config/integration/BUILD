@@ -8,6 +8,7 @@ load(
 envoy_package()
 
 exports_files([
+    "echo_server.json",
     "server.json",
     "server_http2.json",
     "server_http2_upstream.json",

@@ -21,6 +21,9 @@ def envoy_copts(repository, test = False):
     }) + select({
         repository + "//bazel:disable_tcmalloc": [],
         "//conditions:default": ["-DTCMALLOC"],
+    }) + select({
+        repository + "//bazel:disable_signal_trace": [],
+        "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
     })
 
 # References to Envoy external dependencies should be wrapped with this function.
@@ -61,6 +64,7 @@ def envoy_cc_library(name,
                      tcmalloc_dep = None,
                      repository = "",
                      linkstamp = None,
+                     tags = [],
                      deps = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
@@ -70,6 +74,7 @@ def envoy_cc_library(name,
         hdrs = hdrs,
         copts = envoy_copts(repository) + copts,
         visibility = visibility,
+        tags = tags,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//include/envoy/common:base_includes",
             envoy_external_dep_path('spdlog'),

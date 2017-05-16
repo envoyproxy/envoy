@@ -18,11 +18,13 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 
@@ -31,7 +33,8 @@ namespace Ssl {
 namespace {
 
 void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_json,
-              const std::string& expected_digest, const std::string& expected_uri) {
+              const std::string& expected_digest, const std::string& expected_uri,
+              const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
@@ -41,7 +44,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -80,9 +83,13 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
 
 } // namespace
 
-class SslConnectionImplTest : public SslCertsTest {};
+class SslConnectionImplTest : public SslCertsTest,
+                              public testing::WithParamInterface<Network::Address::IpVersion> {};
 
-TEST_F(SslConnectionImplTest, GetCertDigest) {
+INSTANTIATE_TEST_CASE_P(IpVersions, SslConnectionImplTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(SslConnectionImplTest, GetCertDigest) {
   std::string client_ctx_json = R"EOF(
   {
     "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
@@ -99,10 +106,10 @@ TEST_F(SslConnectionImplTest, GetCertDigest) {
   )EOF";
 
   testUtil(client_ctx_json, server_ctx_json,
-           "9d51ffbe193020e88ac2eb9072315e2e8bb3dac589041995b2af80ec7cb86de2", "");
+           "9d51ffbe193020e88ac2eb9072315e2e8bb3dac589041995b2af80ec7cb86de2", "", GetParam());
 }
 
-TEST_F(SslConnectionImplTest, GetUriWithUriSan) {
+TEST_P(SslConnectionImplTest, GetUriWithUriSan) {
   std::string client_ctx_json = R"EOF(
   {
     "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
@@ -119,10 +126,10 @@ TEST_F(SslConnectionImplTest, GetUriWithUriSan) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "istio:account1.foo.cluster.local");
+  testUtil(client_ctx_json, server_ctx_json, "", "istio:account1.foo.cluster.local", GetParam());
 }
 
-TEST_F(SslConnectionImplTest, GetNoUriWithDnsSan) {
+TEST_P(SslConnectionImplTest, GetNoUriWithDnsSan) {
   std::string client_ctx_json = R"EOF(
   {
     "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
@@ -139,10 +146,10 @@ TEST_F(SslConnectionImplTest, GetNoUriWithDnsSan) {
   )EOF";
 
   // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
-  testUtil(client_ctx_json, server_ctx_json, "", "");
+  testUtil(client_ctx_json, server_ctx_json, "", "", GetParam());
 }
 
-TEST_F(SslConnectionImplTest, NoCert) {
+TEST_P(SslConnectionImplTest, NoCert) {
   std::string client_ctx_json = R"EOF(
   {
     "cert_chain_file": "",
@@ -157,10 +164,10 @@ TEST_F(SslConnectionImplTest, NoCert) {
   }
   )EOF";
 
-  testUtil(client_ctx_json, server_ctx_json, "", "");
+  testUtil(client_ctx_json, server_ctx_json, "", "", GetParam());
 }
 
-TEST_F(SslConnectionImplTest, ClientAuthBadVerification) {
+TEST_P(SslConnectionImplTest, ClientAuthBadVerification) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
@@ -179,7 +186,7 @@ TEST_F(SslConnectionImplTest, ClientAuthBadVerification) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -217,7 +224,7 @@ TEST_F(SslConnectionImplTest, ClientAuthBadVerification) {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_F(SslConnectionImplTest, SslError) {
+TEST_P(SslConnectionImplTest, SslError) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
 
@@ -236,7 +243,7 @@ TEST_F(SslConnectionImplTest, SslError) {
   ServerContextPtr server_ctx(manager.createSslServerContext(stats_store, server_ctx_config));
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -268,13 +275,14 @@ TEST_F(SslConnectionImplTest, SslError) {
   EXPECT_EQ(1UL, stats_store.counter("ssl.connection_error").value());
 }
 
-class SslReadBufferLimitTest : public SslCertsTest {
+class SslReadBufferLimitTest : public SslCertsTest,
+                               public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
                            uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
     Stats::IsolatedStoreImpl stats_store;
     Event::DispatcherImpl dispatcher;
-    Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
+    Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
     Network::MockListenerCallbacks listener_callbacks;
     Network::MockConnectionHandler connection_handler;
 
@@ -367,18 +375,22 @@ public:
   }
 };
 
-TEST_F(SslReadBufferLimitTest, NoLimit) {
+INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(SslReadBufferLimitTest, NoLimit) {
   readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1, false);
 }
 
-TEST_F(SslReadBufferLimitTest, NoLimitReserveSpace) { readBufferLimitTest(0, 512, 512, 1, true); }
+TEST_P(SslReadBufferLimitTest, NoLimitReserveSpace) { readBufferLimitTest(0, 512, 512, 1, true); }
 
-TEST_F(SslReadBufferLimitTest, NoLimitSmallWrites) {
+TEST_P(SslReadBufferLimitTest, NoLimitSmallWrites) {
   readBufferLimitTest(0, 256 * 1024, 1, 256 * 1024, false);
 }
 
-TEST_F(SslReadBufferLimitTest, SomeLimit) {
+TEST_P(SslReadBufferLimitTest, SomeLimit) {
   readBufferLimitTest(32 * 1024, 32 * 1024, 256 * 1024, 1, false);
 }
 
 } // Ssl
+} // Envoy

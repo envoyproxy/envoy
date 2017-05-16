@@ -4,12 +4,15 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/common/singleton.h"
+
+namespace Envoy {
 namespace Http {
 
 /**
  * Constant HTTP headers and values. All lower case.
  */
-class Headers {
+class HeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
   const LowerCaseString Authorization{"authorization"};
@@ -56,6 +59,11 @@ public:
   const LowerCaseString TransferEncoding{"transfer-encoding"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
+  const LowerCaseString XB3TraceId{"x-b3-traceid"};
+  const LowerCaseString XB3SpanId{"x-b3-spanid"};
+  const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
+  const LowerCaseString XB3Sampled{"x-b3-sampled"};
+  const LowerCaseString XB3Flags{"x-b3-flags"};
 
   struct {
     const std::string Close{"close"};
@@ -98,14 +106,9 @@ public:
   struct {
     const std::string EnvoyHealthChecker{"Envoy/HC"};
   } UserAgentValues;
-
-  static Headers& get() {
-    static Headers instance;
-    return instance;
-  }
-
-private:
-  Headers() {}
 };
 
+typedef ConstSingleton<HeaderValues> Headers;
+
 } // Http
+} // Envoy

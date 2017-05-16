@@ -7,6 +7,7 @@
 
 #include "common/common/logger.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -35,3 +36,4 @@ private:
 };
 
 } // Server
+} // Envoy

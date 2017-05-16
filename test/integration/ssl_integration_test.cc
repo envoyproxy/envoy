@@ -13,19 +13,13 @@
 #include "integration.h"
 #include "utility.h"
 
+namespace Envoy {
 using testing::Return;
 
 namespace Ssl {
 
-std::unique_ptr<Runtime::Loader> SslIntegrationTest::runtime_;
-std::unique_ptr<ContextManager> SslIntegrationTest::context_manager_;
-ServerContextPtr SslIntegrationTest::upstream_ssl_ctx_;
-ClientContextPtr SslIntegrationTest::client_ssl_ctx_plain_;
-ClientContextPtr SslIntegrationTest::client_ssl_ctx_alpn_;
-ClientContextPtr SslIntegrationTest::client_ssl_ctx_san_;
-ClientContextPtr SslIntegrationTest::client_ssl_ctx_alpn_san_;
-
-void SslIntegrationTest::SetUpTestCase() {
+void SslIntegrationTest::SetUp() {
+  runtime_.reset(new NiceMock<Runtime::MockLoader>());
   context_manager_.reset(new ContextManagerImpl(*runtime_));
   upstream_ssl_ctx_ = createUpstreamSslContext();
   fake_upstreams_.emplace_back(
@@ -34,8 +28,11 @@ void SslIntegrationTest::SetUpTestCase() {
   fake_upstreams_.emplace_back(
       new FakeUpstream(upstream_ssl_ctx_.get(), 0, FakeHttpConnection::Type::HTTP1));
   registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-  test_server_ = MockRuntimeIntegrationTestServer::create(TestEnvironment::temporaryFileSubstitute(
-      "test/config/integration/server_ssl.json", port_map()));
+  // TODO(hennna): Add IPv6 support.
+  test_server_ = MockRuntimeIntegrationTestServer::create(
+      TestEnvironment::temporaryFileSubstitute("test/config/integration/server_ssl.json",
+                                               port_map_),
+      Network::Address::IpVersion::v4);
   registerTestServerPorts({"http"});
   client_ssl_ctx_plain_ = createClientSslContext(false, false);
   client_ssl_ctx_alpn_ = createClientSslContext(true, false);
@@ -43,7 +40,7 @@ void SslIntegrationTest::SetUpTestCase() {
   client_ssl_ctx_alpn_san_ = createClientSslContext(true, true);
 }
 
-void SslIntegrationTest::TearDownTestCase() {
+void SslIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
   upstream_ssl_ctx_.reset();
@@ -52,6 +49,7 @@ void SslIntegrationTest::TearDownTestCase() {
   client_ssl_ctx_san_.reset();
   client_ssl_ctx_alpn_san_.reset();
   context_manager_.reset();
+  runtime_.reset();
 }
 
 ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
@@ -113,7 +111,8 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn, bool san)
   }
   Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(target);
   ContextConfigImpl cfg(*loader);
-  return context_manager_->createSslClientContext(test_server_->store(), cfg);
+  static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
+  return context_manager_->createSslClientContext(*client_stats_store, cfg);
 }
 
 Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool alpn, bool san) {
@@ -209,3 +208,4 @@ TEST_F(SslIntegrationTest, AltAlpn) {
 }
 
 } // Ssl
+} // Envoy

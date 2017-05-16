@@ -18,13 +18,16 @@
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
 #include "common/http/access_log/request_info_impl.h"
 #include "common/http/message_impl.h"
 #include "common/router/router.h"
+#include "common/tracing/http_tracer_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 class AsyncStreamImpl;
@@ -66,7 +69,6 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const Optional<std::chrono::milliseconds>& timeout);
-  virtual ~AsyncStreamImpl();
 
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
@@ -174,9 +176,6 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  void addResetStreamCallback(std::function<void()> callback) override {
-    reset_callback_ = callback;
-  }
   uint64_t connectionId() override { return 0; }
   Ssl::Connection* ssl() override { return nullptr; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
@@ -184,9 +183,11 @@ private:
   Router::RouteConstSharedPtr route() override { return route_; }
   uint64_t streamId() override { return stream_id_; }
   AccessLog::RequestInfo& requestInfo() override { return request_info_; }
+  Tracing::Span& activeSpan() override { return active_span_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
-  Buffer::InstancePtr& decodingBuffer() override {
+  void addDecodedData(Buffer::Instance&) override { NOT_IMPLEMENTED; }
+  const Buffer::Instance* decodingBuffer() override {
     throw EnvoyException("buffering is not supported in streaming");
   }
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -196,8 +197,8 @@ private:
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
   Router::ProdFilter router_;
-  std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
+  Tracing::NullSpan active_span_;
   std::shared_ptr<RouteImpl> route_;
   bool local_closed_{};
   bool remote_closed_{};
@@ -226,7 +227,7 @@ private:
   void onReset() override;
 
   // Http::StreamDecoderFilterCallbacks
-  Buffer::InstancePtr& decodingBuffer() override { return request_->body(); }
+  const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
 
   MessagePtr request_;
   AsyncClient::Callbacks& callbacks_;
@@ -237,3 +238,4 @@ private:
 };
 
 } // Http
+} // Envoy

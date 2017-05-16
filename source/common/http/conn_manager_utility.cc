@@ -12,6 +12,7 @@
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 std::atomic<uint64_t> ConnectionManagerUtility::next_stream_id_(0);
@@ -147,3 +148,4 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
 }
 
 } // Http
+} // Envoy

@@ -17,11 +17,13 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
@@ -49,19 +51,30 @@ void BufferingStreamDecoder::onComplete() {
 
 void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
 
+// TODO(hennna): Deprecate when Ipv6 test support is finished.
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
+                                   const std::string& body, Http::CodecClient::Type type,
+                                   const std::string& host) {
+  return makeSingleRequest(Network::Address::IpVersion::v4, port, method, url, body, type, host);
+}
+
+BufferingStreamDecoderPtr
+IntegrationUtil::makeSingleRequest(const Network::Address::IpVersion version, uint32_t port,
+                                   const std::string& method, const std::string& url,
                                    const std::string& body, Http::CodecClient::Type type,
                                    const std::string& host) {
   Api::Impl api(std::chrono::milliseconds(9000));
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{new Upstream::HostDescriptionImpl(
-      cluster, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), false, "")};
-  Http::CodecClientProd client(type,
-                               dispatcher->createClientConnection(Network::Utility::resolveUrl(
-                                   fmt::format("tcp://127.0.0.1:{}", port))),
-                               host_description);
+      cluster, "", Network::Utility::resolveUrl(fmt::format(
+                       "tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version))),
+      false, "")};
+  Http::CodecClientProd client(
+      type, dispatcher->createClientConnection(Network::Utility::resolveUrl(fmt::format(
+                "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port))),
+      host_description);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void { client.close(); }));
   Http::StreamEncoder& encoder = client.newStream(*response);
   encoder.getStream().addCallbacks(*response);
@@ -81,19 +94,26 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
   return response;
 }
 
-RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
+RawConnectionDriver::RawConnectionDriver(uint32_t port, const Network::Address::IpVersion version,
+                                         Buffer::Instance& initial_data,
                                          ReadCallback data_callback) {
   api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
   dispatcher_ = api_->allocateDispatcher();
-  client_ = dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.1:{}", port)));
+  client_ = dispatcher_->createClientConnection(Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)));
   client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
   client_->write(initial_data);
   client_->connect();
 }
+
+// TODO(hennna): Deprecate when IPv6 test support is finished.
+RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
+                                         ReadCallback data_callback)
+    : RawConnectionDriver(port, Network::Address::IpVersion::v4, initial_data, data_callback) {}
 
 RawConnectionDriver::~RawConnectionDriver() {}
 
 void RawConnectionDriver::run() { dispatcher_->run(Event::Dispatcher::RunType::Block); }
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
+} // Envoy

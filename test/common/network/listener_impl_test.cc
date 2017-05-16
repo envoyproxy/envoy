@@ -5,11 +5,13 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::ByRef;
 using testing::Eq;
@@ -18,12 +20,13 @@ using testing::Return;
 
 namespace Network {
 
-static void errorCallbackTest() {
+static void errorCallbackTest(Address::IpVersion version) {
   // Force the error callback to fire by closing the socket under the listener. We run this entire
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Utility::getCanonicalIpv4LoopbackAddress(), true);
+
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -47,8 +50,12 @@ static void errorCallbackTest() {
   dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
-TEST(ListenerImplDeathTest, ErrorCallback) {
-  EXPECT_DEATH(errorCallbackTest(), ".*listener accept failure.*");
+class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
+INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplDeathTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ListenerImplDeathTest, ErrorCallback) {
+  EXPECT_DEATH(errorCallbackTest(GetParam()), ".*listener accept failure.*");
 }
 
 class TestListenerImpl : public ListenerImpl {
@@ -82,7 +89,7 @@ protected:
   const Address::InstanceConstSharedPtr alt_address_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
-                        testing::Values(Address::IpVersion::v4, Address::IpVersion::v6));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(ListenerImplTest, NormalRedirect) {
   Stats::IsolatedStoreImpl stats_store;
@@ -200,3 +207,4 @@ TEST_P(ListenerImplTest, UseActualDst) {
 }
 
 } // Network
+} // Envoy

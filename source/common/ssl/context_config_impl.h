@@ -7,6 +7,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Ssl {
 
 class ContextConfigImpl final : public Ssl::ContextConfig {
@@ -44,3 +45,4 @@ private:
 };
 
 } // Ssl
+} // Envoy

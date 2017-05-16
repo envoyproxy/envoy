@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/stats/stats_impl.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -143,33 +144,33 @@ private:
 
     RpcMessageType type_;
     uint64_t length_;
-  };
+  } __attribute__((packed));
 
   struct RpcGetListenSocketRequest : public RpcBase {
     RpcGetListenSocketRequest() : RpcBase(RpcMessageType::GetListenSocketRequest, sizeof(*this)) {}
 
-    char address_[256];
-  };
+    char address_[256]{0};
+  } __attribute__((packed));
 
   struct RpcGetListenSocketReply : public RpcBase {
     RpcGetListenSocketReply() : RpcBase(RpcMessageType::GetListenSocketReply, sizeof(*this)) {}
 
-    int fd_;
-  };
+    int fd_{0};
+  } __attribute__((packed));
 
   struct RpcShutdownAdminReply : public RpcBase {
     RpcShutdownAdminReply() : RpcBase(RpcMessageType::ShutdownAdminReply, sizeof(*this)) {}
 
-    uint64_t original_start_time_;
-  };
+    uint64_t original_start_time_{0};
+  } __attribute__((packed));
 
   struct RpcGetStatsReply : public RpcBase {
     RpcGetStatsReply() : RpcBase(RpcMessageType::GetStatsReply, sizeof(*this)) {}
 
-    uint64_t memory_allocated_;
-    uint64_t num_connections_;
-    uint64_t unused_[16];
-  };
+    uint64_t memory_allocated_{0};
+    uint64_t num_connections_{0};
+    uint64_t unused_[16]{0};
+  } __attribute__((packed));
 
   template <class rpc_class, RpcMessageType rpc_type> rpc_class* receiveTypedRpc() {
     RpcBase* base_message = receiveRpc(true);
@@ -201,3 +202,4 @@ private:
 };
 
 } // Server
+} // Envoy

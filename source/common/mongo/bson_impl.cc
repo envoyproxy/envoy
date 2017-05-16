@@ -10,6 +10,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Bson {
 
 int32_t BufferHelper::peakInt32(Buffer::Instance& data) {
@@ -17,8 +18,10 @@ int32_t BufferHelper::peakInt32(Buffer::Instance& data) {
     throw EnvoyException("invalid buffer size");
   }
 
+  int32_t val;
   void* mem = data.linearize(sizeof(int32_t));
-  return le32toh(*reinterpret_cast<int32_t*>(mem));
+  std::memcpy(reinterpret_cast<void*>(&val), mem, sizeof(int32_t));
+  return le32toh(val);
 }
 
 uint8_t BufferHelper::removeByte(Buffer::Instance& data) {
@@ -38,7 +41,7 @@ void BufferHelper::removeBytes(Buffer::Instance& data, uint8_t* out, size_t out_
   }
 
   void* mem = data.linearize(out_len);
-  memcpy(out, mem, out_len);
+  std::memcpy(out, mem, out_len);
   data.drain(out_len);
 }
 
@@ -81,10 +84,11 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
     throw EnvoyException("invalid buffer size");
   }
 
+  int64_t val;
   void* mem = data.linearize(sizeof(int64_t));
-  int64_t ret = le64toh(*reinterpret_cast<int64_t*>(mem));
+  std::memcpy(reinterpret_cast<void*>(&val), mem, sizeof(int64_t));
   data.drain(sizeof(int64_t));
-  return ret;
+  return le64toh(val);
 }
 
 std::string BufferHelper::removeString(Buffer::Instance& data) {
@@ -547,3 +551,4 @@ const Field* DocumentImpl::find(const std::string& name, Field::Type type) const
 }
 
 } // Bson
+} // Envoy

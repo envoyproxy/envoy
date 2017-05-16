@@ -10,6 +10,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -22,7 +23,7 @@ namespace Http {
 // clang-format on
 
 /**
- * Wrapper struct for connection manager stats. @see stats_macros.h
+ * Wrapper struct for buffer filter stats. @see stats_macros.h
  */
 struct BufferFilterStats {
   ALL_BUFFER_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -49,6 +50,9 @@ public:
 
   static BufferFilterStats generateStats(const std::string& prefix, Stats::Store& store);
 
+  // Http::StreamFilterBase
+  void onDestroy() override;
+
   // Http::StreamDecoderFilter
   FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
   FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -56,7 +60,6 @@ public:
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  void onResetStream();
   void onRequestTimeout();
   void resetInternalState();
 
@@ -66,3 +69,4 @@ private:
 };
 
 } // Http
+} // Envoy

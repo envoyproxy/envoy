@@ -20,6 +20,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::AtLeast;
 using testing::Invoke;
@@ -160,7 +161,7 @@ TEST_F(RouterTest, HashPolicy) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel());
-  callbacks_.reset_callback_();
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, HashPolicyNoHash) {
@@ -178,7 +179,7 @@ TEST_F(RouterTest, HashPolicyNoHash) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel());
-  callbacks_.reset_callback_();
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, CancelBeforeBoundToPool) {
@@ -191,7 +192,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel());
-  callbacks_.reset_callback_();
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, NoHost) {
@@ -695,7 +696,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
                              callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
                              return nullptr;
                            }));
-  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(ReturnRef(body_data));
+  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
   EXPECT_CALL(encoder2, encodeHeaders(_, false));
   EXPECT_CALL(encoder2, encodeData(_, false));
   EXPECT_CALL(encoder2, encodeTrailers(_));
@@ -747,7 +748,9 @@ TEST_F(RouterTest, Shadow) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, router_.decodeData(*body_data, false));
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(body_data));
+  EXPECT_CALL(callbacks_, decodingBuffer())
+      .Times(AtLeast(1))
+      .WillRepeatedly(Return(body_data.get()));
   EXPECT_CALL(*shadow_writer_, shadow_("foo", _, std::chrono::milliseconds(10)))
       .WillOnce(Invoke([](const std::string&, Http::MessagePtr& request, std::chrono::milliseconds)
                            -> void {
@@ -1085,3 +1088,4 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
 }
 
 } // Router
+} // Envoy

@@ -2,4 +2,6 @@
 
 #include <string>
 
+namespace Envoy {
 static const std::string EMPTY_STRING = "";
+} // Envoy

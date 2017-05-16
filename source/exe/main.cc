@@ -1,12 +1,17 @@
 #include <iostream>
 #include <memory>
 
+#include "common/common/compiler_requirements.h"
 #include "common/event/libevent.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
 #include "exe/hot_restart.h"
+
+#ifdef ENVOY_HANDLE_SIGNALS
+#include "exe/signal_action.h"
+#endif
 
 #include "server/config_validation/hot_restart.h"
 #include "server/config_validation/server.h"
@@ -18,6 +23,7 @@
 #include "ares.h"
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Server {
 
 class ProdComponentFactory : public ComponentFactory {
@@ -34,6 +40,7 @@ public:
 };
 
 } // Server
+} // Envoy
 
 namespace {
 
@@ -56,11 +63,17 @@ int validateConfig(OptionsImpl& options, Server::ProdComponentFactory& component
 } // namespace
 
 int main(int argc, char** argv) {
-  Event::Libevent::Global::initialize();
-  OptionsImpl options(argc, argv, Server::SharedMemory::version(), spdlog::level::warn);
+#ifdef ENVOY_HANDLE_SIGNALS
+  // Enabled by default. Control with "bazel --define=signal_trace=disabled"
+  Envoy::SignalAction handle_sigs;
+#endif
+  Envoy::Event::Libevent::Global::initialize();
+  Envoy::OptionsImpl options(argc, argv, Envoy::Server::SharedMemory::version(),
+                             spdlog::level::warn);
   Server::ProdComponentFactory component_factory;
-  LocalInfo::LocalInfoImpl local_info(Network::Utility::getLocalAddress(), options.serviceZone(),
-                                      options.serviceClusterName(), options.serviceNodeName());
+  Envoy::LocalInfo::LocalInfoImpl local_info(
+      Envoy::Network::Utility::getLocalAddress(Envoy::Network::Address::IpVersion::v4),
+      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   switch (options.mode()) {
   case Server::Mode::Serve:
@@ -75,20 +88,20 @@ int main(int argc, char** argv) {
 
   ares_library_init(ARES_LIB_INIT_ALL);
 
-  std::unique_ptr<Server::HotRestartImpl> restarter;
+  std::unique_ptr<Envoy::Server::HotRestartImpl> restarter;
   try {
-    restarter.reset(new Server::HotRestartImpl(options));
-  } catch (EnvoyException& e) {
+    restarter.reset(new Envoy::Server::HotRestartImpl(options));
+  } catch (Envoy::EnvoyException& e) {
     std::cerr << "unable to initialize hot restart: " << e.what() << std::endl;
     return 1;
   }
 
-  Logger::Registry::initialize(options.logLevel(), restarter->logLock());
-  DefaultTestHooks default_test_hooks;
-  Stats::ThreadLocalStoreImpl stats_store(*restarter);
-
-  Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
-                              restarter->accessLogLock(), component_factory, local_info);
+  Envoy::Logger::Registry::initialize(options.logLevel(), restarter->logLock());
+  Envoy::DefaultTestHooks default_test_hooks;
+  Envoy::Stats::ThreadLocalStoreImpl stats_store(*restarter);
+  // TODO(henna): Add CLI option for local address IP version.
+  Envoy::Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
+                                     restarter->accessLogLock(), component_factory, local_info);
   server.run();
   ares_library_cleanup();
   return 0;

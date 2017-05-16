@@ -22,6 +22,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Filesystem {
 bool fileExists(const std::string& path) {
   std::ifstream input_file(path);
@@ -29,11 +30,13 @@ bool fileExists(const std::string& path) {
 }
 
 bool directoryExists(const std::string& path) {
-  DIR* dir = opendir(path.c_str());
-  bool dirExists = nullptr != dir;
-  closedir(dir);
+  DIR* const dir = opendir(path.c_str());
+  const bool dir_exists = nullptr != dir;
+  if (dir_exists) {
+    closedir(dir);
+  }
 
-  return dirExists;
+  return dir_exists;
 }
 
 std::string fileReadToEnd(const std::string& path) {
@@ -192,3 +195,4 @@ void FileImpl::createFlushStructures() {
 }
 
 } // Filesystem
+} // Envoy

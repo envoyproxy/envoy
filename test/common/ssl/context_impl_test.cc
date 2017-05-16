@@ -12,6 +12,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Ssl {
 
 class SslContextImplTest : public SslCertsTest {};
@@ -168,3 +169,4 @@ TEST_F(SslContextImplTest, TestNoCert) {
 }
 
 } // Ssl
+} // Envoy

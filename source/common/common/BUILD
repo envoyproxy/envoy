@@ -32,6 +32,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "compiler_requirements_lib",
+    hdrs = ["compiler_requirements.h"],
+)
+
+envoy_cc_library(
     name = "empty_string",
     hdrs = ["empty_string.h"],
 )
@@ -72,6 +77,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "non_copyable",
     hdrs = ["non_copyable.h"],
+)
+
+envoy_cc_library(
+    name = "singleton",
+    hdrs = ["singleton.h"],
 )
 
 envoy_cc_library(

@@ -20,6 +20,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -216,3 +217,4 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
 
 } // Configuration
 } // Server
+} // Envoy

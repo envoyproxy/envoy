@@ -9,6 +9,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Redis {
 
 std::string RespValue::toString() const {
@@ -209,17 +210,13 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         throw ProtocolError("expected new line");
       }
 
-      if (pending_integer_.negative_) {
-        pending_integer_.integer_ *= -1;
-      }
-
       log_trace("parse slice: IntegerLF: {}", pending_integer_.integer_);
       remaining--;
       buffer++;
 
       PendingValue& current_value = pending_value_stack_.front();
       if (current_value.value_->type() == RespType::Array) {
-        if (pending_integer_.integer_ < 0) {
+        if (pending_integer_.negative_) {
           // Null array. Convert to null.
           current_value.value_->type(RespType::Null);
           state_ = State::ValueComplete;
@@ -232,11 +229,19 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
           state_ = State::ValueStart;
         }
       } else if (current_value.value_->type() == RespType::Integer) {
-        current_value.value_->asInteger() = pending_integer_.integer_;
+        if (pending_integer_.integer_ == 0 || !pending_integer_.negative_) {
+          current_value.value_->asInteger() = pending_integer_.integer_;
+        } else {
+          // By subtracting 1 (and later correcting) we ensure that we remain within the int64_t
+          // range to allow a valid static_cast. This is an issue when we have a value of -2^63,
+          // which cannot be represented as 2^63 in the intermediate int64_t.
+          current_value.value_->asInteger() =
+              static_cast<int64_t>(pending_integer_.integer_ - 1) * -1 - 1;
+        }
         state_ = State::ValueComplete;
       } else {
         ASSERT(current_value.value_->type() == RespType::BulkString);
-        if (pending_integer_.integer_ >= 0) {
+        if (!pending_integer_.negative_) {
           // TODO(mattklein123): reserve and define max length since we don't stream currently.
           state_ = State::BulkStringBody;
         } else {
@@ -250,7 +255,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
     }
 
     case State::BulkStringBody: {
-      ASSERT(pending_integer_.integer_ >= 0);
+      ASSERT(!pending_integer_.negative_);
       uint64_t length_to_copy =
           std::min(static_cast<uint64_t>(pending_integer_.integer_), remaining);
       pending_value_stack_.front().value_->asString().append(buffer, length_to_copy);
@@ -396,7 +401,10 @@ void EncoderImpl::encodeInteger(int64_t integer, Buffer::Instance& out) {
     current += StringUtil::itoa(current, 31, integer);
   } else {
     *current++ = '-';
-    current += StringUtil::itoa(current, 30, integer * -1);
+    // By adding 1 (and later correcting) we ensure that we remain within the int64_t
+    // range prior to the static_cast. This is an issue when we have a value of -2^63,
+    // which cannot be represented as 2^63 in the intermediate int64_t.
+    current += StringUtil::itoa(current, 30, static_cast<uint64_t>((integer + 1) * -1) + 1ULL);
   }
 
   *current++ = '\r';
@@ -411,3 +419,4 @@ void EncoderImpl::encodeSimpleString(const std::string& string, Buffer::Instance
 }
 
 } // Redis
+} // Envoy

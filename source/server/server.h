@@ -25,6 +25,7 @@
 #include "server/test_hooks.h"
 #include "server/worker.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -183,3 +184,4 @@ private:
 };
 
 } // Server
+} // Envoy

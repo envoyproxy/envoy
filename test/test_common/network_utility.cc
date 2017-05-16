@@ -15,6 +15,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Network {
 namespace Test {
 
@@ -71,13 +72,34 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
                                                     Address::SocketType type) {
-  auto instance = Address::parseInternetAddressAndPort(addr_port);
+  auto instance = Utility::parseInternetAddressAndPort(addr_port);
   if (instance != nullptr) {
     instance = findOrCheckFreePort(instance, type);
   } else {
     ADD_FAILURE() << "Unable to parse as an address and port: " << addr_port;
   }
   return instance;
+}
+
+const std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v6) {
+    return std::string("[::1]");
+  }
+  return std::string("127.0.0.1");
+}
+
+const std::string getAnyAddressUrlString(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v6) {
+    return std::string("[::]");
+  }
+  return std::string("0.0.0.0");
+}
+
+const std::string addressVersionAsString(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v4) {
+    return std::string("v4");
+  }
+  return std::string("v6");
 }
 
 Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion version) {
@@ -97,6 +119,36 @@ Address::InstanceConstSharedPtr getSomeLoopbackAddress(Address::IpVersion versio
     // There is only one IPv6 loopback address.
     return Network::Utility::getIpv6LoopbackAddress();
   }
+}
+
+Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion version) {
+  if (version == Address::IpVersion::v4) {
+    return Network::Utility::getCanonicalIpv4LoopbackAddress();
+  }
+  return Network::Utility::getIpv6LoopbackAddress();
+}
+
+Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v4) {
+    return Network::Utility::getIpv4AnyAddress();
+  }
+  return Network::Utility::getIpv6AnyAddress();
+}
+
+bool supportsIpVersion(const Address::IpVersion version) {
+  Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
+  const int fd = addr->socket(Address::SocketType::Stream);
+  if (fd < 0) {
+    // Socket creation failed.
+    return false;
+  }
+  if (0 != addr->bind(fd)) {
+    // Socket bind failed.
+    RELEASE_ASSERT(::close(fd) == 0);
+    return false;
+  }
+  RELEASE_ASSERT(::close(fd) == 0);
+  return true;
 }
 
 std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
@@ -123,3 +175,4 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
 
 } // Test
 } // Network
+} // Envoy

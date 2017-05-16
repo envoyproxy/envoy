@@ -29,6 +29,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Upstream {
 
 Outlier::DetectorHostSinkNullImpl HostDescriptionImpl::null_outlier_detector_;
@@ -122,29 +123,19 @@ ClusterPtr ClusterImplBase::create(const Json::Object& cluster, ClusterManager& 
   } else if (string_type == "logical_dns") {
     new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager,
                                             dns_resolver, tls, dispatcher));
-  } else if (string_type == "sds") {
+  } else {
+    ASSERT(string_type == "sds");
     if (!sds_config.valid()) {
       throw EnvoyException("cannot create an sds cluster without an sds config");
     }
 
     new_cluster.reset(new SdsClusterImpl(cluster, runtime, stats, ssl_context_manager,
                                          sds_config.value(), local_info, cm, dispatcher, random));
-  } else {
-    throw EnvoyException(fmt::format("cluster: unknown cluster type '{}'", string_type));
   }
 
   if (cluster.hasObject("health_check")) {
-    Json::ObjectPtr health_check_config = cluster.getObject("health_check");
-    std::string hc_type = health_check_config->getString("type");
-    if (hc_type == "http") {
-      new_cluster->setHealthChecker(HealthCheckerPtr{new ProdHttpHealthCheckerImpl(
-          *new_cluster, *health_check_config, dispatcher, runtime, random)});
-    } else if (hc_type == "tcp") {
-      new_cluster->setHealthChecker(HealthCheckerPtr{new TcpHealthCheckerImpl(
-          *new_cluster, *health_check_config, dispatcher, runtime, random)});
-    } else {
-      throw EnvoyException(fmt::format("cluster: unknown health check type '{}'", hc_type));
-    }
+    new_cluster->setHealthChecker(HealthCheckerFactory::create(
+        *cluster.getObject("health_check"), *new_cluster, runtime, random, dispatcher));
   }
 
   new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
@@ -461,3 +452,4 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 }
 
 } // Upstream
+} // Envoy

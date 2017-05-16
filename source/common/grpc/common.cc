@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 
 #include <cstdint>
+#include <cstring>
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
@@ -18,6 +19,7 @@
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Grpc {
 
 const std::string Common::GRPC_CONTENT_TYPE{"application/grpc"};
@@ -42,10 +44,9 @@ Buffer::InstancePtr Common::serializeBody(const google::protobuf::Message& messa
   ASSERT(iovec.len_ >= alloc_size);
   iovec.len_ = alloc_size;
   uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
-
-  // TODO(fengli79): Make this less ugly.
   *current++ = 0; // flags
-  *reinterpret_cast<uint32_t*>(current) = htonl(size);
+  const uint32_t nsize = htonl(size);
+  std::memcpy(current, reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
   current += sizeof(uint32_t);
   google::protobuf::io::ArrayOutputStream stream(current, size, -1);
   google::protobuf::io::CodedOutputStream codec_stream(&stream);
@@ -114,3 +115,4 @@ void Common::validateResponse(Http::Message& http_response) {
 }
 
 } // Grpc
+} // Envoy

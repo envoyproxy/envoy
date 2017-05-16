@@ -3,10 +3,12 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Network {
 
 class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -15,7 +17,7 @@ protected:
   const Address::IpVersion version_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenSocketImplTest,
-                        testing::Values(Address::IpVersion::v4, Address::IpVersion::v6));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(ListenSocketImplTest, BindSpecificPort) {
   // Pick a free port.
@@ -58,3 +60,4 @@ TEST_P(ListenSocketImplTest, BindPortZero) {
 }
 
 } // Network
+} // Envoy

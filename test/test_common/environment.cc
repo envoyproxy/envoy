@@ -11,11 +11,16 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/compiler_requirements.h"
+#include "common/common/logger.h"
 
 #include "server/options_impl.h"
 
+#include "test/test_common/network_utility.h"
+
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace {
 
 std::string getOrCreateUnixDomainSocketDirectory() {
@@ -47,6 +52,36 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
 void TestEnvironment::initializeOptions(int argc, char** argv) {
   argc_ = argc;
   argv_ = argv;
+}
+
+bool TestEnvironment::shouldRunTestForIpVersion(const Network::Address::IpVersion& type) {
+  const char* value = ::getenv("ENVOY_IP_TEST_VERSIONS");
+  std::string option(value ? value : "");
+  if (option.empty()) {
+    return true;
+  }
+  if ((type == Network::Address::IpVersion::v4 && option == "v6only") ||
+      (type == Network::Address::IpVersion::v6 && option == "v4only")) {
+    return false;
+  }
+  return true;
+}
+
+std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest() {
+  std::vector<Network::Address::IpVersion> parameters;
+  for (auto version : {Network::Address::IpVersion::v4, Network::Address::IpVersion::v6}) {
+    if (TestEnvironment::shouldRunTestForIpVersion(version)) {
+      parameters.push_back(version);
+      if (!Network::Test::supportsIpVersion(version)) {
+        Logger::Registry::getLog(Logger::Id::testing)
+            .warn(
+                fmt::format("Testing with IP{} addresses may not be supported on this machine. If "
+                            "testing fails, set the environment variable ENVOY_IP_TEST_VERSIONS.",
+                            Network::Test::addressVersionAsString(version)));
+      }
+    }
+  }
+  return parameters;
 }
 
 Server::Options& TestEnvironment::getOptions() {
@@ -83,7 +118,14 @@ std::string TestEnvironment::substitute(const std::string str) {
   return out_json_string;
 }
 
+// TODO(hennna): Deprecate when IPv6 test support is finished.
 std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
+                                                     const PortMap& port_map) {
+  return TestEnvironment::temporaryFileSubstitute(path, Network::Address::IpVersion::v4, port_map);
+}
+
+std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
+                                                     const Network::Address::IpVersion& version,
                                                      const PortMap& port_map) {
   // Load the entire file as a string, regex replace one at a time and write it back out. Proper
   // templating might be better one day, but this works for now.
@@ -105,6 +147,11 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
     const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
     out_json_string = std::regex_replace(out_json_string, port_regex, std::to_string(it.second));
   }
+
+  // Substitute IP loopback addresses.
+  const std::regex loopback_address_regex("\\{\\{ ip_loopback_address \\}\\}");
+  out_json_string = std::regex_replace(out_json_string, loopback_address_regex,
+                                       Network::Test::getLoopbackAddressUrlString(version));
   // Substitute paths.
   out_json_string = substitute(out_json_string);
   const std::string out_json_path = TestEnvironment::temporaryPath(path + ".with.ports.json");
@@ -133,3 +180,4 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
     RELEASE_ASSERT(false);
   }
 }
+} // Envoy

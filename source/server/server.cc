@@ -30,6 +30,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Server {
 
 void InitManagerImpl::initialize(std::function<void()> callback) {
@@ -76,10 +77,6 @@ InstanceImpl::InstanceImpl(Options& options, TestHooks& hooks, HotRestart& resta
     throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
   }
   server_stats_.version_.set(version_int);
-
-  if (!local_info_.address()) {
-    throw EnvoyException("could not resolve local address");
-  }
 
   restarter_.initialize(handler_.dispatcher(), *this);
   drain_manager_ = component_factory.createDrainManager(*this);
@@ -334,7 +331,7 @@ void InstanceImpl::initializeStatSinks() {
     log().info("statsd TCP cluster: {}", config_->statsdTcpClusterName().value());
     stat_sinks_.emplace_back(
         new Stats::Statsd::TcpStatsdSink(local_info_, config_->statsdTcpClusterName().value(),
-                                         thread_local_, config_->clusterManager()));
+                                         thread_local_, config_->clusterManager(), stats_store_));
     stats_store_.addSink(*stat_sinks_.back());
   }
 }
@@ -410,3 +407,4 @@ void InstanceImpl::shutdownAdmin() {
 }
 
 } // Server
+} // Envoy

@@ -17,6 +17,7 @@
 #include "common/network/filter_impl.h"
 #include "common/redis/codec_impl.h"
 
+namespace Envoy {
 namespace Redis {
 namespace ConnPool {
 
@@ -119,8 +120,7 @@ public:
 private:
   struct ThreadLocalPool;
 
-  struct ThreadLocalActiveClient : public Network::ConnectionCallbacks,
-                                   public Event::DeferredDeletable {
+  struct ThreadLocalActiveClient : public Network::ConnectionCallbacks {
     ThreadLocalActiveClient(ThreadLocalPool& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
@@ -168,3 +168,4 @@ private:
 
 } // ConnPool
 } // Redis
+} // Envoy

@@ -26,6 +26,7 @@
 #include "ares_dns.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Network {
 
 namespace {
@@ -66,7 +67,8 @@ private:
             // If we don't have enough bytes to determine size, wait until we do.
             return;
           }
-          size_n = *static_cast<uint16_t*>(buffer_.linearize(sizeof(size_n)));
+          void* mem = buffer_.linearize(sizeof(size_n));
+          std::memcpy(reinterpret_cast<void*>(&size_n), mem, sizeof(size_n));
           buffer_.drain(sizeof(size_n));
           size_ = ntohs(size_n);
         }
@@ -366,3 +368,4 @@ TEST_F(DnsImplZeroTimeoutTest, Timeout) {
 }
 
 } // Network
+} // Envoy

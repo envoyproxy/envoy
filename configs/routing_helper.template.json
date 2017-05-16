@@ -36,5 +36,8 @@
     "healthy_threshold": 2,
     "path": "/healthcheck",
     "service_name": "{{ service }}"
+  },
+  "outlier_detection": {
+    "success_rate_stdev_factor": 1900
   }
 {% endmacro %}

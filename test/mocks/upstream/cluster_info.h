@@ -8,14 +8,13 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/stats/stats_impl.h"
-
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::NiceMock;
 
 namespace Upstream {
@@ -49,3 +48,4 @@ public:
 };
 
 } // Upstream
+} // Envoy

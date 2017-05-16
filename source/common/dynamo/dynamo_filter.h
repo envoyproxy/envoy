@@ -10,6 +10,7 @@
 #include "common/dynamo/dynamo_request_parser.h"
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Dynamo {
 
 /**
@@ -24,6 +25,9 @@ public:
       : runtime_(runtime), stat_prefix_(stat_prefix + "dynamodb."), stats_(stats) {
     enabled_ = runtime_.snapshot().featureEnabled("dynamodb.filter_enabled", 100);
   }
+
+  // Http::StreamFilterBase
+  void onDestroy() override {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -67,3 +71,4 @@ private:
 };
 
 } // Dynamo
+} // Envoy

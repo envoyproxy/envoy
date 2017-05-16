@@ -11,6 +11,7 @@
 #include "common/common/non_copyable.h"
 #include "common/http/headers.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -106,8 +107,6 @@ protected:
     StaticLookupEntry root_;
   };
 
-  static const StaticLookupTable static_lookup_table_;
-
   struct AllInlineHeaders {
     ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_STRUCT)
   };
@@ -127,3 +126,4 @@ protected:
 typedef std::unique_ptr<HeaderMapImpl> HeaderMapImplPtr;
 
 } // Http
+} // Envoy

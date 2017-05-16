@@ -5,6 +5,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 TEST(UUIDUtilsTest, mod) {
   uint16_t result;
   EXPECT_TRUE(UuidUtils::uuidModBy("00000000-0000-0000-0000-000000000000", result, 100));
@@ -41,12 +42,15 @@ TEST(UUIDUtilsTest, checkDistribution) {
   const int required_percentage = 11;
   int total_samples = 0;
   int interesting_samples = 0;
+  // For some reason, ASAN/UBSAN seems to run very slowly unless this is defined outside the loop
+  // condition.
+  const int iters = 500000;
 
-  for (int i = 0; i < 500000; ++i) {
+  for (int i = 0; i < iters; ++i) {
     std::string uuid = random.uuid();
 
     uint16_t value;
-    UuidUtils::uuidModBy(uuid, value, mod);
+    ASSERT_TRUE(UuidUtils::uuidModBy(uuid, value, mod));
 
     if (value < required_percentage) {
       interesting_samples++;
@@ -78,3 +82,4 @@ TEST(UUIDUtilsTest, setAndCheckTraceable) {
   std::string invalid_uuid = "";
   EXPECT_FALSE(UuidUtils::setTraceableUuid(invalid_uuid, UuidTraceStatus::Forced));
 }
+} // Envoy

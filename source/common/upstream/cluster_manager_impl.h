@@ -19,6 +19,7 @@
 #include "common/json/json_loader.h"
 #include "common/upstream/sds.h"
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -236,3 +237,4 @@ private:
 };
 
 } // Upstream
+} // Envoy

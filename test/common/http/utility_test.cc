@@ -12,6 +12,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Http {
 
 // Satisfy linker
@@ -145,6 +146,18 @@ TEST(HttpUtility, TestParseCookie) {
   EXPECT_EQ(value, "abc123");
 }
 
+TEST(HttpUtility, TestParseCookieBadValues) {
+  TestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
+                            {"cookie", "token2=abc123;   "},
+                            {"cookie", "; token3=abc123;"},
+                            {"cookie", "=; token4=\"abc123\""}};
+
+  EXPECT_EQ(Utility::parseCookieValue(headers, "token1"), "abc123");
+  EXPECT_EQ(Utility::parseCookieValue(headers, "token2"), "abc123");
+  EXPECT_EQ(Utility::parseCookieValue(headers, "token3"), "abc123");
+  EXPECT_EQ(Utility::parseCookieValue(headers, "token4"), "abc123");
+}
+
 TEST(HttpUtility, TestParseCookieWithQuotes) {
   TestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
@@ -159,3 +172,4 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
 }
 
 } // Http
+} // Envoy

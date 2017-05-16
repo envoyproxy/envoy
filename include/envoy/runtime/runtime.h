@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Runtime {
 
 /**
@@ -26,6 +27,8 @@ public:
    */
   virtual std::string uuid() PURE;
 };
+
+typedef std::unique_ptr<RandomGenerator> RandomGeneratorPtr;
 
 /**
  * A snapshot of runtime data.
@@ -113,3 +116,4 @@ public:
 typedef std::unique_ptr<Loader> LoaderPtr;
 
 } // Runtime
+} // Envoy

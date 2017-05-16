@@ -18,6 +18,11 @@ one with an Envoy binary with debug (`lyft/envoy-alpine-debug`) symbols and one 
 Both images are pushed with two different tags: `<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
 master commit at which the binary was compiled, and `latest` corresponds to a binary built from the latest tip of master that passed tests.
 
+# Build image base and compiler versions
+
+The current build image is based on Ubuntu 16.04 (Xenial) which uses the GCC 5.4 compiler. We also
+install and use the clang-5.0 compiler for some sanitizing runs.
+
 # Building and running tests as a developer
 
 An example basic invocation to build a developer version of the Envoy static binary (using the Bazel `fastbuild` type) is:
@@ -32,7 +37,7 @@ generate the binary in `~/build/envoy/source/exe/envoy-fastbuild` you can run:
 
 
 ```bash
-ENVOY_DOCKER_BUILD_DIR=~/build ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev.server_only'
+ENVOY_DOCKER_BUILD_DIR=~/build ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
 For a release version of the Envoy binary you can run:
@@ -41,15 +46,28 @@ For a release version of the Envoy binary you can run:
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release.server_only'
 ```
 
-The artifacts can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
+The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy` (or wherever
+`$ENVOY_DOCKER_BUILD_DIR` points).
+
+For a debug version of the Envoy binary you can run:
+
+```bash
+./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.debug.server_only'
+```
+
+The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
-* `bazel.asan` &mdash; build and run tests under `-c dbg --config=asan`.
-* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild`.
-* `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt`.
-* `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt`.
-* `bazel.coverage` &mdash; build and run tests under `-c dbg`, generating coverage information in `<SOURCE_DIR>/generated/coverage/coverage.html`.
+
+* `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang-5.0.
+* `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
+* `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
+* `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with gcc.
+* `bazel.release` &mdash; build Envoy static binary and run tests under `-c opt` with gcc.
+* `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.
+* `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
+* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-5.0.
 * `check_format`&mdash; run `clang-format` 3.6 and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format` 3.6 and `buildifier` on entire source tree.

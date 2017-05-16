@@ -9,7 +9,6 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
-#include "common/tracing/lightstep_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -24,6 +23,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -399,3 +399,4 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
 }
 
 } // Tracing
+} // Envoy

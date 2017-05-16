@@ -134,7 +134,12 @@
                   "rate_limits":[
                     {
                       "actions": [
-                        {"type": "service_to_service"}
+                        {
+                          "type": "destination_cluster"
+                        },
+                        {
+                          "type" : "source_cluster"
+                        }
                       ]
                     }
                   ]
@@ -144,6 +149,48 @@
             }{% if not loop.last %},{% endif -%}
             {% endfor -%}
           ]
+        },
+        "filters": [
+          {"type": "decoder", "name": "rate_limit",
+            "config": {
+              "domain": "envoy_service_to_service"
+            }
+          },
+          {"type": "both", "name": "grpc_http1_bridge", "config": {}},
+          {"type": "decoder", "name": "router", "config": {}}
+        ]
+      }
+    }]
+  },
+  {# The following listener is configured to use route discovery service. #}
+  {
+    "address": "tcp://127.0.0.1:9002",
+    "filters": [
+    {
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "auto",
+        "tracing": {
+          "operation_name": "egress"
+        },
+        "add_user_agent": true,
+        "idle_timeout_s": 840,
+        "access_log": [
+        {
+          "path": "/var/log/envoy/egress_http_error.log",
+          "filter": {"type": "logical_or", "filters": [
+              {"type": "status_code", "op": ">=", "value": 400},
+              {"type": "duration", "op": ">=", "value": 2000}
+            ]
+          },
+          {{ access_log_helper.egress_error_log() }}
+        }],
+        "stat_prefix": "egress_http",
+        "use_remote_address": true,
+        "rds" : {
+          "cluster" : "rds",
+          "route_config_name": "9002_http_conn_man"
         },
         "filters": [
           {"type": "decoder", "name": "rate_limit",
@@ -300,6 +347,16 @@
       "refresh_delay_ms": 30000
     },
 
+    "cds": {
+      "cluster": {
+        "name": "cds",
+        "connect_timeout_ms": 250,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "hosts": [{"url": "tcp://cds.yourcompany.net:80"}]
+      }
+    },
+
     "clusters": [
     {% for service, options in internal_virtual_hosts.iteritems() -%}
     {
@@ -378,6 +435,13 @@
         }
       },
       "hosts": [{"url": "tcp://127.0.0.1:8081"}]
+    },
+    {
+      "name": "rds",
+      "connect_timeout_ms": 250,
+      "type": "strict_dns",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://rds.yourcompany.net:80"}]
     },
     {
       "name": "statsd",

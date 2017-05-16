@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <random>
 #include <string>
 
 #include "envoy/event/dispatcher.h"
@@ -15,6 +16,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Runtime {
 
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
@@ -153,3 +155,4 @@ void LoaderImpl::onSymlinkSwap() {
 Snapshot& LoaderImpl::snapshot() { return tls_.getTyped<Snapshot>(tls_slot_); }
 
 } // Runtime
+} // Envoy

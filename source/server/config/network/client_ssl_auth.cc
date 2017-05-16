@@ -7,6 +7,7 @@
 
 #include "common/filter/auth/client_ssl.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -34,3 +35,4 @@ static RegisterNetworkFilterConfigFactory<ClientSslAuthConfigFactory> registered
 
 } // Configuration
 } // Server
+} // Envoy

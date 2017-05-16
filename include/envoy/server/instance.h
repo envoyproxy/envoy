@@ -20,6 +20,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -195,3 +196,4 @@ public:
 };
 
 } // Server
+} // Envoy

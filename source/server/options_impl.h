@@ -8,6 +8,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 /**
  * Implementation of Server::Options.
  */
@@ -47,3 +48,4 @@ private:
   std::chrono::seconds parent_shutdown_time_;
   Server::Mode mode_;
 };
+} // Envoy

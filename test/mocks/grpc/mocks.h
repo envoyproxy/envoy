@@ -7,6 +7,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Grpc {
 
 class MockRpcChannelCallbacks : public RpcChannelCallbacks {
@@ -35,3 +36,4 @@ public:
 MATCHER_P(ProtoMessageEqual, rhs, "") {
   return arg->SerializeAsString() == rhs->SerializeAsString();
 }
+} // Envoy
