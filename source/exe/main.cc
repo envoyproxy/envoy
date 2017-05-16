@@ -58,15 +58,15 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  Logger::Registry::initialize(options.logLevel(), restarter->logLock());
-  DefaultTestHooks default_test_hooks;
-  Stats::ThreadLocalStoreImpl stats_store(*restarter);
-  Server::ProdComponentFactory component_factory;
+  Envoy::Logger::Registry::initialize(options.logLevel(), restarter->logLock());
+  Envoy::DefaultTestHooks default_test_hooks;
+  Envoy::Stats::ThreadLocalStoreImpl stats_store(*restarter);
+  Envoy::Server::ProdComponentFactory component_factory;
   // TODO(henna): Add CLI option for local address IP version.
-  LocalInfo::LocalInfoImpl local_info(
-      Network::Utility::getLocalAddress(Network::Address::IpVersion::v4), options.serviceZone(),
+  Envoy::LocalInfo::LocalInfoImpl local_info(
+      Envoy::Network::Utility::getLocalAddress(Envoy::Network::Address::IpVersion::v4), options.serviceZone(),
       options.serviceClusterName(), options.serviceNodeName());
-  Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
+  Envoy::Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
                               restarter->accessLogLock(), component_factory, local_info);
   server.run();
   ares_library_cleanup();

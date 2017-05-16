@@ -116,7 +116,7 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   std::string type = driver->getString("type");
   log().info(fmt::format("  loading tracing driver: {}", type));
 
-  ::Runtime::RandomGenerator& rand = server_.random();
+  Envoy::Runtime::RandomGenerator& rand = server_.random();
 
   if (type == "lightstep") {
     Json::ObjectPtr lightstep_config = driver->getObject("config");

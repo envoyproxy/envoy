@@ -28,9 +28,6 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-IntegrationTestServerPtr BaseIntegrationTest::test_server_;
-std::vector<std::unique_ptr<FakeUpstream>> BaseIntegrationTest::fake_upstreams_;
-
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
@@ -826,9 +823,6 @@ void BaseIntegrationTest::testUpstreamProtocolError() {
   IntegrationCodecClientPtr codec_client;
   IntegrationStreamDecoderPtr response(new IntegrationStreamDecoder(*dispatcher_));
   FakeRawConnectionPtr fake_upstream_connection;
-  // TSAN seems to get upset if we destroy this in a closure below, so keep it alive.
-  // https://github.com/lyft/envoy/issues/944
-  const std::string upstream_write_data("bad protocol data!");
   executeActions(
       {[&]() -> void {
         codec_client = makeHttpConnection(lookupPort("http"), Http::CodecClient::Type::HTTP1);
@@ -843,7 +837,7 @@ void BaseIntegrationTest::testUpstreamProtocolError() {
        // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
        // be fixed.
        [&]() -> void { fake_upstream_connection->waitForData(187); },
-       [&]() -> void { fake_upstream_connection->write(upstream_write_data); },
+       [&]() -> void { fake_upstream_connection->write("bad protocol data!"); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); },
        [&]() -> void { codec_client->waitForDisconnect(); }});
 
