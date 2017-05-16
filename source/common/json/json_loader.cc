@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 
@@ -107,9 +108,9 @@ private:
       return "Object";
     case Type::String:
       return "String";
-    default:
-      return "Unknown";
     }
+
+    NOT_REACHED;
   }
 
   struct Value {
