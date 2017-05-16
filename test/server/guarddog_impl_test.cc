@@ -31,7 +31,8 @@ namespace Server {
 class GuardDogDeathTest : public testing::Test {
 protected:
   GuardDogDeathTest()
-      : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500) {
+      : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500),
+        mock_time_(0) {
     ON_CALL(time_source_, currentTime())
         .WillByDefault(testing::Invoke([&]() {
           return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
@@ -131,7 +132,7 @@ TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
 
 class GuardDogMissTest : public testing::Test {
 protected:
-  GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0) {
+  GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0), mock_time_(0) {
     ON_CALL(time_source_, currentTime())
         .WillByDefault(testing::Invoke([&]() {
           return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
