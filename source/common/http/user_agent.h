@@ -7,6 +7,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats_macros.h"
 
+namespace Envoy {
 /**
  * All stats for user agents. @see stats_macros.h
  */
@@ -63,3 +64,4 @@ private:
 };
 
 } // Http
+} // Envoy

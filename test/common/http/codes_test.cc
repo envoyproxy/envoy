@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 
 namespace Http {
@@ -191,3 +192,4 @@ TEST(CodeUtilityResponseTimingTest, All) {
 }
 
 } // Http
+} // Envoy

@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 
+namespace Envoy {
 namespace Server {
 
 void WatchDogImpl::startWatchdog(Event::Dispatcher& dispatcher) {
@@ -15,3 +16,4 @@ void WatchDogImpl::startWatchdog(Event::Dispatcher& dispatcher) {
 }
 
 } // Server
+} // Envoy

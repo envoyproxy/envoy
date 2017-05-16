@@ -11,6 +11,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Ssl {
 
 class MockContextManager : public ContextManager {
@@ -52,3 +53,4 @@ public:
 };
 
 } // Ssl
+} // Envoy

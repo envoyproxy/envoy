@@ -8,6 +8,7 @@
 
 #include "common/common/logger.h"
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -52,3 +53,4 @@ private:
 };
 
 } // Upstream
+} // Envoy

@@ -14,6 +14,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
@@ -85,3 +86,4 @@ void WatcherImpl::onInotifyEvent() {
 }
 
 } // Filesystem
+} // Envoy

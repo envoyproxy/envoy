@@ -11,6 +11,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
+namespace Envoy {
 namespace Router {
 
 /**
@@ -56,3 +57,4 @@ private:
 };
 
 } // Router
+} // Envoy

@@ -10,6 +10,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Api {
 
 class MockApi : public Api {
@@ -33,3 +34,4 @@ public:
 };
 
 } // Api
+} // Envoy

@@ -5,6 +5,7 @@
 
 #include "common/common/assert.h"
 
+namespace Envoy {
 constexpr int SignalAction::FATAL_SIGS[];
 
 void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
@@ -96,3 +97,4 @@ void SignalAction::tryEvilAccessForTest(bool end) {
     *(altaltstack + guard_size_ - 1) = 43;
   }
 }
+} // Envoy

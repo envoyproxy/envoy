@@ -6,6 +6,7 @@
 #include "common/tracing/zipkin/util.h"
 #include "common/tracing/zipkin/zipkin_core_constants.h"
 
+namespace Envoy {
 namespace Zipkin {
 
 SpanPtr Tracer::startSpan(const std::string& span_name, SystemTime timestamp) {
@@ -113,3 +114,4 @@ void Tracer::reportSpan(Span&& span) {
 void Tracer::setReporter(ReporterPtr reporter) { reporter_ = std::move(reporter); }
 
 } // Zipkin
+} // Envoy

@@ -2,6 +2,7 @@
 
 #include <vector>
 
+namespace Envoy {
 namespace Http {
 
 class StreamCallbackHelper {
@@ -46,3 +47,4 @@ private:
 };
 
 } // Http
+} // Envoy

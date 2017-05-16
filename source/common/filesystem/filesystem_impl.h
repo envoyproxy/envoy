@@ -14,6 +14,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/thread.h"
 
+namespace Envoy {
 // clang-format off
 #define FILESYSTEM_STATS(COUNTER, GAUGE)                                                           \
   COUNTER(write_buffered)                                                                          \
@@ -117,3 +118,4 @@ private:
 };
 
 } // Filesystem
+} // Envoy

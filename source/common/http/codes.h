@@ -8,6 +8,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -76,3 +77,4 @@ public:
 };
 
 } // Http
+} // Envoy

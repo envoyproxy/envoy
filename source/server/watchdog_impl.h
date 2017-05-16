@@ -7,6 +7,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/watchdog.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -44,3 +45,4 @@ private:
 };
 
 } // namespace Server
+} // Envoy

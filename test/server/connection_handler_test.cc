@@ -11,6 +11,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::ByRef;
 using testing::InSequence;
@@ -136,3 +137,4 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
   EXPECT_EQ(listener2, handler.findListenerByAddress(ByRef(*alt_address2)));
   EXPECT_EQ(listener2, handler.findListenerByAddress(ByRef(*alt_address3)));
 }
+} // Envoy

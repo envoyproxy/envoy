@@ -5,6 +5,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/upstream/host_description.h"
 
+namespace Envoy {
 namespace Network {
 
 class Connection;
@@ -163,3 +164,4 @@ public:
 };
 
 } // Network
+} // Envoy

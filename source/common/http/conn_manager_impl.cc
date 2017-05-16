@@ -30,6 +30,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Http {
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
@@ -992,3 +993,4 @@ const std::string& ConnectionManagerImpl::ActiveStreamFilterBase::downstreamAddr
 }
 
 } // Http
+} // Envoy

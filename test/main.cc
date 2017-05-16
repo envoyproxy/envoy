@@ -1,3 +1,4 @@
+// NOLINT(namespace-envoy)
 #include "test/test_common/environment.h"
 #include "test/test_runner.h"
 
@@ -15,11 +16,11 @@ const char* __asan_default_options() {
 int main(int argc, char** argv) {
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
-  SignalAction handle_sigs;
+  Envoy::SignalAction handle_sigs;
 #endif
 
-  ::setenv("TEST_RUNDIR", (TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
-                           TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE")).c_str(),
+  ::setenv("TEST_RUNDIR", (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
+                           Envoy::TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE")).c_str(),
            1);
   // Select whether to test only for IPv4, IPv6, or both. The default is to
   // test for both. Options are {"v4only", "v6only", "all"}. Set
@@ -29,5 +30,5 @@ int main(int argc, char** argv) {
   // v4 and v6 addresses is desired. This feature is in progress and will be rolled out to all tests
   // in upcoming PRs.
   ::setenv("ENVOY_IP_TEST_VERSIONS", "all", 0);
-  return TestRunner::RunTests(argc, argv);
+  return Envoy::TestRunner::RunTests(argc, argv);
 }

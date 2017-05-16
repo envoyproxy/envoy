@@ -3,6 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -20,3 +21,4 @@ public:
 };
 
 } // Http
+} // Envoy

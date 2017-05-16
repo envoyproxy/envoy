@@ -8,6 +8,7 @@
 #include "envoy/http/access_log.h"
 #include "envoy/http/header_map.h"
 
+namespace Envoy {
 namespace Tracing {
 
 enum class OperationName { Ingress, Egress };
@@ -74,3 +75,4 @@ public:
 typedef std::unique_ptr<HttpTracer> HttpTracerPtr;
 
 } // Tracing
+} // Envoy

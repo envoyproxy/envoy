@@ -18,6 +18,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Network {
 namespace Address {
 
@@ -194,3 +195,4 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
 
 } // Address
 } // Network
+} // Envoy

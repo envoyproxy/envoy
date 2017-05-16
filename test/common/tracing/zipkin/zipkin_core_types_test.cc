@@ -5,6 +5,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Zipkin {
 
 TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
@@ -558,3 +559,4 @@ TEST(ZipkinCoreTypesSpanTest, setTag) {
   EXPECT_EQ("value2", bann.value());
 }
 } // Zipkin
+} // Envoy

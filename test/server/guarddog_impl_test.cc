@@ -16,6 +16,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::InSequence;
 using testing::NiceMock;
 
@@ -234,3 +235,4 @@ TEST(WatchDogTimeTest, AtomicIsAtomicTest) {
 }
 
 } // Server
+} // Envoy

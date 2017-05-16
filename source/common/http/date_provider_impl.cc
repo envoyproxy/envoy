@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 
+namespace Envoy {
 namespace Http {
 
 DateFormatter DateProviderImplBase::date_formatter_("%a, %d %b %Y %H:%M:%S GMT");
@@ -34,3 +35,4 @@ void SlowDateProviderImpl::setDateHeader(HeaderMap& headers) {
 }
 
 } // Http
+} // Envoy

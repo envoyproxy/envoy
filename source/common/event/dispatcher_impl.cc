@@ -20,6 +20,7 @@
 
 #include "event2/event.h"
 
+namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl()
@@ -155,3 +156,4 @@ void DispatcherImpl::runPostCallbacks() {
 }
 
 } // Event
+} // Envoy

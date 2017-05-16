@@ -21,6 +21,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+namespace Envoy {
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder)
     : parent_(parent), encoder_(encoder) {
   encoder.getStream().addCallbacks(*this);
@@ -323,3 +324,4 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
   parent_.connection_event_.notify_one();
   return Network::FilterStatus::StopIteration;
 }
+} // Envoy
