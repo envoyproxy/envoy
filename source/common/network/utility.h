@@ -9,6 +9,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 
+namespace Envoy {
 namespace Network {
 
 /**
@@ -156,3 +157,4 @@ public:
 };
 
 } // Network
+} // Envoy

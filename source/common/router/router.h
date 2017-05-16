@@ -16,6 +16,7 @@
 
 #include "common/common/logger.h"
 
+namespace Envoy {
 namespace Router {
 
 /**
@@ -250,3 +251,4 @@ private:
 };
 
 } // Router
+} // Envoy

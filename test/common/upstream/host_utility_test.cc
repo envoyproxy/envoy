@@ -6,6 +6,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Upstream {
 
 TEST(HostUtilityTest, All) {
@@ -24,3 +25,4 @@ TEST(HostUtilityTest, All) {
 }
 
 } // Upstream
+} // Envoy

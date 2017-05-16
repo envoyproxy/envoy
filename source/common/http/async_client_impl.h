@@ -27,6 +27,7 @@
 #include "common/router/router.h"
 #include "common/tracing/http_tracer_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 class AsyncStreamImpl;
@@ -236,3 +237,4 @@ private:
 };
 
 } // Http
+} // Envoy

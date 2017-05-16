@@ -8,6 +8,7 @@
 
 #include "common/http/utility.h"
 
+namespace Envoy {
 namespace Http {
 
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
@@ -201,3 +202,4 @@ void AsyncRequestImpl::cancel() {
 }
 
 } // Http
+} // Envoy

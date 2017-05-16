@@ -17,6 +17,7 @@
 #include "common/json/json_loader.h"
 #include "common/json/json_validator.h"
 
+namespace Envoy {
 namespace Http {
 namespace RateLimit {
 
@@ -73,9 +74,9 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
  * rate limiting service before allowing further filter iteration.
  */
-class Filter : public StreamDecoderFilter, public ::RateLimit::RequestCallbacks {
+class Filter : public StreamDecoderFilter, public Envoy::RateLimit::RequestCallbacks {
 public:
-  Filter(FilterConfigSharedPtr config, ::RateLimit::ClientPtr&& client)
+  Filter(FilterConfigSharedPtr config, Envoy::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamFilterBase
@@ -88,19 +89,19 @@ public:
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
 
   // RateLimit::RequestCallbacks
-  void complete(::RateLimit::LimitStatus status) override;
+  void complete(Envoy::RateLimit::LimitStatus status) override;
 
 private:
   void initiateCall(const HeaderMap& headers);
   void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                                    std::vector<::RateLimit::Descriptor>& descriptors,
+                                    std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                     const Router::RouteEntry* route_entry,
                                     const HeaderMap& headers) const;
 
   enum class State { NotStarted, Calling, Complete, Responded };
 
   FilterConfigSharedPtr config_;
-  ::RateLimit::ClientPtr client_;
+  Envoy::RateLimit::ClientPtr client_;
   StreamDecoderFilterCallbacks* callbacks_{};
   bool initiating_call_{};
   State state_{State::NotStarted};
@@ -109,3 +110,4 @@ private:
 
 } // RateLimit
 } // Http
+} // Envoy

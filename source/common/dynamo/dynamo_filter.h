@@ -10,6 +10,7 @@
 #include "common/dynamo/dynamo_request_parser.h"
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Dynamo {
 
 /**
@@ -70,3 +71,4 @@ private:
 };
 
 } // Dynamo
+} // Envoy

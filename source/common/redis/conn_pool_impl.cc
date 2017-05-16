@@ -8,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/json/config_schemas.h"
 
+namespace Envoy {
 namespace Redis {
 namespace ConnPool {
 
@@ -241,3 +242,4 @@ void InstanceImpl::ThreadLocalPool::shutdown() {
 
 } // ConnPool
 } // Redis
+} // Envoy

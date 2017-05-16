@@ -4,6 +4,7 @@
 
 #include "common/dynamo/dynamo_filter.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -29,3 +30,4 @@ static RegisterHttpFilterConfigFactory<DynamoFilterConfig> register_;
 
 } // Configuration
 } // Server
+} // Envoy

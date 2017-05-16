@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 /**
  * Less typing for common system time and steady time type.
  *
@@ -38,3 +39,4 @@ public:
    */
   virtual MonotonicTime currentTime() PURE;
 };
+} // Envoy

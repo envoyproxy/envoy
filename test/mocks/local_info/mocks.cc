@@ -5,6 +5,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::Return;
 using testing::ReturnRef;
 
@@ -20,3 +21,4 @@ MockLocalInfo::MockLocalInfo() : address_(new Network::Address::Ipv4Instance("12
 MockLocalInfo::~MockLocalInfo() {}
 
 } // LocalInfo
+} // Envoy

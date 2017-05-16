@@ -14,6 +14,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::DoAll;
 using testing::InSequence;
@@ -118,3 +119,4 @@ TEST_F(BufferFilterTest, TxResetAfterEndStream) {
 }
 
 } // Http
+} // Envoy

@@ -16,6 +16,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Filter {
 namespace Auth {
 namespace ClientSsl {
@@ -124,3 +125,4 @@ void Instance::onEvent(uint32_t events) {
 } // Client Ssl
 } // Auth
 } // Filter
+} // Envoy

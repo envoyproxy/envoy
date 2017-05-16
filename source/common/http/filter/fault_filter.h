@@ -11,6 +11,7 @@
 
 #include "common/router/config_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -92,3 +93,4 @@ private:
 };
 
 } // Http
+} // Envoy

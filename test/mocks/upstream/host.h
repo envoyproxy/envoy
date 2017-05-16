@@ -13,6 +13,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Upstream {
 namespace Outlier {
 
@@ -124,3 +125,4 @@ public:
 };
 
 } // Upstream
+} // Envoy

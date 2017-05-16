@@ -5,6 +5,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+namespace Envoy {
 namespace Grpc {
 
 /**
@@ -53,3 +54,4 @@ private:
 };
 
 } // Grpc
+} // Envoy

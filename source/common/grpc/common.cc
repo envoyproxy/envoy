@@ -19,6 +19,7 @@
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Grpc {
 
 const std::string Common::GRPC_CONTENT_TYPE{"application/grpc"};
@@ -114,3 +115,4 @@ void Common::validateResponse(Http::Message& http_response) {
 }
 
 } // Grpc
+} // Envoy

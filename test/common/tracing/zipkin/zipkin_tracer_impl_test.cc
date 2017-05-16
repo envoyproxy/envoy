@@ -30,6 +30,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::Test;
 
+namespace Envoy {
 namespace Zipkin {
 
 class ZipkinDriverTest : public Test {
@@ -311,3 +312,4 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   EXPECT_EQ(0ULL, zipkin_zipkin_span2.binaryAnnotations().size());
 }
 } // Zipkin
+} // Envoy

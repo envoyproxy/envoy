@@ -11,6 +11,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::ByRef;
 using testing::Eq;
@@ -206,3 +207,4 @@ TEST_P(ListenerImplTest, UseActualDst) {
 }
 
 } // Network
+} // Envoy

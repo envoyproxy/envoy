@@ -10,6 +10,7 @@
 
 #include "server/config/network/http_connection_manager.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -94,3 +95,4 @@ private:
   HealthCheckCacheManagerSharedPtr cache_manager_{};
   const std::string endpoint_;
 };
+} // Envoy

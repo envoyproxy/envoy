@@ -13,6 +13,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -385,3 +386,4 @@ public:
 };
 
 } // Http
+} // Envoy

@@ -13,6 +13,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Network {
 
 class MockConnectionCallbacks : public ConnectionCallbacks {
@@ -231,3 +232,4 @@ public:
 };
 
 } // Network
+} // Envoy

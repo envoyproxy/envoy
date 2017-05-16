@@ -22,6 +22,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Filesystem {
 bool fileExists(const std::string& path) {
   std::ifstream input_file(path);
@@ -194,3 +195,4 @@ void FileImpl::createFlushStructures() {
 }
 
 } // Filesystem
+} // Envoy

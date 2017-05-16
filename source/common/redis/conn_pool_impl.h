@@ -17,6 +17,7 @@
 #include "common/network/filter_impl.h"
 #include "common/redis/codec_impl.h"
 
+namespace Envoy {
 namespace Redis {
 namespace ConnPool {
 
@@ -167,3 +168,4 @@ private:
 
 } // ConnPool
 } // Redis
+} // Envoy

@@ -17,6 +17,7 @@
 
 #include "server/config/network/http_connection_manager.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -164,3 +165,4 @@ private:
 };
 
 } // Server
+} // Envoy

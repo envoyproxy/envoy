@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/upstream/upstream.h"
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -41,3 +42,4 @@ public:
 typedef std::unique_ptr<LoadBalancer> LoadBalancerPtr;
 
 } // Upstream
+} // Envoy

@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/redis/codec.h"
 
+namespace Envoy {
 namespace Redis {
 namespace CommandSplitter {
 
@@ -58,3 +59,4 @@ public:
 
 } // CommandSplitter
 } // Redis
+} // Envoy

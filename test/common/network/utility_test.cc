@@ -12,6 +12,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Network {
 
 TEST(IpListTest, Errors) {
@@ -280,3 +281,4 @@ TEST(PortRangeListTest, Normal) {
 }
 
 } // Network
+} // Envoy
