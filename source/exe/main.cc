@@ -64,10 +64,10 @@ int main(int argc, char** argv) {
   Envoy::Server::ProdComponentFactory component_factory;
   // TODO(henna): Add CLI option for local address IP version.
   Envoy::LocalInfo::LocalInfoImpl local_info(
-      Envoy::Network::Utility::getLocalAddress(Envoy::Network::Address::IpVersion::v4), options.serviceZone(),
-      options.serviceClusterName(), options.serviceNodeName());
+      Envoy::Network::Utility::getLocalAddress(Envoy::Network::Address::IpVersion::v4),
+      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
   Envoy::Server::InstanceImpl server(options, default_test_hooks, *restarter, stats_store,
-                              restarter->accessLogLock(), component_factory, local_info);
+                                     restarter->accessLogLock(), component_factory, local_info);
   server.run();
   ares_library_cleanup();
   return 0;
