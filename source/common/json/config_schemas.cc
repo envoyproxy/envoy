@@ -2,6 +2,7 @@
 
 #include <string>
 
+namespace Envoy {
 const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
   {
     "$schema": "http://json-schema.org/schema#",
@@ -1316,3 +1317,4 @@ const std::string Json::Schema::SDS_SCHEMA(R"EOF(
     "required" : ["hosts"]
   }
   )EOF");
+} // Envoy

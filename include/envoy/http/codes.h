@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -72,3 +73,4 @@ enum class Code {
 };
 
 } // Http
+} // Envoy

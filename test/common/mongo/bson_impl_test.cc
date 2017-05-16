@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Bson {
 
 TEST(BsonImplTest, BadCast) {
@@ -59,3 +60,4 @@ TEST(BufferHelperTest, InvalidSize) {
 }
 
 } // Bson
+} // Envoy

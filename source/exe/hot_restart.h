@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/stats/stats_impl.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -201,3 +202,4 @@ private:
 };
 
 } // Server
+} // Envoy

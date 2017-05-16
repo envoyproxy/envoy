@@ -10,6 +10,7 @@
 
 #include "common/common/logger.h"
 
+namespace Envoy {
 namespace Filesystem {
 
 /**
@@ -44,3 +45,4 @@ private:
 };
 
 } // Filesystem
+} // Envoy

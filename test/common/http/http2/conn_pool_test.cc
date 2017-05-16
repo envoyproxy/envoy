@@ -17,6 +17,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::DoAll;
 using testing::Invoke;
@@ -425,3 +426,4 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
 
 } // Http2
 } // Http
+} // Envoy

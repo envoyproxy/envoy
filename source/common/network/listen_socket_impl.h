@@ -9,6 +9,7 @@
 
 #include "common/ssl/context_impl.h"
 
+namespace Envoy {
 namespace Network {
 
 class ListenSocketImpl : public ListenSocket {
@@ -50,3 +51,4 @@ public:
 };
 
 } // Network
+} // Envoy

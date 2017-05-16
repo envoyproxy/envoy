@@ -6,6 +6,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Grpc {
 
 TEST(GrpcCommonTest, chargeStats) {
@@ -31,3 +32,4 @@ TEST(GrpcCommonTest, prepareHeaders) {
 }
 
 } // Grpc
+} // Envoy

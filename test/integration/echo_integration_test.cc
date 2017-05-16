@@ -1,6 +1,7 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 
+namespace Envoy {
 class EchoIntegrationTest : public BaseIntegrationTest,
                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
@@ -40,3 +41,4 @@ TEST_P(EchoIntegrationTest, Hello) {
   connection.run();
   EXPECT_EQ("hello", response);
 }
+} // Envoy

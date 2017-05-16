@@ -18,6 +18,7 @@
 #include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
@@ -115,7 +116,7 @@ FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Sta
   return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
 }
 
-void FaultFilter::onResetStream() { resetTimerState(); }
+void FaultFilter::onDestroy() { resetTimerState(); }
 
 void FaultFilter::postDelayInjection() {
   resetTimerState();
@@ -160,7 +161,7 @@ void FaultFilter::resetTimerState() {
 
 void FaultFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  callbacks_->addResetStreamCallback([this]() -> void { onResetStream(); });
 }
 
 } // Http
+} // Envoy

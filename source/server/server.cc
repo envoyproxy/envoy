@@ -30,6 +30,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Server {
 
 void InitManagerImpl::initialize(std::function<void()> callback) {
@@ -402,3 +403,4 @@ void InstanceImpl::shutdownAdmin() {
 }
 
 } // Server
+} // Envoy

@@ -21,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::Sequence;
 using testing::InSequence;
@@ -269,3 +270,4 @@ TEST(TcpClientConnectionImplTest, BadConnectConnRefused) {
 }
 
 } // Network
+} // Envoy

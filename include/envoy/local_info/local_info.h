@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
+namespace Envoy {
 namespace LocalInfo {
 
 /**
@@ -36,3 +37,4 @@ public:
 };
 
 } // LocalInfo
+} // Envoy

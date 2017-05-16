@@ -14,6 +14,7 @@
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
 
+namespace Envoy {
 namespace Server {
 /**
  * This feature performs deadlock detection stats collection & enforcement.
@@ -82,3 +83,4 @@ private:
 };
 
 } // Server
+} // Envoy

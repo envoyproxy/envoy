@@ -25,6 +25,7 @@
 #include "common/redis/conn_pool_impl.h"
 #include "common/upstream/host_utility.h"
 
+namespace Envoy {
 namespace Upstream {
 
 HealthCheckerPtr HealthCheckerFactory::create(const Json::Object& hc_config,
@@ -523,3 +524,4 @@ RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
 }
 
 } // Upstream
+} // Envoy

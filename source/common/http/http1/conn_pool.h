@@ -15,6 +15,7 @@
 #include "common/http/codec_client.h"
 #include "common/http/codec_wrappers.h"
 
+namespace Envoy {
 namespace Http {
 namespace Http1 {
 
@@ -138,3 +139,4 @@ public:
 
 } // Http1
 } // Http
+} // Envoy

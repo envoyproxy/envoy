@@ -17,6 +17,7 @@
 
 #include "http_parser.h"
 
+namespace Envoy {
 namespace Http {
 namespace Http1 {
 
@@ -306,3 +307,4 @@ private:
 
 } // Http1
 } // Http
+} // Envoy

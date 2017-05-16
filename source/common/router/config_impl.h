@@ -18,6 +18,7 @@
 #include "common/router/config_utility.h"
 #include "common/router/router_ratelimit.h"
 
+namespace Envoy {
 namespace Router {
 
 /**
@@ -469,3 +470,4 @@ private:
 };
 
 } // Router
+} // Envoy

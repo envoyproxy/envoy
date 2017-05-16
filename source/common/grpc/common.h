@@ -12,6 +12,7 @@
 
 #include "google/protobuf/message.h"
 
+namespace Envoy {
 namespace Grpc {
 
 class Exception : public EnvoyException {
@@ -57,3 +58,4 @@ private:
 };
 
 } // Grpc
+} // Envoy

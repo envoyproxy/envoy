@@ -7,6 +7,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Runtime {
 
 class MockRandomGenerator : public RandomGenerator {
@@ -40,3 +41,4 @@ public:
 };
 
 } // Runtime
+} // Envoy

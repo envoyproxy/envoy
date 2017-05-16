@@ -14,6 +14,7 @@
 
 #include "ares.h"
 
+namespace Envoy {
 namespace Network {
 
 class DnsResolverImplPeer;
@@ -71,3 +72,4 @@ private:
 };
 
 } // Network
+} // Envoy

@@ -4,6 +4,7 @@
 
 #include "envoy/router/router.h"
 
+namespace Envoy {
 namespace Router {
 
 /**
@@ -25,3 +26,4 @@ public:
 typedef std::unique_ptr<RouteConfigProvider> RouteConfigProviderPtr;
 
 } // Router
+} // Envoy

@@ -12,6 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 
@@ -329,3 +330,4 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
 
 } // Configuration
 } // Server
+} // Envoy

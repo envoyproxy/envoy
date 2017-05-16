@@ -7,6 +7,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Filesystem {
 
 class OsSysCalls {
@@ -79,3 +80,4 @@ public:
 typedef std::unique_ptr<Watcher> WatcherPtr;
 
 } // Filesystem
+} // Envoy

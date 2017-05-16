@@ -4,6 +4,7 @@
 
 #include "envoy/json/json_object.h"
 
+namespace Envoy {
 namespace Json {
 
 /**
@@ -17,3 +18,4 @@ public:
 };
 
 } // Json
+} // Envoy

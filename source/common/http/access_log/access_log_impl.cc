@@ -18,6 +18,7 @@
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
+namespace Envoy {
 namespace Http {
 namespace AccessLog {
 
@@ -150,13 +151,14 @@ bool NotHealthCheckFilter::evaluate(const RequestInfo& info, const HeaderMap&) {
 }
 
 InstanceImpl::InstanceImpl(const std::string& access_log_path, FilterPtr&& filter,
-                           FormatterPtr&& formatter, ::AccessLog::AccessLogManager& log_manager)
+                           FormatterPtr&& formatter,
+                           Envoy::AccessLog::AccessLogManager& log_manager)
     : filter_(std::move(filter)), formatter_(std::move(formatter)) {
   log_file_ = log_manager.createAccessLog(access_log_path);
 }
 
 InstanceSharedPtr InstanceImpl::fromJson(Json::Object& json, Runtime::Loader& runtime,
-                                         ::AccessLog::AccessLogManager& log_manager) {
+                                         Envoy::AccessLog::AccessLogManager& log_manager) {
   std::string access_log_path = json.getString("path");
 
   FilterPtr filter;
@@ -199,3 +201,4 @@ void InstanceImpl::log(const HeaderMap* request_headers, const HeaderMap* respon
 
 } // AccessLog
 } // Http
+} // Envoy

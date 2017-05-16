@@ -7,6 +7,7 @@
 
 #include "event2/event.h"
 
+namespace Envoy {
 namespace Event {
 
 FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb,
@@ -68,3 +69,4 @@ void FileEventImpl::setEnabled(uint32_t events) {
 }
 
 } // Event
+} // Envoy

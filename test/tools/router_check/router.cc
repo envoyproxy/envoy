@@ -7,6 +7,7 @@
 
 #include "test/test_common/printers.h"
 
+namespace Envoy {
 // static
 ToolConfig ToolConfig::create(const Json::ObjectSharedPtr& check_config) {
   Json::ObjectSharedPtr input = check_config->getObject("input");
@@ -189,3 +190,4 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   }
   return false;
 }
+} // Envoy

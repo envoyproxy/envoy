@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Json {
 
 TEST(JsonLoaderTest, Basic) {
@@ -319,3 +320,4 @@ TEST(JsonLoaderTest, ListAsString) {
 }
 
 } // Json
+} // Envoy

@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -8,3 +9,4 @@ namespace Upstream {
 enum class LoadBalancerType { RoundRobin, LeastRequest, Random, RingHash };
 
 } // Upstream
+} // Envoy

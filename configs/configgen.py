@@ -35,7 +35,9 @@ front_envoy_clusters = {
 # routing_helper.template.json for the types of options supported.
 service_to_service_envoy_clusters = {
     'ratelimit': {},
-    'service1': {},
+    'service1': {
+        'service_to_service_rate_limit': True
+    },
     'service3': {}
 }
 

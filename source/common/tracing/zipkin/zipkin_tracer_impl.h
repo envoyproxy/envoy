@@ -11,6 +11,7 @@
 #include "common/tracing/zipkin/span_buffer.h"
 #include "common/tracing/zipkin/tracer.h"
 
+namespace Envoy {
 namespace Zipkin {
 
 #define ZIPKIN_TRACER_STATS(COUNTER)                                                               \
@@ -201,3 +202,4 @@ private:
   const std::string collector_endpoint_;
 };
 } // Zipkin
+} // Envoy

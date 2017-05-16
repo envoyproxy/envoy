@@ -11,6 +11,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+namespace Envoy {
 // TODO(fabolive): Need to add interfaces to the JSON namespace
 
 namespace Zipkin {
@@ -53,3 +54,4 @@ uint64_t Util::generateRandom64() {
   return rand_64();
 }
 } // Zipkin
+} // Envoy

@@ -21,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::DoAll;
 using testing::Invoke;
@@ -470,7 +471,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
 
-  filter_callbacks_.reset_callback_();
+  filter_->onDestroy();
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
@@ -559,3 +560,4 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
 }
 
 } // Http
+} // Envoy

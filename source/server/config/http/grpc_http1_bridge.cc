@@ -4,6 +4,7 @@
 
 #include "common/grpc/http1_bridge_filter.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -29,3 +30,4 @@ static RegisterHttpFilterConfigFactory<GrpcHttp1BridgeFilterConfig> register_;
 
 } // Configuration
 } // Server
+} // Envoy

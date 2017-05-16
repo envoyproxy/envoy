@@ -8,6 +8,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Api {
 
 TEST(ApiImplTest, readFileToEnd) {
@@ -32,3 +33,4 @@ TEST(ApiImplTest, fileExists) {
 }
 
 } // Api
+} // Envoy

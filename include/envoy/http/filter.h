@@ -13,6 +13,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -68,12 +69,6 @@ enum class FilterTrailersStatus {
 class StreamFilterCallbacks {
 public:
   virtual ~StreamFilterCallbacks() {}
-
-  /**
-   * Register a callback that will get called when the underlying stream has been reset (either
-   * upstream reset from another filter or downstream reset from the remote side).
-   */
-  virtual void addResetStreamCallback(std::function<void()> callback) PURE;
 
   /**
    * @return uint64_t the ID of the originating connection for logging purposes.
@@ -199,12 +194,28 @@ public:
 };
 
 /**
+ * Common base class for both decoder and encoder filters.
+ */
+class StreamFilterBase {
+public:
+  virtual ~StreamFilterBase() {}
+
+  /**
+   * This routine is called prior to a filter being destroyed. This may happen after normal stream
+   * finish (both downstream and upstream) or due to reset. Every filter is responsible for making
+   * sure that any async events are cleaned up in the context of this routine. This includes timers,
+   * network calls, etc. The reason there is an onDestroy() method vs. doing this type of cleanup
+   * in the destructor is due to the deferred deletion model that Envoy uses to avoid stack unwind
+   * complications.
+   */
+  virtual void onDestroy() PURE;
+};
+
+/**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter {
+class StreamDecoderFilter : public StreamFilterBase {
 public:
-  virtual ~StreamDecoderFilter() {}
-
   /**
    * Called with decoded headers, optionally indicating end of stream.
    * @param headers supplies the decoded headers map.
@@ -283,10 +294,8 @@ public:
 /**
  * Stream encoder filter interface.
  */
-class StreamEncoderFilter {
+class StreamEncoderFilter : public StreamFilterBase {
 public:
-  virtual ~StreamEncoderFilter() {}
-
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
    * @param headers supplies the headers to be encoded.
@@ -377,3 +386,4 @@ public:
 };
 
 } // Http
+} // Envoy

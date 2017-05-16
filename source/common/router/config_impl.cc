@@ -24,6 +24,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Router {
 
 std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
@@ -634,3 +635,4 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
 }
 
 } // Router
+} // Envoy
