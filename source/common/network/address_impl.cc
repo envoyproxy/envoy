@@ -220,34 +220,43 @@ int PipeInstance::socket(SocketType type) const {
   return ::socket(AF_UNIX, flagsFromSocketType(type), 0);
 }
 
-InstanceConstSharedPtr parseInternetAddress(const std::string& ip_addr) {
+InstanceConstSharedPtr parseInternetAddress(const std::string& ip_address) {
   sockaddr_in sa4;
-  if (inet_pton(AF_INET, ip_addr.c_str(), &sa4.sin_addr) == 1) {
+  if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
     sa4.sin_port = 0;
     return std::make_shared<Ipv4Instance>(&sa4);
   }
   sockaddr_in6 sa6;
-  if (inet_pton(AF_INET6, ip_addr.c_str(), &sa6.sin6_addr) == 1) {
+  if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = 0;
     return std::make_shared<Ipv6Instance>(sa6);
   }
-  return nullptr;
+  throw EnvoyException(fmt::format("malformed address: {}", ip_address));
 }
 
-InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& addr) {
-  if (addr.empty()) {
+InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_address) {
+  InstanceConstSharedPtr address = ParseUtility::parseInternetAddressAndPortWorker(ip_address);
+  if (!address) {
+    throw EnvoyException(fmt::format("malformed address: {}", ip_address));
+  }
+  return address;
+}
+
+InstanceConstSharedPtr
+ParseUtility::parseInternetAddressAndPortWorker(const std::string& ip_address) {
+  if (ip_address.empty()) {
     return nullptr;
   }
-  if (addr[0] == '[') {
+  if (ip_address[0] == '[') {
     // Appears to be an IPv6 address. Find the "]:" that separates the address from the port.
-    auto pos = addr.rfind("]:");
+    auto pos = ip_address.rfind("]:");
     if (pos == std::string::npos) {
       return nullptr;
     }
-    const auto ip_str = addr.substr(1, pos - 1);
-    const auto port_str = addr.substr(pos + 2);
+    const auto ip_str = ip_address.substr(1, pos - 1);
+    const auto port_str = ip_address.substr(pos + 2);
     uint64_t port64;
     if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
       return nullptr;
@@ -261,12 +270,12 @@ InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& addr) {
     return std::make_shared<Ipv6Instance>(sa6);
   }
   // Treat it as an IPv4 address followed by a port.
-  auto pos = addr.rfind(":");
+  auto pos = ip_address.rfind(":");
   if (pos == std::string::npos) {
     return nullptr;
   }
-  const auto ip_str = addr.substr(0, pos);
-  const auto port_str = addr.substr(pos + 1);
+  const auto ip_str = ip_address.substr(0, pos);
+  const auto port_str = ip_address.substr(pos + 1);
   uint64_t port64;
   if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
     return nullptr;
@@ -279,6 +288,5 @@ InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& addr) {
   sa4.sin_port = htons(port64);
   return std::make_shared<Ipv4Instance>(&sa4);
 }
-
 } // Address
 } // Network

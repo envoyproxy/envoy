@@ -131,16 +131,17 @@ TEST(NetworkUtility, Url) {
 TEST(NetworkUtility, resolveUrl) {
   EXPECT_THROW(Utility::resolveUrl("foo"), EnvoyException);
   EXPECT_THROW(Utility::resolveUrl("abc://foo"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("tcp://1.2.3.4:1234/"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("tcp://192.168.3.3"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("tcp://192.168.3.3.3:0"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("tcp://192.168.3:0"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("tcp://[::1]"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("tcp://[:::1]:1"), EnvoyException);
+  EXPECT_THROW(Utility::resolveUrl("tcp://foo:0"), EnvoyException);
   EXPECT_EQ("", Utility::resolveUrl("unix://")->asString());
   EXPECT_EQ("foo", Utility::resolveUrl("unix://foo")->asString());
   EXPECT_EQ("tmp", Utility::resolveUrl("unix://tmp")->asString());
   EXPECT_EQ("tmp/server", Utility::resolveUrl("unix://tmp/server")->asString());
-  EXPECT_EQ(nullptr, Utility::resolveUrl("tcp://192.168.3.3"));
-  EXPECT_EQ(nullptr, Utility::resolveUrl("tcp://192.168.3.3.3:0"));
-  EXPECT_EQ(nullptr, Utility::resolveUrl("tcp://192.168.3:0"));
-  EXPECT_EQ(nullptr, Utility::resolveUrl("tcp://[::1]"));
-  EXPECT_EQ(nullptr, Utility::resolveUrl("tcp://[:::1]:1"));
-  EXPECT_EQ(nullptr, Utility::resolveUrl("tcp://foo:0"));
   EXPECT_EQ("1.2.3.4:1234", Utility::resolveUrl("tcp://1.2.3.4:1234")->asString());
   EXPECT_EQ("0.0.0.0:0", Utility::resolveUrl("tcp://0.0.0.0:0")->asString());
   EXPECT_EQ("[::1]:1", Utility::resolveUrl("tcp://[::1]:1")->asString());
