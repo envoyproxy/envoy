@@ -38,10 +38,6 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
   Json::ObjectPtr config_json = Json::Factory::loadFromFile(options.configPath());
   config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
-
-  for (uint32_t i = 0; i < std::max(1U, options.concurrency()); i++) {
-    workers_.emplace_back(new Worker(thread_local_, options.fileFlushIntervalMsec()));
-  }
   thread_local_.registerThread(handler_.dispatcher(), true);
   stats_store_.initializeThreading(handler_.dispatcher(), thread_local_);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
