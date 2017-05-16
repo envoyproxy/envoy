@@ -6,6 +6,7 @@
 
 #include "common/common/singleton.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -123,3 +124,4 @@ public:
 typedef ConstSingleton<HeaderValues> Headers;
 
 } // Http
+} // Envoy

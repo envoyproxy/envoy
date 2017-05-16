@@ -18,6 +18,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Event {
 
 class MockDispatcher : public Dispatcher {
@@ -124,3 +125,4 @@ public:
 };
 
 } // Event
+} // Envoy

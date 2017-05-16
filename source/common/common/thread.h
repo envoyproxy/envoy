@@ -6,6 +6,7 @@
 
 #include "envoy/thread/thread.h"
 
+namespace Envoy {
 namespace Thread {
 
 /**
@@ -47,3 +48,4 @@ private:
 };
 
 } // Thread
+} // Envoy

@@ -4,6 +4,7 @@
 
 #include "envoy/network/drain_decision.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -32,3 +33,4 @@ public:
 typedef std::unique_ptr<DrainManager> DrainManagerPtr;
 
 } // Server
+} // Envoy

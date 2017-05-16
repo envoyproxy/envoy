@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Http {
 
 TEST(HeaderStringTest, All) {
@@ -319,3 +320,4 @@ TEST(HeaderMapImplTest, LargeCharInHeader) {
 }
 
 } // Http
+} // Envoy

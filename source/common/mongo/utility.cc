@@ -6,6 +6,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Mongo {
 
 QueryMessageInfo::QueryMessageInfo(const QueryMessage& query) : request_id_{query.requestId()} {
@@ -135,3 +136,4 @@ void QueryMessageInfo::parseFindCommand(const Bson::Document& command) {
 }
 
 } // Mongo
+} // Envoy

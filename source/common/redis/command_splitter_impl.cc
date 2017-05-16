@@ -9,6 +9,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Redis {
 namespace CommandSplitter {
 
@@ -196,3 +197,4 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
 
 } // CommandSplitter
 } // Redis
+} // Envoy

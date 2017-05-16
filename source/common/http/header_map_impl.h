@@ -11,6 +11,7 @@
 #include "common/common/non_copyable.h"
 #include "common/http/headers.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -125,3 +126,4 @@ protected:
 typedef std::unique_ptr<HeaderMapImpl> HeaderMapImplPtr;
 
 } // Http
+} // Envoy

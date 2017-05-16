@@ -32,6 +32,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Server {
 
 #define MAKE_HANDLER(X)                                                                            \
@@ -423,3 +424,4 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 }
 
 } // Server
+} // Envoy

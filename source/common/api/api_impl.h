@@ -6,6 +6,7 @@
 #include "envoy/api/api.h"
 #include "envoy/filesystem/filesystem.h"
 
+namespace Envoy {
 namespace Api {
 
 /**
@@ -29,3 +30,4 @@ private:
 };
 
 } // Api
+} // Envoy

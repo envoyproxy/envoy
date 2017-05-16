@@ -2,6 +2,7 @@
 
 #include <string>
 
+namespace Envoy {
 namespace Profiler {
 
 /**
@@ -35,3 +36,4 @@ private:
 };
 
 } // Profiler
+} // Envoy

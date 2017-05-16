@@ -5,6 +5,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+namespace Envoy {
 namespace Grpc {
 
 /**
@@ -13,6 +14,9 @@ namespace Grpc {
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
   Http1BridgeFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
+
+  // Http::StreamFilterBase
+  void onDestroy() override {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
@@ -50,3 +54,4 @@ private:
 };
 
 } // Grpc
+} // Envoy

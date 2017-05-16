@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Thread {
 
 /**
@@ -38,3 +39,4 @@ private:
 };
 
 } // Thread
+} // Envoy

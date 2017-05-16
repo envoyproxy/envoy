@@ -4,6 +4,7 @@
 
 #include "envoy/local_info/local_info.h"
 
+namespace Envoy {
 namespace LocalInfo {
 
 class LocalInfoImpl : public LocalInfo {
@@ -26,3 +27,4 @@ private:
 };
 
 } // LocalInfo
+} // Envoy

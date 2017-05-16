@@ -7,6 +7,7 @@
 
 #include "common/event/libevent.h"
 
+namespace Envoy {
 namespace Buffer {
 
 /**
@@ -40,3 +41,4 @@ private:
 };
 
 } // Buffer
+} // Envoy

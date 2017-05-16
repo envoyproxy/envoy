@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/tracing/zipkin:zipkin_lib",
         "//test/mocks:common_lib",

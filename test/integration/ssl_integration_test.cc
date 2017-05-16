@@ -13,6 +13,7 @@
 #include "integration.h"
 #include "utility.h"
 
+namespace Envoy {
 using testing::Return;
 
 namespace Ssl {
@@ -207,3 +208,4 @@ TEST_F(SslIntegrationTest, AltAlpn) {
 }
 
 } // Ssl
+} // Envoy

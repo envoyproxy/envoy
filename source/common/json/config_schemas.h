@@ -2,6 +2,7 @@
 
 #include <string>
 
+namespace Envoy {
 namespace Json {
 
 class Schema {
@@ -49,3 +50,4 @@ public:
 };
 
 } // Json
+} // Envoy

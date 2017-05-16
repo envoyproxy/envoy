@@ -14,6 +14,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::Eq;
 using testing::InSequence;
@@ -446,3 +447,4 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
 
 } // ConnPool
 } // Redis
+} // Envoy
