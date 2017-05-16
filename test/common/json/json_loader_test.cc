@@ -3,6 +3,8 @@
 
 #include "common/json/json_loader.h"
 
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Json {
@@ -20,11 +22,15 @@ TEST(JsonLoaderTest, Basic) {
     EXPECT_THROW(json->getBoolean("hello"), Exception);
     EXPECT_THROW(json->getObjectArray("hello"), Exception);
     EXPECT_THROW(json->getString("hello"), Exception);
+
+    EXPECT_THROW_WITH_MESSAGE(json->getString("hello"), Exception,
+                              "key 'hello' missing or not a string");
   }
 
   {
     ObjectPtr json = Factory::loadFromString("{\"hello\":\"123\"}");
-    EXPECT_THROW(json->getInteger("hello"), Exception);
+    EXPECT_THROW_WITH_MESSAGE(json->getInteger("hello"), Exception,
+                              "key 'hello' missing or not an integer");
   }
 
   {
@@ -44,6 +50,14 @@ TEST(JsonLoaderTest, Basic) {
     ObjectPtr json = Factory::loadFromString("{\"hello\":123}");
     EXPECT_EQ(123, json->getInteger("hello", 456));
     EXPECT_EQ(456, json->getInteger("world", 456));
+  }
+
+  {
+    ObjectPtr json = Factory::loadFromString("{\"hello\": [123]}");
+
+    EXPECT_THROW_WITH_MESSAGE(
+        json->getObjectArray("hello").at(0)->getInteger("hello"), Exception,
+        "JSON field accessed with type 'Object' does not match actual type 'Integer'.");
   }
 
   {
@@ -214,6 +228,36 @@ TEST(JsonLoaderTest, Schema) {
   EXPECT_THROW(json->validateSchema(invalid_schema), Exception);
   EXPECT_THROW(json->validateSchema(different_schema), Exception);
   EXPECT_NO_THROW(json->validateSchema(valid_schema));
+}
+
+TEST(JsonLoaderTest, NestedSchema) {
+
+  std::string schema = R"EOF(
+  {
+    "properties": {
+      "value1": {"type" : "number"},
+      "value2": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+  )EOF";
+
+  std::string json_string = R"EOF(
+  { 
+    "bar": "baz",
+    "foo": {
+      "value1": "should have been a number",
+      "value2" : "test"
+    }
+  }
+  )EOF";
+
+  ObjectPtr json = Factory::loadFromString(json_string);
+
+  EXPECT_THROW_WITH_MESSAGE(json->getObject("foo")->validateSchema(schema), Exception,
+                            "JSON at lines 4-7 does not conform to schema.\n Invalid schema: "
+                            "#/properties/value1.\n Schema violation: type.\n Offending document "
+                            "key: #/value1");
 }
 
 TEST(JsonLoaderTest, AsString) {

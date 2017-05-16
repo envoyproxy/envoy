@@ -278,9 +278,9 @@ TEST_F(ClusterManagerImplTest, MaxClusterName) {
 
   Json::ObjectPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
-                            "JSON object doesn't conform to schema.\n Invalid schema: "
-                            "#/properties/name.\n Invalid keyword: maxLength.\n Invalid document "
-                            "key: #/name");
+                            "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
+                            "#/properties/name.\n Schema violation: maxLength.\n Offending "
+                            "document key: #/name");
 }
 
 TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
@@ -295,8 +295,8 @@ TEST_F(ClusterManagerImplTest, InvalidClusterNameChars) {
 
   Json::ObjectPtr loader = Json::Factory::loadFromString(json);
   EXPECT_THROW_WITH_MESSAGE(create(*loader), Json::Exception,
-                            "JSON object doesn't conform to schema.\n Invalid schema: "
-                            "#/properties/name.\n Invalid keyword: pattern.\n Invalid document "
+                            "JSON at lines 4-6 does not conform to schema.\n Invalid schema: "
+                            "#/properties/name.\n Schema violation: pattern.\n Offending document "
                             "key: #/name");
 }
 

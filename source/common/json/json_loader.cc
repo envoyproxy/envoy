@@ -128,7 +128,7 @@ private:
   void checkType(Type type) const {
     if (!isType(type)) {
       throw Exception(
-          fmt::format("Field accessed JSON with type '{}' does not match actual type '{}'.",
+          fmt::format("JSON field accessed with type '{}' does not match actual type '{}'.",
                       typeAsString(type), typeAsString(type_)));
     }
   }
