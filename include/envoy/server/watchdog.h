@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
+namespace Envoy {
 namespace Server {
 
 /**
@@ -41,3 +42,4 @@ public:
 typedef std::shared_ptr<WatchDog> WatchDogSharedPtr;
 
 } // Server
+} // Envoy

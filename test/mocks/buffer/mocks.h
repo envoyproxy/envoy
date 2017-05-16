@@ -7,6 +7,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
   return TestUtility::buffersEqual(arg, *rhs);
 }
@@ -22,3 +23,4 @@ ACTION_P(AddBufferToString, target_string) {
   target_string->append(TestUtility::bufferToString(arg0));
   arg0.drain(arg0.length());
 }
+} // Envoy

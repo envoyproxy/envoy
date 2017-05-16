@@ -9,6 +9,7 @@
 #include "common/common/logger.h"
 #include "common/http/rest_api_fetcher.h"
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -60,3 +61,4 @@ private:
 };
 
 } // Upstream
+} // Envoy

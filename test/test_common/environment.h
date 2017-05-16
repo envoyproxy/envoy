@@ -10,6 +10,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 class TestEnvironment {
 public:
   typedef std::unordered_map<std::string, uint32_t> PortMap;
@@ -137,3 +138,4 @@ public:
    */
   static void exec(const std::vector<std::string>& args);
 };
+} // Envoy

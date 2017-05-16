@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Envoy {
 namespace Network {
 
 /**
@@ -21,3 +22,4 @@ public:
 };
 
 } // Network
+} // Envoy

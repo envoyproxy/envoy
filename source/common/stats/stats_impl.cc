@@ -7,6 +7,7 @@
 
 #include "common/common/utility.h"
 
+namespace Envoy {
 namespace Stats {
 
 void TimerImpl::TimespanImpl::complete(const std::string& dynamic_name) {
@@ -42,3 +43,4 @@ bool RawStatData::matches(const std::string& name) {
 }
 
 } // Stats
+} // Envoy

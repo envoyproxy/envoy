@@ -10,6 +10,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Network {
 namespace Address {
 
@@ -140,3 +141,4 @@ typedef std::shared_ptr<const Instance> InstanceConstSharedPtr;
 
 } // Address
 } // Network
+} // Envoy

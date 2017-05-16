@@ -12,6 +12,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Tracing {
 
 LightStepSpan::LightStepSpan(lightstep::Span& span, lightstep::Tracer& tracer)
@@ -180,3 +181,4 @@ void LightStepRecorder::onSuccess(Http::MessagePtr&& msg) {
 }
 
 } // Tracing
+} // Envoy

@@ -24,6 +24,7 @@
 #include "common/router/config_impl.h"
 #include "common/router/retry_state_impl.h"
 
+namespace Envoy {
 namespace Router {
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
@@ -347,7 +348,7 @@ void Filter::onRequestComplete() {
   }
 }
 
-void Filter::onResetStream() {
+void Filter::onDestroy() {
   if (upstream_request_) {
     upstream_request_->resetStream();
   }
@@ -748,3 +749,4 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request
 }
 
 } // Router
+} // Envoy

@@ -16,6 +16,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
@@ -454,3 +455,4 @@ TEST_F(Http1ClientConnectionImplTest, GiantPath) {
 
 } // Http1
 } // Http
+} // Envoy

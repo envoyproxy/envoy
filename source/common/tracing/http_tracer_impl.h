@@ -11,6 +11,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Tracing {
 
 enum class Reason {
@@ -96,3 +97,4 @@ public:
 };
 
 } // Tracing
+} // Envoy

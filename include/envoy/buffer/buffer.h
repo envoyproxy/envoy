@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Buffer {
 
 /**
@@ -133,3 +134,4 @@ public:
 typedef std::unique_ptr<Instance> InstancePtr;
 
 } // Buffer
+} // Envoy

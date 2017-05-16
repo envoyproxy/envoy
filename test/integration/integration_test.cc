@@ -10,6 +10,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 TEST_F(IntegrationTest, RouterNotFound) { testRouterNotFound(Http::CodecClient::Type::HTTP1); }
 
 TEST_F(IntegrationTest, RouterNotFoundBodyNoBuffer) {
@@ -145,3 +146,4 @@ TEST_F(IntegrationTest, TcpProxyDownstreamDisconnect) {
        [&]() -> void { fake_upstream_connection->waitForData(10); },
        [&]() -> void { fake_upstream_connection->waitForDisconnect(); }});
 }
+} // Envoy

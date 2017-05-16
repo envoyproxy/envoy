@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import re
 import os
 import os.path
 import sys
@@ -24,6 +25,16 @@ def printError(error):
   print "ERROR: %s" % (error)
 
 
+def checkNamespace(file_path):
+  with open(file_path) as f:
+    text = f.read()
+    if not re.search('^\s*namespace\s+Envoy\s*{', text, re.MULTILINE) and \
+       not re.search('NOLINT\(namespace-envoy\)', text, re.MULTILINE):
+      printError("Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path)
+      return False
+  return True
+
+
 def checkFilePath(file_path):
   if os.path.basename(file_path) == "BUILD":
     if os.system("%s %s | diff -q %s - > /dev/null" %
@@ -33,6 +44,7 @@ def checkFilePath(file_path):
                  (file_path, BUILDIFIER_PATH, file_path)) != 0:
       printError("buildifier check failed for file: %s" % (file_path))
     return
+  checkNamespace(file_path)
   command = ("%s %s | diff -q %s - > /dev/null" % (HEADER_ORDER_PATH, file_path,
                                                    file_path))
   if os.system(command) != 0:
@@ -50,6 +62,8 @@ def fixFilePath(file_path):
     if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
       printError("buildifier rewrite failed for file: %s" % (file_path))
     return
+  if not checkNamespace(file_path):
+    printError("This cannot be automatically corrected. Please fix by hand.")
   command = "%s --rewrite %s" % (HEADER_ORDER_PATH, file_path)
   if os.system(command) != 0:
     printError("header_order.py rewrite error: %s" % (file_path))

@@ -2,6 +2,7 @@
 
 #include <string>
 
+namespace Envoy {
 namespace AccessLog {
 
 void AccessLogManagerImpl::reopen() {
@@ -20,3 +21,4 @@ Filesystem::FileSharedPtr AccessLogManagerImpl::createAccessLog(const std::strin
 }
 
 } // AccessLog
+} // Envoy

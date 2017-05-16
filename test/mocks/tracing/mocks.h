@@ -8,6 +8,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Tracing {
 
 inline bool operator==(const TransportContext& lhs, const TransportContext& rhs) {
@@ -71,3 +72,4 @@ public:
 };
 
 } // Tracing
+} // Envoy

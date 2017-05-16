@@ -27,6 +27,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
@@ -126,11 +127,16 @@ void IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers,
   flushWrite();
 }
 
+void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, Buffer::Instance& data,
+                                      bool end_stream) {
+  encoder.encodeData(data, end_stream);
+  flushWrite();
+}
+
 void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, uint64_t size,
                                       bool end_stream) {
   Buffer::OwnedImpl data(std::string(size, 'a'));
-  encoder.encodeData(data, end_stream);
-  flushWrite();
+  sendData(encoder, data, end_stream);
 }
 
 void IntegrationCodecClient::sendTrailers(Http::StreamEncoder& encoder,
@@ -947,3 +953,4 @@ void BaseIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
     EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
   }
 }
+} // Envoy

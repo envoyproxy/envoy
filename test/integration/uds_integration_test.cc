@@ -4,6 +4,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 TEST_F(UdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(makeClientConnection(lookupPort("http")),
                                        Http::CodecClient::Type::HTTP1, 1024, 512, false);
@@ -28,3 +29,4 @@ TEST_F(UdsIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   testRouterDownstreamDisconnectBeforeResponseComplete(makeClientConnection(lookupPort("http")),
                                                        Http::CodecClient::Type::HTTP1);
 }
+} // Envoy

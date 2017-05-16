@@ -15,6 +15,7 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -340,3 +341,4 @@ public:
 typedef std::unique_ptr<Cluster> ClusterPtr;
 
 } // Upstream
+} // Envoy

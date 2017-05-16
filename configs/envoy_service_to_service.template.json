@@ -134,7 +134,12 @@
                   "rate_limits":[
                     {
                       "actions": [
-                        {"type": "service_to_service"}
+                        {
+                          "type": "destination_cluster"
+                        },
+                        {
+                          "type" : "source_cluster"
+                        }
                       ]
                     }
                   ]

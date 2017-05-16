@@ -6,6 +6,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Dynamo {
 
 std::string Utility::buildPartitionStatString(const std::string& stat_prefix,
@@ -29,3 +30,4 @@ std::string Utility::buildPartitionStatString(const std::string& stat_prefix,
 }
 
 } // Dynamo
+} // Envoy

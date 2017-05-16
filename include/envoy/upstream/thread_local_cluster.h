@@ -1,5 +1,6 @@
 #pragma once
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -31,3 +32,4 @@ public:
 };
 
 } // Upstream
+} // Envoy

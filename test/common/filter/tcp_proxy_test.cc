@@ -18,6 +18,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -537,3 +538,4 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
 }
 
 } // Filter
+} // Envoy

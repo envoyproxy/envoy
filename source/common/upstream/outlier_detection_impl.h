@@ -17,6 +17,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Upstream {
 namespace Outlier {
 
@@ -281,3 +282,4 @@ public:
 
 } // Outlier
 } // Upstream
+} // Envoy

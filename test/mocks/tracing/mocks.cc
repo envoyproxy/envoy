@@ -3,6 +3,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::Return;
 using testing::ReturnRef;
 
@@ -24,3 +25,4 @@ MockDriver::MockDriver() {}
 MockDriver::~MockDriver() {}
 
 } // Tracing
+} // Envoy

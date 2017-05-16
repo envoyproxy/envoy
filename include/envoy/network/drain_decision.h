@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Network {
 
 class DrainDecision {
@@ -16,3 +17,4 @@ public:
 };
 
 } // Network
+} // Envoy

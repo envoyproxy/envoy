@@ -2,6 +2,7 @@
 
 #include "envoy/http/codec.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -93,3 +94,4 @@ protected:
 };
 
 } // Http
+} // Envoy
