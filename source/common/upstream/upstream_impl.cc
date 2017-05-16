@@ -270,7 +270,7 @@ StaticClusterImpl::StaticClusterImpl(const Json::Object& config, Runtime::Loader
     : ClusterImplBase(config, runtime, stats, ssl_context_manager) {
   std::vector<Json::ObjectSharedPtr> hosts_json = config.getObjectArray("hosts");
   HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
-  for (Json::ObjectSharedPtr& host : hosts_json) {
+  for (Json::ObjectSharedPtr host : hosts_json) {
     new_hosts->emplace_back(HostSharedPtr{new HostImpl(
         info_, "", Network::Utility::resolveUrl(host->getString("url")), false, 1, "")});
   }
@@ -370,7 +370,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
       dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
                                        config.getInteger("dns_refresh_rate_ms", 5000))) {
-  for (Json::ObjectSharedPtr& host : config.getObjectArray("hosts")) {
+  for (Json::ObjectSharedPtr host : config.getObjectArray("hosts")) {
     resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, host->getString("url")));
   }
   // We have to first construct resolve_targets_ before invoking startResolve(),

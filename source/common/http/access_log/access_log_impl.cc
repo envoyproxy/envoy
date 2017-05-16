@@ -109,7 +109,7 @@ bool RuntimeFilter::evaluate(const RequestInfo&, const HeaderMap& request_header
 }
 
 OperatorFilter::OperatorFilter(const Json::Object& json, Runtime::Loader& runtime) {
-  for (Json::ObjectSharedPtr& filter : json.getObjectArray("filters")) {
+  for (Json::ObjectSharedPtr filter : json.getObjectArray("filters")) {
     filters_.emplace_back(FilterImpl::fromJson(*filter, runtime));
   }
 }

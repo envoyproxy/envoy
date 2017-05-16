@@ -52,7 +52,7 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
 
   if (json_config.hasObject("headers")) {
     std::vector<Json::ObjectSharedPtr> config_headers = json_config.getObjectArray("headers");
-    for (const Json::ObjectSharedPtr& header_map : config_headers) {
+    for (const Json::ObjectSharedPtr header_map : config_headers) {
       fault_filter_headers_.push_back(*header_map);
     }
   }

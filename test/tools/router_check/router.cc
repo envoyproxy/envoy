@@ -9,7 +9,7 @@
 
 namespace Envoy {
 // static
-ToolConfig ToolConfig::create(const Json::ObjectSharedPtr& check_config) {
+ToolConfig ToolConfig::create(const Json::ObjectSharedPtr check_config) {
   Json::ObjectSharedPtr input = check_config->getObject("input");
   int random_value = input->getInteger("random_value", 0);
 
@@ -25,7 +25,7 @@ ToolConfig ToolConfig::create(const Json::ObjectSharedPtr& check_config) {
   }
 
   if (input->hasObject("additional_headers")) {
-    for (const Json::ObjectSharedPtr& header_config : input->getObjectArray("additional_headers")) {
+    for (const Json::ObjectSharedPtr header_config : input->getObjectArray("additional_headers")) {
       headers->addViaCopy(header_config->getString("field"), header_config->getString("value"));
     }
   }
@@ -60,7 +60,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;
-  for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
+  for (const Json::ObjectSharedPtr check_config : loader->asObjectArray()) {
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
@@ -102,7 +102,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     }
 
     if (validate->hasObject("header_fields")) {
-      for (const Json::ObjectSharedPtr& header_field : validate->getObjectArray("header_fields")) {
+      for (const Json::ObjectSharedPtr header_field : validate->getObjectArray("header_fields")) {
         if (!compareHeaderField(tool_config, header_field->getString("field"),
                                 header_field->getString("value"))) {
           no_failures = false;

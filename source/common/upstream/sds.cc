@@ -26,7 +26,7 @@ void SdsClusterImpl::parseResponse(const Http::Message& response) {
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(response.bodyAsString());
   json->validateSchema(Json::Schema::SDS_SCHEMA);
   std::vector<HostSharedPtr> new_hosts;
-  for (const Json::ObjectSharedPtr& host : json->getObjectArray("hosts")) {
+  for (const Json::ObjectSharedPtr host : json->getObjectArray("hosts")) {
     bool canary = false;
     uint32_t weight = 1;
     std::string zone = "";

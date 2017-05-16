@@ -63,7 +63,7 @@ GlobalStats Config::generateStats(Stats::Store& store, const std::string& prefix
 void Config::parseResponse(const Http::Message& message) {
   AllowedPrincipalsSharedPtr new_principals(new AllowedPrincipals());
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(message.bodyAsString());
-  for (const Json::ObjectSharedPtr& certificate : loader->getObjectArray("certificates")) {
+  for (const Json::ObjectSharedPtr certificate : loader->getObjectArray("certificates")) {
     new_principals->add(certificate->getString("fingerprint_sha256"));
   }
 
