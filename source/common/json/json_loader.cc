@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <fstream>
 #include <limits>
+#include <map>
 #include <sstream>
 #include <stack>
 #include <string>
@@ -13,7 +14,7 @@
 
 #include "spdlog/spdlog.h"
 
-// Do not let RapidJson leak outside of json_loader.
+// Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/reader.h"
@@ -24,41 +25,185 @@
 
 namespace Json {
 
-ObjectPtr Factory::loadFromFile(const std::string& file_path) {
-  return loadFromString(Filesystem::fileReadToEnd(file_path));
-}
+namespace {
+/*
+ * Internal representation of Object.
+ */
+class Field;
+typedef std::shared_ptr<Field> FieldPtr;
 
-ObjectPtr Factory::loadFromString(const std::string& json) {
-  Factory::LineCountingStringStream json_stream(json.c_str());
+class Field : public Object, public std::enable_shared_from_this<Field> {
+public:
+  void setLineNumberStart(uint64_t line_number) { line_number_start_ = line_number; }
+  void setLineNumberEnd(uint64_t line_number) { line_number_end_ = line_number; }
 
-  Factory::ObjectHandler handler(json_stream);
-  rapidjson::Reader reader;
-  reader.Parse(json_stream, handler);
+  // Container factories for handler.
+  static FieldPtr createObject() { return FieldPtr{new Field(Type::Object)}; }
+  static FieldPtr createArray() { return FieldPtr{new Field(Type::Array)}; }
+  static FieldPtr createNull() { return FieldPtr{new Field(Type::Null)}; }
 
-  if (reader.HasParseError()) {
-    throw Exception(fmt::format("JSON supplied is not valid. Error(offset {}): {}\n",
-                                reader.GetErrorOffset(),
-                                GetParseError_En(reader.GetParseErrorCode())));
+  bool isArray() const { return type_ == Type::Array; }
+  bool isObject() const { return type_ == Type::Object; }
+
+  // Value factory.
+  template <typename T> static FieldPtr createValue(T value) { return FieldPtr{new Field(value)}; }
+
+  void append(FieldPtr field_ptr) {
+    checkType(Type::Array);
+    value_.array_value_.push_back(field_ptr);
+  }
+  void insert(const std::string& key, FieldPtr field_ptr) {
+    checkType(Type::Object);
+    value_.object_value_[key] = field_ptr;
   }
 
-  return handler.getRoot();
-}
+  uint64_t hash() const override;
 
-const std::string Factory::listAsJsonString(const std::list<std::string>& items) {
-  rapidjson::StringBuffer writer_string_buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(writer_string_buffer);
+  bool getBoolean(const std::string& name) const override;
+  bool getBoolean(const std::string& name, bool default_value) const override;
+  double getDouble(const std::string& name) const override;
+  double getDouble(const std::string& name, double default_value) const override;
+  int64_t getInteger(const std::string& name) const override;
+  int64_t getInteger(const std::string& name, int64_t default_value) const override;
+  ObjectPtr getObject(const std::string& name, bool allow_empty) const override;
+  std::vector<ObjectPtr> getObjectArray(const std::string& name) const override;
+  std::string getString(const std::string& name) const override;
+  std::string getString(const std::string& name, const std::string& default_value) const override;
+  std::vector<std::string> getStringArray(const std::string& name) const override;
+  std::vector<ObjectPtr> asObjectArray() const override;
+  std::string asString() const override { return stringValue(); }
 
-  writer.StartArray();
-  for (const std::string& item : items) {
-    writer.String(item.c_str());
+  bool empty() const override;
+  bool hasObject(const std::string& name) const override;
+  void iterate(const ObjectCallback& callback) const override;
+  void validateSchema(const std::string& schema) const override;
+
+private:
+  enum class Type {
+    Array,
+    Boolean,
+    Double,
+    Integer,
+    Null,
+    Object,
+    String,
+  };
+
+  struct Value {
+    std::vector<FieldPtr> array_value_;
+    bool boolean_value_;
+    double double_value_;
+    int64_t integer_value_;
+    std::map<const std::string, FieldPtr> object_value_;
+    std::string string_value_;
+  };
+
+  explicit Field(Type type) : type_(type) {}
+  explicit Field(const std::string& value) : type_(Type::String) { value_.string_value_ = value; }
+  explicit Field(int64_t value) : type_(Type::Integer) { value_.integer_value_ = value; }
+  explicit Field(double value) : type_(Type::Double) { value_.double_value_ = value; }
+  explicit Field(bool value) : type_(Type::Boolean) { value_.boolean_value_ = value; }
+
+  bool isType(Type type) const { return type == type_; }
+  void checkType(Type type) const {
+    if (!isType(type)) {
+      throw Exception("Field access in JSON with correct type.");
+    }
   }
-  writer.EndArray();
+  // value rtype funcs
+  std::string stringValue() const {
+    checkType(Type::String);
+    return value_.string_value_;
+  }
+  std::vector<FieldPtr> arrayValue() const {
+    checkType(Type::Array);
+    return value_.array_value_;
+  }
+  bool booleanValue() const {
+    checkType(Type::Boolean);
+    return value_.boolean_value_;
+  }
+  double doubleValue() const {
+    checkType(Type::Double);
+    return value_.double_value_;
+  }
+  int64_t integerValue() const {
+    checkType(Type::Integer);
+    return value_.integer_value_;
+  }
 
-  return writer_string_buffer.GetString();
-}
+  rapidjson::Document asRapidJsonDocument() const;
+  static void build(const Field& field, rapidjson::Value& value,
+                    rapidjson::Document::AllocatorType& allocator);
 
-void Factory::Field::build(const Field& field, rapidjson::Value& value,
-                           rapidjson::Document::AllocatorType& allocator) {
+  uint64_t line_number_start_;
+  uint64_t line_number_end_;
+  Type type_;
+  Value value_;
+};
+
+class LineCountingStringStream : public rapidjson::StringStream {
+  // Ch is typdef in parent class to handle character encoding.
+public:
+  LineCountingStringStream(const Ch* src) : rapidjson::StringStream(src), line_number_(1) {}
+  Ch Take() {
+    Ch ret = rapidjson::StringStream::Take();
+    if (ret == '\n') {
+      line_number_++;
+    }
+    return ret;
+  }
+  uint64_t getLineNumber() { return line_number_; }
+
+private:
+  uint64_t line_number_;
+};
+
+/*
+ * Consume events from SAX callbacks to build JSON Field.
+ */
+class ObjectHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, ObjectHandler> {
+public:
+  ObjectHandler(LineCountingStringStream& stream) : state_(expectRoot), stream_(stream){};
+
+  bool StartObject();
+  bool EndObject(rapidjson::SizeType);
+  bool Key(const char* value, rapidjson::SizeType size, bool);
+  bool StartArray();
+  bool EndArray(rapidjson::SizeType);
+  bool Bool(bool value);
+  bool Double(double value);
+  bool Int(int value);
+  bool Uint(unsigned value);
+  bool Int64(int64_t value);
+  bool Uint64(uint64_t value);
+  bool Null();
+  bool String(const char* value, rapidjson::SizeType size, bool);
+  bool RawNumber(const char*, rapidjson::SizeType, bool);
+
+  ObjectPtr getRoot() { return root_; }
+
+private:
+  bool handleValueEvent(FieldPtr ptr);
+
+  enum State {
+    expectRoot,
+    expectKeyOrEndObject,
+    expectValueOrStartObjectArray,
+    expectArrayValueOrEndArray,
+    expectFinished,
+  };
+  State state_;
+  LineCountingStringStream& stream_;
+
+  std::stack<FieldPtr> stack_;
+  std::string key_;
+
+  FieldPtr root_;
+};
+
+void Field::build(const Field& field, rapidjson::Value& value,
+                  rapidjson::Document::AllocatorType& allocator) {
 
   switch (field.type_) {
   case Type::Array: {
@@ -129,21 +274,21 @@ void Factory::Field::build(const Field& field, rapidjson::Value& value,
   }
 }
 
-rapidjson::Document Factory::Field::asRapidJsonDocument() const {
+rapidjson::Document Field::asRapidJsonDocument() const {
   rapidjson::Document document;
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
   build(*this, document, allocator);
   return document;
 }
 
-uint64_t Factory::Field::hash() const {
+uint64_t Field::hash() const {
   rapidjson::StringBuffer buffer;
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
   asRapidJsonDocument().Accept(writer);
   return std::hash<std::string>{}(buffer.GetString());
 }
 
-bool Factory::Field::getBoolean(const std::string& name) const {
+bool Field::getBoolean(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Boolean)) {
@@ -152,7 +297,7 @@ bool Factory::Field::getBoolean(const std::string& name) const {
   return value_itr->second->booleanValue();
 }
 
-bool Factory::Field::getBoolean(const std::string& name, bool default_value) const {
+bool Field::getBoolean(const std::string& name, bool default_value) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
@@ -162,7 +307,7 @@ bool Factory::Field::getBoolean(const std::string& name, bool default_value) con
   }
 }
 
-double Factory::Field::getDouble(const std::string& name) const {
+double Field::getDouble(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Double)) {
@@ -171,7 +316,7 @@ double Factory::Field::getDouble(const std::string& name) const {
   return value_itr->second->doubleValue();
 }
 
-double Factory::Field::getDouble(const std::string& name, double default_value) const {
+double Field::getDouble(const std::string& name, double default_value) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
@@ -181,7 +326,7 @@ double Factory::Field::getDouble(const std::string& name, double default_value) 
   }
 }
 
-int64_t Factory::Field::getInteger(const std::string& name) const {
+int64_t Field::getInteger(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Integer)) {
@@ -190,7 +335,7 @@ int64_t Factory::Field::getInteger(const std::string& name) const {
   return value_itr->second->integerValue();
 }
 
-int64_t Factory::Field::getInteger(const std::string& name, int64_t default_value) const {
+int64_t Field::getInteger(const std::string& name, int64_t default_value) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
@@ -200,7 +345,7 @@ int64_t Factory::Field::getInteger(const std::string& name, int64_t default_valu
   }
 }
 
-ObjectPtr Factory::Field::getObject(const std::string& name, bool allow_empty) const {
+ObjectPtr Field::getObject(const std::string& name, bool allow_empty) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end()) {
@@ -216,7 +361,7 @@ ObjectPtr Factory::Field::getObject(const std::string& name, bool allow_empty) c
   }
 }
 
-std::vector<ObjectPtr> Factory::Field::getObjectArray(const std::string& name) const {
+std::vector<ObjectPtr> Field::getObjectArray(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
@@ -227,7 +372,7 @@ std::vector<ObjectPtr> Factory::Field::getObjectArray(const std::string& name) c
   return {array_value.begin(), array_value.end()};
 }
 
-std::string Factory::Field::getString(const std::string& name) const {
+std::string Field::getString(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::String)) {
@@ -236,8 +381,7 @@ std::string Factory::Field::getString(const std::string& name) const {
   return value_itr->second->stringValue();
 }
 
-std::string Factory::Field::getString(const std::string& name,
-                                      const std::string& default_value) const {
+std::string Field::getString(const std::string& name, const std::string& default_value) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
@@ -247,7 +391,7 @@ std::string Factory::Field::getString(const std::string& name,
   }
 }
 
-std::vector<std::string> Factory::Field::getStringArray(const std::string& name) const {
+std::vector<std::string> Field::getStringArray(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
@@ -267,12 +411,12 @@ std::vector<std::string> Factory::Field::getStringArray(const std::string& name)
   return string_array;
 }
 
-std::vector<ObjectPtr> Factory::Field::asObjectArray() const {
+std::vector<ObjectPtr> Field::asObjectArray() const {
   checkType(Type::Array);
   return {value_.array_value_.begin(), value_.array_value_.end()};
 }
 
-bool Factory::Field::empty() const {
+bool Field::empty() const {
   if (isType(Type::Object)) {
     return value_.object_value_.empty();
   } else if (isType(Type::Array)) {
@@ -283,13 +427,13 @@ bool Factory::Field::empty() const {
   }
 }
 
-bool Factory::Field::hasObject(const std::string& name) const {
+bool Field::hasObject(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   return value_itr != value_.object_value_.end();
 }
 
-void Factory::Field::iterate(const ObjectCallback& callback) const {
+void Field::iterate(const ObjectCallback& callback) const {
   checkType(Type::Object);
   for (const auto& item : value_.object_value_) {
     bool stop_iteration = !callback(item.first, *item.second);
@@ -299,7 +443,7 @@ void Factory::Field::iterate(const ObjectCallback& callback) const {
   }
 }
 
-void Factory::Field::validateSchema(const std::string& schema) const {
+void Field::validateSchema(const std::string& schema) const {
   rapidjson::Document schema_document;
   if (schema_document.Parse<0>(schema.c_str()).HasParseError()) {
     throw std::invalid_argument(fmt::format(
@@ -326,7 +470,7 @@ void Factory::Field::validateSchema(const std::string& schema) const {
   }
 }
 
-bool Factory::ObjectHandler::StartObject() {
+bool ObjectHandler::StartObject() {
   FieldPtr object = Field::createObject();
   object->setLineNumberStart(stream_.getLineNumber());
 
@@ -351,7 +495,7 @@ bool Factory::ObjectHandler::StartObject() {
   }
 }
 
-bool Factory::ObjectHandler::EndObject(rapidjson::SizeType) {
+bool ObjectHandler::EndObject(rapidjson::SizeType) {
   switch (state_) {
   case expectKeyOrEndObject:
     stack_.top()->setLineNumberEnd(stream_.getLineNumber());
@@ -370,7 +514,7 @@ bool Factory::ObjectHandler::EndObject(rapidjson::SizeType) {
   }
 }
 
-bool Factory::ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
+bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
   switch (state_) {
   case expectKeyOrEndObject:
     key_ = std::string(value, size);
@@ -381,7 +525,7 @@ bool Factory::ObjectHandler::Key(const char* value, rapidjson::SizeType size, bo
   }
 }
 
-bool Factory::ObjectHandler::StartArray() {
+bool ObjectHandler::StartArray() {
   FieldPtr array = Field::createArray();
   array->setLineNumberStart(stream_.getLineNumber());
 
@@ -405,7 +549,7 @@ bool Factory::ObjectHandler::StartArray() {
   }
 }
 
-bool Factory::ObjectHandler::EndArray(rapidjson::SizeType) {
+bool ObjectHandler::EndArray(rapidjson::SizeType) {
   switch (state_) {
   case expectArrayValueOrEndArray:
     stack_.top()->setLineNumberEnd(stream_.getLineNumber());
@@ -426,40 +570,34 @@ bool Factory::ObjectHandler::EndArray(rapidjson::SizeType) {
 }
 
 // Value handlers
-bool Factory::ObjectHandler::Bool(bool value) {
-  return handleValueEvent(Field::createValue(value));
-}
-bool Factory::ObjectHandler::Double(double value) {
-  return handleValueEvent(Field::createValue(value));
-}
-bool Factory::ObjectHandler::Int(int value) {
+bool ObjectHandler::Bool(bool value) { return handleValueEvent(Field::createValue(value)); }
+bool ObjectHandler::Double(double value) { return handleValueEvent(Field::createValue(value)); }
+bool ObjectHandler::Int(int value) {
   return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
 }
-bool Factory::ObjectHandler::Uint(unsigned value) {
+bool ObjectHandler::Uint(unsigned value) {
   return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
 }
-bool Factory::ObjectHandler::Int64(int64_t value) {
-  return handleValueEvent(Field::createValue(value));
-}
-bool Factory::ObjectHandler::Uint64(uint64_t value) {
+bool ObjectHandler::Int64(int64_t value) { return handleValueEvent(Field::createValue(value)); }
+bool ObjectHandler::Uint64(uint64_t value) {
   if (value > std::numeric_limits<int64_t>::max()) {
     throw Exception("Json does not support numbers larger than int64_t");
   }
   return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
 }
 
-bool Factory::ObjectHandler::Null() { return handleValueEvent(Field::createNull()); }
+bool ObjectHandler::Null() { return handleValueEvent(Field::createNull()); }
 
-bool Factory::ObjectHandler::String(const char* value, rapidjson::SizeType size, bool) {
+bool ObjectHandler::String(const char* value, rapidjson::SizeType size, bool) {
   return handleValueEvent(Field::createValue(std::string(value, size)));
 }
 
-bool Factory::ObjectHandler::RawNumber(const char*, rapidjson::SizeType, bool) {
+bool ObjectHandler::RawNumber(const char*, rapidjson::SizeType, bool) {
   // Only called if kParseNumbersAsStrings is set as a parse flag, which it is not.
   return false;
 }
 
-bool Factory::ObjectHandler::handleValueEvent(FieldPtr ptr) {
+bool ObjectHandler::handleValueEvent(FieldPtr ptr) {
   switch (state_) {
   case expectValueOrStartObjectArray:
     state_ = expectKeyOrEndObject;
@@ -471,6 +609,41 @@ bool Factory::ObjectHandler::handleValueEvent(FieldPtr ptr) {
   default:
     return false;
   }
+}
+
+} // namespace
+
+ObjectPtr Factory::loadFromFile(const std::string& file_path) {
+  return loadFromString(Filesystem::fileReadToEnd(file_path));
+}
+
+ObjectPtr Factory::loadFromString(const std::string& json) {
+  LineCountingStringStream json_stream(json.c_str());
+
+  ObjectHandler handler(json_stream);
+  rapidjson::Reader reader;
+  reader.Parse(json_stream, handler);
+
+  if (reader.HasParseError()) {
+    throw Exception(fmt::format("JSON supplied is not valid. Error(offset {}): {}\n",
+                                reader.GetErrorOffset(),
+                                GetParseError_En(reader.GetParseErrorCode())));
+  }
+
+  return handler.getRoot();
+}
+
+const std::string Factory::listAsJsonString(const std::list<std::string>& items) {
+  rapidjson::StringBuffer writer_string_buffer;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(writer_string_buffer);
+
+  writer.StartArray();
+  for (const std::string& item : items) {
+    writer.String(item.c_str());
+  }
+  writer.EndArray();
+
+  return writer_string_buffer.GetString();
 }
 
 } // Json
