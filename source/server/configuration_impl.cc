@@ -48,7 +48,7 @@ void MainImpl::initialize(const Json::Object& json) {
       server_.threadLocal(), server_.runtime(), server_.random(), server_.localInfo(),
       server_.accessLogManager()));
 
-  std::vector<Json::ObjectPtr> listeners = json.getObjectArray("listeners");
+  std::vector<Json::ObjectSharedPtr> listeners = json.getObjectArray("listeners");
   log().info("loading {} listener(s)", listeners.size());
   for (size_t i = 0; i < listeners.size(); i++) {
     log().info("listener #{}:", i);
@@ -79,7 +79,7 @@ void MainImpl::initialize(const Json::Object& json) {
   initializeTracers(json);
 
   if (json.hasObject("rate_limit_service")) {
-    Json::ObjectPtr rate_limit_service_config = json.getObject("rate_limit_service");
+    Json::ObjectSharedPtr rate_limit_service_config = json.getObject("rate_limit_service");
     std::string type = rate_limit_service_config->getString("type");
     ASSERT(type == "grpc_service");
     UNREFERENCED_PARAMETER(type);
@@ -98,7 +98,7 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
     return;
   }
 
-  Json::ObjectPtr tracing_configuration = configuration.getObject("tracing");
+  Json::ObjectSharedPtr tracing_configuration = configuration.getObject("tracing");
   if (!tracing_configuration->hasObject("http")) {
     http_tracer_.reset(new Tracing::HttpNullTracer());
     return;
@@ -110,8 +110,8 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   }
 
   // Initialize tracing driver.
-  Json::ObjectPtr http_tracer_config = tracing_configuration->getObject("http");
-  Json::ObjectPtr driver = http_tracer_config->getObject("driver");
+  Json::ObjectSharedPtr http_tracer_config = tracing_configuration->getObject("http");
+  Json::ObjectSharedPtr driver = http_tracer_config->getObject("driver");
 
   std::string type = driver->getString("type");
   log().info(fmt::format("  loading tracing driver: {}", type));
@@ -119,7 +119,7 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   Envoy::Runtime::RandomGenerator& rand = server_.random();
 
   if (type == "lightstep") {
-    Json::ObjectPtr lightstep_config = driver->getObject("config");
+    Json::ObjectSharedPtr lightstep_config = driver->getObject("config");
 
     std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
     opts->access_token =
@@ -172,11 +172,11 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json) :
   per_connection_buffer_limit_bytes_ =
       json.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024);
 
-  std::vector<Json::ObjectPtr> filters = json.getObjectArray("filters");
+  std::vector<Json::ObjectSharedPtr> filters = json.getObjectArray("filters");
   for (size_t i = 0; i < filters.size(); i++) {
     std::string string_type = filters[i]->getString("type");
     std::string string_name = filters[i]->getString("name");
-    Json::ObjectPtr config = filters[i]->getObject("config");
+    Json::ObjectSharedPtr config = filters[i]->getObject("config");
     log().info("  filter #{}:", i);
     log().info("    type: {}", string_type);
     log().info("    name: {}", string_name);
@@ -216,7 +216,7 @@ bool MainImpl::ListenerConfig::createFilterChain(Network::Connection& connection
 }
 
 InitialImpl::InitialImpl(const Json::Object& json) {
-  Json::ObjectPtr admin = json.getObject("admin");
+  Json::ObjectSharedPtr admin = json.getObject("admin");
   admin_.access_log_path_ = admin->getString("access_log_path");
   admin_.profile_path_ = admin->getString("profile_path", "/var/log/envoy/envoy.prof");
   admin_.address_ = Network::Utility::resolveUrl(admin->getString("address"));

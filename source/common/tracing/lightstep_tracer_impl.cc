@@ -34,12 +34,9 @@ void LightStepSpan::injectContext(Http::HeaderMap& request_headers) {
 }
 
 SpanPtr LightStepSpan::spawnChild(const std::string& name, SystemTime start_time) {
-  SpanPtr child_span;
   lightstep::Span ls_span = tracer_.StartSpan(
       name, {lightstep::ChildOf(span_.context()), lightstep::StartTimestamp(start_time)});
-  child_span.reset(new LightStepSpan(ls_span, tracer_));
-
-  return std::move(child_span);
+  return SpanPtr(new LightStepSpan(ls_span, tracer_));
 }
 
 LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepDriver& driver,

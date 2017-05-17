@@ -162,7 +162,7 @@ TEST(RouteMatcherTest, TestRoutes) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -443,7 +443,7 @@ TEST(RouteMatcherTest, TestAddRemoveReqRespHeaders) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -524,7 +524,7 @@ TEST(RouteMatcherTest, Priority) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -569,7 +569,7 @@ TEST(RouteMatcherTest, NoHostRewriteAndAutoRewrite) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
@@ -629,7 +629,7 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -709,7 +709,7 @@ TEST(RouterMatcherTest, HashPolicy) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -757,7 +757,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -815,7 +815,7 @@ TEST(RouteMatcherTest, ContentType) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -866,7 +866,7 @@ TEST(RouteMatcherTest, Runtime) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   Runtime::MockSnapshot snapshot;
@@ -907,7 +907,7 @@ TEST(RouteMatcherTest, ShadowClusterNotFound) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_CALL(cm, get("www2")).WillRepeatedly(Return(&cm.thread_local_cluster_));
@@ -934,7 +934,7 @@ TEST(RouteMatcherTest, ClusterNotFound) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_CALL(cm, get("www2")).WillRepeatedly(Return(nullptr));
@@ -960,7 +960,7 @@ TEST(RouteMatcherTest, ClusterNotFoundNotChecking) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_CALL(cm, get("www2")).WillRepeatedly(Return(nullptr));
@@ -1001,7 +1001,7 @@ TEST(RouteMatcherTest, Shadow) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -1070,7 +1070,7 @@ TEST(RouteMatcherTest, Retry) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -1151,7 +1151,7 @@ TEST(RouteMatcherTest, TestBadDefaultConfig) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_THROW(ConfigImpl config(*loader, runtime, cm, true), EnvoyException);
@@ -1185,7 +1185,7 @@ TEST(RouteMatcherTest, TestDuplicateDomainConfig) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_THROW(ConfigImpl config(*loader, runtime, cm, true), EnvoyException);
@@ -1251,7 +1251,7 @@ TEST(RouteMatcherTest, Redirect) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -1323,7 +1323,7 @@ TEST(RouteMatcherTest, ExclusiveRouteEntryOrRedirectEntry) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -1371,7 +1371,7 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersEntryOrRedirectEntry) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -1431,7 +1431,7 @@ TEST(RouteMatcherTest, WeightedClusters) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -1510,7 +1510,7 @@ TEST(RouteMatcherTest, ExclusiveWeightedClustersOrClusterConfig) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
@@ -1536,7 +1536,7 @@ TEST(RouteMatcherTest, WeightedClustersMissingClusterList) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
@@ -1563,7 +1563,7 @@ TEST(RouteMatcherTest, WeightedClustersEmptyClustersList) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
@@ -1593,7 +1593,7 @@ TEST(RouteMatcherTest, WeightedClustersSumOFWeightsNotEqualToMax) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
@@ -1623,7 +1623,7 @@ TEST(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_THROW(ConfigImpl(*loader, runtime, cm, true), EnvoyException);
@@ -1653,7 +1653,7 @@ TEST(RouteMatcherTest, TestWeightedClusterInvalidClusterName) {
 }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   EXPECT_CALL(cm, get("cluster1")).WillRepeatedly(Return(&cm.thread_local_cluster_));
@@ -1692,7 +1692,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
 
@@ -1720,7 +1720,7 @@ TEST(BadHttpRouteConfigurationsTest, BadVirtualHostConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
 
@@ -1746,7 +1746,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
 
@@ -1772,7 +1772,7 @@ TEST(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPath) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
 
@@ -1792,8 +1792,7 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
           "cluster": "ats",
           "opaque_config" : {
               "name1": "value1",
-              "name2": "value2",
-              "name1": "value3"
+              "name2": "value2"
           }
         }
       ]
@@ -1802,7 +1801,7 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
 }
 )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   ConfigImpl config(*loader, runtime, cm, true);
@@ -1810,14 +1809,8 @@ TEST(RouteMatcherTest, TestOpaqueConfig) {
   const std::multimap<std::string, std::string>& opaque_config =
       config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->opaqueConfig();
 
-  EXPECT_EQ(2u, opaque_config.count("name1"));
-  auto range = opaque_config.equal_range("name1");
-  auto it = range.first;
-  EXPECT_EQ("value1", it->second);
-  ++it;
-  EXPECT_EQ("value3", it->second);
-
-  EXPECT_EQ("value2", opaque_config.find("name2")->second);
+  EXPECT_EQ(opaque_config.find("name1")->second, "value1");
+  EXPECT_EQ(opaque_config.find("name2")->second, "value2");
 }
 
 TEST(RoutePropertyTest, excludeVHRateLimits) {
@@ -1838,7 +1831,7 @@ TEST(RoutePropertyTest, excludeVHRateLimits) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Upstream::MockClusterManager> cm;
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");

@@ -41,10 +41,8 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
 }
 
 Tracing::SpanPtr ZipkinSpan::spawnChild(const std::string& name, SystemTime start_time) {
-  Tracing::SpanPtr child_span;
   std::unique_ptr<SpanContext> context{new SpanContext(span_)};
-  child_span.reset(new ZipkinSpan(*tracer_.startSpan(name, start_time, *context), tracer_));
-  return child_span;
+  return Tracing::SpanPtr(new ZipkinSpan(*tracer_.startSpan(name, start_time, *context), tracer_));
 }
 
 bool ZipkinSpan::hasCSAnnotation() {
