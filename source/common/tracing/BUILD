@@ -13,13 +13,13 @@ envoy_cc_library(
     srcs = [
         "http_tracer_impl.cc",
     ] + select({
-        "//third_party/envoy/src/bazel:disable_lightstep_tracing": [],
+        "//bazel:disable_lightstep_tracing": [],
         "//conditions:default": ["lightstep_tracer_impl.cc"],
     }),
     hdrs = [
         "http_tracer_impl.h",
     ] + select({
-        "//third_party/envoy/src/bazel:disable_lightstep_tracing": [],
+        "//bazel:disable_lightstep_tracing": [],
         "//conditions:default": ["lightstep_tracer_impl.h"],
     }),
     external_deps = ["lightstep"],

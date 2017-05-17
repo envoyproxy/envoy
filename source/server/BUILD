@@ -21,7 +21,7 @@ envoy_cc_library(
     srcs = ["configuration_impl.cc"],
     hdrs = ["configuration_impl.h"],
     copts = select({
-        "//third_party/envoy/src/bazel:disable_lightstep_tracing": ["-DDISABLE_LIGHTSTEP_TRACING"],
+        "//bazel:disable_lightstep_tracing": ["-DDISABLE_LIGHTSTEP_TRACING"],
         "//conditions:default": [],
     }),
     deps = [
