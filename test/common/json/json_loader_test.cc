@@ -20,18 +20,19 @@ TEST(JsonLoaderTest, Basic) {
     EXPECT_FALSE(json->hasObject("world"));
     EXPECT_FALSE(json->empty());
     EXPECT_THROW(json->getObject("world"), Exception);
+    EXPECT_THROW(json->getObject("hello"), Exception);
     EXPECT_THROW(json->getBoolean("hello"), Exception);
     EXPECT_THROW(json->getObjectArray("hello"), Exception);
     EXPECT_THROW(json->getString("hello"), Exception);
 
     EXPECT_THROW_WITH_MESSAGE(json->getString("hello"), Exception,
-                              "key 'hello' missing or not a string");
+                              "key 'hello' missing or not a string from lines 1-1");
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\":\"123\"}");
+    ObjectSharedPtr json = Factory::loadFromString("{\"hello\":\"123\"\n}");
     EXPECT_THROW_WITH_MESSAGE(json->getInteger("hello"), Exception,
-                              "key 'hello' missing or not an integer");
+                              "key 'hello' missing or not an integer from lines 1-2");
   }
 
   {
@@ -57,7 +58,7 @@ TEST(JsonLoaderTest, Basic) {
     ObjectSharedPtr json = Factory::loadFromString("{\"hello\": \n[123]}");
 
     EXPECT_THROW_WITH_MESSAGE(
-        json->getObjectArray("hello").at(0)->getInteger("hello"), Exception,
+        json->getObjectArray("hello").at(0)->getString("hello"), Exception,
         "JSON field from line 2 accessed with type 'Object' does not match actual type 'Integer'.");
   }
 
@@ -68,7 +69,15 @@ TEST(JsonLoaderTest, Basic) {
         "'}' after an object member.\n");
   }
 
-  { EXPECT_NO_THROW(Factory::loadFromString("[\"foo\",\"bar\"]")); }
+  {
+    ObjectSharedPtr json_object = Factory::loadFromString("[\"foo\",\"bar\"]");
+    EXPECT_FALSE(json_object->empty());
+  }
+
+  {
+    ObjectSharedPtr json_object = Factory::loadFromString("[]");
+    EXPECT_TRUE(json_object->empty());
+  }
 
   {
     ObjectSharedPtr json =
@@ -155,6 +164,16 @@ TEST(JsonLoaderTest, Basic) {
     std::string json = R"EOF({"foo": ["bar", "baz"]})EOF";
     ObjectSharedPtr config = Factory::loadFromString(json);
     EXPECT_FALSE(config->getStringArray("foo").empty());
+  }
+
+  {
+    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": \n[2.0]}");
+    EXPECT_THROW(json->getObjectArray("hello").at(0)->getDouble("foo"), Exception);
+  }
+
+  {
+    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": \n[null]}");
+    json->getObjectArray("hello").at(0)->getDouble("foo");
   }
 }
 

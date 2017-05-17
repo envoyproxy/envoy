@@ -301,7 +301,7 @@ void Field::buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
     break;
   }
   default:
-    throw Exception("Json has a non-object or non-array at the root.");
+    NOT_REACHED;
   }
 }
 
@@ -323,7 +323,8 @@ bool Field::getBoolean(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Boolean)) {
-    throw Exception(fmt::format("key '{}' missing or not a boolean", name));
+    throw Exception(fmt::format("key '{}' missing or not a boolean from lines {}-{}", name,
+                                line_number_start_, line_number_end_));
   }
   return value_itr->second->booleanValue();
 }
@@ -342,7 +343,8 @@ double Field::getDouble(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Double)) {
-    throw Exception(fmt::format("key '{}' missing or not a double", name));
+    throw Exception(fmt::format("key '{}' missing or not a double from lines {}-{}", name,
+                                line_number_start_, line_number_end_));
   }
   return value_itr->second->doubleValue();
 }
@@ -361,7 +363,8 @@ int64_t Field::getInteger(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Integer)) {
-    throw Exception(fmt::format("key '{}' missing or not an integer", name));
+    throw Exception(fmt::format("key '{}' missing or not an integer from lines {}-{}", name,
+                                line_number_start_, line_number_end_));
   }
   return value_itr->second->integerValue();
 }
@@ -383,10 +386,12 @@ ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) cons
     if (allow_empty) {
       return createObject();
     } else {
-      throw Exception(fmt::format("key '{}' missing", name));
+      throw Exception(fmt::format("key '{}' missing from lines {}-{}", name, line_number_start_,
+                                  line_number_end_));
     }
   } else if (!value_itr->second->isType(Type::Object)) {
-    throw Exception(fmt::format("key '{}' not an object", name));
+    throw Exception(fmt::format("key '{}' not an object from line {}", name,
+                                value_itr->second->line_number_start_));
   } else {
     return value_itr->second;
   }
@@ -396,7 +401,8 @@ std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name) cons
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
-    throw Exception(fmt::format("key '{}' missing or not an array", name));
+    throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
+                                line_number_start_, line_number_end_));
   }
 
   std::vector<FieldSharedPtr> array_value = value_itr->second->arrayValue();
@@ -407,7 +413,8 @@ std::string Field::getString(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::String)) {
-    throw Exception(fmt::format("key '{}' missing or not a string", name));
+    throw Exception(fmt::format("key '{}' missing or not a string from lines {}-{}", name,
+                                line_number_start_, line_number_end_));
   }
   return value_itr->second->stringValue();
 }
@@ -426,7 +433,8 @@ std::vector<std::string> Field::getStringArray(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
-    throw Exception(fmt::format("key '{}' missing or not an array", name));
+    throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
+                                line_number_start_, line_number_end_));
   }
 
   std::vector<FieldSharedPtr> array = value_itr->second->arrayValue();
