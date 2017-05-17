@@ -116,32 +116,20 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
   std::string type = driver->getString("type");
   log().info(fmt::format("  loading tracing driver: {}", type));
 
-  Envoy::Runtime::RandomGenerator& rand = server_.random();
+  Json::ObjectSharedPtr driver_config = driver->getObject("config");
 
-  if (type == "lightstep") {
-    Json::ObjectSharedPtr lightstep_config = driver->getObject("config");
+  bool found_tracer = false;
+  for (HttpTracerFactory* http_tracer_factory : httpTracerFactories()) {
+    Tracing::HttpTracerPtr http_tracer =
+        http_tracer_factory->tryCreateHttpTracer(type, *driver_config, server_, *cluster_manager_);
+    if (http_tracer) {
+      http_tracer_ = std::move(http_tracer);
+      found_tracer = true;
+    }
+  }
 
-    std::unique_ptr<lightstep::TracerOptions> opts(new lightstep::TracerOptions());
-    opts->access_token =
-        server_.api().fileReadToEnd(lightstep_config->getString("access_token_file"));
-    StringUtil::rtrim(opts->access_token);
-
-    opts->tracer_attributes["lightstep.component_name"] = server_.localInfo().clusterName();
-    opts->guid_generator = [&rand]() { return rand.random(); };
-
-    Tracing::DriverPtr lightstep_driver(
-        new Tracing::LightStepDriver(*lightstep_config, *cluster_manager_, server_.stats(),
-                                     server_.threadLocal(), server_.runtime(), std::move(opts)));
-    http_tracer_.reset(
-        new Tracing::HttpTracerImpl(std::move(lightstep_driver), server_.localInfo()));
-  } else {
-    ASSERT(type == "zipkin");
-
-    Tracing::DriverPtr zipkin_driver(
-        new Zipkin::Driver(*driver->getObject("config"), *cluster_manager_, server_.stats(),
-                           server_.threadLocal(), server_.runtime(), server_.localInfo(), rand));
-
-    http_tracer_.reset(new Tracing::HttpTracerImpl(std::move(zipkin_driver), server_.localInfo()));
+  if (!found_tracer) {
+    throw EnvoyException(fmt::format("unable to create tracer for type {}", type));
   }
 }
 

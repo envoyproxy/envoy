@@ -11,6 +11,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/instance.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
@@ -44,6 +45,19 @@ public:
 };
 
 /**
+ * Implemented by each network filter and registered via registerHttpTracerFactory() or
+ * the convenience class RegisterHttpTracerFactory.
+ */
+class HttpTracerFactory {
+public:
+  virtual ~HttpTracerFactory() {}
+
+  virtual Tracing::HttpTracerPtr
+  tryCreateHttpTracer(const std::string& type, const Json::Object& json_config,
+                      Server::Instance& server, Upstream::ClusterManager& cluster_manager) PURE;
+};
+
+/**
  * Utilities for creating a filter chain for a network connection.
  */
 class FilterChainUtility {
@@ -65,6 +79,10 @@ public:
 
   static void registerNetworkFilterConfigFactory(NetworkFilterConfigFactory& factory) {
     filterConfigFactories().push_back(&factory);
+  }
+
+  static void registerHttpTracerFactory(HttpTracerFactory& factory) {
+    httpTracerFactories().push_back(&factory);
   }
 
   /**
@@ -135,6 +153,11 @@ private:
     return filter_config_factories;
   }
 
+  static std::list<HttpTracerFactory*>& httpTracerFactories() {
+    static std::list<HttpTracerFactory*> http_tracer_factories;
+    return http_tracer_factories;
+  }
+
   Server::Instance& server_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
@@ -158,6 +181,17 @@ public:
   RegisterNetworkFilterConfigFactory() {
     static T instance;
     MainImpl::registerNetworkFilterConfigFactory(instance);
+  }
+};
+
+/**
+ * @see HttpTracerFactory.
+ */
+template <class T> class RegisterHttpTracerFactory {
+public:
+  RegisterHttpTracerFactory() {
+    static T instance;
+    MainImpl::registerHttpTracerFactory(instance);
   }
 };
 
