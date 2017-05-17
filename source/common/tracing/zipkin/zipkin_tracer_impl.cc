@@ -42,11 +42,9 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
 
 Tracing::SpanPtr ZipkinSpan::spawnChild(const std::string& name, SystemTime start_time) {
   Tracing::SpanPtr child_span;
-  SpanContext context;
-  new SpanContext(span_);
-  child_span.reset(new ZipkinSpan(*tracer_.startSpan(name, start_time, context), tracer_));
-
-  return std::move(child_span);
+  std::unique_ptr<SpanContext> context{new SpanContext(span_)};
+  child_span.reset(new ZipkinSpan(*tracer_.startSpan(name, start_time, *context), tracer_));
+  return child_span;
 }
 
 bool ZipkinSpan::hasCSAnnotation() {
@@ -120,8 +118,6 @@ Tracing::SpanPtr Driver::startSpan(Http::HeaderMap& request_headers, const std::
     // Create a root Zipkin span. No context was found in the headers.
     new_zipkin_span = tracer.startSpan(request_headers.Host()->value().c_str(), start_time);
   }
-
-  // TODO(MS): REMOVE THIS: MOVED TO INJECT
 
   ZipkinSpanPtr active_span;
   active_span.reset(new ZipkinSpan(*new_zipkin_span, tracer));
