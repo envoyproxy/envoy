@@ -48,10 +48,13 @@ timeout, e.g., early exit. This is set on internal requests and is either taken 
 x-envoy-max-retries
 ^^^^^^^^^^^^^^^^^^^
 
-If a retry policy is in place, setting this header controls the number of retries that Envoy will
-perform on the request's behalf. If the header is not specified and there is no :ref:`route
-configuration <config_http_conn_man_route_table_route_retry>` Envoy will perform a single retry. A
-few notes on how Envoy does retries:
+If a :ref:`retry policy <config_http_conn_man_route_table_route_retry>` is in place, Envoy will default to retrying one 
+time unless explicitly specified. The number of retries can be explicitly set in the 
+:ref:`route retry config <config_http_conn_man_route_table_route_retry>`  or by using this header. 
+If a :ref:`retry policy <config_http_conn_man_route_table_route_retry>` is not configured or a 
+:ref:`config_http_filters_router_x-envoy-retry-on` header is not specified, Envoy will not retry a failed request.
+
+A few notes on how Envoy does retries:
 
 * The route timeout (set via :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` or the
   :ref:`route configuration <config_http_conn_man_route_table_route_timeout>`) **includes** all
@@ -69,8 +72,10 @@ few notes on how Envoy does retries:
 x-envoy-retry-on
 ^^^^^^^^^^^^^^^^
 
-Setting this header on egress requests will cause Envoy to attempt to retry failed requests. The
-value that the header is set to indicates the retry policy. One or more policies can be specified
+Setting this header on egress requests will cause Envoy to attempt to retry failed requests (number 
+of retries defaults to 1 and can be controlled by :ref:`x-envoy-max-retries <config_http_filters_router_x-envoy-max-retries>` 
+header or the :ref:`route config retry policy <config_http_conn_man_route_table_route_retry>`). The
+value to which the x-envoy-retry-on header is set indicates the retry policy. One or more policies can be specified
 using a ',' delimited list. The supported policies are:
 
 5xx
