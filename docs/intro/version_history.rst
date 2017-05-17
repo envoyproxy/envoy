@@ -5,7 +5,9 @@ Version history
 =====
 
 * As of this release, we now have an official :repo:`breaking change policy
-  </CONTRIBUTING.md#breaking-change-policy>`.
+  </CONTRIBUTING.md#breaking-change-policy>`. Note that there are numerous breaking configuration
+  changes in this release. They are not listed here. Future releases will adhere to the policy and
+  have clear documentation on deprecations and changes.
 * Bazel is now the canonical build system (replacing CMake). There have been a huge number of
   changes to the development/build/test flow. See :repo:`/bazel/README.md` and
   :repo:`/ci/README.md` for more information.
@@ -14,8 +16,8 @@ Version history
   configuration.
 * TCP level :ref:`listener <config_listeners_per_connection_buffer_limit_bytes>` and
   :ref:`cluster <config_cluster_manager_cluster_per_connection_buffer_limit_bytes>` connections now
-  have configurable buffer limits at which point connection level back pressure is applied. Full end
-  to end flow control will be available in a future release.
+  have configurable receive buffer limits at which point connection level back pressure is applied.
+  Full end to end flow control will be available in a future release.
 * :ref:`Redis health checking <config_cluster_manager_cluster_hc>` has been added as an active
   health check type. Full Redis support will be documented/supported in 1.4.0.
 * :ref:`TCP health checking <config_cluster_manager_cluster_hc_tcp_health_checking>` now supports a
@@ -40,7 +42,7 @@ Version history
   a route's retry policy in addition to via the :ref:`x-envoy-upstream-rq-per-try-timeout-ms
   <config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms>` HTTP header.
 * :ref:`HTTP virtual host matching <config_http_conn_man_route_table_vhost>` now includes support
-  for wildcard domains.
+  for prefix wildcard domains (e.g., `*.lyft.com`).
 * The default for tracing random sampling has been changed to 100% and is still configurable in
   :ref:`runtime <config_http_conn_man_runtime>`.
 * :ref:`HTTP tracing configuration <config_http_conn_man_tracing>` has been extended to allow tags
@@ -67,6 +69,7 @@ Version history
   <config_http_conn_man_route_table_opaque_config>` specified on a per route basis.
 * By default Envoy now has a built in crash handler that will print a back trace. This behavior can
   be disabled if desired via the ``--define=signal_trace=disabled`` Bazel option.
+* Zipkin has been added as a supported :ref:`tracing provider <arch_overview_tracing>`.
 * Numerous small changes and fixes not listed here.
 
 1.2.0
