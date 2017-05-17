@@ -54,12 +54,21 @@ TEST(JsonLoaderTest, Basic) {
   }
 
   {
-    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": [123]}");
+    ObjectSharedPtr json = Factory::loadFromString("{\"hello\": \n[123]}");
 
     EXPECT_THROW_WITH_MESSAGE(
         json->getObjectArray("hello").at(0)->getInteger("hello"), Exception,
-        "JSON field accessed with type 'Object' does not match actual type 'Integer'.");
+        "JSON field from line 2 accessed with type 'Object' does not match actual type 'Integer'.");
   }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        Factory::loadFromString("{\"hello\": \n\n\"world\""), Exception,
+        "JSON supplied is not valid. Error(offset 19, line 3): Missing a comma or "
+        "'}' after an object member.\n");
+  }
+
+  { EXPECT_NO_THROW(Factory::loadFromString("[\"foo\",\"bar\"]")); }
 
   {
     ObjectSharedPtr json =

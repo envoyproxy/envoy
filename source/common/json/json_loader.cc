@@ -28,7 +28,7 @@ namespace Envoy {
 namespace Json {
 
 namespace {
-/*
+/**
  * Internal representation of Object.
  */
 class Field;
@@ -40,6 +40,7 @@ public:
   void setLineNumberEnd(uint64_t line_number) { line_number_end_ = line_number; }
 
   // Container factories for handler.
+  // TODO(danielhochman): figure out how to do make_shared on private constructors
   static FieldSharedPtr createObject() { return FieldSharedPtr{new Field(Type::Object)}; }
   static FieldSharedPtr createArray() { return FieldSharedPtr{new Field(Type::Array)}; }
   static FieldSharedPtr createNull() { return FieldSharedPtr{new Field(Type::Null)}; }
@@ -131,9 +132,9 @@ private:
   bool isType(Type type) const { return type == type_; }
   void checkType(Type type) const {
     if (!isType(type)) {
-      throw Exception(
-          fmt::format("JSON field accessed with type '{}' does not match actual type '{}'.",
-                      typeAsString(type), typeAsString(type_)));
+      throw Exception(fmt::format(
+          "JSON field from line {} accessed with type '{}' does not match actual type '{}'.",
+          line_number_start_, typeAsString(type), typeAsString(type_)));
     }
   }
 
@@ -165,11 +166,11 @@ private:
 
   uint64_t line_number_start_;
   uint64_t line_number_end_;
-  Type type_;
+  const Type type_;
   Value value_;
 };
 
-/*
+/**
  * Custom stream to allow access to the line number for each object.
  */
 class LineCountingStringStream : public rapidjson::StringStream {
@@ -189,7 +190,7 @@ private:
   uint64_t line_number_;
 };
 
-/*
+/**
  * Consume events from SAX callbacks to build JSON Field.
  */
 class ObjectHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, ObjectHandler> {
@@ -433,7 +434,8 @@ std::vector<std::string> Field::getStringArray(const std::string& name) const {
   string_array.reserve(array.size());
   for (const auto& element : array) {
     if (!element->isType(Type::String)) {
-      throw Exception(fmt::format("array '{}' does not contain all strings", name));
+      throw Exception(fmt::format("JSON array '{}' from line {} does not contain all strings", name,
+                                  line_number_start_));
     }
     string_array.push_back(element->stringValue());
   }
@@ -521,7 +523,7 @@ bool ObjectHandler::StartObject() {
     state_ = expectKeyOrEndObject;
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -540,7 +542,7 @@ bool ObjectHandler::EndObject(rapidjson::SizeType) {
     }
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -551,7 +553,7 @@ bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
     state_ = expectValueOrStartObjectArray;
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -575,7 +577,7 @@ bool ObjectHandler::StartArray() {
     state_ = expectArrayValueOrEndArray;
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -595,7 +597,7 @@ bool ObjectHandler::EndArray(rapidjson::SizeType) {
 
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -611,7 +613,8 @@ bool ObjectHandler::Uint(unsigned value) {
 bool ObjectHandler::Int64(int64_t value) { return handleValueEvent(Field::createValue(value)); }
 bool ObjectHandler::Uint64(uint64_t value) {
   if (value > std::numeric_limits<int64_t>::max()) {
-    throw Exception("Json does not support numbers larger than int64_t");
+    throw Exception(fmt::format("JSON value from line {} is larger than int64_t (not supported)",
+                                stream_.getLineNumber()));
   }
   return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
 }
@@ -624,10 +627,12 @@ bool ObjectHandler::String(const char* value, rapidjson::SizeType size, bool) {
 
 bool ObjectHandler::RawNumber(const char*, rapidjson::SizeType, bool) {
   // Only called if kParseNumbersAsStrings is set as a parse flag, which it is not.
-  return false;
+  NOT_REACHED;
 }
 
 bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
+  ptr->setLineNumberStart(stream_.getLineNumber());
+
   switch (state_) {
   case expectValueOrStartObjectArray:
     state_ = expectKeyOrEndObject;
@@ -637,7 +642,7 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
     stack_.top()->append(ptr);
     return true;
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -659,8 +664,8 @@ ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   reader.Parse(json_stream, handler);
 
   if (reader.HasParseError()) {
-    throw Exception(fmt::format("JSON supplied is not valid. Error(offset {}): {}\n",
-                                reader.GetErrorOffset(),
+    throw Exception(fmt::format("JSON supplied is not valid. Error(offset {}, line {}): {}\n",
+                                reader.GetErrorOffset(), json_stream.getLineNumber(),
                                 GetParseError_En(reader.GetParseErrorCode())));
   }
 
