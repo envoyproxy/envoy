@@ -5,6 +5,7 @@
 #include "common/common/base64.h"
 #include "common/http/headers.h"
 
+namespace Envoy {
 namespace Grpc {
 
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
@@ -86,20 +87,20 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
 }
 
 Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& trailers) {
-  if (!encoder_callbacks_->encodingBuffer()) {
-    encoder_callbacks_->encodingBuffer().reset(new Buffer::OwnedImpl());
-  }
-  encoder_callbacks_->encodingBuffer()->add(&GRPC_WEB_TRAILER, 1);
+  Buffer::OwnedImpl buffer;
+  buffer.add(&GRPC_WEB_TRAILER, 1);
   trailers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
-    Buffer::Instance& temp = static_cast<GrpcWebFilter*>(context)->encoding_buffer_trailers_;
-    temp.add(header.key().c_str(), header.key().size());
-    temp.add(":");
-    temp.add(header.value().c_str(), header.value().size());
-    temp.add("\r\n");
-  }, this);
+    Buffer::Instance* buffer = static_cast<Buffer::Instance*>(context);
+    buffer->add(header.key().c_str(), header.key().size());
+    buffer->add(":");
+    buffer->add(header.value().c_str(), header.value().size());
+    buffer->add("\r\n");
+  }, &buffer);
   uint64_t length = htonl(encoding_buffer_trailers_.length());
-  encoder_callbacks_->encodingBuffer()->add(&length, 4);
-  encoder_callbacks_->encodingBuffer()->move(encoding_buffer_trailers_);
+  buffer.add(&length, 4);
+  buffer.move(encoding_buffer_trailers_);
+  encoder_callbacks_->addEncodedData(buffer);
   return Http::FilterTrailersStatus::Continue;
 }
 } // namespace Grpc
+} // namespace Envoy

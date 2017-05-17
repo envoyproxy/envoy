@@ -6,6 +6,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
 
+namespace Envoy {
 namespace Grpc {
 
 class GrpcWebFilter : public Http::StreamFilter {
@@ -16,6 +17,8 @@ public:
   // GrpcWebFilter is neither copyable nor movable.
   GrpcWebFilter(const GrpcWebFilter&) = delete;
   GrpcWebFilter& operator=(const GrpcWebFilter&) = delete;
+
+  void onDestroy() override{};
 
   // Implements StreamDecoderFilter.
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
@@ -47,5 +50,6 @@ private:
   Decoder decoder_;
 };
 } // namespace Grpc
+} // namespace Envoy
 
 #endif // SOURCE_COMMON_GRPC_GRPC_WEB_FILTER_H_

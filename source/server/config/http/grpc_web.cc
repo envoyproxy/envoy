@@ -2,6 +2,7 @@
 
 #include "common/grpc/grpc_web_filter.h"
 
+namespace Envoy {
 namespace Server {
 namespace Configuration {
 
@@ -26,3 +27,4 @@ static RegisterHttpFilterConfigFactory<GrpcWebFilterConfig> register_;
 
 } // namespace Configuration
 } // namespace Server
+} // namespace Envoy
