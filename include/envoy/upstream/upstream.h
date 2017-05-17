@@ -269,6 +269,12 @@ public:
   virtual uint64_t maxRequestsPerConnection() const PURE;
 
   /**
+   * @return int32_t the maximum number of concurrent http2 streams that a connection pool will
+   *         hold on each upstream connection. 0 indicates default (1024), -1 no maximum.
+   */
+  virtual int32_t maxConcurrentStreams() const PURE;
+
+  /**
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;

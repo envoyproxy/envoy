@@ -69,6 +69,7 @@ ClusterInfoImpl::ClusterInfoImpl(const Json::Object& config, Runtime::Loader& ru
                                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
     : runtime_(runtime), name_(config.getString("name")),
       max_requests_per_connection_(config.getInteger("max_requests_per_connection", 0)),
+      max_concurrent_streams_(config.getInteger("max_concurrent_streams", 0)),
       connect_timeout_(std::chrono::milliseconds(config.getInteger("connect_timeout_ms"))),
       per_connection_buffer_limit_bytes_(
           config.getInteger("per_connection_buffer_limit_bytes", 1024 * 1024)),

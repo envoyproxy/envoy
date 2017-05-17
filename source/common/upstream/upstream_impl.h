@@ -180,6 +180,7 @@ public:
   LoadBalancerType lbType() const override { return lb_type_; }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  int32_t maxConcurrentStreams() const override { return max_concurrent_streams_; }
   const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   Ssl::ClientContext* sslContext() const override { return ssl_ctx_.get(); }
@@ -203,6 +204,7 @@ private:
   Runtime::Loader& runtime_;
   const std::string name_;
   const uint64_t max_requests_per_connection_;
+  const int32_t max_concurrent_streams_;
   const std::chrono::milliseconds connect_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
   Stats::ScopePtr stats_scope_;

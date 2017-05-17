@@ -127,6 +127,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
       }
     },
     "max_requests_per_connection": 3,
+    "max_concurrent_streams": 4,
     "http_codec_options": "no_compression",
     "hosts": [{"url": "tcp://localhost1:11001"},
               {"url": "tcp://localhost2:11002"}]
@@ -146,6 +147,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
+  EXPECT_EQ(4U, cluster.info()->maxConcurrentStreams());
   EXPECT_EQ(static_cast<uint64_t>(Http::CodecOptions::NoCompression),
             cluster.info()->httpCodecOptions());
 
