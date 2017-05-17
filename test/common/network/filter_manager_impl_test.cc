@@ -117,7 +117,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   ON_CALL(runtime.snapshot_, featureEnabled("ratelimit.tcp_filter_enforcing", 100))
       .WillByDefault(Return(true));
 
-  Json::ObjectPtr rl_config_loader = Json::Factory::loadFromString(rl_json);
+  Json::ObjectSharedPtr rl_config_loader = Json::Factory::loadFromString(rl_json);
 
   RateLimit::TcpFilter::ConfigSharedPtr rl_config(
       new RateLimit::TcpFilter::Config(*rl_config_loader, stats_store, runtime));
@@ -138,7 +138,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
     }
     )EOF";
 
-  Json::ObjectPtr tcp_proxy_config_loader = Json::Factory::loadFromString(tcp_proxy_json);
+  Json::ObjectSharedPtr tcp_proxy_config_loader = Json::Factory::loadFromString(tcp_proxy_json);
   Envoy::Filter::TcpProxyConfigSharedPtr tcp_proxy_config(
       new Envoy::Filter::TcpProxyConfig(*tcp_proxy_config_loader, cm, stats_store));
   manager.addReadFilter(ReadFilterSharedPtr{new Envoy::Filter::TcpProxy(tcp_proxy_config, cm)});

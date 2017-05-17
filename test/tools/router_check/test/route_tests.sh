@@ -18,7 +18,7 @@ done
 
 # Bad config file
 BAD_CONFIG_OUTPUT=$(("${PATH_BIN}" "${PATH_CONFIG}/Redirect.golden.json" "${PATH_CONFIG}/TestRoutes.json") 2>&1) ||
-  if [[ "${BAD_CONFIG_OUTPUT}" == *"JSON object doesn't conform to schema."* ]]; then
+  if [[ "${BAD_CONFIG_OUTPUT}" == *"does not conform to schema."* ]]; then
     echo testing bad config output
     echo ${BAD_CONFIG_OUTPUT}
   else

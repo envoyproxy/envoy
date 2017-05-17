@@ -53,7 +53,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
     config_.reset(new ConfigImpl(*json_config));
 
     upstream_connection_ = new NiceMock<Network::MockClientConnection>();
@@ -319,7 +319,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
 
   ClientFactoryImpl factory;
   Upstream::MockHost::MockCreateConnectionData conn_info;
@@ -341,7 +341,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
     conn_pool_.reset(new InstanceImpl(cluster_name_, cm_, *this, tls_, *json_config));
   }
 

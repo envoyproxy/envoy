@@ -9,8 +9,8 @@
 
 namespace Envoy {
 // static
-ToolConfig ToolConfig::create(const Json::ObjectPtr& check_config) {
-  Json::ObjectPtr input = check_config->getObject("input");
+ToolConfig ToolConfig::create(const Json::ObjectSharedPtr check_config) {
+  Json::ObjectSharedPtr input = check_config->getObject("input");
   int random_value = input->getInteger("random_value", 0);
 
   // Add header field values
@@ -25,7 +25,7 @@ ToolConfig ToolConfig::create(const Json::ObjectPtr& check_config) {
   }
 
   if (input->hasObject("additional_headers")) {
-    for (const Json::ObjectPtr& header_config : input->getObjectArray("additional_headers")) {
+    for (const Json::ObjectSharedPtr header_config : input->getObjectArray("additional_headers")) {
       headers->addViaCopy(header_config->getString("field"), header_config->getString("value"));
     }
   }
@@ -39,7 +39,7 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 // static
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_json) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
-  Json::ObjectPtr loader = Json::Factory::loadFromFile(router_config_json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(router_config_json);
   loader->validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
   std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime(new NiceMock<Runtime::MockLoader>());
@@ -56,11 +56,11 @@ RouterCheckTool::RouterCheckTool(std::unique_ptr<NiceMock<Runtime::MockLoader>> 
     : runtime_(std::move(runtime)), cm_(std::move(cm)), config_(std::move(config)) {}
 
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectPtr loader = Json::Factory::loadFromFile(expected_route_json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;
-  for (const Json::ObjectPtr& check_config : loader->asObjectArray()) {
+  for (const Json::ObjectSharedPtr check_config : loader->asObjectArray()) {
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
@@ -68,7 +68,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     if (details_) {
       std::cout << test_name << std::endl;
     }
-    Json::ObjectPtr validate = check_config->getObject("validate");
+    Json::ObjectSharedPtr validate = check_config->getObject("validate");
 
     const std::unordered_map<std::string,
                              std::function<bool(ToolConfig&, const std::string&)>> checkers = {
@@ -102,7 +102,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     }
 
     if (validate->hasObject("header_fields")) {
-      for (const Json::ObjectPtr& header_field : validate->getObjectArray("header_fields")) {
+      for (const Json::ObjectSharedPtr header_field : validate->getObjectArray("header_fields")) {
         if (!compareHeaderField(tool_config, header_field->getString("field"),
                                 header_field->getString("value"))) {
           no_failures = false;

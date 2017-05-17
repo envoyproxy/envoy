@@ -204,7 +204,7 @@ TEST_F(HealthCheckFilterCachingTest, NotHcRequest) {
 
 TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSet) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
-  Json::ObjectPtr config = Json::Factory::loadFromString(
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(
       "{\"pass_through_mode\":false, \"cache_time_ms\":234, \"endpoint\":\"foo\"}");
   NiceMock<Server::MockInstance> serverMock;
 
@@ -216,7 +216,7 @@ TEST(HealthCheckFilterConfig, failsWhenNotPassThroughButTimeoutSet) {
 
 TEST(HealthCheckFilterConfig, notFailingWhenNotPassThroughAndTimeoutNotSet) {
   Server::Configuration::HealthCheckFilterConfig healthCheckFilterConfig;
-  Json::ObjectPtr config =
+  Json::ObjectSharedPtr config =
       Json::Factory::loadFromString("{\"pass_through_mode\":false, \"endpoint\":\"foo\"}");
   NiceMock<Server::MockInstance> serverMock;
 
