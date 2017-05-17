@@ -54,6 +54,8 @@ use_original_dst
   destination port. If there is no listener associated with the original destination port, the
   connection is handled by the listener that receives it. Default is false.
 
+.. _config_listeners_per_connection_buffer_limit_bytes:
+
 per_connection_buffer_limit_bytes
   *(optional, integer)* Soft limit on size of the listener's new connection read and write buffers.
   If unspecified, an implementation defined default is applied (1MiB).

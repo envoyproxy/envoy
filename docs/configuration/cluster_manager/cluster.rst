@@ -41,6 +41,8 @@ connect_timeout_ms
   *(required, integer)* The timeout for new network connections to hosts in the cluster specified
   in milliseconds.
 
+.. _config_cluster_manager_cluster_per_connection_buffer_limit_bytes:
+
 per_connection_buffer_limit_bytes
   *(optional, integer)* Soft limit on size of the cluster's connections read and write buffers.
   If unspecified, an implementation defined default is applied (1MiB).
