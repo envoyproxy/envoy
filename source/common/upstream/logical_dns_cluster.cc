@@ -21,7 +21,7 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
       tls_(tls), tls_slot_(tls.allocateSlot()), initialized_(false),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
 
-  std::vector<Json::ObjectPtr> hosts_json = config.getObjectArray("hosts");
+  std::vector<Json::ObjectSharedPtr> hosts_json = config.getObjectArray("hosts");
   if (hosts_json.size() != 1) {
     throw EnvoyException("logical_dns clusters must have a single host");
   }
