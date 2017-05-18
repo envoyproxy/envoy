@@ -506,12 +506,16 @@ void ConnectionImpl::sendPendingFrames() {
   }
 }
 
-void ConnectionImpl::sendSettings(uint64_t codec_options) {
+void ConnectionImpl::sendSettings(const CodecOptions& codec_options) {
   std::vector<nghttp2_settings_entry> iv = {
-      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, MAX_CONCURRENT_STREAMS},
-      {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, DEFAULT_WINDOW_SIZE}};
+      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, codec_options.max_concurrent_streams
+                                                    ? codec_options.max_concurrent_streams
+                                                    : MAX_CONCURRENT_STREAMS},
+      {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, codec_options.initial_window_size
+                                                 ? codec_options.initial_window_size
+                                                 : DEFAULT_WINDOW_SIZE}};
 
-  if (codec_options & CodecOptions::NoCompression) {
+  if (codec_options.flag_options & CodecOptionFlags::NoCompression) {
     iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, 0});
     conn_log_debug("disabling header compression", connection_);
   }
@@ -610,7 +614,7 @@ ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            ConnectionCallbacks& callbacks, Stats::Scope& stats,
-                                           uint64_t codec_options)
+                                           const CodecOptions& codec_options)
     : ConnectionImpl(connection, stats), callbacks_(callbacks) {
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
@@ -648,7 +652,7 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            Http::ServerConnectionCallbacks& callbacks,
-                                           Stats::Store& stats, uint64_t codec_options)
+                                           Stats::Store& stats, const CodecOptions& codec_options)
     : ConnectionImpl(connection, stats), callbacks_(callbacks) {
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());

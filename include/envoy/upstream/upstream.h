@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/common/optional.h"
+#include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/ssl/context.h"
 #include "envoy/upstream/load_balancer_type.h"
@@ -246,7 +247,7 @@ public:
    * @return uint64_t HTTP codec options for HTTP connections created on behalf of this cluster.
    *         @see Http::CodecOptions.
    */
-  virtual uint64_t httpCodecOptions() const PURE;
+  virtual Http::CodecOptions httpCodecOptions() const PURE;
 
   /**
    * @return the type of load balancing that the cluster should use.

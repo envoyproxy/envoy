@@ -136,16 +136,17 @@ bool Utility::isInternalRequest(const HeaderMap& headers) {
   return Network::Utility::isInternalAddress(forwarded_for->value().c_str());
 }
 
-uint64_t Utility::parseCodecOptions(const Json::Object& config) {
-  uint64_t ret = 0;
-  std::string options = config.getString("http_codec_options", "");
-  for (const std::string& option : StringUtil::split(options, ',')) {
-    if (option == "no_compression") {
-      ret |= CodecOptions::NoCompression;
-    } else {
-      throw EnvoyException(fmt::format("unknown http codec option '{}'", option));
-    }
-  }
+CodecOptions Utility::parseCodecOptions(const Json::Object& config) {
+  UNREFERENCED_PARAMETER(config);
+  CodecOptions ret{};
+  // std::string options = config.getString("http_codec_options", "");
+  // for (const std::string& option : StringUtil::split(options, ',')) {
+  //  if (option == "no_compression") {
+  //    ret |= CodecOptions::NoCompression;
+  //  } else {
+  //    throw EnvoyException(fmt::format("unknown http codec option '{}'", option));
+  //  }
+  //}
 
   return ret;
 }

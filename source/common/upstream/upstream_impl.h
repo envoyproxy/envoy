@@ -176,7 +176,7 @@ public:
     return per_connection_buffer_limit_bytes_;
   }
   uint64_t features() const override { return features_; }
-  uint64_t httpCodecOptions() const override { return http_codec_options_; }
+  Http::CodecOptions httpCodecOptions() const override { return http_codec_options_; }
   LoadBalancerType lbType() const override { return lb_type_; }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
@@ -209,7 +209,7 @@ private:
   mutable ClusterStats stats_;
   Ssl::ClientContextPtr ssl_ctx_;
   const uint64_t features_;
-  const uint64_t http_codec_options_;
+  const Http::CodecOptions http_codec_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   LoadBalancerType lb_type_;

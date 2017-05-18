@@ -128,7 +128,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   bool use_remote_address_{};
   CodecType codec_type_;
-  const uint64_t codec_options_;
+  const Http::CodecOptions codec_options_;
   std::string server_name_;
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   Optional<std::string> user_agent_;
