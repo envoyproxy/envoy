@@ -45,13 +45,19 @@ public:
 };
 
 /**
- * Implemented by each network filter and registered via registerHttpTracerFactory() or
+ * Implemented by each HttpTracer and registered via registerHttpTracerFactory() or
  * the convenience class RegisterHttpTracerFactory.
  */
 class HttpTracerFactory {
 public:
   virtual ~HttpTracerFactory() {}
 
+  /**
+  * Attempts to create a particular HttpTracer implementation corresponding to the type of factory.
+  * If the type argument doesn't match the expected value for the factory, a nullptr will be
+  * returned.  However, if the type matches and the HttpTracer instantiation throws an exception,
+  * that exception will be propagated.
+  */
   virtual Tracing::HttpTracerPtr
   tryCreateHttpTracer(const std::string& type, const Json::Object& json_config,
                       Server::Instance& server, Upstream::ClusterManager& cluster_manager) PURE;

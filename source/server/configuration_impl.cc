@@ -125,6 +125,7 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
     if (http_tracer) {
       http_tracer_ = std::move(http_tracer);
       found_tracer = true;
+      break;
     }
   }
 

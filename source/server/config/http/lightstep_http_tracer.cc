@@ -6,6 +6,9 @@
 #include "common/tracing/http_tracer_impl.h"
 #include "common/tracing/lightstep_tracer_impl.h"
 
+#include "lightstep/options.h"
+#include "lightstep/tracer.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
