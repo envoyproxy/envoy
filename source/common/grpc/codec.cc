@@ -61,7 +61,12 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
       case State::FH_LEN_3:
         frame_.length_ |= static_cast<uint32_t>(c);
         frame_.data_.reset(new Buffer::OwnedImpl());
-        state_ = State::DATA;
+        if (frame_.length_ == 0) {
+          output.push_back(std::move(frame_));
+          state_ = State::FH_FLAG;
+        } else {
+          state_ = State::DATA;
+        }
         mem++;
         j++;
         break;
