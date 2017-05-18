@@ -29,16 +29,19 @@ struct LightstepTracerStats {
 
 class LightStepSpan : public Span {
 public:
-  LightStepSpan(lightstep::Span& span);
+  LightStepSpan(lightstep::Span& span, lightstep::Tracer& tracer);
 
   // Tracing::Span
   void finishSpan() override;
   void setTag(const std::string& name, const std::string& value) override;
+  void injectContext(Http::HeaderMap& request_headers) override;
+  SpanPtr spawnChild(const std::string& name, SystemTime start_time) override;
 
   lightstep::SpanContext context() { return span_.context(); }
 
 private:
   lightstep::Span span_;
+  lightstep::Tracer& tracer_;
 };
 
 typedef std::unique_ptr<LightStepSpan> LightStepSpanPtr;

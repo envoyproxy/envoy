@@ -476,6 +476,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
     if (tracing_decision.is_tracing) {
       active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
+      active_span_->injectContext(*request_headers_);
     }
   }
 
