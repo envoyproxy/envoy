@@ -6,6 +6,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 namespace Mongo {
 
 QueryMessageInfo::QueryMessageInfo(const QueryMessage& query) : request_id_{query.requestId()} {
@@ -84,7 +85,7 @@ std::string QueryMessageInfo::parseCallingFunction(const QueryMessage& query) {
 
 std::string QueryMessageInfo::parseCallingFunctionJson(const std::string& json_string) {
   try {
-    Json::ObjectPtr json = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json = Json::Factory::loadFromString(json_string);
     return json->getString("callingFunction");
   } catch (Json::Exception&) {
     return "";
@@ -135,3 +136,4 @@ void QueryMessageInfo::parseFindCommand(const Bson::Document& command) {
 }
 
 } // Mongo
+} // Envoy

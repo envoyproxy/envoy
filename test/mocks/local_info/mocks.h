@@ -6,6 +6,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace LocalInfo {
 
 class MockLocalInfo : public LocalInfo {
@@ -25,3 +26,4 @@ public:
 };
 
 } // LocalInfo
+} // Envoy

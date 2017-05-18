@@ -6,6 +6,7 @@
 
 #include "common/common/assert.h"
 
+namespace Envoy {
 namespace Router {
 
 Upstream::ResourcePriority ConfigUtility::parsePriority(const Json::Object& config) {
@@ -43,3 +44,4 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
 }
 
 } // Router
+} // Envoy

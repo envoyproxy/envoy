@@ -24,6 +24,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Upstream {
 
 void ClusterManagerInitHelper::addCluster(Cluster& cluster) {
@@ -188,7 +189,7 @@ ClusterManagerImpl::ClusterManagerImpl(const Json::Object& config, ClusterManage
   cds_api_ = factory_.createCds(config, *this);
   init_helper_.setCds(cds_api_.get());
 
-  for (const Json::ObjectPtr& cluster : config.getObjectArray("clusters")) {
+  for (const Json::ObjectSharedPtr cluster : config.getObjectArray("clusters")) {
     loadCluster(*cluster, false);
   }
 
@@ -578,3 +579,4 @@ CdsApiPtr ProdClusterManagerFactory::createCds(const Json::Object& config, Clust
 }
 
 } // Upstream
+} // Envoy

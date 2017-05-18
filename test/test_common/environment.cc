@@ -20,6 +20,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace {
 
 std::string getOrCreateUnixDomainSocketDirectory() {
@@ -117,7 +118,14 @@ std::string TestEnvironment::substitute(const std::string str) {
   return out_json_string;
 }
 
+// TODO(hennna): Deprecate when IPv6 test support is finished.
 std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
+                                                     const PortMap& port_map) {
+  return TestEnvironment::temporaryFileSubstitute(path, Network::Address::IpVersion::v4, port_map);
+}
+
+std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
+                                                     const Network::Address::IpVersion& version,
                                                      const PortMap& port_map) {
   // Load the entire file as a string, regex replace one at a time and write it back out. Proper
   // templating might be better one day, but this works for now.
@@ -139,6 +147,11 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
     const std::regex port_regex("\\{\\{ " + it.first + " \\}\\}");
     out_json_string = std::regex_replace(out_json_string, port_regex, std::to_string(it.second));
   }
+
+  // Substitute IP loopback addresses.
+  const std::regex loopback_address_regex("\\{\\{ ip_loopback_address \\}\\}");
+  out_json_string = std::regex_replace(out_json_string, loopback_address_regex,
+                                       Network::Test::getLoopbackAddressUrlString(version));
   // Substitute paths.
   out_json_string = substitute(out_json_string);
   const std::string out_json_path = TestEnvironment::temporaryPath(path + ".with.ports.json");
@@ -150,7 +163,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   return out_json_path;
 }
 
-Json::ObjectPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
+Json::ObjectSharedPtr TestEnvironment::jsonLoadFromString(const std::string& json) {
   return Json::Factory::loadFromString(substitute(json));
 }
 
@@ -167,3 +180,4 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
     RELEASE_ASSERT(false);
   }
 }
+} // Envoy

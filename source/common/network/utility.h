@@ -9,6 +9,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 
+namespace Envoy {
 namespace Network {
 
 /**
@@ -78,10 +79,32 @@ public:
    */
   static uint32_t portFromTcpUrl(const std::string& url);
 
+  /*
+  * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. Throw
+  * an exception if unable to parse the address. The address must not include a port number.
+  * @param ip_address string to be parsed as an internet address.
+  * @return pointer to the Instance, or nullptr if unable to parse the address.
+  */
+  static Address::InstanceConstSharedPtr parseInternetAddress(const std::string& ip_address);
+
+  /*
+  * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it.
+  * @throws an exception if unable to parse the address.
+  * @param ip_addr string to be parsed as an internet address and port. Examples:
+  *        - "1.2.3.4:80"
+  *        - "[1234:5678::9]:443"
+  * @return pointer to the Instance.
+  */
+  static Address::InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_address);
+
   /**
+   * Get the local address of the first interface address that is of type
+   * version and is not a loopback address. If no matches are found, return the
+   * loopback address of type version.
+   * @param the local address IP version.
    * @return the local IP address of the server
    */
-  static Address::InstanceConstSharedPtr getLocalAddress();
+  static Address::InstanceConstSharedPtr getLocalAddress(const Address::IpVersion version);
 
   /**
    * Determine whether this is an internal (RFC1918) address.
@@ -91,6 +114,7 @@ public:
 
   /**
    * Check if address is loopback address.
+   * @param address IP address to check.
    * @return true if so, otherwise false
    */
   static bool isLoopbackAddress(const Address::Instance& address);
@@ -148,6 +172,10 @@ public:
    * @return whether the port appears in at least one of the ranges in the list
    */
   static bool portInRangeList(const Address::Instance& address, const std::list<PortRange>& list);
+
+private:
+  static void throwWithMalformedIp(const std::string& ip_address);
 };
 
 } // Network
+} // Envoy

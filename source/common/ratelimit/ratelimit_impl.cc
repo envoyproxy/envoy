@@ -14,6 +14,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace RateLimit {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::RpcChannelFactory& factory,
@@ -97,3 +98,4 @@ Grpc::RpcChannelPtr GrpcFactoryImpl::create(Grpc::RpcChannelCallbacks& callbacks
 }
 
 } // RateLimit
+} // Envoy

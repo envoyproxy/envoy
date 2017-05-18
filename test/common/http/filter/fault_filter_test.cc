@@ -21,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::DoAll;
 using testing::Invoke;
@@ -96,7 +97,7 @@ public:
     )EOF";
 
   void SetUpTest(const std::string json) {
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     config_.reset(new FaultFilterConfig(*config, runtime_, "", stats_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
@@ -125,7 +126,7 @@ TEST(FaultFilterBadConfigTest, EmptyConfig) {
   )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -141,7 +142,7 @@ TEST(FaultFilterBadConfigTest, BadAbortPercent) {
   )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -156,7 +157,7 @@ TEST(FaultFilterBadConfigTest, MissingHTTPStatus) {
   )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -173,7 +174,7 @@ TEST(FaultFilterBadConfigTest, BadDelayType) {
   )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -190,7 +191,7 @@ TEST(FaultFilterBadConfigTest, BadDelayPercent) {
   )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -207,7 +208,7 @@ TEST(FaultFilterBadConfigTest, BadDelayDuration) {
    )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -223,7 +224,7 @@ TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
    )EOF";
 
   Stats::IsolatedStoreImpl stats;
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Runtime::MockLoader> runtime;
   EXPECT_THROW(FaultFilterConfig(*config, runtime, "", stats), EnvoyException);
 }
@@ -470,7 +471,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
 
-  filter_callbacks_.reset_callback_();
+  filter_->onDestroy();
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
@@ -559,3 +560,4 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
 }
 
 } // Http
+} // Envoy

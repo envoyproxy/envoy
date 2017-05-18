@@ -9,6 +9,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+namespace Envoy {
 namespace Upstream {
 
 SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runtime,
@@ -22,10 +23,10 @@ SdsClusterImpl::SdsClusterImpl(const Json::Object& config, Runtime::Loader& runt
       local_info_(local_info), service_name_(config.getString("service_name")) {}
 
 void SdsClusterImpl::parseResponse(const Http::Message& response) {
-  Json::ObjectPtr json = Json::Factory::loadFromString(response.bodyAsString());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response.bodyAsString());
   json->validateSchema(Json::Schema::SDS_SCHEMA);
   std::vector<HostSharedPtr> new_hosts;
-  for (const Json::ObjectPtr& host : json->getObjectArray("hosts")) {
+  for (const Json::ObjectSharedPtr host : json->getObjectArray("hosts")) {
     bool canary = false;
     uint32_t weight = 1;
     std::string zone = "";
@@ -114,3 +115,4 @@ void SdsClusterImpl::onFetchComplete() {
 }
 
 } // Upstream
+} // Envoy

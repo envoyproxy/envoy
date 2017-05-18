@@ -2,20 +2,6 @@
   "listeners": [
   {
     "address": "tcp://127.0.0.1:0",
-    "use_original_dst": true,
-    "filters": [
-      { "type": "read", "name": "ratelimit",
-        "config": {
-          "domain": "foo",
-          "descriptors": [[{"key": "foo", "value": "bar"}]],
-          "stat_prefix": "name"
-        }
-      },
-      { "type": "read", "name": "echo", "config": {} }
-    ]
-  },
-  {
-    "address": "tcp://127.0.0.1:0",
     "filters": [
     {
       "type": "read",

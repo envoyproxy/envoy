@@ -12,6 +12,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -28,7 +29,7 @@ public:
     ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
         .WillByDefault(Return("access_token"));
 
-    Json::ObjectPtr config_json = Json::Factory::loadFromFile(file_path);
+    Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(file_path);
     Server::Configuration::InitialImpl initial_config(*config_json);
     Server::Configuration::MainImpl main_config(server_);
 
@@ -62,3 +63,4 @@ uint32_t run(const std::string& directory) {
 }
 
 } // ConfigTest
+} // Envoy

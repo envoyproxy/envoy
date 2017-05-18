@@ -11,6 +11,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Logger {
 
 // clang-format off
@@ -166,3 +167,4 @@ protected:
 #endif
 
 #define stream_log_info(FORMAT, STREAM, ...) stream_log(log(), info, FORMAT, STREAM, ##__VA_ARGS__)
+} // Envoy

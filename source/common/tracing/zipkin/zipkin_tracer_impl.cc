@@ -9,6 +9,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Zipkin {
 
 ZipkinSpan::ZipkinSpan(Zipkin::Span& span) : span_(span) {}
@@ -192,3 +193,4 @@ void ReporterImpl::onSuccess(Http::MessagePtr&& http_response) {
   }
 }
 } // Zipkin
+} // Envoy

@@ -6,6 +6,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/filesystem/filesystem_impl.h"
 
+namespace Envoy {
 namespace Api {
 
 Event::DispatcherPtr Impl::allocateDispatcher() {
@@ -27,3 +28,4 @@ bool Impl::fileExists(const std::string& path) { return Filesystem::fileExists(p
 std::string Impl::fileReadToEnd(const std::string& path) { return Filesystem::fileReadToEnd(path); }
 
 } // Api
+} // Envoy

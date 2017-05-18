@@ -10,15 +10,17 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::NiceMock;
 
 namespace Ssl {
 
 class MockRuntimeIntegrationTestServer : public IntegrationTestServer {
 public:
-  static IntegrationTestServerPtr create(const std::string& config_path) {
+  static IntegrationTestServerPtr create(const std::string& config_path,
+                                         Network::Address::IpVersion version) {
     IntegrationTestServerPtr server{new MockRuntimeIntegrationTestServer(config_path)};
-    server->start();
+    server->start(version);
     return server;
   }
 
@@ -38,28 +40,29 @@ private:
 class SslIntegrationTest : public BaseIntegrationTest, public testing::Test {
 public:
   /**
-   * Global initializer for all integration tests.
+   * Initializer for an individual test.
    */
-  static void SetUpTestCase();
+  void SetUp() override;
 
   /**
-   * Global destructor for all integration tests.
+   * Destructor for an individual test.
    */
-  static void TearDownTestCase();
+  void TearDown() override;
 
   Network::ClientConnectionPtr makeSslClientConnection(bool alpn, bool san);
-  static ServerContextPtr createUpstreamSslContext();
-  static ClientContextPtr createClientSslContext(bool alpn, bool san);
+  ServerContextPtr createUpstreamSslContext();
+  ClientContextPtr createClientSslContext(bool alpn, bool san);
   void checkStats();
 
 private:
-  static std::unique_ptr<Runtime::Loader> runtime_;
-  static std::unique_ptr<ContextManager> context_manager_;
-  static ServerContextPtr upstream_ssl_ctx_;
-  static ClientContextPtr client_ssl_ctx_plain_;
-  static ClientContextPtr client_ssl_ctx_alpn_;
-  static ClientContextPtr client_ssl_ctx_san_;
-  static ClientContextPtr client_ssl_ctx_alpn_san_;
+  std::unique_ptr<Runtime::Loader> runtime_;
+  std::unique_ptr<ContextManager> context_manager_;
+  ServerContextPtr upstream_ssl_ctx_;
+  ClientContextPtr client_ssl_ctx_plain_;
+  ClientContextPtr client_ssl_ctx_alpn_;
+  ClientContextPtr client_ssl_ctx_san_;
+  ClientContextPtr client_ssl_ctx_alpn_san_;
 };
 
 } // Ssl
+} // Envoy

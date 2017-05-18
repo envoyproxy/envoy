@@ -27,6 +27,7 @@
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -352,3 +353,4 @@ private:
 };
 
 } // Upstream
+} // Envoy

@@ -9,6 +9,7 @@
 
 #include "common/common/assert.h"
 
+namespace Envoy {
 namespace Grpc {
 
 /**
@@ -63,3 +64,4 @@ private:
 };
 
 } // Grpc
+} // Envoy

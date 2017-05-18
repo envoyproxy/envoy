@@ -9,12 +9,13 @@
 #include "common/common/empty_string.h"
 #include "common/json/config_schemas.h"
 
+namespace Envoy {
 namespace Router {
 
 const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
 
 bool SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
-                                             ::RateLimit::Descriptor& descriptor,
+                                             RateLimit::Descriptor& descriptor,
                                              const std::string& local_service_cluster,
                                              const Http::HeaderMap&, const std::string&) const {
   descriptor.entries_.push_back({"source_cluster", local_service_cluster});
@@ -22,7 +23,7 @@ bool SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
 }
 
 bool DestinationClusterAction::populateDescriptor(const Router::RouteEntry& route,
-                                                  ::RateLimit::Descriptor& descriptor,
+                                                  RateLimit::Descriptor& descriptor,
                                                   const std::string&, const Http::HeaderMap&,
                                                   const std::string&) const {
   descriptor.entries_.push_back({"destination_cluster", route.clusterName()});
@@ -30,8 +31,8 @@ bool DestinationClusterAction::populateDescriptor(const Router::RouteEntry& rout
 }
 
 bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
-                                              ::RateLimit::Descriptor& descriptor,
-                                              const std::string&, const Http::HeaderMap& headers,
+                                              RateLimit::Descriptor& descriptor, const std::string&,
+                                              const Http::HeaderMap& headers,
                                               const std::string&) const {
   const Http::HeaderEntry* header_value = headers.get(header_name_);
   if (!header_value) {
@@ -43,8 +44,8 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
 }
 
 bool RemoteAddressAction::populateDescriptor(const Router::RouteEntry&,
-                                             ::RateLimit::Descriptor& descriptor,
-                                             const std::string&, const Http::HeaderMap&,
+                                             RateLimit::Descriptor& descriptor, const std::string&,
+                                             const Http::HeaderMap&,
                                              const std::string& remote_address) const {
   if (remote_address.empty()) {
     return false;
@@ -55,7 +56,7 @@ bool RemoteAddressAction::populateDescriptor(const Router::RouteEntry&,
 }
 
 bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
-                                          ::RateLimit::Descriptor& descriptor, const std::string&,
+                                          RateLimit::Descriptor& descriptor, const std::string&,
                                           const Http::HeaderMap&, const std::string&) const {
   descriptor.entries_.push_back({"generic_key", descriptor_value_});
   return true;
@@ -64,14 +65,14 @@ bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
 HeaderValueMatchAction::HeaderValueMatchAction(const Json::Object& action)
     : descriptor_value_(action.getString("descriptor_value")),
       expect_match_(action.getBoolean("expect_match", true)) {
-  std::vector<Json::ObjectPtr> config_headers = action.getObjectArray("headers");
-  for (const Json::ObjectPtr& header_map : config_headers) {
+  std::vector<Json::ObjectSharedPtr> config_headers = action.getObjectArray("headers");
+  for (const Json::ObjectSharedPtr header_map : config_headers) {
     action_headers_.push_back(*header_map);
   }
 }
 
 bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
-                                                ::RateLimit::Descriptor& descriptor,
+                                                RateLimit::Descriptor& descriptor,
                                                 const std::string&, const Http::HeaderMap& headers,
                                                 const std::string&) const {
   if (expect_match_ == ConfigUtility::matchHeaders(headers, action_headers_)) {
@@ -86,7 +87,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
     : Json::Validator(config, Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA),
       disable_key_(config.getString("disable_key", "")),
       stage_(static_cast<uint64_t>(config.getInteger("stage", 0))) {
-  for (const Json::ObjectPtr& action : config.getObjectArray("actions")) {
+  for (const Json::ObjectSharedPtr action : config.getObjectArray("actions")) {
     std::string type = action->getString("type");
     if (type == "source_cluster") {
       actions_.emplace_back(new SourceClusterAction());
@@ -105,11 +106,12 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(const Json::Object& config)
   }
 }
 
-void RateLimitPolicyEntryImpl::populateDescriptors(
-    const Router::RouteEntry& route, std::vector<::RateLimit::Descriptor>& descriptors,
-    const std::string& local_service_cluster, const Http::HeaderMap& headers,
-    const std::string& remote_address) const {
-  ::RateLimit::Descriptor descriptor;
+void RateLimitPolicyEntryImpl::populateDescriptors(const Router::RouteEntry& route,
+                                                   std::vector<RateLimit::Descriptor>& descriptors,
+                                                   const std::string& local_service_cluster,
+                                                   const Http::HeaderMap& headers,
+                                                   const std::string& remote_address) const {
+  RateLimit::Descriptor descriptor;
   bool result = true;
   for (const RateLimitActionPtr& action : actions_) {
     result = result &&
@@ -128,7 +130,7 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
 RateLimitPolicyImpl::RateLimitPolicyImpl(const Json::Object& config)
     : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
   if (config.hasObject("rate_limits")) {
-    for (const Json::ObjectPtr& rate_limit : config.getObjectArray("rate_limits")) {
+    for (const Json::ObjectSharedPtr rate_limit : config.getObjectArray("rate_limits")) {
       std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
           new RateLimitPolicyEntryImpl(*rate_limit));
       uint64_t stage = rate_limit_policy_entry->stage();
@@ -146,3 +148,4 @@ RateLimitPolicyImpl::getApplicableRateLimit(uint64_t stage) const {
 }
 
 } // Router
+} // Envoy

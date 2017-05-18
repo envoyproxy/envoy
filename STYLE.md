@@ -35,6 +35,10 @@
   developer discretion. Where possible, methods should have meaningful
   documentation on expected input and state preconditions.
 * Header guards should use `#pragma once`.
+* All code should be inside a top-level Envoy namespace. There are some
+  exceptions such as `main()` functions. When code cannot be placed inside the
+  Envoy namespace there should be a comment of the form `// NOLINT(namespace-envoy)` at
+  the top of the file.
 * There are probably a few other things missing from this list. We will add them as they
   are brought to our attention.
 

@@ -355,6 +355,7 @@ Sending requests to the Key/Value store
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To use the python service and sent gRPC requests::
+
   $ pwd
   ~/src/envoy/examples/grpc-bridge
   # set a key
@@ -378,9 +379,11 @@ This image has all software needed to build envoy. From your envoy directory::
 
   $ pwd
   src/envoy
-  $ docker run -t -i -v <SOURCE_DIR>:/source lyft/envoy-build:latest /bin/bash -c "cd /source && ci/do_ci.sh normal"
+  $ ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 
-That command will take some time to run because it is compiling an envoy binary.
+That command will take some time to run because it is compiling an envoy binary and running tests.
+
+For more information on building and different build targets, please refer to :repo:`ci/README.md`.
 
 **Step 2: Build image with only envoy binary**
 

@@ -27,6 +27,7 @@
 #include "common/router/router.h"
 #include "common/tracing/http_tracer_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 class AsyncStreamImpl;
@@ -68,7 +69,6 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const Optional<std::chrono::milliseconds>& timeout);
-  virtual ~AsyncStreamImpl();
 
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
@@ -176,9 +176,6 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  void addResetStreamCallback(std::function<void()> callback) override {
-    reset_callback_ = callback;
-  }
   uint64_t connectionId() override { return 0; }
   Ssl::Connection* ssl() override { return nullptr; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
@@ -189,7 +186,8 @@ private:
   Tracing::Span& activeSpan() override { return active_span_; }
   const std::string& downstreamAddress() override { return EMPTY_STRING; }
   void continueDecoding() override { NOT_IMPLEMENTED; }
-  Buffer::InstancePtr& decodingBuffer() override {
+  void addDecodedData(Buffer::Instance&) override { NOT_IMPLEMENTED; }
+  const Buffer::Instance* decodingBuffer() override {
     throw EnvoyException("buffering is not supported in streaming");
   }
   void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -199,7 +197,6 @@ private:
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
   Router::ProdFilter router_;
-  std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
   Tracing::NullSpan active_span_;
   std::shared_ptr<RouteImpl> route_;
@@ -229,7 +226,7 @@ private:
   void onReset() override;
 
   // Http::StreamDecoderFilterCallbacks
-  Buffer::InstancePtr& decodingBuffer() override { return request_->body(); }
+  const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
 
   MessagePtr request_;
   AsyncClient::Callbacks& callbacks_;
@@ -240,3 +237,4 @@ private:
 };
 
 } // Http
+} // Envoy

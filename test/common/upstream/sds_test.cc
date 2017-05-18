@@ -21,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::DoAll;
 using testing::Invoke;
@@ -44,7 +45,7 @@ protected:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(raw_config);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(raw_config);
 
     timer_ = new Event::MockTimer(&dispatcher_);
     local_info_.zone_name_ = "us-east-1a";
@@ -359,3 +360,4 @@ TEST_F(SdsTest, FailureArray) {
 }
 
 } // Upstream
+} // Envoy

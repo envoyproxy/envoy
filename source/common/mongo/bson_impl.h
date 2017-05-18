@@ -10,6 +10,7 @@
 
 #include "common/common/logger.h"
 
+namespace Envoy {
 namespace Bson {
 
 /**
@@ -261,3 +262,4 @@ private:
 };
 
 } // Bson
+} // Envoy

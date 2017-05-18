@@ -21,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::DoAll;
 using testing::InSequence;
@@ -45,7 +46,7 @@ TEST(HealthCheckerFactoryTest, createRedis) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Upstream::MockCluster> cluster;
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
@@ -98,7 +99,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     health_checker_.reset(
         new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state)
@@ -119,7 +120,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     health_checker_.reset(
         new TestHttpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state)
@@ -610,7 +611,7 @@ TEST(TcpHealthCheckMatcher, loadJsonBytes) {
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     TcpHealthCheckMatcher::MatchSegments segments =
         TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes"));
     EXPECT_EQ(2U, segments.size());
@@ -625,7 +626,7 @@ TEST(TcpHealthCheckMatcher, loadJsonBytes) {
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     EXPECT_THROW(TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes")),
                  EnvoyException);
   }
@@ -639,7 +640,7 @@ TEST(TcpHealthCheckMatcher, loadJsonBytes) {
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     EXPECT_THROW(TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes")),
                  EnvoyException);
   }
@@ -659,7 +660,7 @@ TEST(TcpHealthCheckMatcher, match) {
   }
   )EOF";
 
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   TcpHealthCheckMatcher::MatchSegments segments =
       TcpHealthCheckMatcher::loadJsonBytes(config->getObjectArray("bytes"));
 
@@ -705,7 +706,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     health_checker_.reset(
         new TcpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
   }
@@ -723,7 +724,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     health_checker_.reset(
         new TcpHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_));
   }
@@ -859,7 +860,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     health_checker_.reset(
         new RedisHealthCheckerImpl(*cluster_, *config, dispatcher_, runtime_, random_, *this));
   }
@@ -963,3 +964,4 @@ TEST_F(RedisHealthCheckerImplTest, All) {
 }
 
 } // Upstream
+} // Envoy

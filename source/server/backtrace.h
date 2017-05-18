@@ -4,6 +4,7 @@
 
 #include "backward.hpp"
 
+namespace Envoy {
 #define BACKTRACE_LOG()                                                                            \
   do {                                                                                             \
     BackwardsTrace t;                                                                              \
@@ -103,3 +104,4 @@ private:
   static const int MAX_STACK_DEPTH = 64;
   backward::StackTrace stack_trace_;
 };
+} // Envoy

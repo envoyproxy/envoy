@@ -24,6 +24,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Router {
 
 std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
@@ -113,13 +114,13 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   if (have_weighted_clusters) {
     uint64_t total_weight = 0UL;
 
-    const Json::ObjectPtr weighted_clusters_json = route.getObject("weighted_clusters");
-    const std::vector<Json::ObjectPtr> cluster_list =
+    const Json::ObjectSharedPtr weighted_clusters_json = route.getObject("weighted_clusters");
+    const std::vector<Json::ObjectSharedPtr> cluster_list =
         weighted_clusters_json->getObjectArray("clusters");
     const std::string runtime_key_prefix =
         weighted_clusters_json->getString("runtime_key_prefix", EMPTY_STRING);
 
-    for (const Json::ObjectPtr& cluster : cluster_list) {
+    for (const Json::ObjectSharedPtr cluster : cluster_list) {
       const std::string cluster_name = cluster->getString("name");
       std::unique_ptr<WeightedClusterEntry> cluster_entry(
           new WeightedClusterEntry(this, runtime_key_prefix + "." + cluster_name, loader_,
@@ -135,8 +136,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   }
 
   if (route.hasObject("headers")) {
-    std::vector<Json::ObjectPtr> config_headers = route.getObjectArray("headers");
-    for (const Json::ObjectPtr& header_map : config_headers) {
+    std::vector<Json::ObjectSharedPtr> config_headers = route.getObjectArray("headers");
+    for (const Json::ObjectSharedPtr header_map : config_headers) {
       config_headers_.push_back(*header_map);
     }
   }
@@ -146,7 +147,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost, const Json:
   }
 
   if (route.hasObject("request_headers_to_add")) {
-    for (const Json::ObjectPtr& header : route.getObjectArray("request_headers_to_add")) {
+    for (const Json::ObjectSharedPtr header : route.getObjectArray("request_headers_to_add")) {
       request_headers_to_add_.push_back(
           {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
@@ -247,7 +248,7 @@ std::multimap<std::string, std::string>
 RouteEntryImplBase::parseOpaqueConfig(const Json::Object& route) {
   std::multimap<std::string, std::string> ret;
   if (route.hasObject("opaque_config")) {
-    Json::ObjectPtr obj = route.getObject("opaque_config");
+    Json::ObjectSharedPtr obj = route.getObject("opaque_config");
     obj->iterate([&ret](const std::string& name, const Json::Object& value) {
       ret.emplace(name, value.asString());
       return true;
@@ -416,13 +417,14 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
   }
 
   if (virtual_host.hasObject("request_headers_to_add")) {
-    for (const Json::ObjectPtr& header : virtual_host.getObjectArray("request_headers_to_add")) {
+    for (const Json::ObjectSharedPtr header :
+         virtual_host.getObjectArray("request_headers_to_add")) {
       request_headers_to_add_.push_back(
           {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
   }
 
-  for (const Json::ObjectPtr& route : virtual_host.getObjectArray("routes")) {
+  for (const Json::ObjectSharedPtr route : virtual_host.getObjectArray("routes")) {
     bool has_prefix = route->hasObject("prefix");
     bool has_path = route->hasObject("path");
     if (!(has_prefix ^ has_path)) {
@@ -448,7 +450,8 @@ VirtualHostImpl::VirtualHostImpl(const Json::Object& virtual_host,
   }
 
   if (virtual_host.hasObject("virtual_clusters")) {
-    for (const Json::ObjectPtr& virtual_cluster : virtual_host.getObjectArray("virtual_clusters")) {
+    for (const Json::ObjectSharedPtr virtual_cluster :
+         virtual_host.getObjectArray("virtual_clusters")) {
       virtual_clusters_.push_back(VirtualClusterEntry(*virtual_cluster));
     }
   }
@@ -500,7 +503,8 @@ RouteMatcher::RouteMatcher(const Json::Object& json_config, const ConfigImpl& gl
 
   json_config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
-  for (const Json::ObjectPtr& virtual_host_config : json_config.getObjectArray("virtual_hosts")) {
+  for (const Json::ObjectSharedPtr virtual_host_config :
+       json_config.getObjectArray("virtual_hosts")) {
     VirtualHostSharedPtr virtual_host(new VirtualHostImpl(*virtual_host_config, global_route_config,
                                                           runtime, cm, validate_clusters));
     uses_runtime_ |= virtual_host->usesRuntime();
@@ -610,7 +614,7 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
   }
 
   if (config.hasObject("response_headers_to_add")) {
-    for (const Json::ObjectPtr& header : config.getObjectArray("response_headers_to_add")) {
+    for (const Json::ObjectSharedPtr header : config.getObjectArray("response_headers_to_add")) {
       response_headers_to_add_.push_back(
           {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
@@ -623,7 +627,7 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
   }
 
   if (config.hasObject("request_headers_to_add")) {
-    for (const Json::ObjectPtr& header : config.getObjectArray("request_headers_to_add")) {
+    for (const Json::ObjectSharedPtr header : config.getObjectArray("request_headers_to_add")) {
       request_headers_to_add_.push_back(
           {Http::LowerCaseString(header->getString("key")), header->getString("value")});
     }
@@ -631,3 +635,4 @@ ConfigImpl::ConfigImpl(const Json::Object& config, Runtime::Loader& runtime,
 }
 
 } // Router
+} // Envoy

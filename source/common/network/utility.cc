@@ -22,6 +22,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Network {
 
 IpList::IpList(const std::vector<std::string>& subnets) {
@@ -88,7 +89,7 @@ const std::string Utility::UNIX_SCHEME = "unix://";
 
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   if (url.find(TCP_SCHEME) == 0) {
-    return Address::parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
+    return parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
   } else if (url.find(UNIX_SCHEME) == 0) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
@@ -129,7 +130,77 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   }
 }
 
-Address::InstanceConstSharedPtr Utility::getLocalAddress() {
+Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address) {
+  sockaddr_in sa4;
+  if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
+    sa4.sin_family = AF_INET;
+    sa4.sin_port = 0;
+    return std::make_shared<Address::Ipv4Instance>(&sa4);
+  }
+  sockaddr_in6 sa6;
+  if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
+    sa6.sin6_family = AF_INET6;
+    sa6.sin6_port = 0;
+    return std::make_shared<Address::Ipv6Instance>(sa6);
+  }
+  throwWithMalformedIp(ip_address);
+  NOT_REACHED;
+}
+
+Address::InstanceConstSharedPtr
+Utility::parseInternetAddressAndPort(const std::string& ip_address) {
+  if (ip_address.empty()) {
+    throwWithMalformedIp(ip_address);
+  }
+  if (ip_address[0] == '[') {
+    // Appears to be an IPv6 address. Find the "]:" that separates the address from the port.
+    auto pos = ip_address.rfind("]:");
+    if (pos == std::string::npos) {
+      throwWithMalformedIp(ip_address);
+    }
+    const auto ip_str = ip_address.substr(1, pos - 1);
+    const auto port_str = ip_address.substr(pos + 2);
+    uint64_t port64 = 0;
+    if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
+      throwWithMalformedIp(ip_address);
+    }
+    sockaddr_in6 sa6;
+    if (ip_str.empty() || inet_pton(AF_INET6, ip_str.c_str(), &sa6.sin6_addr) != 1) {
+      throwWithMalformedIp(ip_address);
+    }
+    sa6.sin6_family = AF_INET6;
+    sa6.sin6_port = htons(port64);
+    return std::make_shared<Address::Ipv6Instance>(sa6);
+  }
+  // Treat it as an IPv4 address followed by a port.
+  auto pos = ip_address.rfind(":");
+  if (pos == std::string::npos) {
+    throwWithMalformedIp(ip_address);
+  }
+  const auto ip_str = ip_address.substr(0, pos);
+  const auto port_str = ip_address.substr(pos + 1);
+  uint64_t port64 = 0;
+  if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
+    throwWithMalformedIp(ip_address);
+  }
+  sockaddr_in sa4;
+  if (ip_str.empty() || inet_pton(AF_INET, ip_str.c_str(), &sa4.sin_addr) != 1) {
+    throwWithMalformedIp(ip_address);
+  }
+  sa4.sin_family = AF_INET;
+  sa4.sin_port = htons(port64);
+  return std::make_shared<Address::Ipv4Instance>(&sa4);
+}
+
+void Utility::throwWithMalformedIp(const std::string& ip_address) {
+  throw EnvoyException(fmt::format("malformed IP address: {}", ip_address));
+}
+
+// TODO(hennna): Currently getLocalAddress does not support choosing between
+// multiple interfaces and addresses not returned by getifaddrs. In additon,
+// the default is to return a loopback address of type version. This function may
+// need to be updated in the future. Discussion can be found at Github issue #939.
+Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersion version) {
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;
   Address::InstanceConstSharedPtr ret;
@@ -144,10 +215,13 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress() {
       continue;
     }
 
-    if (ifa->ifa_addr->sa_family == AF_INET) {
-      sockaddr_in* addr = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
-      if (htonl(INADDR_LOOPBACK) != addr->sin_addr.s_addr) {
-        ret.reset(new Address::Ipv4Instance(addr));
+    if ((ifa->ifa_addr->sa_family == AF_INET && version == Address::IpVersion::v4) ||
+        (ifa->ifa_addr->sa_family == AF_INET6 && version == Address::IpVersion::v6)) {
+      const struct sockaddr_storage* addr =
+          reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
+      ret = Address::addressFromSockAddr(
+          *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
+      if (!isLoopbackAddress(*ret)) {
         break;
       }
     }
@@ -157,6 +231,14 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress() {
     freeifaddrs(ifaddr);
   }
 
+  // If the local address is not found above, then return the loopback addresss by default.
+  if (ret == nullptr) {
+    if (version == Address::IpVersion::v4) {
+      ret.reset(new Address::Ipv4Instance("127.0.0.1"));
+    } else if (version == Address::IpVersion::v6) {
+      ret.reset(new Address::Ipv6Instance("::1"));
+    }
+  }
   return ret;
 }
 
@@ -183,7 +265,14 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     return false;
   }
 
-  return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
+  if (address.ip()->version() == Address::IpVersion::v4) {
+    // Compare to the canonical v4 loopback address: 127.0.0.1.
+    return address.ip()->ipv4()->address() == htonl(INADDR_LOOPBACK);
+  } else if (address.ip()->version() == Address::IpVersion::v6) {
+    std::array<uint8_t, 16> addr = address.ip()->ipv6()->address();
+    return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
+  }
+  NOT_IMPLEMENTED;
 }
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
@@ -264,3 +353,4 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
 }
 
 } // Network
+} // Envoy

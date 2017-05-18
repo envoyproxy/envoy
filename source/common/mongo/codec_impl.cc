@@ -14,6 +14,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Mongo {
 
 std::string
@@ -393,3 +394,4 @@ void EncoderImpl::encodeReply(const ReplyMessage& message) {
 }
 
 } // Mongo
+} // Envoy

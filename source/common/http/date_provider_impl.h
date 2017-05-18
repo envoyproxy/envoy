@@ -10,6 +10,7 @@
 
 #include "date_provider.h"
 
+namespace Envoy {
 namespace Http {
 
 /**
@@ -58,3 +59,4 @@ public:
 };
 
 } // Http
+} // Envoy
