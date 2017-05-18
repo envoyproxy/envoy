@@ -1191,11 +1191,6 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
-      "max_concurrent_streams" : {
-        "type" : "integer",
-        "minimum" : -1,
-        "exclusiveMinimum" : false
-      },
       "circuit_breakers" : {
         "type" : "object",
         "properties" : {

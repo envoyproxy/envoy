@@ -247,17 +247,7 @@ CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnect
   return codec;
 }
 
-uint32_t ProdConnPoolImpl::maxConcurrentStreams() {
-  int32_t max_concurrent_streams = host_->cluster().maxConcurrentStreams();
-  switch (max_concurrent_streams) {
-  case -1:
-    return maxTotalStreams();
-  case 0:
-    return ConnectionImpl::MAX_CONCURRENT_STREAMS;
-  default:
-    return max_concurrent_streams;
-  }
-}
+uint64_t ProdConnPoolImpl::maxConcurrentStreams() { return ConnectionImpl::MAX_CONCURRENT_STREAMS; }
 
 uint32_t ProdConnPoolImpl::maxTotalStreams() { return MAX_STREAMS; }
 
