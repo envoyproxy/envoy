@@ -27,7 +27,10 @@ envoy_cc_library(
         "//bazel:disable_lightstep": ["-DDISABLE_LIGHTSTEP_TRACING"],
         "//conditions:default": [],
     }),
-    deps = [
+    deps = select({
+        "//bazel:disable_lightstep": [],
+        "//conditions:default": ["//source/common/tracing:lightstep_tracer_lib"],
+        }) + [
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -43,7 +46,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/ratelimit:ratelimit_lib",
         "//source/common/ssl:context_config_lib",
-        "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing/zipkin:zipkin_lib",
         "//source/common/upstream:cluster_manager_lib",
     ],
