@@ -64,8 +64,9 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 }
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  parent_.connection().dispatcher().post([this, &data, end_stream]()
-                                             -> void { encoder_.encodeData(data, end_stream); });
+  std::shared_ptr<Buffer::Instance> data_copy(new Buffer::OwnedImpl(data));
+  parent_.connection().dispatcher().post(
+      [this, data_copy, end_stream]() -> void { encoder_.encodeData(*data_copy, end_stream); });
 }
 
 void FakeStream::encodeTrailers(const Http::HeaderMapImpl& trailers) {
