@@ -257,7 +257,7 @@ At a high-level, each span records the latency of upstream API calls as well as 
 needed to correlate the span with other related spans (e.g., the trace ID).
 
 One of the most important benefits of tracing from Envoy is that it will take care of
-propagating the traces to to the Zipkin service cluster. However, in order to fully take advantage
+propagating the traces to the Zipkin service cluster. However, in order to fully take advantage
 of tracing, the application has to propagate trace headers that Envoy generates, while making
 calls to other services. In the sandbox we have provided, the simple flask app
 (see trace function in :repo:`/examples/front-proxy/service.py`) acting as service1 propagates
