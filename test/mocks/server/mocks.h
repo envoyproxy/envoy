@@ -53,7 +53,7 @@ public:
   MOCK_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_METHOD0(restartEpoch, uint64_t());
   MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
-  MOCK_METHOD0(mode, Mode());
+  MOCK_CONST_METHOD0(mode, Mode());
 
   std::string config_path_;
   std::string admin_address_path_;
@@ -137,7 +137,6 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
-  MOCK_METHOD0(clusterManagerFactory, Upstream::ClusterManagerFactory&());
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -157,7 +156,6 @@ public:
   testing::NiceMock<Runtime::MockRandomGenerator> random_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Init::MockManager> init_manager_;
-  Upstream::ProdClusterManagerFactory cluster_manager_factory_;
 };
 
 namespace Configuration {

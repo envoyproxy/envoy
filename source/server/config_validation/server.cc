@@ -1,7 +1,5 @@
 #include "server/config_validation/server.h"
 
-#include "common/json/config_schemas.h"
-
 #include "server/configuration_impl.h"
 
 namespace Envoy {
@@ -21,7 +19,7 @@ ValidationInstance::ValidationInstance(Options& options, HotRestart& restarter,
   } catch (const EnvoyException& e) {
     log().critical("error initializing configuration '{}': {}", options.configPath(), e.what());
     thread_local_.shutdownThread();
-    exit(1);
+    throw;
   }
 }
 
@@ -36,7 +34,6 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   Json::ObjectPtr config_json = Json::Factory::loadFromFile(options.configPath());
-  config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
   thread_local_.registerThread(handler_.dispatcher(), true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
@@ -45,7 +42,8 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo()));
 
-  Configuration::MainImpl* main_config = new Configuration::MainImpl(*this);
+  Configuration::MainImpl* main_config =
+      new Configuration::MainImpl(*this, *cluster_manager_factory_);
   config_.reset(main_config);
   main_config->initialize(*config_json);
 

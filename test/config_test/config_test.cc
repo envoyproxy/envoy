@@ -33,11 +33,9 @@ public:
     ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
         .WillByDefault(Return("access_token"));
 
-    ON_CALL(server_, clusterManagerFactory()).WillByDefault(ReturnRef(cluster_manager_factory_));
-
     Json::ObjectPtr config_json = Json::Factory::loadFromFile(file_path);
     Server::Configuration::InitialImpl initial_config(*config_json);
-    Server::Configuration::MainImpl main_config(server_);
+    Server::Configuration::MainImpl main_config(server_, cluster_manager_factory_);
 
     ON_CALL(server_, clusterManager())
         .WillByDefault(

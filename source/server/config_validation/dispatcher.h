@@ -10,7 +10,7 @@ namespace Event {
 /**
  * Config-validation-only implementation of Event::Dispatcher. This class delegates all calls to
  * Event::DispatcherImpl, except for the methods involved with network events. Those methods are
- * disallowed at validation time, so they throw exceptions.
+ * disallowed at validation time.
  */
 class ValidationDispatcher : public DispatcherImpl {
 public:

@@ -36,10 +36,12 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
   return filter_manager.initializeReadFilters();
 }
 
-MainImpl::MainImpl(Server::Instance& server) : server_(server) {}
+MainImpl::MainImpl(Server::Instance& server,
+                   Upstream::ClusterManagerFactory& cluster_manager_factory)
+    : server_(server), cluster_manager_factory_(cluster_manager_factory) {}
 
 void MainImpl::initialize(const Json::Object& json) {
-  cluster_manager_ = server_.clusterManagerFactory().clusterManagerFromJson(
+  cluster_manager_ = cluster_manager_factory_.clusterManagerFromJson(
       *json.getObject("cluster_manager"), server_.stats(), server_.threadLocal(), server_.runtime(),
       server_.random(), server_.localInfo(), server_.accessLogManager());
 
@@ -211,6 +213,7 @@ bool MainImpl::ListenerConfig::createFilterChain(Network::Connection& connection
 }
 
 InitialImpl::InitialImpl(const Json::Object& json) {
+  json.validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Json::ObjectPtr admin = json.getObject("admin");
   admin_.access_log_path_ = admin->getString("access_log_path");
   admin_.profile_path_ = admin->getString("profile_path", "/var/log/envoy/envoy.prof");

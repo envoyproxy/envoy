@@ -8,9 +8,8 @@ envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
     data = [
-        "//configs:google_com_proxy.json",
-        "//test/config/integration:lightstep_access_token",
-        "//test/config/integration:server.json",
+        "//configs:example_configs",
+        "//test/config_test:example_configs_test_setup.sh",
     ],
     deps = [
         "//source/server/config_validation:hot_restart_lib",

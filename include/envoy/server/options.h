@@ -27,13 +27,10 @@ enum class Mode {
    */
   Validate,
 
-  /**
-   * Mock out access to the filesystem. Perform no validation of files referenced in the config,
-   * such as runtime configs, SSL certs, etc. Validation will pass even if those files are malformed
-   * or don't exist, allowing the config to be validated in a non-prod environment.
-   * TODO(rlazarus): This isn't yet implemented.
-   */
-  ValidateLight,
+  // TODO(rlazarus): Add a third option for "light validation": Mock out access to the filesystem.
+  // Perform no validation of files referenced in the config, such as runtime configs, SSL certs,
+  // etc. Validation will pass even if those files are malformed or don't exist, allowing the config
+  // to be validated in a non-prod environment.
 };
 
 /**
@@ -91,7 +88,7 @@ public:
    * @return whether to verify the configuration file is valid, print any errors, and exit
    *         without serving.
    */
-  virtual Mode mode() PURE;
+  virtual Mode mode() const PURE;
 
   /**
     * @return std::chrono::milliseconds the duration in msec between log flushes.

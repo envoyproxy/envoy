@@ -75,9 +75,6 @@ public:
   Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
-  Upstream::ClusterManagerFactory& clusterManagerFactory() override {
-    return *cluster_manager_factory_;
-  }
 
 private:
   void initialize(Options& options, ComponentFactory& component_factory);

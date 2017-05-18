@@ -54,7 +54,10 @@ TEST(ConfigurationImplTest, DefaultStatsFlushInterval) {
   Json::ObjectPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   config.initialize(*loader);
 
   EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
@@ -76,7 +79,10 @@ TEST(ConfigurationImplTest, CustomStatsFlushInterval) {
   Json::ObjectPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   config.initialize(*loader);
 
   EXPECT_EQ(std::chrono::milliseconds(500), config.statsFlushInterval());
@@ -100,7 +106,10 @@ TEST(ConfigurationImplTest, EmptyFilter) {
   Json::ObjectPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   config.initialize(*loader);
 
   EXPECT_EQ(1U, config.listeners().size());
@@ -124,7 +133,10 @@ TEST(ConfigurationImplTest, DefaultListenerPerConnectionBufferLimit) {
   Json::ObjectPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   config.initialize(*loader);
 
   EXPECT_EQ(1024 * 1024U, config.listeners().back()->perConnectionBufferLimitBytes());
@@ -149,7 +161,10 @@ TEST(ConfigurationImplTest, SetListenerPerConnectionBufferLimit) {
   Json::ObjectPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   config.initialize(*loader);
 
   EXPECT_EQ(8192U, config.listeners().back()->perConnectionBufferLimitBytes());
@@ -181,7 +196,10 @@ TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
   Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   config.initialize(*loader);
 
   EXPECT_TRUE(config.listeners().back()->sslContext() != nullptr);
@@ -211,7 +229,10 @@ TEST(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   Json::ObjectPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   config.initialize(*loader);
 
   ASSERT_EQ(1U, config.clusterManager().clusters().count("test_cluster"));
@@ -243,7 +264,10 @@ TEST(ConfigurationImplTest, BadListenerConfig) {
   Json::ObjectPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   EXPECT_THROW(config.initialize(*loader), Json::Exception);
 }
 
@@ -271,7 +295,10 @@ TEST(ConfigurationImplTest, BadFilterConfig) {
   Json::ObjectPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   EXPECT_THROW(config.initialize(*loader), Json::Exception);
 }
 
@@ -304,7 +331,10 @@ TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
 
   NiceMock<Server::MockInstance> server;
   server.local_info_.cluster_name_ = "";
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   EXPECT_THROW(config.initialize(*loader), EnvoyException);
 }
 
@@ -327,7 +357,10 @@ TEST(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
 
   NiceMock<Server::MockInstance> server;
   server.local_info_.cluster_name_ = "";
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   config.initialize(*loader);
 
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
@@ -362,7 +395,10 @@ TEST(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguratio
 
   NiceMock<Server::MockInstance> server;
   server.local_info_.cluster_name_ = "";
-  MainImpl config(server);
+  Upstream::ProdClusterManagerFactory cluster_manager_factory(
+      server.runtime(), server.stats(), server.threadLocal(), server.random(), server.dnsResolver(),
+      server.sslContextManager(), server.dispatcher(), server.localInfo());
+  MainImpl config(server, cluster_manager_factory);
   config.initialize(*loader);
 
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));

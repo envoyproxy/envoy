@@ -43,7 +43,7 @@ public:
   std::chrono::milliseconds fileFlushIntervalMsec() override {
     return std::chrono::milliseconds(10000);
   }
-  Mode mode() override { return Mode::Serve; }
+  Mode mode() const override { return Mode::Serve; }
 
 private:
   const std::string config_path_;

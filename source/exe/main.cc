@@ -41,27 +41,30 @@ public:
 };
 
 } // Server
-} // Envoy
 
 namespace {
 
-int validateConfig(Envoy::OptionsImpl& options,
-                   Envoy::Server::ProdComponentFactory& component_factory,
-                   const Envoy::LocalInfo::LocalInfoImpl& local_info) {
-  Envoy::Thread::MutexBasicLockable access_log_lock;
-  Envoy::Thread::MutexBasicLockable log_lock;
-  Envoy::Server::ValidationHotRestart restarter;
-  Envoy::Logger::Registry::initialize(options.logLevel(), log_lock);
-  Envoy::Stats::IsolatedStoreImpl stats_store;
+int validateConfig(OptionsImpl& options, Server::ProdComponentFactory& component_factory,
+                   const LocalInfo::LocalInfoImpl& local_info) {
+  Thread::MutexBasicLockable access_log_lock;
+  Thread::MutexBasicLockable log_lock;
+  Server::ValidationHotRestart restarter;
+  Logger::Registry::initialize(options.logLevel(), log_lock);
+  Stats::IsolatedStoreImpl stats_store;
 
-  Envoy::Server::ValidationInstance server(options, restarter, stats_store, access_log_lock,
-                                           component_factory, local_info);
-  std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
-  server.shutdown();
-  return 0;
+  try {
+    Server::ValidationInstance server(options, restarter, stats_store, access_log_lock,
+                                      component_factory, local_info);
+    std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
+    server.shutdown();
+    return 0;
+  } catch (const EnvoyException& e) {
+    return 1;
+  }
 }
 
 } // namespace
+} // Envoy
 
 int main(int argc, char** argv) {
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -80,11 +83,7 @@ int main(int argc, char** argv) {
   case Envoy::Server::Mode::Serve:
     break;
   case Envoy::Server::Mode::Validate:
-    return validateConfig(options, component_factory, local_info);
-  case Envoy::Server::Mode::ValidateLight:
-    NOT_IMPLEMENTED;
-  default:
-    NOT_REACHED;
+    return Envoy::validateConfig(options, component_factory, local_info);
   }
 
   ares_library_init(ARES_LIB_INIT_ALL);

@@ -9,8 +9,8 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Config-validation implementation of ConnectionHandler. Calls to add*Listener() will throw
- * exceptions, since no listeners can be added at validation time.
+ * Config-validation implementation of ConnectionHandler. Calls to add*Listener() will fail, since
+ * no listeners can be added at validation time.
  */
 class ValidationConnectionHandler : public Network::ConnectionHandler {
 public:

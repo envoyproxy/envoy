@@ -96,7 +96,6 @@ envoy_cc_library(
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/common:assert_lib",
-        "//source/common/json:config_schemas_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",

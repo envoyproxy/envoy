@@ -61,7 +61,7 @@ public:
  */
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
-  MainImpl(Server::Instance& server);
+  MainImpl(Server::Instance& server, Upstream::ClusterManagerFactory& cluster_manager_factory_);
 
   static void registerNetworkFilterConfigFactory(NetworkFilterConfigFactory& factory) {
     filterConfigFactories().push_back(&factory);
@@ -136,6 +136,7 @@ private:
   }
 
   Server::Instance& server_;
+  Upstream::ClusterManagerFactory& cluster_manager_factory_;
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   Tracing::HttpTracerPtr http_tracer_;
   std::list<Server::Configuration::ListenerPtr> listeners_;

@@ -188,11 +188,6 @@ public:
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
-
-  /**
-   * @return the server-wide cluster manager factory.
-   */
-  virtual Upstream::ClusterManagerFactory& clusterManagerFactory() PURE;
 };
 
 } // Server
