@@ -41,9 +41,10 @@ TEST_F(GrpcWebFilterTest, BinaryUnary) {
             request_headers.ContentType()->value().c_str());
 
   // Tests request data.
-  Buffer::OwnedImpl request_buffer("grpc-web-bin-data");
+  Buffer::OwnedImpl request_buffer("\x00\x00\x00\x00\x11grpc-web-bin-data");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_buffer, true));
-  EXPECT_EQ("grpc-web-bin-data", TestUtility::bufferToString(request_buffer));
+  EXPECT_EQ(0, strncmp("\x00\x00\x00\x00\x11grpc-web-bin-data",
+                       TestUtility::bufferToString(request_buffer).c_str(), 22));
 
   // Tests response headers.
   Http::TestHeaderMapImpl response_headers;
@@ -54,9 +55,9 @@ TEST_F(GrpcWebFilterTest, BinaryUnary) {
             response_headers.ContentType()->value().c_str());
 
   // Tests response data.
-  Buffer::OwnedImpl response_buffer("grpc-web-bin-data");
+  Buffer::OwnedImpl response_buffer("\x00\x00\x00\x00\x11grpc-web-bin-data");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_buffer, false));
-  EXPECT_EQ("grpc-web-bin-data", TestUtility::bufferToString(response_buffer));
+  EXPECT_EQ("\x00\x00\x00\x00\x11grpc-web-bin-data", TestUtility::bufferToString(response_buffer));
   response_buffer.drain(response_buffer.length());
 
   // Tests response trailers.
@@ -110,8 +111,5 @@ TEST_F(GrpcWebFilterTest, TextUnary) {
                        reinterpret_cast<char*>(response_buffer.linearize(response_buffer.length())),
                        response_buffer.length()));
 }
-
-TEST_F(GrpcWebFilterTest, BinaryBidi) {}
-
 } // namespace Grpc
 } // namespace Envoy
