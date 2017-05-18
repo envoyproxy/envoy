@@ -35,3 +35,6 @@ build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --define tcmalloc=disabled
 build:clang-msan --copt -fsanitize-memory-track-origins=2
+
+# Symbolize stack trace for tests.
+test --run_under=//tools:stack_decode.py
