@@ -13,17 +13,19 @@ envoy_cc_library(
     srcs = [
         "http_tracer_impl.cc",
     ] + select({
-        "//bazel:disable_lightstep_tracing": [],
+        "//bazel:disable_lightstep": [],
         "//conditions:default": ["lightstep_tracer_impl.cc"],
     }),
     hdrs = [
         "http_tracer_impl.h",
     ] + select({
-        "//bazel:disable_lightstep_tracing": [],
+        "//bazel:disable_lightstep": [],
         "//conditions:default": ["lightstep_tracer_impl.h"],
     }),
-    external_deps = ["lightstep"],
-    deps = [
+    deps = select({
+        "//bazel:disable_lightstep": [],
+        "//conditions:default": [":lightstep_external_lib"],
+    }) + [
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/thread_local:thread_local_interface",
@@ -42,4 +44,9 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/runtime:uuid_util_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "lightstep_external_lib",
+    external_deps = ["lightstep"],
 )

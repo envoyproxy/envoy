@@ -21,7 +21,10 @@ envoy_cc_library(
     srcs = ["configuration_impl.cc"],
     hdrs = ["configuration_impl.h"],
     copts = select({
-        "//bazel:disable_lightstep_tracing": ["-DDISABLE_LIGHTSTEP_TRACING"],
+        # TODO(tschroed): This allows linking against Google code, but is very hacky.
+        # https://github.com/lyft/envoy/issues/967 to do it properly, at which point
+        # the -D can be removed.
+        "//bazel:disable_lightstep": ["-DDISABLE_LIGHTSTEP_TRACING"],
         "//conditions:default": [],
     }),
     deps = [
