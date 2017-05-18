@@ -117,9 +117,7 @@ Tracing::SpanPtr Driver::startSpan(Http::HeaderMap& request_headers, const std::
     new_zipkin_span = tracer.startSpan(request_headers.Host()->value().c_str(), start_time);
   }
 
-  ZipkinSpanPtr active_span;
-  active_span.reset(new ZipkinSpan(*new_zipkin_span, tracer));
-
+  ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));
   return std::move(active_span);
 }
 
