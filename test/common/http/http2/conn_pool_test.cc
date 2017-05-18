@@ -45,7 +45,6 @@ public:
 
   uint32_t maxTotalStreams() override { return max_streams_; }
 
-  uint64_t max_concurrent_streams_{std::numeric_limits<uint64_t>::max()};
   uint32_t max_streams_{std::numeric_limits<uint32_t>::max()};
 };
 
@@ -357,7 +356,6 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
 
 TEST_F(Http2ConnPoolImplTest, MaxRequests) {
   InSequence s;
-  pool_.max_concurrent_streams_ = 1;
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0);
