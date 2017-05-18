@@ -43,10 +43,8 @@ public:
 
   MOCK_METHOD1(createCodecClient_, CodecClient*(Upstream::Host::CreateConnectionData& data));
 
-  uint64_t maxConcurrentStreams() override { return max_concurrent_streams_; }
   uint32_t maxTotalStreams() override { return max_streams_; }
 
-  uint64_t max_concurrent_streams_{std::numeric_limits<uint64_t>::max()};
   uint32_t max_streams_{std::numeric_limits<uint32_t>::max()};
 };
 
@@ -354,26 +352,6 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_timeout_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());
-}
-
-TEST_F(Http2ConnPoolImplTest, MaxRequests) {
-  InSequence s;
-  pool_.max_concurrent_streams_ = 1;
-
-  expectClientCreate();
-  ActiveTestRequest r1(*this, 0);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
-  r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
-  expectClientConnect(0);
-
-  ConnPoolCallbacks callbacks;
-  Http::MockStreamDecoder decoder;
-  EXPECT_CALL(callbacks.pool_failure_, ready());
-  EXPECT_EQ(nullptr, pool_.newStream(decoder, callbacks));
-
-  test_clients_[0].connection_->raiseEvents(Network::ConnectionEvent::RemoteClose);
-  EXPECT_CALL(*this, onClientDestroy());
-  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {

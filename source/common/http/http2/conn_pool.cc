@@ -82,22 +82,15 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     primary_client_.reset(new ActiveClient(*this));
   }
 
-  if (primary_client_->client_->numActiveRequests() >= maxConcurrentStreams() ||
-      !host_->cluster().resourceManager(priority_).requests().canCreate()) {
-    log_debug("max requests overflow");
-    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
-    host_->cluster().stats().upstream_rq_pending_overflow_.inc();
-  } else {
-    conn_log_debug("creating stream", *primary_client_->client_);
-    primary_client_->total_streams_++;
-    host_->stats().rq_total_.inc();
-    host_->stats().rq_active_.inc();
-    host_->cluster().stats().upstream_rq_total_.inc();
-    host_->cluster().stats().upstream_rq_active_.inc();
-    host_->cluster().resourceManager(priority_).requests().inc();
-    callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
-                          primary_client_->real_host_description_);
-  }
+  conn_log_debug("creating stream", *primary_client_->client_);
+  primary_client_->total_streams_++;
+  host_->stats().rq_total_.inc();
+  host_->stats().rq_active_.inc();
+  host_->cluster().stats().upstream_rq_total_.inc();
+  host_->cluster().stats().upstream_rq_active_.inc();
+  host_->cluster().resourceManager(priority_).requests().inc();
+  callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
+                        primary_client_->real_host_description_);
 
   return nullptr;
 }
@@ -246,8 +239,6 @@ CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnect
                                            data.host_description_)};
   return codec;
 }
-
-uint64_t ProdConnPoolImpl::maxConcurrentStreams() { return ConnectionImpl::MAX_CONCURRENT_STREAMS; }
 
 uint32_t ProdConnPoolImpl::maxTotalStreams() { return MAX_STREAMS; }
 
