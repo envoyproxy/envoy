@@ -64,8 +64,8 @@ TEST_F(GrpcWebFilterTest, BinaryUnary) {
   response_trailers.addViaCopy(Http::Headers::get().GrpcStatus, "0");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   EXPECT_EQ(0, strncmp("\x80\0x00\0x00\0x00\0x23grpc-status:0\r\n",
-      reinterpret_cast<char*>(response_buffer.linearize(response_buffer.length())),
-                  response_buffer.length()));
+                       reinterpret_cast<char*>(response_buffer.linearize(response_buffer.length())),
+                       response_buffer.length()));
 }
 
 TEST_F(GrpcWebFilterTest, TextUnary) {
@@ -107,8 +107,8 @@ TEST_F(GrpcWebFilterTest, TextUnary) {
   response_trailers.addViaCopy(Http::Headers::get().GrpcStatus, "0");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   EXPECT_EQ(0, strncmp("\x80\0x00\0x00\0x00\0x23grpc-status:0\r\n",
-      reinterpret_cast<char*>(response_buffer.linearize(response_buffer.length())),
-                  response_buffer.length()));
+                       reinterpret_cast<char*>(response_buffer.linearize(response_buffer.length())),
+                       response_buffer.length()));
 }
 
 TEST_F(GrpcWebFilterTest, BinaryBidi) {}

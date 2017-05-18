@@ -62,9 +62,11 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
 Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
   headers.remove(Http::Headers::get().ContentType);
   if (is_text_response_) {
-    headers.addStatic(Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.GrpcWebText);
+    headers.addStatic(Http::Headers::get().ContentType,
+                      Http::Headers::get().ContentTypeValues.GrpcWebText);
   } else {
-    headers.addStatic(Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.GrpcWeb);
+    headers.addStatic(Http::Headers::get().ContentType,
+                      Http::Headers::get().ContentTypeValues.GrpcWeb);
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -82,7 +84,9 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
     temp.add(&frame.flags_, 1);
     uint32_t length = htonl(frame.length_);
     temp.add(&length, 4);
-    temp.add(*frame.data_);
+    if (frame.length_ > 0) {
+      temp.add(*frame.data_);
+    }
     data.add(Base64::encode(temp, temp.length()));
   }
   return Http::FilterDataStatus::Continue;
