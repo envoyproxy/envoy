@@ -43,7 +43,6 @@ public:
 
   MOCK_METHOD1(createCodecClient_, CodecClient*(Upstream::Host::CreateConnectionData& data));
 
-  uint64_t maxConcurrentStreams() override { return max_concurrent_streams_; }
   uint32_t maxTotalStreams() override { return max_streams_; }
 
   uint64_t max_concurrent_streams_{std::numeric_limits<uint64_t>::max()};
