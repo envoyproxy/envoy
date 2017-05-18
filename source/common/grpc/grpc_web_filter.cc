@@ -60,10 +60,11 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
 
 // Implements StreamEncoderFilter.
 Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+  headers.remove(Http::Headers::get().ContentType);
   if (is_text_response_) {
-    headers.ContentType()->value(Http::Headers::get().ContentTypeValues.GrpcWebText);
+    headers.addStatic(Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.GrpcWebText);
   } else {
-    headers.ContentType()->value(Http::Headers::get().ContentTypeValues.GrpcWeb);
+    headers.addStatic(Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.GrpcWeb);
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -79,9 +80,10 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
   for (auto& frame : frames) {
     Buffer::OwnedImpl temp;
     temp.add(&frame.flags_, 1);
-    temp.add(&frame.length_, 4);
+    uint32_t length = htonl(frame.length_);
+    temp.add(&length, 4);
     temp.add(*frame.data_);
-    data.add(temp);
+    data.add(Base64::encode(temp, temp.length()));
   }
   return Http::FilterDataStatus::Continue;
 }
