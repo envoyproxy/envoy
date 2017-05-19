@@ -26,7 +26,6 @@ namespace Http {
 namespace Http2 {
 
 struct Http2SettingsTestParam : public Http2Settings {
-
   Http2SettingsTestParam(uint64_t codec_options, uint32_t max_concurrent_streams,
                          uint32_t initial_window_size) {
     codec_options_ = codec_options;
