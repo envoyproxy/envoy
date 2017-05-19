@@ -18,7 +18,6 @@ env = ${b64env}
 for k, v in env.iteritems():
   os.environ[k] = v
 
-os.chdir('${working_dir}')
 os.system("${gdb} --args ${test_args}")
 """)
 
@@ -26,11 +25,11 @@ if __name__ == '__main__':
   gdb = sys.argv[1]
   generated_path = sys.argv[2]
   test_args = sys.argv[3:]
+  test_args[0] = os.path.abspath(test_args[0])
   with open(generated_path, 'w') as f:
     f.write(
         GDB_RUNNER_SCRIPT.substitute(
             b64env=str(dict(os.environ)),
-            working_dir=os.getcwd(),
             gdb=gdb,
             test_args=' '.join(pipes.quote(arg) for arg in test_args)))
   # To make bazel consider the test a failure we exit non-zero.
