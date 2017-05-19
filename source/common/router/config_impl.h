@@ -327,6 +327,8 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   std::list<std::pair<Http::LowerCaseString, std::string>> request_headers_to_add_;
+
+  // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
 };
 

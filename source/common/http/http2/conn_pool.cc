@@ -82,8 +82,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     primary_client_.reset(new ActiveClient(*this));
   }
 
-  if (primary_client_->client_->numActiveRequests() >= maxConcurrentStreams() ||
-      !host_->cluster().resourceManager(priority_).requests().canCreate()) {
+  if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
     log_debug("max requests overflow");
     callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
@@ -245,11 +244,6 @@ CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnect
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP2, std::move(data.connection_),
                                            data.host_description_)};
   return codec;
-}
-
-uint64_t ProdConnPoolImpl::maxConcurrentStreams() {
-  // NOTES: this function is remove from PR #981, just hard-code the same value here for now
-  return 1024;
 }
 
 uint32_t ProdConnPoolImpl::maxTotalStreams() { return MAX_STREAMS; }

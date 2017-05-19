@@ -34,7 +34,7 @@ TEST(TcpProxyConfigTest, NoRouteConfig) {
     }
     )EOF";
 
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   EXPECT_THROW(TcpProxyConfig(*config, cluster_manager,
                               cluster_manager.thread_local_cluster_.cluster_.info_->stats_store_),
@@ -55,7 +55,7 @@ TEST(TcpProxyConfigTest, NoCluster) {
     }
     )EOF";
 
-  Json::ObjectPtr config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   EXPECT_CALL(cluster_manager, get("fake_cluster")).WillOnce(Return(nullptr));
   EXPECT_THROW(TcpProxyConfig(*config, cluster_manager,
@@ -77,7 +77,7 @@ TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
    }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   EXPECT_THROW(TcpProxyConfig(*json_config, cluster_manager,
                               cluster_manager.thread_local_cluster_.cluster_.info_->stats_store_),
@@ -127,7 +127,7 @@ TEST(TcpProxyConfigTest, Routes) {
     }
     )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   NiceMock<Upstream::MockClusterManager> cm_;
 
   TcpProxyConfig config_obj(*json_config, cm_,
@@ -283,7 +283,7 @@ TEST(TcpProxyConfigTest, EmptyRouteConfig) {
     }
     )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   NiceMock<Upstream::MockClusterManager> cm_;
 
   TcpProxyConfig config_obj(*json_config, cm_,
@@ -309,7 +309,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     config_.reset(
         new TcpProxyConfig(*config, cluster_manager_,
                            cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_));
@@ -480,7 +480,7 @@ public:
     }
     )EOF";
 
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     config_.reset(
         new TcpProxyConfig(*config, cluster_manager_,
                            cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_));

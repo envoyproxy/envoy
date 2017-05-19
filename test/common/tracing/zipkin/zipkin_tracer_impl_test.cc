@@ -56,7 +56,7 @@ public:
        "collector_endpoint": "/api/v1/spans"
        }
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
 
     setup(*loader, true);
   }
@@ -82,14 +82,14 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     std::string invalid_config = R"EOF(
       {"fake" : "fake"}
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(invalid_config);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(invalid_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
 
   {
     std::string empty_config = "{}";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(empty_config);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(empty_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
@@ -104,7 +104,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
        "collector_endpoint": "/api/v1/spans"
        }
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
 
     EXPECT_THROW(setup(*loader, false), EnvoyException);
   }
@@ -120,7 +120,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
        "collector_endpoint": "/api/v1/spans"
        }
     )EOF";
-    Json::ObjectPtr loader = Json::Factory::loadFromString(valid_config);
+    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
 
     setup(*loader, true);
   }
@@ -251,6 +251,9 @@ TEST_F(ZipkinDriverTest, SerializeAndDeserializeContext) {
   // Supply empty context.
   request_headers_.removeOtSpanContext();
   Tracing::SpanPtr span = driver_->startSpan(request_headers_, operation_name_, start_time_);
+
+  EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+  span->injectContext(request_headers_);
 
   injected_ctx = request_headers_.OtSpanContext()->value().c_str();
   EXPECT_FALSE(injected_ctx.empty());

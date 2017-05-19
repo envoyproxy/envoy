@@ -15,12 +15,28 @@
 namespace Envoy {
 namespace Tracing {
 
-LightStepSpan::LightStepSpan(lightstep::Span& span) : span_(span) {}
+LightStepSpan::LightStepSpan(lightstep::Span& span, lightstep::Tracer& tracer)
+    : span_(span), tracer_(tracer) {}
 
 void LightStepSpan::finishSpan() { span_.Finish(); }
 
 void LightStepSpan::setTag(const std::string& name, const std::string& value) {
   span_.SetTag(name, value);
+}
+
+void LightStepSpan::injectContext(Http::HeaderMap& request_headers) {
+  lightstep::BinaryCarrier ctx;
+  tracer_.Inject(context(), lightstep::CarrierFormat::LightStepBinaryCarrier,
+                 lightstep::ProtoWriter(&ctx));
+  const std::string current_span_context = ctx.SerializeAsString();
+  request_headers.insertOtSpanContext().value(
+      Base64::encode(current_span_context.c_str(), current_span_context.length()));
+}
+
+SpanPtr LightStepSpan::spawnChild(const std::string& name, SystemTime start_time) {
+  lightstep::Span ls_span = tracer_.StartSpan(
+      name, {lightstep::ChildOf(span_.context()), lightstep::StartTimestamp(start_time)});
+  return SpanPtr{new LightStepSpan(ls_span, tracer_)};
 }
 
 LightStepRecorder::LightStepRecorder(const lightstep::TracerImpl& tracer, LightStepDriver& driver,
@@ -134,20 +150,12 @@ SpanPtr LightStepDriver::startSpan(Http::HeaderMap& request_headers,
     lightstep::Span ls_span =
         tracer.StartSpan(operation_name, {lightstep::ChildOf(parent_span_ctx),
                                           lightstep::StartTimestamp(start_time)});
-    active_span.reset(new LightStepSpan(ls_span));
+    active_span.reset(new LightStepSpan(ls_span, tracer));
   } else {
     lightstep::Span ls_span =
         tracer.StartSpan(operation_name, {lightstep::StartTimestamp(start_time)});
-    active_span.reset(new LightStepSpan(ls_span));
+    active_span.reset(new LightStepSpan(ls_span, tracer));
   }
-
-  // Inject newly created span context into HTTP carrier.
-  lightstep::BinaryCarrier ctx;
-  tracer.Inject(active_span->context(), lightstep::CarrierFormat::LightStepBinaryCarrier,
-                lightstep::ProtoWriter(&ctx));
-  const std::string current_span_context = ctx.SerializeAsString();
-  request_headers.insertOtSpanContext().value(
-      Base64::encode(current_span_context.c_str(), current_span_context.length()));
 
   return std::move(active_span);
 }

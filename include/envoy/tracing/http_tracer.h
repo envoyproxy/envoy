@@ -34,15 +34,41 @@ public:
 /*
  * Basic abstraction for span.
  */
+class Span;
+
+typedef std::unique_ptr<Span> SpanPtr;
+
 class Span {
 public:
   virtual ~Span() {}
 
+  /**
+   * Attach metadata to a Span, to be handled in an implementation-dependent fashion.
+   * @param name the name of the tag
+   * @param value the value to associate with the tag
+   */
   virtual void setTag(const std::string& name, const std::string& value) PURE;
-  virtual void finishSpan() PURE;
-};
 
-typedef std::unique_ptr<Span> SpanPtr;
+  /**
+   * Capture the final duration for this Span and carry out any work necessary to complete it.
+   * Once this method is called, the Span may be safely discarded.
+   */
+  virtual void finishSpan() PURE;
+
+  /**
+   * Mutate the provided headers with the context necessary to propagate this
+   * (implementation-specific) trace.
+   * @param request_headers the headers to which propagation context will be added
+   */
+  virtual void injectContext(Http::HeaderMap& request_headers) PURE;
+
+  /**
+   * Create and start a child Span, with this Span as its parent in the trace.
+   * @param name operation name captured by the spawned child
+   * @param start_time initial start time for the operation captured by the child
+   */
+  virtual SpanPtr spawnChild(const std::string& name, SystemTime start_time) PURE;
+};
 
 /**
  * Tracing driver is responsible for span creation.
