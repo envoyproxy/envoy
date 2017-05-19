@@ -25,7 +25,7 @@ if __name__ == '__main__':
   gdb = sys.argv[1]
   generated_path = sys.argv[2]
   test_args = sys.argv[3:]
-  test_args[0] = os.path.join(os.getcwd(), test_args[0])
+  test_args[0] = os.path.abspath(test_args[0])
   with open(generated_path, 'w') as f:
     f.write(
         GDB_RUNNER_SCRIPT.substitute(
