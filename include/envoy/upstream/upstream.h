@@ -247,7 +247,7 @@ public:
    * @return uint64_t HTTP codec options for HTTP connections created on behalf of this cluster.
    *         @see Http::CodecOptions.
    */
-  virtual Http::CodecOptions httpCodecOptions() const PURE;
+  virtual const Http::CodecOptions& httpCodecOptions() const PURE;
 
   /**
    * @return the type of load balancing that the cluster should use.

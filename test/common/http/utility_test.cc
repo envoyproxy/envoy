@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Http {
 
 // Satisfy linker
-const uint64_t CodecOptions::NoCompression;
+const uint64_t CodecOptions::DisableDynamicHPACKTable;
 
 TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
@@ -99,7 +99,7 @@ TEST(HttpUtility, parseCodecOptions) {
   {
     Json::ObjectPtr json =
         Json::Factory::loadFromString("{\"http_codec_options\": \"no_compression\"}");
-    EXPECT_EQ(CodecOptions::NoCompression, Utility::parseCodecOptions(*json));
+    EXPECT_EQ(CodecOptions::DisableDynamicHPACKTable, Utility::parseCodecOptions(*json));
   }
 
   {

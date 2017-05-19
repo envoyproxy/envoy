@@ -152,13 +152,13 @@ public:
  */
 class CodecOptionFlags {
 public:
-  static const uint64_t NoCompression = 0x1;
+  static const uint64_t DisableDynamicHPACKTable = 0x1;
 };
 
 struct CodecOptions {
-  uint64_t flag_options;
-  uint32_t max_concurrent_streams;
-  uint32_t initial_window_size;
+  uint64_t flag_options_;
+  uint32_t max_concurrent_streams_;
+  uint32_t initial_window_size_;
 };
 
 /**

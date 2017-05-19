@@ -508,16 +508,16 @@ void ConnectionImpl::sendPendingFrames() {
 
 void ConnectionImpl::sendSettings(const CodecOptions& codec_options) {
   std::vector<nghttp2_settings_entry> iv = {
-      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, codec_options.max_concurrent_streams
-                                                    ? codec_options.max_concurrent_streams
+      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, codec_options.max_concurrent_streams_
+                                                    ? codec_options.max_concurrent_streams_
                                                     : MAX_CONCURRENT_STREAMS},
-      {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, codec_options.initial_window_size
-                                                 ? codec_options.initial_window_size
+      {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, codec_options.initial_window_size_
+                                                 ? codec_options.initial_window_size_
                                                  : DEFAULT_WINDOW_SIZE}};
 
-  if (codec_options.flag_options & CodecOptionFlags::NoCompression) {
+  if (codec_options.flag_options_ & CodecOptionFlags::DisableDynamicHPACKTable) {
     iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, 0});
-    conn_log_debug("disabling header compression", connection_);
+    conn_log_debug("setting HPACK dynamic table size to 0", connection_);
   }
 
   int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &iv[0], iv.size());

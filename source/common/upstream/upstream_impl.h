@@ -176,7 +176,7 @@ public:
     return per_connection_buffer_limit_bytes_;
   }
   uint64_t features() const override { return features_; }
-  Http::CodecOptions httpCodecOptions() const override { return http_codec_options_; }
+  const Http::CodecOptions& httpCodecOptions() const override { return http_codec_options_; }
   LoadBalancerType lbType() const override { return lb_type_; }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }

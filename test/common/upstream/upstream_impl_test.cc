@@ -146,7 +146,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(static_cast<uint64_t>(Http::CodecOptions::NoCompression),
+  EXPECT_EQ(static_cast<uint64_t>(Http::CodecOptions::DisableDynamicHPACKTable),
             cluster.info()->httpCodecOptions());
 
   cluster.info()->stats().upstream_rq_total_.inc();
