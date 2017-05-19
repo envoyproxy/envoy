@@ -36,7 +36,7 @@ address
 
 bind_to_port
   *(optional, boolean)* Whether the listener should bind to the port. A listener that doesn't bind
-  can only receive connections redirected from other listeners that set use_origin_dst parameter to
+  can only receive connections redirected from other listeners that set use_original_dst parameter to
   true. Default is true.
 
 use_proxy_proto
@@ -53,6 +53,8 @@ use_original_dst
   the listener hands off redirected connections to the listener associated with the original
   destination port. If there is no listener associated with the original destination port, the
   connection is handled by the listener that receives it. Default is false.
+
+.. _config_listeners_per_connection_buffer_limit_bytes:
 
 per_connection_buffer_limit_bytes
   *(optional, integer)* Soft limit on size of the listener's new connection read and write buffers.

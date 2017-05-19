@@ -30,7 +30,7 @@ RouteConfigProviderPtr RouteConfigProviderUtil::create(
     return RouteConfigProviderPtr{
         new StaticRouteConfigProviderImpl(*config.getObject("route_config"), runtime, cm)};
   } else {
-    Json::ObjectPtr rds_config = config.getObject("rds");
+    Json::ObjectSharedPtr rds_config = config.getObject("rds");
     rds_config->validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
     std::unique_ptr<RdsRouteConfigProviderImpl> provider{new RdsRouteConfigProviderImpl(
         *rds_config, runtime, cm, dispatcher, random, local_info, scope, stat_prefix, tls)};
@@ -86,7 +86,7 @@ void RdsRouteConfigProviderImpl::createRequest(Http::Message& request) {
 
 void RdsRouteConfigProviderImpl::parseResponse(const Http::Message& response) {
   log_debug("rds: parsing response");
-  Json::ObjectPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
+  Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response.bodyAsString());
   uint64_t new_hash = response_json->hash();
   if (new_hash != last_config_hash_ || !initialized_) {
     response_json->validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);

@@ -100,8 +100,8 @@ def output_stacktrace(thread_id, traceinfo):
 if __name__ == "__main__":
   if len(sys.argv) > 1:
     rununder = subprocess.Popen(
-        sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    decode_stacktrace_log(rununder.stderr)
+        sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    decode_stacktrace_log(rununder.stdout)
     rununder.wait()
     sys.exit(rununder.returncode) # Pass back test pass/fail result
   else:

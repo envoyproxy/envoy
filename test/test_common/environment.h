@@ -128,9 +128,9 @@ public:
   /**
    * Build JSON object from a string subject to environment path substitution.
    * @param json JSON with template patterns including {{ test_certs }}.
-   * @return Json::ObjectPtr with built JSON object.
+   * @return Json::ObjectSharedPtr with built JSON object.
    */
-  static Json::ObjectPtr jsonLoadFromString(const std::string& json);
+  static Json::ObjectSharedPtr jsonLoadFromString(const std::string& json);
 
   /**
    * Execute a program under ::system. Any failure is fatal.

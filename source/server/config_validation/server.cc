@@ -33,7 +33,7 @@ void ValidationInstance::initialize(Options& options, ComponentFactory& componen
   //
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
-  Json::ObjectPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
   Configuration::InitialImpl initial_config(*config_json);
   thread_local_.registerThread(handler_.dispatcher(), true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);

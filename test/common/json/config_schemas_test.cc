@@ -29,7 +29,7 @@ std::vector<std::string> generateTestInputs() {
 class ConfigSchemasTest : public ::testing::TestWithParam<std::string> {};
 
 TEST_P(ConfigSchemasTest, CheckValidationExpectation) {
-  ObjectPtr json = Factory::loadFromFile(GetParam());
+  ObjectSharedPtr json = Factory::loadFromFile(GetParam());
 
   // lookup schema in test input
   std::string schema, schema_name{json->getString("schema")};

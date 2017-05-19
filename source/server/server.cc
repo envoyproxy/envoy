@@ -175,7 +175,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
              restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  Json::ObjectPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
   Configuration::InitialImpl initial_config(*config_json);
   log().info("admin address: {}", initial_config.admin().address()->asString());
 
