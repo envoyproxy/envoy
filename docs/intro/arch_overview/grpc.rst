@@ -17,3 +17,7 @@ application layer:
   The response is translated back to HTTP/1.1.
 * When installed, the bridge filter gathers per RPC statistics in addition to the standard array
   of global HTTP statistics.
+* gRPC-Web is supported by a :ref:`filter <config_http_filters_grpc_web>` that allows a gRPC-Web
+  client sends requests to Envoy over HTTP/1.1 and gets proxied to a gRPC server. It's under
+  active development and is expected to be the successor of the gRPC :ref:`bridge filter
+  <config_http_filters_grpc_bridge>`.
