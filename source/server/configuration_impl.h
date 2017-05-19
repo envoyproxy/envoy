@@ -155,12 +155,13 @@ private:
   };
 
   static std::list<NetworkFilterConfigFactory*>& filterConfigFactories() {
-    static std::list<NetworkFilterConfigFactory*> *filter_config_factories = new std::list<NetworkFilterConfigFactory*>;
+    static std::list<NetworkFilterConfigFactory*>* filter_config_factories =
+        new std::list<NetworkFilterConfigFactory*>;
     return *filter_config_factories;
   }
 
   static std::list<HttpTracerFactory*>& httpTracerFactories() {
-    static std::list<HttpTracerFactory*> *http_tracer_factories = new std::list<HttpTracerFactory*>;
+    static std::list<HttpTracerFactory*>* http_tracer_factories = new std::list<HttpTracerFactory*>;
     return *http_tracer_factories;
   }
 
@@ -185,7 +186,7 @@ private:
 template <class T> class RegisterNetworkFilterConfigFactory {
 public:
   RegisterNetworkFilterConfigFactory() {
-    static T *instance = new T;
+    static T* instance = new T;
     MainImpl::registerNetworkFilterConfigFactory(*instance);
   }
 };
@@ -196,7 +197,7 @@ public:
 template <class T> class RegisterHttpTracerFactory {
 public:
   RegisterHttpTracerFactory() {
-    static T *instance = new T;
+    static T* instance = new T;
     MainImpl::registerHttpTracerFactory(*instance);
   }
 };
