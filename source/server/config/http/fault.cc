@@ -9,13 +9,13 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb FaultFilterConfig::tryCreateFilterFactory(HttpFilterType type,
-                                                              const std::string& name,
-                                                              const Json::Object& json_config,
-                                                              const std::string& stats_prefix,
-                                                              Server::Instance& server) {
-  if (type != HttpFilterType::Decoder || name != "fault") {
-    return nullptr;
+HttpFilterFactoryCb FaultFilterConfig::createFilterFactory(HttpFilterType type,
+                                                           const Json::Object& json_config,
+                                                           const std::string& stats_prefix,
+                                                           Server::Instance& server) {
+  if (type != HttpFilterType::Decoder) {
+    throw EnvoyException(
+        fmt::format("{} http filter must be configured as a decoder filter.", name()));
   }
 
   Http::FaultFilterConfigSharedPtr config(
@@ -25,6 +25,8 @@ HttpFilterFactoryCb FaultFilterConfig::tryCreateFilterFactory(HttpFilterType typ
         Http::StreamDecoderFilterSharedPtr{new Http::FaultFilter(config)});
   };
 }
+
+std::string FaultFilterConfig::name() { return "fault"; }
 
 /**
  * Static registration for the fault filter. @see RegisterHttpFilterConfigFactory.

@@ -34,7 +34,7 @@ TEST(NetworkFilterConfigTest, RedisProxy) {
   NiceMock<MockInstance> server;
   RedisProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb =
-      factory.tryCreateFilterFactory(NetworkFilterType::Read, "redis_proxy", *json_config, server);
+      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -52,7 +52,7 @@ TEST(NetworkFilterConfigTest, MongoProxy) {
   NiceMock<MockInstance> server;
   MongoProxyFilterConfigFactory factory;
   NetworkFilterFactoryCb cb =
-      factory.tryCreateFilterFactory(NetworkFilterType::Both, "mongo_proxy", *json_config, server);
+      factory.createFilterFactory(NetworkFilterType::Both, *json_config, server);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
@@ -70,9 +70,8 @@ TEST(NetworkFilterConfigTest, BadMongoProxyConfig) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   MongoProxyFilterConfigFactory factory;
-  EXPECT_THROW(
-      factory.tryCreateFilterFactory(NetworkFilterType::Both, "mongo_proxy", *json_config, server),
-      Json::Exception);
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Both, *json_config, server),
+               Json::Exception);
 }
 
 TEST(NetworkFilterConfigTest, TcpProxy) {
@@ -107,13 +106,13 @@ TEST(NetworkFilterConfigTest, TcpProxy) {
   NiceMock<MockInstance> server;
   TcpProxyConfigFactory factory;
   NetworkFilterFactoryCb cb =
-      factory.tryCreateFilterFactory(NetworkFilterType::Read, "tcp_proxy", *json_config, server);
+      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 
-  EXPECT_EQ(nullptr, factory.tryCreateFilterFactory(NetworkFilterType::Both, "tcp_proxy",
-                                                    *json_config, server));
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Both, *json_config, server),
+               EnvoyException);
 }
 
 TEST(NetworkFilterConfigTest, ClientSslAuth) {
@@ -128,8 +127,8 @@ TEST(NetworkFilterConfigTest, ClientSslAuth) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   ClientSslAuthConfigFactory factory;
-  NetworkFilterFactoryCb cb = factory.tryCreateFilterFactory(
-      NetworkFilterType::Read, "client_ssl_auth", *json_config, server);
+  NetworkFilterFactoryCb cb =
+      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -148,7 +147,7 @@ TEST(NetworkFilterConfigTest, Ratelimit) {
   NiceMock<MockInstance> server;
   RateLimitConfigFactory factory;
   NetworkFilterFactoryCb cb =
-      factory.tryCreateFilterFactory(NetworkFilterType::Read, "ratelimit", *json_config, server);
+      factory.createFilterFactory(NetworkFilterType::Read, *json_config, server);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -180,8 +179,7 @@ TEST(NetworkFilterConfigTest, BadHttpConnectionMangerConfig) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
-                                              *json_config, server),
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
                Json::Exception);
 }
 
@@ -223,8 +221,7 @@ TEST(NetworkFilterConfigTest, BadAccessLogConfig) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
-                                              *json_config, server),
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
                Json::Exception);
 }
 
@@ -268,8 +265,7 @@ TEST(NetworkFilterConfigTest, BadAccessLogType) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
-                                              *json_config, server),
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
                Json::Exception);
 }
 
@@ -323,9 +319,12 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   NiceMock<MockInstance> server;
-  EXPECT_THROW(factory.tryCreateFilterFactory(NetworkFilterType::Read, "http_connection_manager",
-                                              *json_config, server),
+  EXPECT_THROW(factory.createFilterFactory(NetworkFilterType::Read, *json_config, server),
                Json::Exception);
+}
+
+TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
+  EXPECT_THROW(RegisterNetworkFilterConfigFactory<ClientSslAuthConfigFactory>(), EnvoyException);
 }
 
 } // Configuration

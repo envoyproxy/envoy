@@ -14,9 +14,9 @@ namespace Configuration {
 class TcpProxyConfigFactory : public NetworkFilterConfigFactory {
 public:
   // NetworkFilterConfigFactory
-  NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                                const Json::Object& config,
-                                                Server::Instance& server);
+  NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type, const Json::Object& config,
+                                             Server::Instance& server) override;
+  std::string name() override;
 };
 
 } // Configuration

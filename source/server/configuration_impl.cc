@@ -118,20 +118,10 @@ void MainImpl::initializeTracers(const Json::Object& configuration) {
 
   Json::ObjectSharedPtr driver_config = driver->getObject("config");
 
-  bool found_tracer = false;
-  for (HttpTracerFactory* http_tracer_factory : httpTracerFactories()) {
-    Tracing::HttpTracerPtr http_tracer =
-        http_tracer_factory->tryCreateHttpTracer(type, *driver_config, server_, *cluster_manager_);
-    if (http_tracer) {
-      http_tracer_ = std::move(http_tracer);
-      found_tracer = true;
-      break;
-    }
-  }
-
-  if (!found_tracer) {
-    throw EnvoyException(fmt::format("unable to create tracer for type {}", type));
-  }
+  HttpTracerFactory* http_tracer_factory = httpTracerFactories().at(type);
+  Tracing::HttpTracerPtr http_tracer =
+      http_tracer_factory->createHttpTracer(*driver_config, server_, *cluster_manager_);
+  http_tracer_ = std::move(http_tracer);
 }
 
 const std::list<Server::Configuration::ListenerPtr>& MainImpl::listeners() { return listeners_; }
@@ -182,21 +172,10 @@ MainImpl::ListenerConfig::ListenerConfig(MainImpl& parent, Json::Object& json) :
     }
 
     // Now see if there is a factory that will accept the config.
-    bool found_filter = false;
-    for (NetworkFilterConfigFactory* config_factory : filterConfigFactories()) {
-      NetworkFilterFactoryCb callback =
-          config_factory->tryCreateFilterFactory(type, string_name, *config, parent_.server_);
-      if (callback) {
-        filter_factories_.push_back(callback);
-        found_filter = true;
-        break;
-      }
-    }
-
-    if (!found_filter) {
-      throw EnvoyException(
-          fmt::format("unable to create filter factory for '{}'/'{}'", string_name, string_type));
-    }
+    NetworkFilterConfigFactory* config_factory = filterConfigFactories().at(string_name);
+    NetworkFilterFactoryCb callback =
+        config_factory->createFilterFactory(type, *config, parent_.server_);
+    filter_factories_.push_back(callback);
   }
 }
 

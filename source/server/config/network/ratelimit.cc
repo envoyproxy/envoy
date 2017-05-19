@@ -11,12 +11,12 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb
-RateLimitConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                               const Json::Object& json_config,
-                                               Server::Instance& server) {
-  if (type != NetworkFilterType::Read || name != "ratelimit") {
-    return nullptr;
+NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(NetworkFilterType type,
+                                                                   const Json::Object& json_config,
+                                                                   Server::Instance& server) {
+  if (type != NetworkFilterType::Read) {
+    throw EnvoyException(
+        fmt::format("{} network filter must be configured as a read filter.", name()));
   }
 
   RateLimit::TcpFilter::ConfigSharedPtr config(
@@ -26,6 +26,8 @@ RateLimitConfigFactory::tryCreateFilterFactory(NetworkFilterType type, const std
         config, server.rateLimitClient(Optional<std::chrono::milliseconds>()))});
   };
 }
+
+std::string RateLimitConfigFactory::name() { return "ratelimit"; }
 
 /**
  * Static registration for the rate limit filter. @see RegisterNetworkFilterConfigFactory.

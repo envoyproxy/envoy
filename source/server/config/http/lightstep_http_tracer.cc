@@ -13,12 +13,10 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-Tracing::HttpTracerPtr LightstepHttpTracerFactory::tryCreateHttpTracer(
-    const std::string& type, const Json::Object& json_config, Server::Instance& server,
-    Upstream::ClusterManager& cluster_manager) {
-  if (type != "lightstep") {
-    return nullptr;
-  }
+Tracing::HttpTracerPtr
+LightstepHttpTracerFactory::createHttpTracer(const Json::Object& json_config,
+                                             Server::Instance& server,
+                                             Upstream::ClusterManager& cluster_manager) {
 
   Envoy::Runtime::RandomGenerator& rand = server.random();
 
@@ -35,6 +33,8 @@ Tracing::HttpTracerPtr LightstepHttpTracerFactory::tryCreateHttpTracer(
   return Tracing::HttpTracerPtr(
       new Tracing::HttpTracerImpl(std::move(lightstep_driver), server.localInfo()));
 }
+
+std::string LightstepHttpTracerFactory::name() { return "lightstep"; }
 
 /**
  * Static registration for the lightstep http tracer. @see RegisterHttpTracerFactory.

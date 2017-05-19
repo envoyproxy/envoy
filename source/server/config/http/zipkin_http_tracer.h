@@ -16,10 +16,9 @@ namespace Configuration {
 class ZipkinHttpTracerFactory : public HttpTracerFactory {
 public:
   // HttpTracerFactory
-  Tracing::HttpTracerPtr tryCreateHttpTracer(const std::string& type,
-                                             const Json::Object& json_config,
-                                             Server::Instance& server,
-                                             Upstream::ClusterManager& cluster_manager);
+  Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config, Server::Instance& server,
+                                          Upstream::ClusterManager& cluster_manager) override;
+  std::string name() override;
 };
 
 } // Configuration

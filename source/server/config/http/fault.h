@@ -15,10 +15,10 @@ namespace Configuration {
  */
 class FaultFilterConfig : public HttpFilterConfigFactory {
 public:
-  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                             const Json::Object& json_config,
-                                             const std::string& stats_prefix,
-                                             Server::Instance& server) override;
+  HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object& json_config,
+                                          const std::string& stats_prefix,
+                                          Server::Instance& server) override;
+  std::string name() override;
 };
 
 } // Configuration

@@ -8,13 +8,13 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::tryCreateFilterFactory(HttpFilterType type,
-                                                                        const std::string& name,
-                                                                        const Json::Object&,
-                                                                        const std::string&,
-                                                                        Server::Instance& server) {
-  if (type != HttpFilterType::Both || name != "grpc_http1_bridge") {
-    return nullptr;
+HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactory(HttpFilterType type,
+                                                                     const Json::Object&,
+                                                                     const std::string&,
+                                                                     Server::Instance& server) {
+  if (type != HttpFilterType::Both) {
+    throw EnvoyException(fmt::format(
+        "{} http filter must be configured as both a decoder and encoder filter.", name()));
   }
 
   return [&server](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -22,6 +22,8 @@ HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::tryCreateFilterFactory(HttpFilt
         Http::StreamFilterSharedPtr{new Grpc::Http1BridgeFilter(server.clusterManager())});
   };
 }
+
+std::string GrpcHttp1BridgeFilterConfig::name() { return "grpc_http1_bridge"; }
 
 /**
  * Static registration for the grpc HTTP1 bridge filter. @see RegisterHttpFilterConfigFactory.

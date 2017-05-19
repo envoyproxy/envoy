@@ -30,9 +30,10 @@ class HttpConnectionManagerFilterConfigFactory : Logger::Loggable<Logger::Id::co
                                                  public NetworkFilterConfigFactory {
 public:
   // NetworkFilterConfigFactory
-  NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type, const std::string& name,
-                                                const Json::Object& config,
-                                                Server::Instance& server);
+  NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type, const Json::Object& config,
+                                             Server::Instance& server) override;
+
+  std::string name() override;
 };
 
 /**
@@ -48,10 +49,19 @@ class HttpFilterConfigFactory {
 public:
   virtual ~HttpFilterConfigFactory() {}
 
-  virtual HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                                     const Json::Object& config,
-                                                     const std::string& stat_prefix,
-                                                     Server::Instance& server) PURE;
+  /**
+  * Create a particular http filter factory implementation.  If the creation fails, an error will be
+  * thrown.  The returned callback should always be valid.
+  */
+  virtual HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object& config,
+                                                  const std::string& stat_prefix,
+                                                  Server::Instance& server) PURE;
+
+  /**
+  * Provides the identifying name for a particular implementation of an http filter produced by the
+  * factory.
+  */
+  virtual std::string name() PURE;
 };
 
 /**
@@ -105,7 +115,15 @@ public:
   const Optional<std::string>& userAgent() override { return user_agent_; }
 
   static void registerHttpFilterConfigFactory(HttpFilterConfigFactory& factory) {
-    filterConfigFactories().push_back(&factory);
+    auto result = filterConfigFactories().emplace(std::make_pair(factory.name(), &factory));
+
+    // result is a pair whose second member is a boolean indicating, if false, that the key exists
+    // and that the value was not inserted.
+    if (!result.second) {
+      throw EnvoyException(fmt::format(
+          "Attempted to register multiple HttpFilterConfigFactory objects with name: '{}'",
+          factory.name()));
+    }
   }
 
   static const std::string DEFAULT_SERVER_STRING;
@@ -113,9 +131,10 @@ public:
 private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
 
-  static std::list<HttpFilterConfigFactory*>& filterConfigFactories() {
-    static std::list<HttpFilterConfigFactory*> filter_config_factories;
-    return filter_config_factories;
+  static std::unordered_map<std::string, HttpFilterConfigFactory*>& filterConfigFactories() {
+    static std::unordered_map<std::string, HttpFilterConfigFactory*>* filter_config_factories =
+        new std::unordered_map<std::string, HttpFilterConfigFactory*>;
+    return *filter_config_factories;
   }
 
   HttpFilterType stringToType(const std::string& type);
@@ -145,8 +164,8 @@ private:
 template <class T> class RegisterHttpFilterConfigFactory {
 public:
   RegisterHttpFilterConfigFactory() {
-    static T instance;
-    HttpConnectionManagerConfig::registerHttpFilterConfigFactory(instance);
+    static T* instance = new T;
+    HttpConnectionManagerConfig::registerHttpFilterConfigFactory(*instance);
   }
 };
 

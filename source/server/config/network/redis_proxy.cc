@@ -12,11 +12,11 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-NetworkFilterFactoryCb RedisProxyFilterConfigFactory::tryCreateFilterFactory(
-    NetworkFilterType type, const std::string& name, const Json::Object& config,
-    Server::Instance& server) {
-  if (type != NetworkFilterType::Read || name != "redis_proxy") {
-    return nullptr;
+NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactory(
+    NetworkFilterType type, const Json::Object& config, Server::Instance& server) {
+  if (type != NetworkFilterType::Read) {
+    throw EnvoyException(
+        fmt::format("{} network filter must be configured as a read filter.", name()));
   }
 
   Redis::ProxyFilterConfigSharedPtr filter_config(
@@ -34,6 +34,8 @@ NetworkFilterFactoryCb RedisProxyFilterConfigFactory::tryCreateFilterFactory(
         factory, Redis::EncoderPtr{new Redis::EncoderImpl()}, *splitter, filter_config));
   };
 }
+
+std::string RedisProxyFilterConfigFactory::name() { return "redis_proxy"; }
 
 /**
  * Static registration for the redis filter. @see RegisterNetworkFilterConfigFactory.

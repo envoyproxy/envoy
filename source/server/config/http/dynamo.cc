@@ -8,13 +8,13 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb DynamoFilterConfig::tryCreateFilterFactory(HttpFilterType type,
-                                                               const std::string& name,
-                                                               const Json::Object&,
-                                                               const std::string& stat_prefix,
-                                                               Server::Instance& server) {
-  if (type != HttpFilterType::Both || name != "http_dynamo_filter") {
-    return nullptr;
+HttpFilterFactoryCb DynamoFilterConfig::createFilterFactory(HttpFilterType type,
+                                                            const Json::Object&,
+                                                            const std::string& stat_prefix,
+                                                            Server::Instance& server) {
+  if (type != HttpFilterType::Both) {
+    throw EnvoyException(fmt::format(
+        "{} http filter must be configured as both a decoder and encoder filter.", name()));
   }
 
   return [&server, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -22,6 +22,8 @@ HttpFilterFactoryCb DynamoFilterConfig::tryCreateFilterFactory(HttpFilterType ty
         new Dynamo::DynamoFilter(server.runtime(), stat_prefix, server.stats())});
   };
 }
+
+std::string DynamoFilterConfig::name() { return "http_dynamo_filter"; }
 
 /**
  * Static registration for the http dynamodb filter. @see RegisterHttpFilterConfigFactory.

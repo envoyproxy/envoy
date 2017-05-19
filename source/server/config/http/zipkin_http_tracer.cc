@@ -10,12 +10,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-Tracing::HttpTracerPtr ZipkinHttpTracerFactory::tryCreateHttpTracer(
-    const std::string& type, const Json::Object& json_config, Server::Instance& server,
-    Upstream::ClusterManager& cluster_manager) {
-  if (type != "zipkin") {
-    return nullptr;
-  }
+Tracing::HttpTracerPtr
+ZipkinHttpTracerFactory::createHttpTracer(const Json::Object& json_config, Server::Instance& server,
+                                          Upstream::ClusterManager& cluster_manager) {
 
   Envoy::Runtime::RandomGenerator& rand = server.random();
 
@@ -26,6 +23,8 @@ Tracing::HttpTracerPtr ZipkinHttpTracerFactory::tryCreateHttpTracer(
   return Tracing::HttpTracerPtr(
       new Tracing::HttpTracerImpl(std::move(zipkin_driver), server.localInfo()));
 }
+
+std::string ZipkinHttpTracerFactory::name() { return "zipkin"; }
 
 /**
  * Static registration for the lightstep http tracer. @see RegisterHttpTracerFactory.

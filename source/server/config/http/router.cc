@@ -10,13 +10,13 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-HttpFilterFactoryCb RouterFilterConfig::tryCreateFilterFactory(HttpFilterType type,
-                                                               const std::string& name,
-                                                               const Json::Object& json_config,
-                                                               const std::string& stat_prefix,
-                                                               Server::Instance& server) {
-  if (type != HttpFilterType::Decoder || name != "router") {
-    return nullptr;
+HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(HttpFilterType type,
+                                                            const Json::Object& json_config,
+                                                            const std::string& stat_prefix,
+                                                            Server::Instance& server) {
+  if (type != HttpFilterType::Decoder) {
+    throw EnvoyException(
+        fmt::format("{} http filter must be configured as a decoder filter.", name()));
   }
 
   json_config.validateSchema(Json::Schema::ROUTER_HTTP_FILTER_SCHEMA);
@@ -30,6 +30,8 @@ HttpFilterFactoryCb RouterFilterConfig::tryCreateFilterFactory(HttpFilterType ty
   return [config](Http::FilterChainFactoryCallbacks& callbacks)
       -> void { callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*config)); };
 }
+
+std::string RouterFilterConfig::name() { return "router"; }
 
 /**
  * Static registration for the router filter. @see RegisterHttpFilterConfigFactory.

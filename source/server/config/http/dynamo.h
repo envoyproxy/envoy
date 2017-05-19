@@ -13,9 +13,10 @@ namespace Configuration {
  */
 class DynamoFilterConfig : public HttpFilterConfigFactory {
 public:
-  HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
-                                             const Json::Object&, const std::string& stat_prefix,
-                                             Server::Instance& server) override;
+  HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object&,
+                                          const std::string& stat_prefix,
+                                          Server::Instance& server) override;
+  std::string name() override;
 };
 
 } // Configuration

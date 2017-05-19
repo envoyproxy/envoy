@@ -26,11 +26,11 @@ namespace Configuration {
 
 const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
 
-NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::tryCreateFilterFactory(
-    NetworkFilterType type, const std::string& name, const Json::Object& config,
-    Server::Instance& server) {
-  if (type != NetworkFilterType::Read || name != "http_connection_manager") {
-    return nullptr;
+NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
+    NetworkFilterType type, const Json::Object& config, Server::Instance& server) {
+  if (type != NetworkFilterType::Read) {
+    throw EnvoyException(
+        fmt::format("{} network filter must be configured as a read filter.", name()));
   }
 
   std::shared_ptr<HttpConnectionManagerConfig> http_config(
@@ -41,6 +41,8 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::tryCreateFilter
                                         server.httpTracer(), server.runtime())});
   };
 }
+
+std::string HttpConnectionManagerFilterConfigFactory::name() { return "http_connection_manager"; }
 
 /**
  * Static registration for the HTTP connection manager filter. @see
@@ -152,21 +154,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
     log().info("      name: {}", string_name);
 
     HttpFilterType type = stringToType(string_type);
-    bool found_filter = false;
-    for (HttpFilterConfigFactory* factory : filterConfigFactories()) {
-      HttpFilterFactoryCb callback =
-          factory->tryCreateFilterFactory(type, string_name, *config_object, stats_prefix_, server);
-      if (callback) {
-        filter_factories_.push_back(callback);
-        found_filter = true;
-        break;
-      }
-    }
 
-    if (!found_filter) {
-      throw EnvoyException(fmt::format("unable to create http filter factory for '{}'/'{}'",
-                                       string_name, string_type));
-    }
+    HttpFilterConfigFactory* factory = filterConfigFactories().at(string_name);
+    HttpFilterFactoryCb callback =
+        factory->createFilterFactory(type, *config_object, stats_prefix_, server);
+    filter_factories_.push_back(callback);
   }
 }
 

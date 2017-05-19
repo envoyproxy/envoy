@@ -6,6 +6,8 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <utility>
 
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
@@ -38,10 +40,19 @@ class NetworkFilterConfigFactory {
 public:
   virtual ~NetworkFilterConfigFactory() {}
 
-  virtual NetworkFilterFactoryCb tryCreateFilterFactory(NetworkFilterType type,
-                                                        const std::string& name,
-                                                        const Json::Object& config,
-                                                        Server::Instance& server) PURE;
+  /**
+  * Create a particular network filter factory implementation.  If the creation fails, an error will
+  * be thrown.  The returned callback should always be valid.
+  */
+  virtual NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type,
+                                                     const Json::Object& config,
+                                                     Server::Instance& server) PURE;
+
+  /**
+  * Provides the identifying name for a particular implementation of a network filter produced by
+  * the factory.
+  */
+  virtual std::string name() PURE;
 };
 
 /**
@@ -53,14 +64,18 @@ public:
   virtual ~HttpTracerFactory() {}
 
   /**
-  * Attempts to create a particular HttpTracer implementation corresponding to the type of factory.
-  * If the type argument doesn't match the expected value for the factory, a nullptr will be
-  * returned.  However, if the type matches and the HttpTracer instantiation throws an exception,
-  * that exception will be propagated.
+  * Create a particular HttpTracer implementation.  If the creation fails, an error will be thrown.
+  * The returned pointer should always be valid.
   */
-  virtual Tracing::HttpTracerPtr
-  tryCreateHttpTracer(const std::string& type, const Json::Object& json_config,
-                      Server::Instance& server, Upstream::ClusterManager& cluster_manager) PURE;
+  virtual Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
+                                                  Server::Instance& server,
+                                                  Upstream::ClusterManager& cluster_manager) PURE;
+
+  /**
+  * Provides the identifying name for a particular implementation of HttpTracer produced by the
+  * factory.
+  */
+  virtual std::string name() PURE;
 };
 
 /**
@@ -84,11 +99,27 @@ public:
   MainImpl(Server::Instance& server);
 
   static void registerNetworkFilterConfigFactory(NetworkFilterConfigFactory& factory) {
-    filterConfigFactories().push_back(&factory);
+    auto result = filterConfigFactories().emplace(std::make_pair(factory.name(), &factory));
+
+    // result is a pair whose second member is a boolean indicating, if false, that the key exists
+    // and that the value was not inserted.
+    if (!result.second) {
+      throw EnvoyException(fmt::format(
+          "attempted to register multiple NetworkFilterConfigFactory objects with name: '{}'",
+          factory.name()));
+    }
   }
 
   static void registerHttpTracerFactory(HttpTracerFactory& factory) {
-    httpTracerFactories().push_back(&factory);
+    auto result = httpTracerFactories().emplace(std::make_pair(factory.name(), &factory));
+
+    // result is a pair whose second member is a boolean indicating, if false, that the key exists
+    // and that the value was not inserted.
+    if (!result.second) {
+      throw EnvoyException(
+          fmt::format("attempted to register multiple HttpTracerFactory objects with name: '{}'",
+                      factory.name()));
+    }
   }
 
   /**
@@ -154,14 +185,15 @@ private:
     std::list<NetworkFilterFactoryCb> filter_factories_;
   };
 
-  static std::list<NetworkFilterConfigFactory*>& filterConfigFactories() {
-    static std::list<NetworkFilterConfigFactory*>* filter_config_factories =
-        new std::list<NetworkFilterConfigFactory*>;
+  static std::unordered_map<std::string, NetworkFilterConfigFactory*>& filterConfigFactories() {
+    static std::unordered_map<std::string, NetworkFilterConfigFactory*>* filter_config_factories =
+        new std::unordered_map<std::string, NetworkFilterConfigFactory*>;
     return *filter_config_factories;
   }
 
-  static std::list<HttpTracerFactory*>& httpTracerFactories() {
-    static std::list<HttpTracerFactory*>* http_tracer_factories = new std::list<HttpTracerFactory*>;
+  static std::unordered_map<std::string, HttpTracerFactory*>& httpTracerFactories() {
+    static std::unordered_map<std::string, HttpTracerFactory*>* http_tracer_factories =
+        new std::unordered_map<std::string, HttpTracerFactory*>;
     return *http_tracer_factories;
   }
 
