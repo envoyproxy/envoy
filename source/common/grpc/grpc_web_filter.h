@@ -46,7 +46,6 @@ private:
   bool is_text_request_;
   bool is_text_response_;
   Buffer::OwnedImpl decoding_buffer_;
-  Buffer::OwnedImpl encoding_buffer_trailers_;
   Decoder decoder_;
 };
 } // namespace Grpc

@@ -93,18 +93,19 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
 }
 
 Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& trailers) {
+  Buffer::OwnedImpl temp;
+  trailers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
+    Buffer::Instance* temp = static_cast<Buffer::Instance*>(context);
+    temp->add(header.key().c_str(), header.key().size());
+    temp->add(":");
+    temp->add(header.value().c_str(), header.value().size());
+    temp->add("\r\n");
+  }, &temp);
   Buffer::OwnedImpl buffer;
   buffer.add(&GRPC_WEB_TRAILER, 1);
-  trailers.iterate([](const Http::HeaderEntry& header, void* context) -> void {
-    Buffer::Instance* buffer = static_cast<Buffer::Instance*>(context);
-    buffer->add(header.key().c_str(), header.key().size());
-    buffer->add(":");
-    buffer->add(header.value().c_str(), header.value().size());
-    buffer->add("\r\n");
-  }, &buffer);
-  uint64_t length = htonl(encoding_buffer_trailers_.length());
+  uint64_t length = htonl(temp.length());
   buffer.add(&length, 4);
-  buffer.move(encoding_buffer_trailers_);
+  buffer.move(temp);
   encoder_callbacks_->addEncodedData(buffer);
   return Http::FilterTrailersStatus::Continue;
 }
