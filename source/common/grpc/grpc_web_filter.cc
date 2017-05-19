@@ -21,10 +21,9 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
       Http::Headers::get().ContentTypeValues.GrpcWebText == content_type->value().c_str()) {
     is_text_request_ = true;
   }
-  headers.removeContentType();
   headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Grpc);
 
-  const Http::HeaderEntry* accept = headers.get(Http::LowerCaseString("accept"));
+  const Http::HeaderEntry* accept = headers.get(Http::Headers::get().Accept);
   if (accept != nullptr &&
       Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().c_str()) {
     is_text_response_ = true;
@@ -43,7 +42,6 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
   // Parse application/grpc-web-text format.
   if (data.length() + decoding_buffer_.length() < 4) {
     decoding_buffer_.move(data);
-    data.drain(data.length());
     return Http::FilterDataStatus::Continue;
   }
 
@@ -60,13 +58,10 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
 
 // Implements StreamEncoderFilter.
 Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
-  headers.remove(Http::Headers::get().ContentType);
   if (is_text_response_) {
-    headers.addStatic(Http::Headers::get().ContentType,
-                      Http::Headers::get().ContentTypeValues.GrpcWebText);
+    headers.insertContentType().value(Http::Headers::get().ContentTypeValues.GrpcWebText);
   } else {
-    headers.addStatic(Http::Headers::get().ContentType,
-                      Http::Headers::get().ContentTypeValues.GrpcWeb);
+    headers.insertContentType().value(Http::Headers::get().ContentTypeValues.GrpcWeb);
   }
   return Http::FilterHeadersStatus::Continue;
 }
