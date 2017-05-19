@@ -215,7 +215,7 @@ https://github.com/bazelbuild/bazel/issues/2805.
 # Coverage builds
 
 To generate coverage results, make sure you have
-`[gcovr](https://github.com/gcovr/gcovr)` 3.3 in your `PATH` (or set `GCOVR` to
+[`gcovr`](https://github.com/gcovr/gcovr) 3.3 in your `PATH` (or set `GCOVR` to
 point at it). Then run:
 
 ```
