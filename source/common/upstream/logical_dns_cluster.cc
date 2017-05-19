@@ -18,14 +18,18 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
     : ClusterImplBase(config, runtime, stats, ssl_context_manager), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(config.getInteger("dns_refresh_rate_ms", 5000))),
-      tls_(tls), tls_slot_(tls.allocateSlot()), initialized_(false),
+      dns_lookup_ip_version_(config.getString("dns_lookup_ip_version", "v4_only")), tls_(tls),
+      tls_slot_(tls.allocateSlot()), initialized_(false),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
-
   std::vector<Json::ObjectSharedPtr> hosts_json = config.getObjectArray("hosts");
   if (hosts_json.size() != 1) {
     throw EnvoyException("logical_dns clusters must have a single host");
   }
-
+  if (dns_lookup_ip_version_ != "v4_only" && dns_lookup_ip_version_ != "v6_only" &&
+      dns_lookup_ip_version_ != "auto") {
+    throw EnvoyException(
+        fmt::format("unknown dns_lookup_ip_version option {}", dns_lookup_ip_version_));
+  }
   dns_url_ = hosts_json[0]->getString("url");
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
@@ -51,18 +55,26 @@ void LogicalDnsCluster::startResolve() {
   info_->stats().update_attempt_.inc();
 
   active_dns_query_ = dns_resolver_.resolve(
-      dns_address, [this, dns_address](
-                       std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      dns_address, dns_lookup_ip_version_,
+      [this, dns_address](
+          std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_dns_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address);
         info_->stats().update_success_.inc();
 
         if (!address_list.empty()) {
-          // TODO(mattklein123): IPv6 support as well as moving port handling into the DNS
-          // interface.
-          Network::Address::InstanceConstSharedPtr new_address(
-              new Network::Address::Ipv4Instance(address_list.front()->ip()->addressAsString(),
-                                                 Network::Utility::portFromTcpUrl(dns_url_)));
+          // TODO(mattklein123): Move port handling into the DNS interface.
+          Network::Address::IpVersion version = address_list.front()->ip()->version();
+          Network::Address::InstanceConstSharedPtr new_address;
+          if (version == Network::Address::IpVersion::v4) {
+            new_address.reset(
+                new Network::Address::Ipv4Instance(address_list.front()->ip()->addressAsString(),
+                                                   Network::Utility::portFromTcpUrl(dns_url_)));
+          } else {
+            new_address.reset(
+                new Network::Address::Ipv6Instance(address_list.front()->ip()->addressAsString(),
+                                                   Network::Utility::portFromTcpUrl(dns_url_)));
+          }
           if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
             current_resolved_address_ = new_address;
             // Capture URL to avoid a race with another update.
@@ -77,8 +89,13 @@ void LogicalDnsCluster::startResolve() {
             // to show the friendly DNS name in that output, but currently there is no way to
             // express a DNS name inside of an Address::Instance. For now this is OK but we might
             // want to do better again later.
-            logical_host_.reset(new LogicalHost(
-                info_, hostname_, Network::Utility::resolveUrl("tcp://0.0.0.0:0"), *this));
+            if (version == Network::Address::IpVersion::v4) {
+              logical_host_.reset(
+                  new LogicalHost(info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this));
+            } else {
+              logical_host_.reset(
+                  new LogicalHost(info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this));
+            }
             HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
             new_hosts->emplace_back(logical_host_);
             updateHosts(new_hosts, createHealthyHostList(*new_hosts), empty_host_lists_,

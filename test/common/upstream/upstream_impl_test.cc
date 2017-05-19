@@ -47,12 +47,12 @@ struct ResolverData {
   }
 
   void expectResolve(Network::MockDnsResolver& dns_resolver) {
-    EXPECT_CALL(dns_resolver, resolve(_, _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                             -> Network::ActiveDnsQuery* {
-                               dns_callback_ = cb;
-                               return &active_dns_query_;
-                             }))
+    EXPECT_CALL(dns_resolver, resolve(_, _, _))
+        .WillOnce(Invoke([&](const std::string&, const std::string&,
+                             Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+          dns_callback_ = cb;
+          return &active_dns_query_;
+        }))
         .RetiresOnSaturation();
   }
 
@@ -80,12 +80,80 @@ TEST(StrictDnsClusterImplTest, ImmediateResolve) {
   )EOF";
 
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsResolver::ResolveCb cb)
-                           -> Network::ActiveDnsQuery* {
-                             cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
-                             return nullptr;
-                           }));
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", _, _))
+      .WillOnce(Invoke([&](const std::string&, const std::string&,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+        return nullptr;
+      }));
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
+                               dispatcher);
+  cluster.setInitializedCb([&]() -> void { initialized.ready(); });
+  EXPECT_EQ(2UL, cluster.hosts().size());
+  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+}
+
+TEST(StrictDnsClusterImplTest, ImmediateResolveV6Only) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Network::MockDnsResolver> dns_resolver;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  ReadyWatcher initialized;
+
+  std::string json = R"EOF(
+  {
+    "name": "name",
+    "connect_timeout_ms": 250,
+    "type": "strict_dns",
+    "lb_type": "round_robin",
+    "hosts": [{"url": "tcp://foo.bar.com:443"}],
+    "dns_lookup_ip_version" : "v6_only"
+  }
+  )EOF";
+
+  EXPECT_CALL(initialized, ready());
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", "v6_only", _))
+      .WillOnce(Invoke([&](const std::string&, const std::string&,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        cb(TestUtility::makeDnsResponse({"::1", "::2"}));
+        return nullptr;
+      }));
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
+                               dispatcher);
+  cluster.setInitializedCb([&]() -> void { initialized.ready(); });
+  EXPECT_EQ(2UL, cluster.hosts().size());
+  EXPECT_EQ(2UL, cluster.healthyHosts().size());
+}
+
+TEST(StrictDnsClusterImplTest, ImmediateResolveAuto) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Network::MockDnsResolver> dns_resolver;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  ReadyWatcher initialized;
+
+  std::string json = R"EOF(
+  {
+    "name": "name",
+    "connect_timeout_ms": 250,
+    "type": "strict_dns",
+    "lb_type": "round_robin",
+    "hosts": [{"url": "tcp://foo.bar.com:443"}],
+    "dns_lookup_ip_version" : "auto"
+  }
+  )EOF";
+
+  EXPECT_CALL(initialized, ready());
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", "auto", _))
+      .WillOnce(Invoke([&](const std::string&, const std::string&,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+        return nullptr;
+      }));
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   StrictDnsClusterImpl cluster(*loader, runtime, stats, ssl_context_manager, dns_resolver,
                                dispatcher);
@@ -466,6 +534,22 @@ TEST(ClusterDefinitionTest, BadClusterConfig) {
     "lb_type": "round_robin",
     "fake_type" : "expected_failure",
     "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
+  EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
+}
+
+TEST(ClusterDefinitionTest, BadDnsIpVersionClusterConfig) {
+  std::string json = R"EOF(
+  {
+    "name": "cluster_1",
+    "connect_timeout_ms": 250,
+    "type": "static",
+    "lb_type": "round_robin",
+    "hosts": [{"url": "tcp://127.0.0.1:11001"}],
+    "dns_lookup_ip_version" : "foo"
   }
   )EOF";
 

@@ -369,7 +369,13 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
                                            Event::Dispatcher& dispatcher)
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
       dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
-                                       config.getInteger("dns_refresh_rate_ms", 5000))) {
+                                       config.getInteger("dns_refresh_rate_ms", 5000))),
+      dns_lookup_ip_version_(config.getString("dns_lookup_ip_version", "v4_only")) {
+  if (dns_lookup_ip_version_ != "v4_only" && dns_lookup_ip_version_ != "v6_only" &&
+      dns_lookup_ip_version_ != "auto") {
+    throw EnvoyException(
+        fmt::format("unknown dns_lookup_ip_version option {}", dns_lookup_ip_version_));
+  }
   for (Json::ObjectSharedPtr host : config.getObjectArray("hosts")) {
     resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, host->getString("url")));
   }
@@ -413,7 +419,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   parent_.info_->stats().update_attempt_.inc();
 
   active_query_ = parent_.dns_resolver_.resolve(
-      dns_address_,
+      dns_address_, parent_.dns_lookup_ip_version_,
       [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address_);
@@ -424,11 +430,19 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
           // a new address that has port in it. We need to both support IPv6 as well as potentially
           // move port handling into the DNS interface itself, which would work better for SRV.
-          new_hosts.emplace_back(new HostImpl(
-              parent_.info_, dns_address_,
-              Network::Address::InstanceConstSharedPtr{
-                  new Network::Address::Ipv4Instance(address->ip()->addressAsString(), port_)},
-              false, 1, ""));
+          if (address->ip()->version() == Network::Address::IpVersion::v4) {
+            new_hosts.emplace_back(new HostImpl(
+                parent_.info_, dns_address_,
+                Network::Address::InstanceConstSharedPtr{
+                    new Network::Address::Ipv4Instance(address->ip()->addressAsString(), port_)},
+                false, 1, ""));
+          } else {
+            new_hosts.emplace_back(new HostImpl(
+                parent_.info_, dns_address_,
+                Network::Address::InstanceConstSharedPtr{
+                    new Network::Address::Ipv6Instance(address->ip()->addressAsString(), port_)},
+                false, 1, ""));
+          }
         }
 
         std::vector<HostSharedPtr> hosts_added;

@@ -29,7 +29,8 @@ public:
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver
-  ActiveDnsQuery* resolve(const std::string& dns_name, ResolveCb callback) override;
+  ActiveDnsQuery* resolve(const std::string& dns_name, const std::string& dns_lookup_ip_version,
+                          ResolveCb callback) override;
 
 private:
   friend class DnsResolverImplPeer;
@@ -53,6 +54,13 @@ private:
     bool completed_ = false;
     // Was the query cancelled via cancel()?
     bool cancelled_ = false;
+    // If dns_lookup_ip_version is "auto", fallback to v6 address if v4
+    // resolution failed.
+    bool fallback_if_failed = false;
+    ares_channel channel_;
+    std::string dns_name_;
+
+    void getHostByName(int family);
   };
 
   // Callback for events on sockets tracked in events_.
