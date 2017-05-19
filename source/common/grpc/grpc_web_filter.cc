@@ -45,9 +45,10 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
     return Http::FilterDataStatus::Continue;
   }
 
-  uint64_t needed = (data.length() + decoding_buffer_.length()) / 4 * 4 - decoding_buffer_.length();
+  const uint64_t needed =
+      (data.length() + decoding_buffer_.length()) / 4 * 4 - decoding_buffer_.length();
   decoding_buffer_.move(data, needed);
-  std::string decoded = Base64::decode(
+  const std::string decoded = Base64::decode(
       std::string(static_cast<const char*>(decoding_buffer_.linearize(decoding_buffer_.length())),
                   decoding_buffer_.length()));
   decoding_buffer_.drain(decoding_buffer_.length());
@@ -77,7 +78,7 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
   for (auto& frame : frames) {
     Buffer::OwnedImpl temp;
     temp.add(&frame.flags_, 1);
-    uint32_t length = htonl(frame.length_);
+    const uint32_t length = htonl(frame.length_);
     temp.add(&length, 4);
     if (frame.length_ > 0) {
       temp.add(*frame.data_);
@@ -98,7 +99,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   }, &temp);
   Buffer::OwnedImpl buffer;
   buffer.add(&GRPC_WEB_TRAILER, 1);
-  uint64_t length = htonl(temp.length());
+  const uint32_t length = htonl(temp.length());
   buffer.add(&length, 4);
   buffer.move(temp);
   encoder_callbacks_->addEncodedData(buffer);

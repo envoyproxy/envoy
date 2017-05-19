@@ -1,22 +1,21 @@
-#ifndef SOURCE_COMMON_GRPC_GRPC_WEB_FILTER_H_
-#define SOURCE_COMMON_GRPC_GRPC_WEB_FILTER_H_
+#pragma once
 
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/non_copyable.h"
 #include "common/grpc/codec.h"
 
 namespace Envoy {
 namespace Grpc {
 
-class GrpcWebFilter : public Http::StreamFilter {
+/**
+ * See docs/configuration/http_filters/grpc_web_filter.rst
+ */
+class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
   GrpcWebFilter();
   virtual ~GrpcWebFilter();
-
-  // GrpcWebFilter is neither copyable nor movable.
-  GrpcWebFilter(const GrpcWebFilter&) = delete;
-  GrpcWebFilter& operator=(const GrpcWebFilter&) = delete;
 
   void onDestroy() override{};
 
@@ -50,5 +49,3 @@ private:
 };
 } // namespace Grpc
 } // namespace Envoy
-
-#endif // SOURCE_COMMON_GRPC_GRPC_WEB_FILTER_H_
