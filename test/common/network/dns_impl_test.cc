@@ -461,8 +461,9 @@ TEST_P(DnsImplTest, MultiARecordLookup) {
 TEST_P(DnsImplTest, Cancel) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, A);
 
-  ActiveDnsQuery* query = resolver_->resolve(
-      "some.domain", "auto", [](std::list<Address::InstanceConstSharedPtr> && ) -> void { FAIL(); });
+  ActiveDnsQuery* query =
+      resolver_->resolve("some.domain", "auto",
+                         [](std::list<Address::InstanceConstSharedPtr> && ) -> void { FAIL(); });
 
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr,
