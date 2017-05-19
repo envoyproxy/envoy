@@ -25,7 +25,17 @@ using testing::NiceMock;
 namespace Http {
 namespace Http2 {
 
-class Http2CodecImplTest : public testing::TestWithParam<uint64_t> {
+struct Http2SettingsTestParam : public Http2Settings {
+
+  Http2SettingsTestParam(uint64_t codec_options, uint32_t max_concurrent_streams,
+                         uint32_t initial_window_size) {
+    codec_options_ = codec_options;
+    max_concurrent_streams_ = max_concurrent_streams;
+    initial_window_size_ = initial_window_size;
+  }
+};
+
+class Http2CodecImplTest : public testing::TestWithParam<Http2SettingsTestParam> {
 public:
   struct ConnectionWrapper {
     void dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
@@ -238,7 +248,11 @@ TEST_P(Http2CodecImplTest, DeferredReset) {
 
 INSTANTIATE_TEST_CASE_P(
     Http2CodecImplTest, Http2CodecImplTest,
-    testing::Values(0, Http::Http2Settings::CodecOptions::DisableDynamicHPACKTable));
+    testing::Values(Http2SettingsTestParam(0, Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
+                                           Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE),
+                    Http2SettingsTestParam(Http2Settings::CodecOptions::DisableDynamicHPACKTable,
+                                           Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
+                                           Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE)));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {

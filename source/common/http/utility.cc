@@ -137,16 +137,15 @@ bool Utility::isInternalRequest(const HeaderMap& headers) {
 }
 
 Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
-  UNREFERENCED_PARAMETER(config);
   Http2Settings ret;
-  // std::string options = config.getString("http_codec_options", "");
-  // for (const std::string& option : StringUtil::split(options, ',')) {
-  //  if (option == "no_compression") {
-  //    ret |= Http2Settings::CodecOptions::DisableDynamicHPACKTable;
-  //  } else {
-  //    throw EnvoyException(fmt::format("unknown http codec option '{}'", option));
-  //  }
-  //}
+  std::string options = config.getString("http_codec_options", "");
+  for (const std::string& option : StringUtil::split(options, ',')) {
+    if (option == "no_compression") {
+      ret.codec_options_ |= Http2Settings::CodecOptions::DisableDynamicHPACKTable;
+    } else {
+      throw EnvoyException(fmt::format("unknown http codec option '{}'", option));
+    }
+  }
 
   return ret;
 }
