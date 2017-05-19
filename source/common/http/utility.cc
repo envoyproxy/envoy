@@ -136,13 +136,13 @@ bool Utility::isInternalRequest(const HeaderMap& headers) {
   return Network::Utility::isInternalAddress(forwarded_for->value().c_str());
 }
 
-CodecOptions Utility::parseCodecOptions(const Json::Object& config) {
+Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
   UNREFERENCED_PARAMETER(config);
-  CodecOptions ret{};
+  Http2Settings ret;
   // std::string options = config.getString("http_codec_options", "");
   // for (const std::string& option : StringUtil::split(options, ',')) {
   //  if (option == "no_compression") {
-  //    ret |= CodecOptions::DisableDynamicHPACKTable;
+  //    ret |= Http2Settings::CodecOptions::DisableDynamicHPACKTable;
   //  } else {
   //    throw EnvoyException(fmt::format("unknown http codec option '{}'", option));
   //  }

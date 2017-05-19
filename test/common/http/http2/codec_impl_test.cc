@@ -236,8 +236,9 @@ TEST_P(Http2CodecImplTest, DeferredReset) {
   server_wrapper_.dispatch(Buffer::OwnedImpl(), server_);
 }
 
-INSTANTIATE_TEST_CASE_P(Http2CodecImplTest, Http2CodecImplTest,
-                        testing::Values(0, CodecOptions::DisableDynamicHPACKTable));
+INSTANTIATE_TEST_CASE_P(
+    Http2CodecImplTest, Http2CodecImplTest,
+    testing::Values(0, Http::Http2Settings::CodecOptions::DisableDynamicHPACKTable));
 
 TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   {

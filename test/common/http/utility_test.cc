@@ -90,21 +90,22 @@ TEST(HttpUtility, createSslRedirectPath) {
   }
 }
 
-TEST(HttpUtility, parseCodecOptions) {
+TEST(HttpUtility, parseHttp2Settings) {
   {
     Json::ObjectPtr json = Json::Factory::loadFromString("{}");
-    EXPECT_EQ(0UL, Utility::parseCodecOptions(*json));
+    EXPECT_EQ(0UL, Utility::parseHttp2Settings(*json));
   }
 
   {
     Json::ObjectPtr json =
         Json::Factory::loadFromString("{\"http_codec_options\": \"no_compression\"}");
-    EXPECT_EQ(CodecOptions::DisableDynamicHPACKTable, Utility::parseCodecOptions(*json));
+    EXPECT_EQ(Http2Settings::CodecOptions::DisableDynamicHPACKTable,
+              Utility::parseHttp2Settings(*json));
   }
 
   {
     Json::ObjectPtr json = Json::Factory::loadFromString("{\"http_codec_options\": \"foo\"}");
-    EXPECT_THROW(Utility::parseCodecOptions(*json), EnvoyException);
+    EXPECT_THROW(Utility::parseHttp2Settings(*json), EnvoyException);
   }
 }
 

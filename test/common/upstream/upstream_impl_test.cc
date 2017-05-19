@@ -146,8 +146,8 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(static_cast<uint64_t>(Http::CodecOptions::DisableDynamicHPACKTable),
-            cluster.info()->httpCodecOptions());
+  EXPECT_EQ(static_cast<uint64_t>(Http::Http2Settings::CodecOptions::DisableDynamicHPACKTable),
+            cluster.info()->http2Settings());
 
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats.counter("cluster.name.upstream_rq_total").value());
@@ -429,7 +429,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(0U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(0U, cluster.info()->httpCodecOptions());
+  EXPECT_EQ(0U, cluster.info()->http2Settings());
   EXPECT_EQ(LoadBalancerType::Random, cluster.info()->lbType());
   EXPECT_THAT(std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
               ContainerEq(hostListToAddresses(cluster.hosts())));

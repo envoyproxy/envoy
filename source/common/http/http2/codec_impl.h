@@ -82,8 +82,6 @@ public:
   void shutdownNotice() override;
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
 
-  static const uint32_t MAX_CONCURRENT_STREAMS = 1024;
-
 protected:
   /**
    * Wrapper for static nghttp2 callback dispatchers.
@@ -195,8 +193,7 @@ protected:
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
   void sendPendingFrames();
-
-  void sendSettings(const CodecOptions& codec_options);
+  void sendSettings(const Http2Settings& http2_settings);
 
   static Http2Callbacks http2_callbacks_;
   static Http2Options http2_options_;
@@ -216,10 +213,6 @@ private:
   ssize_t onSend(const uint8_t* data, size_t length);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
 
-  // For now just set all window sizes (stream and connection) to 256MiB. We can adjust later if
-  // needed.
-  static const uint32_t DEFAULT_WINDOW_SIZE = 256 * 1024 * 1024;
-
   static const std::unique_ptr<const Http::HeaderMap> CONTINUE_HEADER;
 
   Network::Connection& connection_;
@@ -234,7 +227,7 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Scope& stats, const CodecOptions& codec_options);
+                       Stats::Scope& stats, const Http2Settings& http2_settings);
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
@@ -254,7 +247,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Store& stats, const CodecOptions& codec_options);
+                       Stats::Store& stats, const Http2Settings& http2_settings);
 
 private:
   // ConnectionImpl

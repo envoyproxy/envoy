@@ -506,16 +506,12 @@ void ConnectionImpl::sendPendingFrames() {
   }
 }
 
-void ConnectionImpl::sendSettings(const CodecOptions& codec_options) {
+void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
   std::vector<nghttp2_settings_entry> iv = {
-      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, codec_options.max_concurrent_streams_
-                                                    ? codec_options.max_concurrent_streams_
-                                                    : MAX_CONCURRENT_STREAMS},
-      {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, codec_options.initial_window_size_
-                                                 ? codec_options.initial_window_size_
-                                                 : DEFAULT_WINDOW_SIZE}};
+      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_settings.max_concurrent_streams_},
+      {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_window_size_}};
 
-  if (codec_options.flag_options_ & CodecOptionFlags::DisableDynamicHPACKTable) {
+  if (http2_settings.codec_options_ & Http::Http2Settings::CodecOption::DisableDynamicHPACKTable) {
     iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, 0});
     conn_log_debug("setting HPACK dynamic table size to 0", connection_);
   }
@@ -526,7 +522,9 @@ void ConnectionImpl::sendSettings(const CodecOptions& codec_options) {
 
   // Increase connection window size up to our default size.
   rc = nghttp2_submit_window_update(session_, NGHTTP2_FLAG_NONE, 0,
-                                    DEFAULT_WINDOW_SIZE - NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
+                                    http2_settings.initial_window_size_ -
+                                        NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
+  // TODO: ensure mimium initial_window_size from json schema
   ASSERT(rc == 0);
 }
 
@@ -614,11 +612,11 @@ ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            ConnectionCallbacks& callbacks, Stats::Scope& stats,
-                                           const CodecOptions& codec_options)
+                                           const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats), callbacks_(callbacks) {
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
-  sendSettings(codec_options);
+  sendSettings(http2_settings);
 }
 
 Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
@@ -652,11 +650,11 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            Http::ServerConnectionCallbacks& callbacks,
-                                           Stats::Store& stats, const CodecOptions& codec_options)
+                                           Stats::Store& stats, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats), callbacks_(callbacks) {
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options_.options());
-  sendSettings(codec_options);
+  sendSettings(http2_settings);
 }
 
 int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {

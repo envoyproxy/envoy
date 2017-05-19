@@ -67,7 +67,7 @@ public:
    * @return uint64_t parse a "http_codec_options" JSON field and turn it into a bitmask of
    *         CodecOption values.
    */
-  static CodecOptions parseCodecOptions(const Json::Object& config);
+  static Http2Settings parseHttp2Settings(const Json::Object& config);
 
   /**
    * Create a locally generated response using filter callbacks.

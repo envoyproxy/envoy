@@ -247,7 +247,10 @@ CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnect
   return codec;
 }
 
-uint64_t ProdConnPoolImpl::maxConcurrentStreams() { return ConnectionImpl::MAX_CONCURRENT_STREAMS; }
+uint64_t ProdConnPoolImpl::maxConcurrentStreams() {
+  // NOTES: this function is remove from PR #981, just hard-code the same value here for now
+  return 1024;
+}
 
 uint32_t ProdConnPoolImpl::maxTotalStreams() { return MAX_STREAMS; }
 
