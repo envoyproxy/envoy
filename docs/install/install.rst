@@ -11,4 +11,4 @@ Building and installation
   installation
   ref_configs
   sandboxes
-  tools
+  tools/tools
