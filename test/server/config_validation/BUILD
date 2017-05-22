@@ -39,6 +39,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "connection_handler_test",
+    srcs = ["connection_handler_test.cc"],
+    deps = [
+        "//include/envoy/api:api_interface",
+        "//source/common/network:address_lib",
+        "//source/server/config_validation:connection_handler_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
     data = [
