@@ -39,6 +39,7 @@ public:
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
 
   std::string name_{"fake_cluster"};
+  Http::Http2Settings http2_settings_{};
   uint64_t max_requests_per_connection_{};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterStats stats_;
