@@ -8,15 +8,13 @@ import requests
 app = Flask(__name__)
 
 TRACE_HEADERS_TO_PROPAGATE = [
-    'X-Client-Trace-Id',
     'X-Ot-Span-Context',
     'X-Request-Id',
     'X-B3-TraceId',
     'X-B3-SpanId',
     'X-B3-ParentSpanId',
     'X-B3-Sampled',
-    'X-B3-Flags',
-    'X-B3-Envoy'
+    'X-B3-Flags'
 ]
 
 @app.route('/service/<service_number>')
