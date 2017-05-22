@@ -6,7 +6,7 @@ Hot restart
 Ease of operation is one of the primary goals of Envoy. In addition to robust statistics and a local
 administration interface, Envoy has the ability to “hot” or “live” restart itself. This means that
 Envoy can fully reload itself (both code and configuration) without dropping any connections. The
-hot restart functionality has has the following general architecture:
+hot restart functionality has the following general architecture:
 
 * Statistics and some locks are kept in a shared memory region. This means that gauges will be
   consistent across both processes as restart is taking place.

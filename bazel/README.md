@@ -214,8 +214,9 @@ https://github.com/bazelbuild/bazel/issues/2805.
 
 # Coverage builds
 
-To generate coverage results, make sure you have `gcov` 3.3 in your `PATH` (or
-set `GCOVR` to point at it). Then run:
+To generate coverage results, make sure you have
+[`gcovr`](https://github.com/gcovr/gcovr) 3.3 in your `PATH` (or set `GCOVR` to
+point at it). Then run:
 
 ```
 test/run_envoy_bazel_coverage.sh
