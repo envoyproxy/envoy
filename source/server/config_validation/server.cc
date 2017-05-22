@@ -20,8 +20,7 @@ int validateConfig(Options& options, ComponentFactory& component_factory,
   }
 }
 
-ValidationInstance::ValidationInstance(Options& options,
-                                       Stats::IsolatedStoreImpl& store,
+ValidationInstance::ValidationInstance(Options& options, Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,
                                        ComponentFactory& component_factory,
                                        const LocalInfo::LocalInfo& local_info)

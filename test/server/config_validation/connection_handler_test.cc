@@ -1,8 +1,8 @@
-#include "server/config_validation/connection_handler.h"
+#include "envoy/api/api.h"
 
 #include "common/network/address_impl.h"
 
-#include "envoy/api/api.h"
+#include "server/config_validation/connection_handler.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"

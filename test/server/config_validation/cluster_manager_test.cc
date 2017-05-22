@@ -1,12 +1,12 @@
-#include "server/config_validation/cluster_manager.h"
+#include "envoy/json/json_object.h"
+#include "envoy/upstream/resource_manager.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/json/json_loader.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 
-#include "envoy/json/json_object.h"
-#include "envoy/upstream/resource_manager.h"
-#include "envoy/upstream/upstream.h"
+#include "server/config_validation/cluster_manager.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -40,9 +40,9 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   )EOF";
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   AccessLog::MockAccessLogManager log_manager;
-  
-  ClusterManagerPtr cluster_manager = factory.clusterManagerFromJson(
-      *config, stats, tls, runtime, random, local_info, log_manager);
+
+  ClusterManagerPtr cluster_manager =
+      factory.clusterManagerFromJson(*config, stats, tls, runtime, random, local_info, log_manager);
   EXPECT_EQ(nullptr,
             cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default, nullptr));
   Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster");
