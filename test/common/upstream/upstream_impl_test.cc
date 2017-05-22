@@ -48,7 +48,7 @@ struct ResolverData {
 
   void expectResolve(Network::MockDnsResolver& dns_resolver) {
     EXPECT_CALL(dns_resolver, resolve(_, _, _))
-        .WillOnce(Invoke([&](const std::string&, const std::string&,
+        .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
                              Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           dns_callback_ = cb;
           return &active_dns_query_;
@@ -80,8 +80,8 @@ TEST(StrictDnsClusterImplTest, ImmediateResolve) {
   )EOF";
 
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", _, _))
-      .WillOnce(Invoke([&](const std::string&, const std::string&,
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::v4_only, _))
+      .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
         return nullptr;
@@ -109,13 +109,13 @@ TEST(StrictDnsClusterImplTest, ImmediateResolveV6Only) {
     "type": "strict_dns",
     "lb_type": "round_robin",
     "hosts": [{"url": "tcp://foo.bar.com:443"}],
-    "dns_lookup_ip_version" : "v6_only"
+    "dns_lookup_family" : "v6_only"
   }
   )EOF";
 
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", "v6_only", _))
-      .WillOnce(Invoke([&](const std::string&, const std::string&,
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::v6_only, _))
+      .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(TestUtility::makeDnsResponse({"::1", "::2"}));
         return nullptr;
@@ -128,7 +128,7 @@ TEST(StrictDnsClusterImplTest, ImmediateResolveV6Only) {
   EXPECT_EQ(2UL, cluster.healthyHosts().size());
 }
 
-TEST(StrictDnsClusterImplTest, ImmediateResolveAuto) {
+TEST(StrictDnsClusterImplTest, ImmediateResolveFallback) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Network::MockDnsResolver> dns_resolver;
@@ -143,13 +143,13 @@ TEST(StrictDnsClusterImplTest, ImmediateResolveAuto) {
     "type": "strict_dns",
     "lb_type": "round_robin",
     "hosts": [{"url": "tcp://foo.bar.com:443"}],
-    "dns_lookup_ip_version" : "auto"
+    "dns_lookup_family" : "fallback"
   }
   )EOF";
 
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", "auto", _))
-      .WillOnce(Invoke([&](const std::string&, const std::string&,
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::fallback, _))
+      .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
         return nullptr;
@@ -549,7 +549,7 @@ TEST(ClusterDefinitionTest, BadDnsIpVersionClusterConfig) {
     "type": "static",
     "lb_type": "round_robin",
     "hosts": [{"url": "tcp://127.0.0.1:11001"}],
-    "dns_lookup_ip_version" : "foo"
+    "dns_lookup_family" : "foo"
   }
   )EOF";
 

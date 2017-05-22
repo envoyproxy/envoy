@@ -350,7 +350,7 @@ private:
   Network::DnsResolver& dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
-  const std::string dns_lookup_ip_version_;
+  Network::DnsLookupFamily dns_lookup_family_;
 };
 
 } // Upstream

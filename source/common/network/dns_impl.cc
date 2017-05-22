@@ -81,7 +81,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent*
     }
   } else if (fallback_if_failed) {
     fallback_if_failed = false;
-    getHostByName(AF_INET6);
+    getHostByName(AF_INET);
   }
   if (!cancelled_ && completed_) {
     callback_(std::move(address_list));
@@ -132,20 +132,20 @@ void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
 }
 
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
-                                         const std::string& dns_lookup_ip_version,
+                                         const DnsLookupFamily& dns_lookup_family,
                                          ResolveCb callback) {
   std::unique_ptr<PendingResolution> pending_resolution(new PendingResolution());
   pending_resolution->callback_ = callback;
   pending_resolution->channel_ = channel_;
   pending_resolution->dns_name_ = dns_name;
-  if (dns_lookup_ip_version == "auto") {
+  if (dns_lookup_family == DnsLookupFamily::fallback) {
     pending_resolution->fallback_if_failed = true;
   }
 
-  if (dns_lookup_ip_version == "v6_only") {
-    pending_resolution->getHostByName(AF_INET6);
-  } else {
+  if (dns_lookup_family == DnsLookupFamily::v4_only) {
     pending_resolution->getHostByName(AF_INET);
+  } else {
+    pending_resolution->getHostByName(AF_INET6);
   }
 
   if (pending_resolution->completed_) {

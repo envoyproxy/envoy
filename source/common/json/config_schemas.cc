@@ -1210,7 +1210,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
-      "dns_lookup_ip_version" : {
+      "dns_lookup_family" : {
         "type" : "string",
         "enum" : ["v4_only", "v6_only", "auto"]
       },

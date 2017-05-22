@@ -119,7 +119,7 @@ public:
   // Network::DnsResolver
   MOCK_METHOD3(resolve,
                ActiveDnsQuery*(const std::string& dns_name,
-                               const std::string& dns_lookup_ip_version, ResolveCb callback));
+                               const DnsLookupFamily& dns_lookup_family, ResolveCb callback));
 
   testing::NiceMock<MockActiveDnsQuery> active_query_;
 };

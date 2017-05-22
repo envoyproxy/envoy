@@ -20,7 +20,7 @@ Cluster
     "features": "...",
     "http_codec_options": "...",
     "dns_refresh_rate_ms": "...",
-    "dns_lookup_ip_version": "...",
+    "dns_lookup_family": "...",
     "outlier_detection": "..."
   }
 
@@ -145,15 +145,15 @@ dns_refresh_rate_ms
   the value defaults to 5000. For cluster types other than *strict_dns* and *logical_dns* this setting is
   ignored.
 
-.. _config_cluster_manager_cluster_dns_lookup_ip_version:
+.. _config_cluster_manager_cluster_dns_lookup_family:
 
-dns_loopkup_ip_version
-  *(optional, string)* The DNS IP address version lookup policy. The options are *v4_only*, *v6_only*,
-  and *auto*. If this setting is not specified, the value defaults to *v4_only*. When *v4_only* is selected,
+dns_lookup_family
+  *(optional, string)* The DNS IP address resolution policy. The options are *v4_only*, *v6_only*,
+  and *fallback*. If this setting is not specified, the value defaults to *v4_only*. When *v4_only* is selected,
   the DNS resolver will only perform a lookup for addresses in the IPv4 family. If *v6_only* is selected,
-  the DNS resolver will only perform a lookup for addresses in the IPv6 family. If *auto* is specified,
-  the DNS resolver will first perform a lookup for addresses in the IPv4 family and fallback to a lookup for
-  addresses in the IPv6 family. For cluster types other than *strict_dns* and *logical_dns*, this setting
+  the DNS resolver will only perform a lookup for addresses in the IPv6 family. If *fallback* is specified,
+  the DNS resolver will first perform a lookup for addresses in the IPv6 family and fallback to a lookup for
+  addresses in the IPv4 family. For cluster types other than *strict_dns* and *logical_dns*, this setting
   is ignored.
 
 .. _config_cluster_manager_cluster_outlier_detection:

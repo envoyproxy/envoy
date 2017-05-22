@@ -369,13 +369,20 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
                                            Event::Dispatcher& dispatcher)
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
       dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
-                                       config.getInteger("dns_refresh_rate_ms", 5000))),
-      dns_lookup_ip_version_(config.getString("dns_lookup_ip_version", "v4_only")) {
-  if (dns_lookup_ip_version_ != "v4_only" && dns_lookup_ip_version_ != "v6_only" &&
-      dns_lookup_ip_version_ != "auto") {
-    throw EnvoyException(
-        fmt::format("unknown dns_lookup_ip_version option {}", dns_lookup_ip_version_));
+                                       config.getInteger("dns_refresh_rate_ms", 5000))) {
+  // Resolve string to enum.
+  std::string dns_lookup_family = config.getString("dns_lookup_family", "v4_only");
+  if (dns_lookup_family == "v6_only") {
+    dns_lookup_family_ = Network::DnsLookupFamily::v6_only;
+  } else if (dns_lookup_family == "fallback") {
+    dns_lookup_family_ = Network::DnsLookupFamily::fallback;
+  } else {
+    dns_lookup_family_ = Network::DnsLookupFamily::v4_only;
   }
+  //} else {
+  //  throw EnvoyException(fmt::format("unknown dns_lookup_family option {}", dns_lookup_family));
+  //}
+
   for (Json::ObjectSharedPtr host : config.getObjectArray("hosts")) {
     resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, host->getString("url")));
   }
@@ -419,7 +426,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   parent_.info_->stats().update_attempt_.inc();
 
   active_query_ = parent_.dns_resolver_.resolve(
-      dns_address_, parent_.dns_lookup_ip_version_,
+      dns_address_, parent_.dns_lookup_family_,
       [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         log_debug("async DNS resolution complete for {}", dns_address_);

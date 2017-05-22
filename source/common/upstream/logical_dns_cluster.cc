@@ -18,17 +18,21 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
     : ClusterImplBase(config, runtime, stats, ssl_context_manager), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(config.getInteger("dns_refresh_rate_ms", 5000))),
-      dns_lookup_ip_version_(config.getString("dns_lookup_ip_version", "v4_only")), tls_(tls),
-      tls_slot_(tls.allocateSlot()), initialized_(false),
+      tls_(tls), tls_slot_(tls.allocateSlot()), initialized_(false),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
   std::vector<Json::ObjectSharedPtr> hosts_json = config.getObjectArray("hosts");
   if (hosts_json.size() != 1) {
     throw EnvoyException("logical_dns clusters must have a single host");
   }
-  if (dns_lookup_ip_version_ != "v4_only" && dns_lookup_ip_version_ != "v6_only" &&
-      dns_lookup_ip_version_ != "auto") {
-    throw EnvoyException(
-        fmt::format("unknown dns_lookup_ip_version option {}", dns_lookup_ip_version_));
+
+  // Resolve string to enum.
+  std::string dns_lookup_family = config.getString("dns_lookup_family", "v4_only");
+  if (dns_lookup_family == "v6_only") {
+    dns_lookup_family_ = Network::DnsLookupFamily::v6_only;
+  } else if (dns_lookup_family == "fallback") {
+    dns_lookup_family_ = Network::DnsLookupFamily::fallback;
+  } else {
+    dns_lookup_family_ = Network::DnsLookupFamily::v4_only;
   }
   dns_url_ = hosts_json[0]->getString("url");
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
@@ -55,7 +59,7 @@ void LogicalDnsCluster::startResolve() {
   info_->stats().update_attempt_.inc();
 
   active_dns_query_ = dns_resolver_.resolve(
-      dns_address, dns_lookup_ip_version_,
+      dns_address, dns_lookup_family_,
       [this, dns_address](
           std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_dns_query_ = nullptr;
