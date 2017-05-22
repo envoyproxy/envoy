@@ -38,9 +38,9 @@ NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactory(
 std::string RedisProxyFilterConfigFactory::name() { return "redis_proxy"; }
 
 /**
- * Static registration for the redis filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the redis filter. @see RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<RedisProxyFilterConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<RedisProxyFilterConfigFactory> registered_;
 
 } // Configuration
 } // Server

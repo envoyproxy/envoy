@@ -11,6 +11,7 @@
 #include "server/http/health_check.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -176,7 +177,9 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
 }
 
 TEST(HttpFilterConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW(RegisterHttpFilterConfigFactory<RouterFilterConfig>(), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      RegisterNamedHttpFilterConfigFactory<RouterFilterConfig>(), EnvoyException,
+      "Attempted to register multiple NamedHttpFilterConfigFactory objects with name: 'router'");
 }
 
 TEST(HttpTracerConfigTest, LightstepHttpTracer) {
@@ -216,7 +219,9 @@ TEST(HttpTracerConfigTest, ZipkinHttpTracer) {
 }
 
 TEST(HttpTracerConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW(RegisterHttpTracerFactory<ZipkinHttpTracerFactory>(), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      RegisterHttpTracerFactory<ZipkinHttpTracerFactory>(), EnvoyException,
+      "Attempted to register multiple HttpTracerFactory objects with name: 'zipkin'");
 }
 
 } // Configuration

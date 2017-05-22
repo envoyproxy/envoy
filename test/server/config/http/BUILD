@@ -22,5 +22,6 @@ envoy_cc_test(
         "//source/server/config/http:zipkin_lib",
         "//source/server/http:health_check_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

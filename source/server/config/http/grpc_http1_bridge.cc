@@ -26,9 +26,9 @@ HttpFilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactory(HttpFilterT
 std::string GrpcHttp1BridgeFilterConfig::name() { return "grpc_http1_bridge"; }
 
 /**
- * Static registration for the grpc HTTP1 bridge filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the grpc HTTP1 bridge filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-static RegisterHttpFilterConfigFactory<GrpcHttp1BridgeFilterConfig> register_;
+static RegisterNamedHttpFilterConfigFactory<GrpcHttp1BridgeFilterConfig> register_;
 
 } // Configuration
 } // Server

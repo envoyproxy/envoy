@@ -11,11 +11,11 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the echo filter. @see NetworkFilterConfigFactory.
+ * Config registration for the echo filter. @see NamedNetworkFilterConfigFactory.
  */
-class EchoConfigFactory : public NetworkFilterConfigFactory {
+class EchoConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
-  // NetworkFilterConfigFactory
+  // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type, const Json::Object&,
                                              Server::Instance&) override {
     if (type != NetworkFilterType::Read) {
@@ -31,9 +31,9 @@ public:
 };
 
 /**
- * Static registration for the echo filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the echo filter. @see RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<EchoConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<EchoConfigFactory> registered_;
 
 } // Configuration
 } // Server

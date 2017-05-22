@@ -26,9 +26,9 @@ HttpFilterFactoryCb DynamoFilterConfig::createFilterFactory(HttpFilterType type,
 std::string DynamoFilterConfig::name() { return "http_dynamo_filter"; }
 
 /**
- * Static registration for the http dynamodb filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the http dynamodb filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-static RegisterHttpFilterConfigFactory<DynamoFilterConfig> register_;
+static RegisterNamedHttpFilterConfigFactory<DynamoFilterConfig> register_;
 
 } // Configuration
 } // Server

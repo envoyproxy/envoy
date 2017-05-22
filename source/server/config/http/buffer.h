@@ -11,9 +11,9 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the buffer filter. @see HttpFilterConfigFactory.
+ * Config registration for the buffer filter. @see NamedHttpFilterConfigFactory.
  */
-class BufferFilterConfig : public HttpFilterConfigFactory {
+class BufferFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object& json_config,
                                           const std::string& stats_prefix,

@@ -29,9 +29,9 @@ HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactory(HttpFilterType ty
 std::string RateLimitFilterConfig::name() { return "rate_limit"; }
 
 /**
- * Static registration for the rate limit filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the rate limit filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-static RegisterHttpFilterConfigFactory<RateLimitFilterConfig> register_;
+static RegisterNamedHttpFilterConfigFactory<RateLimitFilterConfig> register_;
 
 } // Configuration
 } // Server

@@ -30,9 +30,9 @@ NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilterFactory(
 std::string ClientSslAuthConfigFactory::name() { return "client_ssl_auth"; }
 
 /**
- * Static registration for the client SSL auth filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the client SSL auth filter. @see RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<ClientSslAuthConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<ClientSslAuthConfigFactory> registered_;
 
 } // Configuration
 } // Server

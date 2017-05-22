@@ -29,9 +29,9 @@ HttpFilterFactoryCb FaultFilterConfig::createFilterFactory(HttpFilterType type,
 std::string FaultFilterConfig::name() { return "fault"; }
 
 /**
- * Static registration for the fault filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the fault filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-static RegisterHttpFilterConfigFactory<FaultFilterConfig> register_;
+static RegisterNamedHttpFilterConfigFactory<FaultFilterConfig> register_;
 
 } // Configuration
 } // Server

@@ -19,6 +19,7 @@ envoy_cc_test(
         "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:tcp_proxy_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

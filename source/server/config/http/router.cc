@@ -34,9 +34,9 @@ HttpFilterFactoryCb RouterFilterConfig::createFilterFactory(HttpFilterType type,
 std::string RouterFilterConfig::name() { return "router"; }
 
 /**
- * Static registration for the router filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the router filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-static RegisterHttpFilterConfigFactory<RouterFilterConfig> register_;
+static RegisterNamedHttpFilterConfigFactory<RouterFilterConfig> register_;
 
 } // Configuration
 } // Server

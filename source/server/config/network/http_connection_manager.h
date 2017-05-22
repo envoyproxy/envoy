@@ -24,12 +24,12 @@ namespace Configuration {
 enum class HttpFilterType { Decoder, Encoder, Both };
 
 /**
- * Config registration for the HTTP connection manager filter. @see NetworkFilterConfigFactory.
+ * Config registration for the HTTP connection manager filter. @see NamedNetworkFilterConfigFactory.
  */
 class HttpConnectionManagerFilterConfigFactory : Logger::Loggable<Logger::Id::config>,
-                                                 public NetworkFilterConfigFactory {
+                                                 public NamedNetworkFilterConfigFactory {
 public:
-  // NetworkFilterConfigFactory
+  // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type, const Json::Object& config,
                                              Server::Instance& server) override;
 
@@ -42,23 +42,43 @@ public:
 typedef std::function<void(Http::FilterChainFactoryCallbacks&)> HttpFilterFactoryCb;
 
 /**
- * Implemented by each HTTP filter and registered via registerHttpFilterConfigFactory() or the
- * convenience class RegisterHttpFilterConfigFactory.
+ * DEPRECATED - Implemented by each HTTP filter and registered via registerHttpFilterConfigFactory()
+ * or the convenience class RegisterHttpFilterConfigFactory.
  */
 class HttpFilterConfigFactory {
 public:
   virtual ~HttpFilterConfigFactory() {}
 
+  virtual HttpFilterFactoryCb tryCreateFilterFactory(HttpFilterType type, const std::string& name,
+                                                     const Json::Object& config,
+                                                     const std::string& stat_prefix,
+                                                     Server::Instance& server) PURE;
+};
+
+/**
+ * Implemented by each HTTP filter and registered via registerNamedHttpFilterConfigFactory() or the
+ * convenience class RegisterNamedHttpFilterConfigFactory.
+ */
+class NamedHttpFilterConfigFactory {
+public:
+  virtual ~NamedHttpFilterConfigFactory() {}
+
   /**
-  * Create a particular http filter factory implementation.  If the creation fails, an error will be
-  * thrown.  The returned callback should always be valid.
+  * Create a particular http filter factory implementation.  If the implementation is unable to
+  * produce a factory with the provided parameters, it should throw an EnvoyException in the case of
+  * general error or a Json::Exception if the json configuration is erroneous.  The returned
+  * callback should always be initialized.
+  * @param type supplies type of filter to initialize (decoder, encoder, or both)
+  * @param config supplies the general json configuration for the filter
+  * @param stat_prefix prefix for stat logging
+  * @param server supplies the server instance
   */
   virtual HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object& config,
                                                   const std::string& stat_prefix,
                                                   Server::Instance& server) PURE;
 
   /**
-  * Provides the identifying name for a particular implementation of an http filter produced by the
+  * Returns the identifying name for a particular implementation of an http filter produced by the
   * factory.
   */
   virtual std::string name() PURE;
@@ -114,14 +134,28 @@ public:
   const Network::Address::Instance& localAddress() override;
   const Optional<std::string>& userAgent() override { return user_agent_; }
 
+  /**
+   * DEPRECATED - Register an HttpFilterConfigFactory implementation as an option to create
+   * instances of HttpFilterFactoryCb.
+   * @param factory the HttpFilterConfigFactory implementation
+   */
   static void registerHttpFilterConfigFactory(HttpFilterConfigFactory& factory) {
-    auto result = filterConfigFactories().emplace(std::make_pair(factory.name(), &factory));
+    filterConfigFactories().push_back(&factory);
+  }
+
+  /**
+   * Register a NamedHttpFilterConfigFactory implementation as an option to create instances of
+   * HttpFilterFactoryCb.
+   * @param factory the NamedHttpFilterConfigFactory implementation
+   */
+  static void registerNamedHttpFilterConfigFactory(NamedHttpFilterConfigFactory& factory) {
+    auto result = namedFilterConfigFactories().emplace(std::make_pair(factory.name(), &factory));
 
     // result is a pair whose second member is a boolean indicating, if false, that the key exists
     // and that the value was not inserted.
     if (!result.second) {
       throw EnvoyException(fmt::format(
-          "Attempted to register multiple HttpFilterConfigFactory objects with name: '{}'",
+          "Attempted to register multiple NamedHttpFilterConfigFactory objects with name: '{}'",
           factory.name()));
     }
   }
@@ -131,10 +165,25 @@ public:
 private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
 
-  static std::unordered_map<std::string, HttpFilterConfigFactory*>& filterConfigFactories() {
-    static std::unordered_map<std::string, HttpFilterConfigFactory*>* filter_config_factories =
-        new std::unordered_map<std::string, HttpFilterConfigFactory*>;
+  /**
+   * DEPRECATED - Returns a list of the currently registered HttpFilterConfigFactory
+   * implementations.
+   */
+  static std::list<HttpFilterConfigFactory*>& filterConfigFactories() {
+    static std::list<HttpFilterConfigFactory*>* filter_config_factories =
+        new std::list<HttpFilterConfigFactory*>;
     return *filter_config_factories;
+  }
+
+  /**
+   * Returns a map of the currently registered NamedHttpFilterConfigFactory implementations.
+   */
+  static std::unordered_map<std::string, NamedHttpFilterConfigFactory*>&
+  namedFilterConfigFactories() {
+    static std::unordered_map<std::string, NamedHttpFilterConfigFactory*>*
+        named_filter_config_factories =
+            new std::unordered_map<std::string, NamedHttpFilterConfigFactory*>;
+    return *named_filter_config_factories;
   }
 
   HttpFilterType stringToType(const std::string& type);
@@ -159,13 +208,34 @@ private:
 };
 
 /**
- * @see HttpFilterConfigFactory.
+ * @see NamedHttpFilterConfigFactory. An instantiation of this class registers a
+ * NamedHttpFilterConfigFactory implementation (T) so it can be used to create instances of
+ * HttpFilterFactoryCb.
+ */
+template <class T> class RegisterNamedHttpFilterConfigFactory {
+public:
+  /**
+   * Registers the implementation.
+   */
+  RegisterNamedHttpFilterConfigFactory() {
+    static T* instance = new T;
+    HttpConnectionManagerConfig::registerNamedHttpFilterConfigFactory(*instance);
+  }
+};
+
+/**
+ * DEPRECATED @see HttpFilterConfigFactory.  An instantiation of this class registers a
+ * HttpFilterConfigFactory implementation (T) so it can be used to create instances of
+ * HttpFilterFactoryCb.
  */
 template <class T> class RegisterHttpFilterConfigFactory {
 public:
+  /**
+   * Registers the implementation.
+   */
   RegisterHttpFilterConfigFactory() {
     static T* instance = new T;
-    HttpConnectionManagerConfig::registerHttpFilterConfigFactory(*instance);
+    HttpConnectionManagerConfig::registerHttpFilterConfigFactory(instance);
   }
 };
 

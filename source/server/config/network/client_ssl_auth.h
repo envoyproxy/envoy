@@ -9,11 +9,11 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the client SSL auth filter. @see NetworkFilterConfigFactory.
+ * Config registration for the client SSL auth filter. @see NamedNetworkFilterConfigFactory.
  */
-class ClientSslAuthConfigFactory : public NetworkFilterConfigFactory {
+class ClientSslAuthConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
-  // NetworkFilterConfigFactory
+  // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type,
                                              const Json::Object& json_config,
                                              Server::Instance& server) override;

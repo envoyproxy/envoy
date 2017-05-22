@@ -9,11 +9,11 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the mongo proxy filter. @see NetworkFilterConfigFactory.
+ * Config registration for the mongo proxy filter. @see NamedNetworkFilterConfigFactory.
  */
-class MongoProxyFilterConfigFactory : public NetworkFilterConfigFactory {
+class MongoProxyFilterConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
-  // NetworkFilterConfigFactory
+  // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type, const Json::Object& config,
                                              Server::Instance& server) override;
 

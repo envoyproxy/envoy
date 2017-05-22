@@ -35,9 +35,9 @@ HttpFilterFactoryCb BufferFilterConfig::createFilterFactory(HttpFilterType type,
 std::string BufferFilterConfig::name() { return "buffer"; }
 
 /**
- * Static registration for the buffer filter. @see RegisterHttpFilterConfigFactory.
+ * Static registration for the buffer filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-static RegisterHttpFilterConfigFactory<BufferFilterConfig> register_;
+static RegisterNamedHttpFilterConfigFactory<BufferFilterConfig> register_;
 
 } // Configuration
 } // Server

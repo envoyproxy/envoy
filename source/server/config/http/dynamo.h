@@ -11,7 +11,7 @@ namespace Configuration {
 /**
  * Config registration for http dynamodb filter.
  */
-class DynamoFilterConfig : public HttpFilterConfigFactory {
+class DynamoFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object&,
                                           const std::string& stat_prefix,

@@ -8,6 +8,7 @@
 #include "server/config/network/tcp_proxy.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -324,7 +325,10 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
 }
 
 TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW(RegisterNetworkFilterConfigFactory<ClientSslAuthConfigFactory>(), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(RegisterNamedNetworkFilterConfigFactory<ClientSslAuthConfigFactory>(),
+                            EnvoyException, "Attempted to register multiple "
+                                            "NamedNetworkFilterConfigFactory objects with name: "
+                                            "'client_ssl_auth'");
 }
 
 } // Configuration

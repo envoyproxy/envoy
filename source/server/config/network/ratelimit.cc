@@ -30,9 +30,9 @@ NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactory(NetworkFilter
 std::string RateLimitConfigFactory::name() { return "ratelimit"; }
 
 /**
- * Static registration for the rate limit filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the rate limit filter. @see RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<RateLimitConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<RateLimitConfigFactory> registered_;
 
 } // Configuration
 } // Server

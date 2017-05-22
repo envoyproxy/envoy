@@ -46,9 +46,10 @@ std::string HttpConnectionManagerFilterConfigFactory::name() { return "http_conn
 
 /**
  * Static registration for the HTTP connection manager filter. @see
- * RegisterNetworkFilterConfigFactory.
+ * RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<HttpConnectionManagerFilterConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<HttpConnectionManagerFilterConfigFactory>
+    registered_;
 
 std::string
 HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& connection,
@@ -155,10 +156,31 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(const Json::Object& con
 
     HttpFilterType type = stringToType(string_type);
 
-    HttpFilterConfigFactory* factory = filterConfigFactories().at(string_name);
-    HttpFilterFactoryCb callback =
-        factory->createFilterFactory(type, *config_object, stats_prefix_, server);
-    filter_factories_.push_back(callback);
+    // Now see if there is a factory that will accept the config.
+    auto search_it = namedFilterConfigFactories().find(string_name);
+    if (search_it != namedFilterConfigFactories().end()) {
+      HttpFilterFactoryCb callback =
+          search_it->second->createFilterFactory(type, *config_object, stats_prefix_, server);
+      filter_factories_.push_back(callback);
+    } else {
+      // DEPRECATED
+      // This name wasn't found in the named map, so search in the deprecated list registry.
+      bool found_filter = false;
+      for (HttpFilterConfigFactory* config_factory : filterConfigFactories()) {
+        HttpFilterFactoryCb callback = config_factory->tryCreateFilterFactory(
+            type, string_name, *config_object, stats_prefix_, server);
+        if (callback) {
+          filter_factories_.push_back(callback);
+          found_filter = true;
+          break;
+        }
+      }
+
+      if (!found_filter) {
+        throw EnvoyException(fmt::format("unable to create http filter factory for '{}'/'{}'",
+                                         string_name, string_type));
+      }
+    }
   }
 }
 

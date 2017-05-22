@@ -11,9 +11,9 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the router filter. @see HttpFilterConfigFactory.
+ * Config registration for the router filter. @see NamedHttpFilterConfigFactory.
  */
-class RouterFilterConfig : public HttpFilterConfigFactory {
+class RouterFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object& json_config,
                                           const std::string& stat_prefix,

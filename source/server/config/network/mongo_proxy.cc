@@ -37,9 +37,9 @@ NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactory(
 std::string MongoProxyFilterConfigFactory::name() { return "mongo_proxy"; }
 
 /**
- * Static registration for the mongo filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the mongo filter. @see RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<MongoProxyFilterConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<MongoProxyFilterConfigFactory> registered_;
 
 } // Configuration
 } // Server

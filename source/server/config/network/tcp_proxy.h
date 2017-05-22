@@ -9,11 +9,11 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Config registration for the tcp proxy filter. @see NetworkFilterConfigFactory.
+ * Config registration for the tcp proxy filter. @see NamedNetworkFilterConfigFactory.
  */
-class TcpProxyConfigFactory : public NetworkFilterConfigFactory {
+class TcpProxyConfigFactory : public NamedNetworkFilterConfigFactory {
 public:
-  // NetworkFilterConfigFactory
+  // NamedNetworkFilterConfigFactory
   NetworkFilterFactoryCb createFilterFactory(NetworkFilterType type, const Json::Object& config,
                                              Server::Instance& server) override;
   std::string name() override;

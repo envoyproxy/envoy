@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-class HealthCheckFilterConfig : public HttpFilterConfigFactory {
+class HealthCheckFilterConfig : public NamedHttpFilterConfigFactory {
 public:
   HttpFilterFactoryCb createFilterFactory(HttpFilterType type, const Json::Object& config,
                                           const std::string&, Server::Instance& server) override;

@@ -30,9 +30,9 @@ NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactory(NetworkFilterT
 std::string TcpProxyConfigFactory::name() { return "tcp_proxy"; }
 
 /**
- * Static registration for the tcp_proxy filter. @see RegisterNetworkFilterConfigFactory.
+ * Static registration for the tcp_proxy filter. @see RegisterNamedNetworkFilterConfigFactory.
  */
-static RegisterNetworkFilterConfigFactory<TcpProxyConfigFactory> registered_;
+static RegisterNamedNetworkFilterConfigFactory<TcpProxyConfigFactory> registered_;
 
 } // Configuration
 } // Server
