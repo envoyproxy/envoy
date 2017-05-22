@@ -93,13 +93,13 @@ private:
         // name.
         long name_len;
         // Get host name from query and use the name to lookup a record
-        // in a host maap. If the query type is of type A, then perform the lookup in
+        // in a host map. If the query type is of type A, then perform the lookup in
         // the hosts_A_ host map. If the query type is of type AAAA, then perform the
         // lookup in the hosts_AAAA_ host map.
         char* name;
         ASSERT_EQ(ARES_SUCCESS, ares_expand_name(question, request, size_, &name, &name_len));
         const std::list<std::string>* ips = nullptr;
-        // Query type. We only expect for resources of type A or AAAA.
+        // We only expect resources of type A or AAAA.
         const int q_type = DNS_QUESTION_TYPE(question + name_len);
         ASSERT_TRUE(q_type == T_A || q_type == T_AAAA);
         if (q_type == T_A) {
@@ -198,7 +198,7 @@ public:
     queries_.emplace_back(query);
   }
 
-  void addHosts(const std::string& hostname, const IpList& ip, const record_type type) {
+  void addHosts(const std::string& hostname, const IpList& ip, const record_type& type) {
     if (type == A) {
       hosts_A_[hostname] = ip;
     } else if (type == AAAA) {
@@ -290,7 +290,7 @@ static bool hasAddress(const std::list<Address::InstanceConstSharedPtr>& results
   return false;
 }
 
-// Parameterized test dns server socket address.
+// Parameterize the DNS test server socket address.
 INSTANTIATE_TEST_CASE_P(IpVersions, DnsImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
