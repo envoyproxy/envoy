@@ -79,14 +79,14 @@ cluster_header
 
 host_redirect
   *(sometimes required, string)* Indicates that the route is a redirect rule. If there is a match,
-  a 302 redirect response will be sent which swaps the host portion of the URL with this value.
+  a 301 redirect response will be sent which swaps the host portion of the URL with this value.
   *path_redirect* can also be specified along with this option.
 
 .. _config_http_conn_man_route_table_route_path_redirect:
 
 path_redirect
   *(sometimes required, string)* Indicates that the route is a redirect rule. If there is a match,
-  a 302 redirect response will be sent which swaps the path portion of the URL with this value.
+  a 301 redirect response will be sent which swaps the path portion of the URL with this value.
   *host_redirect*  can also be specified along with this option.
 
 .. _config_http_conn_man_route_table_route_prefix_rewrite:
@@ -225,13 +225,13 @@ num_retries
 
 per_try_timeout_ms
   *(optional, integer)* specifies a non-zero timeout per retry attempt. This parameter is optional.
-  The same conditions documented for 
+  The same conditions documented for
   :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms` apply.
 
   **Note:** If left unspecified, Envoy will use the global
-  :ref:`route timeout <config_http_conn_man_route_table_route_timeout>` for the request. 
-  Consequently, when using a :ref:`5xx <config_http_filters_router_x-envoy-retry-on>` based 
-  retry policy, a request that times out will not be retried as the total timeout budget 
+  :ref:`route timeout <config_http_conn_man_route_table_route_timeout>` for the request.
+  Consequently, when using a :ref:`5xx <config_http_filters_router_x-envoy-retry-on>` based
+  retry policy, a request that times out will not be retried as the total timeout budget
   would have been exhausted.
 
 .. _config_http_conn_man_route_table_route_shadow:
