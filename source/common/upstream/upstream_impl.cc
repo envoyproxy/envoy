@@ -379,9 +379,6 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
   } else {
     dns_lookup_family_ = Network::DnsLookupFamily::v4_only;
   }
-  //} else {
-  //  throw EnvoyException(fmt::format("unknown dns_lookup_family option {}", dns_lookup_family));
-  //}
 
   for (Json::ObjectSharedPtr host : config.getObjectArray("hosts")) {
     resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, host->getString("url")));
