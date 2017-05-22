@@ -5,6 +5,21 @@
 namespace Envoy {
 namespace Server {
 
+int validateConfig(Options& options, ComponentFactory& component_factory,
+                   const LocalInfo::LocalInfo& local_info) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+
+  try {
+    ValidationInstance server(options, stats_store, access_log_lock, component_factory, local_info);
+    std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
+    server.shutdown();
+    return 0;
+  } catch (const EnvoyException& e) {
+    return 1;
+  }
+}
+
 ValidationInstance::ValidationInstance(Options& options,
                                        Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,

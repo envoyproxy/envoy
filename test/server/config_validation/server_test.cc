@@ -23,8 +23,6 @@ protected:
   static std::string directory_;
 
   testing::NiceMock<MockOptions> options_;
-  Stats::IsolatedStoreImpl store_;
-  Thread::MutexBasicLockable access_log_lock_;
   TestComponentFactory component_factory_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
@@ -32,11 +30,7 @@ protected:
 std::string ValidationServerTest::directory_ = "";
 
 TEST_P(ValidationServerTest, Validate) {
-  EXPECT_NO_THROW({
-    ValidationInstance instance(options_, store_, access_log_lock_, component_factory_,
-                                local_info_);
-    instance.shutdown();
-  });
+  EXPECT_EQ(0, validateConfig(options_, component_factory_, local_info_));
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against

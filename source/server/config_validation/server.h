@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 #include "envoy/common/optional.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
@@ -23,6 +25,13 @@
 
 namespace Envoy {
 namespace Server {
+
+/**
+ * validateConfig() takes over from main() for a config-validation run of Envoy. It returns an exit
+ * code for the process: 0 if the config is valid, 1 if invalid.
+ */
+int validateConfig(Options& options, ComponentFactory& component_factory,
+                   const LocalInfo::LocalInfo& local_info);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements

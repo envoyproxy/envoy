@@ -40,28 +40,6 @@ public:
 };
 
 } // Server
-
-namespace {
-
-int validateConfig(OptionsImpl& options, Server::ProdComponentFactory& component_factory,
-                   const LocalInfo::LocalInfoImpl& local_info) {
-  Thread::MutexBasicLockable access_log_lock;
-  Thread::MutexBasicLockable log_lock;
-  Logger::Registry::initialize(options.logLevel(), log_lock);
-  Stats::IsolatedStoreImpl stats_store;
-
-  try {
-    Server::ValidationInstance server(options, stats_store, access_log_lock,
-                                      component_factory, local_info);
-    std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
-    server.shutdown();
-    return 0;
-  } catch (const EnvoyException& e) {
-    return 1;
-  }
-}
-
-} // namespace
 } // Envoy
 
 int main(int argc, char** argv) {
@@ -81,7 +59,9 @@ int main(int argc, char** argv) {
   case Envoy::Server::Mode::Serve:
     break;
   case Envoy::Server::Mode::Validate:
-    return Envoy::validateConfig(options, component_factory, local_info);
+    Envoy::Thread::MutexBasicLockable log_lock;
+    Envoy::Logger::Registry::initialize(options.logLevel(), log_lock);
+    return Envoy::Server::validateConfig(options, component_factory, local_info);
   }
 
   ares_library_init(ARES_LIB_INIT_ALL);
