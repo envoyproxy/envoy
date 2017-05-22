@@ -140,7 +140,7 @@ http_codec_options
 .. _config_cluster_manager_cluster_http2_settings:
 
 http2_settings
-  *(optional, object)* Additional http/2 settings that are passed directly to the http/2 codec when
+  *(optional, object)* Additional HTTP/2 settings that are passed directly to the HTTP/2 codec when
   initiating HTTP connection pool connections. These are the same options supported in the HTTP connection
   manager :ref:`http2_settings <config_http_conn_man_http2_settings>` option.
 

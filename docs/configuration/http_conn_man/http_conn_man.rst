@@ -101,20 +101,23 @@ http_codec_options
 .. _config_http_conn_man_http2_settings:
 
 http2_settings
-  *(optional, object)* Additional http/2 codec options that are passed directly to the http/2 codec. 
+  *(optional, object)* Additional HTTP/2 codec options that are passed directly to the HTTP/2 codec. 
   Currently supported settings are:
 
   max_concurrent_streams
-    *(optional, integer)* Maximum concurrent streams allowed on http2 connection. Valid values
-    range from 1 to 536870912 (1 << 29). Default is 1024.
+    *(optional, integer)* `Maximum concurrent streams`_ allowed on one HTTP/2 connection. Valid values
+    range from 1 to 536870912 (2^29). Default is 1024.
 
   initial_window_size
-    *(optional, integer)* Initial window size on http2 connection. Valid values range from 65536
-    (default windows size plus 1) to 2147483647 (1 << 31 - 1), so we only support increase default
+    *(optional, integer)* `Initial flow-control window`_ size. Valid values range from 65536
+    (default window size plus 1) to 2147483647 (2^31 - 1), so we only support increase default
     initial window size now. Default is 268435456 (256 * 1024 * 1024).
 
   These are the same options available in the upstream cluster :ref:`http2_settings
   <config_cluster_manager_cluster_http2_settings>` option.
+
+  .. _Maximum concurrent streams: http://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2
+  .. _Initial flow-control window: http://httpwg.org/specs/rfc7540.html#InitialWindowSize
 
 .. _config_http_conn_man_server_name:
 
