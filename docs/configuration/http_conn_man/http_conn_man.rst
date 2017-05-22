@@ -20,6 +20,7 @@ HTTP connection manager
       "add_user_agent": "...",
       "tracing": "{...}",
       "http_codec_options": "...",
+      "http2_settings": "{...}",
       "server_name": "...",
       "idle_timeout_s": "...",
       "drain_timeout_ms": "...",
@@ -96,6 +97,24 @@ http_codec_options
   These are the same options available in the upstream cluster :ref:`http_codec_options
   <config_cluster_manager_cluster_http_codec_options>` option. See the comment there about
   disabling HTTP/2 header compression.
+
+.. _config_http_conn_man_http2_settings:
+
+http2_settings
+  *(optional, object)* Additional http/2 codec options that are passed directly to the http/2 codec. 
+  Currently supported settings are:
+
+  max_concurrent_streams
+    *(optional, integer)* Maximum concurrent streams allowed on http2 connection. Valid values
+    range from 1 to 536870912 (1 << 29).
+
+  initial_window_size
+    *(optional, integer)* Initial window size on http2 connection. Valid values range from 65536
+    (default windows size plus 1) to 2147483647 (1 << 31 - 1), so we only support increase default
+    initial window size now.
+
+  These are the same options available in the upstream cluster :ref:`http2_settings
+  <config_cluster_manager_cluster_http2_settings>` option.
 
 .. _config_http_conn_man_server_name:
 
