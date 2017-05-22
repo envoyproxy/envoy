@@ -8,7 +8,7 @@ features. As we gauge people's interests we will add more sandboxes demonstratin
 different features. The following sandboxes are available:
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 1
 
   front_proxy
   zipkin_tracing
