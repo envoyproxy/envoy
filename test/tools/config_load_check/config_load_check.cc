@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
   try {
-    const uint32_t num_tested = ConfigTest::run(std::string(argv[1]));
+    const uint32_t num_tested = Envoy::ConfigTest::run(std::string(argv[1]));
     std::cout << fmt::format("Successfully tested: {}", num_tested) << std::endl;
     return EXIT_SUCCESS;
   } catch (const std::runtime_error& e) {
