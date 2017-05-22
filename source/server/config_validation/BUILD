@@ -72,15 +72,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "hot_restart_lib",
-    hdrs = ["hot_restart.h"],
-    deps = [
-        "//include/envoy/server:hot_restart_interface",
-        "//source/common/common:thread_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],

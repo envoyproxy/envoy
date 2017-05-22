@@ -5,12 +5,12 @@
 namespace Envoy {
 namespace Server {
 
-ValidationInstance::ValidationInstance(Options& options, HotRestart& restarter,
+ValidationInstance::ValidationInstance(Options& options,
                                        Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,
                                        ComponentFactory& component_factory,
                                        const LocalInfo::LocalInfo& local_info)
-    : options_(options), restarter_(restarter), stats_store_(store),
+    : options_(options), stats_store_(store),
       handler_(Api::ApiPtr{new Api::ValidationImpl(options.fileFlushIntervalMsec())}),
       local_info_(local_info),
       access_log_manager_(handler_.api(), handler_.dispatcher(), access_log_lock, store) {

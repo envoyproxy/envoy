@@ -14,7 +14,6 @@
 #include "exe/signal_action.h"
 #endif
 
-#include "server/config_validation/hot_restart.h"
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
 #include "server/options_impl.h"
@@ -48,12 +47,11 @@ int validateConfig(OptionsImpl& options, Server::ProdComponentFactory& component
                    const LocalInfo::LocalInfoImpl& local_info) {
   Thread::MutexBasicLockable access_log_lock;
   Thread::MutexBasicLockable log_lock;
-  Server::ValidationHotRestart restarter;
   Logger::Registry::initialize(options.logLevel(), log_lock);
   Stats::IsolatedStoreImpl stats_store;
 
   try {
-    Server::ValidationInstance server(options, restarter, stats_store, access_log_lock,
+    Server::ValidationInstance server(options, stats_store, access_log_lock,
                                       component_factory, local_info);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();

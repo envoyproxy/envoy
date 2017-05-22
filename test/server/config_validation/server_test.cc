@@ -1,4 +1,3 @@
-#include "server/config_validation/hot_restart.h"
 #include "server/config_validation/server.h"
 
 #include "test/integration/server.h"
@@ -24,7 +23,6 @@ protected:
   static std::string directory_;
 
   testing::NiceMock<MockOptions> options_;
-  ValidationHotRestart restarter_;
   Stats::IsolatedStoreImpl store_;
   Thread::MutexBasicLockable access_log_lock_;
   TestComponentFactory component_factory_;
@@ -35,7 +33,7 @@ std::string ValidationServerTest::directory_ = "";
 
 TEST_P(ValidationServerTest, Validate) {
   EXPECT_NO_THROW({
-    ValidationInstance instance(options_, restarter_, store_, access_log_lock_, component_factory_,
+    ValidationInstance instance(options_, store_, access_log_lock_, component_factory_,
                                 local_info_);
     instance.shutdown();
   });

@@ -56,7 +56,6 @@ envoy_cc_library(
         "//source/common/common:compiler_requirements_lib",
         ":envoy_common_lib",
         ":hot_restart_lib",
-        "//source/server/config_validation:hot_restart_lib",
         "//source/server/config_validation:server_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],

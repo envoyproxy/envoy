@@ -38,7 +38,7 @@ namespace Server {
  */
 class ValidationInstance : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
-  ValidationInstance(Options& options, HotRestart& restarter, Stats::IsolatedStoreImpl& store,
+  ValidationInstance(Options& options, Stats::IsolatedStoreImpl& store,
                      Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                      const LocalInfo::LocalInfo& local_info);
 
@@ -57,7 +57,7 @@ public:
   int getListenSocketFd(const std::string&) override { NOT_IMPLEMENTED; }
   Network::ListenSocket* getListenSocketByIndex(uint32_t) override { NOT_IMPLEMENTED; }
   void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED; }
-  HotRestart& hotRestart() override { return restarter_; }
+  HotRestart& hotRestart() override { NOT_IMPLEMENTED; }
   Init::Manager& initManager() override { return init_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
@@ -80,7 +80,6 @@ private:
   void initialize(Options& options, ComponentFactory& component_factory);
 
   Options& options_;
-  HotRestart& restarter_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   ValidationConnectionHandler handler_;
