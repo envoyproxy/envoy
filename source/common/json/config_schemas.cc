@@ -266,12 +266,12 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
         "type" : "object",
         "properties" : {
           "max_concurrent_streams" : {
-            "type": "ingeger",
+            "type": "integer",
             "minimum": 1,
             "maximum" : 536870912
           },
           "initial_window_size" : {
-            "type": "ingeger",
+            "type": "integer",
             "minimum": 65536,
             "maximum" : 2147483647
           }
@@ -1227,12 +1227,12 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
         "type" : "object",
         "properties" : {
           "max_concurrent_streams" : {
-            "type": "ingeger",
+            "type": "integer",
             "minimum": 1,
             "maximum" : 536870912
           },
           "initial_window_size" : {
-            "type": "ingeger",
+            "type": "integer",
             "minimum": 65536,
             "maximum" : 2147483647
           }
