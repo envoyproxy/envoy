@@ -17,6 +17,8 @@ namespace Http {
 
 // Satisfy linker
 const uint64_t Http2Settings::CodecOptions::DISABLE_DYNAMIC_HPACK_TABLE;
+const uint32_t Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
+const uint32_t Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE;
 
 TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
@@ -94,13 +96,24 @@ TEST(HttpUtility, parseHttp2Settings) {
   {
     Json::ObjectSharedPtr json = Json::Factory::loadFromString("{}");
     EXPECT_EQ(0UL, Utility::parseHttp2Settings(*json).codec_options_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
+              Utility::parseHttp2Settings(*json).max_concurrent_streams_);
+    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE,
+              Utility::parseHttp2Settings(*json).initial_window_size_);
   }
 
   {
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString("{\"http_codec_options\": \"no_compression\"}");
+    Json::ObjectSharedPtr json = Json::Factory::loadFromString(R"raw({
+                                          "http_codec_options": "no_compression",
+                                          "http2_settings" : {
+                                            "max_concurrent_streams": 1234,
+                                            "initial_window_size": 5678
+                                          }
+                                        })raw");
     EXPECT_EQ(Http2Settings::CodecOptions::DISABLE_DYNAMIC_HPACK_TABLE,
               Utility::parseHttp2Settings(*json).codec_options_);
+    EXPECT_EQ(1234U, Utility::parseHttp2Settings(*json).max_concurrent_streams_);
+    EXPECT_EQ(5678U, Utility::parseHttp2Settings(*json).initial_window_size_);
   }
 
   {

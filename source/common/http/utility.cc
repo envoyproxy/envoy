@@ -138,6 +138,7 @@ bool Utility::isInternalRequest(const HeaderMap& headers) {
 
 Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
   Http2Settings ret;
+
   std::string options = config.getString("http_codec_options", "");
   for (const std::string& option : StringUtil::split(options, ',')) {
     if (option == "no_compression") {
@@ -146,6 +147,12 @@ Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
       throw EnvoyException(fmt::format("unknown http codec option '{}'", option));
     }
   }
+
+  Json::ObjectSharedPtr http2_settings = config.getObject("http2_settings", true);
+  ret.max_concurrent_streams_ = http2_settings->getInteger(
+      "max_concurrent_streams", Http::Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+  ret.initial_window_size_ = http2_settings->getInteger(
+      "initial_window_size", Http::Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE);
 
   return ret;
 }
