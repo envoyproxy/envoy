@@ -244,7 +244,7 @@ public:
   virtual uint64_t features() const PURE;
 
   /**
-   * @return Http::Http2Settings for http/2 connections created on behalf of this cluster.
+   * @return const Http::Http2Settings& for http/2 connections created on behalf of this cluster.
    *         @see Http::Http2Settings.
    */
   virtual const Http::Http2Settings& http2Settings() const PURE;

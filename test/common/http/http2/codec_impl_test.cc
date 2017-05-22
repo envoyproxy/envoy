@@ -249,7 +249,7 @@ INSTANTIATE_TEST_CASE_P(
     Http2CodecImplTest, Http2CodecImplTest,
     testing::Values(Http2SettingsTestParam(0, Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
                                            Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE),
-                    Http2SettingsTestParam(Http2Settings::CodecOptions::DisableDynamicHPACKTable,
+                    Http2SettingsTestParam(Http2Settings::CodecOptions::DISABLE_DYNAMIC_HPACK_TABLE,
                                            Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
                                            Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE)));
 

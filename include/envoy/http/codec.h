@@ -148,23 +148,19 @@ public:
 };
 
 /**
- * http/2 settings
+ * http/2 codec settings
  */
 struct Http2Settings {
   /**
    * A list of options that can be specified when creating a codec.
    */
   struct CodecOptions {
-    static const uint64_t DisableDynamicHPACKTable = 0x1;
+    static const uint64_t DISABLE_DYNAMIC_HPACK_TABLE = 0x1;
   };
 
-  Http2Settings()
-      : codec_options_(0), max_concurrent_streams_(DEFAULT_MAX_CONCURRENT_STREAMS),
-        initial_window_size_(DEFAULT_INITIAL_WINDOW_SIZE) {}
-
-  uint64_t codec_options_;
-  uint32_t max_concurrent_streams_;
-  uint32_t initial_window_size_;
+  uint64_t codec_options_{0};
+  uint32_t max_concurrent_streams_{DEFAULT_MAX_CONCURRENT_STREAMS};
+  uint32_t initial_window_size_{DEFAULT_INITIAL_WINDOW_SIZE};
 
   static const uint32_t DEFAULT_MAX_CONCURRENT_STREAMS = 1024;
   // For now just set all window sizes (stream and connection) to 256MiB. We can adjust later if

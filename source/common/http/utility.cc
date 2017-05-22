@@ -141,7 +141,7 @@ Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
   std::string options = config.getString("http_codec_options", "");
   for (const std::string& option : StringUtil::split(options, ',')) {
     if (option == "no_compression") {
-      ret.codec_options_ |= Http2Settings::CodecOptions::DisableDynamicHPACKTable;
+      ret.codec_options_ |= Http2Settings::CodecOptions::DISABLE_DYNAMIC_HPACK_TABLE;
     } else {
       throw EnvoyException(fmt::format("unknown http codec option '{}'", option));
     }
