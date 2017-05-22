@@ -58,7 +58,7 @@ Version history
 * The CPU profiler output path is now :ref:`configurable <config_admin>`.
 * A :ref:`watchdog system <config_overview>` has been added that can kill the server if a deadlock
   is detected.
-* A :ref:`route table checking tool <install_tools>` has been added that can be used to test route
+* A :ref:`route table checking tool <install_tools_route_table_check_tool>` has been added that can be used to test route
   tables before use.
 * We have added an :ref:`example repo <extending>` that shows how to compile/link a custom filter.
 * Added additional cluster wide information related to outlier detection to the :ref:`/clusters
