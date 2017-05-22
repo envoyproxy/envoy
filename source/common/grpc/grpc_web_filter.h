@@ -6,7 +6,6 @@
 #include "common/common/non_copyable.h"
 #include "common/grpc/codec.h"
 
-
 namespace Envoy {
 namespace Grpc {
 

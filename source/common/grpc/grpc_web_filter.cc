@@ -51,7 +51,8 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool) {
     return Http::FilterDataStatus::Continue;
   }
 
-  const uint64_t needed = (data.length() + decoding_buffer_.length()) / 4 * 4 - decoding_buffer_.length();
+  const uint64_t needed =
+      (data.length() + decoding_buffer_.length()) / 4 * 4 - decoding_buffer_.length();
   decoding_buffer_.move(data, needed);
   const std::string decoded = Base64::decode(
       std::string(static_cast<const char*>(decoding_buffer_.linearize(decoding_buffer_.length())),
@@ -78,11 +79,13 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
     return Http::FilterDataStatus::Continue;
   }
 
-  // The decoder always consumes and drains the given buffer. Incomplete data frame is buffered inside the decoder.
+  // The decoder always consumes and drains the given buffer. Incomplete data frame is buffered
+  // inside the decoder.
   std::vector<Frame> frames;
   decoder_.decode(data, frames);
-  if(frames.empty()) {
-    // We don't have enough data to decode for one single frame, stop iteration until more data comes in.
+  if (frames.empty()) {
+    // We don't have enough data to decode for one single frame, stop iteration until more data
+    // comes in.
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -92,7 +95,7 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
     temp.add(&frame.flags_, 1);
     const uint32_t length = htonl(frame.length_);
     temp.add(&length, 4);
-    if(frame.length_>0) {
+    if (frame.length_ > 0) {
       temp.add(*frame.data_);
     }
     data.add(Base64::encode(temp, temp.length()));
