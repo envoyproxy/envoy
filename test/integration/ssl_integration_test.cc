@@ -13,6 +13,7 @@
 #include "integration.h"
 #include "utility.h"
 
+namespace Envoy {
 using testing::Return;
 
 namespace Ssl {
@@ -60,7 +61,7 @@ ServerContextPtr SslIntegrationTest::createUpstreamSslContext() {
 }
 )EOF";
 
-  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   ContextConfigImpl cfg(*loader);
   return context_manager_->createSslServerContext(*upstream_stats_store, cfg);
 }
@@ -108,7 +109,7 @@ ClientContextPtr SslIntegrationTest::createClientSslContext(bool alpn, bool san)
   } else {
     target = san ? json_san : json_plain;
   }
-  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(target);
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
   ContextConfigImpl cfg(*loader);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return context_manager_->createSslClientContext(*client_stats_store, cfg);
@@ -207,3 +208,4 @@ TEST_F(SslIntegrationTest, AltAlpn) {
 }
 
 } // Ssl
+} // Envoy

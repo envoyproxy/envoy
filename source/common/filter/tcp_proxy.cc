@@ -17,6 +17,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Filter {
 
 TcpProxyConfig::Route::Route(const Json::Object& config) {
@@ -46,7 +47,7 @@ TcpProxyConfig::TcpProxyConfig(const Json::Object& config,
     : stats_(generateStats(config.getString("stat_prefix"), stats_store)) {
   config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
-  for (const Json::ObjectPtr& route_desc :
+  for (const Json::ObjectSharedPtr route_desc :
        config.getObject("route_config")->getObjectArray("routes")) {
     routes_.emplace_back(Route(*route_desc));
 
@@ -237,3 +238,4 @@ void TcpProxy::onUpstreamEvent(uint32_t event) {
 }
 
 } // Filter
+} // Envoy

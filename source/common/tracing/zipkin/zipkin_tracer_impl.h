@@ -11,6 +11,7 @@
 #include "common/tracing/zipkin/span_buffer.h"
 #include "common/tracing/zipkin/tracer.h"
 
+namespace Envoy {
 namespace Zipkin {
 
 #define ZIPKIN_TRACER_STATS(COUNTER)                                                               \
@@ -34,7 +35,7 @@ public:
    *
    * @param span to be wrapped.
    */
-  ZipkinSpan(Zipkin::Span& span);
+  ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer);
 
   /**
    * Calls Zipkin::Span::finishSpan() to perform all actions needed to finalize the span.
@@ -58,6 +59,8 @@ public:
    */
   void setTag(const std::string& name, const std::string& value) override;
 
+  void injectContext(Http::HeaderMap& request_headers) override;
+  Tracing::SpanPtr spawnChild(const std::string& name, SystemTime start_time) override;
   /**
    * @return true if this span has a CS (Client Send) basic annotation, or false otherwise.
    */
@@ -70,6 +73,7 @@ public:
 
 private:
   Zipkin::Span span_;
+  Zipkin::Tracer& tracer_;
 };
 
 typedef std::unique_ptr<ZipkinSpan> ZipkinSpanPtr;
@@ -201,3 +205,4 @@ private:
   const std::string collector_endpoint_;
 };
 } // Zipkin
+} // Envoy

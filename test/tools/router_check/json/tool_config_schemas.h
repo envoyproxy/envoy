@@ -2,6 +2,7 @@
 
 #include <string>
 
+namespace Envoy {
 namespace Json {
 
 class ToolSchema {
@@ -14,3 +15,4 @@ public:
 };
 
 } // Json
+} // Envoy

@@ -2,6 +2,7 @@
 
 #include <string>
 
+namespace Envoy {
 namespace Dynamo {
 
 class Utility {
@@ -24,3 +25,4 @@ public:
 };
 
 } // Dynamo
+} // Envoy

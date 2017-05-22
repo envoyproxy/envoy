@@ -2,6 +2,7 @@
 
 #include <array>
 
+namespace Envoy {
 /**
  * Convenience class for converting ASCII strings to lower case using a lookup table for maximum
  * speed.
@@ -26,3 +27,4 @@ public:
 private:
   std::array<uint8_t, 256> table_;
 };
+} // Envoy

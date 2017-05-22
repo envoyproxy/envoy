@@ -10,6 +10,7 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+namespace Envoy {
 namespace Http {
 namespace Http2 {
 
@@ -81,8 +82,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     primary_client_.reset(new ActiveClient(*this));
   }
 
-  if (primary_client_->client_->numActiveRequests() >= maxConcurrentStreams() ||
-      !host_->cluster().resourceManager(priority_).requests().canCreate()) {
+  if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
     log_debug("max requests overflow");
     callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
@@ -246,9 +246,8 @@ CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnect
   return codec;
 }
 
-uint64_t ProdConnPoolImpl::maxConcurrentStreams() { return ConnectionImpl::MAX_CONCURRENT_STREAMS; }
-
 uint32_t ProdConnPoolImpl::maxTotalStreams() { return MAX_STREAMS; }
 
 } // Http2
 } // Http
+} // Envoy

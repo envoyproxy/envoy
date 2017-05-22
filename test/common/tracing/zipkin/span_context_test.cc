@@ -3,6 +3,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Zipkin {
 
 TEST(ZipkinSpanContextTest, populateFromString) {
@@ -233,3 +234,4 @@ TEST(ZipkinSpanContextTest, populateFromSpan) {
             span_context_6.serializeToString());
 }
 } // Zipkin
+} // Envoy

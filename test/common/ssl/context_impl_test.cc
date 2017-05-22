@@ -12,6 +12,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Ssl {
 
 class SslContextImplTest : public SslCertsTest {};
@@ -74,7 +75,7 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
@@ -90,7 +91,7 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
@@ -113,7 +114,7 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
@@ -131,7 +132,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
@@ -157,7 +158,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
 }
 
 TEST_F(SslContextImplTest, TestNoCert) {
-  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString("{}");
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
   ContextConfigImpl cfg(*loader);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
@@ -168,3 +169,4 @@ TEST_F(SslContextImplTest, TestNoCert) {
 }
 
 } // Ssl
+} // Envoy

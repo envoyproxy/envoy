@@ -4,6 +4,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Stats {
 
 TEST(StatsIsolatedStoreImplTest, All) {
@@ -35,3 +36,4 @@ TEST(StatsIsolatedStoreImplTest, All) {
 }
 
 } // Stats
+} // Envoy

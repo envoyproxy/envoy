@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 
@@ -27,7 +28,7 @@ TEST(HttpFilterConfigTest, BufferFilter) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   BufferFilterConfig factory;
   HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Decoder, "buffer",
@@ -45,7 +46,7 @@ TEST(HttpFilterConfigTest, BadBufferFilterConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   BufferFilterConfig factory;
   EXPECT_THROW(factory.tryCreateFilterFactory(HttpFilterType::Decoder, "buffer", *json_config,
@@ -59,7 +60,7 @@ TEST(HttpFilterConfigTest, DynamoFilter) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   DynamoFilterConfig factory;
   HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(
@@ -80,7 +81,7 @@ TEST(HttpFilterConfigTest, FaultFilter) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   FaultFilterConfig factory;
   HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Decoder, "fault",
@@ -96,7 +97,7 @@ TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   GrpcHttp1BridgeFilterConfig factory;
   HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Both, "grpc_http1_bridge",
@@ -114,7 +115,7 @@ TEST(HttpFilterConfigTest, HealthCheckFilter) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   HealthCheckFilterConfig factory;
   HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Both, "health_check",
@@ -133,7 +134,7 @@ TEST(HttpFilterConfigTest, BadHealthCheckFilterConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   HealthCheckFilterConfig factory;
   EXPECT_THROW(factory.tryCreateFilterFactory(HttpFilterType::Both, "health_check", *json_config,
@@ -148,7 +149,7 @@ TEST(HttpFilterConfigTest, RouterFilter) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   RouterFilterConfig factory;
   HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Decoder, "router",
@@ -166,7 +167,7 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr json_config = Json::Factory::loadFromString(json_string);
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<MockInstance> server;
   RouterFilterConfig factory;
   EXPECT_THROW(factory.tryCreateFilterFactory(HttpFilterType::Decoder, "router", *json_config,
@@ -176,3 +177,4 @@ TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
 
 } // Configuration
 } // Server
+} // Envoy

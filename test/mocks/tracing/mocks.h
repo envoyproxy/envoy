@@ -8,6 +8,7 @@
 
 #include "gmock/gmock.h"
 
+namespace Envoy {
 namespace Tracing {
 
 inline bool operator==(const TransportContext& lhs, const TransportContext& rhs) {
@@ -33,6 +34,13 @@ public:
 
   MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
   MOCK_METHOD0(finishSpan, void());
+  MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));
+
+  SpanPtr spawnChild(const std::string& name, SystemTime start_time) override {
+    return SpanPtr{spawnChild_(name, start_time)};
+  }
+
+  MOCK_METHOD2(spawnChild_, Span*(const std::string& name, SystemTime start_time));
 };
 
 class MockHttpTracer : public HttpTracer {
@@ -64,3 +72,4 @@ public:
 };
 
 } // Tracing
+} // Envoy

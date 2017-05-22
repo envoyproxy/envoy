@@ -25,6 +25,7 @@
 #include "common/redis/conn_pool_impl.h"
 #include "common/upstream/host_utility.h"
 
+namespace Envoy {
 namespace Upstream {
 
 HealthCheckerPtr HealthCheckerFactory::create(const Json::Object& hc_config,
@@ -350,10 +351,10 @@ ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionDat
 }
 
 TcpHealthCheckMatcher::MatchSegments
-TcpHealthCheckMatcher::loadJsonBytes(const std::vector<Json::ObjectPtr>& byte_array) {
+TcpHealthCheckMatcher::loadJsonBytes(const std::vector<Json::ObjectSharedPtr>& byte_array) {
   MatchSegments result;
 
-  for (const Json::ObjectPtr& entry : byte_array) {
+  for (const Json::ObjectSharedPtr entry : byte_array) {
     std::string hex_string = entry->getString("binary");
     result.push_back(Hex::decode(hex_string));
   }
@@ -523,3 +524,4 @@ RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
 }
 
 } // Upstream
+} // Envoy

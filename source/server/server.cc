@@ -30,6 +30,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Server {
 
 void InitManagerImpl::initialize(std::function<void()> callback) {
@@ -175,7 +176,7 @@ void InstanceImpl::initialize(Options& options, TestHooks& hooks,
              restarter_.version());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  Json::ObjectPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
   config_json->validateSchema(Json::Schema::TOP_LEVEL_CONFIG_SCHEMA);
   Configuration::InitialImpl initial_config(*config_json);
   log().info("admin address: {}", initial_config.admin().address()->asString());
@@ -402,3 +403,4 @@ void InstanceImpl::shutdownAdmin() {
 }
 
 } // Server
+} // Envoy

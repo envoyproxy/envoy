@@ -21,6 +21,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+namespace Envoy {
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder)
     : parent_(parent), encoder_(encoder) {
   encoder.getStream().addCallbacks(*this);
@@ -63,8 +64,9 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 }
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  parent_.connection().dispatcher().post([this, &data, end_stream]()
-                                             -> void { encoder_.encodeData(data, end_stream); });
+  std::shared_ptr<Buffer::Instance> data_copy(new Buffer::OwnedImpl(data));
+  parent_.connection().dispatcher().post(
+      [this, data_copy, end_stream]() -> void { encoder_.encodeData(*data_copy, end_stream); });
 }
 
 void FakeStream::encodeTrailers(const Http::HeaderMapImpl& trailers) {
@@ -207,7 +209,7 @@ static Network::ListenSocketPtr makeTcpListenSocket(uint32_t port) {
 static Network::ListenSocketPtr makeTcpListenSocket(const Network::Address::IpVersion version,
                                                     uint32_t port) {
   return Network::ListenSocketPtr{new Network::TcpListenSocket(
-      Network::Address::parseInternetAddressAndPort(
+      Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:{}", Network::Test::getAnyAddressUrlString(version), port)),
       true)};
 }
@@ -323,3 +325,4 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
   parent_.connection_event_.notify_one();
   return Network::FilterStatus::StopIteration;
 }
+} // Envoy

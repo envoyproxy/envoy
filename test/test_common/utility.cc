@@ -20,6 +20,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {
     return false;
@@ -157,3 +158,4 @@ bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString
 bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
 
 } // Http
+} // Envoy

@@ -12,6 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
@@ -50,7 +51,7 @@ TEST(ConfigurationImplTest, DefaultStatsFlushInterval) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
@@ -72,7 +73,7 @@ TEST(ConfigurationImplTest, CustomStatsFlushInterval) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
@@ -96,7 +97,7 @@ TEST(ConfigurationImplTest, EmptyFilter) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
@@ -120,7 +121,7 @@ TEST(ConfigurationImplTest, DefaultListenerPerConnectionBufferLimit) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
@@ -145,7 +146,7 @@ TEST(ConfigurationImplTest, SetListenerPerConnectionBufferLimit) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
@@ -177,7 +178,7 @@ TEST(ConfigurationImplTest, VerifySubjectAltNameConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = TestEnvironment::jsonLoadFromString(json);
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
@@ -207,7 +208,7 @@ TEST(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
@@ -239,7 +240,7 @@ TEST(ConfigurationImplTest, BadListenerConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
@@ -267,7 +268,7 @@ TEST(ConfigurationImplTest, BadFilterConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   MainImpl config(server);
@@ -299,7 +300,7 @@ TEST(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   server.local_info_.cluster_name_ = "";
@@ -322,7 +323,7 @@ TEST(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   server.local_info_.cluster_name_ = "";
@@ -357,7 +358,7 @@ TEST(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguratio
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
 
   NiceMock<Server::MockInstance> server;
   server.local_info_.cluster_name_ = "";
@@ -369,3 +370,4 @@ TEST(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguratio
 
 } // Configuration
 } // Server
+} // Envoy

@@ -11,6 +11,7 @@
 
 #include "common/http/codec_client.h"
 
+namespace Envoy {
 namespace Http {
 namespace Http2 {
 
@@ -65,7 +66,6 @@ protected:
 
   void checkForDrained();
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
-  virtual uint64_t maxConcurrentStreams() PURE;
   virtual uint32_t maxTotalStreams() PURE;
   void movePrimaryClientToDraining();
   void onConnectionEvent(ActiveClient& client, uint32_t events);
@@ -92,7 +92,6 @@ public:
 
 private:
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
-  uint64_t maxConcurrentStreams() override;
   uint32_t maxTotalStreams() override;
 
   // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
@@ -102,3 +101,4 @@ private:
 
 } // Http2
 } // Http
+} // Envoy

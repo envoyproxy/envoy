@@ -10,6 +10,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::Eq;
 using testing::NiceMock;
 using testing::Pointee;
@@ -99,6 +100,7 @@ TEST_F(MongoCodecImplTest, Query) {
   query2.query(Bson::DocumentImpl::create()->addString("string2", "string2_value"));
   query2.returnFieldsSelector(Bson::DocumentImpl::create()->addDouble("double2", -2.3));
 
+  Json::Factory::loadFromString(query.toString(true));
   EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(true)));
   EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(false)));
   EXPECT_NO_THROW(Json::Factory::loadFromString(query2.toString(true)));
@@ -331,3 +333,4 @@ TEST_F(MongoCodecImplTest, QueryToStringWithEscape) {
 }
 
 } // Mongo
+} // Envoy

@@ -16,6 +16,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -25,7 +26,7 @@ namespace Upstream {
 class LogicalDnsClusterTest : public testing::Test {
 public:
   void setup(const std::string& json) {
-    Json::ObjectPtr config = Json::Factory::loadFromString(json);
+    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     cluster_.reset(new LogicalDnsCluster(*config, runtime_, stats_store_, ssl_context_manager_,
                                          dns_resolver_, tls_, dispatcher_));
@@ -189,3 +190,4 @@ TEST_F(LogicalDnsClusterTest, Basic) {
 }
 
 } // Upstream
+} // Envoy

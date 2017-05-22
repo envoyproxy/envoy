@@ -8,6 +8,7 @@
 
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 std::string DateFormatter::fromTime(const SystemTime& time) {
   return fromTimeT(std::chrono::system_clock::to_time_t(time));
 }
@@ -178,3 +179,4 @@ bool StringUtil::startsWith(const char* source, const std::string& start, bool c
     return strncasecmp(source, start.c_str(), start.size()) == 0;
   }
 }
+} // Envoy

@@ -22,6 +22,7 @@
 #include "common/json/json_validator.h"
 #include "common/network/filter_impl.h"
 
+namespace Envoy {
 namespace Upstream {
 
 /**
@@ -254,7 +255,7 @@ class TcpHealthCheckMatcher {
 public:
   typedef std::list<std::vector<uint8_t>> MatchSegments;
 
-  static MatchSegments loadJsonBytes(const std::vector<Json::ObjectPtr>& byte_array);
+  static MatchSegments loadJsonBytes(const std::vector<Json::ObjectSharedPtr>& byte_array);
   static bool match(const MatchSegments& expected, const Buffer::Instance& buffer);
 };
 
@@ -376,3 +377,4 @@ private:
 };
 
 } // Upstream
+} // Envoy

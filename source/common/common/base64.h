@@ -5,6 +5,7 @@
 
 #include "envoy/buffer/buffer.h"
 
+namespace Envoy {
 class Base64 {
 public:
   /**
@@ -42,3 +43,4 @@ private:
    */
   static void encodeLast(uint64_t pos, uint8_t last_char, std::string& ret);
 };
+} // Envoy

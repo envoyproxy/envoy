@@ -10,6 +10,7 @@
 
 #include "common/json/json_loader.h"
 
+namespace Envoy {
 class TestEnvironment {
 public:
   typedef std::unordered_map<std::string, uint32_t> PortMap;
@@ -127,9 +128,9 @@ public:
   /**
    * Build JSON object from a string subject to environment path substitution.
    * @param json JSON with template patterns including {{ test_certs }}.
-   * @return Json::ObjectPtr with built JSON object.
+   * @return Json::ObjectSharedPtr with built JSON object.
    */
-  static Json::ObjectPtr jsonLoadFromString(const std::string& json);
+  static Json::ObjectSharedPtr jsonLoadFromString(const std::string& json);
 
   /**
    * Execute a program under ::system. Any failure is fatal.
@@ -137,3 +138,4 @@ public:
    */
   static void exec(const std::vector<std::string>& args);
 };
+} // Envoy

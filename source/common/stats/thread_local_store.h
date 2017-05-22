@@ -13,6 +13,7 @@
 
 #include "common/stats/stats_impl.h"
 
+namespace Envoy {
 namespace Stats {
 
 /**
@@ -125,3 +126,4 @@ private:
 };
 
 } // Stats
+} // Envoy

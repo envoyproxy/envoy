@@ -19,6 +19,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -29,7 +30,7 @@ namespace Upstream {
 namespace Outlier {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
-  Json::ObjectPtr loader = Json::Factory::loadFromString("{}");
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString("{}");
   NiceMock<MockCluster> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -44,7 +45,7 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
   }
   )EOF";
 
-  Json::ObjectPtr loader = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
   NiceMock<MockCluster> cluster;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -85,7 +86,7 @@ public:
   CallbackChecker checker_;
   MockMonotonicTimeSource time_source_;
   std::shared_ptr<MockEventLogger> event_logger_{new MockEventLogger()};
-  Json::ObjectPtr loader_ = Json::Factory::loadFromString("{}");
+  Json::ObjectSharedPtr loader_ = Json::Factory::loadFromString("{}");
 };
 
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
@@ -103,7 +104,7 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
   }
   )EOF";
 
-  Json::ObjectPtr custom_config = Json::Factory::loadFromString(json);
+  Json::ObjectSharedPtr custom_config = Json::Factory::loadFromString(json);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100)));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
       cluster_, *custom_config, dispatcher_, runtime_, time_source_, event_logger_));
@@ -594,3 +595,4 @@ TEST(OutlierUtility, SRThreshold) {
 
 } // Outlier
 } // Upstream
+} // Envoy

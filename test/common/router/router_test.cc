@@ -20,6 +20,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+namespace Envoy {
 using testing::_;
 using testing::AtLeast;
 using testing::Invoke;
@@ -160,7 +161,7 @@ TEST_F(RouterTest, HashPolicy) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel());
-  callbacks_.reset_callback_();
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, HashPolicyNoHash) {
@@ -178,7 +179,7 @@ TEST_F(RouterTest, HashPolicyNoHash) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel());
-  callbacks_.reset_callback_();
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, CancelBeforeBoundToPool) {
@@ -191,7 +192,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel());
-  callbacks_.reset_callback_();
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, NoHost) {
@@ -1087,3 +1088,4 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
 }
 
 } // Router
+} // Envoy

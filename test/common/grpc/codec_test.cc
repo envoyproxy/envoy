@@ -11,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+namespace Envoy {
 namespace Grpc {
 
 TEST(GrpcCodecTest, encodeHeader) {
@@ -99,6 +100,17 @@ TEST(GrpcCodecTest, decodeInvalidFrame) {
   EXPECT_EQ(size, buffer.length());
 }
 
+TEST(GrpcCodecTest, decodeEmptyFrame) {
+  Buffer::OwnedImpl buffer("\0\0\0\0", 5);
+
+  Decoder decoder;
+  std::vector<Frame> frames;
+  EXPECT_TRUE(decoder.decode(buffer, frames));
+
+  EXPECT_EQ(1, frames.size());
+  EXPECT_EQ(0, frames[0].length_);
+}
+
 TEST(GrpcCodecTest, decodeSingleFrame) {
   helloworld::HelloRequest request;
   request.set_name("hello");
@@ -153,3 +165,4 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
 }
 
 } // Grpc
+} // Envoy

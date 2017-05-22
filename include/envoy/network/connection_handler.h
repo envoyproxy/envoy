@@ -9,6 +9,7 @@
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
 
+namespace Envoy {
 namespace Network {
 
 /**
@@ -59,3 +60,4 @@ public:
 typedef std::unique_ptr<ConnectionHandler> ConnectionHandlerPtr;
 
 } // Network
+} // Envoy

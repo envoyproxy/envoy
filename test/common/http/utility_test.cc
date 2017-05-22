@@ -12,6 +12,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+namespace Envoy {
 namespace Http {
 
 // Satisfy linker
@@ -91,18 +92,18 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 TEST(HttpUtility, parseCodecOptions) {
   {
-    Json::ObjectPtr json = Json::Factory::loadFromString("{}");
+    Json::ObjectSharedPtr json = Json::Factory::loadFromString("{}");
     EXPECT_EQ(0UL, Utility::parseCodecOptions(*json));
   }
 
   {
-    Json::ObjectPtr json =
+    Json::ObjectSharedPtr json =
         Json::Factory::loadFromString("{\"http_codec_options\": \"no_compression\"}");
     EXPECT_EQ(CodecOptions::NoCompression, Utility::parseCodecOptions(*json));
   }
 
   {
-    Json::ObjectPtr json = Json::Factory::loadFromString("{\"http_codec_options\": \"foo\"}");
+    Json::ObjectSharedPtr json = Json::Factory::loadFromString("{\"http_codec_options\": \"foo\"}");
     EXPECT_THROW(Utility::parseCodecOptions(*json), EnvoyException);
   }
 }
@@ -171,3 +172,4 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
 }
 
 } // Http
+} // Envoy

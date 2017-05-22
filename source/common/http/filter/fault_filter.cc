@@ -18,6 +18,7 @@
 #include "common/json/config_schemas.h"
 #include "common/router/config_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
@@ -26,8 +27,8 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
 
   json_config.validateSchema(Json::Schema::FAULT_HTTP_FILTER_SCHEMA);
 
-  const Json::ObjectPtr config_abort = json_config.getObject("abort", true);
-  const Json::ObjectPtr config_delay = json_config.getObject("delay", true);
+  const Json::ObjectSharedPtr config_abort = json_config.getObject("abort", true);
+  const Json::ObjectSharedPtr config_delay = json_config.getObject("delay", true);
 
   if (config_abort->empty() && config_delay->empty()) {
     throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
@@ -50,8 +51,8 @@ FaultFilterConfig::FaultFilterConfig(const Json::Object& json_config, Runtime::L
   }
 
   if (json_config.hasObject("headers")) {
-    std::vector<Json::ObjectPtr> config_headers = json_config.getObjectArray("headers");
-    for (const Json::ObjectPtr& header_map : config_headers) {
+    std::vector<Json::ObjectSharedPtr> config_headers = json_config.getObjectArray("headers");
+    for (const Json::ObjectSharedPtr header_map : config_headers) {
       fault_filter_headers_.push_back(*header_map);
     }
   }
@@ -115,7 +116,7 @@ FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Sta
   return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(store, final_prefix))};
 }
 
-void FaultFilter::onResetStream() { resetTimerState(); }
+void FaultFilter::onDestroy() { resetTimerState(); }
 
 void FaultFilter::postDelayInjection() {
   resetTimerState();
@@ -160,7 +161,7 @@ void FaultFilter::resetTimerState() {
 
 void FaultFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  callbacks_->addResetStreamCallback([this]() -> void { onResetStream(); });
 }
 
 } // Http
+} // Envoy

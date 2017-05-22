@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 
+namespace Envoy {
 namespace Runtime {
 
 /**
@@ -115,3 +116,4 @@ public:
 typedef std::unique_ptr<Loader> LoaderPtr;
 
 } // Runtime
+} // Envoy

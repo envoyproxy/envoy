@@ -27,6 +27,7 @@
 #include "common/router/router.h"
 #include "common/tracing/http_tracer_impl.h"
 
+namespace Envoy {
 namespace Http {
 
 class AsyncStreamImpl;
@@ -68,7 +69,6 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const Optional<std::chrono::milliseconds>& timeout);
-  virtual ~AsyncStreamImpl();
 
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
@@ -176,9 +176,6 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  void addResetStreamCallback(std::function<void()> callback) override {
-    reset_callback_ = callback;
-  }
   uint64_t connectionId() override { return 0; }
   Ssl::Connection* ssl() override { return nullptr; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
@@ -200,7 +197,6 @@ private:
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
   Router::ProdFilter router_;
-  std::function<void()> reset_callback_;
   AccessLog::RequestInfoImpl request_info_;
   Tracing::NullSpan active_span_;
   std::shared_ptr<RouteImpl> route_;
@@ -241,3 +237,4 @@ private:
 };
 
 } // Http
+} // Envoy
