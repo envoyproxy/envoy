@@ -73,21 +73,6 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   EXPECT_THROW(setup(json), EnvoyException);
 }
 
-TEST_F(LogicalDnsClusterTest, BadDnsConfig) {
-  std::string json = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout_ms": 250,
-    "type": "logical_dns",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://foo.bar.com:443"}],
-    "dns_lookup_family": "foo"
-  }
-  )EOF";
-
-  EXPECT_DEATH(setup(json), "dns_lookup_family == \"v4_only\"");
-}
-
 // Validate that if the DNS resolves immediately, during the LogicalDnsCluster
 // constructor, we have the expected host state and initialization callback
 // invocation.
