@@ -100,15 +100,22 @@ TEST(HttpUtility, parseHttp2Settings) {
 
   {
     Json::ObjectSharedPtr json = Json::Factory::loadFromString(R"raw({
-                                          "http_codec_options": "no_compression",
                                           "http2_settings" : {
+                                            "hpack_table_size": 1234,
                                             "max_concurrent_streams": 1234,
                                             "initial_window_size": 5678
                                           }
                                         })raw");
-    EXPECT_EQ(0U, Utility::parseHttp2Settings(*json).hpack_table_size_);
+    EXPECT_EQ(1234U, Utility::parseHttp2Settings(*json).hpack_table_size_);
     EXPECT_EQ(1234U, Utility::parseHttp2Settings(*json).max_concurrent_streams_);
     EXPECT_EQ(5678U, Utility::parseHttp2Settings(*json).initial_window_size_);
+  }
+
+  {
+    Json::ObjectSharedPtr json = Json::Factory::loadFromString(R"raw({
+                                          "http_codec_options": "no_compression",
+                                        })raw");
+    EXPECT_EQ(0, Utility::parseHttp2Settings(*json).hpack_table_size_);
   }
 
   {
