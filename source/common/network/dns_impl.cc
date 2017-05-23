@@ -79,15 +79,23 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, hostent*
         address_list.emplace_back(new Address::Ipv6Instance(address));
       }
     }
-  } else if (fallback_if_failed) {
+  }
+
+  if (completed_) {
+    if (!cancelled_) {
+      callback_(std::move(address_list));
+    }
+    if (owned_) {
+      delete this;
+      return;
+    }
+  }
+
+  if (status != ARES_SUCCESS && fallback_if_failed) {
     fallback_if_failed = false;
     getHostByName(AF_INET);
-  }
-  if (!cancelled_ && completed_) {
-    callback_(std::move(address_list));
-  }
-  if (owned_ && completed_) {
-    delete this;
+    // Note: Nothing can follow this call to getHostByName due to deletion of this
+    // object upon synchronous resolution.
   }
 }
 
@@ -132,17 +140,17 @@ void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
 }
 
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
-                                         const DnsLookupFamily& dns_lookup_family,
-                                         ResolveCb callback) {
-  std::unique_ptr<PendingResolution> pending_resolution(new PendingResolution());
-  pending_resolution->callback_ = callback;
-  pending_resolution->channel_ = channel_;
-  pending_resolution->dns_name_ = dns_name;
-  if (dns_lookup_family == DnsLookupFamily::fallback) {
+                                         DnsLookupFamily dns_lookup_family, ResolveCb callback) {
+  // TODO(hennna): Add DNS caching which will allow testing the edge case of a
+  // failed intial call to getHostbyName followed by a synchronous IPv4
+  // resolution.
+  std::unique_ptr<PendingResolution> pending_resolution(
+      new PendingResolution(callback, channel_, dns_name));
+  if (dns_lookup_family == DnsLookupFamily::AUTO) {
     pending_resolution->fallback_if_failed = true;
   }
 
-  if (dns_lookup_family == DnsLookupFamily::v4_only) {
+  if (dns_lookup_family == DnsLookupFamily::V4_ONLY) {
     pending_resolution->getHostByName(AF_INET);
   } else {
     pending_resolution->getHostByName(AF_INET6);
@@ -162,9 +170,8 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 
 void DnsResolverImpl::PendingResolution::getHostByName(int family) {
   ares_gethostbyname(channel_, dns_name_.c_str(),
-                     family, [](void* arg, int status, int timeouts, hostent* hostent) {
+                     family, [](void* arg, int status, int, hostent* hostent) {
                        static_cast<PendingResolution*>(arg)->onAresHostCallback(status, hostent);
-                       UNREFERENCED_PARAMETER(timeouts);
                      }, this);
 }
 

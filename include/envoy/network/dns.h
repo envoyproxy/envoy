@@ -24,7 +24,7 @@ public:
   virtual void cancel() PURE;
 };
 
-enum class DnsLookupFamily { v4_only, v6_only, fallback };
+enum class DnsLookupFamily { V4_ONLY, V6_ONLY, AUTO };
 
 /**
  * An asynchronous DNS resolver.
@@ -48,8 +48,7 @@ public:
    * @return if non-null, a handle that can be used to cancel the resolution.
    *         This is only valid until the invocation of callback or ~DnsResolver().
    */
-  virtual ActiveDnsQuery* resolve(const std::string& dns_name,
-                                  const DnsLookupFamily& dns_lookup_family,
+  virtual ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                                   ResolveCb callback) PURE;
 };
 

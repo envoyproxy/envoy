@@ -370,14 +370,14 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const Json::Object& config, Runtime::
     : BaseDynamicClusterImpl(config, runtime, stats, ssl_context_manager),
       dns_resolver_(dns_resolver), dns_refresh_rate_ms_(std::chrono::milliseconds(
                                        config.getInteger("dns_refresh_rate_ms", 5000))) {
-  // Resolve string to enum.
   std::string dns_lookup_family = config.getString("dns_lookup_family", "v4_only");
   if (dns_lookup_family == "v6_only") {
-    dns_lookup_family_ = Network::DnsLookupFamily::v6_only;
-  } else if (dns_lookup_family == "fallback") {
-    dns_lookup_family_ = Network::DnsLookupFamily::fallback;
+    dns_lookup_family_ = Network::DnsLookupFamily::V6_ONLY;
+  } else if (dns_lookup_family == "auto") {
+    dns_lookup_family_ = Network::DnsLookupFamily::AUTO;
   } else {
-    dns_lookup_family_ = Network::DnsLookupFamily::v4_only;
+    ASSERT(dns_lookup_family == "v4_only");
+    dns_lookup_family_ = Network::DnsLookupFamily::V4_ONLY;
   }
 
   for (Json::ObjectSharedPtr host : config.getObjectArray("hosts")) {
@@ -434,18 +434,21 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
           // a new address that has port in it. We need to both support IPv6 as well as potentially
           // move port handling into the DNS interface itself, which would work better for SRV.
-          if (address->ip()->version() == Network::Address::IpVersion::v4) {
+          switch (address->ip()->version()) {
+          case Network::Address::IpVersion::v4:
             new_hosts.emplace_back(new HostImpl(
                 parent_.info_, dns_address_,
                 Network::Address::InstanceConstSharedPtr{
                     new Network::Address::Ipv4Instance(address->ip()->addressAsString(), port_)},
                 false, 1, ""));
-          } else {
+            break;
+          case Network::Address::IpVersion::v6:
             new_hosts.emplace_back(new HostImpl(
                 parent_.info_, dns_address_,
                 Network::Address::InstanceConstSharedPtr{
                     new Network::Address::Ipv6Instance(address->ip()->addressAsString(), port_)},
                 false, 1, ""));
+            break;
           }
         }
 

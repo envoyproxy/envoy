@@ -25,14 +25,14 @@ LogicalDnsCluster::LogicalDnsCluster(const Json::Object& config, Runtime::Loader
     throw EnvoyException("logical_dns clusters must have a single host");
   }
 
-  // Resolve string to enum.
   std::string dns_lookup_family = config.getString("dns_lookup_family", "v4_only");
   if (dns_lookup_family == "v6_only") {
-    dns_lookup_family_ = Network::DnsLookupFamily::v6_only;
-  } else if (dns_lookup_family == "fallback") {
-    dns_lookup_family_ = Network::DnsLookupFamily::fallback;
+    dns_lookup_family_ = Network::DnsLookupFamily::V6_ONLY;
+  } else if (dns_lookup_family == "auto") {
+    dns_lookup_family_ = Network::DnsLookupFamily::AUTO;
   } else {
-    dns_lookup_family_ = Network::DnsLookupFamily::v4_only;
+    ASSERT(dns_lookup_family == "v4_only");
+    dns_lookup_family_ = Network::DnsLookupFamily::V4_ONLY;
   }
   dns_url_ = hosts_json[0]->getString("url");
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
@@ -70,14 +70,17 @@ void LogicalDnsCluster::startResolve() {
           // TODO(mattklein123): Move port handling into the DNS interface.
           Network::Address::IpVersion version = address_list.front()->ip()->version();
           Network::Address::InstanceConstSharedPtr new_address;
-          if (version == Network::Address::IpVersion::v4) {
+          switch (version) {
+          case Network::Address::IpVersion::v4:
             new_address.reset(
                 new Network::Address::Ipv4Instance(address_list.front()->ip()->addressAsString(),
                                                    Network::Utility::portFromTcpUrl(dns_url_)));
-          } else {
+            break;
+          case Network::Address::IpVersion::v6:
             new_address.reset(
                 new Network::Address::Ipv6Instance(address_list.front()->ip()->addressAsString(),
                                                    Network::Utility::portFromTcpUrl(dns_url_)));
+            break;
           }
           if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
             current_resolved_address_ = new_address;
@@ -93,12 +96,15 @@ void LogicalDnsCluster::startResolve() {
             // to show the friendly DNS name in that output, but currently there is no way to
             // express a DNS name inside of an Address::Instance. For now this is OK but we might
             // want to do better again later.
-            if (version == Network::Address::IpVersion::v4) {
+            switch (version) {
+            case Network::Address::IpVersion::v4:
               logical_host_.reset(
                   new LogicalHost(info_, hostname_, Network::Utility::getIpv4AnyAddress(), *this));
-            } else {
+              break;
+            case Network::Address::IpVersion::v6:
               logical_host_.reset(
                   new LogicalHost(info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this));
+              break;
             }
             HostVectorSharedPtr new_hosts(new std::vector<HostSharedPtr>());
             new_hosts->emplace_back(logical_host_);

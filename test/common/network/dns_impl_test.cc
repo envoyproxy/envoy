@@ -300,7 +300,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, DnsImplTest,
 // destruction.
 TEST_P(DnsImplTest, DestructPending) {
   EXPECT_NE(nullptr,
-            resolver_->resolve("", DnsLookupFamily::v4_only,
+            resolver_->resolve("", DnsLookupFamily::V4_ONLY,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  FAIL();
                                  UNREFERENCED_PARAMETER(results);
@@ -316,7 +316,7 @@ TEST_P(DnsImplTest, DestructPending) {
 TEST_P(DnsImplTest, LocalLookup) {
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr,
-            resolver_->resolve("", DnsLookupFamily::v4_only,
+            resolver_->resolve("", DnsLookupFamily::V4_ONLY,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -326,7 +326,7 @@ TEST_P(DnsImplTest, LocalLookup) {
   EXPECT_TRUE(address_list.empty());
 
   if (GetParam() == Address::IpVersion::v4) {
-    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::v4_only,
+    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::V4_ONLY,
                                           [&](std::list<Address::InstanceConstSharedPtr>&& results)
                                               -> void { address_list = results; }));
     EXPECT_TRUE(hasAddress(address_list, "127.0.0.1"));
@@ -334,13 +334,13 @@ TEST_P(DnsImplTest, LocalLookup) {
   }
 
   if (GetParam() == Address::IpVersion::v6) {
-    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::fallback,
+    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::AUTO,
                                           [&](std::list<Address::InstanceConstSharedPtr>&& results)
                                               -> void { address_list = results; }));
     EXPECT_FALSE(hasAddress(address_list, "127.0.0.1"));
     EXPECT_TRUE(hasAddress(address_list, "::1"));
 
-    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::v6_only,
+    EXPECT_EQ(nullptr, resolver_->resolve("localhost", DnsLookupFamily::V6_ONLY,
                                           [&](std::list<Address::InstanceConstSharedPtr>&& results)
                                               -> void { address_list = results; }));
     EXPECT_TRUE(hasAddress(address_list, "::1"));
@@ -352,7 +352,7 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
   std::list<Address::InstanceConstSharedPtr> address_list;
   server_->addHosts("some.good.domain", {"1::2"}, AAAA);
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::fallback,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::AUTO,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -362,7 +362,7 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
   EXPECT_TRUE(hasAddress(address_list, "1::2"));
 
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::v4_only,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::V4_ONLY,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -372,7 +372,7 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
   EXPECT_FALSE(hasAddress(address_list, "1::2"));
 
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::v6_only,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::V6_ONLY,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -386,7 +386,7 @@ TEST_P(DnsImplTest, DnsIpAddressVersion) {
   std::list<Address::InstanceConstSharedPtr> address_list;
   server_->addHosts("some.good.domain", {"1.2.3.4"}, A);
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::fallback,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::AUTO,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -396,7 +396,7 @@ TEST_P(DnsImplTest, DnsIpAddressVersion) {
   EXPECT_TRUE(hasAddress(address_list, "1.2.3.4"));
 
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::v4_only,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::V4_ONLY,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -406,7 +406,7 @@ TEST_P(DnsImplTest, DnsIpAddressVersion) {
   EXPECT_TRUE(hasAddress(address_list, "1.2.3.4"));
 
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::v6_only,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::V6_ONLY,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -422,7 +422,7 @@ TEST_P(DnsImplTest, RemoteAsyncLookup) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, A);
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.bad.domain", DnsLookupFamily::fallback,
+            resolver_->resolve("some.bad.domain", DnsLookupFamily::AUTO,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -432,7 +432,7 @@ TEST_P(DnsImplTest, RemoteAsyncLookup) {
   EXPECT_TRUE(address_list.empty());
 
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::fallback,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::AUTO,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -447,7 +447,7 @@ TEST_P(DnsImplTest, MultiARecordLookup) {
   server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, A);
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::v4_only,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::V4_ONLY,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -464,7 +464,7 @@ TEST_P(DnsImplTest, MultiARecordLookupWithV6) {
   server_->addHosts("some.good.domain", {"1::2", "1::2:3", "1::2:3:4"}, AAAA);
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::v4_only,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::V4_ONLY,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -476,7 +476,7 @@ TEST_P(DnsImplTest, MultiARecordLookupWithV6) {
   EXPECT_TRUE(hasAddress(address_list, "6.5.4.3"));
 
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::fallback,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::AUTO,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -488,7 +488,7 @@ TEST_P(DnsImplTest, MultiARecordLookupWithV6) {
   EXPECT_TRUE(hasAddress(address_list, "1::2:3:4"));
 
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::v6_only,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::V6_ONLY,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -505,12 +505,12 @@ TEST_P(DnsImplTest, Cancel) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, A);
 
   ActiveDnsQuery* query =
-      resolver_->resolve("some.domain", DnsLookupFamily::fallback,
+      resolver_->resolve("some.domain", DnsLookupFamily::AUTO,
                          [](std::list<Address::InstanceConstSharedPtr> && ) -> void { FAIL(); });
 
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::fallback,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::AUTO,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();
@@ -528,12 +528,16 @@ protected:
   bool zero_timeout() const override { return true; }
 };
 
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_CASE_P(IpVersions, DnsImplZeroTimeoutTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
 // Validate that timeouts result in an empty callback.
 TEST_P(DnsImplZeroTimeoutTest, Timeout) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, A);
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr,
-            resolver_->resolve("some.good.domain", DnsLookupFamily::v4_only,
+            resolver_->resolve("some.good.domain", DnsLookupFamily::V4_ONLY,
                                [&](std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                                  address_list = results;
                                  dispatcher_.exit();

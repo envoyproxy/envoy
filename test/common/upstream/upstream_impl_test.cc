@@ -80,7 +80,7 @@ TEST(StrictDnsClusterImplTest, ImmediateResolve) {
   )EOF";
 
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::v4_only, _))
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::V4_ONLY, _))
       .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
@@ -114,7 +114,7 @@ TEST(StrictDnsClusterImplTest, ImmediateResolveV6Only) {
   )EOF";
 
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::v6_only, _))
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::V6_ONLY, _))
       .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(TestUtility::makeDnsResponse({"::1", "::2"}));
@@ -143,12 +143,12 @@ TEST(StrictDnsClusterImplTest, ImmediateResolveFallback) {
     "type": "strict_dns",
     "lb_type": "round_robin",
     "hosts": [{"url": "tcp://foo.bar.com:443"}],
-    "dns_lookup_family" : "fallback"
+    "dns_lookup_family" : "auto"
   }
   )EOF";
 
   EXPECT_CALL(initialized, ready());
-  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::fallback, _))
+  EXPECT_CALL(dns_resolver, resolve("foo.bar.com", Network::DnsLookupFamily::AUTO, _))
       .WillOnce(Invoke([&](const std::string&, const Network::DnsLookupFamily&,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
