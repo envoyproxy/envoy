@@ -216,7 +216,8 @@ https://github.com/bazelbuild/bazel/issues/2805.
 
 To generate coverage results, make sure you have
 [`gcovr`](https://github.com/gcovr/gcovr) 3.3 in your `PATH` (or set `GCOVR` to
-point at it). Then run:
+point at it) and are using a GCC toolchain (clang does not work currently, see
+https://github.com/lyft/envoy/issues/1000). Then run:
 
 ```
 test/run_envoy_bazel_coverage.sh
