@@ -89,44 +89,48 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 TEST(HttpUtility, parseHttp2Settings) {
   {
-    Json::ObjectSharedPtr json = Json::Factory::loadFromString("{}");
-    EXPECT_EQ(Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
-              Utility::parseHttp2Settings(*json).hpack_table_size_);
+    auto http2_settings = Utility::parseHttp2Settings(*Json::Factory::loadFromString("{}"));
+    EXPECT_EQ(Http2Settings::DEFAULT_HPACK_TABLE_SIZE, http2_settings.hpack_table_size_);
     EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-              Utility::parseHttp2Settings(*json).max_concurrent_streams_);
-    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE,
-              Utility::parseHttp2Settings(*json).initial_window_size_);
+              http2_settings.max_concurrent_streams_);
+    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE, http2_settings.initial_window_size_);
   }
 
   {
-    Json::ObjectSharedPtr json = Json::Factory::loadFromString(R"raw({
+    auto http2_settings = Utility::parseHttp2Settings(*Json::Factory::loadFromString(R"raw({
                                           "http2_settings" : {
                                             "hpack_table_size": 1234,
                                             "max_concurrent_streams": 1234,
                                             "initial_window_size": 5678
                                           }
-                                        })raw");
-    EXPECT_EQ(1234U, Utility::parseHttp2Settings(*json).hpack_table_size_);
-    EXPECT_EQ(1234U, Utility::parseHttp2Settings(*json).max_concurrent_streams_);
-    EXPECT_EQ(5678U, Utility::parseHttp2Settings(*json).initial_window_size_);
+                                        })raw"));
+    EXPECT_EQ(1234U, http2_settings.hpack_table_size_);
+    EXPECT_EQ(1234U, http2_settings.max_concurrent_streams_);
+    EXPECT_EQ(5678U, http2_settings.initial_window_size_);
   }
 
   {
-    Json::ObjectSharedPtr json = Json::Factory::loadFromString(R"raw({
-                                          "http_codec_options": "no_compression",
-                                        })raw");
-    EXPECT_EQ(0, Utility::parseHttp2Settings(*json).hpack_table_size_);
+    auto http2_settings = Utility::parseHttp2Settings(*Json::Factory::loadFromString(R"raw({
+                                          "http_codec_options": "no_compression"
+                                        })raw"));
+    EXPECT_EQ(0, http2_settings.hpack_table_size_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
+              http2_settings.max_concurrent_streams_);
+    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE, http2_settings.initial_window_size_);
   }
 
   {
     // http2_settings.hpack_table_size overrides http_codec_options.no_compression
-    Json::ObjectSharedPtr json = Json::Factory::loadFromString(R"raw({
+    auto http2_settings = Utility::parseHttp2Settings(*Json::Factory::loadFromString(R"raw({
                                           "http_codec_options": "no_compression",
                                           "http2_settings" : {
                                             "hpack_table_size": 128
                                           }
-                                        })raw");
-    EXPECT_EQ(128U, Utility::parseHttp2Settings(*json).hpack_table_size_);
+                                        })raw"));
+    EXPECT_EQ(128U, http2_settings.hpack_table_size_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
+              http2_settings.max_concurrent_streams_);
+    EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE, http2_settings.initial_window_size_);
   }
 
   {
