@@ -272,7 +272,7 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
           },
           "initial_window_size" : {
             "type": "integer",
-            "minimum": 65536,
+            "minimum": 65535,
             "maximum" : 2147483647
           }
         }
@@ -1233,7 +1233,7 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
           },
           "initial_window_size" : {
             "type": "integer",
-            "minimum": 65536,
+            "minimum": 65535,
             "maximum" : 2147483647
           }
         }
