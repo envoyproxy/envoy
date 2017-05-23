@@ -250,7 +250,7 @@ INSTANTIATE_TEST_CASE_P(
     testing::Values(Http2SettingsTestParam(Http2Settings::MIN_HPACK_TABLE_SIZE,
                                            Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
                                            Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE),
-                    Http2SettingsTestParam(Http2Settings::MIN_HPACK_TABLE_SIZE,
+                    Http2SettingsTestParam(Http2Settings::MAX_HPACK_TABLE_SIZE,
                                            Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
                                            Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE),
                     Http2SettingsTestParam(Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
