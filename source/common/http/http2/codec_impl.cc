@@ -507,6 +507,13 @@ void ConnectionImpl::sendPendingFrames() {
 }
 
 void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
+  ASSERT(Http2Settings::MIN_HPACK_TABLE_SIZE <= http2_settings.hpack_table_size_ &&
+         http2_settings.hpack_table_size_ <= Http2Settings::MAX_HPACK_TABLE_SIZE);
+  ASSERT(Http2Settings::MIN_MAX_CONCURRENT_STREAMS <= http2_settings.max_concurrent_streams_ &&
+         http2_settings.max_concurrent_streams_ <= Http2Settings::MAX_MAX_CONCURRENT_STREAMS);
+  ASSERT(Http2Settings::MIN_INITIAL_WINDOW_SIZE <= http2_settings.initial_window_size_ &&
+         http2_settings.initial_window_size_ <= Http2Settings::MAX_INITIAL_WINDOW_SIZE);
+
   std::vector<nghttp2_settings_entry> iv = {
       {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_settings.max_concurrent_streams_},
       {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_window_size_}};
