@@ -223,13 +223,15 @@ TEST_F(GrpcRequestImplTest, EmptyBodyInResponse) {
 
   Http::MessagePtr response_http_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  helloworld::HelloReply inner_response;
-  response_http_message->body() = Common::serializeBody(inner_response);
+  helloworld::HelloReply empty_response;
+  response_http_message->body() = Common::serializeBody(empty_response);
+  EXPECT_EQ(response_http_message->body()->length(), 5);
   response_http_message->trailers(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
 
   EXPECT_CALL(grpc_callbacks_, onSuccess());
   http_callbacks_->onSuccess(std::move(response_http_message));
+  EXPECT_EQ(response.SerializeAsString(), empty_response.SerializeAsString());
 }
 
 TEST_F(GrpcRequestImplTest, BadMessageInResponse) {

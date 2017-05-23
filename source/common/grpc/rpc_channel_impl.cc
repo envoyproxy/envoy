@@ -54,7 +54,7 @@ void RpcChannelImpl::onSuccess(Http::MessagePtr&& http_response) {
 
     // A gRPC response contains a 5 byte header. Currently we only support unary responses so we
     // ignore the header. @see serializeBody().
-    if (!http_response->body() || !(http_response->body()->length() >= 5)) {
+    if (!http_response->body() || (http_response->body()->length() < 5)) {
       throw Exception(Optional<uint64_t>(), "bad serialized body");
     }
 
