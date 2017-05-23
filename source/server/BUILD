@@ -20,7 +20,17 @@ envoy_cc_library(
     name = "configuration_lib",
     srcs = ["configuration_impl.cc"],
     hdrs = ["configuration_impl.h"],
-    deps = [
+    copts = select({
+        # TODO(tschroed): This allows linking against Google code, but is very hacky.
+        # https://github.com/lyft/envoy/issues/967 to do it properly, at which point
+        # the -D can be removed.
+        "//bazel:disable_lightstep": ["-DDISABLE_LIGHTSTEP_TRACING"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        "//bazel:disable_lightstep": [],
+        "//conditions:default": ["//source/common/tracing:lightstep_tracer_lib"],
+        }) + [
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -36,7 +46,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/ratelimit:ratelimit_lib",
         "//source/common/ssl:context_config_lib",
-        "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing/zipkin:zipkin_lib",
         "//source/common/upstream:cluster_manager_lib",
     ],

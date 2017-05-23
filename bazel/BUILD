@@ -31,3 +31,8 @@ config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
 )
+
+config_setting(
+    name = "disable_lightstep",
+    values = {"define": "lightstep_tracing=disabled"},
+)
