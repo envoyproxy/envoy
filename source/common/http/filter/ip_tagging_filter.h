@@ -44,15 +44,14 @@ enum class FilterRequestType {
  */
 class IpTaggingFilterConfig : Json::Validator {
 public:
-  IpTaggingFilterConfig(const Json::Object& json_config, Runtime::Loader& runtime,
+  IpTaggingFilterConfig(const Json::Object& json_config,
                         const std::string& stat_prefix, Stats::Store& stats)
     : Json::Validator(json_config, Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA),
-      runtime_(runtime), stats_(generateStats(stat_prefix, stats)),
+      stats_(generateStats(stat_prefix, stats)),
       request_type_(stringToType(json_config.getString("request_type", "both"))) {}
 
   FilterRequestType requestType() const { return request_type_; }
   //const Trie& ipTags() { return ip_tags_; }
-  Runtime::Loader &runtime() { return runtime_; }
   IpTaggingFilterStats &stats() { return stats_; }
 
 private:
@@ -70,7 +69,6 @@ private:
   static IpTaggingFilterStats generateStats(const std::string& prefix, Stats::Store& store);
 
   //Trie ip_tags_;
-  Runtime::Loader& runtime_;
   IpTaggingFilterStats stats_;
   const FilterRequestType request_type_;
 };
