@@ -4,6 +4,7 @@
 #include "server/config/http/dynamo.h"
 #include "server/config/http/fault.h"
 #include "server/config/http/grpc_http1_bridge.h"
+#include "server/config/http/grpc_web.h"
 #include "server/config/http/ratelimit.h"
 #include "server/config/http/router.h"
 #include "server/http/health_check.h"
@@ -101,6 +102,22 @@ TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {
   NiceMock<MockInstance> server;
   GrpcHttp1BridgeFilterConfig factory;
   HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Both, "grpc_http1_bridge",
+                                                          *json_config, "stats", server);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpFilterConfigTest, GrpcWebFilter) {
+  std::string json_string = R"EOF(
+  {
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<MockInstance> server;
+  GrpcWebFilterConfig factory;
+  HttpFilterFactoryCb cb = factory.tryCreateFilterFactory(HttpFilterType::Both, "grpc_web",
                                                           *json_config, "stats", server);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));

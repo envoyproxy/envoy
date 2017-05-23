@@ -21,7 +21,7 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr &&
       Http::Headers::get().ContentTypeValues.GrpcWebText == content_type->value().c_str()) {
-    // Checks whether gRPC-Web client is sending b64 ncoded request.
+    // Checks whether gRPC-Web client is sending base64 encoded request.
     is_text_request_ = true;
   }
   headers.insertContentType().value(Http::Headers::get().ContentTypeValues.Grpc);
@@ -29,7 +29,7 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
   const Http::HeaderEntry* accept = headers.get(Http::Headers::get().Accept);
   if (accept != nullptr &&
       Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().c_str()) {
-    // Checks whether gRPC-Web client is asking for b64 encoded response.
+    // Checks whether gRPC-Web client is asking for base64 encoded response.
     is_text_response_ = true;
   }
 
@@ -126,5 +126,6 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   encoder_callbacks_->addEncodedData(buffer);
   return Http::FilterTrailersStatus::Continue;
 }
+
 } // namespace Grpc
 } // namespace Envoy

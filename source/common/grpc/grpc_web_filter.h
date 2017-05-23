@@ -22,7 +22,6 @@ public:
   // Implements StreamDecoderFilter.
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override;
-
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
@@ -47,5 +46,6 @@ private:
   Buffer::OwnedImpl decoding_buffer_;
   Decoder decoder_;
 };
+
 } // namespace Grpc
 } // namespace Envoy
