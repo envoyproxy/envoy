@@ -30,9 +30,6 @@ using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
 
-// Satisfy linker
-const uint32_t Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE;
-
 namespace Upstream {
 
 static std::list<std::string> hostListToAddresses(const std::vector<HostSharedPtr>& hosts) {

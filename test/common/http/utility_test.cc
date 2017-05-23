@@ -15,11 +15,6 @@
 namespace Envoy {
 namespace Http {
 
-// Satisfy linker
-const uint32_t Http2Settings::DEFAULT_HPACK_TABLE_SIZE;
-const uint32_t Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
-const uint32_t Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE;
-
 TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
