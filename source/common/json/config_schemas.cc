@@ -265,6 +265,11 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       "http2_settings" : {
         "type" : "object",
         "properties" : {
+          "hpack_table_size" : {
+            "type": "integer",
+            "minimum": 0,
+            "maximum" : 16777216
+          },
           "max_concurrent_streams" : {
             "type": "integer",
             "minimum": 1,
@@ -1226,6 +1231,11 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
       "http2_settings" : {
         "type" : "object",
         "properties" : {
+          "hpack_table_size" : {
+            "type": "integer",
+            "minimum": 0,
+            "maximum" : 16777216
+          },
           "max_concurrent_streams" : {
             "type": "integer",
             "minimum": 1,

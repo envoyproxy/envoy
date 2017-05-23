@@ -26,9 +26,9 @@ namespace Http {
 namespace Http2 {
 
 struct Http2SettingsTestParam : public Http2Settings {
-  Http2SettingsTestParam(uint64_t codec_options, uint32_t max_concurrent_streams,
+  Http2SettingsTestParam(uint64_t hpack_table_size, uint32_t max_concurrent_streams,
                          uint32_t initial_window_size) {
-    codec_options_ = codec_options;
+    hpack_table_size_ = hpack_table_size;
     max_concurrent_streams_ = max_concurrent_streams;
     initial_window_size_ = initial_window_size;
   }
@@ -249,7 +249,7 @@ INSTANTIATE_TEST_CASE_P(
     Http2CodecImplTest, Http2CodecImplTest,
     testing::Values(Http2SettingsTestParam(0, Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
                                            Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE),
-                    Http2SettingsTestParam(Http2Settings::CodecOptions::DISABLE_DYNAMIC_HPACK_TABLE,
+                    Http2SettingsTestParam(Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
                                            Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
                                            Http2Settings::DEFAULT_INITIAL_WINDOW_SIZE)));
 

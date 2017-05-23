@@ -511,10 +511,9 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings) {
       {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_settings.max_concurrent_streams_},
       {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_window_size_}};
 
-  if (http2_settings.codec_options_ &
-      Http::Http2Settings::CodecOptions::DISABLE_DYNAMIC_HPACK_TABLE) {
-    iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, 0});
-    conn_log_debug("setting HPACK dynamic table size to 0", connection_);
+  if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
+    iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_settings.hpack_table_size_});
+    conn_log_debug("setting HPACK table size to {}", connection_, http2_settings.hpack_table_size_);
   }
 
   int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &iv[0], iv.size());

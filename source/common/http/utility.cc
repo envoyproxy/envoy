@@ -142,13 +142,16 @@ Http2Settings Utility::parseHttp2Settings(const Json::Object& config) {
   std::string options = config.getString("http_codec_options", "");
   for (const std::string& option : StringUtil::split(options, ',')) {
     if (option == "no_compression") {
-      ret.codec_options_ |= Http2Settings::CodecOptions::DISABLE_DYNAMIC_HPACK_TABLE;
+      ret.hpack_table_size_ = 0;
     } else {
       throw EnvoyException(fmt::format("unknown http codec option '{}'", option));
     }
   }
 
   Json::ObjectSharedPtr http2_settings = config.getObject("http2_settings", true);
+  ret.hpack_table_size_ = http2_settings->getInteger(
+      "hpack_table_size",
+      ret.hpack_table_size_ ? Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE : 0);
   ret.max_concurrent_streams_ = http2_settings->getInteger(
       "max_concurrent_streams", Http::Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
   ret.initial_window_size_ = http2_settings->getInteger(

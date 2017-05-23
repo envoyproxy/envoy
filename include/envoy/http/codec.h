@@ -151,17 +151,11 @@ public:
  * http/2 codec settings
  */
 struct Http2Settings {
-  /**
-   * A list of options that can be specified when creating a codec.
-   */
-  struct CodecOptions {
-    static const uint64_t DISABLE_DYNAMIC_HPACK_TABLE = 0x1;
-  };
-
-  uint64_t codec_options_{0};
+  uint32_t hpack_table_size_{DEFAULT_HPACK_TABLE_SIZE};
   uint32_t max_concurrent_streams_{DEFAULT_MAX_CONCURRENT_STREAMS};
   uint32_t initial_window_size_{DEFAULT_INITIAL_WINDOW_SIZE};
 
+  static const uint32_t DEFAULT_HPACK_TABLE_SIZE = 4096; // from nghttp2
   static const uint32_t DEFAULT_MAX_CONCURRENT_STREAMS = 1024;
   // For now just set all window sizes (stream and connection) to 256MiB. We can adjust later if
   // needed.
